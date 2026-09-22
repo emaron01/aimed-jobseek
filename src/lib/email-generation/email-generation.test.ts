@@ -1199,7 +1199,10 @@ describe("email generation action and UI seams", () => {
     expect(action).toContain("requireVerifiedForAiSpend");
     expect(action).toContain("ADDITIONAL_GUIDANCE_MAX_CHARS");
     expect(form).toContain("Generate Email");
-    expect(form).toContain("+ Add to sequence");
+    expect(form.match(/\+ Add email to sequence/g)).toHaveLength(2);
+    expect(form.lastIndexOf("+ Add email to sequence")).toBeLessThan(
+      form.indexOf("Stop sequence"),
+    );
     expect(form).toContain("I sent this — mark as sent");
     expect(form).toContain("Did you send this email?");
     expect(form).toContain("deeplink-send-confirm");

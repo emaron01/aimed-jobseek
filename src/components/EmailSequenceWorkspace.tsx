@@ -835,7 +835,7 @@ export function EmailSequenceWorkspace({
             }
             className={cn(SECONDARY_BUTTON_CLASS, "mt-3", "disabled:border-slate-200", "disabled:bg-slate-50", "disabled:text-slate-400", "!px-3")}
           >
-            + Add to sequence
+            + Add email to sequence
           </button>
           {!canAdd ? (
             <p className="mt-1 text-xs text-slate-500">{addDisabledReason}</p>
@@ -1318,6 +1318,31 @@ export function EmailSequenceWorkspace({
                     className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:text-slate-400"
                   >
                     Draft reply
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canAdd || aiBusy}
+                    title={
+                      canAdd ? "Generate the next email." : addDisabledReason
+                    }
+                    onClick={() =>
+                      run(() =>
+                        addFollowUpEmailAction(
+                          campaignContactId,
+                          selectedPersonaId || null,
+                          selectedLength,
+                        ),
+                      )
+                    }
+                    className={cn(
+                      SECONDARY_BUTTON_CLASS,
+                      "disabled:border-slate-200",
+                      "disabled:bg-slate-50",
+                      "disabled:text-slate-400",
+                      "!px-3",
+                    )}
+                  >
+                    + Add email to sequence
                   </button>
                   {!sequenceStopped ? (
                     <button
