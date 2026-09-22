@@ -63,7 +63,7 @@ export async function ensureOrganizationReferralCode(input: {
   if (!planAllowsReferrals(org.billingProfile?.planCode)) {
     return {
       ok: false,
-      error: "Referrals are available on the Standard plan only.",
+      error: "Referrals are available to Standard and comped workspaces.",
       code: "PLAN_NOT_ELIGIBLE",
     };
   }

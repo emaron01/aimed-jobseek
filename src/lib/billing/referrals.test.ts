@@ -6,8 +6,17 @@ import {
   rewardPercentForCount,
 } from "@/lib/billing/referral-coupons";
 import { selfReferralBlockReason } from "@/lib/billing/referral-identity";
+import { planAllowsReferrals } from "@/lib/billing/plans";
 
 describe("referral coupons", () => {
+  it("allows paid and legacy comped Standard workspaces to refer", () => {
+    expect(planAllowsReferrals("STANDARD")).toBe(true);
+    expect(planAllowsReferrals("COMPED")).toBe(true);
+    expect(planAllowsReferrals("FREE")).toBe(true);
+    expect(planAllowsReferrals("TEAM")).toBe(false);
+    expect(planAllowsReferrals("ENTERPRISE")).toBe(false);
+  });
+
   it("caps reward percent at 50 and steps by 10", () => {
     expect(rewardPercentForCount(0)).toBe(0);
     expect(rewardPercentForCount(1)).toBe(10);

@@ -265,12 +265,13 @@ export function planUsesPerUserCompanyAllowance(planCode: string): boolean {
 }
 
 /**
- * Referral program is Standard-only (nav + Billing UI + code creation).
- * Team / Enterprise / legacy Premium / Comped are excluded.
+ * Referral program is available to paid and comped Standard workspaces.
+ * Legacy COMPED/FREE plan codes represent comped Standard for this capability.
  */
 export function planAllowsReferrals(planCode: string | null | undefined): boolean {
   if (!planCode?.trim()) return false;
-  return canonicalPlanCode(planCode) === BILLING_PLAN_STANDARD;
+  const code = canonicalPlanCode(planCode);
+  return code === BILLING_PLAN_STANDARD || code === BILLING_PLAN_COMPED;
 }
 
 /** True when product limits and allowances are expressed per seat. */

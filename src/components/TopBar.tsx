@@ -7,7 +7,7 @@ export function TopBar({
   showReferrals = false,
 }: {
   menuModel: UserMenuModel | null;
-  /** Standard plan only — Team / Enterprise hide Refer a Friend. */
+  /** Paid or comped Standard — Team / Enterprise hide Refer a Friend. */
   showReferrals?: boolean;
 }) {
   return (
