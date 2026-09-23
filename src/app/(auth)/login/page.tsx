@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState, Suspense } from "react";
 import { authClient } from "@/lib/auth/client";
+import { vocab } from "@/lib/product-config";
 
 function LoginForm() {
   const router = useRouter();
@@ -47,7 +48,7 @@ function LoginForm() {
         Sign in
       </h1>
       <p className="mt-1 text-sm text-slate-600">
-        Access your outbound workspace.
+        Access your {vocab.outbound.singular} workspace.
       </p>
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <label className="block text-sm">

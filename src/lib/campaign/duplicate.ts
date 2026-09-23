@@ -8,6 +8,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
 import { canOpenCampaignDetail } from "@/lib/campaign/visibility";
+import { vocab } from "@/lib/product-config";
 
 export async function duplicateSharedCampaign(input: {
   organizationId: string;
@@ -26,10 +27,10 @@ export async function duplicateSharedCampaign(input: {
   });
 
   if (!source || source.archivedAt) {
-    throw new TenantError("Campaign not found.");
+    throw new TenantError(`${vocab.campaign.Singular} not found.`);
   }
   if (source.visibility !== "SHARED") {
-    throw new TenantError("Only shared campaigns can be duplicated this way.");
+    throw new TenantError(`Only shared ${vocab.campaign.plural} can be duplicated this way.`);
   }
   if (
     !canOpenCampaignDetail({
@@ -38,7 +39,7 @@ export async function duplicateSharedCampaign(input: {
       campaign: source,
     })
   ) {
-    throw new TenantError("You cannot access this campaign.");
+    throw new TenantError(`You cannot access this ${vocab.campaign.singular}.`);
   }
 
   const baseName = source.name.trim() || "Campaign";

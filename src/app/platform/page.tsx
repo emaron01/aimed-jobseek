@@ -12,6 +12,7 @@ import {
 import { listPurgeEligibleOrganizations } from "@/lib/platform/purge-contact-outbound";
 import { CONTACT_OUTBOUND_RETENTION_DAYS } from "@/lib/platform/purge-contact-outbound-shared";
 import { PLATFORM_ROUTE_AUDIT } from "@/lib/platform/route-audit";
+import { vocab } from "@/lib/product-config";
 
 function formatUsd(n: number | null): string {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -61,7 +62,7 @@ export default async function PlatformHomePage() {
     {
       href: "/platform/costs",
       title: "Costs & margin",
-      body: "Cost per company, contacts ratio, projections, model rates, spend reconciliation.",
+      body: `Cost per company, ${vocab.contact.plural} ratio, projections, model rates, spend reconciliation.`,
     },
     {
       href: "/platform/ai",
@@ -135,14 +136,14 @@ export default async function PlatformHomePage() {
         >
           <div>
             <h2 className="text-lg font-medium text-amber-950">
-              Contact data purge due ({purgeEligible.length})
+              {vocab.contact.Singular} data purge due ({purgeEligible.length})
             </h2>
             <p className="mt-1 text-sm text-amber-900">
               Canceled organizations past the {CONTACT_OUTBOUND_RETENTION_DAYS}
-              -day retention window that still have contacts, campaigns, or
+              -day retention window that still have {vocab.contact.plural}, {vocab.campaign.plural}, or
               suppressions. Open the org and run{" "}
               <span className="font-medium">
-                Delete contact and outbound data
+                Delete {vocab.contact.singular} and outbound data
               </span>
               {canMutate ? "" : " (SUPER_ADMIN only)"}.
             </p>
@@ -162,8 +163,8 @@ export default async function PlatformHomePage() {
                   </Link>
                   <p className="text-xs text-slate-500">
                     Canceled {formatDate(org.canceledAt)} · Eligible since{" "}
-                    {formatDate(org.eligibleAt)} · {org.contactCount} contacts ·{" "}
-                    {org.campaignCount} campaigns · {org.suppressionCount}{" "}
+                    {formatDate(org.eligibleAt)} · {org.contactCount} {vocab.contact.plural} ·{" "}
+                    {org.campaignCount} {vocab.campaign.plural} · {org.suppressionCount}{" "}
                     suppressions
                   </p>
                 </div>
@@ -216,7 +217,7 @@ export default async function PlatformHomePage() {
           </div>
           <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
             <p className="text-xs uppercase tracking-wide text-slate-500">
-              Contacts / company
+              {vocab.contact.Plural} / company
             </p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">
               {formatRatio(report.contactsPerCompany)}

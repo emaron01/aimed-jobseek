@@ -18,6 +18,7 @@ import { parsePersonaCriteriaFormJson } from "@/lib/persona-research/project-sig
 import type { SuggestedBuyerRole } from "@/lib/product-research/contract";
 import { createCorrelationId } from "@/lib/product-research/url";
 import { prisma } from "@/lib/prisma";
+import { vocab } from "@/lib/product-config";
 
 export type PersonaSetupActionResult = {
   ok: boolean;
@@ -30,7 +31,7 @@ export type PersonaSetupActionResult = {
 
 function safeError(error: unknown): string {
   if (error instanceof TenantError) return error.message;
-  return "Unable to complete Persona setup. Please try again.";
+  return `Unable to complete ${vocab.persona.Singular} setup. Please try again.`;
 }
 
 function revalidatePersona(productId: string, runId?: string, personaId?: string) {
@@ -66,7 +67,7 @@ export async function buildPersonaFromBuyerRoleAction(
     const notes = String(formData.get("notes") || "").trim();
 
     if (!productId || !name) {
-      return { ok: false, message: "Product and buyer role name are required." };
+      return { ok: false, message: `${vocab.product.Singular} and ${vocab.buyer.singular} role name are required.` };
     }
 
     const buyerRole: SuggestedBuyerRole = {
@@ -95,8 +96,8 @@ export async function buildPersonaFromBuyerRoleAction(
       ok: result.status !== "FAILED",
       message:
         result.status === "FAILED"
-          ? result.errorSafe || "Persona synthesis failed."
-          : "Persona draft ready for review.",
+          ? result.errorSafe || `${vocab.persona.Singular} synthesis failed.`
+          : `${vocab.persona.Singular} draft ready for review.`,
       productId,
       personaSetupRunId: result.personaSetupRunId,
       status: result.status,
@@ -118,7 +119,7 @@ export async function retryPersonaSynthesisAction(
       formData.get("personaSetupRunId") || "",
     ).trim();
     if (!productId || !personaSetupRunId) {
-      return { ok: false, message: "Product and persona setup run are required." };
+      return { ok: false, message: `${vocab.product.Singular} and ${vocab.persona.singular} setup run are required.` };
     }
     const result = await resynthesizePersonaFromRun({
       organizationId,
@@ -132,7 +133,7 @@ export async function retryPersonaSynthesisAction(
       message:
         result.status === "FAILED"
           ? result.errorSafe || "Retry failed."
-          : "Persona draft ready for review.",
+          : `${vocab.persona.Singular} draft ready for review.`,
       productId,
       personaSetupRunId: result.personaSetupRunId,
       status: result.status,
@@ -157,7 +158,7 @@ export async function saveApprovedPersonaFromRunAction(
     if (!productId || !personaSetupRunId || !name) {
       return {
         ok: false,
-        message: "Product, setup run, and name are required.",
+        message: `${vocab.product.Singular}, setup run, and name are required.`,
       };
     }
 
@@ -210,7 +211,7 @@ export async function saveApprovedPersonaFromRunAction(
     revalidatePersona(productId, personaSetupRunId);
     return {
       ok: true,
-      message: "Persona saved and approved.",
+      message: `${vocab.persona.Singular} saved and approved.`,
       productId,
       personaSetupRunId,
       personaId,
@@ -232,7 +233,7 @@ export async function projectPersonaSignalsFromProfileAction(
     const productId = String(formData.get("productId") || "").trim();
     const personaId = String(formData.get("personaId") || "").trim();
     if (!productId || !personaId) {
-      return { ok: false, message: "Product and persona are required." };
+      return { ok: false, message: `${vocab.product.Singular} and ${vocab.persona.singular} are required.` };
     }
 
     const inserted = await projectPersonaSignalsFromProfile({
@@ -266,7 +267,7 @@ export async function rebuildPersonaFromProductEvidenceAction(
     const productId = String(formData.get("productId") || "").trim();
     const personaId = String(formData.get("personaId") || "").trim();
     if (!productId || !personaId) {
-      return { ok: false, message: "Product and persona are required." };
+      return { ok: false, message: `${vocab.product.Singular} and ${vocab.persona.singular} are required.` };
     }
 
     const result = await startApprovedPersonaResynthesis({
@@ -281,7 +282,7 @@ export async function rebuildPersonaFromProductEvidenceAction(
       ok: result.status !== "FAILED",
       message:
         result.status === "FAILED"
-          ? result.errorSafe || "Persona rebuild failed."
+          ? result.errorSafe || `${vocab.persona.Singular} rebuild failed.`
           : "Rebuild draft ready for review.",
       productId,
       personaId,
@@ -309,7 +310,7 @@ export async function applyPersonaResynthesisAction(
     if (!productId || !personaId || !personaSetupRunId) {
       return {
         ok: false,
-        message: "Product, persona, and rebuild draft are required.",
+        message: `${vocab.product.Singular}, ${vocab.persona.singular}, and rebuild draft are required.`,
       };
     }
 
@@ -347,7 +348,7 @@ export async function applyPersonaResynthesisAction(
     revalidatePersona(productId, personaSetupRunId, personaId);
     return {
       ok: true,
-      message: "Persona updated from rebuild draft.",
+      message: `${vocab.persona.Singular} updated from rebuild draft.`,
       productId,
       personaId,
       personaSetupRunId,

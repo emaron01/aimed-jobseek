@@ -1,5 +1,6 @@
 import type { ContactResearch } from "@prisma/client";
 import type { CriterionSnapshot } from "@/lib/criteria/types";
+import { vocab } from "@/lib/product-config";
 
 export type ContactResearchTriggerResult = {
   needed: boolean;
@@ -143,7 +144,7 @@ export function shouldResearchContactRole(input: {
   ) {
     return {
       needed: false,
-      reason: "Fresh contact research with sufficient confidence already exists.",
+      reason: `Fresh ${vocab.contact.singular} research with sufficient confidence already exists.`,
       reuseExisting: true,
     };
   }
@@ -152,7 +153,7 @@ export function shouldResearchContactRole(input: {
     if (hasResponsibilityCriteria(input.personaCriteria)) {
       return {
         needed: true,
-        reason: "No title provided but persona requires responsibility evidence.",
+        reason: `No title provided but ${vocab.persona.singular} requires responsibility evidence.`,
       };
     }
     return {
@@ -179,12 +180,12 @@ export function shouldResearchContactRole(input: {
     return {
       needed: true,
       reason:
-        "Persona includes responsibility/ownership criteria — title alone is insufficient.",
+        `${vocab.persona.Singular} includes responsibility/ownership criteria — title alone is insufficient.`,
     };
   }
 
   return {
     needed: false,
-    reason: "Title appears sufficient and persona has no responsibility criteria.",
+    reason: `Title appears sufficient and ${vocab.persona.singular} has no responsibility criteria.`,
   };
 }

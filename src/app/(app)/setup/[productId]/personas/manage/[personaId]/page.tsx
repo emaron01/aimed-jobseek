@@ -9,6 +9,7 @@ import {
   getCurrentOrganization,
   TenantError,
 } from "@/lib/tenant/getCurrentOrganization";
+import { vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ productId: string; personaId: string }>;
@@ -21,7 +22,7 @@ export default async function ManagePersonaPage({ params }: PageProps) {
   if (!organization) {
     return (
       <div>
-        <PageHeader title="Persona" />
+        <PageHeader title={vocab.persona.Singular} />
         <TenantMissing />
       </div>
     );
@@ -80,7 +81,7 @@ export default async function ManagePersonaPage({ params }: PageProps) {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title={persona.name}
-        description={`Buyer role for ${product.name}.`}
+        description={`${vocab.buyer.Singular} role for ${product.name}.`}
         actions={
           <Link
             href={`/setup/${product.id}`}

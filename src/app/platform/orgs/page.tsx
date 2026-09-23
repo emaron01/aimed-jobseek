@@ -8,6 +8,7 @@ import {
   billingPlanLabel,
   billingStatusLabel,
 } from "@/lib/billing/billing-state";
+import { vocab } from "@/lib/product-config";
 
 function formatDate(d: Date | null): string {
   if (!d) return "—";
@@ -55,11 +56,11 @@ export default async function PlatformOrgsPage() {
         >
           <p className="font-medium">
             {purgeEligible.length} organization
-            {purgeEligible.length === 1 ? "" : "s"} eligible for contact data
+            {purgeEligible.length === 1 ? "" : "s"} eligible for {vocab.contact.singular} data
             purge
           </p>
           <p className="mt-1 text-amber-900">
-            Highlighted below. Open the org detail page to run Delete contact and
+            Highlighted below. Open the org detail page to run Delete {vocab.contact.singular} and
             outbound data. Also listed on{" "}
             <Link href="/platform" className="font-medium underline">
               Platform home
@@ -78,8 +79,8 @@ export default async function PlatformOrgsPage() {
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium">Plan</th>
               <th className="px-3 py-2 font-medium">Members</th>
-              <th className="px-3 py-2 font-medium">Products</th>
-              <th className="px-3 py-2 font-medium">Campaigns</th>
+              <th className="px-3 py-2 font-medium">{vocab.product.Plural}</th>
+              <th className="px-3 py-2 font-medium">{vocab.campaign.Plural}</th>
               <th className="px-3 py-2 font-medium">Companies</th>
               <th className="px-3 py-2 font-medium">Created</th>
               <th className="px-3 py-2 font-medium">Last active</th>

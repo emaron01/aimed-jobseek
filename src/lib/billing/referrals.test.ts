@@ -143,8 +143,13 @@ describe("referral wiring contracts", () => {
     );
     const topBar = readFileSync("src/components/TopBar.tsx", "utf8");
     const msg = referralShareMessage("AIMED10");
+    const { brand } = await import("@/lib/product-config");
+    const { getBrandDeployment } = await import(
+      "@/lib/product-config/deployment"
+    );
     expect(msg).toContain("Use code AIMED10 when you sign up");
-    expect(msg).toContain("aimedoutreach.com");
+    expect(msg).toContain(brand.appName);
+    expect(msg).toContain(getBrandDeployment().marketingDomain);
     expect(msg).toContain("10% off for as long as you use it");
     expect(fields).toContain("Copy code");
     expect(fields).toContain("Copy message");

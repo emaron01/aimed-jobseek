@@ -10,6 +10,7 @@ import {
 } from "@/app/actions/platform-templates";
 import { ActionFeedbackForm } from "@/components/ActionFeedbackForm";
 import type { TransactionalEmailTemplateKey } from "@prisma/client";
+import { vocab } from "@/lib/product-config";
 
 export default async function PlatformEmailTemplatesPage({
   searchParams,
@@ -54,7 +55,7 @@ export default async function PlatformEmailTemplatesPage({
           Transactional email templates
         </h1>
         <p className="mt-1 text-sm text-slate-600">
-          Platform account emails only — not customer outbound sales email.
+          Platform account emails only — not customer {vocab.outbound.singular} {vocab.sales.singular} email.
           SUPER_ADMIN only.
         </p>
       </div>

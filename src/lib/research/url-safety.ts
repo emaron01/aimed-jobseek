@@ -3,6 +3,8 @@
  * Shared by company website retrieval and product research.
  */
 
+import { brandUserAgent } from "@/lib/product-config";
+
 const BLOCKED_HOSTNAMES = new Set([
   "localhost",
   "metadata.google.internal",
@@ -130,7 +132,7 @@ export async function safeFetchHttp(
           "User-Agent":
             (init?.headers as Record<string, string> | undefined)?.[
               "User-Agent"
-            ] ?? "EmailPlatformSafeFetch/1.0",
+            ] ?? brandUserAgent("SafeFetch"),
           ...(init?.headers as Record<string, string> | undefined),
         },
       });

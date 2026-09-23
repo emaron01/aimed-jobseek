@@ -9,6 +9,7 @@ import {
 } from "@/lib/platform/purge-contact-outbound-shared";
 import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { vocab } from "@/lib/product-config";
 
 /**
  * SUPER_ADMIN selective purge: contact + outbound data only.
@@ -47,12 +48,12 @@ export function PurgeContactOutboundPanel({
     >
       <div>
         <h3 className="text-sm font-medium text-slate-900">
-          Delete contact and outbound data
+          Delete {vocab.contact.singular} and {vocab.outbound.singular} data
         </h3>
         <p className="mt-1 text-sm text-slate-600">
           Honour the 30-day cancel retention for{" "}
           <span className="font-medium text-slate-800">{organizationName}</span>
-          . Removes CRM and outbound rows; keeps setup and billing.
+          . Removes CRM and {vocab.outbound.singular} rows; keeps setup and billing.
         </p>
       </div>
 
@@ -73,7 +74,7 @@ export function PurgeContactOutboundPanel({
           className="rounded-md border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-50"
           data-testid="platform-purge-contact-outbound-open"
         >
-          Delete contact and outbound data
+          Delete {vocab.contact.singular} and {vocab.outbound.singular} data
         </button>
       ) : (
         <div
@@ -84,7 +85,7 @@ export function PurgeContactOutboundPanel({
           data-testid="platform-purge-contact-outbound-modal"
         >
           <p id={titleId} className="text-sm font-semibold text-slate-900">
-            Confirm contact / outbound purge
+            Confirm {vocab.contact.singular} / {vocab.outbound.singular} purge
           </p>
           <div className="space-y-2 text-sm text-slate-700">
             <p className="font-medium text-slate-900">Will be deleted</p>
@@ -127,7 +128,7 @@ export function PurgeContactOutboundPanel({
                 className="rounded-md bg-amber-800 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
                 data-testid="platform-purge-contact-outbound-submit"
               >
-                {pending ? "Purging…" : "Purge contact data"}
+                {pending ? "Purging…" : `Purge ${vocab.contact.singular} data`}
               </button>
               <button
                 type="button"

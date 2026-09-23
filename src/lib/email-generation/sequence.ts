@@ -18,6 +18,7 @@ import {
   releaseDailyEmailSendReservation,
   reserveDailyEmailSend,
 } from "@/lib/usage/quota";
+import { vocab } from "@/lib/product-config";
 
 export function nextSequencePosition(context: EmailGenerationContext): number {
   const latest = context.sequence.at(-1);
@@ -81,7 +82,7 @@ export async function markEmailDraftSent(input: {
   }
   if (draft.campaignContact.campaign.ownerUserId !== input.userId) {
     throw new TenantError(
-      "This campaign is read-only because it belongs to another user.",
+      `This ${vocab.campaign.singular} is read-only because it belongs to another user.`,
     );
   }
   if (draft.status === "SENT" && draft.sentAt) {
@@ -234,7 +235,7 @@ export async function updateEmailDraftContent(input: {
   }
   if (draft.campaignContact.campaign.ownerUserId !== input.userId) {
     throw new TenantError(
-      "This campaign is read-only because it belongs to another user.",
+      `This ${vocab.campaign.singular} is read-only because it belongs to another user.`,
     );
   }
   if (draft.status === "SENT" || draft.sentAt) {
@@ -356,7 +357,7 @@ export async function recordEmailClientIntent(input: {
   }
   if (draft.campaignContact.campaign.ownerUserId !== input.userId) {
     throw new TenantError(
-      "This campaign is read-only because it belongs to another user.",
+      `This ${vocab.campaign.singular} is read-only because it belongs to another user.`,
     );
   }
   const recipient = draft.campaignContact.contact.email?.trim();

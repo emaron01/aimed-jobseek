@@ -65,8 +65,8 @@ describe("ICP incomplete state", () => {
       "src/app/(app)/setup/[productId]/page.tsx",
       "utf8",
     );
-    expect(overviewSrc).toContain("ICP not set up yet");
-    expect(overviewSrc).toContain("Add ICP");
+    expect(overviewSrc).toContain("{vocab.icp.singular} not set up yet");
+    expect(overviewSrc).toContain("Add {vocab.icp.singular}");
     expect(overviewSrc).not.toContain("Commercial real-estate companies");
   });
 });
@@ -107,17 +107,17 @@ describe("productNameDomainMismatchWarning", () => {
   it("warns when product name is a typo of the website domain", () => {
     expect(
       productNameDomainMismatchWarning(
-        "salesforecater.io",
-        "https://www.salesforecaster.io",
+        "acmecopr.example",
+        "https://www.acmecorp.example",
       ),
-    ).toMatch(/doesn’t look like it matches salesforecaster/i);
+    ).toMatch(/doesn’t look like it matches acmecorp/i);
   });
 
   it("does not warn when name matches the domain label", () => {
     expect(
       productNameDomainMismatchWarning(
-        "Sales Forecaster",
-        "https://www.salesforecaster.io",
+        "Acme Corp",
+        "https://www.acmecorp.example",
       ),
     ).toBeNull();
   });
@@ -178,6 +178,6 @@ describe("write paths unchanged", () => {
     expect(overview).not.toContain("upsertIcpAction");
     expect(overview).toContain("ExportPdfButton");
     expect(overview).toContain("data-print-document");
-    expect(overview).toContain("Delete product");
+    expect(overview).toContain("Delete ${vocab.product.singular}");
   });
 });

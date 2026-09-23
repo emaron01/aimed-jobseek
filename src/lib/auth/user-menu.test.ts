@@ -6,6 +6,7 @@ import {
   buildSidebarNavItems,
   buildUserMenuModel,
 } from "@/lib/auth/user-menu";
+import { vocab } from "@/lib/product-config";
 
 describe("buildUserMenuModel", () => {
   it("always includes Log Out for authenticated users", () => {
@@ -37,7 +38,7 @@ describe("buildUserMenuModel", () => {
 
   it("SUPER_ADMIN with no organization still gets Logout + platform admin, no fake org controls", () => {
     const model = buildUserMenuModel({
-      email: "erik@salesforecaster.io",
+      email: "erik@example.test",
       firstName: "Erik",
       platformRole: "SUPER_ADMIN",
       organizationName: null,
@@ -74,7 +75,7 @@ describe("buildUserMenuModel", () => {
 
   it("SUPER_ADMIN platform link points to /platform", () => {
     const model = buildUserMenuModel({
-      email: "erik@salesforecaster.io",
+      email: "erik@example.test",
       firstName: "Erik",
       platformRole: "SUPER_ADMIN",
       organizationName: null,
@@ -144,23 +145,23 @@ describe("buildSidebarNavItems", () => {
       isPlatformOperator: false,
     });
     expect(items.some((i) => i.href === "/")).toBe(true);
-    expect(items.some((i) => i.href === "/lists" && i.label === "Lists")).toBe(
+    expect(items.some((i) => i.href === "/lists" && i.label === vocab.list.Plural)).toBe(
       true,
     );
     expect(
-      items.some((i) => i.href === "/contacts" && i.label === "Contacts"),
+      items.some((i) => i.href === "/contacts" && i.label === vocab.contact.Plural),
     ).toBe(true);
     expect(
-      items.some((i) => i.href === "/campaigns" && i.label === "Campaigns"),
+      items.some((i) => i.href === "/campaigns" && i.label === vocab.campaign.Plural),
     ).toBe(true);
     expect(
-      items.some((i) => i.href === "/products" && i.label === "Products"),
+      items.some((i) => i.href === "/products" && i.label === vocab.product.Plural),
     ).toBe(true);
-    expect(items.some((i) => i.href === "/icps" && i.label === "ICPs")).toBe(
+    expect(items.some((i) => i.href === "/icps" && i.label === vocab.icp.plural)).toBe(
       true,
     );
     expect(
-      items.some((i) => i.href === "/personas" && i.label === "Personas"),
+      items.some((i) => i.href === "/personas" && i.label === vocab.persona.Plural),
     ).toBe(true);
     expect(items.some((i) => i.href === "/setup")).toBe(false);
     expect(

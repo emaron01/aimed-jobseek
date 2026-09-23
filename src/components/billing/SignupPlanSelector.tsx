@@ -13,8 +13,7 @@ import {
   BILLING_PLAN_TEAM,
 } from "@/lib/billing/plans";
 import { cn } from "@/lib/utils";
-
-const ENTERPRISE_CONTACT = "mailto:erik@salesforecaster.io";
+import { features, supportMailtoHref, vocab } from "@/lib/product-config";
 const initial: PendingSignupActionResult | null = null;
 
 export type SignupPlanOption = {
@@ -31,10 +30,12 @@ export function SignupPlanSelector({
   standard,
   team,
   enterprise,
+  supportEmail,
 }: {
   standard: SignupPlanOption;
   team: SignupPlanOption;
   enterprise: SignupPlanOption;
+  supportEmail: string;
 }) {
   const [planCode, setPlanCode] = useState<string>(BILLING_PLAN_STANDARD);
   const [seatQuantity, setSeatQuantity] = useState(2);
@@ -58,18 +59,26 @@ export function SignupPlanSelector({
             {
               code: BILLING_PLAN_STANDARD,
               label: standard.displayName,
-              blurb: standard.tagline || "For individual salespeople",
+              blurb: standard.tagline || `For individual ${vocab.salesperson.plural}`,
             },
-            {
-              code: BILLING_PLAN_TEAM,
-              label: team.displayName,
-              blurb: team.tagline || "For teams of 2-10",
-            },
-            {
-              code: BILLING_PLAN_ENTERPRISE,
-              label: enterprise.displayName,
-              blurb: enterprise.tagline || "For larger teams",
-            },
+            ...(features.teamPlanDisplay
+              ? [
+                  {
+                    code: BILLING_PLAN_TEAM,
+                    label: team.displayName,
+                    blurb: team.tagline || "For teams of 2-10",
+                  } as const,
+                ]
+              : []),
+            ...(features.enterprisePlanDisplay
+              ? [
+                  {
+                    code: BILLING_PLAN_ENTERPRISE,
+                    label: enterprise.displayName,
+                    blurb: enterprise.tagline || "For larger teams",
+                  } as const,
+                ]
+              : []),
           ] as const
         ).map((plan) => (
           <button
@@ -111,7 +120,7 @@ export function SignupPlanSelector({
           ) : null}
         </div>
 
-        {planCode === BILLING_PLAN_TEAM ? (
+        {features.teamSeats && planCode === BILLING_PLAN_TEAM ? (
           <label className="block max-w-xs text-sm">
             <span className="font-medium text-slate-700">
               How many users? (minimum 2)
@@ -167,14 +176,14 @@ export function SignupPlanSelector({
           </p>
         )}
 
-        {planCode === BILLING_PLAN_ENTERPRISE ? (
+        {planCode === BILLING_PLAN_ENTERPRISE && features.contactSales ? (
           <a
-            href={ENTERPRISE_CONTACT}
+            href={supportMailtoHref(supportEmail)}
             className={cn(PRIMARY_BUTTON_CLASS, "w-full !px-4 !py-3")}
           >
             Contact us
           </a>
-        ) : (
+        ) : planCode === BILLING_PLAN_ENTERPRISE ? null : (
           <form action={action} className="space-y-3">
             <input type="hidden" name="planCode" value={planCode} />
             <input

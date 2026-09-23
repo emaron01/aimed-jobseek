@@ -7,6 +7,7 @@ import {
   campaignListScoreButtonLabel,
   listScoreHref,
 } from "@/lib/lists/campaign-query";
+import { features, vocab } from "@/lib/product-config";
 
 /**
  * Header actions when a list was opened from a campaign ( ?campaign= ).
@@ -17,13 +18,17 @@ export function CampaignListWorkflowButtons({
   campaignId,
   campaignName,
   researchComplete,
+  allowResearch = features.listBulkValidation,
+  allowScore = features.listBulkScoring,
 }: {
   listId: string;
   campaignId: string;
   campaignName: string;
   researchComplete: boolean;
+  allowResearch?: boolean;
+  allowScore?: boolean;
 }) {
-  function showResearch() {
+  function scrollToResearch() {
     document.getElementById("company-research")?.scrollIntoView({
       behavior: "smooth",
       block: "start",
@@ -40,9 +45,10 @@ export function CampaignListWorkflowButtons({
 
   return (
     <>
+      {allowResearch ? (
       <button
         type="button"
-        onClick={showResearch}
+        onClick={scrollToResearch}
         data-testid="campaign-list-research-button"
         aria-label={
           researchComplete
@@ -72,7 +78,9 @@ export function CampaignListWorkflowButtons({
           "Research Companies"
         )}
       </button>
-      {researchComplete ? (
+      ) : null}
+      {allowScore ? (
+      researchComplete ? (
         <Link
           href={listScoreHref(listId, campaignId)}
           data-testid="campaign-list-score-button"
@@ -83,7 +91,7 @@ export function CampaignListWorkflowButtons({
       ) : (
         <span
           data-testid="campaign-list-score-button"
-          title="Research companies on this list first"
+          title={`Research companies on this ${vocab.list.singular} first`}
           className={cn(
             SECONDARY_BUTTON_CLASS,
             "cursor-not-allowed border-slate-300 bg-slate-100 text-slate-500 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-500",
@@ -91,7 +99,8 @@ export function CampaignListWorkflowButtons({
         >
           {scoreLabel}
         </span>
-      )}
+      )
+      ) : null}
     </>
   );
 }

@@ -1,4 +1,8 @@
-import type { ProductCampaignReadiness } from "@/lib/workflow/product-campaign-readiness";
+import {
+  PRODUCT_READINESS_BLOCKERS,
+  type ProductCampaignReadiness,
+} from "@/lib/workflow/product-campaign-readiness";
+import { countedNoun, vocab } from "@/lib/product-config";
 
 export function formatProductSetupClause(
   productName: string,
@@ -7,21 +11,21 @@ export function formatProductSetupClause(
   if (readiness.ready) return `${productName} ready`;
 
   const blocker = readiness.blockers[0] ?? "needs setup";
-  if (blocker === "Needs an ICP with criteria") {
-    return `${productName} needs an ICP`;
+  if (blocker === PRODUCT_READINESS_BLOCKERS.needsIcp) {
+    return `${productName} needs ${vocab.icp.aSingular}`;
   }
-  if (blocker === "Needs at least one saved persona") {
-    return `${productName} needs a persona`;
+  if (blocker === PRODUCT_READINESS_BLOCKERS.needsPersona) {
+    return `${productName} needs ${vocab.persona.aSingular}`;
   }
   if (
-    blocker === "Product needs review and approval" ||
-    blocker === "Product is still a draft" ||
-    blocker === "Product is not approved"
+    blocker === PRODUCT_READINESS_BLOCKERS.needsReview ||
+    blocker === PRODUCT_READINESS_BLOCKERS.draft ||
+    blocker === PRODUCT_READINESS_BLOCKERS.notApproved
   ) {
     return `${productName} needs approval`;
   }
-  if (blocker === "Product setup not started") {
-    return `${productName} needs product setup`;
+  if (blocker === PRODUCT_READINESS_BLOCKERS.notStarted) {
+    return `${productName} needs ${vocab.product.singular} setup`;
   }
   return `${productName} needs setup`;
 }
@@ -33,7 +37,7 @@ export function buildHomeSetupLine(input: {
 }): { text: string; href: string | null } {
   if (input.products.length === 0) {
     return {
-      text: "No products yet. Add a product to start setup.",
+      text: `No ${vocab.product.plural} yet. Add ${vocab.product.aSingular} to start setup.`,
       href: "/setup/new",
     };
   }
@@ -44,7 +48,7 @@ export function buildHomeSetupLine(input: {
     const icpCount = input.totalIcps;
     const personaCount = input.totalPersonas;
     return {
-      text: `Setup complete · ${productCount} product${productCount === 1 ? "" : "s"} · ${icpCount} ICP${icpCount === 1 ? "" : "s"} · ${personaCount} persona${personaCount === 1 ? "" : "s"}`,
+      text: `Setup complete · ${countedNoun(productCount, vocab.product)} · ${countedNoun(icpCount, vocab.icp)} · ${countedNoun(personaCount, vocab.persona)}`,
       href: "/products",
     };
   }

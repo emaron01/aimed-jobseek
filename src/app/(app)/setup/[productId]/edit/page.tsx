@@ -7,6 +7,7 @@ import {
   getCurrentOrganization,
   TenantError,
 } from "@/lib/tenant/getCurrentOrganization";
+import { vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ productId: string }>;
@@ -19,7 +20,7 @@ export default async function EditProductPage({ params }: PageProps) {
   if (!organization) {
     return (
       <div>
-        <PageHeader title="Edit product" />
+        <PageHeader title={`Edit ${vocab.product.singular}`} />
         <TenantMissing />
       </div>
     );
@@ -37,7 +38,7 @@ export default async function EditProductPage({ params }: PageProps) {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title={`Edit: ${product.name}`}
-        description="Update product details."
+        description={`Update ${vocab.product.singular} details.`}
         actions={
           <Link
             href={`/setup/${product.id}`}

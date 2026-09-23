@@ -39,8 +39,8 @@ describe("support ticket contract", () => {
 
     expect(config).toContain("SUPPORT_TICKET_NOTIFICATION_EMAIL");
     expect(action).toContain("supportTicketNotificationEmail()");
-    expect(action).not.toContain("emaroney@aimedoutreach.com");
-    expect(form).not.toMatch(/mailto:|@aimedoutreach\.com/);
+    expect(action).not.toMatch(/@[a-z0-9.-]+\.(com|io)/);
+    expect(form).not.toMatch(/mailto:/i);
   });
 
   it("defines a minimal three-state schema with private notes", () => {

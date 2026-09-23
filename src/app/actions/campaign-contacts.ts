@@ -12,6 +12,7 @@ import {
 } from "@/lib/lists/campaign-query";
 import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
+import { countedNoun, nounForCount, vocab } from "@/lib/product-config";
 
 export type CampaignContactsActionResult = {
   ok: boolean;
@@ -30,7 +31,7 @@ function revalidateCampaign(campaignId: string): void {
 
 function toSafeCampaignContactsError(error: unknown): string {
   if (error instanceof TenantError) return error.message;
-  return "Unable to add contacts to this campaign. Please try again.";
+  return `Unable to add ${vocab.contact.plural} to this ${vocab.campaign.singular}. Please try again.`;
 }
 
 export async function addContactsToCampaignAction(
@@ -38,7 +39,7 @@ export async function addContactsToCampaignAction(
   formData: FormData,
 ): Promise<CampaignContactsActionResult> {
   const campaignId = campaignIdFrom(formData);
-  if (!campaignId) return { ok: false, message: "Campaign is required." };
+  if (!campaignId) return { ok: false, message: `${vocab.campaign.Singular} is required.` };
 
   try {
     const addedCount = await addContactsToCampaign({
@@ -53,8 +54,8 @@ export async function addContactsToCampaignAction(
       ok: true,
       message:
         addedCount === 0
-          ? "All selected contacts are already attached."
-          : `${addedCount} contact${addedCount === 1 ? "" : "s"} added.`,
+          ? `All selected ${vocab.contact.plural} are already attached.`
+          : `${countedNoun(addedCount, vocab.contact)} added.`,
       addedCount,
     };
   } catch (error) {
@@ -69,7 +70,7 @@ export async function addScoringRunContactsToCampaignAction(
 ): Promise<CampaignContactsActionResult> {
   const campaignId = campaignIdFrom(formData);
   const scoringRunId = String(formData.get("scoringRunId") ?? "").trim();
-  if (!campaignId) return { ok: false, message: "Campaign is required." };
+  if (!campaignId) return { ok: false, message: `${vocab.campaign.Singular} is required.` };
   if (!scoringRunId) {
     return { ok: false, message: "Select a scoring run." };
   }
@@ -84,8 +85,8 @@ export async function addScoringRunContactsToCampaignAction(
       ok: true,
       message:
         addedCount === 0
-          ? "All scored contacts are already attached."
-          : `${addedCount} scored contact${addedCount === 1 ? "" : "s"} added.`,
+          ? `All scored ${vocab.contact.plural} are already attached.`
+          : `${addedCount} scored ${nounForCount(addedCount, vocab.contact)} added.`,
       addedCount,
     };
   } catch (error) {
@@ -105,7 +106,7 @@ export async function saveScoringRunAndReturnToCampaignAction(
   const campaignId = campaignIdFrom(formData);
   const scoringRunId = String(formData.get("scoringRunId") ?? "").trim();
   if (!campaignId || !scoringRunId) {
-    throw new TenantError("Campaign and scoring run are required.");
+    throw new TenantError(`${vocab.campaign.Singular} and scoring run are required.`);
   }
 
   let attachedCount = 0;

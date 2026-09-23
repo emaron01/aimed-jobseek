@@ -9,6 +9,7 @@ import {
   TenantError,
 } from "@/lib/tenant/getCurrentOrganization";
 import type { SuggestedBuyerRole } from "@/lib/product-research/contract";
+import { vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ productId: string }>;
@@ -26,7 +27,7 @@ export default async function NewPersonaPage({
   if (!organization) {
     return (
       <div>
-        <PageHeader title="Build Persona" />
+        <PageHeader title={`Build ${vocab.persona.Singular}`} />
         <TenantMissing />
       </div>
     );
@@ -43,12 +44,12 @@ export default async function NewPersonaPage({
   if (product.approvalStatus !== "APPROVED") {
     return (
       <div className="space-y-4">
-        <PageHeader title="Build Persona" />
+        <PageHeader title={`Build ${vocab.persona.Singular}`} />
         <p className="text-sm text-slate-600">
-          Approve the Product before building Personas.
+          Approve the {vocab.product.Singular} before building {vocab.persona.Plural}.
         </p>
         <Link href={`/setup/${product.id}/research`} className="underline">
-          Back to Product research
+          Back to {vocab.product.Singular} research
         </Link>
       </div>
     );
@@ -71,11 +72,11 @@ export default async function NewPersonaPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title={role ? `Build Persona: ${product.name}` : `New persona: ${product.name}`}
+        title={role ? `Build ${vocab.persona.Singular}: ${product.name}` : `New ${vocab.persona.singular}: ${product.name}`}
         description={
           role
-            ? "Reuses Product evidence. Runs Persona research only when the role is ambiguous or thin."
-            : "Name the buyer role and add any context you have. Synthesis builds the persona from product evidence and peer differentiation — then you review and edit."
+            ? `Reuses ${vocab.product.Singular} evidence. Runs ${vocab.persona.Singular} research only when the role is ambiguous or thin.`
+            : `Name the ${vocab.buyer.singular} role and add any context you have. Synthesis builds the ${vocab.persona.singular} from ${vocab.product.singular} evidence and peer differentiation — then you review and edit.`
         }
         actions={
           <Link

@@ -11,6 +11,7 @@ import {
   readIcpQualification,
   type IcpQualification,
 } from "@/lib/scoring/icp-qualification";
+import { vocab } from "@/lib/product-config";
 
 /** Active workflow buckets — POOR_FIT remains in the schema for legacy rows only. */
 export const QUALIFICATION_BUCKETS = [
@@ -38,8 +39,8 @@ export const EXCLUSION_REVIEW_COPY = {
   keepExcluded: "Keep excluded",
   panelHeading: (contactCount: number) =>
     contactCount === 1
-      ? "We left 1 contact out of this campaign"
-      : `We left ${contactCount} contacts out of this campaign`,
+      ? `We left 1 ${vocab.contact.singular} out of this ${vocab.campaign.singular}`
+      : `We left ${contactCount} ${vocab.contact.plural} out of this ${vocab.campaign.singular}`,
   panelSubheading:
     "Review each group below. Add anyone back if you disagree — otherwise leave them out.",
   groupReason: (criterionName: string) =>
@@ -134,8 +135,8 @@ export function deterministicContactQualification(input: {
       bucket: "EXCLUDED",
       reason:
         failed.length > 0
-          ? `Mandatory ICP criteria failed: ${failed.join(", ")}.`
-          : "Company failed mandatory ICP qualification.",
+          ? `Mandatory ${vocab.icp.singular} criteria failed: ${failed.join(", ")}.`
+          : `Company failed mandatory ${vocab.icp.singular} qualification.`,
       aiSkipReason: "MANDATORY_ICP_FAIL",
       matchedPersonaId: null,
       personaMatchStatus: "EXCLUDED",
@@ -152,7 +153,7 @@ export function deterministicContactQualification(input: {
   ) {
     return {
       bucket: "EXCLUDED",
-      reason: "Contact matches a persona exclusion rule.",
+      reason: `${vocab.contact.Singular} matches ${vocab.persona.aSingular} exclusion rule.`,
       aiSkipReason: "CONFIRMED_PERSONA_EXCLUSION",
       matchedPersonaId: null,
       personaMatchStatus: "EXCLUDED",
@@ -166,7 +167,7 @@ export function deterministicContactQualification(input: {
   ) {
     return {
       bucket: "EXCLUDED",
-      reason: "Contact matches a persona exclusion rule.",
+      reason: `${vocab.contact.Singular} matches ${vocab.persona.aSingular} exclusion rule.`,
       aiSkipReason: "CONFIRMED_PERSONA_EXCLUSION",
       matchedPersonaId: null,
       personaMatchStatus: "EXCLUDED",
@@ -177,8 +178,8 @@ export function deterministicContactQualification(input: {
     return {
       bucket: "NEEDS_REVIEW",
       reason: input.anyUnknownTitle
-        ? "Title did not match a selected persona."
-        : "No persona match for this contact.",
+        ? `Title did not match a selected ${vocab.persona.singular}.`
+        : `No ${vocab.persona.singular} match for this ${vocab.contact.singular}.`,
       aiSkipReason: "NO_TITLE_FIT",
       matchedPersonaId: null,
       personaMatchStatus: "UNKNOWN",
@@ -189,7 +190,7 @@ export function deterministicContactQualification(input: {
     const names = input.candidatePersonas.map((row) => row.name).join(", ");
     return {
       bucket: "NEEDS_REVIEW",
-      reason: `Title matches multiple personas (${names}).`,
+      reason: `Title matches multiple ${vocab.persona.plural} (${names}).`,
       aiSkipReason: "MULTI_PERSONA_MATCH",
       matchedPersonaId: null,
       personaMatchStatus: "UNKNOWN",
@@ -205,7 +206,7 @@ export function deterministicContactQualification(input: {
   ) {
     return {
       bucket: "NEEDS_REVIEW",
-      reason: "Mandatory ICP criteria could not be confirmed from available evidence.",
+      reason: `Mandatory ${vocab.icp.singular} criteria could not be confirmed from available evidence.`,
       aiSkipReason: "UNRESOLVED_MANDATORY",
       matchedPersonaId: matched.id,
       personaMatchStatus: "MATCHED",
@@ -214,7 +215,7 @@ export function deterministicContactQualification(input: {
 
   return {
     bucket: "GOOD",
-    reason: `Matched persona: ${matched.name}.`,
+    reason: `Matched ${vocab.persona.singular}: ${matched.name}.`,
     aiSkipReason: "SINGLE_PERSONA_MATCH",
     matchedPersonaId: matched.id,
     personaMatchStatus: "MATCHED",

@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { vocab } from "@/lib/product-config";
 
 export function ArtifactProductFilter({
   products,
@@ -15,7 +16,7 @@ export function ArtifactProductFilter({
 
   return (
     <label className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
-      <span className="font-medium text-slate-900">Product</span>
+      <span className="font-medium text-slate-900">{vocab.product.Singular}</span>
       <select
         className="min-w-[12rem] rounded-md border border-slate-300 bg-white px-3 py-2"
         value={selectedProductId ?? ""}
@@ -28,7 +29,7 @@ export function ArtifactProductFilter({
           router.push(query ? `${pathname}?${query}` : pathname);
         }}
       >
-        <option value="">All products</option>
+        <option value="">All {vocab.product.plural}</option>
         {products.map((product) => (
           <option key={product.id} value={product.id}>
             {product.name}

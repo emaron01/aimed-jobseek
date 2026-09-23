@@ -14,8 +14,8 @@ describe("eula seed content", () => {
     );
     expect(filled).not.toContain(EULA_SEED_DATE_PLACEHOLDER);
     expect(filled).toContain("Last updated:");
-    expect(filled).toContain("SalesForecaster.io");
-    expect(filled).toContain("erik@salesforecaster.io");
+    expect(filled).toContain("grants you a limited, non-exclusive");
+    expect(filled).toMatch(/contact: \S+@\S+/);
   });
 });
 

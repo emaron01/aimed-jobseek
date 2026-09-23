@@ -7,6 +7,7 @@ import { upsertProductAction } from "@/app/actions";
 import { Field, SubmitButton } from "@/components/ui";
 import type { ProductActionResult, ProductFormValues } from "@/lib/product/save";
 import { productNameDomainMismatchWarning } from "@/lib/setup/product-overview";
+import { vocab } from "@/lib/product-config";
 
 const initial: ProductActionResult | null = null;
 
@@ -84,7 +85,7 @@ export function ProductDetailsForm({ product }: { product: Product }) {
       ) : null}
       <input type="hidden" name="id" value={product.id} />
       <label className="block text-sm">
-        <span className="font-medium text-slate-700">Product Name</span>
+        <span className="font-medium text-slate-700">{vocab.product.Singular} Name</span>
         <input
           name="name"
           required
@@ -119,7 +120,7 @@ export function ProductDetailsForm({ product }: { product: Product }) {
       ) : null}
       <div className="md:col-span-2">
         <Field
-          label="Product Description"
+          label={`${vocab.product.Singular} Description`}
           name="description"
           defaultValue={defaults.description}
           as="textarea"
@@ -127,7 +128,7 @@ export function ProductDetailsForm({ product }: { product: Product }) {
       </div>
       <div className="md:col-span-2">
         <Field
-          label="Primary Value Proposition"
+          label={`Primary ${vocab.valueProposition.TitleSingular}`}
           name="valueProposition"
           defaultValue={defaults.valueProposition}
           as="textarea"
@@ -142,7 +143,7 @@ export function ProductDetailsForm({ product }: { product: Product }) {
       />
       <div className="flex items-end">
         <SubmitButton disabled={pending}>
-          {pending ? "Saving…" : "Save product"}
+          {pending ? "Saving…" : `Save ${vocab.product.singular}`}
         </SubmitButton>
       </div>
     </form>

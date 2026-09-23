@@ -1,3 +1,4 @@
+import { vocab } from "@/lib/product-config";
 /**
  * ICP criterion evidence class: defaults, heuristics, labels, fingerprints, caps.
  */
@@ -201,7 +202,7 @@ export function evidenceClassAvailabilityLabel(
 ): EvidenceClassLabel {
   switch (evidenceClass) {
     case "LIST_DATA":
-      return { class: evidenceClass, label: "From your list", tone: "neutral" };
+      return { class: evidenceClass, label: `From your ${vocab.list.singular}`, tone: "neutral" };
     case "COMPANY_RESEARCH":
       return {
         class: evidenceClass,
@@ -353,7 +354,7 @@ export function checkTargetedSearchCap(input: {
   return {
     ok: false,
     exceedingNames,
-    message: `This ICP has ${targeted.length} scoring criteria that need a per-company lookup (limit ${input.maxAllowed}). Remove a listed criterion, or set its scoring role to Good to know (Good to know never counts toward fit or this limit): ${exceedingNames
+    message: `This ${vocab.icp.singular} has ${targeted.length} scoring criteria that need a per-company lookup (limit ${input.maxAllowed}). Remove a listed criterion, or set its scoring role to Good to know (Good to know never counts toward fit or this limit): ${exceedingNames
       .map((n) => `"${n}"`)
       .join(", ")}.`,
   };

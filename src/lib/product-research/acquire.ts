@@ -14,6 +14,7 @@ import {
   sha256Hex,
 } from "@/lib/product-research/url";
 import type { EvidenceExcerpt } from "@/lib/product-research/prompt";
+import { vocab } from "@/lib/product-config";
 
 function daysFromNow(days: number): Date {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
@@ -68,7 +69,7 @@ async function requireProduct(organizationId: string, productId: string) {
     where: { id: productId, organizationId },
   });
   if (!product) {
-    throw new TenantError("Product not found in the active organization.");
+    throw new TenantError(`${vocab.product.Singular} not found in the active organization.`);
   }
   return product;
 }
@@ -297,7 +298,7 @@ export async function acquireProductEvidence(input: {
           sourceType: src.type,
           displayName:
             src.displayName ||
-            (src.type === "USER_NOTE" ? "Product notes" : "Pasted content"),
+            (src.type === "USER_NOTE" ? `${vocab.product.Singular} notes` : "Pasted content"),
           acquisitionMethod: "USER_PROVIDED",
           createdByUserId: input.userId,
           retrievedAt: new Date(),
@@ -510,7 +511,7 @@ export async function appendProductSourcesToBundle(input: {
   const disallowed = input.sources.filter((s) => s.type === "URL");
   if (disallowed.length > 0) {
     throw new TenantError(
-      "Adding material to an approved product supports paste, notes, and uploads only.",
+      `Adding material to an approved ${vocab.product.singular} supports paste, notes, and uploads only.`,
     );
   }
   if (input.sources.length === 0) {
@@ -578,7 +579,7 @@ export async function appendProductSourcesToBundle(input: {
           sourceType: src.type,
           displayName:
             src.displayName ||
-            (src.type === "USER_NOTE" ? "Product notes" : "Pasted content"),
+            (src.type === "USER_NOTE" ? `${vocab.product.Singular} notes` : "Pasted content"),
           acquisitionMethod: "USER_PROVIDED",
           createdByUserId: input.userId,
           retrievedAt: new Date(),
@@ -703,7 +704,7 @@ export async function appendProductSourcesToBundle(input: {
     .filter((id) => !priorSourceIds.has(id));
   if (addedSourceIds.length === 0) {
     throw new TenantError(
-      "No new material was added. Paste or upload content that is not already in this product's evidence.",
+      `No new material was added. Paste or upload content that is not already in this ${vocab.product.singular}'s evidence.`,
     );
   }
 

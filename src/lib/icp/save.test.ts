@@ -124,7 +124,7 @@ describe("ICP save UI seam", () => {
     expect(formSrc).toContain("router.push(`/setup/${productId}/icps/${state.icpId}`)");
     expect(formSrc).toContain("icpRecordToFormValues");
     expect(actionsSrc).toContain("submittedIcpProfileIsBlank");
-    expect(actionsSrc).toContain("would have erased this ICP");
+    expect(actionsSrc).toContain("would have erased this ${vocab.icp.singular}");
     const editPage = readFileSync(
       "src/app/(app)/setup/[productId]/icps/[icpId]/page.tsx",
       "utf8",

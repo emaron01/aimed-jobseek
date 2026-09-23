@@ -7,6 +7,7 @@ import {
 } from "@/app/actions/scoring";
 import { PrimaryButton, SecondaryButton } from "@/components/ui";
 import { ALL_PERSONAS_VALUE } from "@/lib/scoring/title-fit";
+import { vocab } from "@/lib/product-config";
 
 type Option = { id: string; name: string; productId: string };
 
@@ -86,7 +87,7 @@ export function ScoreListForm({
       ) : null}
 
       <label className="block text-sm md:col-span-2">
-        <span className="font-medium text-slate-700">Product</span>
+        <span className="font-medium text-slate-700">{vocab.product.Singular}</span>
         <select
           name="productId"
           required
@@ -99,7 +100,7 @@ export function ScoreListForm({
           className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-slate-400 focus:ring-2"
         >
           <option value="" disabled>
-            Select product
+            Select {vocab.product.singular}
           </option>
           {products.map((product) => (
             <option key={product.id} value={product.id}>
@@ -110,7 +111,7 @@ export function ScoreListForm({
       </label>
 
       <label className="block text-sm">
-        <span className="font-medium text-slate-700">ICP</span>
+        <span className="font-medium text-slate-700">{vocab.icp.singular}</span>
         <select
           name="icpId"
           required
@@ -120,7 +121,7 @@ export function ScoreListForm({
           className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-slate-400 focus:ring-2 disabled:bg-slate-50"
         >
           <option value="" disabled>
-            {productId ? "Select ICP" : "Select a product first"}
+            {productId ? `Select ${vocab.icp.singular}` : `Select ${vocab.product.aSingular} first`}
           </option>
           {productIcps.map((icp) => (
             <option key={icp.id} value={icp.id}>
@@ -131,7 +132,7 @@ export function ScoreListForm({
       </label>
 
       <label className="block text-sm">
-        <span className="font-medium text-slate-700">Persona</span>
+        <span className="font-medium text-slate-700">{vocab.persona.Singular}</span>
         <select
           name="personaId"
           required
@@ -141,7 +142,7 @@ export function ScoreListForm({
           className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-slate-400 focus:ring-2 disabled:bg-slate-50"
         >
           <option value={ALL_PERSONAS_VALUE}>
-            {productId ? "All personas" : "Select a product first"}
+            {productId ? `All ${vocab.persona.plural}` : `Select ${vocab.product.aSingular} first`}
           </option>
           {productPersonas.map((persona) => (
             <option key={persona.id} value={persona.id}>

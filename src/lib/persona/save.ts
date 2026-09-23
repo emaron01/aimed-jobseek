@@ -4,6 +4,7 @@
 
 import { parseCommaList } from "@/lib/utils";
 import { TenantError } from "@/lib/tenant/errors";
+import { vocab } from "@/lib/product-config";
 
 export type PersonaActionResult = {
   ok: boolean;
@@ -37,8 +38,8 @@ export function parsePersonaFormData(formData: FormData): {
   const id = requiredString(formData, "id");
   const productId = requiredString(formData, "productId");
   const name = requiredString(formData, "name");
-  if (!productId) throw new TenantError("Product is required.");
-  if (!name) throw new TenantError("Persona name is required.");
+  if (!productId) throw new TenantError(`${vocab.product.Singular} is required.`);
+  if (!name) throw new TenantError(`${vocab.persona.Singular} name is required.`);
 
   return {
     id,

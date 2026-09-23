@@ -20,6 +20,7 @@ import {
   mergeProtectedProductDraftFields,
   productDraftFromApprovedProfile,
 } from "@/lib/product-research/resynthesize-approved-plan";
+import { vocab } from "@/lib/product-config";
 
 export const PRODUCT_RESYNTHESIS_USER_CONTEXT_FLAG = "approvedProductResynthesis";
 
@@ -101,11 +102,11 @@ export async function addProductSourcesAndResynthesize(input: {
     where: { id: input.productId, organizationId: input.organizationId },
   });
   if (!product) {
-    throw new TenantError("Product not found in the active organization.");
+    throw new TenantError(`${vocab.product.Singular} not found in the active organization.`);
   }
   if (product.approvalStatus !== "APPROVED") {
     throw new TenantError(
-      "Only approved products can receive new material for re-synthesis.",
+      `Only approved ${vocab.product.plural} can receive new material for re-synthesis.`,
     );
   }
 
@@ -167,7 +168,7 @@ export async function addProductSourcesAndResynthesize(input: {
       evidenceBundleId: acquired.evidenceBundleId,
       status: "FAILED",
       message:
-        "Re-synthesis produced an unusable draft. Your approved product was not changed.",
+        `Re-synthesis produced an unusable draft. Your approved ${vocab.product.singular} was not changed.`,
       errorSafe: "Near-empty synthesis result.",
     };
   }
@@ -202,7 +203,7 @@ export async function applyApprovedProductResynthesis(input: {
     where: { id: input.productId, organizationId: input.organizationId },
   });
   if (!product) {
-    throw new TenantError("Product not found in the active organization.");
+    throw new TenantError(`${vocab.product.Singular} not found in the active organization.`);
   }
 
   const run = await prisma.productSetupRun.findFirst({
@@ -221,7 +222,7 @@ export async function applyApprovedProductResynthesis(input: {
 
   const userContext = run.userContextJson as Record<string, unknown> | null;
   if (!userContext?.[PRODUCT_RESYNTHESIS_USER_CONTEXT_FLAG]) {
-    throw new TenantError("This setup run is not an in-place product re-synthesis.");
+    throw new TenantError(`This setup run is not an in-place ${vocab.product.singular} re-synthesis.`);
   }
 
   const currentProfile = productDraftFromApprovedProfile(product.profileJson);

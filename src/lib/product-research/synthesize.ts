@@ -25,6 +25,7 @@ import {
   USER_FACING_SYNTHESIS_FAILURE,
 } from "@/lib/product-research/synthesis-errors";
 import { transformProductAiResponse } from "@/lib/product-research/transform";
+import { vocab } from "@/lib/product-config";
 
 export async function synthesizeProductSetup(input: {
   organizationId: string;
@@ -157,7 +158,7 @@ export async function synthesizeProductSetup(input: {
   if (!isProductAiConfigured()) {
     return fail(
       new TenantError(
-        "Product research AI is not configured. Set PRODUCT_AI_* environment variables.",
+        `${vocab.product.Singular} research AI is not configured. Set PRODUCT_AI_* environment variables.`,
       ),
       "config",
     );
@@ -272,7 +273,7 @@ export async function resynthesizeFromBundle(input: {
     where: { id: input.productId, organizationId: input.organizationId },
   });
   if (!product) {
-    throw new TenantError("Product not found in the active organization.");
+    throw new TenantError(`${vocab.product.Singular} not found in the active organization.`);
   }
 
   const raw = bundle.normalizedEvidenceJson;

@@ -13,6 +13,7 @@ import {
 import type { QualificationBucketRow } from "@/components/QualificationBuckets";
 import { readExclusionDetails } from "@/lib/scoring/exclusion-detail";
 import { scoringRunPersonaWhere } from "@/lib/campaign/personas";
+import { vocab } from "@/lib/product-config";
 
 const campaignDetailInclude = {
   owner: { select: { id: true, name: true, email: true } },
@@ -429,7 +430,7 @@ async function requireCampaignForOrganization(
     },
   });
   if (!campaign) {
-    throw new TenantError("Campaign was not found in the active organization.");
+    throw new TenantError(`${vocab.campaign.Singular} was not found in the active organization.`);
   }
   return campaign;
 }
@@ -460,7 +461,7 @@ async function assertCanAttachCampaignContacts(input: {
     })
   ) {
     throw new TenantError(
-      "You cannot add contacts to a shared campaign template. Use this campaign to create your own personal copy.",
+      `You cannot add ${vocab.contact.plural} to a shared ${vocab.campaign.singular} template. Use this ${vocab.campaign.singular} to create your own personal copy.`,
     );
   }
 }
@@ -515,7 +516,7 @@ export async function getCampaignDetail(
     include: campaignDetailInclude,
   });
   if (!campaign) {
-    throw new TenantError("Campaign was not found in the active organization.");
+    throw new TenantError(`${vocab.campaign.Singular} was not found in the active organization.`);
   }
   return campaign;
 }
@@ -645,7 +646,7 @@ async function insertCampaignContacts(input: {
     new Set(input.contactIds.map((id) => id.trim()).filter(Boolean)),
   );
   if (contactIds.length === 0) {
-    throw new TenantError("Select at least one contact to add.");
+    throw new TenantError(`Select at least one ${vocab.contact.singular} to add.`);
   }
 
   const contacts = await prisma.contact.findMany({
@@ -668,7 +669,7 @@ async function insertCampaignContacts(input: {
   });
   if (contacts.length !== contactIds.length) {
     throw new TenantError(
-      "One or more selected contacts do not belong to the active organization.",
+      `One or more selected ${vocab.contact.plural} do not belong to the active organization.`,
     );
   }
   if (
@@ -681,12 +682,12 @@ async function insertCampaignContacts(input: {
     )
   ) {
     throw new TenantError(
-      "Contacts whose only lists are archived cannot be added to a campaign.",
+      `${vocab.contact.Plural} whose only ${vocab.list.plural} are archived cannot be added to ${vocab.campaign.aSingular}.`,
     );
   }
   if (contacts.some((contact) => !contact.normalizedEmail)) {
     throw new TenantError(
-      "Contacts without an email address cannot be added to a campaign.",
+      `${vocab.contact.Plural} without an email address cannot be added to ${vocab.campaign.aSingular}.`,
     );
   }
   const { listActiveNormalizedEmails, contactMatchesSuppressionSet } =
@@ -701,7 +702,7 @@ async function insertCampaignContacts(input: {
     )
   ) {
     throw new TenantError(
-      "One or more selected contacts are on the organization do-not-contact list.",
+      `One or more selected ${vocab.contact.plural} are on the organization do-not-contact list.`,
     );
   }
 
@@ -784,12 +785,12 @@ export async function addScoringRunContactsToCampaign(input: {
   });
   if (!run) {
     throw new TenantError(
-      "Scoring run does not match this campaign in the active organization.",
+      `Scoring run does not match this ${vocab.campaign.singular} in the active organization.`,
     );
   }
   if (run.contactList.ownerUserId !== campaign.ownerUserId) {
     throw new TenantError(
-      "The scoring run and campaign belong to different users.",
+      `The scoring run and ${vocab.campaign.singular} belong to different users.`,
     );
   }
   const { assertCampaignNotArchived } = await import(
@@ -815,7 +816,7 @@ export async function addScoringRunContactsToCampaign(input: {
   });
   if (scores.length === 0) {
     if (input.qualificationBuckets) return 0;
-    throw new TenantError("This scoring run has no completed contact scores.");
+    throw new TenantError(`This scoring run has no completed ${vocab.contact.singular} scores.`);
   }
 
   const allowed = input.qualificationBuckets

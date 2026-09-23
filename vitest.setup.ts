@@ -14,6 +14,19 @@ configureVitestDatabase();
 
 process.env.TRANSACTIONAL_EMAIL_PROVIDER = "console";
 
+if (!process.env.APP_URL?.trim()) {
+  process.env.APP_URL = "http://localhost:3000";
+}
+if (!process.env.NEXT_PUBLIC_APP_URL?.trim()) {
+  process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3000";
+}
+if (!process.env.MARKETING_URL?.trim()) {
+  process.env.MARKETING_URL = "https://aimedjobseek.example";
+}
+if (!process.env.SUPPORT_EMAIL?.trim()) {
+  process.env.SUPPORT_EMAIL = "support@example.test";
+}
+
 const TRANSACTIONAL_EMAIL_SECRET_KEYS = [
   "TRANSACTIONAL_EMAIL_ALLOW_LIVE_SMTP_IN_TESTS",
   "TRANSACTIONAL_EMAIL_API_KEY",

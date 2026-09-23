@@ -45,3 +45,6 @@ yarn-error.log*
 next-env.d.ts
 
 tmp/
+
+# Dedicated local Postgres data (never Aimed Outreach / never production)
+.local-postgres/

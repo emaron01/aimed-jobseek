@@ -10,6 +10,7 @@ import {
   releaseContactById,
   suppressContactById,
 } from "@/lib/suppression/service";
+import { vocab } from "@/lib/product-config";
 
 function logActionError(fallback: string, error: unknown): void {
   if (error instanceof TenantError) {
@@ -68,7 +69,7 @@ export async function suppressContactAction(
     const user = await requireCurrentUser();
     const organizationId = await requireOrganizationId();
     const contactId = String(formData.get("contactId") ?? "").trim();
-    if (!contactId) throw new TenantError("Contact id is required.");
+    if (!contactId) throw new TenantError(`${vocab.contact.Singular} id is required.`);
     if (String(formData.get("confirm") ?? "") !== "1") {
       return { ok: false, message: "Confirm opt-out before continuing." };
     }
@@ -82,7 +83,7 @@ export async function suppressContactAction(
     return {
       ok: true,
       message:
-        "Contact opted out for this organization. They will not be emailed until restored.",
+        `${vocab.contact.Singular} opted out for this organization. They will not be emailed until restored.`,
     };
   } catch (error) {
     logActionError("Failed to opt out contact.", error);
@@ -98,7 +99,7 @@ export async function releaseContactAction(
     const user = await requireCurrentUser();
     const organizationId = await requireOrganizationId();
     const contactId = String(formData.get("contactId") ?? "").trim();
-    if (!contactId) throw new TenantError("Contact id is required.");
+    if (!contactId) throw new TenantError(`${vocab.contact.Singular} id is required.`);
     if (String(formData.get("confirm") ?? "") !== "1") {
       return { ok: false, message: "Confirm restore before continuing." };
     }
@@ -110,7 +111,7 @@ export async function releaseContactAction(
     await revalidateContactSurfaces({ organizationId, contactId });
     return {
       ok: true,
-      message: "Contact restored. They can be scored and emailed again.",
+      message: `${vocab.contact.Singular} restored. They can be scored and emailed again.`,
     };
   } catch (error) {
     logActionError("Failed to restore contact.", error);

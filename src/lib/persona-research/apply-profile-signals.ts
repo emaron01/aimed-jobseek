@@ -5,6 +5,7 @@ import { TenantError } from "@/lib/tenant/errors";
 import { projectSignalsFromProfileJson } from "@/lib/persona-research/project-signals";
 import { getResearchPolicy } from "@/lib/usage/policy";
 import { recordUsageEvent } from "@/lib/usage/events";
+import { vocab } from "@/lib/product-config";
 
 export async function projectPersonaSignalsFromProfile(input: {
   organizationId: string;
@@ -19,7 +20,7 @@ export async function projectPersonaSignalsFromProfile(input: {
     },
   });
   if (!persona) {
-    throw new TenantError("Persona not found in the active organization.");
+    throw new TenantError(`${vocab.persona.Singular} not found in the active organization.`);
   }
   if (!persona.profileJson) {
     return 0;

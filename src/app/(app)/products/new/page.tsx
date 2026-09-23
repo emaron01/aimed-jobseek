@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AssistedProductIntake } from "@/components/AssistedProductSetup";
 import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
+import { vocab } from "@/lib/product-config";
 
 export default async function NewProductPage() {
   const organization = await getCurrentOrganization();
@@ -10,8 +11,8 @@ export default async function NewProductPage() {
     return (
       <div>
         <PageHeader
-          title="New product"
-          description="Create a product for the active organization."
+          title={`New ${vocab.product.singular}`}
+          description={`Create ${vocab.product.aSingular} for the active organization.`}
         />
         <TenantMissing />
       </div>
@@ -21,14 +22,14 @@ export default async function NewProductPage() {
   return (
     <div>
       <PageHeader
-        title="New product"
-        description="Name the product and supply materials you already use. Research builds a draft profile and suggested buyer roles for your review."
+        title={`New ${vocab.product.singular}`}
+        description={`Name the ${vocab.product.singular} and supply materials you already use. Research builds a draft profile and suggested ${vocab.buyer.singular} roles for your review.`}
         actions={
           <Link
             href="/products"
             className={SECONDARY_BUTTON_CLASS}
           >
-            Back to products
+            Back to {vocab.product.plural}
           </Link>
         }
       />

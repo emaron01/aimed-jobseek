@@ -18,6 +18,7 @@ import {
   type HomeSetupStepKey,
 } from "@/lib/workflow/home-setup-rail";
 import { getProductCampaignReadiness } from "@/lib/workflow/product-campaign-readiness";
+import { vocab } from "@/lib/product-config";
 
 export type SetupCardState = {
   done: boolean;
@@ -261,12 +262,12 @@ export async function getHomeWorkflow(
         ? productDone
           ? activeProduct.name
           : `${activeProduct.name} needs review and approval`
-        : "Research, review, and approve your product",
+        : `Research, review, and approve your ${vocab.product.singular}`,
       actionLabel: activeProduct
         ? productDone
-          ? "Review product"
-          : "Continue product setup"
-        : "Add product",
+          ? `Review ${vocab.product.singular}`
+          : `Continue ${vocab.product.singular} setup`
+        : `Add ${vocab.product.singular}`,
       href: productHref,
       suggestedRoleCount,
     },
@@ -280,9 +281,9 @@ export async function getHomeWorkflow(
         : "Define and interpret a primary target",
       actionLabel: icpDone
         ? icpCount > 1
-          ? "Review ICPs"
-          : "Review ICP"
-        : "Add ICP",
+          ? `Review ${vocab.icp.plural}`
+          : `Review ${vocab.icp.singular}`
+        : `Add ${vocab.icp.singular}`,
       href: activeProduct
         ? icpDone
           ? icpCount > 1
@@ -307,8 +308,8 @@ export async function getHomeWorkflow(
       label: personasDone ? "Saved" : "Not started",
       detail: personasDone
         ? `${activeProduct!.personas.length} saved`
-        : "Build at least one buyer persona",
-      actionLabel: personasDone ? "Manage personas" : "Build persona",
+        : `Build at least one ${vocab.buyer.singular} ${vocab.persona.singular}`,
+      actionLabel: personasDone ? `Manage ${vocab.persona.plural}` : `Build ${vocab.persona.singular}`,
       href: activeProduct
         ? `/setup/${activeProduct.id}#personas`
         : "/setup/new",

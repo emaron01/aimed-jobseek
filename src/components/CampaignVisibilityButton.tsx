@@ -7,6 +7,7 @@ import {
   type CampaignSharingActionResult,
 } from "@/app/actions/campaign-sharing";
 import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { vocab } from "@/lib/product-config";
 
 const initial: CampaignSharingActionResult | null = null;
 
@@ -47,8 +48,8 @@ export function CampaignVisibilityButton({
         className={SECONDARY_BUTTON_CLASS}
         title={
           sharing
-            ? "Make this campaign setup available to the team"
-            : "Remove this campaign from the team's shared templates"
+            ? `Make this ${vocab.campaign.singular} setup available to the team`
+            : `Remove this ${vocab.campaign.singular} from the team's shared templates`
         }
         data-testid="campaign-visibility-button"
       >

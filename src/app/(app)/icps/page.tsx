@@ -5,6 +5,7 @@ import { EmptyState, PageHeader, PRIMARY_BUTTON_CLASS, TenantMissing } from "@/c
 import { cn } from "@/lib/utils";
 import { listIcps, listProducts } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
+import { vocab } from "@/lib/product-config";
 
 export default async function IcpsPage({
   searchParams,
@@ -19,8 +20,8 @@ export default async function IcpsPage({
     return (
       <div>
         <PageHeader
-          title="ICPs"
-          description="Ideal customer profiles across your products."
+          title={vocab.icp.plural}
+          description={`${vocab.idealCustomer.Singular} profiles across your ${vocab.product.plural}.`}
         />
         <TenantMissing />
       </div>
@@ -37,8 +38,8 @@ export default async function IcpsPage({
   return (
     <div>
       <PageHeader
-        title="ICPs"
-        description="Org-wide ICP list. Open an ICP to review criteria or attach it to a campaign."
+        title={vocab.icp.plural}
+        description={`Org-wide ${vocab.icp.singular} list. Open ${vocab.icp.aSingular} to review criteria or attach it to ${vocab.campaign.aSingular}.`}
         actions={
           canCreate ? (
             <Link
@@ -47,14 +48,14 @@ export default async function IcpsPage({
               }
               className={PRIMARY_BUTTON_CLASS}
             >
-              New ICP
+              New {vocab.icp.singular}
             </Link>
           ) : (
             <span
-              title="Add a product first"
+              title={`Add ${vocab.product.aSingular} first`}
               className="inline-flex cursor-not-allowed items-center justify-center rounded-md bg-slate-300 px-3.5 py-2 text-sm font-medium text-slate-500"
             >
-              New ICP
+              New {vocab.icp.singular}
             </span>
           )
         }
@@ -74,22 +75,22 @@ export default async function IcpsPage({
 
       {icps.length === 0 ? (
         <EmptyState
-          title="No ICPs yet"
-          description="An ICP defines who you sell to — natural-language criteria interpreted for scoring and campaigns."
+          title={`No ${vocab.icp.plural} yet`}
+          description={`${vocab.icp.ASingular} defines who you sell to — natural-language criteria interpreted for scoring and ${vocab.campaign.plural}.`}
           actions={
             canCreate ? (
               <Link
                 href="/icps/new"
                 className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
               >
-                New ICP
+                New {vocab.icp.singular}
               </Link>
             ) : (
               <Link
                 href="/products/new"
                 className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
               >
-                New product
+                New {vocab.product.singular}
               </Link>
             )
           }
@@ -99,8 +100,8 @@ export default async function IcpsPage({
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-slate-500">
               <tr>
-                <th className="px-4 py-3 font-medium">ICP</th>
-                <th className="px-4 py-3 font-medium">Product</th>
+                <th className="px-4 py-3 font-medium">{vocab.icp.singular}</th>
+                <th className="px-4 py-3 font-medium">{vocab.product.Singular}</th>
                 <th className="px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>

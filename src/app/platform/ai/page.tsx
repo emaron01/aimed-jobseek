@@ -1,6 +1,7 @@
 import { listAiRoleStatuses } from "@/lib/ai/roles";
 import { AiRoleStatusList } from "@/components/AiRoleStatusList";
 import { requirePlatformOperator } from "@/lib/auth/authz";
+import { vocab } from "@/lib/product-config";
 
 export default async function PlatformAiConfigPage() {
   await requirePlatformOperator();
@@ -14,7 +15,7 @@ export default async function PlatformAiConfigPage() {
           AI configuration
         </h1>
         <p className="mt-1 text-sm text-slate-600">
-          Platform-wide role status from environment variables. Reps cannot change
+          Platform-wide role status from environment variables. {vocab.rep.Plural} cannot change
           these — fix them in the host environment and redeploy/restart.
         </p>
       </div>

@@ -4,6 +4,7 @@ import type {
   PreparedContact,
   ValidatedRow,
 } from "@/lib/import/types";
+import { vocab } from "@/lib/product-config";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -226,7 +227,7 @@ export function validateMappedRows(
       issues.push({
         rowNumber,
         level: "error",
-        message: "Row has no identifiable contact fields.",
+        message: `Row has no identifiable ${vocab.contact.singular} fields.`,
       });
     }
 

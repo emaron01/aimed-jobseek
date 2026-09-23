@@ -611,7 +611,7 @@ describe("generation constraints", () => {
     expect(stage).toContain("Open in Write");
     expect(stage).toContain("onOpenInWrite");
     expect(stage).toContain("data-testid=\"campaign-draft-compare\"");
-    expect(stage).toContain("Campaign contacts");
+    expect(stage).toContain("${vocab.campaign.Singular} ${vocab.contact.plural}");
     expect(stage).toContain('data-testid="email-contacts-filter"');
     expect(stage).toContain("Ready to send");
 
@@ -624,7 +624,9 @@ describe("generation constraints", () => {
     const page = readFileSync("src/app/(app)/campaigns/[id]/page.tsx", "utf8");
     expect(page).toContain("campaign.contacts");
     expect(page).not.toContain("qualifiedCampaignContacts");
-    expect(page).toContain("Generate, edit, and send drafts for every contact");
+    expect(page).toContain(
+      "Generate, edit, and send drafts for every ${vocab.contact.singular}",
+    );
     const context = readFileSync("src/lib/email-generation/context.ts", "utf8");
     expect(context).toContain("storedPersonaId: row.personaId");
     expect(context).toContain("chosenPersonaId");

@@ -3,6 +3,7 @@ import { ProductContinuePicker } from "@/components/ProductContinuePicker";
 import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
 import { listProducts } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
+import { vocab } from "@/lib/product-config";
 
 export default async function NewIcpPage({
   searchParams,
@@ -17,8 +18,8 @@ export default async function NewIcpPage({
     return (
       <div>
         <PageHeader
-          title="New ICP"
-          description="Create an ideal customer profile."
+          title={`New ${vocab.icp.singular}`}
+          description={`Create ${vocab.idealCustomer.aSingular} profile.`}
         />
         <TenantMissing />
       </div>
@@ -37,14 +38,14 @@ export default async function NewIcpPage({
   return (
     <div>
       <PageHeader
-        title="New ICP"
-        description="Choose which product this ICP belongs to, then continue to define and interpret it."
+        title={`New ${vocab.icp.singular}`}
+        description={`Choose which ${vocab.product.singular} this ${vocab.icp.singular} belongs to, then continue to define and interpret it.`}
         actions={
           <Link
             href="/icps"
             className={SECONDARY_BUTTON_CLASS}
           >
-            Back to ICPs
+            Back to {vocab.icp.plural}
           </Link>
         }
       />
@@ -52,11 +53,11 @@ export default async function NewIcpPage({
       <section className="rounded-lg border border-slate-200 bg-white p-5">
         {products.length === 0 ? (
           <p className="text-sm text-slate-600">
-            Add a product on the{" "}
+            Add {vocab.product.aSingular} on the{" "}
             <Link href="/products/new" className="underline">
-              Products page
+              {vocab.product.Plural} page
             </Link>{" "}
-            before creating an ICP.
+            before creating {vocab.icp.aSingular}.
           </p>
         ) : (
           <ProductContinuePicker
@@ -66,7 +67,7 @@ export default async function NewIcpPage({
             }))}
             initialProductId={initialProductId}
             continuePathTemplate="/setup/{productId}/icps/new"
-            continueLabel="Continue to ICP setup"
+            continueLabel={`Continue to ${vocab.icp.singular} setup`}
           />
         )}
       </section>

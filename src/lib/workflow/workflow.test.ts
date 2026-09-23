@@ -19,6 +19,7 @@ import {
   scoreLabelToBucket,
 } from "@/lib/workflow/qualification";
 import { voiceReadiness } from "@/lib/voice/types";
+import { vocab } from "@/lib/product-config";
 
 const prismaMock = vi.hoisted(() => ({
   product: { findMany: vi.fn() },
@@ -348,11 +349,11 @@ describe("workflow view contracts", () => {
     expect(page).not.toContain('currentStage === "send"');
     expect(page).toContain("Compare drafts");
     expect(page).toContain("No company qualification results yet");
-    expect(page).toContain("No contact qualification results yet");
-    expect(page).toContain("Next: attach contacts");
+    expect(page).toContain("No ${vocab.contact.singular} qualification results yet");
+    expect(page).toContain("Next: attach ${vocab.contact.plural}");
     expect(page).toContain("CampaignStageShell");
     expect(page).toContain("An offer is optional");
-    expect(page).toContain("No campaign activity has been recorded yet");
+    expect(page).toContain("No ${vocab.campaign.singular} activity has been recorded yet");
   });
 
   it("redirects stage deep links into the persistent campaign workspace", () => {
@@ -402,7 +403,7 @@ describe("workflow view contracts", () => {
       emailReconnectRequired: false,
     });
     expect(steps.find((step) => step.key === "lists")).toMatchObject({
-      label: "Lists",
+      label: vocab.list.Plural,
       href: "/lists",
     });
 
@@ -413,15 +414,15 @@ describe("workflow view contracts", () => {
       }),
     );
     expect(railHtml).toContain('href="/lists"');
-    expect(railHtml).toContain(">Lists<");
+    expect(railHtml).toContain(`>${vocab.list.Plural}<`);
     expect(railHtml).toContain('aria-label="Setup"');
 
     const page = readFileSync("src/app/(app)/page.tsx", "utf8");
     expect(page).toContain("HomeSetupRail");
     expect(page).toContain("workflow.campaigns.map");
     expect(page).toContain('HomeNavLink href="/lists"');
-    expect(page).toContain("Finish product setup first");
-    expect(page).toContain("campaigns stay available");
+    expect(page).toContain("Finish ${vocab.product.singular} setup first");
+    expect(page).toContain("vocab.campaign.plural} stay available");
   });
 
   it("does not render unsupported engagement metrics", () => {

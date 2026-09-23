@@ -7,6 +7,7 @@ import { useTransition } from "react";
 import type { CampaignDueSummary } from "@/lib/cadence/dashboard";
 import { bulkGenerateDueForCampaignAction } from "@/app/actions/cadence";
 import { generateEmailDraftAction, addFollowUpEmailAction } from "@/app/actions/email";
+import { countedNoun, vocab } from "@/lib/product-config";
 
 const URGENCY_STYLES = {
   overdue: "bg-rose-100 text-rose-900",
@@ -49,7 +50,7 @@ export function DueContactsPanel({
             Follow-ups due
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            {totalDue} contact{totalDue === 1 ? "" : "s"} ready for the next
+            {countedNoun(totalDue, vocab.contact)} ready for the next
             email. Generate drafts manually — nothing sends automatically.
           </p>
         </div>

@@ -20,6 +20,7 @@ import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { getActiveResearchedCompanyUsage } from "@/lib/usage/quota";
 import { formatDate, formatNumber } from "@/lib/utils";
 import { canViewAllRepWork } from "@/lib/work/ownership";
+import { features, vocab } from "@/lib/product-config";
 
 export default async function ListsPage({
   searchParams,
@@ -35,8 +36,8 @@ export default async function ListsPage({
     return (
       <div>
         <PageHeader
-          title="Lists"
-          description="Contact lists for this organization."
+          title={vocab.list.Plural}
+          description={`${vocab.contact.Singular} ${vocab.list.plural} for this organization.`}
         />
         <TenantMissing />
       </div>
@@ -60,8 +61,8 @@ export default async function ListsPage({
   return (
     <div>
       <PageHeader
-        title="Lists"
-        description="Create lists by pasting contacts or uploading CSV/XLSX files. All data stays in this organization."
+        title={vocab.list.Plural}
+        description={`Create ${vocab.list.plural} by pasting ${vocab.contact.plural} or uploading CSV/XLSX files. All data stays in this organization.`}
         actions={
           <div className="flex flex-wrap items-center gap-3">
             {campaign ? (
@@ -78,9 +79,9 @@ export default async function ListsPage({
                 archived: !includeArchived,
               })}
               includeArchived={includeArchived}
-              label="lists"
+              label={vocab.list.plural}
             />
-            <AddContactsWizard />
+            {features.listImport ? <AddContactsWizard /> : null}
           </div>
         }
       />
@@ -94,27 +95,27 @@ export default async function ListsPage({
         />
         <p className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900">
           {campaign
-            ? `Select a list to research and score for ${campaign.name}. After scoring, save and return to the campaign to attach Ready to include contacts.`
-            : "Select a list below to research and score your contacts before adding them to a campaign."}
+            ? `Select ${vocab.list.aSingular} to research and score for ${campaign.name}. After scoring, save and return to the ${vocab.campaign.singular} to attach Ready to include ${vocab.contact.plural}.`
+            : `Select ${vocab.list.aSingular} below to research and score your ${vocab.contact.plural} before adding them to ${vocab.campaign.aSingular}.`}
         </p>
       </div>
       {lists.length === 0 ? (
         <EmptyState
-          title="No lists yet"
-          description="Click Add Contacts to paste spreadsheet data or upload a CSV/XLSX file."
+          title={`No ${vocab.list.plural} yet`}
+          description={`Click Add ${vocab.contact.Plural} to paste spreadsheet data or upload a CSV/XLSX file.`}
         />
       ) : (
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-slate-500">
               <tr>
-                <th className="px-4 py-3 font-medium">List Name</th>
+                <th className="px-4 py-3 font-medium">{vocab.list.Singular} Name</th>
                 {showOwners ? (
                   <th className="px-4 py-3 font-medium">Owner</th>
                 ) : null}
                 <th className="px-4 py-3 font-medium">Source</th>
                 <th className="px-4 py-3 font-medium">Filename</th>
-                <th className="px-4 py-3 font-medium">Total Contacts</th>
+                <th className="px-4 py-3 font-medium">Total {vocab.contact.Plural}</th>
                 <th className="px-4 py-3 font-medium">Imported</th>
               </tr>
             </thead>

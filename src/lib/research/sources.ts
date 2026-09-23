@@ -6,6 +6,7 @@ import type {
   CompanyResearchInput,
   ResearchSource,
 } from "@/lib/research/types";
+import { brandUserAgent } from "@/lib/product-config";
 
 export type SourceExcerpt = {
   url: string;
@@ -211,7 +212,7 @@ async function fetchWebsitePage(
       timeoutMs,
       headers: {
         Accept: "text/html,application/xhtml+xml",
-        "User-Agent": "EmailPlatformCompanyResearch/1.0",
+        "User-Agent": brandUserAgent("CompanyResearch"),
       },
     });
 

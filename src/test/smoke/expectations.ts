@@ -1,3 +1,5 @@
+import { vocab } from "@/lib/product-config";
+
 export type SmokeExpectation = {
   /** Substring(s); any match in the final HTML body passes. */
   mustInclude: string | string[];
@@ -40,15 +42,15 @@ const ROUTE_EXPECTATIONS: Record<string, SmokeExpectation> = {
   "/reset-password": { mustInclude: "Reset password", public: true },
   "/invite/accept": { mustInclude: "Invalid invitation", public: true },
   "/": { mustInclude: "data-testid=\"app-sidebar\"" },
-  "/campaigns": { mustInclude: "Campaigns" },
-  "/campaigns/new": { mustInclude: "New campaign" },
-  "/contacts": { mustInclude: "Contacts" },
-  "/icps": { mustInclude: "ICPs" },
-  "/icps/new": { mustInclude: "New ICP" },
-  "/lists": { mustInclude: "Lists" },
-  "/personas": { mustInclude: "Personas" },
-  "/personas/new": { mustInclude: "New persona" },
-  "/products": { mustInclude: "Products" },
+  "/campaigns": { mustInclude: vocab.campaign.Plural },
+  "/campaigns/new": { mustInclude: `New ${vocab.campaign.singular}` },
+  "/contacts": { mustInclude: vocab.contact.Plural },
+  "/icps": { mustInclude: vocab.icp.Plural },
+  "/icps/new": { mustInclude: `New ${vocab.icp.singular}` },
+  "/lists": { mustInclude: vocab.list.Plural },
+  "/personas": { mustInclude: vocab.persona.Plural },
+  "/personas/new": { mustInclude: `New ${vocab.persona.singular}` },
+  "/products": { mustInclude: vocab.product.Plural },
   "/products/new": { mustInclude: "data-testid=\"assisted-product-intake\"" },
   "/settings": { mustInclude: "Settings" },
   "/settings/account": { mustInclude: "Account Settings" },
@@ -66,8 +68,8 @@ const ROUTE_EXPECTATIONS: Record<string, SmokeExpectation> = {
   "/settings/usage": { mustInclude: "Usage" },
   "/settings/voice": { mustInclude: "Your Voice" },
   "/support": { mustInclude: "Submit a support request" },
-  "/setup": { mustInclude: "Products" },
-  "/setup/new": { mustInclude: "New Product" },
+  "/setup": { mustInclude: vocab.product.Plural },
+  "/setup/new": { mustInclude: `New ${vocab.product.Singular}` },
   "/no-workspace": { mustInclude: "data-testid=\"app-sidebar\"" },
   "/platform": { mustInclude: "data-testid=\"platform-console-nav\"" },
   "/platform/orgs": { mustInclude: "Organizations" },
@@ -84,7 +86,7 @@ const ROUTE_EXPECTATIONS: Record<string, SmokeExpectation> = {
 function expectationForCampaignChild(pathname: string): SmokeExpectation | null {
   if (!pathname.startsWith("/campaigns/")) return null;
   if (pathname.endsWith("/score")) return null;
-  return { mustInclude: "Campaign" };
+  return { mustInclude: vocab.campaign.Singular };
 }
 
 function expectationForSetupChild(pathname: string): SmokeExpectation | null {
@@ -96,19 +98,19 @@ function expectationForSetupChild(pathname: string): SmokeExpectation | null {
     return { mustInclude: "persona-resynthesis-review" };
   }
   if (pathname.includes("/personas/new")) {
-    return { mustInclude: "Build Persona" };
+    return { mustInclude: `Build ${vocab.persona.Singular}` };
   }
   if (pathname.includes("/personas/manage/")) {
-    return { mustInclude: "Persona" };
+    return { mustInclude: vocab.persona.Singular };
   }
   if (pathname.includes("/personas/")) {
-    return { mustInclude: "Persona" };
+    return { mustInclude: vocab.persona.Singular };
   }
   if (pathname.includes("/icps/new")) {
-    return { mustInclude: "Add ICP" };
+    return { mustInclude: `Add ${vocab.icp.singular}` };
   }
   if (pathname.includes("/icps/")) {
-    return { mustInclude: "ICP" };
+    return { mustInclude: vocab.icp.singular };
   }
   if (pathname.includes("/research")) {
     return { mustInclude: "Research:" };
@@ -116,7 +118,7 @@ function expectationForSetupChild(pathname: string): SmokeExpectation | null {
   if (pathname.endsWith("/edit")) {
     return { mustInclude: "Edit:" };
   }
-  return { mustInclude: "Product" };
+  return { mustInclude: vocab.product.Singular };
 }
 
 export function smokeExpectationForPath(pathname: string): SmokeExpectation {
@@ -133,7 +135,7 @@ export function smokeExpectationForPath(pathname: string): SmokeExpectation {
     return { mustInclude: "Create Scoring Run" };
   }
   if (pathname.startsWith("/lists/")) {
-    return { mustInclude: "List" };
+    return { mustInclude: vocab.list.Singular };
   }
   if (pathname.startsWith("/companies/")) {
     return { mustInclude: "Company briefing" };

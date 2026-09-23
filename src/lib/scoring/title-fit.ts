@@ -9,6 +9,7 @@
 
 import { evaluatePersonaExclusions } from "@/lib/scoring/persona-exclusions";
 import type { PersonaSnapshot } from "@/lib/scoring/types";
+import { vocab } from "@/lib/product-config";
 
 export const ALL_PERSONAS_VALUE = "__all__";
 
@@ -194,7 +195,7 @@ export function evaluatePersonaTitleGate(input: {
       personaId: input.persona.id,
       personaName: input.persona.name,
       status: "CANDIDATE",
-      reason: "Single-persona run — title fit is not used as a gate.",
+      reason: `Single-${vocab.persona.singular} run — title fit is not used as a gate.`,
     };
   }
 
@@ -217,8 +218,8 @@ export function evaluatePersonaTitleGate(input: {
     personaName: input.persona.name,
     status: "UNKNOWN",
     reason: input.contactTitle?.trim()
-      ? "Title did not match this persona's likely titles and was not title-excluded."
-      : "No contact title is available to test persona fit.",
+      ? `Title did not match this ${vocab.persona.singular}'s likely titles and was not title-excluded.`
+      : `No ${vocab.contact.singular} title is available to test ${vocab.persona.singular} fit.`,
   };
 }
 

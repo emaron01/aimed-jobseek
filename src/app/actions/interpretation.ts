@@ -23,6 +23,7 @@ import {
 import { normalizeIcpCriterionTier } from "@/lib/criteria/tier";
 import { createPersona, updatePersona } from "@/lib/tenant/data";
 import { prisma } from "@/lib/prisma";
+import { vocab } from "@/lib/product-config";
 
 export type CriterionActionResult = {
   ok: boolean;
@@ -41,7 +42,7 @@ export async function interpretIcpAction(
   const icpId = String(formData.get("icpId") || "").trim();
   const productId = String(formData.get("productId") || "").trim();
   if (!icpId) {
-    return { ok: false, message: "ICP id is required." };
+    return { ok: false, message: `${vocab.icp.singular} id is required.` };
   }
 
   try {
@@ -64,7 +65,7 @@ export async function interpretIcpAction(
       message:
         error instanceof TenantError
           ? error.message
-          : "AI interpretation could not be completed. ICP data was not changed.",
+          : `AI interpretation could not be completed. ${vocab.icp.singular} data was not changed.`,
       icpId,
     };
   }
@@ -110,7 +111,7 @@ export async function saveAndInterpretPersonaAction(
     revalidateSetup(productId || undefined);
     return {
       ok: true,
-      message: "Persona saved. Interpretation complete.",
+      message: `${vocab.persona.Singular} saved. Interpretation complete.`,
       personaId,
     };
   } catch (error) {
@@ -122,7 +123,7 @@ export async function saveAndInterpretPersonaAction(
     return {
       ok: true,
       message:
-        "Persona saved. AI criteria regeneration could not be completed. You can retry later.",
+        `${vocab.persona.Singular} saved. AI criteria regeneration could not be completed. You can retry later.`,
       personaId,
     };
   }
@@ -138,7 +139,7 @@ export async function interpretPersonaAction(
   const personaId = String(formData.get("personaId") || "").trim();
   const productId = String(formData.get("productId") || "").trim();
   if (!personaId) {
-    return { ok: false, message: "Save the persona before interpreting." };
+    return { ok: false, message: `Save the ${vocab.persona.singular} before interpreting.` };
   }
 
   try {
@@ -159,7 +160,7 @@ export async function interpretPersonaAction(
       message:
         error instanceof TenantError
           ? error.message
-          : "AI interpretation could not be completed. Persona data was not changed.",
+          : `AI interpretation could not be completed. ${vocab.persona.Singular} data was not changed.`,
       personaId,
     };
   }
@@ -175,7 +176,7 @@ export async function updateIcpCriterionAction(
     const icpId = String(formData.get("icpId") || "").trim();
     const productId = String(formData.get("productId") || "").trim();
     if (!criterionId || !icpId) {
-      return { ok: false, message: "ICP criterion id and icp id are required." };
+      return { ok: false, message: `${vocab.icp.singular} criterion id and icp id are required.` };
     }
 
     const name = String(formData.get("name") || "").trim();
@@ -200,7 +201,7 @@ export async function updateIcpCriterionAction(
       message:
         error instanceof TenantError
           ? error.message
-          : "Unable to update ICP criterion. Please try again.",
+          : `Unable to update ${vocab.icp.singular} criterion. Please try again.`,
     };
   }
 }
@@ -218,7 +219,7 @@ export async function updateIcpEvidenceClassAction(
       formData.get("evidenceClass"),
     );
     if (!criterionId || !icpId) {
-      return { ok: false, message: "ICP criterion id and icp id are required." };
+      return { ok: false, message: `${vocab.icp.singular} criterion id and icp id are required.` };
     }
 
     await updateIcpCriterionManual({
@@ -275,7 +276,7 @@ export async function decideIcpTargetedSearchAction(
       where: { id: criterionId, organizationId, icpId },
     });
     if (!existing) {
-      return { ok: false, message: "ICP criterion not found." };
+      return { ok: false, message: `${vocab.icp.singular} criterion not found.` };
     }
 
     if (decision === "REMOVE") {
@@ -342,7 +343,7 @@ export async function updateIcpCriterionTierAction(
       formData.get("isMandatory") === "on" ||
       formData.get("isMandatory") === "true";
     if (!criterionId || !icpId) {
-      return { ok: false, message: "ICP criterion id and icp id are required." };
+      return { ok: false, message: `${vocab.icp.singular} criterion id and icp id are required.` };
     }
     if (!tier) {
       return {
@@ -382,7 +383,7 @@ export async function updatePersonaCriterionAction(
     if (!criterionId || !personaId) {
       return {
         ok: false,
-        message: "Persona criterion id and persona id are required.",
+        message: `${vocab.persona.Singular} criterion id and ${vocab.persona.singular} id are required.`,
       };
     }
 
@@ -437,7 +438,7 @@ export async function updatePersonaCriterionAction(
       message:
         error instanceof TenantError
           ? error.message
-          : "Unable to update persona criterion. Please try again.",
+          : `Unable to update ${vocab.persona.singular} criterion. Please try again.`,
     };
   }
 }
@@ -454,7 +455,7 @@ export async function deletePersonaCriterionAction(
     if (!criterionId || !personaId) {
       return {
         ok: false,
-        message: "Persona criterion id and persona id are required.",
+        message: `${vocab.persona.Singular} criterion id and ${vocab.persona.singular} id are required.`,
       };
     }
 
@@ -464,7 +465,7 @@ export async function deletePersonaCriterionAction(
     if (!existing) {
       return {
         ok: false,
-        message: "Persona criterion not found in the active organization.",
+        message: `${vocab.persona.Singular} criterion not found in the active organization.`,
       };
     }
 
@@ -477,7 +478,7 @@ export async function deletePersonaCriterionAction(
       message:
         error instanceof TenantError
           ? error.message
-          : "Unable to remove persona criterion. Please try again.",
+          : `Unable to remove ${vocab.persona.singular} criterion. Please try again.`,
     };
   }
 }

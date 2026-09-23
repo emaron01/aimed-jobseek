@@ -39,6 +39,7 @@ import {
   assertCanModifyOwnedWork,
   getWorkActor,
 } from "@/lib/work/ownership";
+import { countedNoun, vocab } from "@/lib/product-config";
 
 type Tx = Prisma.TransactionClient;
 
@@ -173,13 +174,13 @@ export function decideListDelete(impact: ListLifecycleImpact): ListDeleteDecisio
     return {
       mode: "archive",
       impact,
-      message: `List archived because ${impact.scoringRunCount} scoring run(s) reference it. Contacts and campaign history were preserved.`,
+      message: `${vocab.list.Singular} archived because ${impact.scoringRunCount} scoring run(s) reference it. ${vocab.contact.Plural} and ${vocab.campaign.singular} history were preserved.`,
     };
   }
   return {
     mode: "delete",
     impact,
-    message: `List deleted. Removed ${impact.contactCount} membership(s). Contacts were kept.`,
+    message: `${vocab.list.Singular} deleted. Removed ${impact.contactCount} membership(s). ${vocab.contact.Plural} were kept.`,
   };
 }
 
@@ -196,14 +197,14 @@ export async function archiveContactList(id: string): Promise<{
   });
   if (!existing) {
     throw new TenantError(
-      "Contact list not found in the active organization.",
+      `${vocab.contact.Singular} ${vocab.list.singular} not found in the active organization.`,
     );
   }
   assertCanModifyOwnedWork(actor, existing.ownerUserId, "Contact list");
   if (existing.archivedAt) {
     return {
       mode: "archived",
-      message: "List is already archived.",
+      message: `${vocab.list.Singular} is already archived.`,
       cascadedContactCount: 0,
     };
   }
@@ -220,8 +221,8 @@ export async function archiveContactList(id: string): Promise<{
     mode: "archived",
     message:
       cascadedContactCount > 0
-        ? `List archived. ${cascadedContactCount} contact${cascadedContactCount === 1 ? "" : "s"} archived with it (only those with no other active list or active campaign).`
-        : "List archived. It is hidden from campaign and scoring selectors until you unarchive it.",
+        ? `${vocab.list.Singular} archived. ${countedNoun(cascadedContactCount, vocab.contact)} archived with it (only those with no other active ${vocab.list.singular} or active ${vocab.campaign.singular}).`
+        : `${vocab.list.Singular} archived. It is hidden from ${vocab.campaign.singular} and scoring selectors until you unarchive it.`,
     cascadedContactCount,
   };
 }
@@ -239,14 +240,14 @@ export async function unarchiveContactList(id: string): Promise<{
   });
   if (!existing) {
     throw new TenantError(
-      "Contact list not found in the active organization.",
+      `${vocab.contact.Singular} ${vocab.list.singular} not found in the active organization.`,
     );
   }
   assertCanModifyOwnedWork(actor, existing.ownerUserId, "Contact list");
   if (!existing.archivedAt) {
     return {
       mode: "unarchived",
-      message: "List is not archived.",
+      message: `${vocab.list.Singular} is not archived.`,
       restoredContactCount: 0,
     };
   }
@@ -267,8 +268,8 @@ export async function unarchiveContactList(id: string): Promise<{
     mode: "unarchived",
     message:
       restoredContactCount > 0
-        ? `List unarchived. ${restoredContactCount} contact${restoredContactCount === 1 ? "" : "s"} restored from this list’s archive cascade.`
-        : "List unarchived. It appears in campaign and scoring selectors again.",
+        ? `${vocab.list.Singular} unarchived. ${countedNoun(restoredContactCount, vocab.contact)} restored from this ${vocab.list.singular}’s archive cascade.`
+        : `${vocab.list.Singular} unarchived. It appears in ${vocab.campaign.singular} and scoring selectors again.`,
     restoredContactCount,
   };
 }
@@ -392,7 +393,7 @@ export async function deleteContactListGraph(
   });
   if (!list) {
     throw new TenantError(
-      "Contact list not found in the active organization.",
+      `${vocab.contact.Singular} ${vocab.list.singular} not found in the active organization.`,
     );
   }
 
@@ -451,7 +452,7 @@ export async function deleteOrArchiveContactList(id: string): Promise<{
   });
   if (!existing) {
     throw new TenantError(
-      "Contact list not found in the active organization.",
+      `${vocab.contact.Singular} ${vocab.list.singular} not found in the active organization.`,
     );
   }
   assertCanModifyOwnedWork(actor, existing.ownerUserId, "Contact list");

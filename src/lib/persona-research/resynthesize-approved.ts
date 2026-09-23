@@ -30,6 +30,7 @@ import { runProgressivePersonaWebSearch } from "@/lib/persona-research/progressi
 import { synthesizePersonaFromEvidence } from "@/lib/persona-research/synthesize";
 import { getResearchPolicy } from "@/lib/usage/policy";
 import { recordUsageEvent } from "@/lib/usage/events";
+import { vocab } from "@/lib/product-config";
 
 export const PERSONA_RESYNTHESIS_USER_CONTEXT_FLAG = "approvedPersonaResynthesis";
 
@@ -115,20 +116,20 @@ export async function startApprovedPersonaResynthesis(input: {
     },
   });
   if (!persona) {
-    throw new TenantError("Persona not found in the active organization.");
+    throw new TenantError(`${vocab.persona.Singular} not found in the active organization.`);
   }
   if (persona.approvalStatus !== "APPROVED") {
-    throw new TenantError("Only approved personas can be rebuilt from product evidence.");
+    throw new TenantError(`Only approved ${vocab.persona.plural} can be rebuilt from ${vocab.product.singular} evidence.`);
   }
 
   const product = await prisma.product.findFirst({
     where: { id: input.productId, organizationId: input.organizationId },
   });
   if (!product) {
-    throw new TenantError("Product not found in the active organization.");
+    throw new TenantError(`${vocab.product.Singular} not found in the active organization.`);
   }
   if (product.approvalStatus !== "APPROVED") {
-    throw new TenantError("Approve the product before rebuilding a persona.");
+    throw new TenantError(`Approve the ${vocab.product.singular} before rebuilding ${vocab.persona.aSingular}.`);
   }
 
   const approvedRun = persona.approvedPersonaSetupRunId
@@ -156,7 +157,7 @@ export async function startApprovedPersonaResynthesis(input: {
 
   if (!productEvidenceBundleId) {
     throw new TenantError(
-      "No product evidence bundle available. Run product research first.",
+      `No ${vocab.product.singular} evidence bundle available. Run ${vocab.product.singular} research first.`,
     );
   }
 
@@ -167,7 +168,7 @@ export async function startApprovedPersonaResynthesis(input: {
     },
   });
   if (!productBundle) {
-    throw new TenantError("Product evidence bundle not found.");
+    throw new TenantError(`${vocab.product.Singular} evidence bundle not found.`);
   }
 
   const buyerRole = personaToBuyerRole(persona);
@@ -277,7 +278,7 @@ export async function applyApprovedPersonaResynthesis(input: {
     include: { criteria: true },
   });
   if (!persona) {
-    throw new TenantError("Persona not found in the active organization.");
+    throw new TenantError(`${vocab.persona.Singular} not found in the active organization.`);
   }
 
   const run = await prisma.personaSetupRun.findFirst({
@@ -289,7 +290,7 @@ export async function applyApprovedPersonaResynthesis(input: {
     },
   });
   if (!run?.personaDraftJson) {
-    throw new TenantError("Persona rebuild draft not found.");
+    throw new TenantError(`${vocab.persona.Singular} rebuild draft not found.`);
   }
   if (run.status !== "NEEDS_REVIEW") {
     throw new TenantError("This rebuild draft is no longer available for approval.");
@@ -297,7 +298,7 @@ export async function applyApprovedPersonaResynthesis(input: {
 
   const userContext = run.userContextJson as Record<string, unknown> | null;
   if (!userContext?.[PERSONA_RESYNTHESIS_USER_CONTEXT_FLAG]) {
-    throw new TenantError("This setup run is not an in-place persona rebuild.");
+    throw new TenantError(`This setup run is not an in-place ${vocab.persona.singular} rebuild.`);
   }
 
   const draft = run.personaDraftJson as PersonaAiDraft;

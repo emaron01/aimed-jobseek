@@ -16,6 +16,7 @@ import type {
   SuggestedBuyerRole,
   SuggestedPersona,
 } from "@/lib/product-research/contract";
+import { vocab } from "@/lib/product-config";
 
 const initial: ProductSetupActionResult | null = null;
 
@@ -83,8 +84,8 @@ export function AssistedProductIntake({
         </h3>
         <p className="mt-1 text-sm text-slate-600">
           Start with the materials you already use — datasheets, whitepapers,
-          decks, or use cases. Product name is required; everything else is
-          optional. We draft your Product and Personas once for your review.
+          decks, or use cases. {vocab.product.Singular} name is required; everything else is
+          optional. We draft your {vocab.product.Singular} and {vocab.persona.Plural} once for your review.
         </p>
       </div>
 
@@ -94,7 +95,7 @@ export function AssistedProductIntake({
         ) : null}
         <div className="md:col-span-2">
           <Field
-            label="Product Name"
+            label={`${vocab.product.Singular} Name`}
             name="name"
             required
             defaultValue={defaultName}
@@ -105,7 +106,7 @@ export function AssistedProductIntake({
           <label className="flex cursor-pointer flex-col rounded-lg border border-slate-900 bg-slate-900 p-5 text-white transition hover:bg-slate-800">
             <span className="text-base font-semibold">Upload materials</span>
             <span className="mt-1 text-sm text-white/80">
-              Datasheets, whitepapers, decks, use cases, or product overviews.
+              Datasheets, whitepapers, decks, use cases, or {vocab.product.singular} overviews.
               PDF, DOCX, TXT, MD · Max 15 MiB each.
             </span>
             <input
@@ -121,18 +122,18 @@ export function AssistedProductIntake({
           <div className="rounded-lg border border-slate-300 bg-white p-5">
             <label className="block" htmlFor="pastedContent">
               <span className="text-base font-semibold text-slate-900">
-                Paste product content
+                Paste {vocab.product.singular} content
               </span>
               <span className="mt-1 block text-sm text-slate-500">
-                Paste from a brochure, whitepaper, sales deck, datasheet,
-                product sheet, or case study.
+                Paste from a brochure, whitepaper, {vocab.sales.singular} deck, datasheet,
+                {vocab.product.singular} sheet, or case study.
               </span>
             </label>
             <textarea
               id="pastedContent"
               name="pastedContent"
               rows={8}
-              placeholder="Paste product content here…"
+              placeholder={`Paste ${vocab.product.singular} content here…`}
               className="mt-3 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 placeholder:text-slate-400 focus:ring-2"
             />
           </div>
@@ -140,26 +141,26 @@ export function AssistedProductIntake({
 
         <div className="md:col-span-2">
           <Field
-            label="Product Notes"
+            label={`${vocab.product.Singular} Notes`}
             name="notes"
             as="textarea"
-            hint="Anything important about the buyer, positioning, pricing, use case, or market that is not in the materials above."
+            hint={`Anything important about the ${vocab.buyer.singular}, positioning, pricing, use case, or market that is not in the materials above.`}
           />
         </div>
 
         <div className="md:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
           <p className="text-sm text-slate-600">
-            Many product pages cannot be read automatically — they load content
+            Many {vocab.product.singular} pages cannot be read automatically — they load content
             with JavaScript or block automated access. Uploading or pasting the
             materials you already have usually produces a better profile than a
             website link alone.
           </p>
           <Field
-            label="Product URL (optional)"
+            label={`${vocab.product.Singular} URL (optional)`}
             name="primaryUrl"
             defaultValue={defaultUrl}
             placeholder="https://"
-            hint="A product or solution page can help, but it is not required."
+            hint={`${vocab.product.ASingular} or ${vocab.solution.singular} page can help, but it is not required.`}
           />
           <Field
             label="Additional URLs (optional)"
@@ -183,7 +184,7 @@ export function AssistedProductIntake({
 
         <div className="md:col-span-2 flex flex-wrap gap-2">
           <SubmitButton disabled={pending || savePending || retryPending}>
-            {pending ? "Researching…" : "Research & Build Product"}
+            {pending ? "Researching…" : `Research & Build ${vocab.product.Singular}`}
           </SubmitButton>
           {!productId ? (
             <button
@@ -192,7 +193,7 @@ export function AssistedProductIntake({
               disabled={pending || savePending}
               className={SECONDARY_BUTTON_CLASS}
             >
-              {savePending ? "Saving…" : "Save Product only"}
+              {savePending ? "Saving…" : `Save ${vocab.product.Singular} only`}
             </button>
           ) : null}
         </div>
@@ -234,8 +235,8 @@ export function SuggestedBuyerRolesPanel({
         className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
         data-testid="suggested-buyer-roles-locked"
       >
-        Save and approve the Product first. Suggested buyer roles become
-        available for building Personas after Product approval.
+        Save and approve the {vocab.product.Singular} first. Suggested {vocab.buyer.singular} roles become
+        available for building {vocab.persona.Plural} after {vocab.product.Singular} approval.
       </div>
     );
   }
@@ -244,17 +245,17 @@ export function SuggestedBuyerRolesPanel({
     <div className="space-y-4" data-testid="suggested-buyer-roles">
       <div>
         <h3 className="text-lg font-semibold text-slate-900">
-          Suggested Buyer Roles
+          Suggested {vocab.buyer.Singular} Roles
         </h3>
         <p className="mt-1 text-sm text-slate-600">
-          Recommendations only — not Personas yet. Build one Persona at a time.
-          Unused roles incur no Persona research or synthesis cost.
+          Recommendations only — not {vocab.persona.Plural} yet. Build one {vocab.persona.Singular} at a time.
+          Unused roles incur no {vocab.persona.Singular} research or synthesis cost.
         </p>
       </div>
       {roles.length === 0 ? (
         <p className="text-sm text-slate-500">
-          No suggested roles from Product synthesis. You can still create a
-          custom Persona.
+          No suggested roles from {vocab.product.Singular} synthesis. You can still create a
+          custom {vocab.persona.Singular}.
         </p>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -279,7 +280,7 @@ export function SuggestedBuyerRolesPanel({
                   href={`/setup/${productId}/personas/new?role=${encodeURIComponent(role.suggestionKey)}`}
                   className={cn(PRIMARY_BUTTON_CLASS, "!px-3", "!py-1.5")}
                 >
-                  Build Persona
+                  Build {vocab.persona.Singular}
                 </Link>
               </p>
             </div>
@@ -291,11 +292,11 @@ export function SuggestedBuyerRolesPanel({
           href={`/setup/${productId}/personas/new`}
           className="font-medium text-slate-800 underline"
         >
-          Create Custom Persona
+          Create Custom {vocab.persona.Singular}
         </Link>
         {" · "}
         <Link href={`/setup/${productId}`} className="underline">
-          Product ICPs & Personas
+          {vocab.product.Singular} {vocab.icp.plural} & {vocab.persona.Plural}
         </Link>
       </p>
     </div>

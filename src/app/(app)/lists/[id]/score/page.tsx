@@ -18,6 +18,7 @@ import {
   TenantError,
 } from "@/lib/tenant/getCurrentOrganization";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
+import { features, vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -32,7 +33,7 @@ export default async function ScoreListPage({ params, searchParams }: PageProps)
   if (!organization) {
     return (
       <div>
-        <PageHeader title="Score List" description="Create a scoring run." />
+        <PageHeader title={`Score ${vocab.list.Singular}`} description="Create a scoring run." />
         <TenantMissing />
       </div>
     );
@@ -69,13 +70,13 @@ export default async function ScoreListPage({ params, searchParams }: PageProps)
         title={
           campaign ? `Score for ${campaign.name}: ${list.name}` : `Score: ${list.name}`
         }
-        description="Select Product → ICP → Persona. Default is All personas so mixed lists are scored against every buyer role."
+        description={`Select ${vocab.product.Singular} → ${vocab.icp.singular} → ${vocab.persona.Singular}. Default is All ${vocab.persona.plural} so mixed ${vocab.list.plural} are scored against every ${vocab.buyer.singular} role.`}
         actions={
           <Link
             href={listDetailHref(id, { campaignId: campaign?.id })}
             className={SECONDARY_BUTTON_CLASS}
           >
-            Back to list
+            Back to {vocab.list.singular}
           </Link>
         }
       />
@@ -87,19 +88,23 @@ export default async function ScoreListPage({ params, searchParams }: PageProps)
         {readOnly ? (
           <p className="text-sm text-slate-600">
             Manager access is read-only. Only{" "}
-            {list.owner.name?.trim() || list.owner.email} can score this list.
+            {list.owner.name?.trim() || list.owner.email} can score this {vocab.list.singular}.
           </p>
         ) : list.archivedAt ? (
           <p className="text-sm text-slate-600">
-            This list is archived and cannot be scored until it is unarchived.
+            This {vocab.list.singular} is archived and cannot be scored until it is unarchived.
           </p>
         ) : readyProducts.length === 0 ? (
           <p className="text-sm text-slate-600">
-            Add a Product with at least one ICP and one Persona on the{" "}
+            Add a {vocab.product.Singular} with at least one {vocab.icp.singular} and one {vocab.persona.Singular} on the{" "}
             <Link href="/products" className="underline">
-              Products page
+              {vocab.product.Plural} page
             </Link>{" "}
             first.
+          </p>
+        ) : !features.listBulkScoring ? (
+          <p className="text-sm text-slate-600">
+            Scoring is not available for this {vocab.list.singular}.
           </p>
         ) : (
           <ScoreListForm

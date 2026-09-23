@@ -27,6 +27,7 @@
 
 import type { Prisma } from "@prisma/client";
 import { TenantError } from "@/lib/tenant/errors";
+import { vocab } from "@/lib/product-config";
 
 type Tx = Prisma.TransactionClient;
 
@@ -59,7 +60,7 @@ export async function deleteCampaignGraph(
     select: { id: true },
   });
   if (!campaign) {
-    throw new TenantError("Campaign not found in the active organization.");
+    throw new TenantError(`${vocab.campaign.Singular} not found in the active organization.`);
   }
 
   const contacts = await tx.campaignContact.findMany({

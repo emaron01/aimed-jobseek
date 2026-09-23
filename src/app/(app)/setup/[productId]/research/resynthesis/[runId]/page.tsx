@@ -11,6 +11,7 @@ import {
   getCurrentOrganization,
   TenantError,
 } from "@/lib/tenant/getCurrentOrganization";
+import { vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ productId: string; runId: string }>;
@@ -23,7 +24,7 @@ export default async function ProductResynthesisReviewPage({ params }: PageProps
   if (!organization) {
     return (
       <div>
-        <PageHeader title="Re-synthesize product" />
+        <PageHeader title={`Re-synthesize ${vocab.product.singular}`} />
         <TenantMissing />
       </div>
     );
@@ -58,14 +59,14 @@ export default async function ProductResynthesisReviewPage({ params }: PageProps
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         title={`Re-synthesize: ${product.name}`}
-        description="Review new material against your approved product profile. Nothing changes until you confirm."
+        description={`Review new material against your approved ${vocab.product.singular} profile. Nothing changes until you confirm.`}
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
               href="/products"
               className={SECONDARY_BUTTON_CLASS}
             >
-              All products
+              All {vocab.product.plural}
             </Link>
             <Link
               href={`/setup/${product.id}/research`}

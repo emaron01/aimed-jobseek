@@ -6,6 +6,7 @@ import {
   useReferralShare,
 } from "@/components/billing/ReferralShareFields";
 import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { features } from "@/lib/product-config";
 import { cn } from "@/lib/utils";
 
 /**
@@ -27,6 +28,8 @@ export function ReferAFriendButton() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
+
+  if (!features.referralProgram) return null;
 
   return (
     <>

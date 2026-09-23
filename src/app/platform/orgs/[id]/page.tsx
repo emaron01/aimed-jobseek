@@ -40,6 +40,7 @@ import {
   updatePlatformOrgMaxSeatsAction,
 } from "@/app/actions/platform-orgs";
 import { planUsesPerUserCompanyAllowance, COMPANY_CREDIT_BLOCK } from "@/lib/billing/plans";
+import { vocab } from "@/lib/product-config";
 
 function pct(rate: number): string {
   return `${(rate * 100).toFixed(1)}%`;
@@ -147,7 +148,7 @@ export default async function PlatformOrgDetailPage({
             </p>
           </li>
           <li className="rounded-md border border-slate-200 bg-white p-3 sm:col-span-2">
-            Ops contact:{" "}
+            Ops {vocab.contact.singular}:{" "}
             {billing.billingEmail ?? "— (no address/tax stored)"}
           </li>
           <li className="rounded-md border border-slate-200 bg-white p-3">
@@ -191,7 +192,7 @@ export default async function PlatformOrgDetailPage({
             billing.stripeEffectiveUnitAmountCents <
               billing.stripePriceUnitAmountCents ? (
               <p className="mt-1 text-xs text-slate-500">
-                List:{" "}
+                {vocab.list.Singular}:{" "}
                 {formatStripeMoney(
                   billing.stripePriceUnitAmountCents,
                   billing.stripePriceCurrency,
@@ -318,9 +319,9 @@ export default async function PlatformOrgDetailPage({
         <ul className="grid gap-2 text-sm sm:grid-cols-4">
           {(
             [
-              ["Product", detail.products.length > 0],
-              ["ICP", detail.icps.length > 0],
-              ["Persona", detail.personas.length > 0],
+              [vocab.product.Singular, detail.products.length > 0],
+              [vocab.icp.singular, detail.icps.length > 0],
+              [vocab.persona.Singular, detail.personas.length > 0],
               ["List", detail.contactLists.length > 0],
             ] as const
           ).map(([label, ok]) => (
@@ -344,7 +345,7 @@ export default async function PlatformOrgDetailPage({
             >
               <span>
                 {m.user.email} · {m.role}
-                {m.isBillingContact ? " · billing contact" : ""}
+                {m.isBillingContact ? ` · billing ${vocab.contact.singular}` : ""}
               </span>
               {canMutate && m.role !== "OWNER" ? (
                 <div className="flex flex-wrap gap-2">
@@ -461,7 +462,7 @@ export default async function PlatformOrgDetailPage({
       <section className="grid gap-4 sm:grid-cols-2">
         <div>
           <h2 className="text-lg font-medium">
-            Products ({detail.products.length})
+            {vocab.product.Plural} ({detail.products.length})
           </h2>
           <ul className="mt-2 space-y-1 text-sm text-slate-700">
             {detail.products.map((p) => (
@@ -474,7 +475,7 @@ export default async function PlatformOrgDetailPage({
         </div>
         <div>
           <h2 className="text-lg font-medium">
-            Campaigns ({detail.campaigns.length})
+            {vocab.campaign.Plural} ({detail.campaigns.length})
           </h2>
           <ul className="mt-2 space-y-1 text-sm text-slate-700">
             {detail.campaigns.map((c) => (
@@ -488,7 +489,7 @@ export default async function PlatformOrgDetailPage({
           </ul>
         </div>
         <div>
-          <h2 className="text-lg font-medium">ICPs ({detail.icps.length})</h2>
+          <h2 className="text-lg font-medium">{vocab.icp.plural} ({detail.icps.length})</h2>
           <ul className="mt-2 space-y-1 text-sm text-slate-700">
             {detail.icps.map((i) => (
               <li key={i.id}>{i.name}</li>
@@ -500,7 +501,7 @@ export default async function PlatformOrgDetailPage({
         </div>
         <div>
           <h2 className="text-lg font-medium">
-            Personas ({detail.personas.length})
+            {vocab.persona.Plural} ({detail.personas.length})
           </h2>
           <ul className="mt-2 space-y-1 text-sm text-slate-700">
             {detail.personas.map((p) => (
@@ -513,14 +514,14 @@ export default async function PlatformOrgDetailPage({
         </div>
         <div className="sm:col-span-2">
           <h2 className="text-lg font-medium">
-            Lists ({detail.contactLists.length})
+            {vocab.list.Plural} ({detail.contactLists.length})
           </h2>
           <ul className="mt-2 space-y-1 text-sm text-slate-700">
             {detail.contactLists.map((list) => (
               <li key={list.id}>
                 {list.name}
                 {list.totalContacts != null
-                  ? ` · ${list.totalContacts} contacts`
+                  ? ` · ${list.totalContacts} ${vocab.contact.plural}`
                   : ""}
               </li>
             ))}
@@ -627,11 +628,11 @@ export default async function PlatformOrgDetailPage({
           >
             <input type="hidden" name="organizationId" value={id} />
             <h3 className="text-sm font-medium text-slate-900">
-              Contact research
+              {vocab.contact.Singular} research
             </h3>
             <p className="text-sm text-slate-600">
-              Per-contact AI research during email generation. Carries real
-              per-contact cost — platform operator only. Customers cannot enable
+              Per-{vocab.contact.singular} AI research during email generation. Carries real
+              per-{vocab.contact.singular} cost — platform operator only. Customers cannot enable
               this in organization settings.
             </p>
             <label className="flex items-start gap-2 text-sm">
@@ -642,7 +643,7 @@ export default async function PlatformOrgDetailPage({
                 className="mt-1"
               />
               <span>
-                Enable contact research for this organization
+                Enable {vocab.contact.singular} research for this organization
               </span>
             </label>
             <button

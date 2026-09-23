@@ -17,6 +17,7 @@ import {
   planUsesSeatBilling,
 } from "@/lib/billing/plans";
 import { formatSeatsUsedLabel } from "@/lib/org/seat-limits";
+import { vocab } from "@/lib/product-config";
 
 export {
   BILLING_PLAN_COMPED,
@@ -273,17 +274,17 @@ export function billingPlanDescription(input: {
     const monthlyBit =
       monthly != null ? ` (${monthly.toLocaleString("en-US")} a month)` : "";
     if (isTrial) {
-      return `Trial: research up to ${companies} companies, send up to ${daily} emails a day${monthlyBit}, full product access. Emails send through your own mailbox.`;
+      return `Trial: research up to ${companies} companies, send up to ${daily} emails a day${monthlyBit}, full ${vocab.product.singular} access. Emails send through your own mailbox.`;
     }
-    return `Research up to ${companies} companies, send up to ${daily} emails a day${monthlyBit}. Full product access. Emails send through your own mailbox.`;
+    return `Research up to ${companies} companies, send up to ${daily} emails a day${monthlyBit}. Full ${vocab.product.singular} access. Emails send through your own mailbox.`;
   }
 
   // Fallback when policy numbers are unavailable (legacy callers / tests).
   if (isStandard && isTrial) {
-    return "Trial: research up to 25 companies, send up to 50 emails a day (1,000 a month), full product access. Emails send through your own mailbox. After trial: 100 companies researched.";
+    return `Trial: research up to 25 companies, send up to 50 emails a day (1,000 a month), full ${vocab.product.singular} access. Emails send through your own mailbox. After trial: 100 companies researched.`;
   }
   if (isStandard) {
-    return "Research up to 100 companies, send up to 50 emails a day and 1,000 a month. Full product access. Emails send through your own mailbox.";
+    return `Research up to 100 companies, send up to 50 emails a day and 1,000 a month. Full ${vocab.product.singular} access. Emails send through your own mailbox.`;
   }
   return "Emails send through your own mailbox.";
 }

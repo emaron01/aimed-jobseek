@@ -9,6 +9,7 @@
 
 import { AiConfigError } from "@/lib/ai/errors";
 import { sanitizeModelUrlIdentifier } from "@/lib/ai/redact";
+import { vocab } from "@/lib/product-config";
 
 /**
  * Scoring AI supports:
@@ -173,13 +174,13 @@ function notConfiguredMessage(role: AiRole): string {
     case "scoring":
       return "AI scoring is not configured.";
     case "interpretation":
-      return "ICP and persona interpretation is not configured.";
+      return `${vocab.icp.singular} and ${vocab.persona.singular} interpretation is not configured.`;
     case "contact_research":
-      return "Contact role research is not configured.";
+      return `${vocab.contact.Singular} role research is not configured.`;
     case "product":
-      return "Product research & assisted setup AI is not configured.";
+      return `${vocab.product.Singular} research & assisted setup AI is not configured.`;
     case "persona":
-      return "Persona research & synthesis AI is not configured.";
+      return `${vocab.persona.Singular} research & synthesis AI is not configured.`;
     case "email":
       return "Email generation AI is not configured.";
     case "email_facts":

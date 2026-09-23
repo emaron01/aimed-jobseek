@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { brand } from "@/lib/product-config";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,8 +14,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Email Platform",
-  description: "Multi-tenant outbound email platform",
+  title: brand.defaultPageTitle,
+  description: brand.metaDescription,
+  icons: { icon: brand.faviconPath },
+  openGraph: {
+    title: brand.defaultPageTitle,
+    description: brand.metaDescription,
+    siteName: brand.appName,
+  },
 };
 
 export const dynamic = "force-dynamic";

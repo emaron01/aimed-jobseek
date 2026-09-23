@@ -9,6 +9,7 @@ import { requireCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { assertCanModifyOwnedWork } from "@/lib/work/ownership";
 import { requireOrganization } from "@/lib/tenant/getCurrentOrganization";
+import { vocab } from "@/lib/product-config";
 
 export type QualificationOverrideActionResult = {
   ok: boolean;
@@ -163,7 +164,7 @@ export async function bulkRestoreQualificationAction(input: {
   }
   const targetIds = [...new Set(input.targetIds.map(String).filter(Boolean))];
   if (targetIds.length === 0) {
-    return { ok: false, message: "Select at least one contact to restore." };
+    return { ok: false, message: `Select at least one ${vocab.contact.singular} to restore.` };
   }
   try {
     const [user, organization] = await Promise.all([

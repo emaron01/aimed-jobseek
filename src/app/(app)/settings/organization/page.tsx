@@ -22,6 +22,7 @@ import {
 } from "@/lib/billing/plans";
 import { prisma } from "@/lib/prisma";
 import { ensureOrganizationPolicies } from "@/lib/usage/policy";
+import { brand, features, vocab } from "@/lib/product-config";
 
 function formatLimit(value: number | null | undefined): string {
   if (value == null) return "Inherit organization default";
@@ -150,7 +151,7 @@ export default async function OrganizationSettingsPage() {
           <Link href="/settings/cadence" className="font-medium underline">
             Email cadence settings
           </Link>{" "}
-          — follow-up intervals and max sequence length.
+          — follow-up intervals and max {vocab.sequence.singular} length.
         </p>
       </section>
 
@@ -158,7 +159,7 @@ export default async function OrganizationSettingsPage() {
         <h2 className="text-lg font-medium text-slate-900">Usage limits</h2>
         <p className="text-sm text-slate-600">
           Set by your account administrator. Confirmed sends are advisory only —
-          they leave from the rep&apos;s mailbox and protect domain reputation,
+          they leave from the {vocab.rep.singular}&apos;s mailbox and protect domain reputation,
           not platform cost. AI email generation is a separate platform ceiling
           and does not count toward the send advisory.
         </p>
@@ -193,12 +194,13 @@ export default async function OrganizationSettingsPage() {
         </dl>
       </section>
 
+      {features.teamMemberManagement ? (
       <section className="space-y-3">
         <h2 className="text-lg font-medium text-slate-900">Members</h2>
         <p className="text-sm text-slate-600">
           OWNER and ADMIN can change roles and remove users
-          {canInvite ? ", and invite new members" : ""}. Product, ICP, and
-          Personas are shared across the org; voice and signature stay per user.
+          {canInvite ? ", and invite new members" : ""}. {vocab.product.Singular}, {vocab.icp.singular}, and
+          {vocab.persona.Plural} are shared across the org; voice and signature stay per user.
         </p>
         <ul className="space-y-3">
           {members.map((m) => (
@@ -209,11 +211,13 @@ export default async function OrganizationSettingsPage() {
               <span>
                 {m.user.name ?? m.user.email}{" "}
                 <span className="text-slate-500">
-                  ({m.user.email}) · {m.role}
+                  ({m.user.email}
+                  {features.teamRoles ? ` · ${m.role}` : ""})
                 </span>
               </span>
               {m.role !== "OWNER" && m.userId !== user.id ? (
                 <div className="flex flex-wrap gap-2">
+                  {features.teamRoles ? (
                   <ActionFeedbackForm
                     action={changeMemberRoleAction}
                     className="flex items-center gap-1"
@@ -234,6 +238,7 @@ export default async function OrganizationSettingsPage() {
                       Save role
                     </button>
                   </ActionFeedbackForm>
+                  ) : null}
                   <ActionFeedbackForm action={removeMemberAction}>
                     <input type="hidden" name="targetUserId" value={m.userId} />
                     <button
@@ -249,6 +254,7 @@ export default async function OrganizationSettingsPage() {
           ))}
         </ul>
       </section>
+      ) : null}
 
       <section className="space-y-3" data-testid="user-overrides-readonly">
         <h2 className="text-lg font-medium text-slate-900">User overrides</h2>
@@ -299,7 +305,7 @@ export default async function OrganizationSettingsPage() {
         </ul>
       </section>
 
-      {showSeats ? (
+      {features.teamSeats && showSeats ? (
         <section className="space-y-3" data-testid="org-seats-section">
           <h2 className="text-lg font-medium text-slate-900">Seats</h2>
           <p className="text-sm text-slate-600">
@@ -310,7 +316,7 @@ export default async function OrganizationSettingsPage() {
             {" · "}
             Cap {seatSnap.maxSeats}
             {seatsAreInvoiceManaged
-              ? " (set by Sales Forecaster)"
+              ? ` (set by ${brand.appName})`
               : ""}
             .
           </p>
@@ -333,6 +339,7 @@ export default async function OrganizationSettingsPage() {
         </section>
       ) : null}
 
+      {features.teamInvites ? (
       <section className="space-y-3">
         <h2 className="text-lg font-medium text-slate-900">Invite user</h2>
         {canInvite ? (
@@ -402,6 +409,7 @@ export default async function OrganizationSettingsPage() {
           </p>
         )}
       </section>
+      ) : null}
     </div>
   );
 }

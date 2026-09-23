@@ -7,6 +7,7 @@ import {
   type ResearchActionResult,
 } from "@/app/actions/research";
 import { Field, SubmitButton } from "@/components/ui";
+import { vocab } from "@/lib/product-config";
 
 function listToText(value: unknown): string {
   if (!Array.isArray(value)) return "";
@@ -93,7 +94,7 @@ export function ManualCompanyResearchForm({
         />
       </div>
       <Field
-        label="Customer Types (one per line)"
+        label={`${vocab.customer.Singular} Types (one per line)`}
         name="customerTypes"
         as="textarea"
         defaultValue={listToText(defaults.customerTypes)}
@@ -122,7 +123,7 @@ export function ManualCompanyResearchForm({
         defaultValue={listToText(defaults.relevantTechnologies)}
       />
       <Field
-        label="Buying Signals (one per line)"
+        label={`${vocab.buyingSignal.TitlePlural} (one per line)`}
         name="buyingSignals"
         as="textarea"
         defaultValue={listToText(defaults.buyingSignals)}

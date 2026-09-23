@@ -236,7 +236,7 @@ describe("company research use in email prompts", () => {
     for (const file of files) {
       const source = readFileSync(file, "utf8");
       expect(source, file).not.toMatch(
-        /SalesForecaster|StoneEagle|dealership|F&I|\bCRM\b|\bpipeline\b|\bforecast\b|\bcommit\b/i,
+        /ForecastWorks|StoneEagle|dealership|F&I|\bCRM\b|\bpipeline\b|\bforecast\b|\bcommit\b/i,
       );
     }
   });

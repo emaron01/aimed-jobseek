@@ -9,6 +9,7 @@ import type {
   ProductMessagingDraft,
   SuggestedPersona,
 } from "@/lib/product-research/contract";
+import { vocab } from "@/lib/product-config";
 
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -51,7 +52,7 @@ export async function approveProductFromDraft(input: {
     where: { id: input.productId, organizationId: input.organizationId },
   });
   if (!product) {
-    throw new TenantError("Product not found in the active organization.");
+    throw new TenantError(`${vocab.product.Singular} not found in the active organization.`);
   }
 
   const run = await prisma.productSetupRun.findFirst({
@@ -62,7 +63,7 @@ export async function approveProductFromDraft(input: {
     },
   });
   if (!run) {
-    throw new TenantError("Setup run not found for this product.");
+    throw new TenantError(`Setup run not found for this ${vocab.product.singular}.`);
   }
 
   const protectedPaths = mergeProtectedFields(
@@ -114,7 +115,7 @@ export async function approvePersonaFromDraft(input: {
     where: { id: input.productId, organizationId: input.organizationId },
   });
   if (!product) {
-    throw new TenantError("Product not found in the active organization.");
+    throw new TenantError(`${vocab.product.Singular} not found in the active organization.`);
   }
 
   const run = await prisma.productSetupRun.findFirst({
@@ -125,7 +126,7 @@ export async function approvePersonaFromDraft(input: {
     },
   });
   if (!run) {
-    throw new TenantError("Setup run not found for this product.");
+    throw new TenantError(`Setup run not found for this ${vocab.product.singular}.`);
   }
 
   const definition =
@@ -149,7 +150,7 @@ export async function approvePersonaFromDraft(input: {
       },
     });
     if (!existing) {
-      throw new TenantError("Persona not found in the active organization.");
+      throw new TenantError(`${vocab.persona.Singular} not found in the active organization.`);
     }
     const protectedPaths = asStringArray(existing.manuallyEditedFields);
     await prisma.persona.update({

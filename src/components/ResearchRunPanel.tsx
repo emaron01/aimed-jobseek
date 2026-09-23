@@ -29,6 +29,7 @@ import {
   type ActiveResearchedCompanyUsageView,
   type ResearchBillingContext,
 } from "@/lib/usage/research-allowance";
+import { vocab } from "@/lib/product-config";
 
 export type ResearchPlanView = {
   totalContacts: number;
@@ -296,7 +297,7 @@ export function ResearchRunPanel({
       <CompanyResearchAllowanceBanner usage={allowance} billing={billing} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Total Contacts" value={plan.totalContacts} />
+        <Stat label={`Total ${vocab.contact.Plural}`} value={plan.totalContacts} />
         <Stat label="Unique Companies" value={plan.uniqueCompanies} />
         <Stat label="Research Available" value={plan.alreadyResearched} />
         <Stat label="Need Research" value={plan.needingResearch} />

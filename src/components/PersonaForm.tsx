@@ -36,6 +36,7 @@ import {
 } from "@/lib/persona-research/persona-briefing";
 import { NEEDS_REVIEW_CLASSIFY_TARGETS } from "@/lib/persona-research/project-signals";
 import { cn, listToCommaString } from "@/lib/utils";
+import { vocab, vocabExamples } from "@/lib/product-config";
 
 type CriterionRow = {
   id?: string;
@@ -128,7 +129,7 @@ function CriteriaReview({
   if (criteria.length === 0) {
     return (
       <p className="mt-3 text-sm text-slate-500">
-        No structured criteria yet. Save the Persona definition, then run AI
+        No structured criteria yet. Save the {vocab.persona.Singular} definition, then run AI
         Interpretation.
       </p>
     );
@@ -373,7 +374,7 @@ function NewPersonaForm({
       data-testid="persona-form"
     >
       <p className="mb-3 text-xs text-slate-500">
-        Workflow: Persona definition → Save → AI Interpretation → Review
+        Workflow: {vocab.persona.Singular} definition → Save → AI Interpretation → Review
         criteria. AI is optional for saving.
       </p>
       <form
@@ -383,12 +384,12 @@ function NewPersonaForm({
       >
         <input type="hidden" name="id" value="" />
         <input type="hidden" name="productId" value={productId} />
-        <Field label="Persona Name" name="name" required />
+        <Field label={`${vocab.persona.Singular} Name`} name="name" required />
         <Field
           label="Likely Titles (evidence)"
           name="targetTitles"
-          placeholder="CRO, VP Sales, Director of Sales"
-          hint="Literal job titles only — not generic labels like “Sales Leader”."
+          placeholder={vocabExamples.personaLikelyTitlesPlaceholder}
+          hint={vocabExamples.personaLikelyTitlesHint}
         />
         <div className="md:col-span-2">
           <Field
@@ -396,7 +397,7 @@ function NewPersonaForm({
             name="definition"
             as="textarea"
             placeholder="The executive responsible for…"
-            hint="Authoritative buyer-role narrative. Preserved as source data."
+            hint={`Authoritative ${vocab.buyer.singular}-role narrative. Preserved as source data.`}
           />
         </div>
         <div className="md:col-span-2">
@@ -409,8 +410,8 @@ function NewPersonaForm({
         <Field
           label="Department / Function"
           name="department"
-          placeholder="Sales"
-          hint="Organizational function (e.g. Sales, Finance) — not “Sales Leader”."
+          placeholder={vocabExamples.personaDepartmentPlaceholder}
+          hint={vocabExamples.personaDepartmentHint}
         />
         <Field
           label="Seniority"
@@ -428,17 +429,17 @@ function NewPersonaForm({
         </div>
         <div className="md:col-span-2">
           <Field
-            label="Problems / Pain Points"
+            label={`Problems / ${vocab.painPoint.TitlePlural}`}
             name="painPoints"
             as="textarea"
           />
         </div>
         <div className="md:col-span-2">
           <Field
-            label="Desired Outcomes From Your Solution"
+            label={`Desired Outcomes From Your ${vocab.solution.Singular}`}
             name="desiredOutcomes"
             as="textarea"
-            hint="What does this person want to improve, achieve, reduce, or avoid by using a solution like yours? Not a campaign CTA (meeting, demo, reply)."
+            hint={`What does this person want to improve, achieve, reduce, or avoid by using ${vocab.solution.aSingular} like yours? Not ${vocab.campaign.aSingular} CTA (meeting, ${vocab.demo.singular}, reply).`}
             placeholder="Reduce forecast administration time; improve forecast confidence…"
           />
         </div>
@@ -452,7 +453,7 @@ function NewPersonaForm({
         </div>
         <div className="md:col-span-2 flex flex-wrap items-center gap-2">
           <SubmitButton disabled={pending}>
-            {savePending ? "Saving…" : "Add persona"}
+            {savePending ? "Saving…" : `Add ${vocab.persona.singular}`}
           </SubmitButton>
           <button
             type="submit"
@@ -608,7 +609,7 @@ export function PersonaForm({
           data-testid="persona-form"
         >
           <p className="mb-3 text-xs text-slate-500">
-            Workflow: Persona definition → Save → AI Interpretation → Review
+            Workflow: {vocab.persona.Singular} definition → Save → AI Interpretation → Review
             criteria. AI is optional for saving.
           </p>
           <form
@@ -619,7 +620,7 @@ export function PersonaForm({
             <input type="hidden" name="id" value={persona.id} />
             <input type="hidden" name="productId" value={productId} />
             <Field
-              label="Persona Name"
+              label={`${vocab.persona.Singular} Name`}
               name="name"
               defaultValue={persona.name}
               required
@@ -628,8 +629,8 @@ export function PersonaForm({
               label="Likely Titles (evidence)"
               name="targetTitles"
               defaultValue={listToCommaString(persona.targetTitles)}
-              placeholder="CRO, VP Sales, Director of Sales"
-              hint="Literal job titles only — not generic labels like “Sales Leader”."
+              placeholder={vocabExamples.personaLikelyTitlesPlaceholder}
+              hint={vocabExamples.personaLikelyTitlesHint}
             />
             <div className="md:col-span-2">
               <Field
@@ -638,7 +639,7 @@ export function PersonaForm({
                 defaultValue={persona.definition ?? persona.responsibilities}
                 as="textarea"
                 placeholder="The executive responsible for…"
-                hint="Authoritative buyer-role narrative. Preserved as source data."
+                hint={`Authoritative ${vocab.buyer.singular}-role narrative. Preserved as source data.`}
               />
             </div>
             <div className="md:col-span-2">
@@ -653,8 +654,8 @@ export function PersonaForm({
               label="Department / Function"
               name="department"
               defaultValue={persona.department}
-              placeholder="Sales"
-              hint="Organizational function (e.g. Sales, Finance) — not “Sales Leader”."
+              placeholder={vocabExamples.personaDepartmentPlaceholder}
+              hint={vocabExamples.personaDepartmentHint}
             />
             <Field
               label="Seniority"
@@ -674,7 +675,7 @@ export function PersonaForm({
             </div>
             <div className="md:col-span-2">
               <Field
-                label="Problems / Pain Points"
+                label={`Problems / ${vocab.painPoint.TitlePlural}`}
                 name="painPoints"
                 defaultValue={persona.painPoints}
                 as="textarea"
@@ -682,11 +683,11 @@ export function PersonaForm({
             </div>
             <div className="md:col-span-2">
               <Field
-                label="Desired Outcomes From Your Solution"
+                label={`Desired Outcomes From Your ${vocab.solution.Singular}`}
                 name="desiredOutcomes"
                 defaultValue={persona.desiredOutcomes}
                 as="textarea"
-                hint="What does this person want to improve, achieve, reduce, or avoid by using a solution like yours? Not a campaign CTA (meeting, demo, reply)."
+                hint={`What does this person want to improve, achieve, reduce, or avoid by using ${vocab.solution.aSingular} like yours? Not ${vocab.campaign.aSingular} CTA (meeting, ${vocab.demo.singular}, reply).`}
                 placeholder="Reduce forecast administration time; improve forecast confidence…"
               />
             </div>
@@ -701,7 +702,7 @@ export function PersonaForm({
             </div>
             <div className="md:col-span-2 flex flex-wrap items-center gap-2">
               <SubmitButton disabled={pending}>
-                {savePending ? "Saving…" : "Save persona"}
+                {savePending ? "Saving…" : `Save ${vocab.persona.singular}`}
               </SubmitButton>
               <button
                 type="submit"
@@ -751,7 +752,7 @@ export function PersonaForm({
                 >
                   {rebuildPending
                     ? "Rebuilding…"
-                    : "Rebuild from product evidence"}
+                    : `Rebuild from ${vocab.product.singular} evidence`}
                 </button>
               </form>
             ) : null}
@@ -760,8 +761,8 @@ export function PersonaForm({
         {!editing ? (
           <p className="text-xs text-slate-500">
             Regenerate criteria updates scoring criteria from the text fields
-            above. Rebuild from product evidence re-synthesizes role summary,
-            pains, outcomes, and messaging from stored product research (review
+            above. Rebuild from {vocab.product.singular} evidence re-synthesizes role summary,
+            pains, outcomes, and messaging from stored {vocab.product.singular} research (review
             before anything changes).
           </p>
         ) : null}
@@ -795,10 +796,10 @@ export function PersonaForm({
             id: persona.id,
             productId,
           }}
-          triggerLabel="Delete persona"
-          confirmTitle={`Delete Persona "${persona.name}"?`}
-          confirmBody={`This will remove this Persona and its current generated criteria.\nHistorical scoring snapshots will not be changed.\nIf scoring runs reference this Persona, it will be archived instead of permanently deleted.`}
-          confirmButtonLabel="Delete Persona"
+          triggerLabel={`Delete ${vocab.persona.singular}`}
+          confirmTitle={`Delete ${vocab.persona.Singular} "${persona.name}"?`}
+          confirmBody={`This will remove this ${vocab.persona.Singular} and its current generated criteria.\nHistorical scoring snapshots will not be changed.\nIf scoring runs reference this ${vocab.persona.Singular}, it will be archived instead of permanently deleted.`}
+          confirmButtonLabel={`Delete ${vocab.persona.Singular}`}
           onSuccessNavigate={`/setup/${productId}`}
         />
       </div>

@@ -1,15 +1,16 @@
 import type { ExclusionDetail, ExclusionSourceKind } from "@/lib/scoring/exclusion-detail";
+import { vocab } from "@/lib/product-config";
 
 function sourceKindLabel(kind: ExclusionSourceKind): string {
   switch (kind) {
     case "LIST":
-      return "List data";
+      return `${vocab.list.Singular} data`;
     case "RESEARCH":
       return "Research";
     case "TITLE":
       return "Title";
     case "CONTACT_RESEARCH":
-      return "Contact research";
+      return `${vocab.contact.Singular} research`;
     default:
       return "Evidence";
   }
@@ -50,7 +51,7 @@ export function ExclusionDetailList({
             </div>
           ) : (
             <div className="space-y-1">
-              <p className="font-medium">Persona exclusion: {detail.criterionName}</p>
+              <p className="font-medium">{vocab.persona.Singular} exclusion: {detail.criterionName}</p>
               <p>
                 Matched: <span className="font-medium">{detail.matchedText}</span>
               </p>

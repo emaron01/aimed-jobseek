@@ -32,6 +32,7 @@ import {
   formatNearDuplicateWarning,
   parsePersonaListField,
 } from "@/lib/persona/persona-differentiation";
+import { vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ productId: string }>;
@@ -105,7 +106,7 @@ export default async function SetupProductPage({ params }: PageProps) {
   if (!organization) {
     return (
       <div>
-        <PageHeader title="Product" description="Manage product setup." />
+        <PageHeader title={vocab.product.Singular} description={`Manage ${vocab.product.singular} setup.`} />
         <TenantMissing />
       </div>
     );
@@ -151,23 +152,23 @@ export default async function SetupProductPage({ params }: PageProps) {
 
   const productDeleteBody = (() => {
     const c = impact?._count;
-    if (!c) return "This will permanently delete this Product.";
+    if (!c) return `This will permanently delete this ${vocab.product.Singular}.`;
     const lines = [
-      `Delete Product "${product.name}"?`,
+      `Delete ${vocab.product.Singular} "${product.name}"?`,
       "",
       "This will also remove:",
-      `• ${c.icps} ICP(s)`,
-      `• ${c.personas} Persona(s) and their current criteria`,
-      `• ${c.sources} product source(s)`,
+      `• ${c.icps} ${vocab.icp.singular}(s)`,
+      `• ${c.personas} ${vocab.persona.Singular}(s) and their current criteria`,
+      `• ${c.sources} ${vocab.product.singular} source(s)`,
       `• ${c.evidenceBundles} evidence bundle(s)`,
       `• ${c.setupRuns} research draft run(s)`,
       "",
       c.scoringRuns > 0
-        ? `Note: ${c.scoringRuns} scoring run(s) reference this Product — it will be archived instead of permanently deleted so historical snapshots remain.`
+        ? `Note: ${c.scoringRuns} scoring run(s) reference this ${vocab.product.Singular} — it will be archived instead of permanently deleted so historical snapshots remain.`
         : "Historical scoring snapshots (if any later) would be preserved via archive rather than hard delete.",
       c.campaigns > 0
-        ? `Blocked until ${c.campaigns} campaign(s) are removed or reassigned.`
-        : "Campaigns: none currently reference this Product.",
+        ? `Blocked until ${c.campaigns} ${vocab.campaign.singular}(s) are removed or reassigned.`
+        : `${vocab.campaign.Plural}: none currently reference this ${vocab.product.Singular}.`,
     ];
     return lines.join("\n");
   })();
@@ -238,7 +239,7 @@ export default async function SetupProductPage({ params }: PageProps) {
                 href="/setup"
                 className={SECONDARY_BUTTON_CLASS}
               >
-                All products
+                All {vocab.product.plural}
               </Link>
             </div>
           }
@@ -250,8 +251,8 @@ export default async function SetupProductPage({ params }: PageProps) {
       <div className="space-y-5">
         {/* 1. Product */}
         <Panel
-          title="1. Product"
-          description="Core product record used by research and scoring."
+          title={`1. ${vocab.product.Singular}`}
+          description={`Core ${vocab.product.singular} record used by research and scoring.`}
         >
           <div data-print-document>
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -278,7 +279,7 @@ export default async function SetupProductPage({ params }: PageProps) {
               </div>
               <div data-print-hide>
                 <ActionLink href={`/setup/${product.id}/edit`}>
-                  Edit product
+                  Edit {vocab.product.singular}
                 </ActionLink>
               </div>
             </div>
@@ -289,7 +290,7 @@ export default async function SetupProductPage({ params }: PageProps) {
                 text={profile.description || product.description}
               />
               <PrintProse
-                title="Value proposition"
+                title={vocab.valueProposition.Singular}
                 text={profile.valueProposition || product.valueProposition}
               />
               <PrintProse title="Website" text={product.websiteUrl} />
@@ -304,7 +305,7 @@ export default async function SetupProductPage({ params }: PageProps) {
                 items={profile.primaryUseCases}
               />
               <PrintList
-                title="Relevant buyer functions"
+                title={`Relevant ${vocab.buyer.singular} functions`}
                 items={profile.relevantBuyerFunctions}
               />
               <PrintList
@@ -325,7 +326,7 @@ export default async function SetupProductPage({ params }: PageProps) {
               />
               <PrintList title="Proof points" items={profile.proofPoints} />
               <PrintList
-                title="Customer evidence"
+                title={`${vocab.customer.Singular} evidence`}
                 items={profile.customerEvidence}
               />
               <PrintList title="Terminology" items={profile.terminology} />
@@ -339,10 +340,10 @@ export default async function SetupProductPage({ params }: PageProps) {
               <ConfirmDeleteForm
                 action={deleteProductAction}
                 hiddenFields={{ id: product.id }}
-                triggerLabel="Delete product"
-                confirmTitle={`Delete Product "${product.name}"?`}
+                triggerLabel={`Delete ${vocab.product.singular}`}
+                confirmTitle={`Delete ${vocab.product.Singular} "${product.name}"?`}
                 confirmBody={productDeleteBody}
-                confirmButtonLabel="Delete Product"
+                confirmButtonLabel={`Delete ${vocab.product.Singular}`}
                 onSuccessNavigate="/products"
               />
             </div>
@@ -352,13 +353,13 @@ export default async function SetupProductPage({ params }: PageProps) {
         {/* 2. Personas */}
         <div data-print-hide>
         <Panel
-          title="2. Personas"
-          description="Saved buyers and suggested roles still available to build."
+          title={`2. ${vocab.persona.Plural}`}
+          description={`Saved ${vocab.buyer.plural} and suggested roles still available to build.`}
         >
           <div className="space-y-5">
             <div>
               <h4 className="text-sm font-semibold text-slate-900">
-                Saved personas
+                Saved {vocab.persona.plural}
               </h4>
               {nearDuplicatePersonaPairs.length > 0 ? (
                 <div className="mt-2 space-y-2">
@@ -374,7 +375,7 @@ export default async function SetupProductPage({ params }: PageProps) {
               ) : null}
               {personas.length === 0 ? (
                 <p className="mt-2 text-sm text-slate-500">
-                  None saved yet. Build a suggested role or add a custom persona.
+                  None saved yet. Build a suggested role or add a custom {vocab.persona.singular}.
                 </p>
               ) : (
                 <ul className="mt-2 divide-y divide-slate-100">
@@ -433,7 +434,7 @@ export default async function SetupProductPage({ params }: PageProps) {
               {unbuiltSuggestions.length === 0 ? (
                 <p className="mt-2 text-sm text-slate-500">
                   {suggestedRoles.length === 0
-                    ? "No suggested roles from product research yet."
+                    ? `No suggested roles from ${vocab.product.singular} research yet.`
                     : "All suggested roles have been built."}
                 </p>
               ) : (
@@ -455,7 +456,7 @@ export default async function SetupProductPage({ params }: PageProps) {
                         href={`/setup/${product.id}/personas/new?role=${encodeURIComponent(role.suggestionKey)}`}
                         primary
                       >
-                        Build Persona
+                        Build {vocab.persona.Singular}
                       </ActionLink>
                     </li>
                   ))}
@@ -463,7 +464,7 @@ export default async function SetupProductPage({ params }: PageProps) {
               )}
               <div className="mt-3">
                 <ActionLink href={`/setup/${product.id}/personas/new`}>
-                  Add custom persona
+                  Add custom {vocab.persona.singular}
                 </ActionLink>
               </div>
             </div>
@@ -472,8 +473,8 @@ export default async function SetupProductPage({ params }: PageProps) {
 
         {/* 3. ICP */}
         <Panel
-          title="3. ICP"
-          description="Ideal customer profile for company-level fit."
+          title={`3. ${vocab.icp.singular}`}
+          description={`${vocab.idealCustomer.Singular} profile for company-level fit.`}
         >
           {primaryIcp ? (
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -487,7 +488,7 @@ export default async function SetupProductPage({ params }: PageProps) {
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
                   {primaryIcpCriteria.length} criteria
-                  {icps.length > 1 ? ` · ${icps.length} ICPs total` : ""}
+                  {icps.length > 1 ? ` · ${icps.length} ${vocab.icp.plural} total` : ""}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -500,7 +501,7 @@ export default async function SetupProductPage({ params }: PageProps) {
                   </ActionLink>
                 ) : (
                   <ActionLink href={`/setup/${product.id}/icps/new`}>
-                    Add ICP
+                    Add {vocab.icp.singular}
                   </ActionLink>
                 )}
               </div>
@@ -508,15 +509,15 @@ export default async function SetupProductPage({ params }: PageProps) {
           ) : (
             <div className="rounded-md border border-dashed border-amber-300 bg-amber-50 px-4 py-4">
               <p className="text-sm font-semibold text-amber-950">
-                ICP not set up yet
+                {vocab.icp.singular} not set up yet
               </p>
               <p className="mt-1 text-sm text-amber-900/80">
-                Add an ideal customer profile so company-level scoring has a
-                target. You can do this before or after building personas.
+                Add {vocab.idealCustomer.aSingular} profile so company-level scoring has a
+                target. You can do this before or after building {vocab.persona.plural}.
               </p>
               <div className="mt-3">
                 <ActionLink href={`/setup/${product.id}/icps/new`} primary>
-                  Add ICP
+                  Add {vocab.icp.singular}
                 </ActionLink>
               </div>
             </div>

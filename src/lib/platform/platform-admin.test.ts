@@ -438,7 +438,7 @@ describe("platform org detail and scoped view", () => {
       resolve("src/app/platform/orgs/[id]/page.tsx"),
       "utf8",
     );
-    expect(detailPage).toContain("Lists (");
+    expect(detailPage).toContain("{vocab.list.Plural} (");
     expect(detailPage).toContain("Setup completeness");
     expect(detailPage).toContain("Credit grants");
     expect(detailPage).toContain("Health (failure rates)");
@@ -472,7 +472,7 @@ describe("phase B cost reporting seams", () => {
   it("costs page covers company cost, ratio, projections, rates, reconciliation", () => {
     const page = readFileSync(resolve("src/app/platform/costs/page.tsx"), "utf8");
     expect(page).toContain("Cost per company researched");
-    expect(page).toContain("Contacts per company");
+    expect(page).toContain("{vocab.contact.Plural} per company");
     expect(page).toContain("Projected monthly cost");
     expect(page).toContain("ensureAiModelRatesSeeded");
     expect(page).toContain("upsertAiModelRateAction");

@@ -1,3 +1,6 @@
+import { brand } from "@/lib/product-config";
+import { getBrandDeployment } from "@/lib/product-config/deployment";
+
 /**
  * Node-safe transactional email config (no server-only).
  * Next.js entry: `@/lib/transactional-email/config` re-exports behind server-only.
@@ -121,14 +124,11 @@ export function getTransactionalEmailConfig(): TransactionalEmailConfig {
     process.env.TRANSACTIONAL_EMAIL_FROM_EMAIL?.trim() ||
     "noreply@localhost";
   const fromName =
-    process.env.TRANSACTIONAL_EMAIL_FROM_NAME?.trim() || "Email Platform";
+    process.env.TRANSACTIONAL_EMAIL_FROM_NAME?.trim() ||
+    brand.transactionalSenderName;
   const replyTo =
     process.env.TRANSACTIONAL_EMAIL_REPLY_TO?.trim() || null;
-  const supportEmail =
-    process.env.SUPPORT_EMAIL?.trim() ||
-    process.env.TRANSACTIONAL_EMAIL_SUPPORT_EMAIL?.trim() ||
-    replyTo ||
-    fromEmail;
+  const supportEmail = getBrandDeployment().supportEmail;
 
   if (provider === "resend" && !apiKey) {
     throw new TransactionalEmailConfigError(

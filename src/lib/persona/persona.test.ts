@@ -83,9 +83,9 @@ describe("Persona field semantics", () => {
     const src = await import("node:fs").then((fs) =>
       fs.readFileSync("src/components/PersonaForm.tsx", "utf8"),
     );
-    expect(src).toContain("Desired Outcomes From Your Solution");
+    expect(src).toContain("Desired Outcomes From Your ${vocab.solution.Singular}");
     expect(src).toContain(
-      "Not a campaign CTA (meeting, demo, reply)",
+      "Not ${vocab.campaign.aSingular} CTA (meeting, ${vocab.demo.singular}, reply)",
     );
     expect(src).not.toMatch(/label=\"Desired Outcomes\"/);
   });

@@ -22,6 +22,7 @@ import {
   generateEmailDraftAction,
 } from "@/app/actions/email";
 import { getDueContactsForUser } from "@/lib/cadence/dashboard";
+import { vocab } from "@/lib/product-config";
 
 export type CadenceActionResult = { ok: boolean; message: string };
 
@@ -47,7 +48,7 @@ function parseMaxSequence(value: FormDataEntryValue | null): number | null {
   if (!raw || raw === "unlimited") return null;
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 1) {
-    throw new TenantError("Max sequence emails must be a positive integer or unlimited.");
+    throw new TenantError(`Max ${vocab.sequence.singular} emails must be a positive integer or unlimited.`);
   }
   return n;
 }
@@ -143,7 +144,7 @@ export async function stopSequenceAction(
       actorUserId: user.id,
     });
     revalidatePath("/");
-    return { ok: true, message: "Follow-up sequence stopped for this contact." };
+    return { ok: true, message: `Follow-up ${vocab.sequence.singular} stopped for this ${vocab.contact.singular}.` };
   } catch (error) {
     return { ok: false, message: toSafeCadenceError(error) };
   }
@@ -168,7 +169,7 @@ export async function restoreSequenceAction(
       organizationId: organization.id,
     });
     revalidatePath("/");
-    return { ok: true, message: "Follow-up sequence restored for this contact." };
+    return { ok: true, message: `Follow-up ${vocab.sequence.singular} restored for this ${vocab.contact.singular}.` };
   } catch (error) {
     return { ok: false, message: toSafeCadenceError(error) };
   }
@@ -187,7 +188,7 @@ export async function bulkGenerateDueForCampaignAction(
     });
     const campaign = dueByCampaign.find((row) => row.campaignId === campaignId);
     if (!campaign) {
-      return { ok: false, message: "No due contacts found for this campaign." };
+      return { ok: false, message: `No due ${vocab.contact.plural} found for this ${vocab.campaign.singular}.` };
     }
 
     let generated = 0;

@@ -3,6 +3,7 @@ import type {
   CampaignStage,
   CampaignStageKey,
 } from "@/lib/workflow/campaign-stages";
+import { vocab } from "@/lib/product-config";
 
 export function CampaignStageRail({
   campaignId,
@@ -17,7 +18,7 @@ export function CampaignStageRail({
     stages.find((stage) => stage.key === currentStage)?.number ?? 4;
   return (
     <nav
-      aria-label="Campaign workflow"
+      aria-label={`${vocab.campaign.Singular} workflow`}
       className="mb-6 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2"
     >
       <ol className="flex min-w-max items-center gap-1">

@@ -10,6 +10,7 @@ import {
   formatProductUrlUnreadableError,
   isUsableProductUrlExtraction,
 } from "@/lib/product-research/extraction-quality";
+import { brandUserAgent } from "@/lib/product-config";
 
 export type FetchedPage = {
   url: string;
@@ -64,7 +65,7 @@ export async function fetchProductPageUrl(
       method: "GET",
       timeoutMs,
       headers: {
-        "User-Agent": "EmailPlatformProductResearch/1.0",
+        "User-Agent": brandUserAgent("ProductResearch"),
       },
     });
 

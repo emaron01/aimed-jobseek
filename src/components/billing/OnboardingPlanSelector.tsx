@@ -9,6 +9,7 @@ import {
   BILLING_PLAN_TEAM,
 } from "@/lib/billing/plans";
 import { cn } from "@/lib/utils";
+import { features, supportMailtoHref, vocab } from "@/lib/product-config";
 
 export type OnboardingPlanOption = {
   planCode: string;
@@ -19,8 +20,6 @@ export type OnboardingPlanOption = {
   priceLabel: string | null;
   creditsBulletNote: string | null;
 };
-
-const ENTERPRISE_CONTACT = "mailto:erik@salesforecaster.io";
 
 export function OnboardingPlanSelector({
   standard,
@@ -34,6 +33,7 @@ export function OnboardingPlanSelector({
   initialPlanCode = BILLING_PLAN_STANDARD,
   initialSeatQuantity = 2,
   lockSelection = false,
+  supportEmail,
 }: {
   standard: OnboardingPlanOption;
   team: OnboardingPlanOption;
@@ -49,6 +49,7 @@ export function OnboardingPlanSelector({
   initialSeatQuantity?: number;
   /** When true, plan/seats were chosen at /signup/plan — confirm + checkout only. */
   lockSelection?: boolean;
+  supportEmail: string;
 }) {
   const [planCode, setPlanCode] = useState<string>(
     initialPlanCode === BILLING_PLAN_TEAM ||
@@ -91,18 +92,26 @@ export function OnboardingPlanSelector({
               {
                 code: BILLING_PLAN_STANDARD,
                 label: "Standard",
-                blurb: "For individual salespeople",
+                blurb: `For individual ${vocab.salesperson.plural}`,
               },
-              {
-                code: BILLING_PLAN_TEAM,
-                label: "Team",
-                blurb: "For teams of 2-10",
-              },
-              {
-                code: BILLING_PLAN_ENTERPRISE,
-                label: "Enterprise",
-                blurb: "For larger teams",
-              },
+              ...(features.teamPlanDisplay
+                ? [
+                    {
+                      code: BILLING_PLAN_TEAM,
+                      label: "Team",
+                      blurb: "For teams of 2-10",
+                    } as const,
+                  ]
+                : []),
+              ...(features.enterprisePlanDisplay
+                ? [
+                    {
+                      code: BILLING_PLAN_ENTERPRISE,
+                      label: "Enterprise",
+                      blurb: "For larger teams",
+                    } as const,
+                  ]
+                : []),
             ] as const
           ).map((plan) => (
             <button
@@ -154,7 +163,7 @@ export function OnboardingPlanSelector({
           ) : null}
         </div>
 
-        {planCode === BILLING_PLAN_TEAM && !lockSelection ? (
+        {features.teamSeats && planCode === BILLING_PLAN_TEAM && !lockSelection ? (
           <label className="block max-w-xs text-sm">
             <span className="font-medium text-slate-700">
               How many users? (minimum 2)
@@ -226,15 +235,15 @@ export function OnboardingPlanSelector({
               : "Cancel anytime before your trial ends and you won\u2019t be charged. Once your subscription starts, you may cancel at any time. Active billing ends at the end of the most current billing cycle."}
         </p>
 
-        {planCode === BILLING_PLAN_ENTERPRISE ? (
+        {planCode === BILLING_PLAN_ENTERPRISE && features.contactSales ? (
           <a
-            href={ENTERPRISE_CONTACT}
+            href={supportMailtoHref(supportEmail)}
             className={cn(PRIMARY_BUTTON_CLASS, "w-full !px-4 !py-3")}
             data-testid="onboarding-enterprise-contact"
           >
             Contact us
           </a>
-        ) : (
+        ) : planCode === BILLING_PLAN_ENTERPRISE ? null : (
           <StartFreeTrialButton
             disabledReason={planDisabledReason}
             trialPeriodDays={selectedTrialDays}

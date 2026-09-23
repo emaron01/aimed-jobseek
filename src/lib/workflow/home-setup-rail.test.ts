@@ -6,6 +6,7 @@ import {
   resolveHomeSetupFocus,
 } from "@/lib/workflow/home-setup-rail";
 import { getProductCampaignReadiness } from "@/lib/workflow/product-campaign-readiness";
+import { countedNoun, vocab } from "@/lib/product-config";
 
 describe("home setup rail", () => {
   it("matches campaign stage rail green-check pattern on Home", () => {
@@ -41,7 +42,9 @@ describe("home setup rail", () => {
     });
     const products = steps.find((step) => step.key === "products");
     expect(products?.completed).toBe(true);
-    expect(products?.detail).toBe("2 products · 1 needs a persona");
+    expect(products?.detail).toBe(
+      `${countedNoun(2, vocab.product)} · 1 needs ${vocab.persona.aSingular}`,
+    );
     expect(steps.find((step) => step.key === "voice")?.detail).toBe(
       "No samples yet",
     );
@@ -70,7 +73,9 @@ describe("home setup rail", () => {
     });
     const products = steps.find((step) => step.key === "products");
     expect(products?.completed).toBe(true);
-    expect(products?.detail).toBe("2 products · 1 needs approval");
+    expect(products?.detail).toBe(
+      `${countedNoun(2, vocab.product)} · 1 needs approval`,
+    );
   });
 
   it("does not mark Products complete until a campaign-ready product exists", () => {
@@ -92,7 +97,9 @@ describe("home setup rail", () => {
     });
     const products = steps.find((step) => step.key === "products");
     expect(products?.completed).toBe(false);
-    expect(products?.detail).toBe("1 product · 1 needs approval");
+    expect(products?.detail).toBe(
+      `${countedNoun(1, vocab.product)} · 1 needs approval`,
+    );
     expect(resolveHomeSetupFocus(steps)).toBe("products");
   });
 

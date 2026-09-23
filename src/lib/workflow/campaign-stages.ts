@@ -1,3 +1,4 @@
+import { vocab } from "@/lib/product-config";
 export const CAMPAIGN_STAGE_KEYS = [
   "setup",
   "list",
@@ -39,12 +40,12 @@ export function buildCampaignStages(input: {
     {
       number: 5,
       key: "list",
-      label: "List",
+      label: vocab.list.Singular,
       completed: input.hasListData,
       available: input.setupComplete,
       unavailableReason: input.setupComplete
         ? null
-        : "Complete campaign setup first.",
+        : `Complete ${vocab.campaign.singular} setup first.`,
     },
     {
       number: 6,
@@ -59,7 +60,7 @@ export function buildCampaignStages(input: {
     {
       number: 7,
       key: "contacts",
-      label: "Contacts",
+      label: vocab.contact.Plural,
       completed: input.qualifiedContactCount > 0,
       available: input.survivingCompanyCount > 0,
       unavailableReason:

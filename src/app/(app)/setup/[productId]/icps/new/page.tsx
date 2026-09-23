@@ -7,6 +7,7 @@ import {
   getCurrentOrganization,
   TenantError,
 } from "@/lib/tenant/getCurrentOrganization";
+import { vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ productId: string }>;
@@ -19,7 +20,7 @@ export default async function NewIcpPage({ params }: PageProps) {
   if (!organization) {
     return (
       <div>
-        <PageHeader title="Add ICP" />
+        <PageHeader title={`Add ${vocab.icp.singular}`} />
         <TenantMissing />
       </div>
     );
@@ -36,8 +37,8 @@ export default async function NewIcpPage({ params }: PageProps) {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
-        title="Add ICP"
-        description={`Ideal customer profile for ${product.name}.`}
+        title={`Add ${vocab.icp.singular}`}
+        description={`${vocab.idealCustomer.Singular} profile for ${product.name}.`}
         actions={
           <Link
             href={`/setup/${product.id}`}

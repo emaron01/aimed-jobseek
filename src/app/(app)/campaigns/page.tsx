@@ -16,6 +16,7 @@ import { listCampaigns } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { cn, formatDate } from "@/lib/utils";
 import { getHomeWorkflow } from "@/lib/workflow/home";
+import { vocab } from "@/lib/product-config";
 
 function viewHref(
   view: string,
@@ -42,8 +43,8 @@ export default async function CampaignsPage({
     return (
       <div>
         <PageHeader
-          title="Campaigns"
-          description="Campaigns belonging to the active organization."
+          title={vocab.campaign.Plural}
+          description={`${vocab.campaign.Plural} belonging to the active organization.`}
         />
         <TenantMissing />
       </div>
@@ -76,28 +77,28 @@ export default async function CampaignsPage({
   return (
     <div>
       <PageHeader
-        title="Campaigns"
-        description="Each campaign selects a product, an ICP, personas in play, and a campaign-specific offer. Open a campaign to attach contacts and work through qualification and email."
+        title={vocab.campaign.Plural}
+        description={`Each ${vocab.campaign.singular} selects ${vocab.product.aSingular}, ${vocab.icp.aSingular}, ${vocab.persona.plural} in play, and ${vocab.campaign.aSingular}-specific offer. Open ${vocab.campaign.aSingular} to attach ${vocab.contact.plural} and work through qualification and email.`}
         actions={
           <>
             <ShowArchivedToggle
               href={viewHref(effectiveView, !includeArchived)}
               includeArchived={includeArchived}
-              label="campaigns"
+              label={vocab.campaign.plural}
             />
             {canCreate ? (
               <Link
                 href="/campaigns/new"
                 className={PRIMARY_BUTTON_CLASS}
               >
-                New campaign
+                New {vocab.campaign.singular}
               </Link>
             ) : (
               <span
-                title="Add a product first"
+                title={`Add ${vocab.product.aSingular} first`}
                 className="inline-flex cursor-not-allowed items-center justify-center rounded-md bg-slate-300 px-3.5 py-2 text-sm font-medium text-slate-500"
               >
-                New campaign
+                New {vocab.campaign.singular}
               </span>
             )}
           </>
@@ -110,12 +111,12 @@ export default async function CampaignsPage({
       >
         {(
           [
-            { id: CAMPAIGN_LIST_VIEW_MY, label: "My Campaigns" },
+            { id: CAMPAIGN_LIST_VIEW_MY, label: `My ${vocab.campaign.Plural}` },
             {
               id: CAMPAIGN_LIST_VIEW_SHARED_ALL,
               label: canManageCampaigns
-                ? "All org campaigns"
-                : "All Campaigns",
+                ? `All org ${vocab.campaign.plural}`
+                : `All ${vocab.campaign.Plural}`,
             },
           ] as const
         ).map((tab) => (
@@ -141,16 +142,16 @@ export default async function CampaignsPage({
           title={
             effectiveView === CAMPAIGN_LIST_VIEW_SHARED_ALL
               ? canManageCampaigns
-                ? "No campaigns in this organization"
-                : "No shared campaigns"
-              : "No campaigns yet"
+                ? `No ${vocab.campaign.plural} in this organization`
+                : `No shared ${vocab.campaign.plural}`
+              : `No ${vocab.campaign.plural} yet`
           }
           description={
             effectiveView === CAMPAIGN_LIST_VIEW_SHARED_ALL
               ? canManageCampaigns
-                ? "Every campaign owned by a member of this organization appears here."
-                : "Shared campaigns appear here for the whole organization. Ask an admin to share a campaign, or create your own."
-              : "A campaign ties your product setup to a contact list — qualify companies, score contacts, and write emails in one workspace."
+                ? `Every ${vocab.campaign.singular} owned by a member of this organization appears here.`
+                : `Shared ${vocab.campaign.plural} appear here for the whole organization. Ask an admin to share ${vocab.campaign.aSingular}, or create your own.`
+              : `${vocab.campaign.ASingular} ties your ${vocab.product.singular} setup to ${vocab.contact.aSingular} ${vocab.list.singular} — qualify companies, score ${vocab.contact.plural}, and write emails in one workspace.`
           }
           actions={
             canCreate && effectiveView === CAMPAIGN_LIST_VIEW_MY ? (
@@ -158,14 +159,14 @@ export default async function CampaignsPage({
                 href="/campaigns/new"
                 className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
               >
-                New campaign
+                New {vocab.campaign.singular}
               </Link>
             ) : !canCreate && effectiveView === CAMPAIGN_LIST_VIEW_MY ? (
               <Link
                 href="/products/new"
                 className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
               >
-                New product
+                New {vocab.product.singular}
               </Link>
             ) : null
           }
@@ -175,16 +176,16 @@ export default async function CampaignsPage({
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-slate-500">
               <tr>
-                <th className="px-4 py-3 font-medium">Campaign</th>
+                <th className="px-4 py-3 font-medium">{vocab.campaign.Singular}</th>
                 {effectiveView === CAMPAIGN_LIST_VIEW_SHARED_ALL &&
                 canManageCampaigns ? (
                   <th className="px-4 py-3 font-medium">Owner</th>
                 ) : null}
                 <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Product</th>
-                <th className="px-4 py-3 font-medium">ICP</th>
+                <th className="px-4 py-3 font-medium">{vocab.product.Singular}</th>
+                <th className="px-4 py-3 font-medium">{vocab.icp.singular}</th>
                 <th className="px-4 py-3 font-medium">Offer</th>
-                <th className="px-4 py-3 font-medium">Contacts</th>
+                <th className="px-4 py-3 font-medium">{vocab.contact.Plural}</th>
                 <th className="px-4 py-3 font-medium">Created</th>
                 <th className="px-4 py-3 font-medium"> </th>
               </tr>
@@ -227,7 +228,7 @@ export default async function CampaignsPage({
                       <td className="px-4 py-3 text-slate-600">
                         {campaign.owner?.name ||
                           campaign.owner?.email ||
-                          "Legacy campaign"}
+                          `Legacy ${vocab.campaign.singular}`}
                       </td>
                     ) : null}
                     <td className="px-4 py-3 text-slate-600">

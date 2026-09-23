@@ -11,6 +11,7 @@ import {
 import { renderTransactionalTemplate } from "@/lib/transactional-email/render-service";
 import { createEmailVerificationToken } from "better-auth/api";
 import { jwtVerify } from "jose";
+import { brand } from "@/lib/product-config";
 
 const hasDatabase = Boolean(process.env.DATABASE_URL?.trim());
 
@@ -107,7 +108,7 @@ describe.skipIf(!hasDatabase)(
           firstName: "Test",
           verificationUrl: suppliedUrl,
           expirationTime: "24 hours",
-          appName: "Email Platform",
+          appName: brand.appName,
           supportEmail: "support@example.test",
         },
       });

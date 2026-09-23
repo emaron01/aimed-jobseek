@@ -13,6 +13,7 @@ import {
 import { formatDate, formatNumber } from "@/lib/utils";
 import type { ResearchSource } from "@/lib/research";
 import { hasUsableCompanyResearchFields } from "@/lib/research/freshness";
+import { vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ companyId: string }>;
@@ -49,13 +50,13 @@ export default async function CompanyResearchPage({ params }: PageProps) {
       <div data-print-hide>
         <PageHeader
           title="Company briefing"
-          description="Prospect intelligence for meeting prep. Product/ICP fit is scored separately."
+          description={`${vocab.prospect.Singular} intelligence for meeting prep. ${vocab.product.Singular}/${vocab.icp.singular} fit is scored separately.`}
           actions={
             <Link
               href="/lists"
               className={SECONDARY_BUTTON_CLASS}
             >
-              Back to lists
+              Back to {vocab.list.plural}
             </Link>
           }
         />

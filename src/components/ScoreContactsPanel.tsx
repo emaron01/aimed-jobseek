@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { scoreContactsAction } from "@/app/actions/scoring";
 import { PrimaryButton, SecondaryButton } from "@/components/ui";
+import { vocab } from "@/lib/product-config";
 
 export type ScoringReadinessView = {
   totalContacts: number;
@@ -47,7 +48,7 @@ export function ScoreContactsPanel({
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Contacts" value={readiness.totalContacts} />
+        <Stat label={vocab.contact.Plural} value={readiness.totalContacts} />
         <Stat
           label="Companies researched"
           value={readiness.companiesResearched}
@@ -81,7 +82,7 @@ export function ScoreContactsPanel({
           disabled={pending || !canScore || readiness.totalContacts === 0}
           onClick={() => runScore(false)}
         >
-          {pending ? "Scoring…" : "Score Contacts"}
+          {pending ? "Scoring…" : `Score ${vocab.contact.Plural}`}
         </PrimaryButton>
         <SecondaryButton
           disabled={

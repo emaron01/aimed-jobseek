@@ -30,6 +30,7 @@ import {
 import type { PersonaSnapshot } from "@/lib/scoring/types";
 import { TenantError } from "@/lib/tenant/getCurrentOrganization";
 import { recordUsageEvent } from "@/lib/usage/events";
+import { countedNoun, vocab } from "@/lib/product-config";
 
 export type UnmatchedTitleRow = {
   contactScoreId: string;
@@ -395,7 +396,7 @@ async function loadPersonaSnapshot(
     include: { criteria: { orderBy: { sortOrder: "asc" } } },
   });
   if (!persona) {
-    throw new TenantError("Persona not found in the active organization.");
+    throw new TenantError(`${vocab.persona.Singular} not found in the active organization.`);
   }
   return snapshotPersona(
     persona,
@@ -418,7 +419,7 @@ async function persistManualTargetTitle(input: {
     },
   });
   if (!persona) {
-    throw new TenantError("Persona not found in the active organization.");
+    throw new TenantError(`${vocab.persona.Singular} not found in the active organization.`);
   }
 
   const targetTitles = appendTargetTitle(
@@ -535,7 +536,7 @@ export async function resolveTitleSuggestion(input: {
     ]);
     return {
       ok: true,
-      message: `Dismissed "${suggestion.unmatchedTitle}". It will not be proposed again for this product.`,
+      message: `Dismissed "${suggestion.unmatchedTitle}". It will not be proposed again for this ${vocab.product.singular}.`,
     };
   }
 
@@ -547,7 +548,7 @@ export async function resolveTitleSuggestion(input: {
     return {
       ok: false,
       message:
-        "Choose a persona to assign. The model did not propose a match.",
+        `Choose ${vocab.persona.aSingular} to assign. The model did not propose a match.`,
     };
   }
 
@@ -597,7 +598,7 @@ export async function resolveTitleSuggestion(input: {
   if (contactScoreIds.length === 0) {
     return {
       ok: true,
-      message: `Added "${suggestion.unmatchedTitle}" to ${snapshot.name}. No unmatched contacts left to score.`,
+      message: `Added "${suggestion.unmatchedTitle}" to ${snapshot.name}. No unmatched ${vocab.contact.plural} left to score.`,
       scored: 0,
       failed: 0,
     };
@@ -611,7 +612,7 @@ export async function resolveTitleSuggestion(input: {
 
   return {
     ok: true,
-    message: `Added "${suggestion.unmatchedTitle}" to ${snapshot.name} and scored ${summary.completed} contact${summary.completed === 1 ? "" : "s"}.`,
+    message: `Added "${suggestion.unmatchedTitle}" to ${snapshot.name} and scored ${countedNoun(summary.completed, vocab.contact)}.`,
     scored: summary.completed,
     failed: summary.failed,
   };

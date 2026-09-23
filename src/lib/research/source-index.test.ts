@@ -57,7 +57,7 @@ describe("icp briefing page contracts", () => {
     expect(form).toContain("IcpBriefingDocument");
     expect(form).toContain("ExportPdfButton");
     expect(form).toContain("data-print-document");
-    expect(briefing).toContain("Ideal customer definition");
+    expect(briefing).toContain("{vocab.idealCustomer.Singular} definition");
     expect(briefing).toContain("evidenceClassAvailabilityLabel");
     expect(form).toContain("IcpCriteriaReview");
   });

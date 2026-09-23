@@ -44,6 +44,7 @@ import {
   readQualificationReason,
 } from "@/lib/workflow/qualification";
 import type { QualificationBucket } from "@prisma/client";
+import { countedNoun, vocab, vocabExamples } from "@/lib/product-config";
 
 export type CompanyResearchView = {
   id: string;
@@ -556,7 +557,7 @@ export function ScoreReportClient({
             disabled={selected.size === 0}
             onClick={() => setShowCampaign(true)}
           >
-            Create Campaign From Selected
+            Create {vocab.campaign.Singular} From Selected
           </PrimaryButton>
         </div>
       </div>
@@ -576,7 +577,7 @@ export function ScoreReportClient({
           <thead className="sticky top-0 z-10 bg-slate-50 text-left text-slate-500 shadow-[0_1px_0_0_rgb(226_232_240)]">
             <tr>
               <th className="px-3 py-3 font-medium">Select</th>
-              <th className="px-3 py-3 font-medium">Contact</th>
+              <th className="px-3 py-3 font-medium">{vocab.contact.Singular}</th>
               <th className="px-3 py-3 font-medium">Title</th>
               <th className="px-3 py-3 font-medium">Company</th>
               <th className="px-3 py-3 font-medium">Research</th>
@@ -713,7 +714,7 @@ export function ScoreReportClient({
                       )}
                       {personaMatch?.matchedPersonaId ? (
                         <p className="mt-1 text-xs text-slate-500">
-                          Persona matched
+                          {vocab.persona.Singular} matched
                         </p>
                       ) : null}
                     </td>
@@ -780,7 +781,7 @@ export function ScoreReportClient({
                                 <p className="mt-1 tabular-nums text-slate-500">
                                   Legacy score: overall {row.overallScore}
                                   {row.icpScore != null
-                                    ? ` · ICP ${row.icpScore}`
+                                    ? ` · ${vocab.icp.singular} ${row.icpScore}`
                                     : ""}
                                 </p>
                               ) : null}
@@ -827,7 +828,7 @@ export function ScoreReportClient({
                           {why ? (
                             <section data-testid="icp-qualification-why">
                               <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Why this ICP result
+                                Why this {vocab.icp.singular} result
                               </h4>
                               <div className="mt-2 space-y-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
                                 {why.mandatory ? (
@@ -970,11 +971,10 @@ export function ScoreReportClient({
             <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">
-                  Create Campaign From Selected
+                  Create {vocab.campaign.Singular} From Selected
                 </h3>
                 <p className="mt-1 text-sm text-slate-600">
-                  {selected.size} contact
-                  {selected.size === 1 ? "" : "s"} · {productName} · {icpName} ·{" "}
+                  {countedNoun(selected.size, vocab.contact)} · {productName} · {icpName} ·{" "}
                   {personaName}
                 </p>
               </div>
@@ -1002,7 +1002,7 @@ export function ScoreReportClient({
               ) : (
                 <input type="hidden" name="allPersonas" value="1" />
               )}
-              <Field label="Campaign Name" name="name" required />
+              <Field label={`${vocab.campaign.Singular} Name`} name="name" required />
               <Field
                 label="Offer Name"
                 name="offerName"
@@ -1011,7 +1011,7 @@ export function ScoreReportClient({
               <Field
                 label="Primary CTA"
                 name="offerCta"
-                placeholder="Book a demo"
+                placeholder={vocabExamples.offerCallToActionPlaceholder}
               />
               <Field
                 label="Offer Description"
@@ -1054,7 +1054,7 @@ export function ScoreReportClient({
                     Email guidance
                   </span>
                   <span className="mt-1 block text-xs text-slate-500">
-                    Steers every generated email in this campaign, up to{" "}
+                    Steers every generated email in this {vocab.campaign.singular}, up to{" "}
                     {EMAIL_GUIDANCE_MAX_CHARS} characters.
                   </span>
                   <textarea
@@ -1074,7 +1074,7 @@ export function ScoreReportClient({
               </div>
               <div className="flex gap-2">
                 <SubmitButton disabled={campaignPending}>
-                  {campaignPending ? "Creating…" : "Create campaign"}
+                  {campaignPending ? "Creating…" : `Create ${vocab.campaign.singular}`}
                 </SubmitButton>
                 <SecondaryButton
                   type="button"
@@ -1084,8 +1084,8 @@ export function ScoreReportClient({
                 </SecondaryButton>
               </div>
               <p className="text-xs text-slate-500">
-                Scoring run {runId} context is preserved via Product / ICP /
-                Persona selection. Emails are not generated in this phase.
+                Scoring run {runId} context is preserved via {vocab.product.Singular} / {vocab.icp.singular} /
+                {vocab.persona.Singular} selection. Emails are not generated in this phase.
               </p>
             </form>
           </div>

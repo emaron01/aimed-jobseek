@@ -7,6 +7,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
+import { vocab } from "@/lib/product-config";
 
 export async function assertCanManageContactCadence(input: {
   campaignContactId: string;
@@ -31,13 +32,13 @@ export async function assertCanManageContactCadence(input: {
 
   if (!row) {
     throw new TenantError(
-      "Campaign contact does not belong to the active organization.",
+      `${vocab.campaign.Singular} ${vocab.contact.singular} does not belong to the active organization.`,
     );
   }
 
   if (row.campaign.ownerUserId === input.userId) return;
 
   throw new TenantError(
-    "You can only change cadence on contacts in campaigns you own.",
+    `You can only change cadence on ${vocab.contact.plural} in ${vocab.campaign.plural} you own.`,
   );
 }

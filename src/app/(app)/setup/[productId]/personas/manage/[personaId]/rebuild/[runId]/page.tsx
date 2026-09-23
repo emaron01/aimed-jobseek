@@ -15,6 +15,7 @@ import {
   TenantError,
 } from "@/lib/tenant/getCurrentOrganization";
 import { getResearchPolicy } from "@/lib/usage/policy";
+import { vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ productId: string; personaId: string; runId: string }>;
@@ -27,7 +28,7 @@ export default async function PersonaResynthesisReviewPage({ params }: PageProps
   if (!organization) {
     return (
       <div>
-        <PageHeader title="Rebuild persona" />
+        <PageHeader title={`Rebuild ${vocab.persona.singular}`} />
         <TenantMissing />
       </div>
     );
@@ -71,20 +72,20 @@ export default async function PersonaResynthesisReviewPage({ params }: PageProps
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         title={`Rebuild: ${persona.name}`}
-        description={`Review product-evidence rebuild for ${product.name}. Nothing changes until you confirm.`}
+        description={`Review ${vocab.product.singular}-evidence rebuild for ${product.name}. Nothing changes until you confirm.`}
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
               href={`/personas?product=${product.id}`}
               className={SECONDARY_BUTTON_CLASS}
             >
-              All personas
+              All {vocab.persona.plural}
             </Link>
             <Link
               href={`/setup/${product.id}/personas/manage/${persona.id}`}
               className={SECONDARY_BUTTON_CLASS}
             >
-              Back to persona
+              Back to {vocab.persona.singular}
             </Link>
           </div>
         }

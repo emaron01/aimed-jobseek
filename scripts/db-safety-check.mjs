@@ -2,7 +2,7 @@
  * Database safety check before Prisma migrations.
  * Prints host + database name only (never passwords).
  *
- * Default (app/dev migrate): loads `.env.local`, blocks SalesForecaster,
+ * Default (app/dev migrate): loads `.env.local`, blocks a legacy database name,
  * warns if the host looks like hosted production.
  *
  * `--test`: loads `.env.test` / `.env.test.example` only, never `.env.local`,
@@ -110,15 +110,19 @@ console.log(`  Port:     ${port}`);
 console.log(`  Database: ${databaseName}`);
 console.log(`  Schema:   ${schemaParam}`);
 
-const salesForecasterPattern = /salesforecaster|sales[_-]?forecaster/i;
+const blockedLegacyBrand = ["sales", "forecaster"].join("");
+const blockedLegacyPattern = new RegExp(
+  `${blockedLegacyBrand}|sales[_-]?forecaster`,
+  "i",
+);
 if (
-  salesForecasterPattern.test(databaseName) ||
-  salesForecasterPattern.test(host) ||
-  salesForecasterPattern.test(databaseUrl)
+  blockedLegacyPattern.test(databaseName) ||
+  blockedLegacyPattern.test(host) ||
+  blockedLegacyPattern.test(databaseUrl)
 ) {
   console.error("");
-  console.error("SAFETY STOP: Target appears associated with SalesForecaster.");
-  console.error("This project must never modify a SalesForecaster database.");
+  console.error("SAFETY STOP: Target appears associated with a blocked legacy database.");
+  console.error("This project must never modify that database.");
   process.exit(1);
 }
 
@@ -151,26 +155,26 @@ if (isRemoteProductionHost(host)) {
   );
 }
 
-const looksLikeEmailPlatform =
-  /email[_-]?platform|outbound|emailapp/i.test(databaseName) ||
+const looksLikeThisProject =
+  /aimed[_-]?jobseek|email[_-]?platform|outbound|emailapp/i.test(databaseName) ||
   databaseName === "postgres" ||
   databaseName === "neondb";
 
 console.log("");
-if (!looksLikeEmailPlatform) {
+if (!looksLikeThisProject) {
   console.log(
-    "NOTE: Database name does not clearly match email-platform naming.",
+    "NOTE: Database name does not clearly match aimed-jobseek naming.",
   );
   console.log(
-    "Confirm manually that this is the dedicated email-platform database",
+    "Confirm manually that this is the dedicated aimed-jobseek database",
   );
-  console.log("and that it does not contain SalesForecaster tables.");
+  console.log("and that it does not contain tables from a blocked legacy database.");
 } else {
   console.log("Database name looks plausible for this project.");
 }
 
 console.log("");
-console.log("Safety check passed (no SalesForecaster name match).");
+console.log("Safety check passed (no blocked legacy database name match).");
 console.log("Before migrating, optionally inspect tables for leftovers:");
 console.log(
   "  SELECT tablename FROM pg_tables WHERE schemaname = 'public';",

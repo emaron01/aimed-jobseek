@@ -10,6 +10,7 @@ import {
 import { contactMatchesSuppressionSet } from "@/lib/suppression/service";
 import { cn, contactDisplayName, formatNumber } from "@/lib/utils";
 import type { CompanyResearch } from "@prisma/client";
+import { vocab } from "@/lib/product-config";
 
 function hasResearchSummary(research: CompanyResearch | null): boolean {
   if (!research) return false;
@@ -165,7 +166,7 @@ export function ListCompanyResearchView({
             ) : (
               <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
                 <p className="text-sm text-slate-600">
-                  These contacts could not be linked to a company record. Add a
+                  These {vocab.contact.plural} could not be linked to a company record. Add a
                   company name on import to enable research.
                 </p>
               </div>
@@ -175,7 +176,7 @@ export function ListCompanyResearchView({
               <table className="min-w-full divide-y divide-slate-100 text-sm">
                 <thead className="bg-slate-50 text-left text-slate-500">
                   <tr>
-                    <th className="px-4 py-2.5 font-medium sm:px-5">Contact</th>
+                    <th className="px-4 py-2.5 font-medium sm:px-5">{vocab.contact.Singular}</th>
                     <th className="px-4 py-2.5 font-medium sm:px-5">Title</th>
                     <th className="px-4 py-2.5 font-medium sm:px-5">Suppression</th>
                   </tr>

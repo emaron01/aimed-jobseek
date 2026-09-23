@@ -7,6 +7,7 @@ import { canEditCampaignTemplate } from "@/lib/campaign/visibility";
 import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
+import { vocab } from "@/lib/product-config";
 
 async function assertCanEditCampaignTemplate(campaignId: string): Promise<void> {
   const organizationId = await requireOrganizationId();
@@ -23,7 +24,7 @@ async function assertCanEditCampaignTemplate(campaignId: string): Promise<void> 
   ]);
   if (!campaign) {
     throw new TenantError(
-      "Campaign does not belong to the active organization.",
+      `${vocab.campaign.Singular} does not belong to the active organization.`,
     );
   }
   if (
@@ -34,7 +35,7 @@ async function assertCanEditCampaignTemplate(campaignId: string): Promise<void> 
     })
   ) {
     throw new TenantError(
-      "You cannot edit the shared campaign template. Use this campaign to create your own personal copy.",
+      `You cannot edit the shared ${vocab.campaign.singular} template. Use this ${vocab.campaign.singular} to create your own personal copy.`,
     );
   }
 }
@@ -74,7 +75,7 @@ export async function updateCampaignEmailSettings(input: {
 
   if (result.count !== 1) {
     throw new TenantError(
-      "Campaign does not belong to the active organization.",
+      `${vocab.campaign.Singular} does not belong to the active organization.`,
     );
   }
 }
@@ -94,7 +95,7 @@ export async function getCampaignOfferValidationTarget(campaignId: string) {
   });
   if (!campaign) {
     throw new TenantError(
-      "Campaign does not belong to the active organization.",
+      `${vocab.campaign.Singular} does not belong to the active organization.`,
     );
   }
   return campaign;
@@ -128,7 +129,7 @@ export async function updateCampaignOffer(input: {
   });
   if (result.count !== 1) {
     throw new TenantError(
-      "Campaign does not belong to the active organization.",
+      `${vocab.campaign.Singular} does not belong to the active organization.`,
     );
   }
 }

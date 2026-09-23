@@ -1,3 +1,4 @@
+import { anyListFeatureEnabled, vocab } from "@/lib/product-config";
 /**
  * Pure menu/nav model for authenticated users.
  * Platform-only SUPER_ADMIN (no Organization) is a first-class case.
@@ -202,17 +203,19 @@ export function buildSidebarNavItems(input: {
 
   const items: SidebarNavItem[] = [
     { href: "/", label: "Home" },
-    { href: "/campaigns", label: "Campaigns" },
-    { href: "/lists", label: "Lists" },
-    { href: "/contacts", label: "Contacts" },
+    { href: "/campaigns", label: vocab.campaign.Plural },
+    ...(anyListFeatureEnabled()
+      ? [{ href: "/lists", label: vocab.list.Plural }]
+      : []),
+    { href: "/contacts", label: vocab.contact.Plural },
     {
       href: "/products",
-      label: "Products",
+      label: vocab.product.Plural,
       separatorBefore: true,
       activePrefixes: ["/products", "/setup"],
     },
-    { href: "/icps", label: "ICPs" },
-    { href: "/personas", label: "Personas" },
+    { href: "/icps", label: vocab.icp.plural },
+    { href: "/personas", label: vocab.persona.Plural },
     {
       href: "/settings/voice",
       label: "Your Voice",

@@ -11,6 +11,7 @@ import {
 } from "@/lib/campaign/visibility";
 import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
+import { vocab } from "@/lib/product-config";
 
 export type CampaignActionResult = { ok: boolean; message: string };
 /** Result returned by campaign visibility controls. */
@@ -23,7 +24,7 @@ export async function useSharedCampaignAction(
     await getMembershipForCurrentUser();
   await assertOrganizationNotPaymentLocked(organization.id);
   const campaignId = String(formData.get("campaignId") || "").trim();
-  if (!campaignId) throw new TenantError("Campaign is required.");
+  if (!campaignId) throw new TenantError(`${vocab.campaign.Singular} is required.`);
 
   const { campaignId: newId } = await duplicateSharedCampaign({
     organizationId: organization.id,
@@ -46,7 +47,7 @@ export async function setCampaignVisibilityAction(
     if (!canSetCampaignShared(membership.role)) {
       return {
         ok: false,
-        message: "Only organization admins can share campaigns.",
+        message: `Only organization admins can share ${vocab.campaign.plural}.`,
       };
     }
     const campaignId = String(formData.get("campaignId") || "").trim();
@@ -58,7 +59,7 @@ export async function setCampaignVisibilityAction(
       where: { id: campaignId, organizationId: organization.id },
       select: { ownerUserId: true, visibility: true },
     });
-    if (!campaign) return { ok: false, message: "Campaign not found." };
+    if (!campaign) return { ok: false, message: `${vocab.campaign.Singular} not found.` };
     if (
       !canEditCampaignTemplate({
         role: membership.role,
@@ -66,7 +67,7 @@ export async function setCampaignVisibilityAction(
         campaign,
       })
     ) {
-      return { ok: false, message: "You cannot change this campaign." };
+      return { ok: false, message: `You cannot change this ${vocab.campaign.singular}.` };
     }
 
     await prisma.campaign.update({
@@ -82,8 +83,8 @@ export async function setCampaignVisibilityAction(
       ok: true,
       message:
         visibility === "SHARED"
-          ? "Campaign is shared. Teammates can use it to create a personal copy with no contacts."
-          : "Campaign is personal again.",
+          ? `${vocab.campaign.Singular} is shared. Teammates can use it to create a personal copy with no ${vocab.contact.plural}.`
+          : `${vocab.campaign.Singular} is personal again.`,
     };
   } catch (error) {
     return {

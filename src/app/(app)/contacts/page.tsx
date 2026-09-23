@@ -20,6 +20,7 @@ import {
 import { contactDisplayName, formatNumber } from "@/lib/utils";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
 import { canViewAllRepWork } from "@/lib/work/ownership";
+import { vocab } from "@/lib/product-config";
 
 type PageProps = {
   searchParams: Promise<{
@@ -53,8 +54,8 @@ export default async function ContactsPage({ searchParams }: PageProps) {
     return (
       <div>
         <PageHeader
-          title="Contacts"
-          description="Contacts belonging to the active organization."
+          title={vocab.contact.Plural}
+          description={`${vocab.contact.Plural} belonging to the active organization.`}
         />
         <TenantMissing />
       </div>
@@ -96,8 +97,8 @@ export default async function ContactsPage({ searchParams }: PageProps) {
   return (
     <div>
       <PageHeader
-        title="Contacts"
-        description="Contacts on active lists. Use Show archived to include archived lists and cascade-archived contacts."
+        title={vocab.contact.Plural}
+        description={`${vocab.contact.Plural} on active ${vocab.list.plural}. Use Show archived to include archived ${vocab.list.plural} and cascade-archived ${vocab.contact.plural}.`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <a
@@ -127,7 +128,7 @@ export default async function ContactsPage({ searchParams }: PageProps) {
                     })}`
               }
               includeArchived={includeArchived}
-              label="lists and contacts"
+              label={`${vocab.list.plural} and ${vocab.contact.plural}`}
             />
           </div>
         }
@@ -135,13 +136,13 @@ export default async function ContactsPage({ searchParams }: PageProps) {
 
       <form className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
         <label className="block text-sm">
-          <span className="font-medium text-slate-700">List</span>
+          <span className="font-medium text-slate-700">{vocab.list.Singular}</span>
           <select
             name="listId"
             defaultValue={listId ?? ""}
             className="mt-1 block min-w-48 rounded-md border border-slate-300 px-3 py-2 text-sm"
           >
-            <option value="">All lists</option>
+            <option value="">All {vocab.list.plural}</option>
             {lists.map((list) => (
               <option key={list.id} value={list.id}>
                 {list.name}
@@ -170,13 +171,13 @@ export default async function ContactsPage({ searchParams }: PageProps) {
 
       {contacts.length === 0 ? (
         <EmptyState
-          title="No contacts found"
+          title={`No ${vocab.contact.plural} found`}
           description={
             search || listId
-              ? "Try clearing filters or importing another list."
+              ? `Try clearing filters or importing another ${vocab.list.singular}.`
               : includeUnlisted
-                ? "No contacts in this organization yet."
-                : "Contacts will appear here after you import a list. Use Show unlisted for people with no list membership."
+                ? `No ${vocab.contact.plural} in this organization yet.`
+                : `${vocab.contact.Plural} will appear here after you import ${vocab.list.aSingular}. Use Show unlisted for people with no ${vocab.list.singular} membership.`
           }
         />
       ) : (
@@ -196,8 +197,8 @@ export default async function ContactsPage({ searchParams }: PageProps) {
                 {showEmployeesColumn ? (
                   <th className="px-4 py-3 font-medium">Employees</th>
                 ) : null}
-                <th className="px-4 py-3 font-medium">List</th>
-                <th className="px-4 py-3 font-medium">Campaigns</th>
+                <th className="px-4 py-3 font-medium">{vocab.list.Singular}</th>
+                <th className="px-4 py-3 font-medium">{vocab.campaign.Plural}</th>
                 <th className="px-4 py-3 font-medium">Suppression</th>
               </tr>
             </thead>
@@ -277,7 +278,7 @@ export default async function ContactsPage({ searchParams }: PageProps) {
                           ))}
                         </ul>
                       ) : (
-                        "Not in a campaign."
+                        `Not in ${vocab.campaign.aSingular}.`
                       )}
                     </td>
                     <td className="px-4 py-3">
