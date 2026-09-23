@@ -430,6 +430,75 @@ describe("employer criterion strength", () => {
     expect(source).toContain("applyEmployerCriterionStrength");
     expect(source).toContain("icp_criterion_strength_adjustment");
   });
+
+  it.each([
+    ["doesn't need to be remote", "Work arrangement", "work_arrangement", "Remote"],
+    ["remote isn't required", "Work arrangement", "work_arrangement", "Remote"],
+    ["not necessarily SaaS", "Industry", "industry", "SaaS"],
+    ["it's not a must", "Work arrangement", "work_arrangement", "Remote"],
+    ["I don't only want startups", "Company stage", "company_stage", "Startups"],
+  ])(
+    "does not treat %j as a Must-have",
+    (seekerText, name, criterionType, targetValue) => {
+      const result = applyEmployerCriterionStrength({
+        seekerText,
+        name,
+        criterionType,
+        description: seekerText === "it's not a must" ? "must" : null,
+        targetValue,
+        isRequired: true,
+        isDisqualifier: false,
+        importance: "HIGH",
+      });
+      expect(result.isRequired).toBe(false);
+      expect(result.strengthAdjustment).toContain(
+        `${criterionFlags.required} was removed`,
+      );
+    },
+  );
+
+  it.each([
+    ["no preference on size", "Company size", "employee_count", "mid-size"],
+    ["no strong feelings about industry", "Industry", "industry", "SaaS"],
+    ["not opposed to agencies", "Industry", "industry", "Agencies"],
+    ["never been a requirement", "Company size", "employee_count", "mid-size"],
+  ])(
+    "does not treat %j as a Deal-breaker",
+    (seekerText, name, criterionType, targetValue) => {
+      const result = applyEmployerCriterionStrength({
+        seekerText,
+        name,
+        criterionType,
+        description:
+          seekerText === "never been a requirement" ? "requirement" : null,
+        targetValue,
+        isRequired: true,
+        isDisqualifier: true,
+        importance: "HIGH",
+      });
+      expect(result.isRequired).toBe(false);
+      expect(result.isDisqualifier).toBe(false);
+      expect(result.strengthAdjustment).toContain(
+        `${criterionFlags.disqualifier} was removed`,
+      );
+    },
+  );
+
+  it("treats a double negative as a real Must-have", () => {
+    const result = applyEmployerCriterionStrength({
+      seekerText: "I can't work anywhere that isn't remote",
+      name: "Work arrangement",
+      criterionType: "work_arrangement",
+      description: null,
+      targetValue: "Remote",
+      isRequired: true,
+      isDisqualifier: false,
+      importance: "HIGH",
+    });
+    expect(result.isRequired).toBe(true);
+    expect(result.isDisqualifier).toBe(false);
+    expect(result.strengthAdjustment).toBeNull();
+  });
 });
 
 describe("Must-have and Deal-breaker labels", () => {

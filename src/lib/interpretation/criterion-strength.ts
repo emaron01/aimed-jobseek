@@ -111,24 +111,77 @@ export function splitSeekerClauses(text: string): string[] {
   return clauses;
 }
 
-function hasHardRequirement(clause: string): boolean {
-  return (
-    /\b(?:must|need(?:ed|s)?|requirements?|non-?negotiable)\b/i.test(clause) ||
-    /\bwill only consider\b/i.test(clause) ||
-    /\bi will only\b/i.test(clause) ||
-    /(?<!not\s)\bonly\b/i.test(clause)
-  );
+const NEGATOR_PATTERN =
+  /\b(?:doesn'?t|don'?t|didn'?t|isn'?t|aren'?t|wasn'?t|weren'?t|cannot|can't|won'?t|not|no|never|without)\b/gi;
+
+const HARD_TERM_PATTERN =
+  /\b(?:must|need(?:ed|s)?|requirements?|non-?negotiable|only|necessarily)\b|\bwill only consider\b|\bi will only\b/gi;
+
+const EXCLUSION_TERM_PATTERN =
+  /\b(?:never|won'?t|will not|not interested in|do not want|don't want)\b|\bno\b(?!\s+(?:more|fewer|less|greater)\b)/gi;
+
+/** Odd count of negators in the few words before `index` cancels the term. */
+function isNegated(clause: string, index: number): boolean {
+  const prefix = clause.slice(Math.max(0, index - 48), index);
+  const window = prefix.trim().split(/\s+/).slice(-5).join(" ");
+  const negators = window.match(NEGATOR_PATTERN);
+  return (negators?.length ?? 0) % 2 === 1;
+}
+
+/**
+ * "I can't work anywhere that isn't remote" requires remote.
+ * The criterion term has to be what the inner negation rejects.
+ */
+function hasAffirmativeDoubleNegative(clause: string, terms: string[]): boolean {
+  const pattern =
+    /\b(?:can(?:not|'t)|unable to)\b(?:(?!\b(?:can(?:not|'t)|unable to)\b).){0,80}?\b(?:isn'?t|is not|aren'?t|are not)\s+([^.,;]+)/gi;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(clause))) {
+    const tail = match[1] ?? "";
+    if (terms.some((term) => clauseMentions(tail, [term]))) return true;
+  }
+  return false;
+}
+
+function hasHardRequirement(clause: string, terms: string[]): boolean {
+  if (hasAffirmativeDoubleNegative(clause, terms)) return true;
+  HARD_TERM_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = HARD_TERM_PATTERN.exec(clause))) {
+    if (!isNegated(clause, match.index)) return true;
+  }
+  return false;
+}
+
+function isNeutralizedExclusion(term: string, after: string): boolean {
+  if (
+    /^never$/i.test(term) &&
+    /^\s+(?:been\s+(?:a\s+)?)?(?:requirements?|required|a\s+must)\b/i.test(after)
+  ) {
+    return true;
+  }
+  if (
+    /^no$/i.test(term) &&
+    /^\s+(?:particular\s+)?(?:requirements?|preference|strong feelings|strong feeling|opinion)\b/i.test(
+      after,
+    )
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function hasExclusion(clause: string): boolean {
-  return (
-    /\bnever\b/i.test(clause) ||
-    /\bwon'?t\b/i.test(clause) ||
-    /\bwill not\b/i.test(clause) ||
-    /\bnot interested in\b/i.test(clause) ||
-    /\b(?:do not|don't) want\b/i.test(clause) ||
-    /\bno\b(?!\s+(?:more|fewer|less|greater)\b)/i.test(clause)
-  );
+  EXCLUSION_TERM_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = EXCLUSION_TERM_PATTERN.exec(clause))) {
+    const term = match[0];
+    const after = clause.slice(match.index + term.length);
+    if (isNeutralizedExclusion(term, after)) continue;
+    if (isNegated(clause, match.index)) continue;
+    return true;
+  }
+  return false;
 }
 
 function collectTerms(value: unknown, into: Set<string>): void {
@@ -190,7 +243,9 @@ export function applyEmployerCriterionStrength(
     terms.length === 0
       ? []
       : clauses.filter((clause) => clauseMentions(clause, terms));
-  const requiredSupported = relevant.some(hasHardRequirement);
+  const requiredSupported = relevant.some((clause) =>
+    hasHardRequirement(clause, terms),
+  );
   const exclusionSupported = relevant.some(hasExclusion);
 
   const isRequired = input.isRequired && requiredSupported;
