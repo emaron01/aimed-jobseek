@@ -23,6 +23,10 @@ import {
   type CoverLetterAssetContent,
 } from "@/lib/application-assets/contract";
 import { renderApplicationAssetDocx } from "@/lib/application-assets/docx";
+import {
+  formatResumeDateRange,
+  formatResumeRoleMeta,
+} from "@/lib/application-assets/dates";
 import { loadApplicationGenerationContext } from "@/lib/generation/context";
 import { loadEmailGenerationContext } from "@/lib/email-generation/context";
 import { normalizeParsedJobRequirement } from "@/lib/job-requirement/normalize";
@@ -123,6 +127,52 @@ function validResume(): ResumeAssetContent {
     credentials: [],
   };
 }
+
+describe("application asset date display", () => {
+  const { currentRoleLabel, rangeSeparator } = applicationAssetConfig.dateDisplay;
+
+  it("formats completed, current, and year-only dates for the workspace view", () => {
+    expect(formatResumeDateRange("2017-06", "2020-12")).toBe(
+      `June 2017 ${rangeSeparator} December 2020`,
+    );
+    expect(formatResumeDateRange("2021-01", null)).toBe(
+      `January 2021 ${rangeSeparator} ${currentRoleLabel}`,
+    );
+    expect(formatResumeDateRange("2015", "2016")).toBe(
+      `2015 ${rangeSeparator} 2016`,
+    );
+    expect(formatResumeRoleMeta({
+      startDate: "2021-01",
+      endDate: null,
+      location: "Seattle, WA",
+    })).toBe(`January 2021 ${rangeSeparator} ${currentRoleLabel} | Seattle, WA`);
+  });
+
+  it("renders those dates in the DOCX without inventing a month", async () => {
+    const resume = validResume();
+    resume.experience.push({
+      roleId: "role_year",
+      employer: "Example Labs",
+      title: "Intern",
+      startDate: "2015",
+      endDate: "2016",
+      location: null,
+      hidden: false,
+      bullets: [],
+    });
+    const buffer = await renderApplicationAssetDocx(resume);
+    const zip = await JSZip.loadAsync(buffer);
+    const documentXml = await zip.file("word/document.xml")!.async("string");
+    expect(documentXml).toContain(
+      `January 2021 ${rangeSeparator} ${currentRoleLabel}`,
+    );
+    expect(documentXml).toContain(`June 2017 ${rangeSeparator} December 2020`);
+    expect(documentXml).toContain(`2015 ${rangeSeparator} 2016`);
+    expect(documentXml).not.toContain("January 2015");
+    expect(documentXml).not.toContain("2021-01");
+    expect(documentXml).not.toContain("2017-06");
+  });
+});
 
 describe("application asset DOCX", () => {
   it("uses configured ATS-safe styles without tables, drawings, text boxes, headers, or footers", async () => {
@@ -278,12 +328,64 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     await prisma.applicationAsset.deleteMany({ where: { campaignId } });
   });
 
+  function validCoverLetter(
+    payload: {
+      salutation: string;
+      signerName: string;
+      sources: Array<{ id: string; text: string; url: string | null }>;
+    },
+  ): CoverLetterAssetContent {
+    const research = payload.sources.find(
+      (source) => source.url === "https://example.com/acme-robotics",
+    )!;
+    return {
+      type: "COVER_LETTER",
+      salutation: payload.salutation,
+      paragraphs: [
+        {
+          id: "cover-opening",
+          text: "Acme builds warehouse robotics systems, and my Northwind Analytics billing work is the closest match I have to keeping a high-volume system dependable.",
+          supports: [
+            ...support(research.id, "Acme builds warehouse robotics systems."),
+            ...support(
+              "profile:role_1",
+              "Senior Software Engineer. Northwind Analytics. 2021-01. Seattle, WA. Billing and payments systems.",
+            ),
+          ],
+        },
+        {
+          id: "cover-story",
+          text: "At Northwind Analytics I led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
+          supports: [
+            ...support(
+              "profile:role_1",
+              "Senior Software Engineer. Northwind Analytics. 2021-01. Seattle, WA. Billing and payments systems.",
+            ),
+            ...support(
+              "profile:ach_1",
+              "Led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
+            ),
+          ],
+        },
+        {
+          id: "cover-close",
+          text: "Can we schedule a conversation about the role?",
+          supports: support("profile:id_name", "Alex Chen"),
+        },
+      ],
+      signoff: "Sincerely,",
+      signerName: payload.signerName,
+    };
+  }
+
   function installModel(input?: {
     resumes?: ResumeAssetContent[];
+    coverLetters?: CoverLetterAssetContent[];
     coverLetter?: CoverLetterAssetContent;
     violations?: Array<{ claimId: string; reason: string }>;
   }) {
     const resumes = [...(input?.resumes ?? [validResume()])];
+    const coverLetters = [...(input?.coverLetters ?? [])];
     generateStructured.mockImplementation(
       async (request: { schemaName: string; messages: Array<{ content: string }> }) => {
         if (request.schemaName === "application_resume") {
@@ -295,41 +397,11 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
             signerName: string;
             sources: Array<{ id: string; text: string; url: string | null }>;
           };
-          const research = payload.sources.find(
-            (source) => source.url === "https://example.com/acme-robotics",
-          )!;
           return {
             data:
+              coverLetters.shift() ??
               input?.coverLetter ??
-              ({
-                type: "COVER_LETTER",
-                salutation: payload.salutation,
-                paragraphs: [
-                  {
-                    id: "cover-opening",
-                    text: "Acme builds warehouse robotics systems.",
-                    supports: support(
-                      research.id,
-                      "Acme builds warehouse robotics systems.",
-                    ),
-                  },
-                  {
-                    id: "cover-story",
-                    text: "I led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
-                    supports: support(
-                      "profile:ach_1",
-                      "Led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
-                    ),
-                  },
-                  {
-                    id: "cover-close",
-                    text: "I would welcome a conversation about the role.",
-                    supports: support("profile:id_name", "Alex Chen"),
-                  },
-                ],
-                signoff: "Sincerely,",
-                signerName: payload.signerName,
-              } satisfies CoverLetterAssetContent),
+              validCoverLetter(payload),
           };
         }
         if (request.schemaName === "application_asset_claim_validation") {
@@ -461,9 +533,178 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     const content =
       saved?.contentJson as unknown as CoverLetterAssetContent | undefined;
     expect(content?.salutation).toBe("Dear Morgan Lee,");
-    expect(content?.paragraphs[0]?.supports[0]?.sourceId).toMatch(
-      /^research:.+:source:0$/,
-    );
+    expect(
+      content?.paragraphs[0]?.supports.some((item) =>
+        /^research:.+:source:0$/.test(item.sourceId),
+      ),
+    ).toBe(true);
+    expect(
+      content?.paragraphs[0]?.supports.some((item) =>
+        item.sourceId.startsWith("profile:"),
+      ),
+    ).toBe(true);
+  });
+
+  it("regenerates a cover letter that restates a phrase without adding information", async () => {
+    installModel({
+      coverLetters: [
+        {
+          type: "COVER_LETTER",
+          salutation: "Dear Morgan Lee,",
+          paragraphs: [
+            {
+              id: "cover-opening",
+              text: "Acme builds warehouse robotics systems, and my Northwind Analytics billing work is the closest match I have to keeping a high-volume system dependable.",
+              supports: [
+                ...support(
+                  "research:placeholder:source:0",
+                  "Acme builds warehouse robotics systems.",
+                ),
+                ...support(
+                  "profile:role_1",
+                  "Senior Software Engineer. Northwind Analytics. 2021-01. Seattle, WA. Billing and payments systems.",
+                ),
+              ],
+            },
+            {
+              id: "cover-story",
+              text: "I led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters. I led the rewrite of invoice generation that cut those failed billing runs from 8% to under 1% over two quarters.",
+              supports: support(
+                "profile:ach_1",
+                "Led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
+              ),
+            },
+            {
+              id: "cover-close",
+              text: "Can we schedule a conversation about the role?",
+              supports: support("profile:id_name", "Alex Chen"),
+            },
+          ],
+          signoff: "Sincerely,",
+          signerName: "Alex Chen",
+        },
+      ],
+    });
+    const result = await generateApplicationAsset({
+      organizationId,
+      campaignId,
+      userId,
+      type: "COVER_LETTER",
+    });
+    expect(result.ok).toBe(true);
+    expect(
+      generateStructured.mock.calls.filter(
+        ([request]) => request.schemaName === "application_cover_letter",
+      ),
+    ).toHaveLength(2);
+  });
+
+  it("regenerates when a configured cover-letter banned phrase appears", async () => {
+    for (const phrase of applicationAssetConfig.bannedPhrases) {
+      generateStructured.mockReset();
+      await prisma.applicationAsset.deleteMany({ where: { campaignId } });
+      const banned: CoverLetterAssetContent = {
+        type: "COVER_LETTER",
+        salutation: "Dear Morgan Lee,",
+        paragraphs: [
+          {
+            id: "cover-opening",
+            text: `${phrase} for a team that builds warehouse robotics systems, and my Northwind Analytics billing work is the closest match I have to keeping a high-volume system dependable.`,
+            supports: [
+              ...support(
+                "research:placeholder:source:0",
+                "Acme builds warehouse robotics systems.",
+              ),
+              ...support(
+                "profile:role_1",
+                "Senior Software Engineer. Northwind Analytics. 2021-01. Seattle, WA. Billing and payments systems.",
+              ),
+            ],
+          },
+          {
+            id: "cover-story",
+            text: "At Northwind Analytics I led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
+            supports: support(
+              "profile:ach_1",
+              "Led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
+            ),
+          },
+          {
+            id: "cover-close",
+            text: "Can we schedule a conversation about the role?",
+            supports: support("profile:id_name", "Alex Chen"),
+          },
+        ],
+        signoff: "Sincerely,",
+        signerName: "Alex Chen",
+      };
+      installModel({ coverLetters: [banned] });
+      const result = await generateApplicationAsset({
+        organizationId,
+        campaignId,
+        userId,
+        type: "COVER_LETTER",
+      });
+      expect(result.ok).toBe(true);
+      expect(
+        generateStructured.mock.calls.filter(
+          ([request]) => request.schemaName === "application_cover_letter",
+        ),
+      ).toHaveLength(2);
+    }
+  });
+
+  it("rejects an opening that does not cite both research and a Personal Profile fact", async () => {
+    const opening = {
+      type: "COVER_LETTER" as const,
+      salutation: "Dear Morgan Lee,",
+      paragraphs: [
+        {
+          id: "cover-opening",
+          text: "Acme builds warehouse robotics systems.",
+          supports: support(
+            "research:placeholder:source:0",
+            "Acme builds warehouse robotics systems.",
+          ),
+        },
+        {
+          id: "cover-story",
+          text: "At Northwind Analytics I led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
+          supports: support(
+            "profile:ach_1",
+            "Led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
+          ),
+        },
+        {
+          id: "cover-close",
+          text: "Can we schedule a conversation about the role?",
+          supports: support("profile:id_name", "Alex Chen"),
+        },
+      ],
+      signoff: "Sincerely,",
+      signerName: "Alex Chen",
+    };
+    installModel({
+      coverLetters: [opening, opening, opening, opening, opening],
+    });
+    const result = await generateApplicationAsset({
+      organizationId,
+      campaignId,
+      userId,
+      type: "COVER_LETTER",
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("Expected the opening to fail closed.");
+    expect(
+      result.violations.some((item) =>
+        item.includes("Personal Profile FACT"),
+      ),
+    ).toBe(true);
+    expect(
+      await prisma.applicationAsset.count({
+        where: { campaignId, type: "COVER_LETTER" },
+      }),
+    ).toBe(0);
   });
 
   it("increments versions and keeps only one approved version per type", async () => {

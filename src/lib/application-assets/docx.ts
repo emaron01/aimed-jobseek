@@ -11,6 +11,7 @@ import type {
   ApplicationAssetContent,
   ResumeAssetContent,
 } from "./contract";
+import { formatResumeRoleMeta } from "./dates";
 
 const style = applicationAssetConfig.docx;
 
@@ -96,14 +97,7 @@ function resumeChildren(content: ResumeAssetContent): Paragraph[] {
         [role.title, role.employer].filter(Boolean).join(", "),
         { bold: true, after: 0 },
       ),
-      bodyParagraph(
-        [
-          [role.startDate, role.endDate].filter(Boolean).join(" - "),
-          role.location,
-        ]
-          .filter(Boolean)
-          .join(" | "),
-      ),
+      bodyParagraph(formatResumeRoleMeta(role)),
       ...role.bullets.map((claim) =>
         bodyParagraph(claim.text, { bullet: true }),
       ),

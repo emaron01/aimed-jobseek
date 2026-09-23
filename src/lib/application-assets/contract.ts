@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const RESUME_ASSET_PROMPT_VERSION = "4";
-export const COVER_LETTER_ASSET_PROMPT_VERSION = "6";
+export const COVER_LETTER_ASSET_PROMPT_VERSION = "7";
 export const ASSET_CLAIM_VALIDATION_PROMPT_VERSION = "2";
 
 export const assetSupportSchema = z.object({

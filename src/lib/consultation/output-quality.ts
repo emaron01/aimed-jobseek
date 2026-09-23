@@ -92,25 +92,18 @@ function repetitionTokens(text: string): Set<string> {
   );
 }
 
-export function validateInterviewAnswerQuality(input: {
+export function validateRepetitionAndMetaLanguage(input: {
   text: string;
-  maxWords: number;
   bannedPhrases: readonly string[];
 }): string[] {
   const errors: string[] = [];
   const text = input.text.trim();
-  const wordCount = text.split(/\s+/).filter(Boolean).length;
-  if (wordCount > input.maxWords) {
-    errors.push(`The interview answer exceeded ${input.maxWords} words.`);
-  }
+  if (!text) return errors;
   const metaHits = bannedPhraseHits([text], input.bannedPhrases);
   if (metaHits.length > 0) {
     errors.push(
-      `The interview answer described its structure instead of telling the story: ${metaHits.join(", ")}.`,
+      `The writing described its structure instead of making a point: ${metaHits.join(", ")}.`,
     );
-  }
-  if (!/\b(?:I|I'm|I've|I'd|I'll|my|mine|we|we're|we've|our|ours)\b/i.test(text)) {
-    errors.push("The interview answer was not written as natural first-person speech.");
   }
   const numberCounts = new Map<string, number>();
   for (const token of numericTokens(text).map(normalized)) {
@@ -121,7 +114,7 @@ export function validateInterviewAnswerQuality(input: {
     .map(([token]) => token);
   if (repeatedNumbers.length > 0) {
     errors.push(
-      `The interview answer repeated the same number without adding information: ${repeatedNumbers.join(", ")}.`,
+      `The writing repeated the same number without adding information: ${repeatedNumbers.join(", ")}.`,
     );
   }
   const sentences = sentenceParts(text).map((sentence) => ({
@@ -137,11 +130,34 @@ export function validateInterviewAnswerQuality(input: {
       const union = new Set([...a.tokens, ...b.tokens]).size;
       if (union > 0 && overlap / union >= 0.6) {
         errors.push(
-          `The interview answer restated the same fact in multiple sentences: "${a.sentence}" / "${b.sentence}".`,
+          `The writing restated the same fact in multiple sentences: "${a.sentence}" / "${b.sentence}".`,
         );
       }
     }
   }
+  return [...new Set(errors)];
+}
+
+export function validateInterviewAnswerQuality(input: {
+  text: string;
+  maxWords: number;
+  bannedPhrases: readonly string[];
+}): string[] {
+  const errors: string[] = [];
+  const text = input.text.trim();
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  if (wordCount > input.maxWords) {
+    errors.push(`The interview answer exceeded ${input.maxWords} words.`);
+  }
+  if (!/\b(?:I|I'm|I've|I'd|I'll|my|mine|we|we're|we've|our|ours)\b/i.test(text)) {
+    errors.push("The interview answer was not written as natural first-person speech.");
+  }
+  errors.push(
+    ...validateRepetitionAndMetaLanguage({
+      text,
+      bannedPhrases: input.bannedPhrases,
+    }),
+  );
   return [...new Set(errors)];
 }
 

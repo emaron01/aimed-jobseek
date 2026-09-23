@@ -8,7 +8,7 @@ import {
   COVER_LETTER_ASSET_INSTRUCTIONS,
   RESUME_ASSET_INSTRUCTIONS,
 } from "@/lib/prompt-content";
-import { applicationAssetConfig } from "@/lib/product-config";
+import { applicationAssetConfig, consultationConfig } from "@/lib/product-config";
 import {
   ASSET_CLAIM_VALIDATION_PROMPT_VERSION,
   COVER_LETTER_ASSET_PROMPT_VERSION,
@@ -78,6 +78,10 @@ export function buildResumeAssetMessages(input: {
         applicationGuidance: input.context.campaign.applicationGuidance,
         regenerationInstruction: input.regenerationInstruction,
         qualityFeedback: input.qualityFeedback,
+        bannedPhrases: [
+          ...consultationConfig.bannedPhrases,
+          ...applicationAssetConfig.bannedPhrases,
+        ],
         targetLength: resumeTargetLength(input.context),
         headerFacts: [
           contact.name,
@@ -146,6 +150,10 @@ export function buildCoverLetterAssetMessages(input: {
         applicationGuidance: input.context.campaign.applicationGuidance,
         regenerationInstruction: input.regenerationInstruction,
         qualityFeedback: input.qualityFeedback,
+        bannedPhrases: [
+          ...consultationConfig.bannedPhrases,
+          ...applicationAssetConfig.bannedPhrases,
+        ],
         salutation: input.salutation,
         signerName: input.context.profile.identity.name?.text ?? "",
         responseShape: {

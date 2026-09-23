@@ -12,6 +12,7 @@ import {
   type ApplicationAssetContent,
   type AssetClaim,
 } from "@/lib/application-assets/contract";
+import { formatResumeRoleMeta } from "@/lib/application-assets/dates";
 import { applicationAssetConfig } from "@/lib/product-config";
 import { SECONDARY_BUTTON_CLASS, SubmitButton } from "@/components/ui";
 
@@ -115,8 +116,7 @@ function AssetPreview({ content }: { content: ApplicationAssetContent }) {
                 {role.title}, {role.employer}
               </p>
               <p className="text-xs text-slate-600">
-                {[role.startDate, role.endDate].filter(Boolean).join(" - ")}
-                {role.location ? ` | ${role.location}` : ""}
+                {formatResumeRoleMeta(role)}
               </p>
               <ul className="list-disc pl-5">
                 {role.bullets.map((claim) => (

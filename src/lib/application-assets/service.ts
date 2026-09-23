@@ -2,6 +2,7 @@ import { Prisma, type ApplicationAssetType } from "@prisma/client";
 import {
   bannedPhraseHits,
   mentionsInternalSystemState,
+  validateRepetitionAndMetaLanguage,
 } from "@/lib/consultation/output-quality";
 import {
   loadApplicationGenerationContext,
@@ -151,8 +152,11 @@ function supportErrors(
       errors.push(`Claim id ${claim.id} was duplicated.`);
     }
     ids.add(claim.id);
+    const isCoverLetterClose =
+      content.type === "COVER_LETTER" && index === claims.length - 1;
     const requiresSeekerSupport =
-      content.type === "RESUME" || index > 0;
+      content.type === "RESUME" ||
+      (content.type === "COVER_LETTER" && index > 0 && !isCoverLetterClose);
     let hasSeekerSupport = false;
     for (const support of claim.supports) {
       const source = sourceById.get(support.sourceId);
@@ -250,12 +254,26 @@ function coverLetterStructureErrors(
     errors.push("The cover letter changed the seeker's name.");
   }
   const sourceById = new Map(context.sources.map((source) => [source.id, source]));
-  const openingHasCitedResearch = content.paragraphs[0]?.supports.some((support) => {
-    const source = sourceById.get(support.sourceId);
-    return source?.category === "COMPANY_RESEARCH" && Boolean(source.url);
-  });
+  const opening = content.paragraphs[0];
+  const openingSupports = (opening?.supports ?? [])
+    .map((support) => ({
+      support,
+      source: sourceById.get(support.sourceId),
+    }))
+    .filter((item) => item.source);
+  const openingHasCitedResearch = openingSupports.some(
+    (item) => item.source?.category === "COMPANY_RESEARCH" && Boolean(item.source.url),
+  );
+  const openingHasSeekerFact = openingSupports.some(
+    (item) => item.source && isSeekerSource(item.source.category),
+  );
   if (!openingHasCitedResearch) {
     errors.push("The opening needs a cited company-research source.");
+  }
+  if (!openingHasSeekerFact) {
+    errors.push(
+      "The opening needs a cited Personal Profile FACT or approved consultation statement.",
+    );
   }
   return errors;
 }
@@ -272,8 +290,20 @@ export async function validateAssetContent(input: {
     ...supportErrors(input.content, input.context),
     ...bannedPhraseHits(texts, [
       ...consultationConfig.bannedPhrases,
-      ...consultationConfig.interviewAnswerBannedPhrases,
+      ...applicationAssetConfig.bannedPhrases,
     ]).map((phrase) => `Remove configured banned language: ${phrase}.`),
+    ...texts.flatMap((text) =>
+      validateRepetitionAndMetaLanguage({
+        text,
+        bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
+      }),
+    ),
+    ...(input.content.type === "COVER_LETTER"
+      ? validateRepetitionAndMetaLanguage({
+          text: texts.join(" "),
+          bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
+        })
+      : []),
   ];
   if (texts.some(mentionsInternalSystemState)) {
     errors.push("Remove references to internal system state.");
