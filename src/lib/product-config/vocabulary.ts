@@ -165,6 +165,15 @@ export function criterionFlagLabels(flags: {
 export type VocabKey = keyof typeof vocab;
 export type NounForm = keyof NounForms;
 
+const SCORING_DIMENSION_LABELS: Record<string, string> = {
+  "Positive Buying Signals": `Positive ${vocab.employerSignal.plural}`,
+};
+
+/** Seeker-facing label for a stored scoring dimension. The stored name is unchanged. */
+export function scoringDimensionLabel(storedName: string): string {
+  return SCORING_DIMENSION_LABELS[storedName] ?? storedName;
+}
+
 /** Lowercase noun agreeing with `count`: 1 → singular, otherwise plural. */
 export function nounForCount(count: number, forms: NounForms): string {
   return count === 1 ? forms.singular : forms.plural;

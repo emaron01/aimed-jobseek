@@ -16,6 +16,10 @@ import { companyResearchAiResultSchema } from "@/lib/research/assessment";
 import { productSourceDiscoverySchema } from "@/lib/research/source-discovery-contract";
 import { aiScoringAssessmentSchema } from "@/lib/scoring/assessment";
 import { titleSuggestionAiResultSchema } from "@/lib/scoring/title-suggestion-contract";
+import {
+  consultationCoachSchema,
+  consultationExtractSchema,
+} from "@/lib/consultation/contract";
 
 export type StructuredOutputSchemaEntry = {
   schemaName: string;
@@ -35,7 +39,8 @@ export type StructuredOutputSchemaEntry = {
     | "EMAIL_REPLY_CLASSIFIED"
     | "PERSONA_WEB_SEARCH"
     | "TITLE_SUGGESTION"
-    | "JOB_REQUIREMENT_PARSE")[];
+    | "JOB_REQUIREMENT_PARSE"
+    | "CONSULTATION")[];
 };
 
 /**
@@ -113,6 +118,16 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
     schemaName: "email_claim_validation",
     schema: claimValidationSchema,
     usageOperations: ["EMAIL_DRAFT_CREATED"],
+  },
+  consultationCoach: {
+    schemaName: "consultation_coach",
+    schema: consultationCoachSchema,
+    usageOperations: ["CONSULTATION"],
+  },
+  consultationExtract: {
+    schemaName: "consultation_extract",
+    schema: consultationExtractSchema,
+    usageOperations: ["CONSULTATION"],
   },
   prospectReplyClassification: {
     schemaName: "prospect_reply_classification",

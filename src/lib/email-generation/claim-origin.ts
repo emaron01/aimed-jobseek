@@ -7,8 +7,16 @@ import type { ClaimValidationViolation } from "@/lib/email-generation/claim-vali
 
 export type ClaimOrigin =
   | "REP_ASSERTED"
+  | "CONSULTATION_ANSWER"
   | "EVIDENCE_SUPPORTED"
   | "MODEL_ORIGINATED";
+
+/** Seeker-authored consultation answers. Trusted the same way as rep text. */
+export type ConsultationClaimSource = {
+  id: string;
+  text: string;
+  seekerAuthored: true;
+};
 
 export type RepClaimSources = {
   offerText: string;
@@ -215,6 +223,28 @@ export function isTraceableToEvidence(
   return needles.some((needle) => textOverlapsRepSource(needle, evidenceText));
 }
 
+export function isTraceableToConsultationAnswer(
+  assertion: {
+    description?: string | null;
+    matchedGuard?: string | null;
+    bodyExcerpt?: string | null;
+  },
+  sources: ConsultationClaimSource[],
+): boolean {
+  const texts = sources
+    .filter((source) => source.seekerAuthored && source.text.trim())
+    .map((source) => source.text);
+  if (texts.length === 0) return false;
+  const needles = [
+    assertion.bodyExcerpt,
+    assertion.matchedGuard,
+    assertion.description,
+  ].filter((value): value is string => Boolean(value?.trim()));
+  return needles.some((needle) =>
+    texts.some((text) => textOverlapsRepSource(needle, text)),
+  );
+}
+
 export function classifyClaimOrigin(
   assertion: {
     description?: string | null;
@@ -223,8 +253,12 @@ export function classifyClaimOrigin(
   },
   sources: RepClaimSources,
   evidenceTexts: string[],
+  consultationSources: ConsultationClaimSource[] = [],
 ): ClaimOrigin {
   if (isTraceableToRepInput(assertion, sources)) return "REP_ASSERTED";
+  if (isTraceableToConsultationAnswer(assertion, consultationSources)) {
+    return "CONSULTATION_ANSWER";
+  }
   if (isTraceableToEvidence(assertion, evidenceTexts)) {
     return "EVIDENCE_SUPPORTED";
   }
@@ -236,12 +270,17 @@ export function keepModelOriginatedViolations(
   violations: ClaimValidationViolation[],
   sources: RepClaimSources,
   evidenceTexts: string[],
+  consultationSources: ConsultationClaimSource[] = [],
 ): ClaimValidationViolation[] {
   return violations
     .filter(
       (violation) =>
-        classifyClaimOrigin(violation, sources, evidenceTexts) ===
-        "MODEL_ORIGINATED",
+        classifyClaimOrigin(
+          violation,
+          sources,
+          evidenceTexts,
+          consultationSources,
+        ) === "MODEL_ORIGINATED",
     )
     .map((violation) => ({
       ...violation,

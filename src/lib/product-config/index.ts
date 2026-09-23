@@ -8,6 +8,7 @@ export {
   criterionFlagLabels,
   criterionFlags,
   nounForCount,
+  scoringDimensionLabel,
   vocab,
   vocabExamples,
 } from "./vocabulary";
@@ -23,6 +24,11 @@ export {
   HIRING_TEAM_TEMPLATE_DEFAULTS,
 } from "./hiring-team-templates";
 export type { HiringTeamTemplateKey } from "./hiring-team-templates";
+export {
+  consultationConfig,
+  evidenceStrengthLabels,
+  gapStrategyCopy,
+} from "./consultation";
 export type {
   CriterionFlagKey,
   NounForm,

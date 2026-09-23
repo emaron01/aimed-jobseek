@@ -2,6 +2,7 @@ import type { AiRole } from "@/lib/ai/config";
 import {
   getContactResearchAiConfig,
   getEmailAiConfig,
+  getConsultationAiConfig,
   getEmailFactsAiConfig,
   getInterpretationAiConfig,
   getPersonaAiConfig,
@@ -132,6 +133,18 @@ export const AI_ROLE_CATALOG: readonly AiRoleCatalogEntry[] = [
     operations: ["Email company-fact selection (EMAIL_COMPANY_FACT_SELECTION)"],
     requiredForScoring: false,
   },
+  {
+    role: "consultation",
+    label: "Consultation",
+    requiredEnv: [
+      "CONSULTATION_AI_PROVIDER",
+      "CONSULTATION_AI_MODEL",
+      "CONSULTATION_AI_MODEL_URL",
+      "CONSULTATION_AI_API_KEY",
+    ],
+    operations: ["Consultation coaching", "Consultation fact extraction"],
+    requiredForScoring: false,
+  },
 ] as const;
 
 /** Same loaders the runtime uses — panel status matches call-time config. */
@@ -144,6 +157,7 @@ const LOADERS: Record<AiRole, () => unknown> = {
   persona: getPersonaAiConfig,
   email: getEmailAiConfig,
   email_facts: getEmailFactsAiConfig,
+  consultation: getConsultationAiConfig,
 };
 
 export type AiRoleStatus = AiRoleCatalogEntry & {

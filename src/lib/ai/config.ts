@@ -35,7 +35,8 @@ export type AiRole =
   | "product"
   | "persona"
   | "email"
-  | "email_facts";
+  | "email_facts"
+  | "consultation";
 
 /**
  * OpenAI Responses `reasoning.effort` values.
@@ -165,6 +166,15 @@ const ROLE_ENV: Record<AiRole, RoleEnv> = {
     maxRetries: "EMAIL_FACTS_AI_MAX_RETRIES",
     temperature: "EMAIL_FACTS_AI_TEMPERATURE",
   },
+  consultation: {
+    provider: "CONSULTATION_AI_PROVIDER",
+    model: "CONSULTATION_AI_MODEL",
+    modelUrl: "CONSULTATION_AI_MODEL_URL",
+    apiKey: "CONSULTATION_AI_API_KEY",
+    timeoutMs: "CONSULTATION_AI_TIMEOUT_MS",
+    maxRetries: "CONSULTATION_AI_MAX_RETRIES",
+    temperature: "CONSULTATION_AI_TEMPERATURE",
+  },
 };
 
 function notConfiguredMessage(role: AiRole): string {
@@ -185,6 +195,8 @@ function notConfiguredMessage(role: AiRole): string {
       return "Email generation AI is not configured.";
     case "email_facts":
       return "Email company-fact selection AI is not configured.";
+    case "consultation":
+      return "Consultation AI is not configured.";
   }
 }
 
@@ -240,7 +252,8 @@ function parseProvider(
       role === "product" ||
       role === "persona" ||
       role === "email" ||
-      role === "email_facts"
+      role === "email_facts" ||
+      role === "consultation"
     ) {
       return "openai-responses";
     }
@@ -403,6 +416,20 @@ export function getEmailFactsAiConfig(): AiConfig {
 export function isEmailFactsAiConfigured(): boolean {
   try {
     getEmailFactsAiConfig();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Fail closed for Consultation AI. Never reads another role's variables. */
+export function getConsultationAiConfig(): AiConfig {
+  return getAiConfigForRole("consultation");
+}
+
+export function isConsultationAiConfigured(): boolean {
+  try {
+    getConsultationAiConfig();
     return true;
   } catch {
     return false;

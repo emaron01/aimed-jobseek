@@ -518,6 +518,11 @@ model Organization {
   icps                     Icp[]
   personas                 Persona[]
   personaTemplates         PersonaTemplate[]
+  consultationSessions     ConsultationSession[]
+  consultationTurns        ConsultationTurn[]
+  consultationAssessments  ConsultationAssessment[]
+  consultationProposals    ConsultationProposal[]
+  profileStories           ProfileStory[]
   contactLists             ContactList[]
   contacts                 Contact[]
   companies                Company[]
@@ -1207,6 +1212,7 @@ model Product {
   personaSources         PersonaSource[]
   personaEvidenceBundles PersonaEvidenceBundle[]
   personaSetupRuns       PersonaSetupRun[]
+  profileStories         ProfileStory[]
 
   @@index([organizationId])
   @@index([organizationId, createdAt])
@@ -2216,6 +2222,7 @@ model Campaign {
   jobRequirement JobRequirement?
   applicationFit ApplicationFit?
   hiringTeamRoles Persona[] @relation("ApplicationHiringTeam")
+  consultationSession ConsultationSession?
 
   @@index([organizationId])
   @@index([organizationId, createdAt])
@@ -2294,6 +2301,153 @@ model ApplicationFit {
   @@index([organizationId])
   @@index([icpId])
   @@index([overriddenByUserId])
+}
+
+enum ConsultationStatus {
+  IN_PROGRESS
+  PAUSED
+  SKIPPED
+  DONE
+}
+
+enum ConsultationSpeaker {
+  CONSULTANT
+  SEEKER
+}
+
+enum EvidenceStrength {
+  STRONG
+  PARTIAL
+  NONE
+}
+
+enum GapStrategy {
+  PROVE_WITH_STORY
+  REFRAME_ADJACENT
+  ACKNOWLEDGE
+}
+
+enum ConsultationProposalStatus {
+  PENDING
+  CONFIRMED
+  DISMISSED
+}
+
+enum ConsultationProposalKind {
+  FACT
+  STORY
+}
+
+/// One consultation per application. Answers stay verbatim. Nothing is written to the Personal Profile until confirmed.
+model ConsultationSession {
+  id               String              @id @default(cuid())
+  organizationId   String
+  campaignId       String              @unique
+  productId        String
+  status           ConsultationStatus  @default(IN_PROGRESS)
+  promptVersion    String
+  /// Coach commentary, or the reason commentary could not be written.
+  coachNote        String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign                  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  turns        ConsultationTurn[]
+  assessments  ConsultationAssessment[]
+  proposals    ConsultationProposal[]
+
+  @@index([organizationId])
+  @@index([productId])
+}
+
+model ConsultationTurn {
+  id             String               @id @default(cuid())
+  organizationId String
+  sessionId      String
+  sequence       Int
+  speaker        ConsultationSpeaker
+  /// Seeker answers are stored verbatim.
+  body           String
+  skipped        Boolean              @default(false)
+  /// Requirement key this turn is about. Null for session-level notes.
+  targetKey      String?
+  followUp       Boolean              @default(false)
+  /// Seeker turns are the seeker's own words. Voice may use them later.
+  seekerAuthored Boolean              @default(false)
+  createdAt      DateTime             @default(now())
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  session      ConsultationSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  proposals    ConsultationProposal[]
+
+  @@unique([sessionId, sequence])
+  @@index([organizationId])
+  @@index([sessionId])
+}
+
+model ConsultationAssessment {
+  id                 String            @id @default(cuid())
+  organizationId     String
+  sessionId          String
+  targetKey          String
+  kind               String
+  text               String
+  strength           EvidenceStrength
+  supportingFactIds  Json
+  strategy           GapStrategy?
+  updatedAt          DateTime          @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  session      ConsultationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, targetKey])
+  @@index([organizationId])
+}
+
+model ConsultationProposal {
+  id              String                       @id @default(cuid())
+  organizationId  String
+  sessionId       String
+  turnId          String
+  status          ConsultationProposalStatus   @default(PENDING)
+  kind            ConsultationProposalKind
+  text            String
+  storyJson       Json?
+  competencyLinks Json?
+  profileItemId   String?
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  session      ConsultationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  turn         ConsultationTurn    @relation(fields: [turnId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([sessionId])
+  @@index([turnId])
+}
+
+/// STAR story bank on the Personal Profile. Reused by later applications.
+model ProfileStory {
+  id               String   @id @default(cuid())
+  organizationId   String
+  productId        String
+  situation        String
+  task             String
+  action           String
+  result           String
+  competencyLinks  Json
+  consultationTurnId String
+  seekerAuthored   Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([productId])
+  @@index([consultationTurnId])
 }
 
 /// Personas a campaign will email. Empty means all personas for the product.

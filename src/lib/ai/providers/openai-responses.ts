@@ -156,7 +156,8 @@ function roleMode(config: AiConfig): ResponsesRoleMode {
     config.role === "email" ||
     // Structured JSON pick of company-fact candidates — same as scoring/product.
     // Was omitted when email_facts was added to parseProvider; no special mode needed.
-    config.role === "email_facts"
+    config.role === "email_facts" ||
+    config.role === "consultation"
   ) {
     return "structured_only";
   }
@@ -184,6 +185,8 @@ function roleLabel(config: AiConfig): string {
       return "Email generation";
     case "email_facts":
       return "Email company-fact selection";
+    case "consultation":
+      return "Consultation";
     default:
       return "AI";
   }

@@ -60,6 +60,45 @@ describe("claim origin", () => {
     expect(filtered).toEqual([]);
   });
 
+  it("trusts a claim that overlaps a seeker-authored consultation answer", () => {
+    const sources = buildRepClaimSources({
+      offer: { offerName: null, offerDescription: null, offerCta: null, offerNotes: null },
+    });
+    const consultation = [
+      {
+        id: "turn_1",
+        text: "I cut failed billing runs from 8% to under 1% over two quarters.",
+        seekerAuthored: true as const,
+      },
+    ];
+    expect(
+      classifyClaimOrigin(
+        {
+          bodyExcerpt: "cut failed billing runs from 8% to under 1%",
+          description: "Billing metric",
+          matchedGuard: null,
+        },
+        sources,
+        [],
+        consultation,
+      ),
+    ).toBe("CONSULTATION_ANSWER");
+    const filtered = keepModelOriginatedViolations(
+      [
+        {
+          type: "UNSUPPORTED_FACT",
+          description: "Billing metric",
+          matchedGuard: null,
+          bodyExcerpt: "cut failed billing runs from 8% to under 1%",
+        },
+      ],
+      sources,
+      [],
+      consultation,
+    );
+    expect(filtered).toEqual([]);
+  });
+
   it("keeps model inventions that appear in neither rep sources nor evidence", () => {
     const sources = buildRepClaimSources({
       offer: {

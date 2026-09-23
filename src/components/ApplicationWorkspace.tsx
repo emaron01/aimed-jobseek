@@ -9,6 +9,7 @@ import {
   saveRoleAsTemplateAction,
 } from "@/app/actions/hiring-team";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
+import { ConsultationSection } from "@/components/ConsultationSection";
 import { displayedFitBucket, fitSignalLabels } from "@/lib/application/fit";
 import type { ApplicationFitOutcome } from "@/lib/application/fit";
 import { readApplicationFitStale } from "@/lib/application/service";
@@ -302,6 +303,11 @@ export async function ApplicationWorkspace({
       </div>
     </section>
     <HiringTeamSection
+      campaignId={requirement.campaignId}
+      organizationId={organizationId}
+      canEdit={canEdit}
+    />
+    <ConsultationSection
       campaignId={requirement.campaignId}
       organizationId={organizationId}
       canEdit={canEdit}

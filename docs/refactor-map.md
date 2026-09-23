@@ -178,15 +178,11 @@ Decided: contacts are added one at a time to the application's roster. Lists, bu
 
 ### Consultation (journey step 4)
 
-**Nothing interactive exists.** Closest pieces, and they are not this feature:
+**Exists per application.** `ConsultationSession` stores status, prompt version, and coach commentary. `ConsultationTurn` stores the ordered transcript, with seeker answers verbatim and `seekerAuthored`. `ConsultationAssessment` stores STRONG, PARTIAL, or NONE evidence against scorecard items and required and preferred requirements, linked to Personal Profile FACT ids. `ConsultationProposal` holds extracted facts and STAR stories until the seeker confirms them. Confirmed facts append to `Product.profileJson` with provenance pointing at the seeker turn. Confirmed STAR stories are `ProfileStory` rows linked to competencies. Prompt content is `src/lib/prompt-content/consultation.ts` (version 1). The consultant display name is `consultationConfig.displayName`.
 
-- ICP interpretation returns `understoodSummary` and `undetermined` once (`src/lib/interpretation/icp.ts`). It does not ask the user questions in a loop.
-- Email regeneration takes one instruction string (`additionalGuidance` in `src/lib/email-generation/prompt.ts`).
-- There is no chat transcript table.
+**Classification: NEW, now in place.**
 
-**Classification: NEW.**
-
-Attach it as its own action and table beside the application, writing approved answers onto the profile (`Product.profileJson` or a child table of facts). Do not implement it as another email regeneration call. Answers are one of the two decided trace sources for the claim rule, so each answer needs a stable identity that a generated fact can point to.
+The seeker can skip the consultation, skip a question, pause and resume, or mark Done. It also ends when required, outcome, competency, and mission gaps are STRONG or skipped. Preferred gaps do not block. Skipping does not block later asset generation. Consultation answers are a trusted claim source in `src/lib/email-generation/claim-origin.ts`.
 
 ### Assets (journey step 5)
 
@@ -456,7 +452,7 @@ The vision's Decisions log settles Target Employers, lists, contacts, email, `Ap
 7. **RESOLVED.** Microsoft 365 through Graph is the only direct send path and the only one that attaches. Outlook desktop and Google Workspace are handoff paths with a download step. The catalog's Google sending copy still needs correcting (section 8).
 8. **RESOLVED.** The digest survives with two clocks, both on Home and in the digest: application outreach on the existing sequence clock with job-seeker intervals, and interview stages anchored to the interview date (thank-you about 24 hours after, check-in N days after with no response). Due items ask for notes. Content is generated on demand after notes, never on a timer. The anchor wording is question 17.
 9. **RESOLVED.** Every asset may state a skill, title, employer, date, credential, metric, or achievement only when it traces to the profile or a consultation answer. Assets may emphasize and order facts but never add them. Resume generation fails closed. Whether other asset types fail closed is question 20.
-10. **OPEN.** Consultation: what ends the Q&A, and may the seeker skip it? There is no product rule in the vision and no pattern in the code.
+10. **RESOLVED.** The seeker may skip the consultation, skip any question, pause and resume, or click Done. The consultation also ends when required, outcome, competency, and mission gaps are STRONG or skipped. Preferred gaps do not block the end. Materials can still be generated from the Personal Profile when consultation is skipped.
 11. **OPEN.** Who supplies the DOCX styles for resume and cover letter? Nothing in the repo is a template. Rendering on demand is decided; the layout is not.
 12. **OPEN.** LinkedIn is paste-only in the vision. Confirm there will be no LinkedIn API.
 13. **RESOLVED.** Account-level templates are `PersonaTemplate` rows, created from product configuration for each organization. A per-application role is a `Persona` with `campaignId` set. `productId` stays required and points at the Personal Profile. Selectors show only that application's roles.

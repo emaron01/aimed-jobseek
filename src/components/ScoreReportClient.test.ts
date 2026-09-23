@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { vocab } from "@/lib/product-config";
+import { scoringDimensionLabel, vocab } from "@/lib/product-config";
+import { ICP_DIMENSIONS } from "@/lib/scoring/config";
 
 const source = readFileSync("src/components/ScoreReportClient.tsx", "utf8");
 
@@ -35,6 +36,14 @@ describe("ScoreReportClient table layout", () => {
     expect(source).toContain("bulkRestoreQualificationAction");
     expect(source).toContain('data-testid="bulk-exclusion-restore"');
     expect(source).toContain("`restore-contact-${row.contactId}`");
+  });
+
+  it("shows Positive Buying Signals with job-seeker wording", () => {
+    expect(ICP_DIMENSIONS).toContain("Positive Buying Signals");
+    expect(scoringDimensionLabel("Positive Buying Signals")).toBe(
+      "Positive employer signals",
+    );
+    expect(source).toContain("scoringDimensionLabel(dim.dimension)");
   });
 
   it("caps non-excluded reasons at two lines and keeps details expandable", () => {

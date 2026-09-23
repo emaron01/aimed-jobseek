@@ -9,7 +9,9 @@ import {
   deterministicSignalLeakageViolations,
   keepModelOriginatedViolations,
   normalizedClaimText,
+  type ConsultationClaimSource,
 } from "@/lib/email-generation/claim-origin";
+import { prisma } from "@/lib/prisma";
 import {
   claimValidationSchema,
   type ClaimValidationResult,
@@ -110,6 +112,10 @@ export async function validateGeneratedEmailClaims(input: {
     repEditText: input.repEditText,
   });
   const evidenceTexts = claimEvidenceTexts(input.context);
+  const consultationSources = await consultationClaimSources({
+    organizationId: input.context.organizationId,
+    campaignId: input.context.campaign.id,
+  });
   const prospect = prospectResearchPayload(input.context);
 
   const deterministic = [
@@ -194,6 +200,30 @@ export async function validateGeneratedEmailClaims(input: {
     merged,
     repSources,
     evidenceTexts,
+    consultationSources,
   );
   return { response, violations };
+}
+
+async function consultationClaimSources(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<ConsultationClaimSource[]> {
+  const turns = await prisma.consultationTurn.findMany({
+    where: {
+      organizationId: input.organizationId,
+      speaker: "SEEKER",
+      skipped: false,
+      seekerAuthored: true,
+      session: { campaignId: input.campaignId },
+    },
+    select: { id: true, body: true },
+  });
+  return turns
+    .filter((turn) => turn.body.trim())
+    .map((turn) => ({
+      id: turn.id,
+      text: turn.body,
+      seekerAuthored: true as const,
+    }));
 }

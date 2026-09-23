@@ -23,7 +23,8 @@ function clearAllAiEnv() {
       key.startsWith("PRODUCT_AI_") ||
       key.startsWith("PERSONA_AI_") ||
       key.startsWith("EMAIL_AI_") ||
-      key.startsWith("EMAIL_FACTS_AI_")
+      key.startsWith("EMAIL_FACTS_AI_") ||
+      key.startsWith("CONSULTATION_AI_")
     ) {
       delete process.env[key];
     }
@@ -50,6 +51,7 @@ describe("AI role readiness", () => {
       "persona",
       "email",
       "email_facts",
+      "consultation",
     ]);
     expect(statuses.every((row) => !row.configured)).toBe(true);
     expect(

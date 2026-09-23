@@ -44,7 +44,12 @@ import {
   readQualificationReason,
 } from "@/lib/workflow/qualification";
 import type { QualificationBucket } from "@prisma/client";
-import { countedNoun, vocab, vocabExamples } from "@/lib/product-config";
+import {
+  countedNoun,
+  scoringDimensionLabel,
+  vocab,
+  vocabExamples,
+} from "@/lib/product-config";
 
 export type CompanyResearchView = {
   id: string;
@@ -804,7 +809,7 @@ export function ScoreReportClient({
                                     className="rounded-md border border-slate-200 bg-white px-3 py-2"
                                   >
                                     <p className="font-medium text-slate-900">
-                                      {dim.dimension}{" "}
+                                      {scoringDimensionLabel(dim.dimension)}{" "}
                                       <span className="font-normal text-slate-500">
                                         · {dim.assessment}
                                       </span>

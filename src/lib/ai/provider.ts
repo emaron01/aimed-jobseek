@@ -1,6 +1,7 @@
 import {
   getContactResearchAiConfig,
   getEmailAiConfig,
+  getConsultationAiConfig,
   getEmailFactsAiConfig,
   getInterpretationAiConfig,
   getPersonaAiConfig,
@@ -62,6 +63,10 @@ const emailCache: { key: string; provider: AiProvider | null } = {
   provider: null,
 };
 const emailFactsCache: { key: string; provider: AiProvider | null } = {
+  key: "",
+  provider: null,
+};
+const consultationCache: { key: string; provider: AiProvider | null } = {
   key: "",
   provider: null,
 };
@@ -174,6 +179,19 @@ export function getEmailFactsAiProvider(): AiProvider {
   return provider;
 }
 
+/** Consultation AI only — never uses another role's configuration. */
+export function getConsultationAiProvider(): AiProvider {
+  const config = getConsultationAiConfig();
+  const key = cacheKey(config);
+  if (consultationCache.key === key && consultationCache.provider) {
+    return consultationCache.provider;
+  }
+  const provider = createAiProvider(config);
+  consultationCache.key = key;
+  consultationCache.provider = provider;
+  return provider;
+}
+
 /** Test helper to clear provider caches. */
 export function clearAiProviderCache(): void {
   researchCache.key = "";
@@ -192,4 +210,6 @@ export function clearAiProviderCache(): void {
   emailCache.provider = null;
   emailFactsCache.key = "";
   emailFactsCache.provider = null;
+  consultationCache.key = "";
+  consultationCache.provider = null;
 }
