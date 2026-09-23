@@ -9,6 +9,7 @@ import {
   getProductAiConfig,
   getResearchAiConfig,
   getScoringAiConfig,
+  getAssetAiConfig,
 } from "@/lib/ai/config";
 import { AiConfigError } from "@/lib/ai/errors";
 import { vocab } from "@/lib/product-config";
@@ -145,6 +146,18 @@ export const AI_ROLE_CATALOG: readonly AiRoleCatalogEntry[] = [
     operations: ["Consultation coaching", "Consultation fact extraction"],
     requiredForScoring: false,
   },
+  {
+    role: "asset",
+    label: "Resume and cover letter generation",
+    requiredEnv: [
+      "ASSET_AI_PROVIDER",
+      "ASSET_AI_MODEL",
+      "ASSET_AI_MODEL_URL",
+      "ASSET_AI_API_KEY",
+    ],
+    operations: ["Resume generation", "Cover letter generation", "Claim validation"],
+    requiredForScoring: false,
+  },
 ] as const;
 
 /** Same loaders the runtime uses — panel status matches call-time config. */
@@ -158,6 +171,7 @@ const LOADERS: Record<AiRole, () => unknown> = {
   email: getEmailAiConfig,
   email_facts: getEmailFactsAiConfig,
   consultation: getConsultationAiConfig,
+  asset: getAssetAiConfig,
 };
 
 export type AiRoleStatus = AiRoleCatalogEntry & {

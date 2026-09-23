@@ -54,7 +54,7 @@ describe("parseProductAiResponse coercion", () => {
   });
 
   it("uses prompt version 6", () => {
-    expect(PRODUCT_SYNTHESIS_PROMPT_VERSION).toBe("7");
+    expect(PRODUCT_SYNTHESIS_PROMPT_VERSION).toBe("8");
   });
 });
 

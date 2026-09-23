@@ -31,6 +31,7 @@ import {
   type ContactPersonaSource,
   type PersonalizationTier,
 } from "@/lib/email-generation/personalization";
+import { loadApplicationGenerationContext } from "@/lib/generation/context";
 
 const CONTACT_RESEARCH_FRESHNESS_DAYS = 90;
 
@@ -302,23 +303,12 @@ export async function loadEmailGenerationContext(
   }
 
   const [
-    voiceSamples,
     contactResearch,
     approvedEvidence,
     companyResearchRow,
     matchedScore,
     researchPolicy,
   ] = await Promise.all([
-      prisma.voiceSample.findMany({
-        where: { organizationId, userId },
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          label: true,
-          sampleText: true,
-          createdAt: true,
-        },
-      }),
       prisma.contactResearch.findUnique({
         where: {
           organizationId_contactId: {
@@ -413,13 +403,18 @@ export async function loadEmailGenerationContext(
         : `No ${vocab.persona.singular} is available for this ${vocab.contact.singular}.`,
     );
   }
+  const applicationContext = await loadApplicationGenerationContext(
+    campaign.id,
+    userId,
+    { personaId: personaRow.id, allowProductPersona: true },
+  );
   const emailLength = options?.emailLength ?? campaign.emailLength;
 
   const productMessaging = objectValue(campaign.product.messagingJson);
   const productProfile = objectValue(campaign.product.profileJson);
-  const generationProfile = candidateProfileForGeneration(
-    campaign.product.profileJson,
-  );
+  const generationProfile =
+    applicationContext.profile ??
+    candidateProfileForGeneration(campaign.product.profileJson);
   const personaMessaging = objectValue(personaRow.personaMessagingJson);
   const personaProfile = objectValue(personaRow.profileJson);
 
@@ -558,7 +553,7 @@ export async function loadEmailGenerationContext(
         ? stringList(freshContactResearch.negativeRoleSignals)
         : [],
     },
-    voiceSamples,
+    voiceSamples: applicationContext.voiceSamples,
     sequence: campaignContact.emailDrafts,
     personaResolution: {
       source: resolved.source,

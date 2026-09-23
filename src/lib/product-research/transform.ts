@@ -62,6 +62,11 @@ function filterCandidateProfile(
       name: filterOptionalFact(profile.identity.name, allowed),
       headline: filterOptionalFact(profile.identity.headline, allowed),
       location: filterOptionalFact(profile.identity.location, allowed),
+      email: filterOptionalFact(profile.identity.email, allowed),
+      phone: filterOptionalFact(profile.identity.phone, allowed),
+      cityState: filterOptionalFact(profile.identity.cityState, allowed),
+      linkedinUrl: filterOptionalFact(profile.identity.linkedinUrl, allowed),
+      personalSite: filterOptionalFact(profile.identity.personalSite, allowed),
       workArrangementPreference: filterOptionalFact(
         profile.identity.workArrangementPreference,
         allowed,

@@ -118,6 +118,11 @@ export function profileEvidenceItems(profile: CandidateProfile): ProfileFactRef[
   pushItem(facts, profile.identity.name);
   pushItem(facts, profile.identity.headline);
   pushItem(facts, profile.identity.location);
+  pushItem(facts, profile.identity.email);
+  pushItem(facts, profile.identity.phone);
+  pushItem(facts, profile.identity.cityState);
+  pushItem(facts, profile.identity.linkedinUrl);
+  pushItem(facts, profile.identity.personalSite);
   pushItem(facts, profile.identity.workArrangementPreference);
   pushItem(facts, profile.identity.relocationOpenness);
   pushItem(facts, profile.positioning);
@@ -126,7 +131,14 @@ export function profileEvidenceItems(profile: CandidateProfile): ProfileFactRef[
   profile.direction.functions.forEach((item) => pushItem(facts, item));
   profile.direction.careerGoals.forEach((item) => pushItem(facts, item));
   for (const role of profile.experience) {
-    const bits = [role.title, role.employer, role.summary].filter(
+    const bits = [
+      role.title,
+      role.employer,
+      role.startDate,
+      role.endDate,
+      role.location,
+      role.summary,
+    ].filter(
       (value): value is string => Boolean(value?.trim()),
     );
     if (bits.length > 0) {

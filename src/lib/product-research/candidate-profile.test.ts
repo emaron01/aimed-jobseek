@@ -101,7 +101,7 @@ describe("profile synthesis output", () => {
   });
 
   it("uses prompt version 7 and does not ask for compensation", () => {
-    expect(PRODUCT_SYNTHESIS_PROMPT_VERSION).toBe("7");
+    expect(PRODUCT_SYNTHESIS_PROMPT_VERSION).toBe("8");
     const messages = buildProductSynthesisMessages({
       productName: "Alex Chen",
       primaryUrl: null,

@@ -75,6 +75,11 @@ export const candidateProfileSchema = z.object({
     name: optionalFact,
     headline: optionalFact,
     location: optionalFact,
+    email: optionalFact,
+    phone: optionalFact,
+    cityState: optionalFact,
+    linkedinUrl: optionalFact,
+    personalSite: optionalFact,
     workArrangementPreference: optionalFact,
     relocationOpenness: optionalFact,
   }),
@@ -215,6 +220,11 @@ export function flattenProfileTextsForEvidence(
   pushFact(profile.identity.name);
   pushFact(profile.identity.headline);
   pushFact(profile.identity.location);
+  pushFact(profile.identity.email);
+  pushFact(profile.identity.phone);
+  pushFact(profile.identity.cityState);
+  pushFact(profile.identity.linkedinUrl);
+  pushFact(profile.identity.personalSite);
   pushFact(profile.identity.workArrangementPreference);
   pushFact(profile.identity.relocationOpenness);
   pushFact(profile.positioning);

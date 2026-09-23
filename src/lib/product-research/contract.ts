@@ -197,4 +197,4 @@ export type PersonaDraft = {
 
 export type { CandidateProfile };
 
-export const PRODUCT_SYNTHESIS_PROMPT_VERSION = "7";
+export const PRODUCT_SYNTHESIS_PROMPT_VERSION = "8";

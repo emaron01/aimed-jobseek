@@ -498,6 +498,93 @@ export function ProductDraftReview({
               singleLine
             />
             <EditField
+              label="Email"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS["identity.email"]}
+              value={profile.identity.email?.text ?? ""}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  identity: {
+                    ...prev.identity,
+                    email: updateOptionalFact(prev.identity.email, value, "id_email"),
+                  },
+                }))
+              }
+              singleLine
+            />
+            <EditField
+              label="Phone"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS["identity.phone"]}
+              value={profile.identity.phone?.text ?? ""}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  identity: {
+                    ...prev.identity,
+                    phone: updateOptionalFact(prev.identity.phone, value, "id_phone"),
+                  },
+                }))
+              }
+              singleLine
+            />
+            <EditField
+              label="City and state"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS["identity.cityState"]}
+              value={profile.identity.cityState?.text ?? ""}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  identity: {
+                    ...prev.identity,
+                    cityState: updateOptionalFact(
+                      prev.identity.cityState,
+                      value,
+                      "id_city_state",
+                    ),
+                  },
+                }))
+              }
+              singleLine
+            />
+            <EditField
+              label="LinkedIn URL"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS["identity.linkedinUrl"]}
+              value={profile.identity.linkedinUrl?.text ?? ""}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  identity: {
+                    ...prev.identity,
+                    linkedinUrl: updateOptionalFact(
+                      prev.identity.linkedinUrl,
+                      value,
+                      "id_linkedin_url",
+                    ),
+                  },
+                }))
+              }
+              singleLine
+            />
+            <EditField
+              label="Personal site"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS["identity.personalSite"]}
+              value={profile.identity.personalSite?.text ?? ""}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  identity: {
+                    ...prev.identity,
+                    personalSite: updateOptionalFact(
+                      prev.identity.personalSite,
+                      value,
+                      "id_personal_site",
+                    ),
+                  },
+                }))
+              }
+              singleLine
+            />
+            <EditField
               label="Work arrangement"
               hint={CANDIDATE_PROFILE_FIELD_HINTS["identity.workArrangementPreference"]}
               value={profile.identity.workArrangementPreference?.text ?? ""}
@@ -709,7 +796,12 @@ export function ProductDraftReview({
               empty={
                 !profile.identity.name &&
                 !profile.identity.headline &&
-                !profile.identity.location
+                !profile.identity.location &&
+                !profile.identity.email &&
+                !profile.identity.phone &&
+                !profile.identity.cityState &&
+                !profile.identity.linkedinUrl &&
+                !profile.identity.personalSite
               }
             >
               <FactLine
@@ -724,6 +816,31 @@ export function ProductDraftReview({
               />
               <FactLine
                 item={profile.identity.location}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
+              <FactLine
+                item={profile.identity.email}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
+              <FactLine
+                item={profile.identity.phone}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
+              <FactLine
+                item={profile.identity.cityState}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
+              <FactLine
+                item={profile.identity.linkedinUrl}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
+              <FactLine
+                item={profile.identity.personalSite}
                 sources={sources}
                 sourceIndex={sourceIndex}
               />

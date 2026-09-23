@@ -1,0 +1,188 @@
+import type { AiMessage } from "@/lib/ai/types";
+import type {
+  ApplicationGenerationContext,
+  ReadyApplicationGenerationContext,
+} from "@/lib/generation/context";
+import {
+  ASSET_CLAIM_VALIDATION_INSTRUCTIONS,
+  COVER_LETTER_ASSET_INSTRUCTIONS,
+  RESUME_ASSET_INSTRUCTIONS,
+} from "@/lib/prompt-content";
+import { applicationAssetConfig } from "@/lib/product-config";
+import {
+  ASSET_CLAIM_VALIDATION_PROMPT_VERSION,
+  COVER_LETTER_ASSET_PROMPT_VERSION,
+  RESUME_ASSET_PROMPT_VERSION,
+  type AssetClaim,
+} from "./contract";
+
+function seekerSources(context: ApplicationGenerationContext) {
+  return context.sources.filter((source) =>
+    [
+      "PROFILE_FACT",
+      "APPROVED_STATEMENT",
+      "APPROVED_STORY",
+    ].includes(source.category),
+  );
+}
+
+function commonPayload(context: ReadyApplicationGenerationContext) {
+  return {
+    application: context.campaign,
+    jobRequirement: context.requirement,
+    companyResearch: context.companyResearch,
+    persona: context.persona,
+    assessments: context.assessments,
+    approvedStatements: context.approvedStatements,
+    approvedStories: context.stories,
+    voiceSamples: context.voiceSamples,
+    sources: context.sources,
+  };
+}
+
+function resumeTargetLength(context: ReadyApplicationGenerationContext) {
+  const seniority = context.requirement?.seniority?.toLowerCase() ?? "";
+  if (
+    applicationAssetConfig.seniorityBandTerms.executive.some((term) =>
+      seniority.includes(term),
+    )
+  ) {
+    return applicationAssetConfig.resumeTargetWordsBySeniority.executive;
+  }
+  if (
+    applicationAssetConfig.seniorityBandTerms.senior.some((term) =>
+      seniority.includes(term),
+    )
+  ) {
+    return applicationAssetConfig.resumeTargetWordsBySeniority.senior;
+  }
+  return applicationAssetConfig.resumeTargetWordsBySeniority.default;
+}
+
+export function buildResumeAssetMessages(input: {
+  context: ReadyApplicationGenerationContext;
+  hiddenRoleIds: string[];
+  regenerationInstruction: string | null;
+  qualityFeedback: string[];
+}): AiMessage[] {
+  const contact = input.context.profile.identity;
+  return [
+    {
+      role: "system",
+      content: `Prompt version: ${RESUME_ASSET_PROMPT_VERSION}\n\n${RESUME_ASSET_INSTRUCTIONS}`,
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        ...commonPayload(input.context),
+        applicationGuidance: input.context.campaign.applicationGuidance,
+        regenerationInstruction: input.regenerationInstruction,
+        qualityFeedback: input.qualityFeedback,
+        targetLength: resumeTargetLength(input.context),
+        headerFacts: [
+          contact.name,
+          contact.email,
+          contact.phone,
+          contact.cityState,
+          contact.linkedinUrl,
+          contact.personalSite,
+        ]
+          .filter(Boolean)
+          .map((item) => ({
+            sourceId: `profile:${item!.id}`,
+            text: item!.text,
+          })),
+        experience: input.context.profile.experience,
+        hiddenRoleIds: input.hiddenRoleIds,
+        seekerSources: seekerSources(input.context),
+        responseShape: {
+          type: "RESUME",
+          header: {
+            name: "claim",
+            contactDetails: ["claim"],
+          },
+          summary: ["claim"],
+          experience: [
+            {
+              roleId: "exact supplied role id",
+              employer: "exact supplied employer",
+              title: "exact supplied title",
+              startDate: "exact supplied date|null",
+              endDate: "exact supplied date|null",
+              location: "exact supplied location|null",
+              hidden: "boolean from hiddenRoleIds only",
+              bullets: ["claim"],
+            },
+          ],
+          skills: ["claim"],
+          education: ["claim"],
+          credentials: ["claim"],
+          claim: {
+            id: "unique string",
+            text: "string",
+            supports: [{ sourceId: "supplied source id", quote: "exact quote" }],
+          },
+        },
+      }),
+    },
+  ];
+}
+
+export function buildCoverLetterAssetMessages(input: {
+  context: ReadyApplicationGenerationContext;
+  salutation: string;
+  regenerationInstruction: string | null;
+  qualityFeedback: string[];
+}): AiMessage[] {
+  return [
+    {
+      role: "system",
+      content: `Prompt version: ${COVER_LETTER_ASSET_PROMPT_VERSION}\n\n${COVER_LETTER_ASSET_INSTRUCTIONS}`,
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        ...commonPayload(input.context),
+        applicationGuidance: input.context.campaign.applicationGuidance,
+        regenerationInstruction: input.regenerationInstruction,
+        qualityFeedback: input.qualityFeedback,
+        salutation: input.salutation,
+        signerName: input.context.profile.identity.name?.text ?? "",
+        responseShape: {
+          type: "COVER_LETTER",
+          salutation: "exact supplied salutation",
+          paragraphs: ["claim"],
+          signoff: "professional signoff",
+          signerName: "exact supplied signer name",
+          claim: {
+            id: "unique string",
+            text: "string",
+            supports: [{ sourceId: "supplied source id", quote: "exact quote" }],
+          },
+        },
+      }),
+    },
+  ];
+}
+
+export function buildAssetClaimValidationMessages(input: {
+  claims: AssetClaim[];
+  sources: ApplicationGenerationContext["sources"];
+}): AiMessage[] {
+  return [
+    {
+      role: "system",
+      content: `Prompt version: ${ASSET_CLAIM_VALIDATION_PROMPT_VERSION}\n\n${ASSET_CLAIM_VALIDATION_INSTRUCTIONS}`,
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        claims: input.claims,
+        sources: input.sources,
+        responseShape: {
+          violations: [{ claimId: "string", reason: "string" }],
+        },
+      }),
+    },
+  ];
+}

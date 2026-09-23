@@ -8,6 +8,8 @@ import {
   getProductAiConfig,
   getResearchAiConfig,
   getScoringAiConfig,
+  getAssetAiConfig,
+  getAssetValidationAiConfig,
   type AiConfig,
 } from "@/lib/ai/config";
 import { AiConfigError } from "@/lib/ai/errors";
@@ -67,6 +69,14 @@ const emailFactsCache: { key: string; provider: AiProvider | null } = {
   provider: null,
 };
 const consultationCache: { key: string; provider: AiProvider | null } = {
+  key: "",
+  provider: null,
+};
+const assetCache: { key: string; provider: AiProvider | null } = {
+  key: "",
+  provider: null,
+};
+const assetValidationCache: { key: string; provider: AiProvider | null } = {
   key: "",
   provider: null,
 };
@@ -192,6 +202,31 @@ export function getConsultationAiProvider(): AiProvider {
   return provider;
 }
 
+export function getAssetAiProvider(): AiProvider {
+  const config = getAssetAiConfig();
+  const key = `${cacheKey(config)}|${config.temperature}`;
+  if (assetCache.key === key && assetCache.provider) return assetCache.provider;
+  const provider = createAiProvider(config);
+  assetCache.key = key;
+  assetCache.provider = provider;
+  return provider;
+}
+
+export function getAssetValidationAiProvider(): AiProvider {
+  const config = getAssetValidationAiConfig();
+  const key = `${cacheKey(config)}|${config.temperature}`;
+  if (
+    assetValidationCache.key === key &&
+    assetValidationCache.provider
+  ) {
+    return assetValidationCache.provider;
+  }
+  const provider = createAiProvider(config);
+  assetValidationCache.key = key;
+  assetValidationCache.provider = provider;
+  return provider;
+}
+
 /** Test helper to clear provider caches. */
 export function clearAiProviderCache(): void {
   researchCache.key = "";
@@ -212,4 +247,8 @@ export function clearAiProviderCache(): void {
   emailFactsCache.provider = null;
   consultationCache.key = "";
   consultationCache.provider = null;
+  assetCache.key = "";
+  assetCache.provider = null;
+  assetValidationCache.key = "";
+  assetValidationCache.provider = null;
 }

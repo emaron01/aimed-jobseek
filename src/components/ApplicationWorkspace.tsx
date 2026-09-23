@@ -15,6 +15,7 @@ import {
 } from "@/app/actions/hiring-team";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { ConsultationSection } from "@/components/ConsultationSection";
+import { ApplicationAssetsSection } from "@/components/ApplicationAssetsSection";
 import { HiringTeamDisclosureGroup } from "@/components/HiringTeamDisclosureGroup";
 import { displayedFitBucket, fitSignalLabels } from "@/lib/application/fit";
 import type { ApplicationFitOutcome } from "@/lib/application/fit";
@@ -24,6 +25,7 @@ import { prisma } from "@/lib/prisma";
 import { applicationSummaryConfig, criterionFlags, hiringTeamConfig, vocab } from "@/lib/product-config";
 import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
 import { parseStringArray } from "@/lib/research";
+import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 
 function textList(value: unknown): string[] {
   return parseStringArray(value);
@@ -110,6 +112,10 @@ export async function ApplicationWorkspace({
             select: { updatedAt: true, interpretationPromptVersion: true, name: true },
           },
           applicationFit: true,
+          product: { select: { profileJson: true } },
+          applicationAssets: {
+            orderBy: [{ type: "asc" }, { version: "desc" }],
+          },
         },
       },
     },
@@ -134,6 +140,9 @@ export async function ApplicationWorkspace({
       })
     : null;
   const outcomes = fit ? readOutcomes(fit.outcomesJson) : [];
+  const profile = parseCandidateProfileSafe(
+    requirement.campaign.product.profileJson,
+  );
   const shownBucket = fit
     ? displayedFitBucket({
         bucket: fit.bucket,
@@ -326,6 +335,31 @@ export async function ApplicationWorkspace({
       campaignId={requirement.campaignId}
       organizationId={organizationId}
       canEdit={canEdit}
+    />
+    <ApplicationAssetsSection
+      campaignId={requirement.campaignId}
+      canEdit={canEdit}
+      profileRoles={
+        profile.ok
+          ? profile.profile.experience.map((role) => ({
+              id: role.id,
+              employer: role.employer,
+              title: role.title,
+              startDate: role.startDate,
+              endDate: role.endDate,
+            }))
+          : []
+      }
+      assets={requirement.campaign.applicationAssets.map((asset) => ({
+        id: asset.id,
+        type: asset.type,
+        version: asset.version,
+        status: asset.status,
+        content: asset.contentJson,
+        guidance: asset.guidance,
+        promptVersion: asset.promptVersion,
+        createdAt: asset.createdAt.toISOString(),
+      }))}
     />
     </>
   );

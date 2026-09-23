@@ -42,3 +42,5 @@ export { FEATURE_FLAGS, anyListFeatureEnabled, features } from "./features";
 export type { FeatureFlag } from "./features";
 export { hiringTeamConfig } from "./hiring-team";
 export { applicationSummaryConfig } from "./application-summary";
+export { applicationAssetConfig } from "./application-assets";
+export type { ApplicationAssetTypeValue } from "./application-assets";

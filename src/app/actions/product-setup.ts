@@ -26,6 +26,7 @@ import type {
   SuggestedPersona,
 } from "@/lib/product-research/contract";
 import { productFieldsFromCandidateProfile } from "@/lib/product-research/candidate-profile";
+import { confirmProfileContactDetails } from "@/lib/product-research/contact-details";
 import {
   diffCandidateProfileFields,
   parseCandidateProfileFromFormData,
@@ -482,7 +483,7 @@ export async function saveApprovedProductAction(
       select: { name: true, websiteUrl: true },
     });
     const originalDraft = storedProfileFromJson(run.productDraftJson);
-    const profile = parseCandidateProfileFromFormData(formData);
+    let profile = parseCandidateProfileFromFormData(formData);
     const websiteUrl = String(formData.get("websiteUrl") || "").trim() || null;
     const editedFields = diffCandidateProfileFields(originalDraft, profile);
     if (existingProduct && name !== existingProduct.name) {
@@ -491,6 +492,12 @@ export async function saveApprovedProductAction(
     if (existingProduct && websiteUrl !== (existingProduct.websiteUrl ?? null)) {
       editedFields.push("websiteUrl");
     }
+    profile = await confirmProfileContactDetails({
+      organizationId,
+      productId,
+      userId: user.id,
+      profile,
+    });
 
     await approveProductFromDraft({
       organizationId,

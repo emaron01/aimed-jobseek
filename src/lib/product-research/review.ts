@@ -27,6 +27,11 @@ export const CANDIDATE_PROFILE_FIELD_PATHS = [
   "identity.name",
   "identity.headline",
   "identity.location",
+  "identity.email",
+  "identity.phone",
+  "identity.cityState",
+  "identity.linkedinUrl",
+  "identity.personalSite",
   "identity.workArrangementPreference",
   "identity.relocationOpenness",
   "positioning",
@@ -56,6 +61,11 @@ export const CANDIDATE_PROFILE_FIELD_LABELS: Record<
   "identity.name": "Name",
   "identity.headline": "Current headline",
   "identity.location": "Location",
+  "identity.email": "Email",
+  "identity.phone": "Phone",
+  "identity.cityState": "City and state",
+  "identity.linkedinUrl": "LinkedIn URL",
+  "identity.personalSite": "Personal site",
   "identity.workArrangementPreference": "Work arrangement preference",
   "identity.relocationOpenness": "Relocation openness",
   positioning: "Positioning statement",
@@ -83,6 +93,11 @@ export const CANDIDATE_PROFILE_FIELD_HINTS: Record<
   "identity.headline": "Current title or how you describe your work today.",
   "identity.name": "Your name as it should appear on the profile.",
   "identity.location": "City and region, if stated.",
+  "identity.email": "Email address to use on application materials.",
+  "identity.phone": "Phone number to use on application materials.",
+  "identity.cityState": "City and state exactly as they should appear on a resume.",
+  "identity.linkedinUrl": "Full LinkedIn profile URL.",
+  "identity.personalSite": "Personal site, portfolio, or GitHub URL.",
   "identity.workArrangementPreference":
     "Remote, hybrid, on-site, or other arrangement you stated.",
   "identity.relocationOpenness": "Whether you are open to relocating, if stated.",
@@ -141,6 +156,16 @@ function sectionValue(
       return profile.identity.headline;
     case "identity.location":
       return profile.identity.location;
+    case "identity.email":
+      return profile.identity.email;
+    case "identity.phone":
+      return profile.identity.phone;
+    case "identity.cityState":
+      return profile.identity.cityState;
+    case "identity.linkedinUrl":
+      return profile.identity.linkedinUrl;
+    case "identity.personalSite":
+      return profile.identity.personalSite;
     case "identity.workArrangementPreference":
       return profile.identity.workArrangementPreference;
     case "identity.relocationOpenness":

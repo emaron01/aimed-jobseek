@@ -36,7 +36,8 @@ export type AiRole =
   | "persona"
   | "email"
   | "email_facts"
-  | "consultation";
+  | "consultation"
+  | "asset";
 
 /**
  * OpenAI Responses `reasoning.effort` values.
@@ -175,6 +176,15 @@ const ROLE_ENV: Record<AiRole, RoleEnv> = {
     maxRetries: "CONSULTATION_AI_MAX_RETRIES",
     temperature: "CONSULTATION_AI_TEMPERATURE",
   },
+  asset: {
+    provider: "ASSET_AI_PROVIDER",
+    model: "ASSET_AI_MODEL",
+    modelUrl: "ASSET_AI_MODEL_URL",
+    apiKey: "ASSET_AI_API_KEY",
+    timeoutMs: "ASSET_AI_TIMEOUT_MS",
+    maxRetries: "ASSET_AI_MAX_RETRIES",
+    temperature: "ASSET_AI_TEMPERATURE",
+  },
 };
 
 function notConfiguredMessage(role: AiRole): string {
@@ -197,6 +207,8 @@ function notConfiguredMessage(role: AiRole): string {
       return "Email company-fact selection AI is not configured.";
     case "consultation":
       return "Consultation AI is not configured.";
+    case "asset":
+      return "Application asset AI is not configured.";
   }
 }
 
@@ -253,7 +265,8 @@ function parseProvider(
       role === "persona" ||
       role === "email" ||
       role === "email_facts" ||
-      role === "consultation"
+      role === "consultation" ||
+      role === "asset"
     ) {
       return "openai-responses";
     }
@@ -430,6 +443,31 @@ export function getConsultationAiConfig(): AiConfig {
 export function isConsultationAiConfigured(): boolean {
   try {
     getConsultationAiConfig();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Fail closed for resume and cover-letter generation. */
+export function getAssetAiConfig(): AiConfig {
+  const config = getAiConfigForRole("asset");
+  return {
+    ...config,
+    temperature: process.env.ASSET_AI_TEMPERATURE?.trim()
+      ? config.temperature
+      : 0.5,
+  };
+}
+
+/** Validation uses the same model and endpoint, always at temperature zero. */
+export function getAssetValidationAiConfig(): AiConfig {
+  return { ...getAssetAiConfig(), temperature: 0 };
+}
+
+export function isAssetAiConfigured(): boolean {
+  try {
+    getAssetAiConfig();
     return true;
   } catch {
     return false;

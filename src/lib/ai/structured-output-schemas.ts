@@ -24,6 +24,11 @@ import {
 } from "@/lib/consultation/contract";
 import { hiringTeamIdentificationSchema } from "@/lib/hiring-team/contract";
 import { applicationSummaryGuidanceSchema } from "@/lib/application-summary/contract";
+import {
+  assetClaimValidationSchema,
+  coverLetterAssetContentSchema,
+  resumeAssetContentSchema,
+} from "@/lib/application-assets/contract";
 
 export type StructuredOutputSchemaEntry = {
   schemaName: string;
@@ -44,7 +49,8 @@ export type StructuredOutputSchemaEntry = {
     | "PERSONA_WEB_SEARCH"
     | "TITLE_SUGGESTION"
     | "JOB_REQUIREMENT_PARSE"
-    | "CONSULTATION")[];
+    | "CONSULTATION"
+    | "APPLICATION_ASSET_GENERATION")[];
 };
 
 /**
@@ -152,6 +158,21 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
     schemaName: "application_summary_guidance",
     schema: applicationSummaryGuidanceSchema,
     usageOperations: ["CONSULTATION"],
+  },
+  resumeAsset: {
+    schemaName: "application_resume",
+    schema: resumeAssetContentSchema,
+    usageOperations: ["APPLICATION_ASSET_GENERATION"],
+  },
+  coverLetterAsset: {
+    schemaName: "application_cover_letter",
+    schema: coverLetterAssetContentSchema,
+    usageOperations: ["APPLICATION_ASSET_GENERATION"],
+  },
+  applicationAssetClaimValidation: {
+    schemaName: "application_asset_claim_validation",
+    schema: assetClaimValidationSchema,
+    usageOperations: ["APPLICATION_ASSET_GENERATION"],
   },
   prospectReplyClassification: {
     schemaName: "prospect_reply_classification",

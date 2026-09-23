@@ -45,6 +45,16 @@ function sectionValue(
       return profile.identity.headline;
     case "identity.location":
       return profile.identity.location;
+    case "identity.email":
+      return profile.identity.email;
+    case "identity.phone":
+      return profile.identity.phone;
+    case "identity.cityState":
+      return profile.identity.cityState;
+    case "identity.linkedinUrl":
+      return profile.identity.linkedinUrl;
+    case "identity.personalSite":
+      return profile.identity.personalSite;
     case "identity.workArrangementPreference":
       return profile.identity.workArrangementPreference;
     case "identity.relocationOpenness":
@@ -112,6 +122,24 @@ function setSectionValue(
       break;
     case "identity.location":
       next.identity.location = value as CandidateProfile["identity"]["location"];
+      break;
+    case "identity.email":
+      next.identity.email = value as CandidateProfile["identity"]["email"];
+      break;
+    case "identity.phone":
+      next.identity.phone = value as CandidateProfile["identity"]["phone"];
+      break;
+    case "identity.cityState":
+      next.identity.cityState =
+        value as CandidateProfile["identity"]["cityState"];
+      break;
+    case "identity.linkedinUrl":
+      next.identity.linkedinUrl =
+        value as CandidateProfile["identity"]["linkedinUrl"];
+      break;
+    case "identity.personalSite":
+      next.identity.personalSite =
+        value as CandidateProfile["identity"]["personalSite"];
       break;
     case "identity.workArrangementPreference":
       next.identity.workArrangementPreference =

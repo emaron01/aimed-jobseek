@@ -37,6 +37,12 @@ export function fixtureAlexChenProfile(
         text: "Seattle, WA",
         provenance: [{ sourceId }],
       },
+      cityState: {
+        id: "id_city_state",
+        kind: "FACT",
+        text: "Seattle, WA",
+        provenance: [{ sourceId }],
+      },
       workArrangementPreference: {
         id: "id_work_arrangement",
         kind: "FACT",
