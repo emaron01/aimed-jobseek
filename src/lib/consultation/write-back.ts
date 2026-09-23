@@ -1,10 +1,6 @@
-import type { EvidenceAssessment, EvidenceTarget } from "@/lib/consultation/assess";
-import {
-  assessEvidence,
-  contentTokens,
-  profileFactEvidence,
-} from "@/lib/consultation/assess";
-import { answerHasResult } from "@/lib/consultation/questions";
+import type { EvidenceTarget } from "@/lib/consultation/assess";
+import type { ConsultationExtractResult } from "@/lib/consultation/contract";
+import { validModelQuestion } from "@/lib/consultation/questions";
 import {
   parseCandidateProfile,
   type CandidateProfile,
@@ -16,7 +12,7 @@ export type StoryDraft = {
   task: string;
   action: string;
   result: string;
-  competencyLinks: Array<{ id: string; text: string }>;
+  competencyLinks: Array<{ id: string; text: string; explanation: string }>;
 };
 
 export type ProposalDraft = {
@@ -26,69 +22,83 @@ export type ProposalDraft = {
   profileItemId: string;
 };
 
-function sentences(text: string): string[] {
-  return text
-    .split(/(?<=[.!?])\s+|\n+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-}
-
-function resultSentence(answer: string): string | null {
-  const parts = sentences(answer);
-  const hit = parts.find((part) => answerHasResult(part));
-  return hit ?? (answerHasResult(answer) ? answer.trim() : null);
-}
-
-export function proposalsFromAnswer(input: {
+export function proposalsFromExtraction(input: {
   answer: string;
   turnId: string;
-  competencies: Array<{ id: string; text: string }>;
-  targetCompetency?: { id: string; text: string } | null;
-  allowWithoutResult: boolean;
-}): ProposalDraft[] {
-  const answer = input.answer.trim();
-  if (!answer) return [];
-  const result = resultSentence(answer);
-  if (!result && !input.allowWithoutResult) return [];
+  extracted: ConsultationExtractResult;
+  targets: EvidenceTarget[];
+}): {
+  proposals: ProposalDraft[];
+  dropped: string[];
+  followUpQuestion: string | null;
+  missingStarElements: ConsultationExtractResult["missingStarElements"];
+} {
+  const dropped: string[] = [];
   const proposals: ProposalDraft[] = [];
-  const factText = result ?? answer;
-  proposals.push({
-    kind: "FACT",
-    text: factText,
-    story: null,
-    profileItemId: `consult_${input.turnId}_fact`,
+  input.extracted.facts.forEach((fact, index) => {
+    if (!groundedInAnswer(fact.text, input.answer)) {
+      dropped.push(`fact:${index}`);
+      return;
+    }
+    proposals.push({
+      kind: "FACT",
+      text: fact.text.trim(),
+      story: null,
+      profileItemId: `consult_${input.turnId}_fact_${index}`,
+    });
   });
-  if (!result) return proposals;
-  const parts = sentences(answer);
-  const before = parts.filter((part) => part !== result);
-  const situation = before[0] ?? answer;
-  const action = before.slice(1).join(" ") || situation;
-  const answerTokens = new Set(contentTokens(answer));
-  const competencies = input.targetCompetency
-    ? [
-        input.targetCompetency,
-        ...input.competencies.filter((item) => item.id !== input.targetCompetency?.id),
-      ]
-    : input.competencies;
-  const links = competencies.filter((item) => {
-    const shared = contentTokens(item.text).filter((token) =>
-      answerTokens.has(token),
-    );
-    return shared.length > 0;
+  const targetByKey = new Map(input.targets.map((target) => [target.key, target]));
+  const links = input.extracted.demonstratedTargets.flatMap((link) => {
+    const target = targetByKey.get(link.targetKey);
+    if (!target) {
+      dropped.push(`target:${link.targetKey}`);
+      return [];
+    }
+    return [{
+      id: target.key,
+      text: target.text,
+      explanation: link.explanation.trim(),
+    }];
   });
-  proposals.push({
-    kind: "STORY",
-    text: result,
-    story: {
-      situation,
-      task: situation,
-      action,
-      result,
-      competencyLinks: links,
-    },
-    profileItemId: `consult_${input.turnId}_story`,
-  });
-  return proposals;
+  const story = input.extracted.story;
+  const completeStory =
+    story?.situation &&
+    story.task &&
+    story.action &&
+    story.result &&
+    groundedInAnswer(story.situation, input.answer) &&
+    groundedInAnswer(story.task, input.answer) &&
+    groundedInAnswer(story.action, input.answer) &&
+    groundedInAnswer(story.result, input.answer);
+  if (story && !completeStory) {
+    dropped.push("story:unsupported-or-incomplete");
+  }
+  if (completeStory && story?.situation && story.task && story.action && story.result) {
+    proposals.push({
+      kind: "STORY",
+      text: story.result,
+      story: {
+        situation: story.situation,
+        task: story.task,
+        action: story.action,
+        result: story.result,
+        competencyLinks: links,
+      },
+      profileItemId: `consult_${input.turnId}_story`,
+    });
+  }
+  const followUpQuestion =
+    input.extracted.missingStarElements.length > 0 &&
+    input.extracted.followUpQuestion &&
+    validModelQuestion(input.extracted.followUpQuestion)
+      ? input.extracted.followUpQuestion.trim()
+      : null;
+  return {
+    proposals,
+    dropped,
+    followUpQuestion,
+    missingStarElements: input.extracted.missingStarElements,
+  };
 }
 
 export function groundedInAnswer(proposalText: string, answer: string): boolean {
@@ -144,14 +154,4 @@ export function appendConfirmedFact(
     next.skills.push(item);
   }
   return parseCandidateProfile(next);
-}
-
-export function reassessProfile(input: {
-  profile: CandidateProfile;
-  targets: EvidenceTarget[];
-}): EvidenceAssessment[] {
-  return assessEvidence({
-    targets: input.targets,
-    facts: profileFactEvidence(input.profile),
-  });
 }

@@ -4,8 +4,9 @@ import {
   isConsultationAiConfigured,
 } from "@/lib/ai";
 import {
-  consultationCoachSchema,
+  consultationPlanSchema,
   consultationExtractSchema,
+  type ConsultationPlanResult,
   type ConsultationExtractResult,
 } from "@/lib/consultation/contract";
 import {
@@ -13,36 +14,43 @@ import {
   buildConsultationExtractMessages,
 } from "@/lib/consultation/prompt";
 
-export type CoachNoteResult =
-  | { ok: true; commentary: string }
+export type ConsultationPlanAiResult =
+  | { ok: true; data: ConsultationPlanResult }
   | { ok: false; message: string };
 
 const UNCONFIGURED =
-  "Consultation AI is not configured, so this round keeps the planned questions without extra coaching.";
+  "Consultation AI is not configured. Configure it, then retry consultation.";
 
-export async function writeCoachNote(input: {
-  questions: Array<{ targetKey: string; text: string }>;
-  gaps: Array<{ text: string; strength: string; strategy: string | null }>;
+export async function planConsultationWithModel(input: {
+  targets: Array<{ key: string; kind: string; text: string }>;
+  profileItems: Array<{
+    id: string;
+    kind: string;
+    text: string;
+    itemType: string;
+    employer?: string | null;
+    title?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    roleId?: string | null;
+  }>;
   hiringTeam: Array<{ name: string; whyThisRoleMatters: string | null }>;
-  stretch: boolean;
-}): Promise<CoachNoteResult> {
+  chronologyRequested: boolean;
+  coveredTargetKeys: string[];
+}): Promise<ConsultationPlanAiResult> {
   if (!isConsultationAiConfigured()) {
     return { ok: false, message: UNCONFIGURED };
   }
   try {
     const response = await getConsultationAiProvider().generateStructured({
-      ...structuredOutputRequest("consultationCoach"),
+      ...structuredOutputRequest("consultationPlan"),
       messages: buildConsultationCoachMessages(input),
       parseOutput: (raw) => ({
-        data: consultationCoachSchema.parse(raw),
+        data: consultationPlanSchema.parse(raw),
         coercedFields: [],
       }),
     });
-    const commentary = response.data.commentary.trim();
-    if (!commentary) {
-      return { ok: false, message: "Consultation AI returned empty coaching." };
-    }
-    return { ok: true, commentary };
+    return { ok: true, data: response.data };
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
     console.error(
@@ -50,15 +58,16 @@ export async function writeCoachNote(input: {
     );
     return {
       ok: false,
-      message: "Consultation coaching could not be written. The planned questions are still here.",
+      message: "Consultation planning could not be generated. Retry consultation.",
     };
   }
 }
 
 export async function extractWithModel(input: {
   answer: string;
-  requirement: string | null;
-  competencies: Array<{ id: string; text: string }>;
+  question: string;
+  target: { key: string; kind: string; text: string } | null;
+  targets: Array<{ key: string; kind: string; text: string }>;
 }): Promise<
   | { ok: true; data: ConsultationExtractResult }
   | { ok: false; message: string }
@@ -83,7 +92,7 @@ export async function extractWithModel(input: {
     );
     return {
       ok: false,
-      message: "Consultation AI could not extract facts. Review the answer text before confirming.",
+      message: "Consultation answer analysis failed. Retry consultation.",
     };
   }
 }

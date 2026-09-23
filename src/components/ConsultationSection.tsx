@@ -4,6 +4,7 @@ import {
   confirmConsultationProposalAction,
   dismissConsultationProposalAction,
   pauseConsultationAction,
+  retryConsultationAction,
   resumeConsultationAction,
   skipConsultationAction,
   skipConsultationQuestionAction,
@@ -14,7 +15,6 @@ import { prisma } from "@/lib/prisma";
 import {
   consultationConfig,
   evidenceStrengthLabels,
-  gapStrategyCopy,
   vocab,
 } from "@/lib/product-config";
 import { parseStringArray } from "@/lib/research";
@@ -35,6 +35,73 @@ function storyFields(value: unknown): {
     task: typeof row.task === "string" ? row.task : "",
     action: typeof row.action === "string" ? row.action : "",
     result: row.result,
+  };
+}
+
+function storyLinks(value: unknown): Array<{
+  id: string;
+  text: string;
+  explanation: string;
+}> {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const link = entry as Record<string, unknown>;
+    if (
+      typeof link.id !== "string" ||
+      typeof link.text !== "string" ||
+      typeof link.explanation !== "string"
+    ) {
+      return [];
+    }
+    return [{
+      id: link.id,
+      text: link.text,
+      explanation: link.explanation,
+    }];
+  });
+}
+
+function experienceCalculation(value: unknown): {
+  requiredYears: number;
+  totalMonths: number;
+  totalYears: number;
+  missingDateRoleIds: string[];
+  periods: Array<{ roleId: string; startDate: string; endDate: string }>;
+} | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  if (
+    typeof row.requiredYears !== "number" ||
+    typeof row.totalMonths !== "number" ||
+    typeof row.totalYears !== "number"
+  ) {
+    return null;
+  }
+  const periods = Array.isArray(row.periods)
+    ? row.periods.flatMap((entry) => {
+        if (!entry || typeof entry !== "object") return [];
+        const period = entry as Record<string, unknown>;
+        if (
+          typeof period.roleId !== "string" ||
+          typeof period.startDate !== "string" ||
+          typeof period.endDate !== "string"
+        ) {
+          return [];
+        }
+        return [{
+          roleId: period.roleId,
+          startDate: period.startDate,
+          endDate: period.endDate,
+        }];
+      })
+    : [];
+  return {
+    requiredYears: row.requiredYears,
+    totalMonths: row.totalMonths,
+    totalYears: row.totalYears,
+    missingDateRoleIds: parseStringArray(row.missingDateRoleIds),
+    periods,
   };
 }
 
@@ -86,19 +153,46 @@ export async function ConsultationSection({
       {session && session.assessments.length > 0 ? (
         <ul className="space-y-2" data-testid="consultation-evidence">
           {session.assessments.map((item) => (
-            <li key={item.id} className="text-sm text-slate-800">
-              <span className="font-medium">{item.text}</span>
-              <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-800">
-                {evidenceStrengthLabels[item.strength]}
-              </span>
-              {item.strategy ? (
-                <span className="ml-2 text-slate-600">{gapStrategyCopy[item.strategy]}</span>
+            <li key={item.id} className="space-y-1 text-sm text-slate-800">
+              <div>
+                <span className="font-medium">{item.text}</span>
+                <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-800">
+                  {evidenceStrengthLabels[item.strength]}
+                </span>
+              </div>
+              {item.explanation ? <p>{item.explanation}</p> : null}
+              {item.strategyText ? (
+                <p className="text-slate-600">{item.strategyText}</p>
               ) : null}
               {parseStringArray(item.supportingFactIds).length > 0 ? (
-                <span className="mt-1 block text-xs text-slate-500">
+                <p className="text-xs text-slate-500">
                   Supported by {parseStringArray(item.supportingFactIds).join(", ")}
-                </span>
+                </p>
               ) : null}
+              {(() => {
+                const calculation = experienceCalculation(
+                  item.experienceCalculationJson,
+                );
+                if (!calculation) return null;
+                return (
+                  <p className="text-xs text-slate-500">
+                    Verified experience: {calculation.totalYears} years
+                    ({calculation.totalMonths} months) toward {calculation.requiredYears}
+                    years
+                    {calculation.periods.length > 0
+                      ? ` across ${calculation.periods
+                          .map(
+                            (period) =>
+                              `${period.roleId}: ${period.startDate}–${period.endDate}`,
+                          )
+                          .join("; ")}`
+                      : ""}
+                    {calculation.missingDateRoleIds.length > 0
+                      ? `. Dates needed for ${calculation.missingDateRoleIds.join(", ")}.`
+                      : "."}
+                  </p>
+                );
+              })()}
             </li>
           ))}
         </ul>
@@ -110,6 +204,23 @@ export async function ConsultationSection({
         <p className="text-sm text-slate-800" data-testid="consultation-coach">
           {session.coachNote}
         </p>
+      ) : null}
+
+      {session?.generationStatus === "FAILED" ? (
+        <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3">
+          <p className="text-sm text-amber-950">
+            {session.generationError ?? "Consultation generation failed."}
+          </p>
+          {canEdit ? (
+            <ApplicationActionForm
+              action={retryConsultationAction}
+              submitLabel="Retry consultation"
+              testId="retry-consultation"
+            >
+              <input type="hidden" name="campaignId" value={campaignId} />
+            </ApplicationActionForm>
+          ) : null}
+        </div>
       ) : null}
 
       {session?.status === "SKIPPED" ? (
@@ -135,7 +246,9 @@ export async function ConsultationSection({
         </div>
       ) : null}
 
-      {canEdit && session?.status === "IN_PROGRESS" ? (
+      {canEdit &&
+      session?.status === "IN_PROGRESS" &&
+      session.generationStatus !== "FAILED" ? (
         <div className="space-y-4">
           {openQuestions.map((question) => (
             <div key={question.id} className="space-y-2 rounded-md border border-slate-200 p-3" data-testid="consultation-question">
@@ -179,6 +292,7 @@ export async function ConsultationSection({
           <h3 className="text-sm font-semibold text-slate-900">Confirm before saving</h3>
           {session.proposals.map((proposal) => {
             const story = storyFields(proposal.storyJson);
+            const links = storyLinks(proposal.competencyLinks);
             return (
               <div key={proposal.id} className="space-y-2 rounded-md border border-slate-200 p-3">
                 <ApplicationActionForm
@@ -207,6 +321,18 @@ export async function ConsultationSection({
                         <textarea name="result" required rows={2} defaultValue={story.result} className={fieldClass} />
                       </label>
                       <input type="hidden" name="text" value={story.result} />
+                      {links.length > 0 ? (
+                        <div className="text-sm text-slate-700">
+                          <p className="font-medium">Proposed job links</p>
+                          <ul className="mt-1 list-disc space-y-1 pl-5">
+                            {links.map((link) => (
+                              <li key={link.id}>
+                                {link.text}: {link.explanation}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
                     </>
                   ) : (
                     <label className="block text-sm">

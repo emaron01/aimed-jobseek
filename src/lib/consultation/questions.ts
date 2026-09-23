@@ -18,51 +18,98 @@ export function seniorityWarrantsChronology(input: {
   return SENIOR_ROLE.test(`${input.seniority ?? ""} ${input.title ?? ""}`);
 }
 
-export function answerHasResult(answer: string): boolean {
-  const text = answer.trim();
-  if (!text) return false;
-  if (/\d/.test(text)) return true;
-  if (/%/.test(text)) return true;
-  return /\b(reduced|increased|cut|grew|saved|improved)\b/i.test(text);
+const INTERNAL_STATE =
+  /\b(?:research (?:status|is|isn't|has|hasn't|not|pending|incomplete|unavailable)|confidence(?: score)?|ambiguit(?:y|ies)|ambiguous|missing (?:data|information|context)|internal (?:state|system)|prompt|model (?:output|behavior|generation)|not configured)\b/i;
+
+export function validModelQuestion(text: string): boolean {
+  const cleaned = text.trim();
+  return cleaned.length >= 20 && !INTERNAL_STATE.test(cleaned);
 }
 
-export function resultFollowUpQuestion(requirement: string): string {
-  return `What was the concrete result for "${requirement}", including a number or a before-and-after if you have one?`;
+function targetMeaning(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 export function planQuestionRound(input: {
   assessments: EvidenceAssessment[];
+  modelQuestions: Array<{ targetKey: string; text: string }>;
   askedKeys: ReadonlySet<string>;
   skippedKeys: ReadonlySet<string>;
   includeChronology: boolean;
   chronologyAsked: boolean;
-  recentRole: { title: string | null; employer: string | null } | null;
-  hiringTeamNote: string | null;
 }): PlannedQuestion[] {
+  const coveredMeanings = new Set(
+    input.assessments
+      .filter(
+        (assessment) =>
+          input.askedKeys.has(assessment.key) ||
+          input.skippedKeys.has(assessment.key),
+      )
+      .map((assessment) => targetMeaning(assessment.text)),
+  );
   const gaps = openGaps(input.assessments).filter(
-    (gap) => !input.askedKeys.has(gap.key) && !input.skippedKeys.has(gap.key),
+    (gap) =>
+      !input.askedKeys.has(gap.key) &&
+      !input.skippedKeys.has(gap.key) &&
+      !coveredMeanings.has(targetMeaning(gap.text)),
   );
   const room = input.includeChronology && !input.chronologyAsked
     ? consultationConfig.roundSize - 1
     : consultationConfig.roundSize;
-  const selected = gaps.slice(0, Math.max(room, 0));
-  const note = input.hiringTeamNote?.trim()
-    ? ` ${input.hiringTeamNote.trim()}`
-    : "";
-  const questions: PlannedQuestion[] = selected.map((gap) => ({
-    targetKey: gap.key,
-    followUp: false,
-    text: `Tell a story about "${gap.text}". Cover the situation, what you were responsible for, what you did, and the result.${note}`,
-  }));
+  const selected: EvidenceAssessment[] = [];
+  const selectedMeanings = new Set<string>();
+  const selectionLimit = Math.max(room, 0);
+  for (const gap of gaps) {
+    if (selected.length >= selectionLimit) break;
+    const meaning = targetMeaning(gap.text);
+    if (selectedMeanings.has(meaning)) continue;
+    selected.push(gap);
+    selectedMeanings.add(meaning);
+  }
+  const byKey = new Map(
+    input.modelQuestions
+      .filter((question) => validModelQuestion(question.text))
+      .map((question) => [question.targetKey, question.text.trim()]),
+  );
+  const questions: PlannedQuestion[] = selected.map((gap) => {
+    const text = byKey.get(gap.key);
+    if (!text) {
+      throw new Error(`Consultation AI did not write a valid question for ${gap.key}.`);
+    }
+    if (
+      gap.experienceCalculation?.missingDateRoleIds.length &&
+      !/\b(?:date|dates|when|from|started|ended|month|year)\b/i.test(text)
+    ) {
+      throw new Error(
+        `Consultation AI did not ask for the missing role dates for ${gap.key}.`,
+      );
+    }
+    if (
+      gap.experienceCalculation &&
+      /\b(?:approximate(?:ly)?|roughly|estimate[ds]?)\b/i.test(text)
+    ) {
+      throw new Error(
+        `Consultation AI asked for an estimated duration instead of exact dates for ${gap.key}.`,
+      );
+    }
+    return {
+      targetKey: gap.key,
+      followUp: false,
+      text,
+    };
+  });
   if (input.includeChronology && !input.chronologyAsked) {
-    const role = input.recentRole;
-    const where = [role?.title, role?.employer].filter(Boolean).join(" at ");
+    const text = byKey.get("chronology");
+    if (!text) {
+      throw new Error("Consultation AI did not write a valid chronology question.");
+    }
     questions.push({
       targetKey: "chronology",
       followUp: false,
-      text: where
-        ? `Walk through what you accomplished as ${where}, and why you moved on.`
-        : "Walk through what you accomplished in your most recent role, and why you moved on.",
+      text,
     });
   }
   return questions.slice(0, consultationConfig.roundSize);

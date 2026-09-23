@@ -2310,6 +2310,12 @@ enum ConsultationStatus {
   DONE
 }
 
+enum ConsultationGenerationStatus {
+  READY
+  GENERATING
+  FAILED
+}
+
 enum ConsultationSpeaker {
   CONSULTANT
   SEEKER
@@ -2345,8 +2351,10 @@ model ConsultationSession {
   campaignId       String              @unique
   productId        String
   status           ConsultationStatus  @default(IN_PROGRESS)
+  generationStatus ConsultationGenerationStatus @default(READY)
+  generationError  String?
   promptVersion    String
-  /// Coach commentary, or the reason commentary could not be written.
+  /// Model-written coaching commentary. Generation errors are stored separately.
   coachNote        String?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
@@ -2375,6 +2383,8 @@ model ConsultationTurn {
   followUp       Boolean              @default(false)
   /// Seeker turns are the seeker's own words. Voice may use them later.
   seekerAuthored Boolean              @default(false)
+  /// Model extraction plus guardrail drops. Never used as seeker-authored evidence.
+  analysisJson   Json?
   createdAt      DateTime             @default(now())
 
   organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -2396,6 +2406,12 @@ model ConsultationAssessment {
   strength           EvidenceStrength
   supportingFactIds  Json
   strategy           GapStrategy?
+  /// Model-written reasoning and item-specific coaching.
+  explanation        String?
+  strategyText       String?
+  /// Grounding downgrades and deterministic years calculation.
+  verificationJson   Json?
+  experienceCalculationJson Json?
   updatedAt          DateTime          @updatedAt
 
   organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)

@@ -5,6 +5,7 @@
 export const consultationConfig = Object.freeze({
   displayName: "Harper",
   roundSize: 3,
+  maxFollowUpsPerTarget: 2,
 });
 
 export const evidenceStrengthLabels = Object.freeze({

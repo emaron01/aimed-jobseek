@@ -17,7 +17,7 @@ import { productSourceDiscoverySchema } from "@/lib/research/source-discovery-co
 import { aiScoringAssessmentSchema } from "@/lib/scoring/assessment";
 import { titleSuggestionAiResultSchema } from "@/lib/scoring/title-suggestion-contract";
 import {
-  consultationCoachSchema,
+  consultationPlanSchema,
   consultationExtractSchema,
 } from "@/lib/consultation/contract";
 import { hiringTeamIdentificationSchema } from "@/lib/hiring-team/contract";
@@ -125,9 +125,9 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
     schema: claimValidationSchema,
     usageOperations: ["EMAIL_DRAFT_CREATED"],
   },
-  consultationCoach: {
-    schemaName: "consultation_coach",
-    schema: consultationCoachSchema,
+  consultationPlan: {
+    schemaName: "consultation_plan",
+    schema: consultationPlanSchema,
     usageOperations: ["CONSULTATION"],
   },
   consultationExtract: {

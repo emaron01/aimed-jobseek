@@ -26,7 +26,23 @@ export type EvidenceTarget = {
 
 export type ProfileFactRef = {
   id: string;
+  kind: "FACT" | "INFERENCE";
   text: string;
+  itemType: "ITEM" | "EXPERIENCE";
+  employer?: string | null;
+  title?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  roleId?: string | null;
+};
+
+export type ExperienceCalculation = {
+  requiredYears: number;
+  totalMonths: number;
+  totalYears: number;
+  roleIds: string[];
+  missingDateRoleIds: string[];
+  periods: Array<{ roleId: string; startDate: string; endDate: string }>;
 };
 
 export type EvidenceAssessment = {
@@ -36,6 +52,15 @@ export type EvidenceAssessment = {
   strength: EvidenceStrengthName;
   supportingFactIds: string[];
   strategy: GapStrategyName | null;
+  explanation: string;
+  strategyText: string;
+  verification: {
+    originalStrength: EvidenceStrengthName;
+    invalidSupportingFactIds: string[];
+    invalidRoleIds: string[];
+    downgradeReasons: string[];
+  };
+  experienceCalculation: ExperienceCalculation | null;
 };
 
 const STOPWORDS = new Set([
@@ -70,44 +95,66 @@ export function contentTokens(text: string): string[] {
     .filter((token) => token.length >= 4 && !STOPWORDS.has(token));
 }
 
-function pushFact(facts: ProfileFactRef[], item: ProfileFactItem | null | undefined) {
-  if (!item || item.kind !== "FACT") return;
+function pushItem(
+  facts: ProfileFactRef[],
+  item: ProfileFactItem | null | undefined,
+  roleId?: string,
+) {
+  if (!item) return;
   const text = item.text.trim();
   if (!text) return;
-  facts.push({ id: item.id, text });
+  facts.push({
+    id: item.id,
+    kind: item.kind,
+    text,
+    itemType: "ITEM",
+    roleId: roleId ?? null,
+  });
+}
+
+/** All profile items are sent to the model with their kind; only FACT may support fit. */
+export function profileEvidenceItems(profile: CandidateProfile): ProfileFactRef[] {
+  const facts: ProfileFactRef[] = [];
+  pushItem(facts, profile.identity.name);
+  pushItem(facts, profile.identity.headline);
+  pushItem(facts, profile.identity.location);
+  pushItem(facts, profile.identity.workArrangementPreference);
+  pushItem(facts, profile.identity.relocationOpenness);
+  pushItem(facts, profile.positioning);
+  profile.direction.targetTitles.forEach((item) => pushItem(facts, item));
+  pushItem(facts, profile.direction.seniority);
+  profile.direction.functions.forEach((item) => pushItem(facts, item));
+  profile.direction.careerGoals.forEach((item) => pushItem(facts, item));
+  for (const role of profile.experience) {
+    const bits = [role.title, role.employer, role.summary].filter(
+      (value): value is string => Boolean(value?.trim()),
+    );
+    if (bits.length > 0) {
+      facts.push({
+        id: role.id,
+        kind: role.kind,
+        text: bits.join(". "),
+        itemType: "EXPERIENCE",
+        employer: role.employer,
+        title: role.title,
+        startDate: role.startDate,
+        endDate: role.endDate,
+      });
+    }
+    role.achievements.forEach((item) => pushItem(facts, item, role.id));
+  }
+  profile.skills.forEach((item) => pushItem(facts, item));
+  profile.problemsSolved.forEach((item) => pushItem(facts, item));
+  profile.differentiators.forEach((item) => pushItem(facts, item));
+  profile.education.forEach((item) => pushItem(facts, item));
+  profile.credentials.forEach((item) => pushItem(facts, item));
+  profile.domainVocabulary.forEach((item) => pushItem(facts, item));
+  return facts;
 }
 
 /** FACT items only. INFERENCE items and compensation are not evidence. */
 export function profileFactEvidence(profile: CandidateProfile): ProfileFactRef[] {
-  const facts: ProfileFactRef[] = [];
-  pushFact(facts, profile.identity.name);
-  pushFact(facts, profile.identity.headline);
-  pushFact(facts, profile.identity.location);
-  pushFact(facts, profile.identity.workArrangementPreference);
-  pushFact(facts, profile.identity.relocationOpenness);
-  pushFact(facts, profile.positioning);
-  profile.direction.targetTitles.forEach((item) => pushFact(facts, item));
-  pushFact(facts, profile.direction.seniority);
-  profile.direction.functions.forEach((item) => pushFact(facts, item));
-  profile.direction.careerGoals.forEach((item) => pushFact(facts, item));
-  for (const role of profile.experience) {
-    if (role.kind === "FACT") {
-      const bits = [role.title, role.employer, role.summary].filter(
-        (value): value is string => Boolean(value?.trim()),
-      );
-      if (bits.length > 0) {
-        facts.push({ id: role.id, text: bits.join(". ") });
-      }
-    }
-    role.achievements.forEach((item) => pushFact(facts, item));
-  }
-  profile.skills.forEach((item) => pushFact(facts, item));
-  profile.problemsSolved.forEach((item) => pushFact(facts, item));
-  profile.differentiators.forEach((item) => pushFact(facts, item));
-  profile.education.forEach((item) => pushFact(facts, item));
-  profile.credentials.forEach((item) => pushFact(facts, item));
-  profile.domainVocabulary.forEach((item) => pushFact(facts, item));
-  return facts;
+  return profileEvidenceItems(profile).filter((item) => item.kind === "FACT");
 }
 
 export function evidenceTargets(input: {
@@ -150,60 +197,188 @@ export function evidenceTargets(input: {
   return targets;
 }
 
-function overlapCount(requirement: string[], fact: string[]): number {
-  const factTokens = new Set(fact);
-  return requirement.filter((token) => factTokens.has(token)).length;
+function parseMonth(value: string): number | null {
+  const match = value.trim().match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (!Number.isInteger(year) || month < 1 || month > 12) return null;
+  return year * 12 + month - 1;
 }
 
-export function assessEvidence(input: {
+export function yearsRequirement(text: string): number | null {
+  const match = text.match(/\b(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)\b/i);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+export function calculateExperienceYears(input: {
+  requiredYears: number;
+  roleIds: string[];
+  profileItems: ProfileFactRef[];
+  asOf: Date;
+}): ExperienceCalculation {
+  const roleIds = [...new Set(input.roleIds)];
+  const roles = roleIds
+    .map((id) => input.profileItems.find((item) => item.id === id))
+    .filter(
+      (item): item is ProfileFactRef =>
+        Boolean(item && item.itemType === "EXPERIENCE" && item.kind === "FACT"),
+    );
+  const missingDateRoleIds: string[] = [];
+  const periods: Array<{ roleId: string; startDate: string; endDate: string }> = [];
+  const monthRanges: Array<{ start: number; end: number }> = [];
+  const current = input.asOf.getUTCFullYear() * 12 + input.asOf.getUTCMonth();
+  for (const role of roles) {
+    const start = role.startDate ? parseMonth(role.startDate) : null;
+    const end = role.endDate ? parseMonth(role.endDate) : current;
+    if (start == null || end == null || end < start) {
+      missingDateRoleIds.push(role.id);
+      continue;
+    }
+    monthRanges.push({ start, end });
+    periods.push({
+      roleId: role.id,
+      startDate: role.startDate!,
+      endDate:
+        role.endDate ??
+        `${input.asOf.getUTCFullYear()}-${String(input.asOf.getUTCMonth() + 1).padStart(2, "0")}`,
+    });
+  }
+  monthRanges.sort((a, b) => a.start - b.start);
+  const merged: Array<{ start: number; end: number }> = [];
+  for (const range of monthRanges) {
+    const prior = merged.at(-1);
+    if (!prior || range.start > prior.end + 1) {
+      merged.push({ ...range });
+    } else {
+      prior.end = Math.max(prior.end, range.end);
+    }
+  }
+  const totalMonths = merged.reduce(
+    (sum, range) => sum + (range.end - range.start + 1),
+    0,
+  );
+  return {
+    requiredYears: input.requiredYears,
+    totalMonths,
+    totalYears: Number((totalMonths / 12).toFixed(1)),
+    roleIds: roles.map((role) => role.id),
+    missingDateRoleIds,
+    periods,
+  };
+}
+
+function downgrade(strength: EvidenceStrengthName): EvidenceStrengthName {
+  if (strength === "STRONG") return "PARTIAL";
+  if (strength === "PARTIAL") return "NONE";
+  return "NONE";
+}
+
+export type ModelAssessment = {
+  targetKey: string;
+  strength: EvidenceStrengthName;
+  supportingFactIds: string[];
+  relevantRoleIds: string[];
+  explanation: string;
+  strategyMode: GapStrategyName;
+  strategy: string;
+};
+
+/** Verifies model reasoning without writing replacement assessment or strategy prose. */
+export function verifyModelAssessments(input: {
   targets: EvidenceTarget[];
-  facts: ProfileFactRef[];
+  profileItems: ProfileFactRef[];
+  assessments: ModelAssessment[];
+  asOf: Date;
 }): EvidenceAssessment[] {
+  const byKey = new Map(input.assessments.map((item) => [item.targetKey, item]));
+  if (
+    byKey.size !== input.targets.length ||
+    input.targets.some((target) => !byKey.has(target.key))
+  ) {
+    throw new Error("Consultation AI did not assess every job target exactly once.");
+  }
+  const itemsById = new Map(input.profileItems.map((item) => [item.id, item]));
   return input.targets.map((target) => {
-    const requirementTokens = contentTokens(target.text);
-    let bestIds: string[] = [];
-    let bestShared = 0;
-    let anyShared = 0;
-    for (const fact of input.facts) {
-      const shared = overlapCount(requirementTokens, contentTokens(fact.text));
-      if (shared > anyShared) anyShared = shared;
-      if (shared > bestShared) {
-        bestShared = shared;
-        bestIds = [fact.id];
-      } else if (shared > 0 && shared === bestShared) {
-        bestIds.push(fact.id);
+    const model = byKey.get(target.key)!;
+    if (!model.explanation.trim() || !model.strategy.trim()) {
+      throw new Error(
+        `Consultation AI did not write an explanation and strategy for ${target.key}.`,
+      );
+    }
+    let strength = model.strength;
+    const validFactIds = model.supportingFactIds.filter(
+      (id) => itemsById.get(id)?.kind === "FACT",
+    );
+    const invalidSupportingFactIds = model.supportingFactIds.filter(
+      (id) => itemsById.get(id)?.kind !== "FACT",
+    );
+    const validRoleIds = model.relevantRoleIds.filter((id) => {
+      const item = itemsById.get(id);
+      return item?.kind === "FACT" && item.itemType === "EXPERIENCE";
+    });
+    const invalidRoleIds = model.relevantRoleIds.filter(
+      (id) => !validRoleIds.includes(id),
+    );
+    const downgradeReasons: string[] = [];
+    if (
+      (strength === "STRONG" || strength === "PARTIAL") &&
+      (invalidSupportingFactIds.length > 0 || validFactIds.length === 0)
+    ) {
+      strength = downgrade(strength);
+      downgradeReasons.push("A cited supporting item was missing or was not FACT.");
+    }
+    if ((strength === "STRONG" || strength === "PARTIAL") && validFactIds.length === 0) {
+      strength = "NONE";
+    }
+    const requiredYears = yearsRequirement(target.text);
+    const experienceCalculation =
+      requiredYears == null
+        ? null
+        : calculateExperienceYears({
+            requiredYears,
+            roleIds: validRoleIds,
+            profileItems: input.profileItems,
+            asOf: input.asOf,
+          });
+    if (experienceCalculation) {
+      if (invalidRoleIds.length > 0) {
+        strength = downgrade(strength);
+        downgradeReasons.push("A cited experience role was missing or was not FACT.");
+      }
+      if (
+        experienceCalculation.missingDateRoleIds.length > 0 &&
+        strength !== "NONE"
+      ) {
+        strength = downgrade(strength);
+        downgradeReasons.push("One or more relevant roles have missing or invalid dates.");
+      } else if (
+        strength !== "NONE" &&
+        experienceCalculation.totalMonths <
+        experienceCalculation.requiredYears * 12
+      ) {
+        strength = experienceCalculation.totalMonths > 0 ? "PARTIAL" : "NONE";
+        downgradeReasons.push("Verified, non-overlapping role dates do not meet the required duration.");
       }
     }
-    const coverage =
-      requirementTokens.length === 0 ? 0 : bestShared / requirementTokens.length;
-    const strong =
-      bestShared > 0 &&
-      coverage >= 0.5 &&
-      (requirementTokens.length < 2 || bestShared >= 2);
-    const partial =
-      !strong &&
-      bestShared > 0 &&
-      (bestShared >= 2 || coverage >= 0.34);
-    const strength: EvidenceStrengthName = strong
-      ? "STRONG"
-      : partial
-        ? "PARTIAL"
-        : "NONE";
-    const strategy: GapStrategyName | null =
-      strength === "STRONG"
-        ? null
-        : strength === "PARTIAL"
-          ? "PROVE_WITH_STORY"
-          : anyShared > 0
-            ? "REFRAME_ADJACENT"
-            : "ACKNOWLEDGE";
     return {
       key: target.key,
       kind: target.kind,
       text: target.text,
       strength,
-      supportingFactIds: strength === "NONE" ? [] : bestIds,
-      strategy,
+      supportingFactIds: strength === "NONE" ? [] : validFactIds,
+      strategy: model.strategyMode,
+      explanation: model.explanation.trim(),
+      strategyText: model.strategy.trim(),
+      verification: {
+        originalStrength: model.strength,
+        invalidSupportingFactIds,
+        invalidRoleIds,
+        downgradeReasons,
+      },
+      experienceCalculation,
     };
   });
 }

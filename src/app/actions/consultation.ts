@@ -7,6 +7,7 @@ import {
   confirmConsultationProposal,
   dismissConsultationProposal,
   pauseConsultation,
+  retryConsultationGeneration,
   resumeConsultation,
   skipConsultation,
   skipConsultationQuestion,
@@ -50,6 +51,25 @@ export async function startConsultationAction(
     return { ok: true, message: "Consultation started." };
   } catch (error) {
     return fail(error, "The consultation could not be started.");
+  }
+}
+
+export async function retryConsultationAction(
+  _prev: ConsultationActionResult | null,
+  formData: FormData,
+): Promise<ConsultationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = campaignIdFrom(formData);
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    await retryConsultationGeneration({ organizationId, campaignId });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: "Consultation generation retried." };
+  } catch (error) {
+    return fail(error, "The consultation could not be retried.");
   }
 }
 
