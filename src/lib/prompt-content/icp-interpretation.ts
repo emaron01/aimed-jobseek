@@ -12,7 +12,15 @@ RULES:
 2. Each criterion must be evaluable from public company research evidence when possible.
 3. Include researchGuidance on every criterion describing what evidence company research should look for.
 4. Use appropriate dataType, operator, and target values.
-5. Mark must-have constraints with isRequired=true. Mark deal-breaker exclusions with isDisqualifier=true. These stored flags keep their existing meaning.
+5. isRequired and isDisqualifier are rare. Ambiguous statements are preferences, never hard requirements.
+   - isRequired=true ONLY when the seeker uses a hard requirement for that criterion: "must", "only", "need", "required", "non-negotiable", "I will only consider", or an equivalent unambiguous statement. The hard language must apply to that criterion, not to a different part of the description.
+   - isDisqualifier=true ONLY for an explicit exclusion of that criterion: "no", "never", "won't", "will not", "not interested in", or an equivalent. "No more than" and "no fewer than" are ranges, not exclusions.
+   - Everything else is a preference: isRequired=false and isDisqualifier=false.
+   - Weight a preference by how strongly it is stated: "prefer" or "ideally" → importance HIGH; "would like" or "I want" → MEDIUM; "open to" → LOW. When no strength word is present, use MEDIUM.
+   Worked examples:
+   - "prefer mid-size, open to remote or hybrid, ideally SaaS" → zero isRequired. Size HIGH, work arrangement LOW, industry HIGH.
+   - "must be fully remote, no defense contractors" → work arrangement isRequired=true; defense contractors isDisqualifier=true. Nothing else is required.
+   - "I want a SaaS company of about 200 people" → preferences, not isRequired.
 6. For operator IN / NOT_IN: targetValue MUST be a JSON array of discrete values.
    Never put "or" / "and" inside a single string. Example: ["SaaS", "Climate tech"] not
    ["SaaS or Climate tech"].

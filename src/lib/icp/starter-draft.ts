@@ -28,6 +28,7 @@ import {
 import type { InterpretedCriterionDraft } from "@/lib/criteria/types";
 import { parseIcpInterpretedCriteria } from "@/lib/interpretation/schema";
 import { resolveIcpEvidenceClass } from "@/lib/criteria/evidence-class";
+import { applyEmployerCriterionStrength } from "@/lib/interpretation/criterion-strength";
 import { resolveProposedIcpCriterionTier } from "@/lib/criteria/tier";
 import { normalizeInOperatorValues } from "@/lib/criteria/multi-value";
 
@@ -114,6 +115,7 @@ function draftToRow(draft: InterpretedCriterionDraft): StarterCriterionRow {
     isRequired: draft.isRequired,
     isDisqualifier: draft.isDisqualifier,
     researchGuidance: draft.researchGuidance ?? null,
+    strengthAdjustment: draft.strengthAdjustment ?? null,
     evidenceClass: draft.evidenceClass ?? null,
     tier: draft.tier ?? null,
     isMandatory: false,
@@ -123,6 +125,7 @@ function draftToRow(draft: InterpretedCriterionDraft): StarterCriterionRow {
 
 export function parseStarterCriteriaJson(
   raw: string,
+  seekerText: string,
 ): InterpretedCriterionDraft[] {
   const trimmed = raw.trim();
   if (!trimmed) return [];
@@ -154,10 +157,27 @@ export function parseStarterCriteriaJson(
       criterionType: c.criterionType,
       description: c.description,
     });
+    const strength = applyEmployerCriterionStrength({
+      seekerText,
+      name: c.name,
+      criterionType: c.criterionType,
+      description: c.description,
+      targetValue: normalized.targetValue,
+      minValue: c.minValue,
+      maxValue: c.maxValue,
+      allowedValues: normalized.allowedValues,
+      isRequired: c.isRequired,
+      isDisqualifier: c.isDisqualifier,
+      importance: c.importance,
+    });
     return {
       ...c,
       targetValue: normalized.targetValue,
       allowedValues: normalized.allowedValues,
+      isRequired: strength.isRequired,
+      isDisqualifier: strength.isDisqualifier,
+      importance: strength.importance,
+      strengthAdjustment: strength.strengthAdjustment,
       evidenceClass,
       tier: resolveProposedIcpCriterionTier({
         proposedTier: c.tier,
@@ -165,7 +185,7 @@ export function parseStarterCriteriaJson(
         criterionType: c.criterionType,
         description: c.description,
         evidenceClass,
-        isDisqualifier: c.isDisqualifier,
+        isDisqualifier: strength.isDisqualifier,
       }),
       isMandatory: false,
       source: "AI_INTERPRETED" as const,
@@ -264,7 +284,13 @@ export async function approveStarterTargetEmployer(input: {
     productId: parsed.productId,
   });
 
-  const drafts = parseStarterCriteriaJson(input.criteriaJson);
+  const drafts = parseStarterCriteriaJson(
+    input.criteriaJson,
+    [parsed.fields.definition ?? "", parsed.fields.additionalContext ?? ""]
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join("\n"),
+  );
   if (drafts.length > 0) {
     await persistGeneratedIcpCriteria({
       organizationId: input.organizationId,

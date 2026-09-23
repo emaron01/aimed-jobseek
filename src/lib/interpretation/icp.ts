@@ -37,6 +37,7 @@ import { recordUsageEvent } from "@/lib/usage/events";
 import { getResearchPolicy } from "@/lib/usage/policy";
 import { parseIcpInterpretedCriteria } from "@/lib/interpretation/schema";
 import { ICP_INTERPRETATION_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content";
+import { applyEmployerCriterionStrength } from "@/lib/interpretation/criterion-strength";
 import { vocab } from "@/lib/product-config";
 import type { AiMessage } from "@/lib/ai/types";
 
@@ -56,6 +57,7 @@ function criterionRowToSnapshot(row: IcpCriterion): CriterionSnapshot {
     isRequired: row.isRequired,
     isDisqualifier: row.isDisqualifier,
     researchGuidance: row.researchGuidance,
+    strengthAdjustment: row.strengthAdjustment,
     source: row.source,
     confidence: row.confidence,
     manuallyEdited: row.manuallyEdited,
@@ -299,6 +301,11 @@ export async function updateIcpCriterionManual(input: {
       importance: input.data.importance,
       isRequired: input.data.isRequired,
       isDisqualifier: input.data.isDisqualifier,
+      strengthAdjustment:
+        input.data.isRequired !== undefined ||
+        input.data.isDisqualifier !== undefined
+          ? null
+          : undefined,
       researchGuidance: input.data.researchGuidance,
       sortOrder: input.data.sortOrder,
       evidenceClass: input.data.evidenceClass
@@ -392,6 +399,7 @@ function draftToCreateData(
     isRequired: d.isRequired,
     isDisqualifier: d.isDisqualifier,
     researchGuidance: d.researchGuidance ?? null,
+    strengthAdjustment: d.strengthAdjustment ?? null,
     evidenceClass,
     evidenceClassLocked: d.evidenceClassLocked ?? false,
     tier,
@@ -496,8 +504,9 @@ export type GeneratedIcpInterpretation = {
 function mapParsedCriteriaToDrafts(
   parsed: ReturnType<typeof parseIcpInterpretedCriteria>,
   existingSnapshots: CriterionSnapshot[],
+  seekerText: string,
 ): InterpretedCriterionDraft[] {
-  return parsed.criteria.map((c) => {
+  const drafts = parsed.criteria.map((c) => {
     const normalized = normalizeInOperatorValues({
       operator: c.operator,
       dataType: c.dataType,
@@ -510,24 +519,55 @@ function mapParsedCriteriaToDrafts(
       criterionType: c.criterionType,
       description: c.description,
     });
+    const strength = applyEmployerCriterionStrength({
+      seekerText,
+      name: c.name,
+      criterionType: c.criterionType,
+      description: c.description,
+      targetValue: normalized.targetValue,
+      minValue: c.minValue,
+      maxValue: c.maxValue,
+      allowedValues: normalized.allowedValues,
+      isRequired: c.isRequired,
+      isDisqualifier: c.isDisqualifier,
+      importance: c.importance,
+    });
     const draft: InterpretedCriterionDraft = {
       ...c,
       targetValue: normalized.targetValue,
       allowedValues: normalized.allowedValues,
       evidenceClass,
+      isRequired: strength.isRequired,
+      isDisqualifier: strength.isDisqualifier,
+      importance: strength.importance,
+      strengthAdjustment: strength.strengthAdjustment,
       tier: resolveProposedIcpCriterionTier({
         proposedTier: c.tier,
         name: c.name,
         criterionType: c.criterionType,
         description: c.description,
         evidenceClass,
-        isDisqualifier: c.isDisqualifier,
+        isDisqualifier: strength.isDisqualifier,
       }),
       isMandatory: false,
       source: "AI_INTERPRETED",
     };
     return applyLockedEvidenceClass(draft, existingSnapshots);
   });
+  const adjustments = drafts.flatMap((draft) =>
+    draft.strengthAdjustment
+      ? [{ name: draft.name, strengthAdjustment: draft.strengthAdjustment }]
+      : [],
+  );
+  if (adjustments.length > 0) {
+    console.info(
+      JSON.stringify({
+        event: "icp_criterion_strength_adjustment",
+        adjustments,
+      }),
+    );
+  }
+  return drafts;
 }
 
 /** Interpret a definition without writing Icp or IcpCriterion rows. */
@@ -572,7 +612,14 @@ export async function generateIcpInterpretation(input: {
     undetermined: parsed.undetermined
       .map((item) => item.trim())
       .filter(Boolean),
-    drafts: mapParsedCriteriaToDrafts(parsed, existingSnapshots),
+    drafts: mapParsedCriteriaToDrafts(
+      parsed,
+      existingSnapshots,
+      [input.definition, input.additionalContext ?? ""]
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .join("\n"),
+    ),
   };
 }
 

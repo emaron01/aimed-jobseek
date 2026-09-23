@@ -68,6 +68,11 @@ function ReadCriterionRow({ criterion }: { criterion: IcpCriterionReviewRow }) {
           {LIMITED_PUBLIC_EVIDENCE_CRITERION_WARNING}
         </p>
       ) : null}
+      {criterion.strengthAdjustment ? (
+        <p className="mt-1 text-sm text-slate-600" data-testid="criterion-strength-adjustment">
+          {criterion.strengthAdjustment}
+        </p>
+      ) : null}
     </li>
   );
 }

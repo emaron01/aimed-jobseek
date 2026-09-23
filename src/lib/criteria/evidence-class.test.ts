@@ -948,7 +948,7 @@ describe("ICP interpretation prose + definition isolation", () => {
 
 describe("prompt version + UI seams", () => {
   it("ICP interpretation prompt version is 6 and asserted in prompt builder", () => {
-    expect(ICP_INTERPRETATION_PROMPT_VERSION).toBe("6");
+    expect(ICP_INTERPRETATION_PROMPT_VERSION).toBe("7");
     const icp = readFileSync("src/lib/interpretation/icp.ts", "utf8");
     const content = readFileSync(
       "src/lib/prompt-content/icp-interpretation.ts",
@@ -965,7 +965,7 @@ describe("prompt version + UI seams", () => {
     expect(icp).not.toMatch(/Prefer this when unsure/);
     expect(icp).not.toMatch(/data:\s*\{[\s\S]{0,400}definition:/);
     const types = readFileSync("src/lib/criteria/types.ts", "utf8");
-    expect(types).toContain('ICP_INTERPRETATION_PROMPT_VERSION = "6"');
+    expect(types).toContain('ICP_INTERPRETATION_PROMPT_VERSION = "7"');
     const evidenceClass = readFileSync("src/lib/criteria/evidence-class.ts", "utf8");
     expect(evidenceClass).toContain("Good to know");
     expect(evidenceClass).toContain("countsTowardTargetedSearchCap");

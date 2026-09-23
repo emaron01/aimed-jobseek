@@ -11,6 +11,7 @@ import {
   resolveIcpEvidenceClass,
 } from "@/lib/criteria/evidence-class";
 import { ICP_INTERPRETATION_PROMPT_VERSION } from "@/lib/criteria/types";
+import { applyEmployerCriterionStrength } from "@/lib/interpretation/criterion-strength";
 import {
   criterionFlagLabels,
   criterionFlags,
@@ -38,7 +39,7 @@ export const EMPLOYER_PREFERENCE_INTERPRETATION = {
       minValue: 80,
       maxValue: 400,
       importance: "HIGH" as const,
-      isRequired: true,
+      isRequired: false,
       isDisqualifier: false,
       evidenceClass: "LIST_DATA" as const,
       tier: "PRIMARY" as const,
@@ -53,7 +54,7 @@ export const EMPLOYER_PREFERENCE_INTERPRETATION = {
       operator: "IN" as const,
       targetValue: ["Climate tech", "Developer tools", "B2B SaaS"],
       importance: "HIGH" as const,
-      isRequired: true,
+      isRequired: false,
       isDisqualifier: false,
       evidenceClass: "LIST_DATA" as const,
       tier: "PRIMARY" as const,
@@ -68,7 +69,7 @@ export const EMPLOYER_PREFERENCE_INTERPRETATION = {
       operator: "IN" as const,
       targetValue: ["Series B", "Series C", "Series D", "Late stage", "Public"],
       importance: "HIGH" as const,
-      isRequired: true,
+      isRequired: false,
       isDisqualifier: false,
       evidenceClass: "COMPANY_RESEARCH" as const,
       tier: "PRIMARY" as const,
@@ -83,7 +84,7 @@ export const EMPLOYER_PREFERENCE_INTERPRETATION = {
       operator: "IN" as const,
       targetValue: ["United States", "Canada"],
       importance: "HIGH" as const,
-      isRequired: true,
+      isRequired: false,
       isDisqualifier: false,
       evidenceClass: "LIST_DATA" as const,
       tier: "PRIMARY" as const,
@@ -98,7 +99,7 @@ export const EMPLOYER_PREFERENCE_INTERPRETATION = {
       operator: "IN" as const,
       targetValue: ["Remote", "Hybrid"],
       importance: "HIGH" as const,
-      isRequired: true,
+      isRequired: false,
       isDisqualifier: false,
       evidenceClass: "COMPANY_RESEARCH" as const,
       tier: "PRIMARY" as const,
@@ -201,7 +202,7 @@ function profileWithDirection() {
 
 describe("ICP interpretation prompt content", () => {
   it("lives in prompt-content at version 6", () => {
-    expect(ICP_INTERPRETATION_PROMPT_VERSION).toBe("6");
+    expect(ICP_INTERPRETATION_PROMPT_VERSION).toBe("7");
     const content = readFileSync(
       "src/lib/prompt-content/icp-interpretation.ts",
       "utf8",
@@ -251,8 +252,26 @@ describe("employer preference fixture", () => {
     expect(isLimitedPublicEvidenceClass(culture?.evidenceClass)).toBe(true);
     const exclusion = resolved.find((c) => c.name === "Excluded industries");
     expect(exclusion?.isDisqualifier).toBe(true);
+    expect(resolved.filter((c) => c.isRequired)).toHaveLength(0);
+    expect(resolved.filter((c) => c.isDisqualifier)).toHaveLength(1);
     expect(resolved.every((c) => c.researchGuidance?.trim())).toBe(true);
     expect(EMPLOYER_PREFERENCE_FIXTURE).toMatch(/psychological safety/i);
+
+    const enforced = parsed.criteria.map((c) => ({
+      name: c.name,
+      ...applyEmployerCriterionStrength({
+        seekerText: EMPLOYER_PREFERENCE_FIXTURE,
+        ...c,
+        description: c.description,
+        isRequired: true,
+        isDisqualifier: c.name === "Excluded industries",
+      }),
+    }));
+    expect(enforced.filter((c) => c.isRequired)).toHaveLength(0);
+    expect(enforced.filter((c) => c.isDisqualifier)).toHaveLength(1);
+    expect(
+      enforced.find((c) => c.name === "Company size")?.strengthAdjustment,
+    ).toContain(`${criterionFlags.required} was removed`);
   });
 
   it("forces culture criteria to SEMANTIC even if the model proposes company research", () => {
@@ -264,6 +283,152 @@ describe("employer preference fixture", () => {
         description: "Psychological safety",
       }),
     ).toBe("SEMANTIC");
+  });
+});
+
+describe("employer criterion strength", () => {
+  function enforce(
+    seekerText: string,
+    criteria: Array<{
+      name: string;
+      criterionType: string;
+      description?: string;
+      targetValue?: unknown;
+      isRequired?: boolean;
+      isDisqualifier?: boolean;
+    }>,
+  ) {
+    return criteria.map((criterion) =>
+      applyEmployerCriterionStrength({
+        seekerText,
+        name: criterion.name,
+        criterionType: criterion.criterionType,
+        description: criterion.description ?? null,
+        targetValue: criterion.targetValue,
+        isRequired: criterion.isRequired ?? true,
+        isDisqualifier: criterion.isDisqualifier ?? false,
+        importance: "HIGH",
+      }),
+    );
+  }
+
+  it("loose description produces zero Must-haves", () => {
+    const result = enforce(
+      "prefer mid-size, open to remote or hybrid, ideally SaaS",
+      [
+        {
+          name: "Company size",
+          criterionType: "employee_count",
+          description: "mid-size",
+        },
+        {
+          name: "Work arrangement",
+          criterionType: "work_arrangement",
+          targetValue: ["Remote", "Hybrid"],
+        },
+        {
+          name: "Industry",
+          criterionType: "industry",
+          targetValue: ["SaaS"],
+        },
+      ],
+    );
+    expect(result.filter((criterion) => criterion.isRequired)).toHaveLength(0);
+    expect(result.filter((criterion) => criterion.isDisqualifier)).toHaveLength(0);
+    expect(result.map((criterion) => criterion.importance)).toEqual([
+      "HIGH",
+      "LOW",
+      "HIGH",
+    ]);
+    expect(result.every((criterion) => criterion.strengthAdjustment)).toBe(true);
+  });
+
+  it("explicit description produces one Must-have and one Deal-breaker", () => {
+    const result = enforce(
+      "must be fully remote, no defense contractors",
+      [
+        {
+          name: "Work arrangement",
+          criterionType: "work_arrangement",
+          targetValue: "Remote",
+        },
+        {
+          name: "Excluded industries",
+          criterionType: "industry",
+          targetValue: ["Defense"],
+          isDisqualifier: true,
+        },
+      ],
+    );
+    expect(result.filter((criterion) => criterion.isRequired)).toHaveLength(1);
+    expect(result.filter((criterion) => criterion.isDisqualifier)).toHaveLength(1);
+    expect(result[0]?.isRequired).toBe(true);
+    expect(result[0]?.strengthAdjustment).toBeNull();
+    expect(result[1]?.isDisqualifier).toBe(true);
+    expect(result[1]?.isRequired).toBe(false);
+  });
+
+  it("mixed description keeps only the explicitly stated requirements", () => {
+    const result = enforce(
+      "I prefer mid-size companies. The role must be fully remote. Ideally Series B. No defense contractors.",
+      [
+        {
+          name: "Company size",
+          criterionType: "employee_count",
+          description: "mid-size",
+        },
+        {
+          name: "Work arrangement",
+          criterionType: "work_arrangement",
+          targetValue: "Remote",
+        },
+        {
+          name: "Company stage",
+          criterionType: "company_stage",
+          targetValue: ["Series B"],
+        },
+        {
+          name: "Excluded industries",
+          criterionType: "industry",
+          targetValue: ["Defense"],
+          isDisqualifier: true,
+        },
+      ],
+    );
+    expect(result.map((criterion) => criterion.isRequired)).toEqual([
+      false,
+      true,
+      false,
+      false,
+    ]);
+    expect(result.map((criterion) => criterion.isDisqualifier)).toEqual([
+      false,
+      false,
+      false,
+      true,
+    ]);
+  });
+
+  it("downgrades a model-proposed Must-have that lacks supporting language", () => {
+    const result = applyEmployerCriterionStrength({
+      seekerText: "I would like a SaaS company",
+      name: "Industry",
+      criterionType: "industry",
+      description: null,
+      targetValue: ["SaaS"],
+      isRequired: true,
+      isDisqualifier: false,
+      importance: "CRITICAL",
+    });
+    expect(result.isRequired).toBe(false);
+    expect(result.isDisqualifier).toBe(false);
+    expect(result.importance).toBe("MEDIUM");
+    expect(result.strengthAdjustment).toContain(
+      `${criterionFlags.required} was removed`,
+    );
+    const source = readFileSync("src/lib/interpretation/icp.ts", "utf8");
+    expect(source).toContain("applyEmployerCriterionStrength");
+    expect(source).toContain("icp_criterion_strength_adjustment");
   });
 });
 

@@ -59,6 +59,8 @@ export type CriterionSnapshot = {
   /** Persona exclusion evidence mode; null for non-disqualifiers and ICP criteria. */
   exclusionTestability?: ExclusionTestabilityValue | null;
   researchGuidance?: string | null;
+  /** Why a model-proposed Must-have or Deal-breaker was downgraded. Null when kept. */
+  strengthAdjustment?: string | null;
   source?: string;
   confidence?: string | null;
   manuallyEdited?: boolean;
@@ -123,7 +125,7 @@ function stringifyValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
-export const ICP_INTERPRETATION_PROMPT_VERSION = "6";
+export const ICP_INTERPRETATION_PROMPT_VERSION = "7";
 export const PERSONA_INTERPRETATION_PROMPT_VERSION = "2";
 export const CONTACT_RESEARCH_PROMPT_VERSION = "1";
 export const SCORING_LOGIC_VERSION_CRITERIA = "5";

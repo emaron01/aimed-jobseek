@@ -37,6 +37,7 @@ export type IcpCriterionReviewRow = {
   importance: string;
   isDisqualifier: boolean;
   isRequired: boolean;
+  strengthAdjustment?: string | null;
   manuallyEdited?: boolean;
   dataType: string;
   operator: string;
@@ -283,6 +284,14 @@ function CriterionCard({
           data-testid="limited-public-evidence-warning"
         >
           {LIMITED_PUBLIC_EVIDENCE_CRITERION_WARNING}
+        </p>
+      ) : null}
+      {criterion.strengthAdjustment ? (
+        <p
+          className="mt-2 text-xs text-slate-600"
+          data-testid="criterion-strength-adjustment"
+        >
+          {criterion.strengthAdjustment}
         </p>
       ) : null}
       {needsDecision ? (

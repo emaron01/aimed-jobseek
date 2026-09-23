@@ -1284,6 +1284,8 @@ model IcpCriterion {
   isRequired                        Boolean                 @default(false)
   isDisqualifier                    Boolean                 @default(false)
   researchGuidance                  String?
+  /// Why a proposed isRequired or isDisqualifier flag was downgraded. Null when the flag was kept or never proposed.
+  strengthAdjustment                String?
   source                            CriterionSource         @default(AI_INTERPRETED)
   confidence                        ResearchConfidence?
   /// Where evidence is expected; app owns default (missing/unrecognized → TARGETED_SEARCH).

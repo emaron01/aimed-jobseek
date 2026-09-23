@@ -34,6 +34,7 @@ export type StarterCriterionRow = {
   isRequired: boolean;
   isDisqualifier: boolean;
   researchGuidance?: string | null;
+  strengthAdjustment?: string | null;
   evidenceClass?: string | null;
   tier?: string | null;
   isMandatory?: boolean;
