@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   assertSafeTestDatabaseUrl,
@@ -92,5 +93,20 @@ describe("test database guard", () => {
   it("prefixes test entity names once", () => {
     expect(testEntityName("CampDel A")).toBe("[TEST] CampDel A");
     expect(testEntityName("[TEST] Org A")).toBe("[TEST] Org A");
+  });
+
+  it("db:test:up starts a dedicated 5435 cluster and migrates", () => {
+    const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
+      scripts: Record<string, string>;
+    };
+    const script = readFileSync("scripts/start-test-postgres.mjs", "utf8");
+    expect(pkg.scripts["db:test:up"]).toBe(
+      "node scripts/start-test-postgres.mjs",
+    );
+    expect(script).toContain('PORT = "5435"');
+    expect(script).toContain(".local-postgres-test");
+    expect(script).toContain("aimedjobseek_test");
+    expect(script).toContain("migrate-test-db.ts");
+    expect(script).toContain("dockerAvailable");
   });
 });

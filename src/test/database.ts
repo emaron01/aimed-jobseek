@@ -132,8 +132,8 @@ export function assertSafeTestDatabaseUrl(
 
   throw new Error(
     `REFUSING to run ${purpose} against production database host "${host}". ` +
-      `Set TEST_DATABASE_URL to the docker-compose Postgres in .env.test.example ` +
-      `(npm run db:test:up && npm run db:test:migrate). ` +
+      `Set TEST_DATABASE_URL to the dedicated test database in .env.test.example ` +
+      `(npm run db:test:up). ` +
       `Override only with ALLOW_PROD_DB_TESTS=1 — never against customer data.`,
   );
 }

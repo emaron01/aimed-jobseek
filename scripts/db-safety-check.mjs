@@ -133,7 +133,7 @@ if (testMode) {
       `SAFETY STOP: Test migrations refuse production host "${host}".`,
     );
     console.error(
-      "Use docker-compose Postgres (npm run db:test:up) and TEST_DATABASE_URL.",
+      "Use npm run db:test:up (Docker or the dedicated local TEST cluster) and TEST_DATABASE_URL.",
     );
     console.error("Do not run test migrations against Render.");
     process.exit(1);
