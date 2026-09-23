@@ -701,24 +701,6 @@ export function ProductDraftReview({
                 }))
               }
             />
-            <EditField
-              label="Compensation expectations (private)"
-              hint={CANDIDATE_PROFILE_FIELD_HINTS.compensation}
-              value={profile.compensation?.text ?? ""}
-              onChange={(value) =>
-                setProfile((prev) => ({
-                  ...prev,
-                  compensation: value.trim()
-                    ? {
-                        id: prev.compensation?.id ?? "comp_1",
-                        kind: prev.compensation?.kind ?? "INFERENCE",
-                        text: value.trim(),
-                        provenance: prev.compensation?.provenance ?? [],
-                      }
-                    : null,
-                }))
-              }
-            />
           </div>
         ) : (
           <article className="space-y-8">
@@ -890,21 +872,6 @@ export function ProductDraftReview({
                   </li>
                 ))}
               </ul>
-            </ReadSection>
-
-            <ReadSection
-              title="Compensation expectations (private)"
-              empty={!profile.compensation?.text}
-            >
-              <p className="text-[17px] leading-7 text-slate-800">
-                {profile.compensation?.text}
-                {profile.compensation ? (
-                  <KindBadge kind={profile.compensation.kind} />
-                ) : null}
-              </p>
-              <p className="text-xs text-slate-500">
-                Private. Not sent to outreach or document generation.
-              </p>
             </ReadSection>
           </article>
         )}

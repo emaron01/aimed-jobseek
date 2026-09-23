@@ -31,6 +31,7 @@ import { resolveIcpEvidenceClass } from "@/lib/criteria/evidence-class";
 import { applyEmployerCriterionStrength } from "@/lib/interpretation/criterion-strength";
 import { resolveProposedIcpCriterionTier } from "@/lib/criteria/tier";
 import { normalizeInOperatorValues } from "@/lib/criteria/multi-value";
+import { statedEmployerCompensationFromProfile } from "@/lib/icp/stated-compensation";
 
 export { STARTER_DRAFT_KIND };
 export type { StarterCriterionRow, StarterTargetEmployerDraft };
@@ -222,6 +223,8 @@ export async function previewStarterTargetEmployer(input: {
   const definition = buildStarterTargetEmployerDefinition(profile);
   const name = starterTargetEmployerName(profile);
 
+  const compensation = statedEmployerCompensationFromProfile(profile);
+
   if (!isInterpretationAiConfigured()) {
     return {
       kind: STARTER_DRAFT_KIND,
@@ -231,6 +234,7 @@ export async function previewStarterTargetEmployer(input: {
       criteria: [],
       interpretationSummary: null,
       interpretationUndetermined: null,
+      compensation,
     };
   }
 
@@ -250,6 +254,7 @@ export async function previewStarterTargetEmployer(input: {
     interpretationSummary: generated.understoodSummary,
     interpretationUndetermined:
       generated.undetermined.join("\n") || null,
+    compensation,
   };
 }
 
@@ -331,6 +336,7 @@ export function starterDraftToActionResult(
       positiveSignals: "",
       negativeSignals: "",
       notes: "",
+      ...draft.compensation,
     },
   };
 }

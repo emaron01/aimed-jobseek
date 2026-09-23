@@ -73,8 +73,6 @@ function sectionValue(
       return profile.credentials;
     case "domainVocabulary":
       return profile.domainVocabulary;
-    case "compensation":
-      return profile.compensation;
     case "gaps":
       return profile.gaps;
     default: {
@@ -162,9 +160,6 @@ function setSectionValue(
       break;
     case "domainVocabulary":
       next.domainVocabulary = value as CandidateProfile["domainVocabulary"];
-      break;
-    case "compensation":
-      next.compensation = value as CandidateProfile["compensation"];
       break;
     case "gaps":
       next.gaps = value as CandidateProfile["gaps"];

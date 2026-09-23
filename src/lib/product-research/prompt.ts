@@ -66,12 +66,6 @@ ${PROFILE_SYNTHESIS_SYSTEM_INSTRUCTIONS}`;
         education: ["factItem"],
         credentials: ["factItem"],
         domainVocabulary: ["factItem"],
-        compensation: {
-          id: "string",
-          kind: "FACT|INFERENCE",
-          text: "string|null",
-          provenance: [{ sourceId: "string" }],
-        },
         gaps: [{ id: "string", area: "string", detail: "string" }],
       },
       factItem: {

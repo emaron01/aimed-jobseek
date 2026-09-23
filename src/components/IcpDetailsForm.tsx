@@ -23,7 +23,14 @@ import {
   type IcpClientRecord,
   type IcpFormValues,
 } from "@/lib/icp/save";
-import { criterionFlags, vocab } from "@/lib/product-config";
+import {
+  EMPLOYMENT_TYPES,
+  compensationConfig,
+  compensationCopy,
+  criterionFlags,
+  employmentTypeLabel,
+  vocab,
+} from "@/lib/product-config";
 import type { StarterTargetEmployerDraft } from "@/lib/icp/save";
 
 type CriterionRow = IcpCriterionReviewRow;
@@ -50,6 +57,115 @@ function StatusBanner({
     >
       {result.message}
     </p>
+  );
+}
+
+function EmployerCompensationFields({
+  defaults,
+  fieldHint,
+}: {
+  defaults: Partial<IcpFormValues>;
+  fieldHint: (key: keyof IcpFormValues) => string | undefined;
+}) {
+  const selected = (defaults.employmentTypes ?? "")
+    .split(",")
+    .map((item) => item.trim());
+  return (
+    <div className="md:col-span-2 space-y-3" data-testid="employer-compensation-fields">
+      <div>
+        <p className="text-sm font-medium text-slate-900">
+          {compensationCopy.annualEarningsLabel}
+        </p>
+        <p className="text-sm text-slate-600">{compensationCopy.annualEarningsHint}</p>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field
+          label={compensationCopy.annualMinimumLabel}
+          name="targetAnnualEarningsMin"
+          type="number"
+          defaultValue={defaults.targetAnnualEarningsMin}
+          hint={fieldHint("targetAnnualEarningsMin")}
+        />
+        <Field
+          label={compensationCopy.annualTargetLabel}
+          name="targetAnnualEarningsTarget"
+          type="number"
+          defaultValue={defaults.targetAnnualEarningsTarget}
+          hint={fieldHint("targetAnnualEarningsTarget")}
+        />
+        <label className="flex items-center gap-2 text-sm text-slate-800">
+          <input
+            type="checkbox"
+            name="annualEarningsMinimumRequired"
+            value="true"
+            defaultChecked={defaults.annualEarningsMinimumRequired === "true"}
+          />
+          {criterionFlags.required}
+        </label>
+      </div>
+      <p className="text-sm font-medium text-slate-900">{compensationCopy.hourlyRateLabel}</p>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field
+          label={compensationCopy.hourlyMinimumLabel}
+          name="targetHourlyRateMin"
+          type="number"
+          defaultValue={defaults.targetHourlyRateMin}
+          hint={fieldHint("targetHourlyRateMin")}
+        />
+        <Field
+          label={compensationCopy.hourlyTargetLabel}
+          name="targetHourlyRateTarget"
+          type="number"
+          defaultValue={defaults.targetHourlyRateTarget}
+          hint={fieldHint("targetHourlyRateTarget")}
+        />
+        <label className="flex items-center gap-2 text-sm text-slate-800">
+          <input
+            type="checkbox"
+            name="hourlyRateMinimumRequired"
+            value="true"
+            defaultChecked={defaults.hourlyRateMinimumRequired === "true"}
+          />
+          {criterionFlags.required}
+        </label>
+      </div>
+      <Field
+        label={compensationCopy.currencyLabel}
+        name="compensationCurrency"
+        defaultValue={
+          defaults.compensationCurrency || compensationConfig.defaultCurrency
+        }
+        hint={fieldHint("compensationCurrency")}
+      />
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium text-slate-900">
+          {compensationCopy.employmentTypeLabel}
+        </legend>
+        {EMPLOYMENT_TYPES.map((code) => (
+          <label key={code} className="flex items-center gap-2 text-sm text-slate-800">
+            <input
+              type="checkbox"
+              name="employmentTypes"
+              value={code}
+              defaultChecked={selected.includes(code)}
+            />
+            {employmentTypeLabel(code)}
+          </label>
+        ))}
+        <label className="flex items-center gap-2 text-sm text-slate-800">
+          <input
+            type="checkbox"
+            name="employmentTypeRequired"
+            value="true"
+            defaultChecked={defaults.employmentTypeRequired === "true"}
+          />
+          {criterionFlags.required}
+        </label>
+        {fieldHint("employmentTypeRequired") ? (
+          <p className="text-sm text-red-600">{fieldHint("employmentTypeRequired")}</p>
+        ) : null}
+      </fieldset>
+    </div>
   );
 }
 
@@ -102,6 +218,7 @@ function NewIcpForm({
           name: starterDraft.name,
           definition: starterDraft.definition,
           additionalContext: starterDraft.additionalContext,
+          ...starterDraft.compensation,
         }
       : {}),
     [restored, starterDraft],
@@ -248,6 +365,7 @@ function NewIcpForm({
             hint={fieldHint("description")}
           />
         </div>
+        <EmployerCompensationFields defaults={defaults} fieldHint={fieldHint} />
         <Field
           label="Minimum Employees"
           name="minEmployees"
@@ -471,6 +589,17 @@ export function IcpDetailsForm({
           criteria={criteria}
           interpretationSummary={icp.interpretationSummary}
           interpretationUndetermined={icp.interpretationUndetermined}
+          compensation={{
+            targetAnnualEarningsMin: icp.targetAnnualEarningsMin,
+            targetAnnualEarningsTarget: icp.targetAnnualEarningsTarget,
+            targetHourlyRateMin: icp.targetHourlyRateMin,
+            targetHourlyRateTarget: icp.targetHourlyRateTarget,
+            compensationCurrency: icp.compensationCurrency,
+            employmentTypes: icp.employmentTypes,
+            annualEarningsMinimumRequired: icp.annualEarningsMinimumRequired,
+            hourlyRateMinimumRequired: icp.hourlyRateMinimumRequired,
+            employmentTypeRequired: icp.employmentTypeRequired,
+          }}
         />
       ) : null}
 
@@ -532,6 +661,7 @@ export function IcpDetailsForm({
                 hint={fieldHint("description")}
               />
             </div>
+            <EmployerCompensationFields defaults={defaults} fieldHint={fieldHint} />
             <Field
               label="Minimum Employees"
               name="minEmployees"

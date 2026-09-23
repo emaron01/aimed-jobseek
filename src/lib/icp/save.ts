@@ -4,7 +4,13 @@
 
 import { parseCommaList } from "@/lib/utils";
 import { TenantError } from "@/lib/tenant/errors";
-import { criterionFlags, vocab } from "@/lib/product-config";
+import {
+  compensationConfig,
+  criterionFlags,
+  isEmploymentTypeCode,
+  vocab,
+} from "@/lib/product-config";
+import { parseEmploymentTypeCodes } from "@/lib/application/compensation-fit";
 
 export type IcpActionResult = {
   ok: boolean;
@@ -49,6 +55,19 @@ export type StarterTargetEmployerDraft = {
   criteria: StarterCriterionRow[];
   interpretationSummary: string | null;
   interpretationUndetermined: string | null;
+  compensation: StatedCompensationFormFields;
+};
+
+type StatedCompensationFormFields = {
+  targetAnnualEarningsMin: string;
+  targetAnnualEarningsTarget: string;
+  targetHourlyRateMin: string;
+  targetHourlyRateTarget: string;
+  compensationCurrency: string;
+  employmentTypes: string;
+  annualEarningsMinimumRequired: string;
+  hourlyRateMinimumRequired: string;
+  employmentTypeRequired: string;
 };
 
 export type IcpFormValues = {
@@ -68,6 +87,15 @@ export type IcpFormValues = {
   positiveSignals: string;
   negativeSignals: string;
   notes: string;
+  targetAnnualEarningsMin: string;
+  targetAnnualEarningsTarget: string;
+  targetHourlyRateMin: string;
+  targetHourlyRateTarget: string;
+  compensationCurrency: string;
+  employmentTypes: string;
+  annualEarningsMinimumRequired: string;
+  hourlyRateMinimumRequired: string;
+  employmentTypeRequired: string;
 };
 
 /**
@@ -93,6 +121,15 @@ export type IcpClientRecord = {
   notes: string | null;
   interpretationSummary: string | null;
   interpretationUndetermined: string | null;
+  targetAnnualEarningsMin: string | null;
+  targetAnnualEarningsTarget: string | null;
+  targetHourlyRateMin: string | null;
+  targetHourlyRateTarget: string | null;
+  compensationCurrency: string | null;
+  employmentTypes: string[];
+  annualEarningsMinimumRequired: boolean;
+  hourlyRateMinimumRequired: boolean;
+  employmentTypeRequired: boolean;
 };
 
 export type IcpRecordSource = {
@@ -113,6 +150,15 @@ export type IcpRecordSource = {
   notes?: string | null;
   interpretationSummary?: string | null;
   interpretationUndetermined?: string | null;
+  targetAnnualEarningsMin?: unknown;
+  targetAnnualEarningsTarget?: unknown;
+  targetHourlyRateMin?: unknown;
+  targetHourlyRateTarget?: unknown;
+  compensationCurrency?: string | null;
+  employmentTypes?: unknown;
+  annualEarningsMinimumRequired?: boolean | null;
+  hourlyRateMinimumRequired?: boolean | null;
+  employmentTypeRequired?: boolean | null;
 };
 
 function decimalLikeToInput(value: unknown): string {
@@ -174,6 +220,16 @@ export function serializeIcpForClient(icp: IcpRecordSource): IcpClientRecord {
     notes: icp.notes ?? null,
     interpretationSummary: icp.interpretationSummary ?? null,
     interpretationUndetermined: icp.interpretationUndetermined ?? null,
+    targetAnnualEarningsMin: decimalLikeToInput(icp.targetAnnualEarningsMin) || null,
+    targetAnnualEarningsTarget:
+      decimalLikeToInput(icp.targetAnnualEarningsTarget) || null,
+    targetHourlyRateMin: decimalLikeToInput(icp.targetHourlyRateMin) || null,
+    targetHourlyRateTarget: decimalLikeToInput(icp.targetHourlyRateTarget) || null,
+    compensationCurrency: icp.compensationCurrency ?? null,
+    employmentTypes: parseEmploymentTypeCodes(icp.employmentTypes),
+    annualEarningsMinimumRequired: icp.annualEarningsMinimumRequired === true,
+    hourlyRateMinimumRequired: icp.hourlyRateMinimumRequired === true,
+    employmentTypeRequired: icp.employmentTypeRequired === true,
   };
 }
 
@@ -198,6 +254,18 @@ export function icpRecordToFormValues(
     positiveSignals: jsonListToInput(icp.positiveSignals),
     negativeSignals: jsonListToInput(icp.negativeSignals),
     notes: icp.notes ?? "",
+    targetAnnualEarningsMin: decimalLikeToInput(icp.targetAnnualEarningsMin),
+    targetAnnualEarningsTarget: decimalLikeToInput(icp.targetAnnualEarningsTarget),
+    targetHourlyRateMin: decimalLikeToInput(icp.targetHourlyRateMin),
+    targetHourlyRateTarget: decimalLikeToInput(icp.targetHourlyRateTarget),
+    compensationCurrency:
+      icp.compensationCurrency?.trim() || compensationConfig.defaultCurrency,
+    employmentTypes: parseEmploymentTypeCodes(icp.employmentTypes).join(","),
+    annualEarningsMinimumRequired: icp.annualEarningsMinimumRequired
+      ? "true"
+      : "",
+    hourlyRateMinimumRequired: icp.hourlyRateMinimumRequired ? "true" : "",
+    employmentTypeRequired: icp.employmentTypeRequired ? "true" : "",
   };
 }
 
@@ -215,6 +283,11 @@ export function submittedIcpProfileIsBlank(fields: {
   positiveSignals: string[];
   negativeSignals: string[];
   notes: string | null;
+  targetAnnualEarningsMin: number | null;
+  targetAnnualEarningsTarget: number | null;
+  targetHourlyRateMin: number | null;
+  targetHourlyRateTarget: number | null;
+  employmentTypes: string[];
 }): boolean {
   return (
     !fields.definition &&
@@ -229,7 +302,12 @@ export function submittedIcpProfileIsBlank(fields: {
     fields.targetGeographies.length === 0 &&
     fields.requiredTechnologies.length === 0 &&
     fields.positiveSignals.length === 0 &&
-    fields.negativeSignals.length === 0
+    fields.negativeSignals.length === 0 &&
+    fields.targetAnnualEarningsMin == null &&
+    fields.targetAnnualEarningsTarget == null &&
+    fields.targetHourlyRateMin == null &&
+    fields.targetHourlyRateTarget == null &&
+    fields.employmentTypes.length === 0
   );
 }
 
@@ -248,12 +326,35 @@ export function storedIcpHasProfile(icp: IcpRecordSource): boolean {
       values.targetGeographies.trim() ||
       values.requiredTechnologies.trim() ||
       values.positiveSignals.trim() ||
-      values.negativeSignals.trim(),
+      values.negativeSignals.trim() ||
+      values.targetAnnualEarningsMin.trim() ||
+      values.targetAnnualEarningsTarget.trim() ||
+      values.targetHourlyRateMin.trim() ||
+      values.targetHourlyRateTarget.trim() ||
+      values.employmentTypes.trim(),
   );
 }
 
 function readString(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
+}
+
+function readChecked(formData: FormData, key: string): string {
+  const value = String(formData.get(key) ?? "").trim().toLowerCase();
+  return value === "true" || value === "on" || value === "1" ? "true" : "";
+}
+
+function readEmploymentTypes(formData: FormData): string {
+  const raw = formData
+    .getAll("employmentTypes")
+    .flatMap((entry) => String(entry).split(","))
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const codes: string[] = [];
+  for (const code of raw) {
+    if (isEmploymentTypeCode(code) && !codes.includes(code)) codes.push(code);
+  }
+  return codes.join(",");
 }
 
 export function readIcpFormValues(formData: FormData): IcpFormValues {
@@ -274,6 +375,20 @@ export function readIcpFormValues(formData: FormData): IcpFormValues {
     positiveSignals: readString(formData, "positiveSignals"),
     negativeSignals: readString(formData, "negativeSignals"),
     notes: readString(formData, "notes"),
+    targetAnnualEarningsMin: readString(formData, "targetAnnualEarningsMin"),
+    targetAnnualEarningsTarget: readString(formData, "targetAnnualEarningsTarget"),
+    targetHourlyRateMin: readString(formData, "targetHourlyRateMin"),
+    targetHourlyRateTarget: readString(formData, "targetHourlyRateTarget"),
+    compensationCurrency:
+      readString(formData, "compensationCurrency") ||
+      compensationConfig.defaultCurrency,
+    employmentTypes: readEmploymentTypes(formData),
+    annualEarningsMinimumRequired: readChecked(
+      formData,
+      "annualEarningsMinimumRequired",
+    ),
+    hourlyRateMinimumRequired: readChecked(formData, "hourlyRateMinimumRequired"),
+    employmentTypeRequired: readChecked(formData, "employmentTypeRequired"),
   };
 }
 
@@ -296,6 +411,15 @@ export function parseIcpFormData(formData: FormData): {
     positiveSignals: string[];
     negativeSignals: string[];
     notes: string | null;
+    targetAnnualEarningsMin: number | null;
+    targetAnnualEarningsTarget: number | null;
+    targetHourlyRateMin: number | null;
+    targetHourlyRateTarget: number | null;
+    compensationCurrency: string | null;
+    employmentTypes: string[];
+    annualEarningsMinimumRequired: boolean;
+    hourlyRateMinimumRequired: boolean;
+    employmentTypeRequired: boolean;
   };
   fieldErrors: Partial<Record<keyof IcpFormValues, string>>;
 } {
@@ -330,6 +454,84 @@ export function parseIcpFormData(formData: FormData): {
     fieldErrors.maxRevenue = "Maximum revenue must be a number.";
   }
 
+  const targetAnnualEarningsMin = toOptionalFloat(values.targetAnnualEarningsMin);
+  const targetAnnualEarningsTarget = toOptionalFloat(values.targetAnnualEarningsTarget);
+  const targetHourlyRateMin = toOptionalFloat(values.targetHourlyRateMin);
+  const targetHourlyRateTarget = toOptionalFloat(values.targetHourlyRateTarget);
+  const employmentTypes = parseEmploymentTypeCodes(values.employmentTypes);
+  const annualEarningsMinimumRequired = values.annualEarningsMinimumRequired === "true";
+  const hourlyRateMinimumRequired = values.hourlyRateMinimumRequired === "true";
+  const employmentTypeRequired = values.employmentTypeRequired === "true";
+
+  if (values.targetAnnualEarningsMin && targetAnnualEarningsMin == null) {
+    fieldErrors.targetAnnualEarningsMin = "Annual minimum must be a number.";
+  }
+  if (values.targetAnnualEarningsTarget && targetAnnualEarningsTarget == null) {
+    fieldErrors.targetAnnualEarningsTarget = "Annual target must be a number.";
+  }
+  if (values.targetHourlyRateMin && targetHourlyRateMin == null) {
+    fieldErrors.targetHourlyRateMin = "Hourly minimum must be a number.";
+  }
+  if (values.targetHourlyRateTarget && targetHourlyRateTarget == null) {
+    fieldErrors.targetHourlyRateTarget = "Hourly target must be a number.";
+  }
+  if (
+    (targetAnnualEarningsMin != null && targetAnnualEarningsMin < 0) ||
+    (targetAnnualEarningsTarget != null && targetAnnualEarningsTarget < 0)
+  ) {
+    fieldErrors.targetAnnualEarningsMin = "Annual earnings cannot be negative.";
+  }
+  if (
+    (targetHourlyRateMin != null && targetHourlyRateMin < 0) ||
+    (targetHourlyRateTarget != null && targetHourlyRateTarget < 0)
+  ) {
+    fieldErrors.targetHourlyRateMin = "Hourly rate cannot be negative.";
+  }
+  if (
+    targetAnnualEarningsMin != null &&
+    targetAnnualEarningsTarget != null &&
+    targetAnnualEarningsMin > targetAnnualEarningsTarget
+  ) {
+    fieldErrors.targetAnnualEarningsMin =
+      "Annual minimum cannot be above the annual target.";
+  }
+  if (
+    targetHourlyRateMin != null &&
+    targetHourlyRateTarget != null &&
+    targetHourlyRateMin > targetHourlyRateTarget
+  ) {
+    fieldErrors.targetHourlyRateMin =
+      "Hourly minimum cannot be above the hourly target.";
+  }
+  if (annualEarningsMinimumRequired && targetAnnualEarningsMin == null) {
+    fieldErrors.annualEarningsMinimumRequired =
+      `Set an annual minimum before marking it ${criterionFlags.required}.`;
+  }
+  if (hourlyRateMinimumRequired && targetHourlyRateMin == null) {
+    fieldErrors.hourlyRateMinimumRequired =
+      `Set an hourly minimum before marking it ${criterionFlags.required}.`;
+  }
+  if (employmentTypeRequired && employmentTypes.length === 0) {
+    fieldErrors.employmentTypeRequired =
+      `Select an employment type before marking it ${criterionFlags.required}.`;
+  }
+
+  const currencyRaw = values.compensationCurrency.trim();
+  let compensationCurrency: string | null = null;
+  const hasAmount =
+    targetAnnualEarningsMin != null ||
+    targetAnnualEarningsTarget != null ||
+    targetHourlyRateMin != null ||
+    targetHourlyRateTarget != null;
+  if (hasAmount) {
+    const code = (currencyRaw || compensationConfig.defaultCurrency).toUpperCase();
+    if (!/^[A-Z]{3}$/.test(code)) {
+      fieldErrors.compensationCurrency = "Currency must be a 3-letter code.";
+    } else {
+      compensationCurrency = code;
+    }
+  }
+
   return {
     id: values.id,
     productId: values.productId,
@@ -350,6 +552,15 @@ export function parseIcpFormData(formData: FormData): {
       positiveSignals: parseCommaList(values.positiveSignals),
       negativeSignals: parseCommaList(values.negativeSignals),
       notes: values.notes || null,
+      targetAnnualEarningsMin,
+      targetAnnualEarningsTarget,
+      targetHourlyRateMin,
+      targetHourlyRateTarget,
+      compensationCurrency,
+      employmentTypes,
+      annualEarningsMinimumRequired,
+      hourlyRateMinimumRequired,
+      employmentTypeRequired,
     },
   };
 }

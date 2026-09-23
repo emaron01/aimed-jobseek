@@ -41,7 +41,6 @@ export const CANDIDATE_PROFILE_FIELD_PATHS = [
   "education",
   "credentials",
   "domainVocabulary",
-  "compensation",
   "gaps",
 ] as const;
 
@@ -71,7 +70,6 @@ export const CANDIDATE_PROFILE_FIELD_LABELS: Record<
   education: "Education",
   credentials: "Credentials",
   domainVocabulary: "Domain vocabulary",
-  compensation: "Compensation expectations (private)",
   gaps: "Gaps",
 };
 
@@ -100,8 +98,6 @@ export const CANDIDATE_PROFILE_FIELD_HINTS: Record<
   education: "One education item per line.",
   credentials: "One credential per line.",
   domainVocabulary: "One term per line.",
-  compensation:
-    "Private. Stored on the profile and never sent to outreach or document generation.",
   gaps: "Missing dates, achievements without results, or unclear scope.",
 };
 
@@ -173,8 +169,6 @@ function sectionValue(
       return profile.credentials;
     case "domainVocabulary":
       return profile.domainVocabulary;
-    case "compensation":
-      return profile.compensation;
     case "gaps":
       return profile.gaps;
     default: {

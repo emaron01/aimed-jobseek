@@ -1250,6 +1250,18 @@ model Icp {
   positiveSignals             Json?
   negativeSignals             Json?
   notes                       String?
+  /// Total annual compensation floor. Null when the seeker did not set one.
+  targetAnnualEarningsMin     Decimal?  @db.Decimal(14, 2)
+  /// Total annual compensation the seeker is aiming for, including OTE.
+  targetAnnualEarningsTarget  Decimal?  @db.Decimal(14, 2)
+  targetHourlyRateMin         Decimal?  @db.Decimal(14, 2)
+  targetHourlyRateTarget      Decimal?  @db.Decimal(14, 2)
+  compensationCurrency        String?
+  /// FULL_TIME and/or PART_TIME. Null when unset.
+  employmentTypes             Json?
+  annualEarningsMinimumRequired Boolean @default(false)
+  hourlyRateMinimumRequired   Boolean   @default(false)
+  employmentTypeRequired      Boolean   @default(false)
   interpretationVersion       Int       @default(1)
   interpretationPromptVersion String?
   lastInterpretedAt           DateTime?

@@ -194,3 +194,27 @@ export const vocabExamples = Object.freeze({
 });
 
 export type VocabExampleKey = keyof typeof vocabExamples;
+
+/**
+ * Compensation and employment-type copy for the Target Employer profile
+ * and employer-fit comparison. Display only.
+ */
+export const compensationCopy = Object.freeze({
+  annualEarningsLabel: "Target annual earnings",
+  annualEarningsHint:
+    "Total annual compensation, including on-target earnings (OTE) for sales roles.",
+  annualMinimumLabel: "Annual minimum",
+  annualTargetLabel: "Annual target",
+  hourlyRateLabel: "Target hourly rate",
+  hourlyMinimumLabel: "Hourly minimum",
+  hourlyTargetLabel: "Hourly target",
+  currencyLabel: "Currency",
+  employmentTypeLabel: "Employment type",
+  fullTime: "Full-time",
+  partTime: "Part-time",
+  compensationSignal: "Compensation",
+  notStated: "Not stated",
+  estimate: "Estimate",
+  unitUnrecognized:
+    "Compensation is stated, but the pay period could not be compared.",
+});

@@ -22,7 +22,7 @@ Every fact-bearing item (role, achievement, skill, credential, metric, date, ide
 
 FACT means the materials state it. INFERENCE is a reasonable reading (positioning is usually INFERENCE). FACT items with empty provenance are invalid.
 
-compensation is private compensation expectations if the materials state them. If they do not, return null. Do not invent a number.
+Do not return compensation, salary, hourly rate, or on-target earnings. Those are not part of this profile.
 
 gaps list missing dates, achievements without results, unclear scope, or other holes the candidate or a later consultation can fill.
 

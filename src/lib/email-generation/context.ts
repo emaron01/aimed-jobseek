@@ -17,6 +17,7 @@ import {
   factTexts,
   omitCompensationFromUnknown,
 } from "@/lib/product-research/candidate-profile";
+import { icpForGeneration } from "@/lib/generation/compensation";
 import {
   isResearchFresh,
   parseStringArray,
@@ -510,12 +511,7 @@ export async function loadEmailGenerationContext(
         decisionInfluence: stringList(personaProfile.decisionInfluence),
       },
     },
-    icp: {
-      id: campaign.icp.id,
-      name: campaign.icp.name,
-      definition: campaign.icp.definition,
-      description: campaign.icp.description,
-    },
+    icp: icpForGeneration(campaign.icp),
     contactResearch: freshContactResearch?.researchedAt
       ? {
           id: freshContactResearch.id,

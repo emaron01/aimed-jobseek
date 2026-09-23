@@ -17,7 +17,13 @@ import { formatCriterionDisplay } from "@/lib/criteria/types";
 import { ResearchReadSection } from "@/components/research-document";
 import type { IcpCriterionReviewRow } from "@/components/IcpCriteriaReview";
 import { listToCommaString } from "@/lib/utils";
-import { criterionFlagLabels, vocab } from "@/lib/product-config";
+import {
+  compensationCopy,
+  criterionFlagLabels,
+  employmentTypeLabel,
+  isEmploymentTypeCode,
+  vocab,
+} from "@/lib/product-config";
 
 function ReadCriterionRow({ criterion }: { criterion: IcpCriterionReviewRow }) {
   const evidenceClass = normalizeEvidenceClass(criterion.evidenceClass);
@@ -180,6 +186,11 @@ export function IcpCriteriaBriefing({
   );
 }
 
+function moneyLine(label: string, value: string | null | undefined, hard: boolean): string | null {
+  if (!value?.trim()) return null;
+  return hard ? `${label}: ${value.trim()} (${criterionFlagLabels({ isRequired: true }).join(", ")})` : `${label}: ${value.trim()}`;
+}
+
 export function IcpBriefingDocument({
   name,
   definition,
@@ -189,6 +200,7 @@ export function IcpBriefingDocument({
   criteria,
   interpretationSummary,
   interpretationUndetermined,
+  compensation,
 }: {
   name: string;
   definition?: string | null;
@@ -198,10 +210,51 @@ export function IcpBriefingDocument({
   criteria: IcpCriterionReviewRow[];
   interpretationSummary?: string | null;
   interpretationUndetermined?: string | null;
+  compensation?: {
+    targetAnnualEarningsMin: string | null;
+    targetAnnualEarningsTarget: string | null;
+    targetHourlyRateMin: string | null;
+    targetHourlyRateTarget: string | null;
+    compensationCurrency: string | null;
+    employmentTypes: string[];
+    annualEarningsMinimumRequired: boolean;
+    hourlyRateMinimumRequired: boolean;
+    employmentTypeRequired: boolean;
+  } | null;
 }) {
   const industries = listToCommaString(targetIndustries);
   const geographies = listToCommaString(targetGeographies);
   const metaLine = [industries, geographies].filter(Boolean).join(" · ");
+  const payLines = compensation
+    ? [
+        moneyLine(
+          compensationCopy.annualMinimumLabel,
+          compensation.targetAnnualEarningsMin,
+          compensation.annualEarningsMinimumRequired,
+        ),
+        moneyLine(
+          compensationCopy.annualTargetLabel,
+          compensation.targetAnnualEarningsTarget,
+          false,
+        ),
+        moneyLine(
+          compensationCopy.hourlyMinimumLabel,
+          compensation.targetHourlyRateMin,
+          compensation.hourlyRateMinimumRequired,
+        ),
+        moneyLine(
+          compensationCopy.hourlyTargetLabel,
+          compensation.targetHourlyRateTarget,
+          false,
+        ),
+      ].filter((line): line is string => Boolean(line))
+    : [];
+  const employment =
+    compensation?.employmentTypes
+      .filter(isEmploymentTypeCode)
+      .map((code) => employmentTypeLabel(code))
+      .join(", ") ?? "";
+  const showPay = payLines.length > 0 || Boolean(employment);
 
   return (
     <article className="space-y-8">
@@ -209,6 +262,30 @@ export function IcpBriefingDocument({
         <h2 className="text-xl font-semibold text-slate-900">{name}</h2>
         {metaLine ? <p className="text-sm text-slate-600">{metaLine}</p> : null}
       </header>
+
+      {showPay && compensation ? (
+        <ResearchReadSection title={compensationCopy.annualEarningsLabel} empty={false}>
+          <p className="text-sm text-slate-600">{compensationCopy.annualEarningsHint}</p>
+          {compensation.compensationCurrency ? (
+            <p className="mt-2 text-sm text-slate-700">
+              {compensationCopy.currencyLabel}: {compensation.compensationCurrency}
+            </p>
+          ) : null}
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-[17px] text-slate-800">
+            {payLines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+            {employment ? (
+              <li>
+                {compensationCopy.employmentTypeLabel}: {employment}
+                {compensation.employmentTypeRequired
+                  ? ` (${criterionFlagLabels({ isRequired: true }).join(", ")})`
+                  : ""}
+              </li>
+            ) : null}
+          </ul>
+        </ResearchReadSection>
+      ) : null}
 
       <ResearchReadSection title={`${vocab.idealCustomer.Singular} definition`} empty={!definition?.trim()}>
         {definition?.trim() ? (

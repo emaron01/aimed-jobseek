@@ -100,8 +100,8 @@ describe("profile synthesis output", () => {
     expect(productAiResponseSchema.safeParse(parsed.data).success).toBe(true);
   });
 
-  it("uses prompt version 6 and forbids buyer-role output", () => {
-    expect(PRODUCT_SYNTHESIS_PROMPT_VERSION).toBe("6");
+  it("uses prompt version 7 and does not ask for compensation", () => {
+    expect(PRODUCT_SYNTHESIS_PROMPT_VERSION).toBe("7");
     const messages = buildProductSynthesisMessages({
       productName: "Alex Chen",
       primaryUrl: null,
@@ -116,12 +116,20 @@ describe("profile synthesis output", () => {
     });
     expect(messages[0]!.content).toContain("Do NOT return suggestedBuyerRoles");
     expect(messages[0]!.content).toContain("Do not invent a web search");
+    expect(messages[0]!.content).toContain("Do not return compensation");
     expect(messages[1]!.content).toContain("suggestedBuyerRoles");
     expect(messages[1]!.content).toContain("webSearchForThePerson");
+    expect(messages[1]!.content).not.toContain('"compensation"');
   });
 });
 
 describe("compensation privacy", () => {
+  it("old profileJson with a compensation field still loads", () => {
+    const profile = parseCandidateProfile(fixtureAlexChenProfile());
+    expect(profile.compensation?.text).toMatch(/180,000/);
+    expect(parseCandidateProfileSafe(profile).ok).toBe(true);
+  });
+
   it("is excluded from outreach and document generation context", () => {
     const profile = fixtureAlexChenProfile();
     expect(profileContainsCompensation(profile)).toBe(true);

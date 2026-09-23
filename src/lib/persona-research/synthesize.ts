@@ -34,6 +34,7 @@ import {
   logProductSynthesisFailure,
 } from "@/lib/product-research/synthesis-errors";
 import { vocab } from "@/lib/product-config";
+import { personaGenerationSnapshot } from "@/lib/generation/compensation";
 
 function excerptsFromBundle(raw: unknown): EvidenceExcerpt[] {
   if (Array.isArray(raw)) return raw as EvidenceExcerpt[];
@@ -361,13 +362,10 @@ export async function synthesizePersonaFromEvidence(input: {
       ...structuredOutputRequest("personaSynthesis"),
       messages: buildPersonaSynthesisMessages({
         productName: input.product.name,
-        productSnapshot: {
-          name: input.product.name,
-          description: input.product.description,
-          valueProposition: input.product.valueProposition,
-          websiteUrl: input.product.websiteUrl,
-          profile: input.product.profileJson,
-        },
+        ...personaGenerationSnapshot({
+          product: input.product,
+          icp: approvedIcp,
+        }),
         productMessaging:
           (input.product.messagingJson as Record<string, unknown> | null) ??
           null,
@@ -378,12 +376,6 @@ export async function synthesizePersonaFromEvidence(input: {
         userContext: input.userContext ?? null,
         productEvidence: input.productEvidence,
         personaEvidence: input.personaEvidence,
-        icpContext: approvedIcp
-          ? {
-              name: approvedIcp.name,
-              definition: approvedIcp.definition,
-            }
-          : null,
         existingApprovedPersonas,
       }),
       parseOutput: parsePersonaAiResponse,

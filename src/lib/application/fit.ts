@@ -7,6 +7,11 @@ import {
   icpQualificationToBucket,
   resolveIcpQualification,
 } from "@/lib/scoring/icp-qualification";
+import {
+  compareEmployerCompensation,
+  compensationSignalMiss,
+  type EmployerCompensationProfile,
+} from "@/lib/application/compensation-fit";
 import { criterionFlags, vocab } from "@/lib/product-config";
 import type { QualificationBucket } from "@prisma/client";
 
@@ -24,6 +29,8 @@ export type ApplicationFitOutcome = {
   limitedPublicEvidence: boolean;
   mustHaveMiss: boolean;
   dealBreakerHit: boolean;
+  preferenceMiss?: boolean;
+  estimated?: boolean;
 };
 
 export type ApplicationFitComputation = {
@@ -43,6 +50,11 @@ export function computeApplicationEmployerFit(input: {
   company: CompanyListActuals;
   research: CompanyResearchActuals | null;
   interpretationPromptVersion: string | null;
+  compensation?: {
+    profile: EmployerCompensationProfile;
+    compensationRange: string | null;
+    employmentType: string | null;
+  };
 }): ApplicationFitComputation {
   const assessments = input.criteria.map((criterion) => {
     const resolution = resolveCompanyActualWithProvenance(
@@ -62,7 +74,7 @@ export function computeApplicationEmployerFit(input: {
     criteria: input.criteria,
     assessments: assessments.map((row) => row.assessment),
   });
-  const bucket = icpQualificationToBucket(qualification, null);
+  let bucket = icpQualificationToBucket(qualification, null);
 
   const outcomes: ApplicationFitOutcome[] = assessments.map(
     ({ criterion, resolution, assessment }) => {
@@ -88,6 +100,14 @@ export function computeApplicationEmployerFit(input: {
       };
     },
   );
+
+  if (input.compensation) {
+    const payOutcomes = compareEmployerCompensation(input.compensation);
+    outcomes.push(...payOutcomes);
+    if (compensationSignalMiss(payOutcomes) && bucket === "GOOD") {
+      bucket = "NEEDS_REVIEW";
+    }
+  }
 
   return {
     bucket,

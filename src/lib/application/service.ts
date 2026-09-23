@@ -15,6 +15,11 @@ import { JOB_REQUIREMENT_PROMPT_VERSION } from "@/lib/job-requirement/types";
 import { normalizeEvidenceClass } from "@/lib/criteria/evidence-class";
 import type { CompanyResearchActuals } from "@/lib/criteria/research-cascade";
 import type { CriterionSnapshot } from "@/lib/criteria/types";
+import {
+  emptyEmployerCompensationProfile,
+  parseEmploymentTypeCodes,
+  type EmployerCompensationProfile,
+} from "@/lib/application/compensation-fit";
 import { prisma } from "@/lib/prisma";
 import { vocab } from "@/lib/product-config";
 import { normalizeCompanyName, parseStringArray } from "@/lib/research";
@@ -62,10 +67,46 @@ function researchActuals(row: {
   };
 }
 
+function decimalToNumber(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function employerCompensationFromIcp(icp: {
+  targetAnnualEarningsMin: unknown;
+  targetAnnualEarningsTarget: unknown;
+  targetHourlyRateMin: unknown;
+  targetHourlyRateTarget: unknown;
+  compensationCurrency: string | null;
+  employmentTypes: unknown;
+  annualEarningsMinimumRequired: boolean;
+  hourlyRateMinimumRequired: boolean;
+  employmentTypeRequired: boolean;
+}): EmployerCompensationProfile {
+  return {
+    targetAnnualEarningsMin: decimalToNumber(icp.targetAnnualEarningsMin),
+    targetAnnualEarningsTarget: decimalToNumber(icp.targetAnnualEarningsTarget),
+    targetHourlyRateMin: decimalToNumber(icp.targetHourlyRateMin),
+    targetHourlyRateTarget: decimalToNumber(icp.targetHourlyRateTarget),
+    compensationCurrency: icp.compensationCurrency,
+    employmentTypes: parseEmploymentTypeCodes(icp.employmentTypes),
+    annualEarningsMinimumRequired: icp.annualEarningsMinimumRequired,
+    hourlyRateMinimumRequired: icp.hourlyRateMinimumRequired,
+    employmentTypeRequired: icp.employmentTypeRequired,
+  };
+}
+
 async function loadCriteria(
   organizationId: string,
   icpId: string,
-): Promise<{ criteria: CriterionSnapshot[]; version: string | null; updatedAt: Date; targets: string[] }> {
+): Promise<{
+  criteria: CriterionSnapshot[];
+  version: string | null;
+  updatedAt: Date;
+  targets: string[];
+  compensation: EmployerCompensationProfile;
+}> {
   const icp = await prisma.icp.findFirst({
     where: { id: icpId, organizationId },
     include: { criteria: { orderBy: { sortOrder: "asc" } } },
@@ -101,6 +142,7 @@ async function loadCriteria(
     targets: criteria
       .map((criterion) => criterion.researchGuidance?.trim() ?? "")
       .filter(Boolean),
+    compensation: employerCompensationFromIcp(icp),
   };
 }
 
@@ -141,6 +183,13 @@ async function scoreFit(input: {
   if (!research || research.identityAmbiguous) {
     return;
   }
+  const requirement = await prisma.jobRequirement.findFirst({
+    where: {
+      campaignId: input.campaignId,
+      organizationId: input.organizationId,
+    },
+    select: { compensationRange: true, employmentType: true },
+  });
   const computed = computeApplicationEmployerFit({
     criteria: profile.criteria,
     company: {
@@ -151,6 +200,11 @@ async function scoreFit(input: {
     },
     research: researchActuals(research),
     interpretationPromptVersion: profile.version,
+    compensation: {
+      profile: profile.compensation ?? emptyEmployerCompensationProfile(),
+      compensationRange: requirement?.compensationRange ?? null,
+      employmentType: requirement?.employmentType ?? null,
+    },
   });
   const now = new Date();
   const data = {
