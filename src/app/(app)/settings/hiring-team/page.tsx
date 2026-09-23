@@ -4,7 +4,6 @@ import {
   savePersonaTemplateAction,
 } from "@/app/actions/hiring-team";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
-import { ensureDefaultPersonaTemplates } from "@/lib/hiring-team/templates";
 import { prisma } from "@/lib/prisma";
 import { vocab } from "@/lib/product-config";
 import { parseStringArray } from "@/lib/research";
@@ -14,7 +13,6 @@ const fieldClass = "mt-1 w-full rounded-md border border-slate-300 px-3 py-2 tex
 
 export default async function HiringTeamTemplatesPage() {
   const organization = await requireOrganization();
-  await ensureDefaultPersonaTemplates(prisma, organization.id);
   const templates = await prisma.personaTemplate.findMany({
     where: { organizationId: organization.id },
     orderBy: { createdAt: "asc" },
@@ -30,7 +28,7 @@ export default async function HiringTeamTemplatesPage() {
           {vocab.persona.nav} templates
         </h1>
         <p className="mt-1 text-sm text-slate-600">
-          These starting points are copied onto each {vocab.campaign.singular} when its job requirement is parsed. Editing a template does not change roles already on an {vocab.campaign.singular}.
+          Save a {vocab.persona.singular} you built, then add it to an {vocab.campaign.singular} yourself. Templates are not added automatically. Editing a template does not change roles already on an {vocab.campaign.singular}.
         </p>
       </div>
 

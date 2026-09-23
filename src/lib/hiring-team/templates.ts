@@ -1,40 +1,33 @@
-import { Prisma, type PrismaClient } from "@prisma/client";
-import { HIRING_TEAM_TEMPLATE_DEFAULTS } from "@/lib/product-config/hiring-team-templates";
 import { prisma } from "@/lib/prisma-client";
 import { vocab } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 
-type TemplateDb = PrismaClient | Prisma.TransactionClient;
+/** Keys of the retired product defaults. Seeker-created templates have a null key. */
+export const RETIRED_DEFAULT_TEMPLATE_KEYS = [
+  "recruiter",
+  "hr_people_partner",
+  "hiring_manager",
+  "hiring_manager_executive",
+  "cross_functional_lead",
+] as const;
 
-export async function ensureDefaultPersonaTemplates(
-  db: TemplateDb,
-  organizationId: string,
-): Promise<void> {
-  const existing = await db.personaTemplate.count({
-    where: { organizationId },
-  });
-  if (existing > 0) return;
-  try {
-    await db.personaTemplate.createMany({
-      data: HIRING_TEAM_TEMPLATE_DEFAULTS.map((template) => ({
-        organizationId,
-        templateKey: template.templateKey,
-        name: template.name,
-        likelyTitles: [...template.likelyTitles],
-        department: template.department.trim() || null,
-        whyThisRoleMatters: template.whyThisRoleMatters,
-        notes: template.notes.trim() || null,
-      })),
-    });
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      return;
-    }
-    throw error;
+const UNEDITED_WINDOW_MS = 2_000;
+
+/** True only for an untouched default row. An edited or seeker-created template is kept. */
+export function isUneditedDefaultTemplate(row: {
+  templateKey: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): boolean {
+  if (
+    !row.templateKey ||
+    !RETIRED_DEFAULT_TEMPLATE_KEYS.includes(
+      row.templateKey as (typeof RETIRED_DEFAULT_TEMPLATE_KEYS)[number],
+    )
+  ) {
+    return false;
   }
+  return row.updatedAt.getTime() - row.createdAt.getTime() <= UNEDITED_WINDOW_MS;
 }
 
 function titles(values: string[]): string[] {

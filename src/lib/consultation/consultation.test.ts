@@ -249,7 +249,7 @@ describe("consultation evidence and questions", () => {
   });
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
-    expect(consultationConfig.displayName).toBe("Avery");
+    expect(consultationConfig.displayName).toBe("Harper");
     expect(CONSULTATION_PROMPT_VERSION).toBe("1");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("coach, not an interrogator");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("Never inflate fit");

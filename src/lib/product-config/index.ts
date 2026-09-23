@@ -20,11 +20,6 @@ export {
 } from "./compensation";
 export type { EmploymentTypeCode } from "./compensation";
 export {
-  HIRING_MANAGER_TEMPLATE_KEY,
-  HIRING_TEAM_TEMPLATE_DEFAULTS,
-} from "./hiring-team-templates";
-export type { HiringTeamTemplateKey } from "./hiring-team-templates";
-export {
   consultationConfig,
   evidenceStrengthLabels,
   gapStrategyCopy,

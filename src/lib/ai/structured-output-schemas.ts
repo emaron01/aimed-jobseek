@@ -20,6 +20,7 @@ import {
   consultationCoachSchema,
   consultationExtractSchema,
 } from "@/lib/consultation/contract";
+import { hiringTeamIdentificationSchema } from "@/lib/hiring-team/contract";
 
 export type StructuredOutputSchemaEntry = {
   schemaName: string;
@@ -57,6 +58,11 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   personaSynthesis: {
     schemaName: "persona_setup_synthesis",
     schema: personaAiResponseSchema,
+    usageOperations: ["PERSONA_SYNTHESIS"],
+  },
+  hiringTeamIdentification: {
+    schemaName: "hiring_team_identification",
+    schema: hiringTeamIdentificationSchema,
     usageOperations: ["PERSONA_SYNTHESIS"],
   },
   contactScoring: {

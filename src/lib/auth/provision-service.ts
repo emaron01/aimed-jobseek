@@ -12,7 +12,6 @@ import {
 } from "@/lib/usage/defaults";
 import { SELF_SERVE_BILLING_DEFAULTS } from "@/lib/billing/billing-state";
 import { isPlatformSuperAdminProvisioningActive } from "@/lib/auth/platform-provision-flag";
-import { ensureDefaultPersonaTemplates } from "@/lib/hiring-team/templates";
 
 export class ProvisionError extends Error {
   constructor(message: string) {
@@ -81,8 +80,6 @@ async function createTenantWorkspaceForUser(
       timezone: input.timezone?.trim() || DEFAULT_ORGANIZATION_TIMEZONE,
     },
   });
-
-  await ensureDefaultPersonaTemplates(tx, organization.id);
 
   await tx.organizationMembership.create({
     data: {

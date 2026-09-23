@@ -3,7 +3,7 @@
  * consultant is named.
  */
 export const consultationConfig = Object.freeze({
-  displayName: "Avery",
+  displayName: "Harper",
   roundSize: 3,
 });
 

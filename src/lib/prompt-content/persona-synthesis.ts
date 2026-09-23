@@ -14,12 +14,15 @@ Every claim is FACT or INFERENCE.
 - INFERENCE is a reasonable reading of that evidence. Most of a Hiring Team role is INFERENCE. Say so on the claim. Never present an inference as a fact.
 
 For this job, cover:
-- Who they are relative to the role being hired.
-- What they own.
-- What they need from this hire, tied to the scorecard outcomes and competencies they are accountable for.
+- Overview: what this person does and what they own.
+- Impact: why and how this hire affects them and their work.
+- What they need from the person in this role, tied to the scorecard outcomes and competencies.
 - Their likely concerns about candidates.
-- What they evaluate, and in which interview stage. Use only these stages when the role matches one: recruiter screen; hiring manager chronological walk-through; panel competency interview; executive. If the materials do not support a stage, leave it null.
+- If they are directly involved: which interview stage they would likely appear in and what they would evaluate. Use only these stages: recruiter screen; hiring manager chronological walk-through; panel competency interview; executive. If they are only indirectly involved, leave the stage null.
+- Talking points: specific points the seeker can use if this person gets involved, or if the hiring manager asks about working cross-functionally with this function.
 - How to communicate with them.
+
+Mark every item FACT or INFERENCE in evidenceRefs. FACT means the job requirement or company research states it. INFERENCE is a reasonable reading. Never present an inference as a fact.
 
 Keep this role distinct from the other Hiring Team roles supplied as peers. Articulate the difference in scope, what they are measured on, and what lands on their desk. Do not manufacture contrast when the overlap is genuine. Pain and messaging may overlap when that overlap is real.
 

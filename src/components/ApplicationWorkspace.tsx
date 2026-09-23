@@ -5,8 +5,12 @@ import {
 } from "@/app/actions/application";
 import {
   addApplicationRoleAction,
+  addTemplateRoleAction,
+  approveApplicationRoleAction,
+  rebuildApplicationRoleAction,
   removeApplicationRoleAction,
   saveRoleAsTemplateAction,
+  updateApplicationRoleAction,
 } from "@/app/actions/hiring-team";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { ConsultationSection } from "@/components/ConsultationSection";
@@ -316,6 +320,72 @@ export async function ApplicationWorkspace({
   );
 }
 
+function annotatedList(value: unknown): Array<{ text: string; kind: string }> {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as { text?: unknown; kind?: unknown };
+    if (typeof row.text !== "string" || !row.text.trim()) return [];
+    return [{ text: row.text.trim(), kind: row.kind === "FACT" ? "FACT" : "INFERENCE" }];
+  });
+}
+
+function readNarrative(value: unknown): {
+  involvement: string | null;
+  overview: string | null;
+  impact: { text: string; kind: string } | null;
+  needs: Array<{ text: string; kind: string }>;
+  concerns: Array<{ text: string; kind: string }>;
+  interviewStage: { text: string; kind: string } | null;
+  evaluates: Array<{ text: string; kind: string }>;
+  talkingPoints: Array<{ text: string; kind: string }>;
+  communication: Array<{ text: string; kind: string }>;
+  identificationEvidence: Array<{ text: string; kind: string }>;
+} | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as { narrative?: unknown; involvement?: unknown; identification?: unknown };
+  const narrative = row.narrative;
+  if (!narrative || typeof narrative !== "object") return null;
+  const body = narrative as Record<string, unknown>;
+  const one = (entry: unknown) => {
+    if (!entry || typeof entry !== "object") return null;
+    const item = entry as { text?: unknown; kind?: unknown };
+    if (typeof item.text !== "string" || !item.text.trim()) return null;
+    return { text: item.text.trim(), kind: item.kind === "FACT" ? "FACT" : "INFERENCE" };
+  };
+  const identification = row.identification;
+  const evidence =
+    identification && typeof identification === "object" && Array.isArray((identification as { evidence?: unknown }).evidence)
+      ? annotatedList(
+          (identification as { evidence: unknown[] }).evidence.map((item) => {
+            if (!item || typeof item !== "object") return null;
+            const claim = item as { claim?: unknown; kind?: unknown };
+            return { text: claim.claim, kind: claim.kind };
+          }),
+        )
+      : [];
+  return {
+    involvement: typeof row.involvement === "string" ? row.involvement : null,
+    overview: one(body.overview)?.text ?? null,
+    impact: one(body.impact),
+    needs: annotatedList(body.needs),
+    concerns: annotatedList(body.concerns),
+    interviewStage: one(body.interviewStage),
+    evaluates: annotatedList(body.evaluates),
+    talkingPoints: annotatedList(body.talkingPoints),
+    communication: annotatedList(body.communication),
+    identificationEvidence: evidence,
+  };
+}
+
+function KindMark({ kind }: { kind: string }) {
+  return (
+    <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">
+      {kind === "FACT" ? "Fact" : "Inference"}
+    </span>
+  );
+}
+
 async function HiringTeamSection({
   campaignId,
   organizationId,
@@ -325,68 +395,123 @@ async function HiringTeamSection({
   organizationId: string;
   canEdit: boolean;
 }) {
-  const roles = await prisma.persona.findMany({
-    where: { organizationId, campaignId, archivedAt: null },
-    orderBy: { createdAt: "asc" },
-  });
+  const [roles, templates] = await Promise.all([
+    prisma.persona.findMany({
+      where: { organizationId, campaignId, archivedAt: null },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.personaTemplate.findMany({
+      where: { organizationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+  ]);
   const fieldClass = "mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm";
   return (
     <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-5" data-testid="hiring-team">
       <div>
         <h2 className="text-base font-semibold text-slate-900">{vocab.persona.nav}</h2>
         <p className="mt-1 text-sm text-slate-600">
-          Roles for this {vocab.campaign.singular} only. They are built from the job requirement and employer research.
+          Roles for this {vocab.campaign.singular} are identified from the job and employer research. Review each draft before you rely on it. Saved templates are added only when you choose one.
         </p>
       </div>
       {roles.length === 0 ? (
         <p className="text-sm text-slate-600">No {vocab.persona.plural} yet.</p>
       ) : (
         <ul className="space-y-4">
-          {roles.map((role) => (
-            <li key={role.id} className="space-y-2 rounded-md border border-slate-200 p-4" data-testid="hiring-team-role">
-              <h3 className="text-sm font-semibold text-slate-900">{role.name}</h3>
-              <p className="text-sm text-slate-700">{textList(role.targetTitles).join(", ") || "No likely titles."}</p>
-              {role.department ? <p className="text-sm text-slate-700">{role.department}</p> : null}
-              {role.whyThisPersonaMatters ? (
-                <p className="text-sm text-slate-800">{role.whyThisPersonaMatters}</p>
-              ) : null}
-              {role.definition ? <p className="text-sm text-slate-800">{role.definition}</p> : null}
-              {role.painPoints ? <p className="text-sm text-slate-700">{role.painPoints}</p> : null}
-              {role.desiredOutcomes ? <p className="text-sm text-slate-700">{role.desiredOutcomes}</p> : null}
-              {role.messagingNotes ? <p className="text-sm text-slate-700">{role.messagingNotes}</p> : null}
-              {role.setupStatus === "FAILED" || role.setupStatus === "PARTIAL" ? (
-                <p className="text-sm text-amber-900">{role.additionalContext}</p>
-              ) : null}
-              {canEdit ? (
-                <div className="flex flex-wrap gap-3">
-                  <ApplicationActionForm
-                    action={removeApplicationRoleAction}
-                    submitLabel="Remove role"
-                    testId={`remove-role-${role.id}`}
-                  >
-                    <input type="hidden" name="campaignId" value={campaignId} />
-                    <input type="hidden" name="personaId" value={role.id} />
-                  </ApplicationActionForm>
-                  <ApplicationActionForm
-                    action={saveRoleAsTemplateAction}
-                    submitLabel="Save as template"
-                    testId={`save-role-template-${role.id}`}
-                  >
-                    <input type="hidden" name="campaignId" value={campaignId} />
-                    <input type="hidden" name="personaId" value={role.id} />
-                  </ApplicationActionForm>
+          {roles.map((role) => {
+            const narrative = readNarrative(role.profileJson);
+            return (
+              <li key={role.id} className="space-y-3 rounded-md border border-slate-200 p-4" data-testid="hiring-team-role">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold text-slate-900">{role.name}</h3>
+                  {narrative?.involvement ? (
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">
+                      {narrative.involvement === "DIRECT" ? "Direct" : "Indirect"}
+                    </span>
+                  ) : null}
+                  <span className="text-xs text-slate-500">{role.approvalStatus === "APPROVED" ? "Approved" : "Needs review"}</span>
                 </div>
-              ) : null}
-            </li>
-          ))}
+                <p className="text-sm text-slate-700">{textList(role.targetTitles).join(", ") || "No likely titles."}</p>
+                {role.department ? <p className="text-sm text-slate-700">{role.department}</p> : null}
+                {role.whyThisPersonaMatters ? <p className="text-sm text-slate-800">{role.whyThisPersonaMatters}</p> : null}
+                {narrative?.overview ? <p className="text-sm text-slate-800">{narrative.overview}</p> : role.definition ? <p className="text-sm text-slate-800">{role.definition}</p> : null}
+                {narrative?.impact ? (
+                  <p className="text-sm text-slate-800">
+                    {narrative.impact.text}
+                    <KindMark kind={narrative.impact.kind} />
+                  </p>
+                ) : null}
+                {narrative ? (
+                  <>
+                    <AnnotatedBlock title="What they need" items={narrative.needs} />
+                    <AnnotatedBlock title="Concerns" items={narrative.concerns} />
+                    {narrative.interviewStage ? (
+                      <p className="text-sm text-slate-800">
+                        Interview stage: {narrative.interviewStage.text}
+                        <KindMark kind={narrative.interviewStage.kind} />
+                      </p>
+                    ) : null}
+                    <AnnotatedBlock title="What they evaluate" items={narrative.evaluates} />
+                    <AnnotatedBlock title="Talking points" items={narrative.talkingPoints} />
+                    <AnnotatedBlock title="How to communicate" items={narrative.communication} />
+                    <AnnotatedBlock title="Why they were identified" items={narrative.identificationEvidence} />
+                  </>
+                ) : null}
+                {role.additionalContext ? <p className="text-sm text-amber-900">{role.additionalContext}</p> : null}
+                {canEdit ? (
+                  <div className="space-y-3">
+                    <ApplicationActionForm action={updateApplicationRoleAction} submitLabel="Save edits" testId={`edit-role-${role.id}`}>
+                      <input type="hidden" name="campaignId" value={campaignId} />
+                      <input type="hidden" name="personaId" value={role.id} />
+                      <label className="block text-sm">
+                        <span className="font-medium text-slate-700">Name</span>
+                        <input name="name" required defaultValue={role.name} className={fieldClass} />
+                      </label>
+                      <label className="block text-sm">
+                        <span className="font-medium text-slate-700">Likely titles</span>
+                        <textarea name="likelyTitles" rows={2} defaultValue={textList(role.targetTitles).join("\n")} className={fieldClass} />
+                      </label>
+                      <label className="block text-sm">
+                        <span className="font-medium text-slate-700">Department</span>
+                        <input name="department" defaultValue={role.department ?? ""} className={fieldClass} />
+                      </label>
+                      <label className="block text-sm">
+                        <span className="font-medium text-slate-700">Why this role matters</span>
+                        <textarea name="whyThisRoleMatters" rows={2} defaultValue={role.whyThisPersonaMatters ?? ""} className={fieldClass} />
+                      </label>
+                      <label className="block text-sm">
+                        <span className="font-medium text-slate-700">Notes</span>
+                        <textarea name="notes" rows={2} defaultValue={role.additionalContext ?? ""} className={fieldClass} />
+                      </label>
+                    </ApplicationActionForm>
+                    <div className="flex flex-wrap gap-3">
+                      <ApplicationActionForm action={approveApplicationRoleAction} submitLabel="Approve" testId={`approve-role-${role.id}`}>
+                        <input type="hidden" name="campaignId" value={campaignId} />
+                        <input type="hidden" name="personaId" value={role.id} />
+                      </ApplicationActionForm>
+                      <ApplicationActionForm action={rebuildApplicationRoleAction} submitLabel="Rebuild" testId={`rebuild-role-${role.id}`}>
+                        <input type="hidden" name="campaignId" value={campaignId} />
+                        <input type="hidden" name="personaId" value={role.id} />
+                      </ApplicationActionForm>
+                      <ApplicationActionForm action={removeApplicationRoleAction} submitLabel="Remove role" testId={`remove-role-${role.id}`}>
+                        <input type="hidden" name="campaignId" value={campaignId} />
+                        <input type="hidden" name="personaId" value={role.id} />
+                      </ApplicationActionForm>
+                      <ApplicationActionForm action={saveRoleAsTemplateAction} submitLabel="Save as template" testId={`save-role-template-${role.id}`}>
+                        <input type="hidden" name="campaignId" value={campaignId} />
+                        <input type="hidden" name="personaId" value={role.id} />
+                      </ApplicationActionForm>
+                    </div>
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       )}
       {canEdit ? (
-        <ApplicationActionForm
-          action={addApplicationRoleAction}
-          submitLabel={`Add ${vocab.persona.singular}`}
-          testId="add-hiring-team-role"
-        >
+        <ApplicationActionForm action={addApplicationRoleAction} submitLabel={`Add ${vocab.persona.singular}`} testId="add-hiring-team-role">
           <input type="hidden" name="campaignId" value={campaignId} />
           <label className="block text-sm">
             <span className="font-medium text-slate-700">Name</span>
@@ -410,7 +535,48 @@ async function HiringTeamSection({
           </label>
         </ApplicationActionForm>
       ) : null}
+      {canEdit && templates.length > 0 ? (
+        <ApplicationActionForm action={addTemplateRoleAction} submitLabel="Add saved template" testId="add-template-role">
+          <input type="hidden" name="campaignId" value={campaignId} />
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">Saved template</span>
+            <select name="templateId" required className={fieldClass} defaultValue="">
+              <option value="" disabled>
+                Choose a template
+              </option>
+              {templates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </ApplicationActionForm>
+      ) : null}
     </section>
+  );
+}
+
+function AnnotatedBlock({
+  title,
+  items,
+}: {
+  title: string;
+  items: Array<{ text: string; kind: string }>;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <h4 className="text-sm font-medium text-slate-900">{title}</h4>
+      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-800">
+        {items.map((item) => (
+          <li key={item.text}>
+            {item.text}
+            <KindMark kind={item.kind} />
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

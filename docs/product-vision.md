@@ -39,7 +39,7 @@ Setup order: Personal Profile → Target Employers → Applications.
 
 ## Personas are the hiring team
 Personas are the people involved in hiring and in the day-to-day work of the role: HR, recruiters, the hiring manager, the hiring manager's executive, and cross-functional team leaders. Each is defined by their relationship to the role's responsibilities and what matters to them. Personas drive outreach, interview guides, and follow-ups.
-- A stakeholder template library exists at the account level. Templates are instantiated and researched per application.
+- A stakeholder template library exists at the account level. The seeker saves a role they built and can add that template to an application. Templates are not created from a fixed list and do not auto-populate an application. Roles are identified from that application's job requirement and company research, then drafted and reviewed.
 - The custom persona builder (name, likely titles, department, why this role matters, notes) is reused. Its evidence source changes from product evidence to job requirement plus company research, plus differentiation from peer personas so the recruiter, hiring manager, and executive stay distinct.
 - Personas are created per application. Personal Profile build does not create them.
 - Contacts are real people at the company, added one at a time to an application's roster (name, title, optional email, LinkedIn URL, persona). Title-to-persona matching is suggested automatically and the seeker can change it.

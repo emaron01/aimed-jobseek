@@ -1,5 +1,4 @@
 import type { EvidenceExcerpt } from "@/lib/product-research/prompt";
-import { HIRING_MANAGER_TEMPLATE_KEY } from "@/lib/product-config/hiring-team-templates";
 import type { JobScorecard } from "@/lib/job-requirement/types";
 
 export type HiringTeamJobEvidence = {
@@ -106,15 +105,3 @@ export function hiringTeamEvidenceExcerpts(input: {
   return excerpts;
 }
 
-export function likelyTitlesForTemplate(input: {
-  templateKey: string | null;
-  likelyTitles: string[];
-  reportingLine: string | null;
-}): string[] {
-  const titles = input.likelyTitles.map((title) => title.trim()).filter(Boolean);
-  const reportingLine = input.reportingLine?.trim() ?? "";
-  if (input.templateKey !== HIRING_MANAGER_TEMPLATE_KEY || !reportingLine) {
-    return titles;
-  }
-  return [reportingLine, ...titles.filter((title) => title !== reportingLine)];
-}

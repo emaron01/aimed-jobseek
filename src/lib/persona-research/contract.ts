@@ -86,6 +86,11 @@ export const personaAiDraftSchema = z.object({
   likelyObjections: stringList,
   terminology: stringList,
   messagingNotes: stringList,
+  impact: optionalString,
+  talkingPoints: z.array(z.string()).optional(),
+  needsFromHire: z.array(z.string()).optional(),
+  candidateConcerns: z.array(z.string()).optional(),
+  involvement: z.enum(["DIRECT", "INDIRECT"]).nullable().optional(),
   interviewStage: optionalString,
   evaluates: z.array(z.string()).optional(),
   communicationApproach: z.array(z.string()).optional(),
@@ -156,4 +161,4 @@ export function parsePersonaAiResponse(
   };
 }
 
-export const PERSONA_SYNTHESIS_PROMPT_VERSION = "9";
+export const PERSONA_SYNTHESIS_PROMPT_VERSION = "10";

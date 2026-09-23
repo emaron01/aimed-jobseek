@@ -1,29 +1,27 @@
 import { Prisma } from "@prisma/client";
-import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
-import { getPersonaAiProvider, isPersonaAiConfigured } from "@/lib/ai";
+import type { HiringTeamJobEvidence, HiringTeamResearchEvidence } from "@/lib/hiring-team/evidence";
+import { hiringTeamEvidenceExcerpts } from "@/lib/hiring-team/evidence";
+import { draftRoleWithModel, identifyRolesWithModel } from "@/lib/hiring-team/ai";
 import {
-  hiringTeamEvidenceExcerpts,
-  likelyTitlesForTemplate,
-  type HiringTeamJobEvidence,
-  type HiringTeamResearchEvidence,
-} from "@/lib/hiring-team/evidence";
-import { ensureDefaultPersonaTemplates } from "@/lib/hiring-team/templates";
+  acceptModelRoles,
+  differentiateNarratives,
+  draftHiringTeamRole,
+  evidenceTextFor,
+  identifyHiringTeamRoles,
+  mergeIdentifiedRoles,
+  narrativeLists,
+  type AnnotatedText,
+  type HiringTeamNarrative,
+  type IdentifiedHiringRole,
+} from "@/lib/hiring-team/identify";
 import type { PersonaDifferentiationInput } from "@/lib/persona/persona-differentiation";
-import {
-  PERSONA_SYNTHESIS_PROMPT_VERSION,
-  parsePersonaAiResponse,
-  type PersonaAiDraft,
-} from "@/lib/persona-research/contract";
-import { buildPersonaSynthesisMessages } from "@/lib/persona-research/prompt";
 import { parsePersonaListField } from "@/lib/persona/persona-differentiation";
+import { PERSONA_SYNTHESIS_PROMPT_VERSION } from "@/lib/persona-research/contract";
 import { prisma } from "@/lib/prisma";
 import { vocab } from "@/lib/product-config";
 import type { JobScorecard, ScorecardItem } from "@/lib/job-requirement/types";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
-
-const AI_UNCONFIGURED =
-  "Persona AI is not configured, so this role keeps the template fields only.";
 
 function readScorecard(value: unknown): JobScorecard {
   if (!value || typeof value !== "object") {
@@ -56,86 +54,51 @@ function joined(values: string[]): string | null {
   return text || null;
 }
 
-function titlesFromJson(value: unknown): string[] {
-  return parseStringArray(value);
+function seekerEdited(value: unknown): boolean {
+  return Array.isArray(value) && value.length > 0;
 }
 
-function draftMessaging(draft: PersonaAiDraft): string | null {
-  return joined([
-    ...(draft.communicationApproach ?? []),
-    ...draft.messagingNotes,
-    draft.interviewStage?.trim()
-      ? `Interview stage: ${draft.interviewStage.trim()}`
-      : "",
-    ...(draft.evaluates ?? []).map((item) => `Evaluates: ${item}`),
-  ]);
-}
-
-async function synthesizeRole(input: {
-  roleName: string;
-  likelyTitles: string[];
-  department: string | null;
-  whyThisRoleMatters: string | null;
-  notes: string | null;
+function profilePayload(input: {
+  includeResearch: boolean;
   excerpts: ReturnType<typeof hiringTeamEvidenceExcerpts>;
-  peers: PersonaDifferentiationInput[];
-}): Promise<PersonaAiDraft> {
-  const response = await getPersonaAiProvider().generateStructured({
-    ...structuredOutputRequest("personaSynthesis"),
-    messages: buildPersonaSynthesisMessages({
-      productName: input.roleName,
-      productSnapshot: {
-        roleName: input.roleName,
-        likelyTitles: input.likelyTitles,
-        department: input.department,
-        whyThisRoleMatters: input.whyThisRoleMatters,
-        notes: input.notes,
-      },
-      productMessaging: null,
-      buyerRole: {
-        suggestionKey: input.roleName,
-        name: input.roleName,
-        likelyTitles: input.likelyTitles,
-        departmentFunction: input.department,
-        whyThisRoleMatters: input.whyThisRoleMatters,
-        confidence: "MEDIUM",
-        evidenceRefs: [],
-      },
-      userContext: input.notes ? { notes: input.notes } : null,
-      productEvidence: input.excerpts,
-      personaEvidence: [],
-      icpContext: null,
-      existingApprovedPersonas: input.peers,
-    }),
-    parseOutput: parsePersonaAiResponse,
-  });
-  return response.data.personaDraft;
+  role: IdentifiedHiringRole;
+  narrative: HiringTeamNarrative;
+  modelNote: string | null;
+}): Prisma.InputJsonValue {
+  return {
+    includeResearch: input.includeResearch,
+    roleKey: input.role.roleKey,
+    involvement: input.role.involvement,
+    evidence: input.excerpts.map((excerpt) => ({
+      sourceId: excerpt.sourceId,
+      displayName: excerpt.displayName,
+      text: excerpt.text,
+    })),
+    identification: input.role,
+    narrative: input.narrative,
+    modelNote: input.modelNote,
+  } as unknown as Prisma.InputJsonValue;
 }
 
-export async function syncApplicationHiringTeam(input: {
-  organizationId: string;
-  campaignId: string;
-}): Promise<void> {
-  await ensureDefaultPersonaTemplates(prisma, input.organizationId);
+async function loadApplication(organizationId: string, campaignId: string) {
   const campaign = await prisma.campaign.findFirst({
-    where: { id: input.campaignId, organizationId: input.organizationId },
+    where: { id: campaignId, organizationId },
     select: { id: true, productId: true },
   });
   if (!campaign) {
     throw new TenantError(
-      `${vocab.campaign.Singular} was not found for this Hiring Team.`,
+      `${vocab.campaign.Singular} was not found for this ${vocab.persona.nav}.`,
     );
   }
   const requirement = await prisma.jobRequirement.findFirst({
-    where: { campaignId: campaign.id, organizationId: input.organizationId },
+    where: { campaignId: campaign.id, organizationId },
     include: {
       company: {
         include: { research: { orderBy: { updatedAt: "desc" }, take: 1 } },
       },
     },
   });
-  if (!requirement) return;
-
+  if (!requirement) return { campaign, requirement: null, job: null, research: null, includeResearch: false };
   const researchRow = requirement.company?.research[0] ?? null;
   const includeResearch =
     requirement.employerDisposition === "IDENTIFIED" &&
@@ -164,171 +127,196 @@ export async function syncApplicationHiringTeam(input: {
         riskSignals: parseStringArray(researchRow.riskSignals),
       }
     : null;
-  const excerpts = hiringTeamEvidenceExcerpts({
-    job,
-    research,
-    includeResearch,
-  });
+  return { campaign, requirement, job, research, includeResearch };
+}
 
-  const templates = await prisma.personaTemplate.findMany({
-    where: { organizationId: input.organizationId },
-    orderBy: { createdAt: "asc" },
+async function identifiedRoles(input: {
+  job: HiringTeamJobEvidence;
+  research: HiringTeamResearchEvidence | null;
+  includeResearch: boolean;
+}): Promise<{ roles: IdentifiedHiringRole[]; modelNote: string | null }> {
+  const fromEvidence = identifyHiringTeamRoles(input);
+  const excerpts = hiringTeamEvidenceExcerpts(input);
+  const model = await identifyRolesWithModel({ evidence: excerpts });
+  if (!model.ok) {
+    return {
+      roles: fromEvidence,
+      modelNote: model.message.includes("not configured") ? null : model.message,
+    };
+  }
+  const accepted = acceptModelRoles({
+    roles: model.data.roles,
+    evidenceText: evidenceTextFor(input),
+    reportingLine: input.job.reportingLine,
   });
+  return {
+    roles: mergeIdentifiedRoles(fromEvidence, accepted),
+    modelNote: null,
+  };
+}
+
+async function narrativesFor(input: {
+  roles: IdentifiedHiringRole[];
+  job: HiringTeamJobEvidence;
+  excerpts: ReturnType<typeof hiringTeamEvidenceExcerpts>;
+}): Promise<{ narratives: HiringTeamNarrative[]; modelNote: string | null }> {
+  const drafted = input.roles.map((role) => draftHiringTeamRole(role, input.job));
   const peers: PersonaDifferentiationInput[] = [];
-
-  for (const template of templates) {
-    const titles = likelyTitlesForTemplate({
-      templateKey: template.templateKey,
-      likelyTitles: titlesFromJson(template.likelyTitles),
-      reportingLine: requirement.reportingLine,
+  let modelNote: string | null = null;
+  const withModel: HiringTeamNarrative[] = [];
+  for (let index = 0; index < input.roles.length; index += 1) {
+    const role = input.roles[index]!;
+    const base = drafted[index]!;
+    const model = await draftRoleWithModel({
+      roleName: role.name,
+      likelyTitles: role.likelyTitles,
+      department: role.department,
+      whyThisRoleMatters: role.whyInvolved,
+      involvement: role.involvement,
+      notes: null,
+      excerpts: input.excerpts,
+      peers,
     });
+    const narrative = model.ok ? applyModelDraft(base, model.draft, role) : base;
+    if (!model.ok && !model.message.includes("not configured")) {
+      modelNote = model.message;
+    }
+    withModel.push(narrative);
+    const lists = narrativeLists(narrative);
+    peers.push({
+      id: role.roleKey,
+      name: role.name,
+      painPoints: lists.painPoints,
+      messagingNotes: lists.messagingNotes,
+    });
+  }
+  return {
+    narratives: differentiateNarratives({ roles: input.roles, narratives: withModel }),
+    modelNote,
+  };
+}
+
+function applyModelDraft(
+  base: HiringTeamNarrative,
+  draft: {
+    roleSummary?: string | null;
+    impact?: string | null;
+    talkingPoints?: string[];
+    needsFromHire?: string[];
+    candidateConcerns?: string[];
+    interviewStage?: string | null;
+    evaluates?: string[];
+    communicationApproach?: string[];
+    primaryResponsibilities?: string[];
+  },
+  role: IdentifiedHiringRole,
+): HiringTeamNarrative {
+  const texts = (values: string[] | undefined, fallback: AnnotatedText[]) => {
+    const cleaned = (values ?? []).map((value) => value.trim()).filter(Boolean);
+    if (cleaned.length === 0) return fallback;
+    return cleaned.map((text) => ({ text, kind: "INFERENCE" as const }));
+  };
+  const stage =
+    role.involvement === "DIRECT"
+      ? draft.interviewStage?.trim()
+        ? { text: draft.interviewStage.trim(), kind: "INFERENCE" as const }
+        : base.interviewStage
+      : null;
+  return {
+    overview: {
+      text: draft.roleSummary?.trim() || base.overview.text,
+      kind: base.overview.kind,
+    },
+    impact: {
+      text: draft.impact?.trim() || base.impact.text,
+      kind: "INFERENCE",
+    },
+    needs: texts(draft.needsFromHire, base.needs),
+    concerns: texts(draft.candidateConcerns, base.concerns),
+    interviewStage: stage,
+    evaluates: texts(draft.evaluates, base.evaluates),
+    talkingPoints: texts(draft.talkingPoints, base.talkingPoints),
+    communication: texts(draft.communicationApproach, base.communication),
+  };
+}
+
+function personaFields(role: IdentifiedHiringRole, narrative: HiringTeamNarrative) {
+  const lists = narrativeLists(narrative);
+  return {
+    name: role.name,
+    targetTitles: role.likelyTitles,
+    department: role.department,
+    whyThisPersonaMatters: role.whyInvolved,
+    definition: narrative.overview.text,
+    responsibilities: joined(narrative.needs.map((item) => item.text)),
+    painPoints: joined(lists.painPoints),
+    desiredOutcomes: joined(narrative.needs.map((item) => item.text)),
+    messagingNotes: joined(lists.messagingNotes),
+    suggestionKey: role.roleKey,
+    interpretationPromptVersion: PERSONA_SYNTHESIS_PROMPT_VERSION,
+    setupStatus: "NEEDS_REVIEW" as const,
+    approvalStatus: "NEEDS_REVIEW" as const,
+  };
+}
+
+export async function syncApplicationHiringTeam(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const loaded = await loadApplication(input.organizationId, input.campaignId);
+  if (!loaded.job) return;
+  const { roles, modelNote } = await identifiedRoles({
+    job: loaded.job,
+    research: loaded.research,
+    includeResearch: loaded.includeResearch,
+  });
+  const excerpts = hiringTeamEvidenceExcerpts({
+    job: loaded.job,
+    research: loaded.research,
+    includeResearch: loaded.includeResearch,
+  });
+  const { narratives, modelNote: draftNote } = await narrativesFor({
+    roles,
+    job: loaded.job,
+    excerpts,
+  });
+  const note = draftNote ?? modelNote;
+  for (let index = 0; index < roles.length; index += 1) {
+    const role = roles[index]!;
+    const narrative = narratives[index]!;
     const existing = await prisma.persona.findFirst({
       where: {
         organizationId: input.organizationId,
-        campaignId: campaign.id,
-        personaTemplateId: template.id,
+        campaignId: loaded.campaign.id,
+        suggestionKey: role.roleKey,
         archivedAt: null,
       },
     });
-    const base = {
-      name: template.name,
-      targetTitles: titles,
-      department: template.department,
-      whyThisPersonaMatters: template.whyThisRoleMatters,
-      additionalContext: template.notes,
-      interpretationPromptVersion: PERSONA_SYNTHESIS_PROMPT_VERSION,
-      definition: null as string | null,
-      responsibilities: null as string | null,
-      painPoints: null as string | null,
-      desiredOutcomes: null as string | null,
-      messagingNotes: null as string | null,
-    };
-    let narrative: {
-      name?: string;
-      targetTitles?: string[];
-      department?: string | null;
-      whyThisPersonaMatters?: string | null;
-      additionalContext?: string | null;
-      definition?: string | null;
-      responsibilities?: string | null;
-      painPoints?: string | null;
-      desiredOutcomes?: string | null;
-      messagingNotes?: string | null;
-      profileJson?: Prisma.InputJsonValue;
-      setupStatus: "PARTIAL" | "FAILED" | "APPROVED";
-      approvalStatus?: "APPROVED";
-    } = {
-      setupStatus: "PARTIAL",
-      definition: null,
-      profileJson: {
-        includeResearch,
-        evidence: excerpts.map((excerpt) => ({
-          sourceId: excerpt.sourceId,
-          displayName: excerpt.displayName,
-          text: excerpt.text,
-        })),
-      },
-    };
-    if (!isPersonaAiConfigured()) {
-      narrative = {
-        ...narrative,
-        additionalContext: [template.notes, AI_UNCONFIGURED].filter(Boolean).join("\n"),
-      };
-    } else {
-      try {
-        const draft = await synthesizeRole({
-          roleName: template.name,
-          likelyTitles: titles,
-          department: template.department,
-          whyThisRoleMatters: template.whyThisRoleMatters,
-          notes: template.notes,
-          excerpts,
-          peers,
-        });
-        const keptTitles = likelyTitlesForTemplate({
-          templateKey: template.templateKey,
-          likelyTitles: draft.likelyTitles.length > 0 ? draft.likelyTitles : titles,
-          reportingLine: requirement.reportingLine,
-        });
-        narrative = {
-          name: draft.name.trim() || template.name,
-          targetTitles: keptTitles,
-          department: draft.departmentFunction ?? template.department,
-          definition: draft.roleSummary ?? null,
-          responsibilities: joined(draft.primaryResponsibilities),
-          painPoints: joined(draft.painPoints),
-          desiredOutcomes: joined(draft.desiredOutcomesFromSolution),
-          messagingNotes: draftMessaging(draft),
-          whyThisPersonaMatters:
-            draft.buyingRole ?? template.whyThisRoleMatters,
-          additionalContext: template.notes,
-          profileJson: {
-            includeResearch,
-            evidence: excerpts.map((excerpt) => ({
-              sourceId: excerpt.sourceId,
-              displayName: excerpt.displayName,
-              text: excerpt.text,
-            })),
-            personaDraft: draft,
-          } as unknown as Prisma.InputJsonValue,
-          setupStatus: "APPROVED",
-          approvalStatus: "APPROVED",
-        };
-      } catch (error) {
-        console.error(
-          JSON.stringify({
-            event: "hiring_team_synthesis_failed",
-            campaignId: campaign.id,
-            templateId: template.id,
-            message: error instanceof Error ? error.message : "unknown",
-          }),
-        );
-        narrative = {
-          setupStatus: "FAILED",
-          profileJson: {
-            includeResearch,
-            evidence: excerpts.map((excerpt) => ({
-              sourceId: excerpt.sourceId,
-              displayName: excerpt.displayName,
-              text: excerpt.text,
-            })),
-          },
-          additionalContext: [
-            template.notes,
-            `This ${vocab.persona.singular} could not be written from the job requirement. Try again after employer research.`,
-          ]
-            .filter(Boolean)
-            .join("\n"),
-        };
-      }
-    }
-
-    const saved = existing
-      ? await prisma.persona.update({
-          where: { id: existing.id },
-          data: { ...base, ...narrative },
-        })
-      : await prisma.persona.create({
-          data: {
-            organizationId: input.organizationId,
-            productId: campaign.productId,
-            campaignId: campaign.id,
-            personaTemplateId: template.id,
-            name: template.name,
-            targetTitles: titles,
-            department: template.department,
-            whyThisPersonaMatters: template.whyThisRoleMatters,
-            additionalContext: template.notes,
-            interpretationPromptVersion: PERSONA_SYNTHESIS_PROMPT_VERSION,
-            ...narrative,
-          },
-        });
-    peers.push({
-      id: saved.id,
-      name: saved.name,
-      painPoints: parsePersonaListField(saved.painPoints),
-      messagingNotes: parsePersonaListField(saved.messagingNotes),
+    if (existing && seekerEdited(existing.manuallyEditedFields)) continue;
+    const fields = personaFields(role, narrative);
+    const profileJson = profilePayload({
+      includeResearch: loaded.includeResearch,
+      excerpts,
+      role,
+      narrative,
+      modelNote: note,
     });
+    if (existing) {
+      await prisma.persona.update({
+        where: { id: existing.id },
+        data: { ...fields, profileJson },
+      });
+    } else {
+      await prisma.persona.create({
+        data: {
+          organizationId: input.organizationId,
+          productId: loaded.campaign.productId,
+          campaignId: loaded.campaign.id,
+          ...fields,
+          profileJson,
+        },
+      });
+    }
   }
 }
 
@@ -360,8 +348,173 @@ export async function addApplicationHiringTeamRole(input: {
       department: input.department,
       whyThisPersonaMatters: input.whyThisRoleMatters,
       additionalContext: input.notes,
-      setupStatus: "APPROVED",
+      setupStatus: "NEEDS_REVIEW",
+      approvalStatus: "NEEDS_REVIEW",
+      manuallyEditedFields: ["seeker"],
+    },
+    select: { id: true },
+  });
+  return { personaId: created.id };
+}
+
+export async function updateApplicationHiringTeamRole(input: {
+  organizationId: string;
+  campaignId: string;
+  personaId: string;
+  name: string;
+  likelyTitles: string[];
+  department: string | null;
+  whyThisRoleMatters: string | null;
+  notes: string | null;
+}): Promise<void> {
+  const name = input.name.trim();
+  if (!name) throw new TenantError(`${vocab.persona.Singular} name is required.`);
+  const persona = await requireRole(input);
+  await prisma.persona.update({
+    where: { id: persona.id },
+    data: {
+      name,
+      targetTitles: input.likelyTitles,
+      department: input.department,
+      whyThisPersonaMatters: input.whyThisRoleMatters,
+      additionalContext: input.notes,
+      manuallyEditedFields: ["seeker"],
+      approvalStatus: "NEEDS_REVIEW",
+      setupStatus: "NEEDS_REVIEW",
+    },
+  });
+}
+
+export async function approveApplicationHiringTeamRole(input: {
+  organizationId: string;
+  campaignId: string;
+  personaId: string;
+}): Promise<void> {
+  const persona = await requireRole(input);
+  await prisma.persona.update({
+    where: { id: persona.id },
+    data: {
       approvalStatus: "APPROVED",
+      setupStatus: "APPROVED",
+      approvedAt: new Date(),
+    },
+  });
+}
+
+export async function rebuildApplicationHiringTeamRole(input: {
+  organizationId: string;
+  campaignId: string;
+  personaId: string;
+}): Promise<void> {
+  const persona = await requireRole(input);
+  const loaded = await loadApplication(input.organizationId, input.campaignId);
+  if (!loaded.job) {
+    throw new TenantError(
+      `This ${vocab.campaign.singular} has no job requirement to rebuild from.`,
+    );
+  }
+  const { roles } = await identifiedRoles({
+    job: loaded.job,
+    research: loaded.research,
+    includeResearch: loaded.includeResearch,
+  });
+  const role =
+    roles.find((item) => item.roleKey === persona.suggestionKey) ??
+    roles.find((item) => item.name === persona.name) ?? {
+      roleKey: persona.suggestionKey ?? `custom_${persona.id}`,
+      name: persona.name,
+      likelyTitles: parseStringArray(persona.targetTitles),
+      department: persona.department,
+      involvement: "DIRECT" as const,
+      whyInvolved: persona.whyThisPersonaMatters ?? persona.name,
+      evidence: [
+        {
+          claim: persona.whyThisPersonaMatters ?? persona.name,
+          kind: "INFERENCE" as const,
+          sourceId: "job-requirement",
+        },
+      ],
+    };
+  const excerpts = hiringTeamEvidenceExcerpts({
+    job: loaded.job,
+    research: loaded.research,
+    includeResearch: loaded.includeResearch,
+  });
+  const peers = await prisma.persona.findMany({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      archivedAt: null,
+      id: { not: persona.id },
+    },
+    select: { id: true, name: true, painPoints: true, messagingNotes: true },
+  });
+  const base = draftHiringTeamRole(role, loaded.job);
+  const model = await draftRoleWithModel({
+    roleName: role.name,
+    likelyTitles: role.likelyTitles,
+    department: role.department,
+    whyThisRoleMatters: role.whyInvolved,
+    involvement: role.involvement,
+    notes: persona.additionalContext,
+    excerpts,
+    peers: peers.map((peer) => ({
+      id: peer.id,
+      name: peer.name,
+      painPoints: parsePersonaListField(peer.painPoints),
+      messagingNotes: parsePersonaListField(peer.messagingNotes),
+    })),
+  });
+  const narrative = model.ok ? applyModelDraft(base, model.draft, role) : base;
+  const fields = personaFields(role, narrative);
+  await prisma.persona.update({
+    where: { id: persona.id },
+    data: {
+      ...fields,
+      suggestionKey: persona.suggestionKey ?? role.roleKey,
+      manuallyEditedFields: [],
+      additionalContext: model.ok ? persona.additionalContext : model.message,
+      profileJson: profilePayload({
+        includeResearch: loaded.includeResearch,
+        excerpts,
+        role,
+        narrative,
+        modelNote: model.ok ? null : model.message.includes("not configured") ? null : model.message,
+      }),
+    },
+  });
+}
+
+export async function addTemplateToApplication(input: {
+  organizationId: string;
+  campaignId: string;
+  templateId: string;
+}): Promise<{ personaId: string }> {
+  const template = await prisma.personaTemplate.findFirst({
+    where: { id: input.templateId, organizationId: input.organizationId },
+  });
+  if (!template) throw new TenantError("That template was not found.");
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: { productId: true },
+  });
+  if (!campaign) {
+    throw new TenantError(`${vocab.campaign.Singular} was not found.`);
+  }
+  const created = await prisma.persona.create({
+    data: {
+      organizationId: input.organizationId,
+      productId: campaign.productId,
+      campaignId: input.campaignId,
+      personaTemplateId: template.id,
+      name: template.name,
+      targetTitles: template.likelyTitles ?? [],
+      department: template.department,
+      whyThisPersonaMatters: template.whyThisRoleMatters,
+      additionalContext: template.notes,
+      setupStatus: "NEEDS_REVIEW",
+      approvalStatus: "NEEDS_REVIEW",
+      manuallyEditedFields: ["seeker"],
     },
     select: { id: true },
   });
@@ -373,17 +526,7 @@ export async function removeApplicationHiringTeamRole(input: {
   campaignId: string;
   personaId: string;
 }): Promise<void> {
-  const persona = await prisma.persona.findFirst({
-    where: {
-      id: input.personaId,
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      archivedAt: null,
-    },
-  });
-  if (!persona) {
-    throw new TenantError(`${vocab.persona.Singular} was not found on this ${vocab.campaign.singular}.`);
-  }
+  const persona = await requireRole(input);
   try {
     await prisma.persona.delete({ where: { id: persona.id } });
   } catch (error) {
@@ -421,4 +564,25 @@ export async function savePersonaAsTemplate(input: {
     select: { id: true },
   });
   return { templateId: created.id };
+}
+
+async function requireRole(input: {
+  organizationId: string;
+  campaignId: string;
+  personaId: string;
+}) {
+  const persona = await prisma.persona.findFirst({
+    where: {
+      id: input.personaId,
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      archivedAt: null,
+    },
+  });
+  if (!persona) {
+    throw new TenantError(
+      `${vocab.persona.Singular} was not found on this ${vocab.campaign.singular}.`,
+    );
+  }
+  return persona;
 }

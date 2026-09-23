@@ -3,8 +3,12 @@
 import { revalidatePath } from "next/cache";
 import {
   addApplicationHiringTeamRole,
+  addTemplateToApplication,
+  approveApplicationHiringTeamRole,
+  rebuildApplicationHiringTeamRole,
   removeApplicationHiringTeamRole,
   savePersonaAsTemplate,
+  updateApplicationHiringTeamRole,
 } from "@/lib/hiring-team/build";
 import {
   createPersonaTemplate,
@@ -108,6 +112,95 @@ export async function addApplicationRoleAction(
     });
     revalidatePath(`/campaigns/${campaignId}`);
     return { ok: true, message: `${vocab.persona.Singular} added.` };
+  } catch (error) {
+    return fail(error, `The ${vocab.persona.singular} could not be added.`);
+  }
+}
+
+export async function updateApplicationRoleAction(
+  _prev: HiringTeamActionResult | null,
+  formData: FormData,
+): Promise<HiringTeamActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    const personaId = String(formData.get("personaId") ?? "").trim();
+    if (!campaignId || !personaId) {
+      return { ok: false, message: `${vocab.persona.Singular} was not found.` };
+    }
+    await updateApplicationHiringTeamRole({
+      organizationId,
+      campaignId,
+      personaId,
+      name: String(formData.get("name") ?? ""),
+      likelyTitles: lines(formData.get("likelyTitles")),
+      department: optional(formData.get("department")),
+      whyThisRoleMatters: optional(formData.get("whyThisRoleMatters")),
+      notes: optional(formData.get("notes")),
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: `${vocab.persona.Singular} updated.` };
+  } catch (error) {
+    return fail(error, `The ${vocab.persona.singular} could not be updated.`);
+  }
+}
+
+export async function approveApplicationRoleAction(
+  _prev: HiringTeamActionResult | null,
+  formData: FormData,
+): Promise<HiringTeamActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    const personaId = String(formData.get("personaId") ?? "").trim();
+    if (!campaignId || !personaId) {
+      return { ok: false, message: `${vocab.persona.Singular} was not found.` };
+    }
+    await approveApplicationHiringTeamRole({ organizationId, campaignId, personaId });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: `${vocab.persona.Singular} approved.` };
+  } catch (error) {
+    return fail(error, `The ${vocab.persona.singular} could not be approved.`);
+  }
+}
+
+export async function rebuildApplicationRoleAction(
+  _prev: HiringTeamActionResult | null,
+  formData: FormData,
+): Promise<HiringTeamActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    const personaId = String(formData.get("personaId") ?? "").trim();
+    if (!campaignId || !personaId) {
+      return { ok: false, message: `${vocab.persona.Singular} was not found.` };
+    }
+    await rebuildApplicationHiringTeamRole({ organizationId, campaignId, personaId });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: `${vocab.persona.Singular} rebuilt from the job.` };
+  } catch (error) {
+    return fail(error, `The ${vocab.persona.singular} could not be rebuilt.`);
+  }
+}
+
+export async function addTemplateRoleAction(
+  _prev: HiringTeamActionResult | null,
+  formData: FormData,
+): Promise<HiringTeamActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    const templateId = String(formData.get("templateId") ?? "").trim();
+    if (!campaignId || !templateId) {
+      return { ok: false, message: "Choose a saved template." };
+    }
+    await addTemplateToApplication({ organizationId, campaignId, templateId });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: `${vocab.persona.Singular} added from the template.` };
   } catch (error) {
     return fail(error, `The ${vocab.persona.singular} could not be added.`);
   }
