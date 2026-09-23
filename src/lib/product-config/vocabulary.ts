@@ -23,12 +23,15 @@ export type NounForms = Readonly<{
   aSingular: string;
   /** "A campaign" / "An ICP" */
   ASingular: string;
+  /** Sidebar / tab label when it is not the plural form. */
+  nav: string;
 }>;
 
 type NounSpec = {
   singular: string;
   plural: string;
   article: "a" | "an";
+  nav?: string;
 };
 
 function capitalizeFirst(value: string): string {
@@ -52,24 +55,49 @@ function noun(spec: NounSpec): NounForms {
     TitlePlural: titleCase(spec.plural),
     aSingular: `${spec.article} ${spec.singular}`,
     ASingular: `${capitalizeFirst(spec.article)} ${spec.singular}`,
+    nav: spec.nav ?? capitalizeFirst(spec.plural),
   });
 }
 
 export const vocab = Object.freeze({
-  product: noun({ singular: "product", plural: "products", article: "a" }),
-  icp: noun({ singular: "ICP", plural: "ICPs", article: "an" }),
+  product: noun({
+    singular: "profile",
+    plural: "profiles",
+    article: "a",
+    nav: "Profile",
+  }),
+  icp: noun({
+    singular: "Target Employer profile",
+    plural: "Target Employer profiles",
+    article: "a",
+    nav: "Target Employers",
+  }),
   idealCustomer: noun({
-    singular: "ideal customer",
-    plural: "ideal customers",
+    singular: "target employer",
+    plural: "target employers",
+    article: "a",
+  }),
+  persona: noun({
+    singular: "Hiring Team role",
+    plural: "Hiring Team roles",
+    article: "a",
+    nav: "Hiring Team",
+  }),
+  campaign: noun({
+    singular: "application",
+    plural: "applications",
     article: "an",
   }),
-  persona: noun({ singular: "persona", plural: "personas", article: "a" }),
-  campaign: noun({ singular: "campaign", plural: "campaigns", article: "a" }),
   list: noun({ singular: "list", plural: "lists", article: "a" }),
   contact: noun({ singular: "contact", plural: "contacts", article: "a" }),
   sequence: noun({ singular: "sequence", plural: "sequences", article: "a" }),
-  prospect: noun({ singular: "prospect", plural: "prospects", article: "a" }),
-  buyer: noun({ singular: "buyer", plural: "buyers", article: "a" }),
+  prospect: noun({ singular: "contact", plural: "contacts", article: "a" }),
+  buyer: noun({
+    singular: "Hiring Team role",
+    plural: "Hiring Team roles",
+    article: "a",
+    nav: "Hiring Team",
+  }),
   customer: noun({ singular: "customer", plural: "customers", article: "a" }),
   valueProposition: noun({
     singular: "value proposition",
@@ -91,8 +119,8 @@ export const vocab = Object.freeze({
   demo: noun({ singular: "demo", plural: "demos", article: "a" }),
   outbound: noun({ singular: "outbound", plural: "outbound", article: "an" }),
   outreach: noun({ singular: "outreach", plural: "outreach", article: "an" }),
-  /** A company the user sells to (not a login account). */
-  account: noun({ singular: "account", plural: "accounts", article: "an" }),
+  /** A company the user is pursuing (not a login account). */
+  account: noun({ singular: "employer", plural: "employers", article: "an" }),
   rep: noun({ singular: "rep", plural: "reps", article: "a" }),
   sales: noun({ singular: "sales", plural: "sales", article: "a" }),
   salesperson: noun({

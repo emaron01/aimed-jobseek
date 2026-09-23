@@ -81,7 +81,7 @@ export default async function ManagePersonaPage({ params }: PageProps) {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title={persona.name}
-        description={`${vocab.buyer.Singular} role for ${product.name}.`}
+        description={`${vocab.persona.Singular} for ${product.name}.`}
         actions={
           <Link
             href={`/setup/${product.id}`}

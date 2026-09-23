@@ -21,7 +21,7 @@ export default async function PersonasPage({
       <div>
         <PageHeader
           title={vocab.persona.Plural}
-          description={`${vocab.buyer.Singular} ${vocab.persona.plural} across your ${vocab.product.plural}.`}
+          description={`${vocab.persona.Plural} across your ${vocab.product.plural}.`}
         />
         <TenantMissing />
       </div>
@@ -78,7 +78,7 @@ export default async function PersonasPage({
       {personas.length === 0 ? (
         <EmptyState
           title={`No ${vocab.persona.plural} yet`}
-          description={`${vocab.persona.ASingular} is ${vocab.buyer.aSingular} role you score and email against — titles, responsibilities, and discriminators that separate good fits from bad ones.`}
+          description={`${vocab.persona.ASingular} is someone you score and email against — titles, responsibilities, and discriminators that separate good fits from bad ones.`}
           actions={
             canCreate ? (
               <Link

@@ -397,7 +397,7 @@ function NewPersonaForm({
             name="definition"
             as="textarea"
             placeholder="The executive responsible for…"
-            hint={`Authoritative ${vocab.buyer.singular}-role narrative. Preserved as source data.`}
+            hint={`Authoritative ${vocab.buyer.singular} narrative. Preserved as source data.`}
           />
         </div>
         <div className="md:col-span-2">
@@ -639,7 +639,7 @@ export function PersonaForm({
                 defaultValue={persona.definition ?? persona.responsibilities}
                 as="textarea"
                 placeholder="The executive responsible for…"
-                hint={`Authoritative ${vocab.buyer.singular}-role narrative. Preserved as source data.`}
+                hint={`Authoritative ${vocab.buyer.singular} narrative. Preserved as source data.`}
               />
             </div>
             <div className="md:col-span-2">

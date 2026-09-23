@@ -67,7 +67,7 @@ export async function buildPersonaFromBuyerRoleAction(
     const notes = String(formData.get("notes") || "").trim();
 
     if (!productId || !name) {
-      return { ok: false, message: `${vocab.product.Singular} and ${vocab.buyer.singular} role name are required.` };
+      return { ok: false, message: `${vocab.product.Singular} and ${vocab.buyer.singular} name are required.` };
     }
 
     const buyerRole: SuggestedBuyerRole = {

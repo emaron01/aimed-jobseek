@@ -463,7 +463,7 @@ export async function resynthesizePersonaFromRun(input: {
 
   const buyerRole = prior.selectedBuyerRoleJson as SuggestedBuyerRole | null;
   if (!buyerRole?.name) {
-    throw new TenantError(`Prior run has no selected ${vocab.buyer.singular} role.`);
+    throw new TenantError(`Prior run has no selected ${vocab.buyer.singular}.`);
   }
 
   let productEvidence: EvidenceExcerpt[] = [];

@@ -70,7 +70,7 @@ export default async function ScoreListPage({ params, searchParams }: PageProps)
         title={
           campaign ? `Score for ${campaign.name}: ${list.name}` : `Score: ${list.name}`
         }
-        description={`Select ${vocab.product.Singular} → ${vocab.icp.singular} → ${vocab.persona.Singular}. Default is All ${vocab.persona.plural} so mixed ${vocab.list.plural} are scored against every ${vocab.buyer.singular} role.`}
+        description={`Select ${vocab.product.Singular} → ${vocab.icp.singular} → ${vocab.persona.Singular}. Default is All ${vocab.persona.plural} so mixed ${vocab.list.plural} are scored against every ${vocab.buyer.singular}.`}
         actions={
           <Link
             href={listDetailHref(id, { campaignId: campaign?.id })}

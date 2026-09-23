@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { vocab } from "@/lib/product-config";
 import {
   buildProductResynthesisApplyPlan,
   mergeProtectedProductDraftFields,
@@ -37,7 +38,7 @@ describe("buildProductResynthesisApplyPlan", () => {
     expect(plan.preserved.some((item) => item.label === "Value proposition")).toBe(
       true,
     );
-    expect(plan.preserved.some((item) => item.label === "Product id")).toBe(true);
+    expect(plan.preserved.some((item) => item.label === `${vocab.product.Singular} id`)).toBe(true);
     expect(plan.fieldDiffs.map((d) => d.field)).not.toContain("valueProposition");
     expect(plan.replaced.some((item) => item.label === "Description")).toBe(true);
   });

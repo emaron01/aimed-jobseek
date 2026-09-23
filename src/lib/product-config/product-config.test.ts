@@ -17,10 +17,16 @@ import {
 
 describe("vocabulary", () => {
   it("exposes typed noun forms used in the UI", () => {
-    expect(vocab.campaign.singular).toBe("campaign");
-    expect(vocab.campaign.Plural).toBe("Campaigns");
-    expect(vocab.icp.aSingular).toBe("an ICP");
-    expect(vocab.persona.Singular).toBe("Persona");
+    expect(vocab.campaign.singular).toBe("application");
+    expect(vocab.campaign.Plural).toBe("Applications");
+    expect(vocab.campaign.aSingular).toBe("an application");
+    expect(vocab.icp.aSingular).toBe("a Target Employer profile");
+    expect(vocab.icp.nav).toBe("Target Employers");
+    expect(vocab.persona.singular).toBe("Hiring Team role");
+    expect(vocab.persona.nav).toBe("Hiring Team");
+    expect(vocab.product.nav).toBe("Profile");
+    expect(vocab.prospect.plural).toBe("contacts");
+    expect(vocab.account.singular).toBe("employer");
     expect(nounForCount(1, vocab.contact)).toBe("contact");
     expect(countedNoun(3, vocab.contact)).toBe("3 contacts");
   });
@@ -44,10 +50,19 @@ describe("brand", () => {
 });
 
 describe("feature flags", () => {
-  it("keeps every flag enabled", () => {
-    for (const flag of FEATURE_FLAGS) {
-      expect(features[flag]).toBe(true);
-    }
+  it("hides team and sales-plan UI while keeping lists and referrals", () => {
+    expect(features.listImport).toBe(true);
+    expect(features.listBulkValidation).toBe(true);
+    expect(features.listBulkScoring).toBe(true);
+    expect(features.referralProgram).toBe(true);
+    expect(features.teamSeats).toBe(false);
+    expect(features.teamInvites).toBe(false);
+    expect(features.teamRoles).toBe(false);
+    expect(features.teamMemberManagement).toBe(false);
+    expect(features.contactSales).toBe(false);
+    expect(features.teamPlanDisplay).toBe(false);
+    expect(features.enterprisePlanDisplay).toBe(false);
+    expect(FEATURE_FLAGS).toContain("teamSeats");
   });
 });
 

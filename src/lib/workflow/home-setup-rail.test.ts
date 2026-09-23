@@ -23,42 +23,11 @@ describe("home setup rail", () => {
     expect(campaignRail).toContain('bg-emerald-600 text-white');
   });
 
-  it("explains product gaps instead of a bare count", () => {
+  it("explains profile approval gaps instead of a bare count", () => {
     const steps = buildHomeSetupRail({
       voice: voiceReadiness(0),
       productTotal: 2,
-      productReadyCount: 1,
-      productIncomplete: [
-        getProductCampaignReadiness({
-          approvalStatus: "APPROVED",
-          icps: [{ criteria: [{ id: "c1" }] }],
-          personas: [],
-        }),
-      ],
-      listCount: 3,
-      contactCount: 40,
-      emailConnected: false,
-      emailReconnectRequired: false,
-    });
-    const products = steps.find((step) => step.key === "products");
-    expect(products?.completed).toBe(true);
-    expect(products?.detail).toBe(
-      `${countedNoun(2, vocab.product)} · 1 needs ${vocab.persona.aSingular}`,
-    );
-    expect(steps.find((step) => step.key === "voice")?.detail).toBe(
-      "No samples yet",
-    );
-    expect(steps.find((step) => step.key === "email")?.detail).toBe(
-      "Not connected",
-    );
-    expect(resolveHomeSetupFocus(steps)).toBe("voice");
-  });
-
-  it("treats unapproved products as incomplete with approval gap text", () => {
-    const steps = buildHomeSetupRail({
-      voice: voiceReadiness(3),
-      productTotal: 2,
-      productReadyCount: 1,
+      productApprovedCount: 1,
       productIncomplete: [
         getProductCampaignReadiness({
           approvalStatus: "NEEDS_REVIEW",
@@ -66,9 +35,8 @@ describe("home setup rail", () => {
           personas: [{ id: "p1" }],
         }),
       ],
-      listCount: 1,
-      contactCount: 1,
-      emailConnected: true,
+      icpCount: 1,
+      emailConnected: false,
       emailReconnectRequired: false,
     });
     const products = steps.find((step) => step.key === "products");
@@ -76,13 +44,22 @@ describe("home setup rail", () => {
     expect(products?.detail).toBe(
       `${countedNoun(2, vocab.product)} · 1 needs approval`,
     );
+    expect(steps.find((step) => step.key === "voice")?.detail).toBe(
+      "No samples yet",
+    );
+    expect(steps.find((step) => step.key === "email")?.detail).toBe(
+      "Not connected",
+    );
+    expect(steps.map((step) => step.key)).not.toContain("lists");
+    expect(steps.map((step) => step.key)).not.toContain("contacts");
+    expect(resolveHomeSetupFocus(steps)).toBe("voice");
   });
 
-  it("does not mark Products complete until a campaign-ready product exists", () => {
+  it("does not mark Profile complete until a profile is approved", () => {
     const steps = buildHomeSetupRail({
       voice: voiceReadiness(3),
       productTotal: 1,
-      productReadyCount: 0,
+      productApprovedCount: 0,
       productIncomplete: [
         getProductCampaignReadiness({
           approvalStatus: "NEEDS_REVIEW",
@@ -90,8 +67,7 @@ describe("home setup rail", () => {
           personas: [{ id: "p1" }],
         }),
       ],
-      listCount: 1,
-      contactCount: 1,
+      icpCount: 1,
       emailConnected: true,
       emailReconnectRequired: false,
     });
@@ -103,14 +79,37 @@ describe("home setup rail", () => {
     expect(resolveHomeSetupFocus(steps)).toBe("products");
   });
 
+  it("lists Target Employers as a rail step and omits Lists and Contacts", () => {
+    const steps = buildHomeSetupRail({
+      voice: voiceReadiness(3),
+      productTotal: 1,
+      productApprovedCount: 1,
+      productIncomplete: [],
+      icpCount: 0,
+      emailConnected: true,
+      emailReconnectRequired: false,
+    });
+    expect(steps.map((step) => step.key)).toEqual([
+      "voice",
+      "products",
+      "icps",
+      "email",
+    ]);
+    expect(steps.find((step) => step.key === "icps")).toMatchObject({
+      label: vocab.icp.nav,
+      href: "/icps",
+      completed: false,
+    });
+    expect(resolveHomeSetupFocus(steps)).toBe("icps");
+  });
+
   it("stays visible and focused on the last step when everything is green", () => {
     const steps = buildHomeSetupRail({
       voice: voiceReadiness(3),
       productTotal: 1,
-      productReadyCount: 1,
+      productApprovedCount: 1,
       productIncomplete: [],
-      listCount: 1,
-      contactCount: 10,
+      icpCount: 2,
       emailConnected: true,
       emailReconnectRequired: false,
     });
@@ -119,8 +118,7 @@ describe("home setup rail", () => {
     expect(steps.map((step) => step.href)).toEqual([
       "/settings/voice",
       "/products",
-      "/lists",
-      "/contacts",
+      "/icps",
       "/settings/email",
     ]);
   });

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
+import { vocab } from "@/lib/product-config";
 import type { EmailGenerationContext } from "@/lib/email-generation/context";
 import {
   additionalGuidanceRejection,
@@ -1661,7 +1662,7 @@ describe.skipIf(!hasDatabase)(
       );
       await expect(
         loadEmailGenerationContext(undecidedCampaignContact.id, userAId),
-      ).rejects.toThrow(/choose a persona/i);
+      ).rejects.toThrow(new RegExp(`choose ${vocab.persona.aSingular}`, "i"));
     });
 
     it("uses ContactScore.matchedPersonaId instead of the campaign fallback when present", async () => {

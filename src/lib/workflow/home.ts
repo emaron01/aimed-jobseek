@@ -84,7 +84,7 @@ export async function getHomeWorkflow(
     canViewAllRepWork?: boolean;
   },
 ): Promise<HomeWorkflow> {
-  const [products, campaigns, dueByCampaign, listCount, contactCount, mailbox] =
+  const [products, campaigns, dueByCampaign, mailbox] =
     await Promise.all([
       prisma.product.findMany({
         where: { organizationId, archivedAt: null },
@@ -150,24 +150,6 @@ export async function getHomeWorkflow(
             includeArchived: options.includeArchived,
           })
         : Promise.resolve([] as CampaignDueSummary[]),
-      prisma.contactList.count({
-        where: {
-          organizationId,
-          ...(options?.userId && !options.canViewAllRepWork
-            ? { ownerUserId: options.userId }
-            : {}),
-          archivedAt: null,
-        },
-      }),
-      prisma.contact.count({
-        where: {
-          organizationId,
-          ...(options?.userId && !options.canViewAllRepWork
-            ? { ownerUserId: options.userId }
-            : {}),
-          archivedAt: null,
-        },
-      }),
       options?.userId
         ? getMailboxConnectionView({
             organizationId,
@@ -236,13 +218,15 @@ export async function getHomeWorkflow(
     .map((product) => getProductCampaignReadiness(product));
 
   const voice = voiceReadiness(voiceSampleCount);
+  const approvedProducts = products.filter(
+    (product) => product.approvalStatus === "APPROVED",
+  );
   const setupRail = buildHomeSetupRail({
     voice,
     productTotal: products.length,
-    productReadyCount: completeProducts.length,
+    productApprovedCount: approvedProducts.length,
     productIncomplete: productIncompleteForRail,
-    listCount,
-    contactCount,
+    icpCount: totalIcps,
     emailConnected: mailbox?.status === "CONNECTED",
     emailReconnectRequired: mailbox?.status === "RECONNECT_REQUIRED",
   });
@@ -308,7 +292,7 @@ export async function getHomeWorkflow(
       label: personasDone ? "Saved" : "Not started",
       detail: personasDone
         ? `${activeProduct!.personas.length} saved`
-        : `Build at least one ${vocab.buyer.singular} ${vocab.persona.singular}`,
+        : `Build at least one ${vocab.persona.singular}`,
       actionLabel: personasDone ? `Manage ${vocab.persona.plural}` : `Build ${vocab.persona.singular}`,
       href: activeProduct
         ? `/setup/${activeProduct.id}#personas`

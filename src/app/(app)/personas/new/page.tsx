@@ -19,7 +19,7 @@ export default async function NewPersonaPage({
       <div>
         <PageHeader
           title={`New ${vocab.persona.singular}`}
-          description={`Build ${vocab.buyer.aSingular} ${vocab.persona.singular}.`}
+          description={`Build ${vocab.persona.aSingular}.`}
         />
         <TenantMissing />
       </div>

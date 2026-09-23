@@ -235,7 +235,7 @@ export function SuggestedBuyerRolesPanel({
         className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
         data-testid="suggested-buyer-roles-locked"
       >
-        Save and approve the {vocab.product.Singular} first. Suggested {vocab.buyer.singular} roles become
+        Save and approve the {vocab.product.Singular} first. Suggested {vocab.buyer.plural} become
         available for building {vocab.persona.Plural} after {vocab.product.Singular} approval.
       </div>
     );
@@ -245,7 +245,7 @@ export function SuggestedBuyerRolesPanel({
     <div className="space-y-4" data-testid="suggested-buyer-roles">
       <div>
         <h3 className="text-lg font-semibold text-slate-900">
-          Suggested {vocab.buyer.Singular} Roles
+          Suggested {vocab.buyer.plural}
         </h3>
         <p className="mt-1 text-sm text-slate-600">
           Recommendations only — not {vocab.persona.Plural} yet. Build one {vocab.persona.Singular} at a time.

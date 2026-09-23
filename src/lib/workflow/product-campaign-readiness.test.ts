@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getProductCampaignReadiness } from "@/lib/workflow/product-campaign-readiness";
+import { vocab } from "@/lib/product-config";
+import {
+  getProductCampaignReadiness,
+  PRODUCT_READINESS_BLOCKERS,
+} from "@/lib/workflow/product-campaign-readiness";
 
 describe("getProductCampaignReadiness", () => {
   const complete = {
@@ -22,7 +26,7 @@ describe("getProductCampaignReadiness", () => {
       approvalStatus: "NEEDS_REVIEW",
     });
     expect(result.ready).toBe(false);
-    expect(result.blockers).toContain("Product needs review and approval");
+    expect(result.blockers).toContain(PRODUCT_READINESS_BLOCKERS.needsReview);
   });
 
   it("requires an ICP with criteria rows", () => {
@@ -31,7 +35,7 @@ describe("getProductCampaignReadiness", () => {
       icps: [{ criteria: [] }],
     });
     expect(result.ready).toBe(false);
-    expect(result.blockers).toContain("Needs an ICP with criteria");
+    expect(result.blockers).toContain(PRODUCT_READINESS_BLOCKERS.needsIcp);
   });
 
   it("requires at least one persona", () => {
@@ -40,7 +44,7 @@ describe("getProductCampaignReadiness", () => {
       personas: [],
     });
     expect(result.ready).toBe(false);
-    expect(result.blockers).toContain("Needs at least one saved persona");
+    expect(result.blockers).toContain(PRODUCT_READINESS_BLOCKERS.needsPersona);
   });
 
   it("lists every blocker when multiple are missing", () => {
@@ -52,7 +56,7 @@ describe("getProductCampaignReadiness", () => {
     expect(result.ready).toBe(false);
     expect(result.blockers).toHaveLength(3);
     expect(result.omissionReason).toContain("draft");
-    expect(result.omissionReason).toContain("ICP");
-    expect(result.omissionReason).toContain("persona");
+    expect(result.omissionReason).toContain(vocab.icp.singular);
+    expect(result.omissionReason).toContain(vocab.persona.singular);
   });
 });

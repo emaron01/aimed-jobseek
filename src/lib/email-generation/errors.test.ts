@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { vocab } from "@/lib/product-config";
 import {
   AiProviderError,
   AiValidationError,
@@ -28,7 +29,7 @@ describe("email generation error observability", () => {
       },
     );
     expect(toSafeEmailGenerationError(error)).toBe(
-      "[VALIDATION] Generated copy conflicts with product restrictions: Generated copy repeats a prohibited claim: Guaranteed revenue growth",
+      `[VALIDATION] Generated copy conflicts with ${vocab.product.singular} restrictions: Generated copy repeats a prohibited claim: Guaranteed revenue growth`,
     );
     const classified = classifyEmailGenerationError(error);
     expect(classified.stage).toBe("claimValidation");

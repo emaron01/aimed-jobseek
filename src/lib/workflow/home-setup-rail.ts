@@ -8,13 +8,12 @@ import {
   PRODUCT_READINESS_BLOCKERS,
   type ProductCampaignReadiness,
 } from "@/lib/workflow/product-campaign-readiness";
-import { anyListFeatureEnabled, countedNoun, vocab } from "@/lib/product-config";
+import { countedNoun, vocab } from "@/lib/product-config";
 
 export const HOME_SETUP_STEP_KEYS = [
   "voice",
   "products",
-  "lists",
-  "contacts",
+  "icps",
   "email",
 ] as const;
 
@@ -49,12 +48,23 @@ function shortProductGap(readiness: ProductCampaignReadiness): string {
   return "needs setup";
 }
 
+function isProfileApprovalGap(readiness: ProductCampaignReadiness): boolean {
+  return readiness.blockers.some(
+    (blocker) =>
+      blocker === PRODUCT_READINESS_BLOCKERS.needsReview ||
+      blocker === PRODUCT_READINESS_BLOCKERS.draft ||
+      blocker === PRODUCT_READINESS_BLOCKERS.notApproved ||
+      blocker === PRODUCT_READINESS_BLOCKERS.notStarted,
+  );
+}
+
 function productsDetail(input: {
   total: number;
   readyCount: number;
   incomplete: ProductCampaignReadiness[];
 }): string {
-  const { total, readyCount, incomplete } = input;
+  const { total, readyCount } = input;
+  const incomplete = input.incomplete.filter(isProfileApprovalGap);
   if (total === 0) return `No ${vocab.product.plural} yet`;
 
   const productWord = countedNoun(total, vocab.product);
@@ -62,7 +72,7 @@ function productsDetail(input: {
     return readyCount === 1 ? `1 ${vocab.product.singular} ready` : `${readyCount} ${vocab.product.plural} ready`;
   }
 
-  // Group identical gaps: "1 needs a persona", "2 need an ICP"
+  // Group identical gaps: "1 needs approval", "2 need a Target Employer profile"
   const gapCounts = new Map<string, number>();
   for (const readiness of incomplete) {
     const gap = shortProductGap(readiness);
@@ -85,11 +95,10 @@ function productsDetail(input: {
 export function buildHomeSetupRail(input: {
   voice: ReturnType<typeof voiceReadiness>;
   productTotal: number;
-  /** Same readiness as New campaign: approved + ICP with criteria + persona. */
-  productReadyCount: number;
+  /** Approved profiles — Target Employers is a separate rail step. */
+  productApprovedCount: number;
   productIncomplete: ProductCampaignReadiness[];
-  listCount: number;
-  contactCount: number;
+  icpCount: number;
   emailConnected: boolean;
   emailReconnectRequired: boolean;
 }): HomeSetupStep[] {
@@ -120,37 +129,26 @@ export function buildHomeSetupRail(input: {
       key: "products",
       label: vocab.product.Plural,
       href: "/products",
-      completed: input.productReadyCount > 0,
+      completed: input.productApprovedCount > 0,
       detail: productsDetail({
         total: input.productTotal,
-        readyCount: input.productReadyCount,
+        readyCount: input.productApprovedCount,
         incomplete: input.productIncomplete,
       }),
     },
     {
       number: 3,
-      key: "lists",
-      label: vocab.list.Plural,
-      href: "/lists",
-      completed: input.listCount > 0,
+      key: "icps",
+      label: vocab.icp.nav,
+      href: "/icps",
+      completed: input.icpCount > 0,
       detail:
-        input.listCount === 0
-          ? `No ${vocab.list.plural} yet`
-          : countedNoun(input.listCount, vocab.list),
+        input.icpCount === 0
+          ? `No ${vocab.icp.plural} yet`
+          : countedNoun(input.icpCount, vocab.icp),
     },
     {
       number: 4,
-      key: "contacts",
-      label: vocab.contact.Plural,
-      href: "/contacts",
-      completed: input.contactCount > 0,
-      detail:
-        input.contactCount === 0
-          ? `No ${vocab.contact.plural} yet`
-          : countedNoun(input.contactCount, vocab.contact),
-    },
-    {
-      number: 5,
       key: "email",
       label: "Email connection",
       href: "/settings/email",
@@ -158,10 +156,7 @@ export function buildHomeSetupRail(input: {
       detail: emailDetail,
     },
   ];
-  const visible = anyListFeatureEnabled()
-    ? steps
-    : steps.filter((step) => step.key !== "lists");
-  return visible.map((step, index) => ({ ...step, number: index + 1 }));
+  return steps;
 }
 
 /** First incomplete step, or the last step when everything is green. */

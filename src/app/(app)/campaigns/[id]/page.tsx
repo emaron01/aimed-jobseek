@@ -657,7 +657,7 @@ export default async function CampaignDetailPage({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-medium text-slate-900">
-                  {vocab.campaign.Singular} email settings
+                  {vocab.campaign.Singular} guidance
                 </p>
                 <p className="mt-0.5 text-xs text-slate-600">
                   Default length and {vocab.campaign.singular}-specific guidance. Length can be

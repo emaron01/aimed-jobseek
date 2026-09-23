@@ -76,7 +76,7 @@ export default async function NewPersonaPage({
         description={
           role
             ? `Reuses ${vocab.product.Singular} evidence. Runs ${vocab.persona.Singular} research only when the role is ambiguous or thin.`
-            : `Name the ${vocab.buyer.singular} role and add any context you have. Synthesis builds the ${vocab.persona.singular} from ${vocab.product.singular} evidence and peer differentiation — then you review and edit.`
+            : `Name the ${vocab.buyer.singular} and add any context you have. Synthesis builds the ${vocab.persona.singular} from ${vocab.product.singular} evidence and peer differentiation — then you review and edit.`
         }
         actions={
           <Link

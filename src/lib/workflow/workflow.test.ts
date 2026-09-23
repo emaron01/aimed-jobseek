@@ -166,7 +166,7 @@ describe("home workflow", () => {
     expect(result.icp.done).toBe(true);
     expect(result.icp.count).toBe(2);
     expect(result.icp.detail).toBe("2 saved");
-    expect(result.icp.actionLabel).toBe("Review ICPs");
+    expect(result.icp.actionLabel).toBe(`Review ${vocab.icp.plural}`);
     expect(result.icp.href).toBe("/setup/product_1/icps");
   });
 
@@ -188,7 +188,9 @@ describe("home workflow", () => {
     expect(result.campaignProducts[0]).toMatchObject({
       id: "product_1",
       ready: false,
-      blockers: expect.arrayContaining(["Needs an ICP with criteria"]),
+      blockers: expect.arrayContaining([
+        `Needs ${vocab.icp.aSingular} with criteria`,
+      ]),
     });
     expect(result.icp.done).toBe(false);
     expect(result.icp.label).toBe("Not started");
@@ -388,24 +390,22 @@ describe("workflow view contracts", () => {
     expect(stages.map((stage) => stage.key)).not.toContain("send");
   });
 
-  it("renders Lists on the Home setup rail; campaigns stay listed when setup is incomplete", () => {
-    // Incomplete-setup campaign data: "still returns existing campaigns…" above.
-    // Smoke `/` only asserts the sidebar shell — not Home→Lists. Prove the link
-    // in rendered markup (setup rail owns Lists; header also keeps a Lists nav).
+  it("renders Target Employers on the Home setup rail; lists stay in nav only", () => {
     const steps = buildHomeSetupRail({
       voice: voiceReadiness(0),
       productTotal: 0,
-      productReadyCount: 0,
+      productApprovedCount: 0,
       productIncomplete: [],
-      listCount: 0,
-      contactCount: 0,
+      icpCount: 0,
       emailConnected: false,
       emailReconnectRequired: false,
     });
-    expect(steps.find((step) => step.key === "lists")).toMatchObject({
-      label: vocab.list.Plural,
-      href: "/lists",
+    expect(steps.find((step) => step.key === "icps")).toMatchObject({
+      label: vocab.icp.nav,
+      href: "/icps",
     });
+    expect(steps.map((step) => step.key)).not.toContain("lists");
+    expect(steps.map((step) => step.key)).not.toContain("contacts");
 
     const railHtml = renderToStaticMarkup(
       createElement(HomeSetupRail, {
@@ -413,8 +413,9 @@ describe("workflow view contracts", () => {
         focusKey: resolveHomeSetupFocus(steps),
       }),
     );
-    expect(railHtml).toContain('href="/lists"');
-    expect(railHtml).toContain(`>${vocab.list.Plural}<`);
+    expect(railHtml).toContain('href="/icps"');
+    expect(railHtml).toContain(`>${vocab.icp.nav}<`);
+    expect(railHtml).not.toContain('href="/lists"');
     expect(railHtml).toContain('aria-label="Setup"');
 
     const page = readFileSync("src/app/(app)/page.tsx", "utf8");

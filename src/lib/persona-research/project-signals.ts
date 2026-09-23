@@ -754,7 +754,7 @@ export function projectPersonaSignalsToCriteria(
     pushUnique({
       name: normalized.name,
       criterionType: normalized.criterionType,
-      description: `Positive role signal — evidence this ${vocab.buyer.singular} role fits.`,
+      description: `Positive role signal — evidence this ${vocab.buyer.singular} fits.`,
       operator: "EXISTS",
       importance: "HIGH",
       isRequired: normalized.isRequired ?? false,
@@ -783,7 +783,7 @@ export function projectPersonaSignalsToCriteria(
     pushUnique({
       name: normalized.name,
       criterionType: normalized.criterionType,
-      description: `Negative role signal — evidence against this ${vocab.buyer.singular} role.`,
+      description: `Negative role signal — evidence against this ${vocab.buyer.singular}.`,
       operator: "EXISTS",
       importance: "CRITICAL",
       isRequired: false,
@@ -807,7 +807,7 @@ export function projectPersonaSignalsToCriteria(
     pushUnique({
       name: normalized.name,
       criterionType: normalized.criterionType,
-      description: `Ownership area for this ${vocab.buyer.singular} role.`,
+      description: `Ownership area for this ${vocab.buyer.singular}.`,
       operator: "EXISTS",
       importance: "CRITICAL",
       isRequired: normalized.isRequired ?? false,
@@ -831,7 +831,7 @@ export function projectPersonaSignalsToCriteria(
     pushUnique({
       name: normalized.name,
       criterionType: normalized.criterionType,
-      description: `KPI or accountability for this ${vocab.buyer.singular} role.`,
+      description: `KPI or accountability for this ${vocab.buyer.singular}.`,
       operator: "EXISTS",
       importance: "HIGH",
       isRequired: normalized.isRequired ?? false,

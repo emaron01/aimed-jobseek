@@ -155,14 +155,27 @@ describe("buildSidebarNavItems", () => {
       items.some((i) => i.href === "/campaigns" && i.label === vocab.campaign.Plural),
     ).toBe(true);
     expect(
-      items.some((i) => i.href === "/products" && i.label === vocab.product.Plural),
+      items.some((i) => i.href === "/products" && i.label === vocab.product.nav),
     ).toBe(true);
-    expect(items.some((i) => i.href === "/icps" && i.label === vocab.icp.plural)).toBe(
+    expect(items.some((i) => i.href === "/icps" && i.label === vocab.icp.nav)).toBe(
       true,
     );
     expect(
-      items.some((i) => i.href === "/personas" && i.label === vocab.persona.Plural),
+      items.some((i) => i.href === "/personas" && i.label === vocab.persona.nav),
     ).toBe(true);
+    expect(items.map((i) => i.href)).toEqual([
+      "/",
+      "/campaigns",
+      "/contacts",
+      "/lists",
+      "/products",
+      "/icps",
+      "/personas",
+      "/settings/voice",
+      "/settings/email",
+      "/settings",
+      "/settings/account",
+    ]);
     expect(items.some((i) => i.href === "/setup")).toBe(false);
     expect(
       items.some(

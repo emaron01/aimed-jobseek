@@ -23,7 +23,7 @@ export default async function NewProductPage() {
     <div>
       <PageHeader
         title={`New ${vocab.product.singular}`}
-        description={`Name the ${vocab.product.singular} and supply materials you already use. Research builds a draft profile and suggested ${vocab.buyer.singular} roles for your review.`}
+        description={`Name the ${vocab.product.singular} and supply materials you already use. Research builds a draft profile and suggested ${vocab.buyer.plural} for your review.`}
         actions={
           <Link
             href="/products"

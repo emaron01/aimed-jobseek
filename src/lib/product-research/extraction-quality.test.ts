@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { vocab } from "@/lib/product-config";
 import {
   formatProductUrlUnreadableError,
   isLikelySiteChromeExtraction,
@@ -96,6 +97,11 @@ describe("near-empty product draft", () => {
     expect(lead.kind).toBe("failed_read");
     expect(lead.sentence).not.toMatch(/We read your website/i);
     expect(lead.detail).toMatch(/8000 characters/i);
-    expect(lead.detail).toMatch(/Paste the product description into the paste field/i);
+    expect(lead.detail).toMatch(
+      new RegExp(
+        `Paste the ${vocab.product.singular} description into the paste field`,
+        "i",
+      ),
+    );
   });
 });

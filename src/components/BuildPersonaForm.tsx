@@ -43,7 +43,7 @@ export function BuildPersonaForm({
         value={role?.suggestionKey ?? ""}
       />
       <Field
-        label={`${vocab.persona.Singular} / ${vocab.buyer.Singular} Role Name`}
+        label={`${vocab.persona.Singular} name`}
         name="name"
         required
         defaultValue={role?.name ?? ""}

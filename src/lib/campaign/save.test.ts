@@ -147,7 +147,7 @@ describe("campaign save UI seam", () => {
       "export async function updateCampaignEmailSettingsAction",
     );
     expect(detailPage).toContain("CampaignEmailSettingsForm");
-    expect(detailPage).toContain("{vocab.campaign.Singular} email settings");
+    expect(detailPage).toContain("{vocab.campaign.Singular} guidance");
     expect(detailPage).toContain('?stage=setup');
   });
 });

@@ -467,3 +467,90 @@ The vision's Decisions log settles Target Employers, lists, contacts, email, `Ap
 20. **OPEN.** Do cover letter, LinkedIn copy, and email fail closed like the resume, or keep today's flag-and-save?
 21. **OPEN.** Where is the application-level employer-fit result stored, and is the seeker's override stored with it?
 22. **OPEN.** Plan limit values for applications and generated assets, and whether both are limited or only one.
+
+## Remaining sales-framed copy
+
+Nouns now come from `src/lib/product-config/vocabulary.ts`. The sentences below still describe selling, a product being sold, or sales workflow. They were left in place except where a noun swap broke grammar. LLM prompts were not changed and are not listed here.
+
+### Home (2)
+
+- `src/app/(app)/page.tsx` — "Work {applications} for {org} from qualification through sending."
+- `src/app/(app)/page.tsx` — "{Application} creation unlocks after at least one {profile} is approved with {a Target Employer profile} that has criteria and a saved {Hiring Team role}." (still the sales setup gate: score-ready product + ICP + persona)
+
+### Profile / product setup (16)
+
+- `src/app/(app)/products/page.tsx` — "A profile is what you sell — research it once, then define the Target Employer profiles and Hiring Team roles that belong to it."
+- `src/components/AssistedProductSetup.tsx` — "Tell us what you sell"
+- `src/components/AssistedProductSetup.tsx` — hint: "Anything important about the Hiring Team role, positioning, pricing, use case, or market…"
+- `src/lib/product/save.ts` — "Product name is required."
+- `src/lib/product-research/review.ts` — "The product name as you want it used in emails and scoring."
+- `src/lib/product-research/review.ts` — "The core value a buyer gets."
+- `src/lib/product-research/review.ts` — "One buyer function or role family per line."
+- `src/lib/product-research/review.ts` — "How it is priced or typical deal size, if known."
+- `src/lib/product-research/review.ts` — "How it is sold or deployed (sales motion, delivery)."
+- `src/lib/product-research/review.ts` — "One customer or case reference per line."
+- `src/lib/product-research/review.ts` — field labels: "Value proposition", "Buyer functions", "Pricing / deal context", "How it is sold", "Customer evidence"
+- `src/lib/product-research/extract.ts` — "Paste the product description into the paste field and try again."
+- `src/lib/product-research/extraction-quality.ts` — "We could not read usable product content from this page…"
+- `src/lib/product-research/fetch-url.ts` — "This URL did not return readable page text. Paste the product description…"
+- `src/lib/product-config/vocabulary.ts` — `personaLikelyTitlesPlaceholder` / department placeholders still use CRO, VP Sales, Sales
+- `src/lib/product-research/review.ts` — "Primary product or company URL."
+
+### Target Employers / ICP (4)
+
+- `src/app/(app)/icps/page.tsx` — "A Target Employer profile defines who you sell to — natural-language criteria interpreted for scoring and applications."
+- `src/lib/icp/save.ts` — "ICP name is required."
+- `src/lib/icp/save.ts` — "Describe your ideal customer before saving. Interpretation uses this definition."
+- `src/components/IcpDetailsForm.tsx` — "Positive Buying Signals"
+
+### Hiring Team / personas (4)
+
+- `src/components/PersonaBriefingDocument.tsx` — "Buying role: {…}"
+- `src/lib/scoring/config.ts` — dimension label "Positive Buying Signals"
+- `src/app/(app)/setup/[productId]/page.tsx` — "Relevant {Hiring Team role} functions"
+- `src/components/ProductDraftReview.tsx` — "Who it's for — {Hiring Team role} functions"
+
+### Applications / campaigns (8)
+
+- `src/lib/campaign/save.ts` — "Campaign name is required."
+- `src/lib/campaign/save.ts` — "Product is required."
+- `src/lib/campaign/save.ts` — "ICP is required."
+- `src/components/NewCampaignForm.tsx` — "{Application} offer"
+- `src/components/NewCampaignForm.tsx` — "Offers are {application}-specific and used in email copy when present."
+- `src/components/NewCampaignForm.tsx` — offer name placeholder "Free Forecast Audit"
+- `src/lib/product-config/vocabulary.ts` — `offerCallToActionPlaceholder`: "Book a demo"
+- `src/lib/scoring/score-contact.ts` — "Ready to include in outreach."
+
+### Contacts / lists (5)
+
+- `src/app/(app)/companies/[companyId]/page.tsx` — "Contact intelligence for meeting prep."
+- `src/components/CompanyResearchBriefing.tsx` — "What they sell" / "Who they sell to"
+- `src/components/ListCompanyResearchView.tsx` — "What they sell" / "Who they sell to"
+- `src/components/ManualCompanyResearchForm.tsx` — "Buying Signals (one per line)"
+- `src/lib/research/company-briefing.ts` — label "What they sell"
+
+### Email (3)
+
+- `src/app/(app)/campaigns/[id]/page.tsx` — "Default length and {application}-specific guidance." (settings still framed as campaign email generation)
+- `src/components/CampaignEmailSettingsForm.tsx` — "Save email settings"
+- `src/app/actions/campaign-email-settings.ts` — "Unable to update email settings. Please try again."
+
+### Billing (5)
+
+- `src/lib/billing/billing-catalog.ts` — Standard tagline "For individual salespeople"
+- `src/lib/product-config/brand.ts` — lockup eyebrow `{Outbound}`; meta description "Multi-tenant outbound email platform"
+- `src/lib/product-config/brand.ts` — referral share: "research {contacts} and write outbound emails — it saves me the half hour per {employer}…"
+- `src/app/(auth)/login/page.tsx` — "Access your outbound workspace."
+- `src/app/(app)/settings/billing/page.tsx` — "After 30 days we permanently delete that {contact} and outbound…"
+
+### Emails and digest (1)
+
+- `src/lib/transactional-email/templates.ts` — cadence digest: "you have {n} contact(s) due for a follow-up" (sequence/outreach clock, not hiring-stage copy)
+
+### Admin (4)
+
+- `src/app/platform/email-templates/page.tsx` — "not customer outbound sales email."
+- `src/components/platform/PurgeContactOutboundPanel.tsx` — "Delete {contact} and outbound data"; "Removes CRM and outbound rows"
+- `src/app/platform/orgs/page.tsx` — "outbound data"
+- `src/app/platform/orgs/new/page.tsx` — Enterprise / multi-user org copy (hidden from seeker plan UI; still on the operator console)
+

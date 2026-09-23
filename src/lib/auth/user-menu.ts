@@ -204,18 +204,18 @@ export function buildSidebarNavItems(input: {
   const items: SidebarNavItem[] = [
     { href: "/", label: "Home" },
     { href: "/campaigns", label: vocab.campaign.Plural },
+    { href: "/contacts", label: vocab.contact.Plural },
     ...(anyListFeatureEnabled()
       ? [{ href: "/lists", label: vocab.list.Plural }]
       : []),
-    { href: "/contacts", label: vocab.contact.Plural },
     {
       href: "/products",
-      label: vocab.product.Plural,
+      label: vocab.product.nav,
       separatorBefore: true,
       activePrefixes: ["/products", "/setup"],
     },
-    { href: "/icps", label: vocab.icp.plural },
-    { href: "/personas", label: vocab.persona.Plural },
+    { href: "/icps", label: vocab.icp.nav },
+    { href: "/personas", label: vocab.persona.nav },
     {
       href: "/settings/voice",
       label: "Your Voice",

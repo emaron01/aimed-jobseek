@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { vocab } from "@/lib/product-config";
 import { TARGET_TITLES_FIELD } from "@/lib/persona/manual-target-titles";
 import {
   buildPersonaResynthesisApplyPlan,
@@ -51,8 +52,8 @@ describe("buildPersonaResynthesisApplyPlan", () => {
 
     expect(plan.preserved.map((item) => item.label)).toEqual(
       expect.arrayContaining([
-        "Persona id",
-        "Persona name",
+        `${vocab.persona.Singular} id`,
+        `${vocab.persona.Singular} name`,
         "Manually edited criterion",
         "Rep-approved likely titles",
       ]),
