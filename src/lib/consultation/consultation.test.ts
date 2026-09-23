@@ -1036,6 +1036,94 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     }
   });
 
+  it("asks about a thin Action and polishes honestly when the follow-up is declined", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Thin STAR ${suffix}`,
+        productId,
+        icpId,
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(
+      NORMAL_JOB_MODEL,
+      NORMAL_JOB_POSTING,
+    );
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        reportingLine: parsed.reportingLine,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaign.id);
+    await startConsultation({ organizationId, campaignId: campaign.id });
+    const session = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: { turns: { orderBy: { sequence: "asc" } } },
+    });
+    const question = session?.turns.find(
+      (turn) => turn.speaker === "CONSULTANT" && turn.targetKey,
+    );
+    const answer =
+      "Invoice generation had failed billing runs at 8%. I led the rewrite. Over two quarters, failed billing runs fell to under 1%.";
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey: question!.targetKey!,
+      answer,
+    });
+    const afterAnswer = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: {
+        turns: { orderBy: { sequence: "asc" } },
+        statements: true,
+      },
+    });
+    const followUp = afterAnswer?.turns.find(
+      (turn) => turn.speaker === "CONSULTANT" && turn.followUp,
+    );
+    expect(followUp?.body).toContain("what did you personally change");
+    expect(afterAnswer?.statements).toHaveLength(0);
+
+    await skipConsultationQuestion({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey: question!.targetKey!,
+    });
+    const declined = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: {
+        turns: { orderBy: { sequence: "asc" } },
+        statements: { orderBy: { kind: "asc" } },
+      },
+    });
+    const interview = declined?.statements.find(
+      (statement) => statement.kind === "INTERVIEW_ANSWER",
+    );
+    expect(interview?.content).toBe(answer);
+    expect(interview?.content.match(/8%/g)).toHaveLength(1);
+    expect(interview?.strengtheningNote).toContain("ACTION");
+    expect(
+      declined?.turns.some(
+        (turn) =>
+          turn.skipped &&
+          turn.analysisJson &&
+          typeof turn.analysisJson === "object" &&
+          (turn.analysisJson as { followUpDeclined?: unknown })
+            .followUpDeclined === true,
+      ),
+    ).toBe(true);
+  });
+
   it("shows a failed generation state with no substitute questions and retries", async () => {
     const campaign = await prisma.campaign.create({
       data: {
