@@ -3,6 +3,7 @@ import { requireCurrentUser } from "@/lib/auth/session";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { enforceEulaAcceptanceGate } from "@/lib/legal/eula-gate";
 import { enforcePaymentLockGate } from "@/lib/billing/payment-lock-gate";
+import { brand } from "@/lib/product-config";
 
 /**
  * Minimal chrome for post-verify EULA / subscribe — no AppShell / checkout-gate.
@@ -24,7 +25,7 @@ export default async function OnboardingLayout({
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
           <p className="text-sm font-medium tracking-tight">
-            {organization?.name ?? "Aim Outreach"}
+            {organization?.name ?? brand.appName}
           </p>
           <Link
             href="/settings/billing"

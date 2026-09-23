@@ -8,8 +8,9 @@ AimedJobSeek helps job seekers pursue specific jobs with research-backed, person
 ## Settled decisions
 - Separate repo (aimed-jobseek), Render service, and Postgres instance. Full upstream commit history retained.
 - Job discovery is cut-and-paste. The seeker finds a posting anywhere and pastes it in. No job-board integrations.
-- Internal identifiers (tables, columns, models, services, routes) keep their upstream names to preserve mergeability with Aimed Outreach. Only user-facing text and prompt content change.
-- Prompt machinery (context assembly, fact selection, claim-guard mechanics, length control, voice application, versioning) stays shared with upstream. Prompt content (instructions, examples, structure) is product-specific and lives in its own layer.
+- This repo does not sync with Aimed Outreach.
+- Internal identifiers (tables, columns, models, services, routes) keep their names to avoid the cost and risk of renaming, not for mergeability. Only user-facing text and prompt content change.
+- Prompt machinery (context assembly, fact selection, claim-guard mechanics, length control, voice application, versioning) stays in the shared generation layer. Prompt content (instructions, examples, structure) is product-specific and lives in its own layer, for clarity.
 - No hardcoded vocabulary or branding. All user-facing terms come from a single vocabulary source. This has caused repeated production problems and is non-negotiable.
 - Production-ready code only. No placeholders, stubs, or temporary fixes.
 - The EULA is managed by the super admin through the admin console. It is data, not code.

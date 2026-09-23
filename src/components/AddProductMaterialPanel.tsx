@@ -8,6 +8,7 @@ import {
 } from "@/app/actions/product-setup";
 import { Field, SECONDARY_BUTTON_CLASS, SubmitButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { vocab } from "@/lib/product-config";
 
 const initial: ProductSetupActionResult | null = null;
 
@@ -32,7 +33,7 @@ export function AddProductMaterialPanel({ productId }: { productId: string }) {
       <div>
         <h3 className="text-lg font-semibold text-slate-900">Add material</h3>
         <p className="mt-1 text-sm text-slate-600">
-          Upload, paste, or add notes about new product material. We will
+          Upload, paste, or add notes about new {vocab.product.singular} material. We will
           re-synthesize a draft for review — your approved profile stays in
           place until you confirm.
         </p>
@@ -53,8 +54,8 @@ export function AddProductMaterialPanel({ productId }: { productId: string }) {
           name="pastedContent"
           as="textarea"
           rows={6}
-          placeholder="Paste new product material here"
-          hint="Product copy, release notes, or a datasheet excerpt."
+          placeholder={`Paste new ${vocab.product.singular} material here`}
+          hint={`${vocab.product.Singular} copy, release notes, or a datasheet excerpt.`}
         />
         <label className="block text-sm">
           <span className="font-medium text-slate-700">Upload documents</span>

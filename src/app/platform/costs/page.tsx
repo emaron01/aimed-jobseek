@@ -20,6 +20,7 @@ import {
   listSpendReconciliations,
   type CostWindow,
 } from "@/lib/platform/cost";
+import { vocab } from "@/lib/product-config";
 
 function parseWindow(raw: string | undefined): CostWindow {
   if (raw === "7d" || raw === "30d" || raw === "90d") return raw;
@@ -108,14 +109,14 @@ export default async function PlatformCostsPage({
 
       {/* 2. Contact ratio */}
       <section className="space-y-2">
-        <h2 className="text-lg font-medium">Contacts per company</h2>
+        <h2 className="text-lg font-medium">{vocab.contact.Plural} per company</h2>
         <p className="text-3xl font-semibold tabular-nums">
           {formatRatio(report.contactsPerCompany)}
           {report.contactsPerCompany != null ? "×" : ""}
         </p>
         <p className="max-w-2xl text-sm text-slate-600">
-          {report.contactsWithCompany} contacts across{" "}
-          {report.distinctCompaniesWithContacts} companies (contacts with a
+          {report.contactsWithCompany} {vocab.contact.plural} across{" "}
+          {report.distinctCompaniesWithContacts} companies ({vocab.contact.plural} with a
           companyId).
           {report.costMultiplierVsMultiThread != null ? (
             <>
@@ -123,7 +124,7 @@ export default async function PlatformCostsPage({
               At 1:1 outreach you would need ~{formatRatio(
                 report.costMultiplierVsMultiThread,
               )}
-              × more company research for the same contact volume than the
+              × more company research for the same {vocab.contact.singular} volume than the
               observed multi-thread ratio.
             </>
           ) : null}
@@ -136,8 +137,8 @@ export default async function PlatformCostsPage({
           Projected monthly cost (observed ratio)
         </h2>
         <p className="text-sm text-slate-600">
-          Assumptions: one email ≈ one contact; companiesNeeded = emails ÷
-          contacts/company (1.0 if unknown); cost = companies × cost/company +
+          Assumptions: one email ≈ one {vocab.contact.singular}; companiesNeeded = emails ÷
+          {vocab.contact.plural}/company (1.0 if unknown); cost = companies × cost/company +
           emails × cost/email ({formatUsd(report.costPerEmailUsd)}/email from{" "}
           {report.emailDraftCount} drafts).
         </p>
@@ -217,7 +218,7 @@ export default async function PlatformCostsPage({
               <tr>
                 <th className="px-3 py-2 font-medium">Organization</th>
                 <th className="px-3 py-2 font-medium">Cost / company</th>
-                <th className="px-3 py-2 font-medium">Contacts / company</th>
+                <th className="px-3 py-2 font-medium">{vocab.contact.Plural} / company</th>
                 <th className="px-3 py-2 font-medium">{window} spend</th>
               </tr>
             </thead>

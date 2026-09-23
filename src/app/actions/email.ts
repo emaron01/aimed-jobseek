@@ -51,6 +51,7 @@ import { commitLookaheadDraftQuota } from "@/lib/email-generation/lookahead-quot
 import { resolveEmailGenerationPersona } from "@/lib/email-generation/personalization";
 import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
+import { vocab } from "@/lib/product-config";
 
 export type GenerateEmailDraftActionResult = {
   ok: boolean;
@@ -108,12 +109,12 @@ async function persistChosenPersonaForGeneration(
   });
   if (!row) {
     throw new TenantError(
-      "Campaign contact was not found in the active organization.",
+      `${vocab.campaign.Singular} ${vocab.contact.singular} was not found in the active organization.`,
     );
   }
   if (row.campaign.ownerUserId !== userId) {
     throw new TenantError(
-      "This campaign is read-only because it belongs to another user.",
+      `This ${vocab.campaign.singular} is read-only because it belongs to another user.`,
     );
   }
   if (row.chosenPersonaId === personaId) return;
@@ -128,7 +129,7 @@ async function persistChosenPersonaForGeneration(
   });
   if (!persona) {
     throw new TenantError(
-      "The selected persona is not available for this campaign.",
+      `The selected ${vocab.persona.singular} is not available for this ${vocab.campaign.singular}.`,
     );
   }
 
@@ -543,7 +544,7 @@ export async function addFollowUpEmailAction(
       ok: true,
       message: hasClaimConflicts
         ? `Email ${sequenceNumber} added with claim conflicts. Review before sending.`
-        : `Email ${sequenceNumber} added to the sequence.`,
+        : `Email ${sequenceNumber} added to the ${vocab.sequence.singular}.`,
       draftId: draft.draftId,
       subject: draft.subject,
       body: draft.body,
@@ -703,12 +704,12 @@ export async function draftReplyAction(
 ): Promise<GenerateEmailDraftActionResult> {
   const normalizedReply = prospectReply.trim();
   if (!normalizedReply) {
-    return { ok: false, message: "Paste the prospect reply first." };
+    return { ok: false, message: `Paste the ${vocab.prospect.singular} reply first.` };
   }
   if (normalizedReply.length > PROSPECT_REPLY_MAX_CHARS) {
     return {
       ok: false,
-      message: `Prospect reply must be ${PROSPECT_REPLY_MAX_CHARS} characters or fewer.`,
+      message: `${vocab.prospect.Singular} reply must be ${PROSPECT_REPLY_MAX_CHARS} characters or fewer.`,
     };
   }
 
@@ -779,7 +780,7 @@ export async function draftReplyAction(
       message: hasClaimConflicts
         ? `Reply drafted as Email ${sequenceNumber} with claim conflicts. Copy and send from your inbox — this app does not send replies. Cadence stopped.`
         : classification.classification === "REFERRAL"
-          ? `Reply drafted as Email ${sequenceNumber}. Copy and send from your inbox — this app does not send replies. A new contact may need to be added. Cadence stopped.`
+          ? `Reply drafted as Email ${sequenceNumber}. Copy and send from your inbox — this app does not send replies. A new ${vocab.contact.singular} may need to be added. Cadence stopped.`
           : `Reply drafted as Email ${sequenceNumber}. Copy and send from your inbox — this app does not send replies. Cadence stopped.`,
       draftId: draft.draftId,
       subject: draft.subject,

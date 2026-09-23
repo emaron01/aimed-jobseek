@@ -33,6 +33,7 @@ import {
   classifyProductSynthesisError,
   logProductSynthesisFailure,
 } from "@/lib/product-research/synthesis-errors";
+import { vocab } from "@/lib/product-config";
 
 function excerptsFromBundle(raw: unknown): EvidenceExcerpt[] {
   if (Array.isArray(raw)) return raw as EvidenceExcerpt[];
@@ -72,10 +73,10 @@ export async function researchAndSynthesizePersona(
     where: { id: input.productId, organizationId: input.organizationId },
   });
   if (!product) {
-    throw new TenantError("Product not found in the active organization.");
+    throw new TenantError(`${vocab.product.Singular} not found in the active organization.`);
   }
   if (product.approvalStatus !== "APPROVED") {
-    throw new TenantError("Approve the Product before building a Persona.");
+    throw new TenantError(`Approve the ${vocab.product.Singular} before building a ${vocab.persona.Singular}.`);
   }
 
   const productBundleId =
@@ -92,7 +93,7 @@ export async function researchAndSynthesizePersona(
 
   if (!productBundleId) {
     throw new TenantError(
-      "No Product evidence bundle available. Run Product research first.",
+      `No ${vocab.product.Singular} evidence bundle available. Run ${vocab.product.Singular} research first.`,
     );
   }
 
@@ -104,7 +105,7 @@ export async function researchAndSynthesizePersona(
     },
   });
   if (!productBundle) {
-    throw new TenantError("Product evidence bundle not found.");
+    throw new TenantError(`${vocab.product.Singular} evidence bundle not found.`);
   }
 
   const correlationId = createCorrelationId();
@@ -310,7 +311,7 @@ export async function synthesizePersonaFromEvidence(input: {
   if (!isPersonaAiConfigured()) {
     return fail(
       new TenantError(
-        "Persona AI is not configured. Set PERSONA_AI_* environment variables.",
+        `${vocab.persona.Singular} AI is not configured. Set PERSONA_AI_* environment variables.`,
       ),
       "config",
     );
@@ -452,17 +453,17 @@ export async function resynthesizePersonaFromRun(input: {
     },
   });
   if (!prior) {
-    throw new TenantError("Persona setup run not found.");
+    throw new TenantError(`${vocab.persona.Singular} setup run not found.`);
   }
 
   const product = await prisma.product.findFirst({
     where: { id: input.productId, organizationId: input.organizationId },
   });
-  if (!product) throw new TenantError("Product not found.");
+  if (!product) throw new TenantError(`${vocab.product.Singular} not found.`);
 
   const buyerRole = prior.selectedBuyerRoleJson as SuggestedBuyerRole | null;
   if (!buyerRole?.name) {
-    throw new TenantError("Prior run has no selected buyer role.");
+    throw new TenantError(`Prior run has no selected ${vocab.buyer.singular} role.`);
   }
 
   let productEvidence: EvidenceExcerpt[] = [];

@@ -51,6 +51,7 @@ import {
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { validateCampaignOffer } from "@/lib/campaign/offer-validation";
 import { DELETE_SUCCESS_NOTICE_KEY } from "@/lib/tenant/delete-success-notice";
+import { vocab } from "@/lib/product-config";
 
 function requiredString(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -123,7 +124,7 @@ export async function upsertProductAction(
     if (id) {
       await updateProduct(id, fields);
       revalidateSetup(id);
-      return { ok: true, message: "Product saved.", productId: id };
+      return { ok: true, message: `${vocab.product.Singular} saved.`, productId: id };
     }
 
     const product = await createProduct(fields);
@@ -131,7 +132,7 @@ export async function upsertProductAction(
     revalidateSetup(productId);
     return {
       ok: true,
-      message: "Product created.",
+      message: `${vocab.product.Singular} created.`,
       productId,
     };
   } catch (error) {
@@ -152,7 +153,7 @@ export async function deleteProductAction(
   try {
     await requireSetupDeletePermission();
     const id = requiredString(formData, "id");
-    if (!id) throw new TenantError("Product id is required.");
+    if (!id) throw new TenantError(`${vocab.product.Singular} id is required.`);
     const confirmed = requiredString(formData, "confirm") === "1";
     if (!confirmed) {
       return {
@@ -218,7 +219,7 @@ export async function upsertIcpAction(
         return {
           ok: false,
           message:
-            "Save aborted: the form was empty and would have erased this ICP.",
+            `Save aborted: the form was empty and would have erased this ${vocab.icp.singular}.`,
           productId,
           values: parsed.values,
         };
@@ -232,7 +233,7 @@ export async function upsertIcpAction(
     revalidateSetup(productId);
     return {
       ok: true,
-      message: id ? "ICP saved." : "ICP created.",
+      message: id ? `${vocab.icp.singular} saved.` : `${vocab.icp.singular} created.`,
       icpId,
       productId,
     };
@@ -255,7 +256,7 @@ export async function deleteIcpAction(
     await requireSetupDeletePermission();
     const id = requiredString(formData, "id");
     const productId = requiredString(formData, "productId");
-    if (!id) throw new TenantError("ICP id is required.");
+    if (!id) throw new TenantError(`${vocab.icp.singular} id is required.`);
     if (requiredString(formData, "confirm") !== "1") {
       return { ok: false, message: "Confirm deletion before continuing." };
     }
@@ -286,7 +287,7 @@ export async function upsertPersonaAction(
     revalidateSetup(productId);
     return {
       ok: true,
-      message: "Persona saved.",
+      message: `${vocab.persona.Singular} saved.`,
       personaId,
     };
   } catch (error) {
@@ -303,7 +304,7 @@ export async function deletePersonaAction(
     await requireSetupDeletePermission();
     const id = requiredString(formData, "id");
     const productId = requiredString(formData, "productId");
-    if (!id) throw new TenantError("Persona id is required.");
+    if (!id) throw new TenantError(`${vocab.persona.Singular} id is required.`);
     if (requiredString(formData, "confirm") !== "1") {
       return { ok: false, message: "Confirm deletion before continuing." };
     }
@@ -329,7 +330,7 @@ export async function deleteCampaignAction(
   let notice: string;
   try {
     const id = requiredString(formData, "id");
-    if (!id) throw new TenantError("Campaign id is required.");
+    if (!id) throw new TenantError(`${vocab.campaign.Singular} id is required.`);
     if (requiredString(formData, "confirm") !== "1") {
       return { ok: false, message: "Confirm deletion before continuing." };
     }
@@ -356,7 +357,7 @@ export async function archiveCampaignAction(
 ): Promise<CrudDeleteResult> {
   try {
     const id = requiredString(formData, "id");
-    if (!id) throw new TenantError("Campaign id is required.");
+    if (!id) throw new TenantError(`${vocab.campaign.Singular} id is required.`);
     if (requiredString(formData, "confirm") !== "1") {
       return { ok: false, message: "Confirm archive before continuing." };
     }
@@ -378,7 +379,7 @@ export async function unarchiveCampaignAction(
 ): Promise<CrudDeleteResult> {
   try {
     const id = requiredString(formData, "id");
-    if (!id) throw new TenantError("Campaign id is required.");
+    if (!id) throw new TenantError(`${vocab.campaign.Singular} id is required.`);
     const { unarchiveCampaign } = await import("@/lib/tenant/campaign-archive");
     const result = await unarchiveCampaign(id);
     revalidatePath("/campaigns");
@@ -397,7 +398,7 @@ export async function archiveContactListAction(
 ): Promise<CrudDeleteResult> {
   try {
     const id = requiredString(formData, "id");
-    if (!id) throw new TenantError("List id is required.");
+    if (!id) throw new TenantError(`${vocab.list.Singular} id is required.`);
     if (requiredString(formData, "confirm") !== "1") {
       return { ok: false, message: "Confirm archive before continuing." };
     }
@@ -421,7 +422,7 @@ export async function unarchiveContactListAction(
 ): Promise<CrudDeleteResult> {
   try {
     const id = requiredString(formData, "id");
-    if (!id) throw new TenantError("List id is required.");
+    if (!id) throw new TenantError(`${vocab.list.Singular} id is required.`);
     const { unarchiveContactList } = await import("@/lib/tenant/list-delete");
     const result = await unarchiveContactList(id);
     revalidatePath("/lists");
@@ -444,7 +445,7 @@ export async function deleteContactListAction(
   let destination: string;
   try {
     const id = requiredString(formData, "id");
-    if (!id) throw new TenantError("List id is required.");
+    if (!id) throw new TenantError(`${vocab.list.Singular} id is required.`);
     if (requiredString(formData, "confirm") !== "1") {
       return { ok: false, message: "Confirm deletion before continuing." };
     }
@@ -528,7 +529,7 @@ export async function createCampaignAction(
     revalidatePath("/");
     return {
       ok: true,
-      message: "Campaign created.",
+      message: `${vocab.campaign.Singular} created.`,
       campaignId: campaign.id,
     };
   } catch (error) {

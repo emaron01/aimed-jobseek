@@ -1,6 +1,7 @@
 "use client";
 import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
 import { BILLING_PLAN_STANDARD } from "@/lib/billing/plans";
+import { vocab } from "@/lib/product-config";
 import { cn } from "@/lib/utils";
 
 import { useState, useTransition } from "react";
@@ -81,7 +82,7 @@ export function StartStandardCheckoutButton({
       <p className="text-xs text-slate-500">
         {trialPeriodDays == null
           ? "Card required. Billing starts when Checkout completes (no free trial). You can enter a promotion code on the Stripe Checkout page. Card details stay in Stripe."
-          : `Card required for a ${trialPeriodDays}-day trial (full product access, 25 companies). You can enter a promotion code on the Stripe Checkout page. Card details stay in Stripe.`}
+          : `Card required for a ${trialPeriodDays}-day trial (full ${vocab.product.singular} access, 25 companies). You can enter a promotion code on the Stripe Checkout page. Card details stay in Stripe.`}
       </p>
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
     </div>

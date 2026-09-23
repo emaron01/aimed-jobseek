@@ -31,6 +31,7 @@ import {
   productDraftFromFormData,
 } from "@/lib/product-research/review";
 import { prisma } from "@/lib/prisma";
+import { vocab } from "@/lib/product-config";
 
 export type ProductSetupActionResult = {
   ok: boolean;
@@ -52,7 +53,7 @@ function revalidateProduct(productId?: string) {
 function safeError(error: unknown): string {
   if (error instanceof PaymentLockError) return error.message;
   if (error instanceof TenantError) return error.message;
-  return "Unable to complete product setup. Please try again.";
+  return `Unable to complete ${vocab.product.singular} setup. Please try again.`;
 }
 
 /**
@@ -67,7 +68,7 @@ export async function createProductMinimalAction(
     await requireOrganizationId();
     const name = String(formData.get("name") || "").trim();
     if (!name) {
-      return { ok: false, message: "Product name is required." };
+      return { ok: false, message: `${vocab.product.Singular} name is required.` };
     }
     const websiteUrl = String(formData.get("primaryUrl") || "").trim() || null;
     const product = await createProduct({
@@ -80,7 +81,7 @@ export async function createProductMinimalAction(
     revalidateProduct(product.id);
     return {
       ok: true,
-      message: "Product saved.",
+      message: `${vocab.product.Singular} saved.`,
       productId: product.id,
     };
   } catch (error) {
@@ -112,7 +113,7 @@ export async function researchAndBuildProductAction(
 
     if (!productId) {
       if (!name) {
-        return { ok: false, message: "Product name is required." };
+        return { ok: false, message: `${vocab.product.Singular} name is required.` };
       }
       const created = await createProduct({
         name,
@@ -131,19 +132,19 @@ export async function researchAndBuildProductAction(
 
     const sources: IngestSourceInput[] = [];
     if (primaryUrl) {
-      sources.push({ type: "URL", url: primaryUrl, displayName: "Primary product URL" });
+      sources.push({ type: "URL", url: primaryUrl, displayName: `Primary ${vocab.product.singular} URL` });
     }
     for (const u of additionalUrls) {
       sources.push({ type: "URL", url: u });
     }
     if (notes) {
-      sources.push({ type: "USER_NOTE", text: notes, displayName: "Product notes" });
+      sources.push({ type: "USER_NOTE", text: notes, displayName: `${vocab.product.Singular} notes` });
     }
     if (pasted) {
       sources.push({
         type: "PASTED_TEXT",
         text: pasted,
-        displayName: "Pasted product content",
+        displayName: `Pasted ${vocab.product.singular} content`,
       });
     }
 
@@ -200,7 +201,7 @@ export async function retryProductSynthesisAction(
     const productId = String(formData.get("productId") || "").trim();
     const evidenceBundleId = String(formData.get("evidenceBundleId") || "").trim();
     if (!productId || !evidenceBundleId) {
-      return { ok: false, message: "Product and evidence bundle are required." };
+      return { ok: false, message: `${vocab.product.Singular} and evidence bundle are required.` };
     }
     const result = await resynthesizeFromBundle({
       organizationId,
@@ -214,8 +215,8 @@ export async function retryProductSynthesisAction(
       message:
         result.status === "FAILED"
           ? result.errorSafe ||
-            "Product synthesis could not be completed. Acquired evidence was preserved."
-          : "Synthesis complete — review the Product draft.",
+            `${vocab.product.Singular} synthesis could not be completed. Acquired evidence was preserved.`
+          : `Synthesis complete — review the ${vocab.product.Singular} draft.`,
       productId,
       setupRunId: result.setupRunId,
       evidenceBundleId,
@@ -240,7 +241,7 @@ export async function retryApprovedProductResynthesisAction(
     if (!productId || !setupRunId || !evidenceBundleId) {
       return {
         ok: false,
-        message: "Product, setup run, and evidence bundle are required.",
+        message: `${vocab.product.Singular}, setup run, and evidence bundle are required.`,
       };
     }
 
@@ -274,7 +275,7 @@ export async function retryApprovedProductResynthesisAction(
       message:
         result.status === "FAILED"
           ? result.errorSafe ||
-            "Re-synthesis could not be completed. Your approved product was not changed."
+            `Re-synthesis could not be completed. Your approved ${vocab.product.singular} was not changed.`
           : "Re-synthesis draft ready for review.",
       productId,
       setupRunId: result.setupRunId,
@@ -298,20 +299,20 @@ export async function addProductSourcesAction(
     const organizationId = await requireOrganizationId();
     const productId = String(formData.get("productId") || "").trim();
     if (!productId) {
-      return { ok: false, message: "Product is required." };
+      return { ok: false, message: `${vocab.product.Singular} is required.` };
     }
 
     const notes = String(formData.get("notes") || "").trim();
     const pasted = String(formData.get("pastedContent") || "").trim();
     const sources: IngestSourceInput[] = [];
     if (notes) {
-      sources.push({ type: "USER_NOTE", text: notes, displayName: "Product notes" });
+      sources.push({ type: "USER_NOTE", text: notes, displayName: `${vocab.product.Singular} notes` });
     }
     if (pasted) {
       sources.push({
         type: "PASTED_TEXT",
         text: pasted,
-        displayName: "Pasted product content",
+        displayName: `Pasted ${vocab.product.singular} content`,
       });
     }
 
@@ -369,7 +370,7 @@ export async function applyProductResynthesisAction(
     if (!productId || !setupRunId || !name) {
       return {
         ok: false,
-        message: "Product, setup run, and name are required.",
+        message: `${vocab.product.Singular}, setup run, and name are required.`,
       };
     }
 
@@ -413,7 +414,7 @@ export async function applyProductResynthesisAction(
     return {
       ok: true,
       message:
-        "Product profile updated. Personas, ICPs, campaigns, and scoring still use this product.",
+        `${vocab.product.Singular} profile updated. ${vocab.persona.Plural}, ${vocab.icp.plural}, ${vocab.campaign.plural}, and scoring still use this ${vocab.product.singular}.`,
       productId,
       setupRunId,
       status: "APPROVED",
@@ -443,7 +444,7 @@ export async function getProductAiConfigDiagnosticAction(): Promise<{
     const { getProductAiConfigDiagnostic } = await import("@/lib/ai/config");
     return {
       ok: true,
-      message: "Product AI configuration diagnostic.",
+      message: `${vocab.product.Singular} AI configuration diagnostic.`,
       diagnostic: getProductAiConfigDiagnostic(),
     };
   } catch (error) {
@@ -464,7 +465,7 @@ export async function saveApprovedProductAction(
     if (!productId || !setupRunId || !name) {
       return {
         ok: false,
-        message: "Product, setup run, and name are required.",
+        message: `${vocab.product.Singular}, setup run, and name are required.`,
       };
     }
 
@@ -511,7 +512,7 @@ export async function saveApprovedProductAction(
     return {
       ok: true,
       message:
-        "Product profile approved. Personas, scoring, and every email will use this record.",
+        `${vocab.product.Singular} profile approved. ${vocab.persona.Plural}, scoring, and every email will use this record.`,
       productId,
       setupRunId,
     };
@@ -531,7 +532,7 @@ export async function saveApprovedPersonaFromSuggestionAction(
     const setupRunId = String(formData.get("setupRunId") || "").trim();
     const suggestionKey = String(formData.get("suggestionKey") || "").trim();
     if (!productId || !setupRunId || !suggestionKey) {
-      return { ok: false, message: "Missing product, setup run, or suggestion." };
+      return { ok: false, message: `Missing ${vocab.product.singular}, setup run, or suggestion.` };
     }
 
     const run = await prisma.productSetupRun.findFirst({
@@ -583,7 +584,7 @@ export async function saveApprovedPersonaFromSuggestionAction(
         : null);
 
     if (!suggestion || !draft) {
-      return { ok: false, message: "Suggested persona not found in this run." };
+      return { ok: false, message: `Suggested ${vocab.persona.singular} not found in this run.` };
     }
 
     // Apply form overrides
@@ -613,7 +614,7 @@ export async function saveApprovedPersonaFromSuggestionAction(
     revalidateProduct(productId);
     return {
       ok: true,
-      message: "Persona saved and approved.",
+      message: `${vocab.persona.Singular} saved and approved.`,
       productId,
       setupRunId,
       status: personaId,

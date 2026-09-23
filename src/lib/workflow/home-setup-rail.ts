@@ -4,7 +4,11 @@
  */
 
 import { VOICE_SAMPLE_READY_MIN, voiceReadiness } from "@/lib/voice/types";
-import type { ProductCampaignReadiness } from "@/lib/workflow/product-campaign-readiness";
+import {
+  PRODUCT_READINESS_BLOCKERS,
+  type ProductCampaignReadiness,
+} from "@/lib/workflow/product-campaign-readiness";
+import { anyListFeatureEnabled, countedNoun, vocab } from "@/lib/product-config";
 
 export const HOME_SETUP_STEP_KEYS = [
   "voice",
@@ -26,22 +30,22 @@ export type HomeSetupStep = {
   detail: string;
 };
 
-function plural(count: number, singular: string, pluralForm?: string): string {
-  return count === 1 ? singular : (pluralForm ?? `${singular}s`);
+function plural(count: number, singular: string): string {
+  return count === 1 ? singular : `${singular}s`;
 }
 
 function shortProductGap(readiness: ProductCampaignReadiness): string {
   const blocker = readiness.blockers[0] ?? "needs setup";
-  if (blocker === "Needs an ICP with criteria") return "needs an ICP";
-  if (blocker === "Needs at least one saved persona") return "needs a persona";
+  if (blocker === PRODUCT_READINESS_BLOCKERS.needsIcp) return `needs ${vocab.icp.aSingular}`;
+  if (blocker === PRODUCT_READINESS_BLOCKERS.needsPersona) return `needs ${vocab.persona.aSingular}`;
   if (
-    blocker === "Product needs review and approval" ||
-    blocker === "Product is still a draft" ||
-    blocker === "Product is not approved"
+    blocker === PRODUCT_READINESS_BLOCKERS.needsReview ||
+    blocker === PRODUCT_READINESS_BLOCKERS.draft ||
+    blocker === PRODUCT_READINESS_BLOCKERS.notApproved
   ) {
     return "needs approval";
   }
-  if (blocker === "Product setup not started") return "needs product setup";
+  if (blocker === PRODUCT_READINESS_BLOCKERS.notStarted) return `needs ${vocab.product.singular} setup`;
   return "needs setup";
 }
 
@@ -51,11 +55,11 @@ function productsDetail(input: {
   incomplete: ProductCampaignReadiness[];
 }): string {
   const { total, readyCount, incomplete } = input;
-  if (total === 0) return "No products yet";
+  if (total === 0) return `No ${vocab.product.plural} yet`;
 
-  const productWord = `${total} ${plural(total, "product")}`;
+  const productWord = countedNoun(total, vocab.product);
   if (incomplete.length === 0) {
-    return readyCount === 1 ? "1 product ready" : `${readyCount} products ready`;
+    return readyCount === 1 ? `1 ${vocab.product.singular} ready` : `${readyCount} ${vocab.product.plural} ready`;
   }
 
   // Group identical gaps: "1 needs a persona", "2 need an ICP"
@@ -102,7 +106,7 @@ export function buildHomeSetupRail(input: {
       ? "Reconnect required"
       : "Not connected";
 
-  return [
+  const steps: HomeSetupStep[] = [
     {
       number: 1,
       key: "voice",
@@ -114,7 +118,7 @@ export function buildHomeSetupRail(input: {
     {
       number: 2,
       key: "products",
-      label: "Products",
+      label: vocab.product.Plural,
       href: "/products",
       completed: input.productReadyCount > 0,
       detail: productsDetail({
@@ -126,24 +130,24 @@ export function buildHomeSetupRail(input: {
     {
       number: 3,
       key: "lists",
-      label: "Lists",
+      label: vocab.list.Plural,
       href: "/lists",
       completed: input.listCount > 0,
       detail:
         input.listCount === 0
-          ? "No lists yet"
-          : `${input.listCount} ${plural(input.listCount, "list")}`,
+          ? `No ${vocab.list.plural} yet`
+          : countedNoun(input.listCount, vocab.list),
     },
     {
       number: 4,
       key: "contacts",
-      label: "Contacts",
+      label: vocab.contact.Plural,
       href: "/contacts",
       completed: input.contactCount > 0,
       detail:
         input.contactCount === 0
-          ? "No contacts yet"
-          : `${input.contactCount} ${plural(input.contactCount, "contact")}`,
+          ? `No ${vocab.contact.plural} yet`
+          : countedNoun(input.contactCount, vocab.contact),
     },
     {
       number: 5,
@@ -154,6 +158,10 @@ export function buildHomeSetupRail(input: {
       detail: emailDetail,
     },
   ];
+  const visible = anyListFeatureEnabled()
+    ? steps
+    : steps.filter((step) => step.key !== "lists");
+  return visible.map((step, index) => ({ ...step, number: index + 1 }));
 }
 
 /** First incomplete step, or the last step when everything is green. */

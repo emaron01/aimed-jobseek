@@ -52,6 +52,7 @@ import {
 } from "@/lib/usage/policy";
 import { buildSeatSnapshot } from "@/lib/org/seat-limits";
 import { defaultMaxSeatsForPlan } from "@/lib/org/seat-limits";
+import { features, vocab } from "@/lib/product-config";
 
 /** Always read live billing state — never serve a pre-checkout RSC snapshot. */
 export const dynamic = "force-dynamic";
@@ -290,22 +291,22 @@ export default async function OrganizationBillingSettingsPage({
                 {billing?.canceledAt
                   ? ` (${formatBillingDate(billing.canceledAt)})`
                   : ""}
-                , we keep your contact lists, research, scores, campaigns,
+                , we keep your {vocab.contact.singular} {vocab.list.plural}, research, scores, {vocab.campaign.plural},
                 drafts, send history, and{" "}
                 <span className="font-medium">opt-out / suppression list</span>.
                 Resubscribe in that window and all of it unlocks with this
                 workspace.
               </p>
               <p>
-                After 30 days we permanently delete that contact and outbound
-                data — including suppressions. Your account, products, ICPs,
-                personas, voice, signature, billing, and credit packs stay so you
-                can return and rebuild lists.
+                After 30 days we permanently delete that {vocab.contact.singular} and outbound
+                data — including suppressions. Your account, {vocab.product.plural}, {vocab.icp.plural},
+                {vocab.persona.plural}, voice, signature, billing, and credit packs stay so you
+                can return and rebuild {vocab.list.plural}.
               </p>
             </>
           ) : billingStatus === "PAST_DUE" && !paymentLocked ? (
             <p>
-              You can still open campaigns, contacts, and setup pages to view
+              You can still open {vocab.campaign.plural}, {vocab.contact.plural}, and setup pages to view
               your work, but the workspace is read-only — no setup changes,
               research, email generation, or sending until payment succeeds.
               Stripe may retry the charge automatically; you can also update your
@@ -316,8 +317,8 @@ export default async function OrganizationBillingSettingsPage({
             </p>
           ) : (
             <p>
-              Your products, ICPs, personas, and account stay on this workspace.
-              Resubscribe or update payment to unlock the product again.
+              Your {vocab.product.plural}, {vocab.icp.plural}, {vocab.persona.plural}, and account stay on this workspace.
+              Resubscribe or update payment to unlock the {vocab.product.singular} again.
             </p>
           )}
           {!isAdmin ? (
@@ -403,7 +404,7 @@ export default async function OrganizationBillingSettingsPage({
           ) : null}
           <div>
             <dt className="text-xs uppercase tracking-wide text-slate-500">
-              Billing contact
+              Billing {vocab.contact.singular}
             </dt>
             <dd className="mt-1 font-medium text-slate-900">
               {billing?.billingEmail ?? "—"}
@@ -537,6 +538,7 @@ export default async function OrganizationBillingSettingsPage({
       </section>
 
       {!paymentLocked &&
+      features.teamSeats &&
       planUsesSeatBilling(planCode) &&
       hasLiveSubscription ? (
         <section
@@ -575,7 +577,9 @@ export default async function OrganizationBillingSettingsPage({
         </section>
       ) : null}
 
-      {paymentLocked || !planAllowsReferrals(billing?.planCode)
+      {paymentLocked ||
+      !features.referralProgram ||
+      !planAllowsReferrals(billing?.planCode)
         ? null
         : (
             <ReferralProgramPanel />

@@ -4,6 +4,7 @@ import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/
 import { listIcps, listPersonas } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { getHomeWorkflow } from "@/lib/workflow/home";
+import { vocab } from "@/lib/product-config";
 
 export default async function NewCampaignPage() {
   const organization = await getCurrentOrganization();
@@ -12,8 +13,8 @@ export default async function NewCampaignPage() {
     return (
       <div>
         <PageHeader
-          title="New campaign"
-          description="Create a campaign for the active organization."
+          title={`New ${vocab.campaign.singular}`}
+          description={`Create ${vocab.campaign.aSingular} for the active organization.`}
         />
         <TenantMissing />
       </div>
@@ -34,14 +35,14 @@ export default async function NewCampaignPage() {
   return (
     <div>
       <PageHeader
-        title="New campaign"
-        description="Select the product, ICP, and personas in play. ICP and persona options are filtered by product and validated server-side."
+        title={`New ${vocab.campaign.singular}`}
+        description={`Select the ${vocab.product.singular}, ${vocab.icp.singular}, and ${vocab.persona.plural} in play. ${vocab.icp.singular} and ${vocab.persona.singular} options are filtered by ${vocab.product.singular} and validated server-side.`}
         actions={
           <Link
             href="/campaigns"
             className={SECONDARY_BUTTON_CLASS}
           >
-            Back to campaigns
+            Back to {vocab.campaign.plural}
           </Link>
         }
       />
@@ -68,11 +69,11 @@ export default async function NewCampaignPage() {
           />
         ) : (
           <p className="text-sm text-slate-600">
-            Add a product on the{" "}
+            Add {vocab.product.aSingular} on the{" "}
             <Link href="/products/new" className="underline">
-              Products page
+              {vocab.product.Plural} page
             </Link>{" "}
-            before creating a campaign.
+            before creating {vocab.campaign.aSingular}.
           </p>
         )}
         {canCreate && readyProducts.length === 0 ? (
@@ -80,8 +81,8 @@ export default async function NewCampaignPage() {
             className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
             data-testid="campaign-product-setup-required"
           >
-            No products are ready for campaigns yet. Each product needs
-            approval, an ICP with criteria, and at least one saved persona.
+            No {vocab.product.plural} are ready for {vocab.campaign.plural} yet. Each {vocab.product.singular} needs
+            approval, {vocab.icp.aSingular} with criteria, and at least one saved {vocab.persona.singular}.
           </p>
         ) : null}
         {unavailableProducts.length > 0 && readyProducts.length > 0 ? (
@@ -90,7 +91,7 @@ export default async function NewCampaignPage() {
             data-testid="campaign-product-omissions"
           >
             <p className="font-medium text-slate-900">
-              Products not yet available
+              {vocab.product.Plural} not yet available
             </p>
             <ul className="list-disc space-y-1 pl-5">
               {unavailableProducts.map((product) => (

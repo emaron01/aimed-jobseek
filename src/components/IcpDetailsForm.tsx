@@ -18,6 +18,7 @@ import {
   type IcpClientRecord,
   type IcpFormValues,
 } from "@/lib/icp/save";
+import { vocab } from "@/lib/product-config";
 
 type CriterionRow = IcpCriterionReviewRow;
 
@@ -70,7 +71,7 @@ function NewIcpForm({
 
   const definitionPlaceholder = productName?.trim()
     ? `Describe companies that should buy ${productName.trim()} — industry, size, geography, and other fit signals.`
-    : "Describe the companies that should buy this product — industry, size, geography, and other fit signals.";
+    : `Describe the companies that should buy this ${vocab.product.singular} — industry, size, geography, and other fit signals.`;
 
   const restored = state && !state.ok ? state.values : undefined;
   const defaults: Partial<IcpFormValues> = useMemo(
@@ -112,7 +113,7 @@ function NewIcpForm({
         <input type="hidden" name="id" value={defaults.id ?? ""} />
         <input type="hidden" name="productId" value={productId} />
         <Field
-          label="ICP Name"
+          label={`${vocab.icp.singular} Name`}
           name="name"
           defaultValue={defaults.name}
           required
@@ -127,7 +128,7 @@ function NewIcpForm({
         />
         <div className="md:col-span-2">
           <Field
-            label="Describe your ideal customer"
+            label={`Describe your ${vocab.idealCustomer.singular}`}
             name="definition"
             defaultValue={defaults.definition}
             as="textarea"
@@ -195,7 +196,7 @@ function NewIcpForm({
           hint={fieldHint("requiredTechnologies")}
         />
         <Field
-          label="Positive Buying Signals"
+          label={`Positive ${vocab.buyingSignal.TitlePlural}`}
           name="positiveSignals"
           defaultValue={defaults.positiveSignals}
           hint={fieldHint("positiveSignals")}
@@ -217,7 +218,7 @@ function NewIcpForm({
         </div>
         <div className="md:col-span-2 flex flex-wrap items-center gap-2">
           <SubmitButton disabled={pending}>
-            {pending ? "Saving…" : "Save ICP"}
+            {pending ? "Saving…" : `Save ${vocab.icp.singular}`}
           </SubmitButton>
           {existingIcpId ? (
             <SecondaryButton
@@ -232,7 +233,7 @@ function NewIcpForm({
             >
               {interpretPending
                 ? "Interpreting…"
-                : "Interpret / Reinterpret ICP"}
+                : `Interpret / Reinterpret ${vocab.icp.singular}`}
             </SecondaryButton>
           ) : null}
         </div>
@@ -266,7 +267,7 @@ export function IcpDetailsForm({
 
   const definitionPlaceholder = productName?.trim()
     ? `Describe companies that should buy ${productName.trim()} — industry, size, geography, and other fit signals.`
-    : "Describe the companies that should buy this product — industry, size, geography, and other fit signals.";
+    : `Describe the companies that should buy this ${vocab.product.singular} — industry, size, geography, and other fit signals.`;
 
   const restored = state && !state.ok ? state.values : undefined;
   const defaults = useMemo(
@@ -344,7 +345,7 @@ export function IcpDetailsForm({
             <input type="hidden" name="id" value={icp.id} />
             <input type="hidden" name="productId" value={productId} />
             <Field
-              label="ICP Name"
+              label={`${vocab.icp.singular} Name`}
               name="name"
               defaultValue={defaults.name}
               required
@@ -359,7 +360,7 @@ export function IcpDetailsForm({
             />
             <div className="md:col-span-2">
               <Field
-                label="Describe your ideal customer"
+                label={`Describe your ${vocab.idealCustomer.singular}`}
                 name="definition"
                 defaultValue={defaults.definition}
                 as="textarea"
@@ -427,7 +428,7 @@ export function IcpDetailsForm({
               hint={fieldHint("requiredTechnologies")}
             />
             <Field
-              label="Positive Buying Signals"
+              label={`Positive ${vocab.buyingSignal.TitlePlural}`}
               name="positiveSignals"
               defaultValue={defaults.positiveSignals}
               hint={fieldHint("positiveSignals")}
@@ -449,7 +450,7 @@ export function IcpDetailsForm({
             </div>
             <div className="md:col-span-2 flex flex-wrap items-center gap-2">
               <SubmitButton disabled={pending}>
-                {pending ? "Saving…" : "Save ICP"}
+                {pending ? "Saving…" : `Save ${vocab.icp.singular}`}
               </SubmitButton>
               <SecondaryButton
                 type="button"
@@ -463,7 +464,7 @@ export function IcpDetailsForm({
               >
                 {interpretPending
                   ? "Interpreting…"
-                  : "Interpret / Reinterpret ICP"}
+                  : `Interpret / Reinterpret ${vocab.icp.singular}`}
               </SecondaryButton>
             </div>
           </form>
@@ -489,16 +490,16 @@ export function IcpDetailsForm({
           <SecondaryButton type="submit" disabled={interpretPending}>
             {interpretPending
               ? "Interpreting…"
-              : "Interpret / Reinterpret ICP"}
+              : `Interpret / Reinterpret ${vocab.icp.singular}`}
           </SecondaryButton>
         </form>
         <ConfirmDeleteForm
           action={deleteIcpAction}
           hiddenFields={{ id: icp.id, productId }}
-          triggerLabel="Delete ICP"
-          confirmTitle={`Delete ICP "${icp.name}"?`}
-          confirmBody={`This will remove this ICP and its current generated criteria.\nHistorical scoring snapshots will not be changed.\nIf scoring runs reference this ICP, it will be archived instead of permanently deleted.`}
-          confirmButtonLabel="Delete ICP"
+          triggerLabel={`Delete ${vocab.icp.singular}`}
+          confirmTitle={`Delete ${vocab.icp.singular} "${icp.name}"?`}
+          confirmBody={`This will remove this ${vocab.icp.singular} and its current generated criteria.\nHistorical scoring snapshots will not be changed.\nIf scoring runs reference this ${vocab.icp.singular}, it will be archived instead of permanently deleted.`}
+          confirmButtonLabel={`Delete ${vocab.icp.singular}`}
           onSuccessNavigate={`/setup/${productId}`}
         />
       </div>

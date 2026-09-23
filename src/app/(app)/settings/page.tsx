@@ -5,6 +5,7 @@ import {
   canManageOrganizationPolicy,
 } from "@/lib/org/authz";
 import { ensureOrganizationPolicies } from "@/lib/usage/policy";
+import { vocab } from "@/lib/product-config";
 
 export default async function SettingsIndexPage() {
   const organization = await requireOrganization();
@@ -101,7 +102,7 @@ export default async function SettingsIndexPage() {
                 Email cadence
               </Link>
               <p className="text-slate-600">
-                Follow-up intervals and max sequence length.
+                Follow-up intervals and max {vocab.sequence.singular} length.
               </p>
             </li>
           </>

@@ -1145,7 +1145,7 @@ describe("sequence and claim guards", () => {
       motionSpecifics,
     ]) {
       expect(source).not.toMatch(
-        /forecast|accuracy|trial|roi|durationTerms|pricingTerms|audienceCountTerms|offerSensitiveTerms|dealership|F&I|SalesForecaster|StoneEagle|\bCRM\b|\bpipeline\b/i,
+        /forecast|accuracy|trial|roi|durationTerms|pricingTerms|audienceCountTerms|offerSensitiveTerms|dealership|F&I|ForecastWorks|StoneEagle|\bCRM\b|\bpipeline\b/i,
       );
     }
   });
@@ -1199,9 +1199,9 @@ describe("email generation action and UI seams", () => {
     expect(action).toContain("requireVerifiedForAiSpend");
     expect(action).toContain("ADDITIONAL_GUIDANCE_MAX_CHARS");
     expect(form).toContain("Generate Email");
-    expect(form.match(/\+ Add email to sequence/g)).toHaveLength(2);
-    expect(form.lastIndexOf("+ Add email to sequence")).toBeLessThan(
-      form.indexOf("Stop sequence"),
+    expect(form.match(/\+ Add email to \{vocab\.sequence\.singular\}/g)).toHaveLength(2);
+    expect(form.lastIndexOf("+ Add email to {vocab.sequence.singular}")).toBeLessThan(
+      form.indexOf("Stop {vocab.sequence.singular}"),
     );
     expect(form).toContain("I sent this — mark as sent");
     expect(form).toContain("Did you send this email?");
@@ -1235,7 +1235,7 @@ describe("email generation action and UI seams", () => {
     expect(form).toContain("cursor-pointer");
     expect(form).toContain("sequence-reply-guidance");
     expect(form).toContain(
-      "When this prospect replies, click the email they replied to",
+      "When this {vocab.prospect.singular} replies, click the email they replied to",
     );
     expect(form).toContain("Regenerate");
     expect(form).toContain("maxLength={ADDITIONAL_GUIDANCE_MAX_CHARS}");
@@ -1303,7 +1303,7 @@ describe("email generation action and UI seams", () => {
     expect(form).toContain("Claim conflicts in this draft");
     expect(form).not.toContain("Acknowledge conflicts and allow send");
     expect(form).toContain("Offending copy:");
-    expect(form).toContain("Product restriction:");
+    expect(form).toContain("{vocab.product.Singular} restriction:");
     const service = readFileSync("src/lib/email-generation/service.ts", "utf8");
     expect(service).toContain("Always persist the draft");
     expect(service).toContain("claimConflictsJson");

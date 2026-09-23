@@ -96,7 +96,7 @@ describe("campaign visibility", () => {
     expect(data).toContain(
       "visibilityWhere = canViewEveryCampaign ? {} : { visibility: \"SHARED\" }",
     );
-    expect(page).toContain("All org campaigns");
+    expect(page).toContain("All org ${vocab.campaign.plural}");
     expect(page).toContain("<th className=\"px-4 py-3 font-medium\">Owner</th>");
   });
 
@@ -111,7 +111,7 @@ describe("campaign visibility", () => {
     expect(action).toContain("duplicateSharedCampaign");
     expect(action).not.toContain("createCampaignExecution");
     expect(action).not.toContain("duplicateSharedCampaignAction");
-    expect(ui).toContain("Use this campaign");
+    expect(ui).toContain("Use this {vocab.campaign.singular}");
     expect(ui).not.toContain("Duplicate as mine");
     expect(duplicate).toContain('visibility: "PERSONAL"');
     expect(duplicate).not.toContain("campaignContact");

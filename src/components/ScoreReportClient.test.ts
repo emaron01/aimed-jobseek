@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { vocab } from "@/lib/product-config";
 
 const source = readFileSync("src/components/ScoreReportClient.tsx", "utf8");
 
@@ -15,7 +16,7 @@ describe("ScoreReportClient table layout", () => {
     expect(source).toContain("readQualificationBucket");
     expect(source).toContain("readQualificationReason");
     expect(source).not.toContain(">Overall</th>");
-    expect(source).not.toContain(">Persona</th>");
+    expect(source).not.toContain(`>${vocab.persona.Singular}</th>`);
   });
 
   it("keeps ICP detail sections in the expanded panel", () => {

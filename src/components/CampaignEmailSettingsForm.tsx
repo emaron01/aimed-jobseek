@@ -12,6 +12,7 @@ import {
 } from "@/lib/campaign/save";
 import { SubmitButton } from "@/components/ui";
 import { EmailGuidancePromptExamples } from "@/components/EmailGuidancePromptExamples";
+import { vocab } from "@/lib/product-config";
 
 const initial: CampaignEmailSettingsActionResult | null = null;
 
@@ -81,7 +82,7 @@ export function CampaignEmailSettingsForm({
         <label className="block text-sm">
           <span className="font-medium text-slate-700">Email guidance</span>
           <span className="mt-1 block text-xs text-slate-500">
-            Steers every generated email in this campaign, up to{" "}
+            Steers every generated email in this {vocab.campaign.singular}, up to{" "}
             {EMAIL_GUIDANCE_MAX_CHARS} characters.
           </span>
           <textarea

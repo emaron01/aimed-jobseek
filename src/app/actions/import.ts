@@ -12,6 +12,7 @@ import {
   importContactList,
 } from "@/lib/tenant/data";
 import { TenantError } from "@/lib/tenant/getCurrentOrganization";
+import { vocab } from "@/lib/product-config";
 
 export type DuplicateCheckResult = {
   ok: boolean;
@@ -105,12 +106,12 @@ export async function importContactsAction(input: {
   try {
     const name = input.name.trim();
     if (!name) {
-      return { ok: false, error: "List name is required." };
+      return { ok: false, error: `${vocab.list.Singular} name is required.` };
     }
 
     let contacts = sanitizeContacts(input.contacts);
     if (contacts.length === 0) {
-      return { ok: false, error: "No contacts to import." };
+      return { ok: false, error: `No ${vocab.contact.plural} to import.` };
     }
 
     if (input.duplicateMode === "skip") {
@@ -122,7 +123,7 @@ export async function importContactsAction(input: {
     if (contacts.length === 0) {
       return {
         ok: false,
-        error: "All contacts were skipped as duplicates. Nothing to import.",
+        error: `All ${vocab.contact.plural} were skipped as duplicates. Nothing to import.`,
       };
     }
 

@@ -25,6 +25,7 @@ import {
   revokeOrganizationInvitationAsPlatform,
 } from "@/lib/org/signup";
 import { redirect } from "next/navigation";
+import { vocab } from "@/lib/product-config";
 
 export type PlatformOrgActionResult = { ok: boolean; message: string };
 
@@ -167,7 +168,7 @@ export async function purgeContactOutboundDataAction(
     revalidatePath(`/platform/orgs/${organizationId}/view`);
     return {
       ok: true,
-      message: `Purged contact/outbound data: ${counts.contacts} contacts, ${counts.campaigns} campaigns, ${counts.emailSuppressions} suppressions.`,
+      message: `Purged ${vocab.contact.singular}/${vocab.outbound.singular} data: ${counts.contacts} ${vocab.contact.plural}, ${counts.campaigns} ${vocab.campaign.plural}, ${counts.emailSuppressions} suppressions.`,
     };
   } catch (error) {
     return { ok: false, message: toSafeError(error) };
@@ -256,8 +257,8 @@ export async function updatePlatformResearchPolicyAction(
     return {
       ok: true,
       message: contactResearchEnabled
-        ? "Contact research enabled for this organization."
-        : "Contact research disabled for this organization.",
+        ? `${vocab.contact.Singular} research enabled for this organization.`
+        : `${vocab.contact.Singular} research disabled for this organization.`,
     };
   } catch (error) {
     return { ok: false, message: toSafeError(error) };

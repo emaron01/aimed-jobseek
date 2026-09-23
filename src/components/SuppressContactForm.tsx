@@ -6,6 +6,7 @@ import {
   suppressContactAction,
 } from "@/app/actions/suppression";
 import { suppressionOptOutConfirmBody } from "@/lib/suppression/confirm-copy";
+import { vocab } from "@/lib/product-config";
 
 export function SuppressContactForm({
   contactId,
@@ -27,7 +28,7 @@ export function SuppressContactForm({
       <ConfirmDeleteForm
         action={releaseContactAction}
         hiddenFields={{ contactId }}
-        triggerLabel="Restore contact"
+        triggerLabel={`Restore ${vocab.contact.singular}`}
         confirmTitle={`Restore ${email}?`}
         confirmBody="This removes the organization-wide suppression. The address can be scored and emailed again. Who restored it is recorded."
         confirmButtonLabel="Restore"

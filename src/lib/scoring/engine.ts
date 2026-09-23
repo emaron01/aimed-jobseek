@@ -21,6 +21,7 @@ import {
   assertCanModifyOwnedWork,
   getWorkActor,
 } from "@/lib/work/ownership";
+import { vocab } from "@/lib/product-config";
 
 export {
   scoreSingleContact,
@@ -205,7 +206,7 @@ export async function runScoringForRun(
         });
   const persona = personas[0];
   if (!persona) {
-    throw new TenantError("Scoring run is missing a persona snapshot.");
+    throw new TenantError(`Scoring run is missing ${vocab.persona.aSingular} snapshot.`);
   }
 
   const subset = Boolean(options?.contactScoreIds?.length);

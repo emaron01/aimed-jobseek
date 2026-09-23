@@ -15,6 +15,7 @@ import {
   assertCanModifyOwnedWork,
   getWorkActor,
 } from "@/lib/work/ownership";
+import { vocab } from "@/lib/product-config";
 
 type Tx = Prisma.TransactionClient;
 
@@ -41,13 +42,13 @@ export async function decideContactDelete(
     return {
       mode: "archive",
       message:
-        "Contact archived because it has campaign or send history. Suppression for this address is unchanged.",
+        `${vocab.contact.Singular} archived because it has ${vocab.campaign.singular} or send history. Suppression for this address is unchanged.`,
     };
   }
   return {
     mode: "delete",
     message:
-      "Contact deleted. Suppression for this address (if any) is unchanged.",
+      `${vocab.contact.Singular} deleted. Suppression for this address (if any) is unchanged.`,
   };
 }
 
@@ -68,7 +69,7 @@ export async function deleteOrArchiveContact(contactId: string): Promise<{
     },
   });
   if (!existing) {
-    throw new TenantError("Contact not found in the active organization.");
+    throw new TenantError(`${vocab.contact.Singular} not found in the active organization.`);
   }
   assertCanModifyOwnedWork(actor, existing.ownerUserId, "Contact");
 

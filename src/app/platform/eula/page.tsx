@@ -3,6 +3,7 @@ import { requirePlatformSuperAdmin } from "@/lib/auth/authz";
 import { ensureEulaSeeded } from "@/lib/legal/eula";
 import { prisma } from "@/lib/prisma";
 import { PlatformEulaConsole } from "@/components/platform/PlatformEulaConsole";
+import { vocab } from "@/lib/product-config";
 
 export default async function PlatformEulaPage() {
   const user = await requirePlatformSuperAdmin();
@@ -27,7 +28,7 @@ export default async function PlatformEulaPage() {
           End User License Agreement
         </h1>
         <p className="mt-1 text-sm text-slate-600">
-          Manage published terms users must accept before using the product.
+          Manage published terms users must accept before using the {vocab.product.singular}.
           SUPER_ADMIN only.
         </p>
       </div>

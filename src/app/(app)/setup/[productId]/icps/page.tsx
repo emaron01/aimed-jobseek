@@ -9,6 +9,7 @@ import {
   getCurrentOrganization,
   TenantError,
 } from "@/lib/tenant/getCurrentOrganization";
+import { vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ productId: string }>;
@@ -22,7 +23,7 @@ export default async function ListIcpsPage({ params }: PageProps) {
   if (!organization) {
     return (
       <div>
-        <PageHeader title="ICPs" />
+        <PageHeader title={vocab.icp.plural} />
         <TenantMissing />
       </div>
     );
@@ -50,14 +51,14 @@ export default async function ListIcpsPage({ params }: PageProps) {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
-        title={`ICPs: ${product.name}`}
+        title={`${vocab.icp.plural}: ${product.name}`}
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
               href={`/setup/${product.id}/icps/new`}
               className={PRIMARY_BUTTON_CLASS}
             >
-              Add ICP
+              Add {vocab.icp.singular}
             </Link>
             <Link
               href={`/setup/${product.id}`}
@@ -69,7 +70,7 @@ export default async function ListIcpsPage({ params }: PageProps) {
         }
       />
       {icps.length === 0 ? (
-        <p className="text-sm text-slate-500">No ICPs yet.</p>
+        <p className="text-sm text-slate-500">No {vocab.icp.plural} yet.</p>
       ) : (
         icps.map((icp) => (
           <IcpDetailsForm

@@ -193,8 +193,8 @@ describe("product review UI contracts", () => {
   it("product intake prioritizes upload and paste over URL", () => {
     const src = readFileSync("src/components/AssistedProductSetup.tsx", "utf8");
     const upload = src.indexOf("Upload materials");
-    const paste = src.indexOf("Paste product content");
-    const url = src.indexOf("Product URL (optional)");
+    const paste = src.indexOf("Paste {vocab.product.singular} content");
+    const url = src.indexOf("${vocab.product.Singular} URL (optional)");
     expect(upload).toBeGreaterThan(-1);
     expect(paste).toBeGreaterThan(upload);
     expect(url).toBeGreaterThan(paste);

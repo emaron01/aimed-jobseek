@@ -50,6 +50,7 @@ import {
 import { listActiveNormalizedEmails } from "@/lib/suppression/service";
 import { getActiveResearchedCompanyUsage } from "@/lib/usage/quota";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
+import { features, vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -69,7 +70,7 @@ export default async function ListDetailPage({
   if (!organization) {
     return (
       <div>
-        <PageHeader title="List" description="List detail" />
+        <PageHeader title={vocab.list.Singular} description={`${vocab.list.Singular} detail`} />
         <TenantMissing />
       </div>
     );
@@ -151,7 +152,7 @@ export default async function ListDetailPage({
         title={list.name}
         description={`${list.sourceType}${
           list.originalFilename ? ` · ${list.originalFilename}` : ""
-        } · ${formatNumber(list.totalContacts)} contacts · imported ${formatDate(list.createdAt)}`}
+        } · ${formatNumber(list.totalContacts)} ${vocab.contact.plural} · imported ${formatDate(list.createdAt)}`}
         actions={
           <div className="flex flex-wrap gap-2">
             {readOnly ? (
@@ -163,7 +164,7 @@ export default async function ListDetailPage({
               <UnarchiveForm
                 action={unarchiveContactListAction}
                 id={list.id}
-                label="Unarchive list"
+                label={`Unarchive ${vocab.list.singular}`}
               />
             ) : (
               <>
@@ -173,22 +174,24 @@ export default async function ListDetailPage({
                     campaignId={campaign.id}
                     campaignName={campaign.name}
                     researchComplete={researchComplete}
+                    allowResearch={features.listBulkValidation}
+                    allowScore={features.listBulkScoring}
                   />
-                ) : (
+                ) : features.listBulkScoring ? (
                   <Link
                     href={scoreHref}
                     className={PRIMARY_BUTTON_CLASS}
                   >
-                    Score List
+                    Score {vocab.list.Singular}
                   </Link>
-                )}
+                ) : null}
                 <ConfirmDeleteForm
                   action={archiveContactListAction}
                   hiddenFields={{ id: list.id }}
-                  triggerLabel="Archive list"
-                  confirmTitle={`Archive list "${list.name}"?`}
+                  triggerLabel={`Archive ${vocab.list.singular}`}
+                  confirmTitle={`Archive ${vocab.list.singular} "${list.name}"?`}
                   confirmBody={listArchiveConfirmBody()}
-                  confirmButtonLabel="Archive list"
+                  confirmButtonLabel={`Archive ${vocab.list.singular}`}
                   tone="warning"
                   pendingLabel="Archiving…"
                 />
@@ -198,14 +201,14 @@ export default async function ListDetailPage({
               <ConfirmDeleteForm
                 action={deleteContactListAction}
                 hiddenFields={{ id: list.id, redirectTo: listsHref }}
-                triggerLabel="Delete list"
-                confirmTitle={`Delete list "${list.name}"?`}
+                triggerLabel={`Delete ${vocab.list.singular}`}
+                confirmTitle={`Delete ${vocab.list.singular} "${list.name}"?`}
                 confirmBody={listDeleteConfirmBody(deleteDecision)}
                 confirmButtonLabel={
                   deleteDecision.mode === "delete"
-                    ? "Delete list"
+                    ? `Delete ${vocab.list.singular}`
                     : deleteDecision.mode === "archive"
-                      ? "Archive list"
+                      ? `Archive ${vocab.list.singular}`
                       : "Cannot delete"
                 }
                 onSuccessNavigate={listsHref}
@@ -215,7 +218,7 @@ export default async function ListDetailPage({
               href={listsHref}
               className={SECONDARY_BUTTON_CLASS}
             >
-              Back to lists
+              Back to {vocab.list.plural}
             </Link>
           </div>
         }
@@ -223,22 +226,22 @@ export default async function ListDetailPage({
 
       {listArchived ? (
         <div className="mb-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          This list is archived and read-only. Unarchive it to score, research, or
-          attach it to a campaign.
+          This {vocab.list.singular} is archived and read-only. Unarchive it to score, research, or
+          attach it to {vocab.campaign.aSingular}.
         </div>
       ) : null}
 
       <div id="company-research" className="mb-6">
         <Panel
           title="Company Research"
-          description="Research runs once per unique company on this list. Results appear below grouped by company — qualification scoring stays on the score report."
+          description={`Research runs once per unique company on this ${vocab.list.singular}. Results appear below grouped by company — qualification scoring stays on the score report.`}
         >
           {readOnly ? (
             <p className="text-sm text-slate-600">
               Manager access is read-only. Research can only be started by the
-              list owner.
+              {vocab.list.singular} owner.
             </p>
-          ) : (
+          ) : features.listBulkValidation ? (
             <ResearchRunPanel
             contactListId={id}
             researchAiConfigured={isResearchAiConfigured()}
@@ -257,6 +260,10 @@ export default async function ListDetailPage({
               statusCounts: researchPlan.statusCounts,
             }}
             />
+          ) : (
+            <p className="text-sm text-slate-600">
+              Company research for this {vocab.list.singular} is not available.
+            </p>
           )}
         </Panel>
       </div>
@@ -264,21 +271,21 @@ export default async function ListDetailPage({
       <div className="mb-6">
         <Panel
           title="Scoring History"
-          description="The same list can be scored multiple times against different Product / ICP / Persona combinations."
+          description={`The same ${vocab.list.singular} can be scored multiple times against different ${vocab.product.Singular} / ${vocab.icp.singular} / ${vocab.persona.Singular} combinations.`}
         >
           {scoringRuns.length === 0 ? (
             <p className="text-sm text-slate-600">
               No scoring runs yet.{" "}
               {readOnly
-                ? "Only the list owner can create a scoring run."
+                ? `Only the ${vocab.list.singular} owner can create a scoring run.`
                 : listArchived
-                ? "Unarchive this list to score it."
-                : readyProducts.length > 0 ? (
+                ? `Unarchive this ${vocab.list.singular} to score it.`
+                : features.listBulkScoring && readyProducts.length > 0 ? (
                 <Link href={scoreHref} className="underline">
-                  Score this list
+                  Score this {vocab.list.singular}
                 </Link>
               ) : (
-                "Add a Product with an ICP and Persona in Setup first."
+                `Add a ${vocab.product.Singular} with ${vocab.icp.aSingular} and ${vocab.persona.Singular} in Setup first.`
               )}
             </p>
           ) : (
@@ -298,9 +305,9 @@ export default async function ListDetailPage({
                       {run.label?.trim()
                         ? `${formatDate(run.createdAt)} · ${run.product.name} · `
                         : null}
-                      ICP: {run.icp.name} · Persona:{" "}
-                      {run.persona?.name ?? "All personas"} ·{" "}
-                      {formatNumber(run.totalContacts)} contacts · {run.status}
+                      {vocab.icp.singular}: {run.icp.name} · {vocab.persona.Singular}:{" "}
+                      {run.persona?.name ?? `All ${vocab.persona.plural}`} ·{" "}
+                      {formatNumber(run.totalContacts)} {vocab.contact.plural} · {run.status}
                     </p>
                   </div>
                   <Link
@@ -318,8 +325,8 @@ export default async function ListDetailPage({
 
       {companyGroups.totalContacts === 0 ? (
         <EmptyState
-          title="No contacts in this list"
-          description="This list exists but has no contact records."
+          title={`No ${vocab.contact.plural} in this ${vocab.list.singular}`}
+          description={`This ${vocab.list.singular} exists but has no ${vocab.contact.singular} records.`}
         />
       ) : (
         <>
@@ -336,7 +343,7 @@ export default async function ListDetailPage({
             <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
               <span>
                 Companies {companyGroups.page} of {totalPages} ·{" "}
-                {formatNumber(companyGroups.totalContacts)} contacts total
+                {formatNumber(companyGroups.totalContacts)} {vocab.contact.plural} total
               </span>
               <div className="flex gap-2">
                 {page > 1 ? (

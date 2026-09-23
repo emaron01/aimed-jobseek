@@ -6,6 +6,7 @@ import {
   useReferralShare,
 } from "@/components/billing/ReferralShareFields";
 import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { features } from "@/lib/product-config";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,6 +15,8 @@ import { cn } from "@/lib/utils";
 export function ReferralProgramPanel() {
   const [open, setOpen] = useState(false);
   const share = useReferralShare(open);
+
+  if (!features.referralProgram) return null;
 
   return (
     <section

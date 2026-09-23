@@ -114,7 +114,7 @@ export const CRO_PERSONA_DRAFT_V2_FIXTURE = {
     },
     {
       "note": null,
-      "claim": "SalesForecaster.io is positioned to provide executive risk visibility and evidence-backed commit governance.",
+      "claim": "ForecastWorks.io is positioned to provide executive risk visibility and evidence-backed commit governance.",
       "sourceIds": [
         "cmt3d2a6x000npr2op7op6q2m"
       ],

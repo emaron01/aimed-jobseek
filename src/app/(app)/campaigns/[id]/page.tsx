@@ -53,6 +53,7 @@ import {
   listIndexHref,
 } from "@/lib/lists/campaign-query";
 import { prisma } from "@/lib/prisma";
+import { nounForCount, vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -97,7 +98,7 @@ export default async function CampaignDetailPage({
   if (!organization) {
     return (
       <div>
-        <PageHeader title="Campaign" description="Campaign details." />
+        <PageHeader title={vocab.campaign.Singular} description={`${vocab.campaign.Singular} details.`} />
         <TenantMissing />
       </div>
     );
@@ -359,10 +360,10 @@ export default async function CampaignDetailPage({
     campaignArchived
       ? null
       : {
-          title: "Next: attach a list",
-          body: "An offer is optional. When setup looks right, move to List to research, score, and add contacts.",
+          title: `Next: attach ${vocab.list.aSingular}`,
+          body: `An offer is optional. When setup looks right, move to ${vocab.list.Singular} to research, score, and add ${vocab.contact.plural}.`,
           href: `/campaigns/${campaign.id}?stage=list`,
-          label: "Continue to List",
+          label: `Continue to ${vocab.list.Singular}`,
         };
 
   const listNext = campaignArchived
@@ -371,22 +372,22 @@ export default async function CampaignDetailPage({
       ? {
           title:
             scoringRuns.length === 0
-              ? "Next: research and score a list"
-              : "Next: add contacts from a scored run",
+              ? `Next: research and score ${vocab.list.aSingular}`
+              : `Next: add ${vocab.contact.plural} from a scored run`,
           body:
             scoringRuns.length === 0
-              ? "Open Lists, research companies, score against this campaign’s Product / ICP / Persona, then save and return from the score report."
-              : "Pick a completed scoring run below, or search for individual contacts. After contacts are attached, continue to Companies.",
+              ? `Open ${vocab.list.Plural}, research companies, score against this ${vocab.campaign.singular}’s ${vocab.product.Singular} / ${vocab.icp.singular} / ${vocab.persona.Singular}, then save and return from the score report.`
+              : `Pick a completed scoring run below, or search for individual ${vocab.contact.plural}. After ${vocab.contact.plural} are attached, continue to Companies.`,
           href:
             scoringRuns.length === 0 ? "/lists" : `#campaign-scored-run-form`,
           label:
             scoringRuns.length === 0
-              ? "Go to Lists to score"
+              ? `Go to ${vocab.list.Plural} to score`
               : "Jump to scored runs",
         }
       : {
           title: "Next: review companies",
-          body: `${campaign.contacts.length} contact(s) are on this campaign. Qualify companies against the campaign ICP before drafting email.`,
+          body: `${campaign.contacts.length} ${vocab.contact.singular}(s) are on this ${vocab.campaign.singular}. Qualify companies against the ${vocab.campaign.singular} ${vocab.icp.singular} before drafting email.`,
           href: `/campaigns/${campaign.id}?stage=companies`,
           label: "Continue to Companies",
         };
@@ -394,17 +395,17 @@ export default async function CampaignDetailPage({
   const companiesNext =
     campaignCompanyRows.length === 0
       ? {
-          title: "Next: attach a scored list",
-          body: "Company qualification appears after contacts from a scored run are on this campaign.",
+          title: `Next: attach a scored ${vocab.list.singular}`,
+          body: `Company qualification appears after ${vocab.contact.plural} from a scored run are on this ${vocab.campaign.singular}.`,
           href: `/campaigns/${campaign.id}?stage=list`,
-          label: "Back to List",
+          label: `Back to ${vocab.list.Singular}`,
         }
       : campaignCompanyRows.some((row) => row.bucket === "GOOD")
         ? {
-            title: "Next: review contacts",
-            body: "Companies in Good keep their contacts in play. Open Contacts to restore or confirm exclusions.",
+            title: `Next: review ${vocab.contact.plural}`,
+            body: `Companies in Good keep their ${vocab.contact.plural} in play. Open ${vocab.contact.Plural} to restore or confirm exclusions.`,
             href: `/campaigns/${campaign.id}?stage=contacts`,
-            label: "Continue to Contacts",
+            label: `Continue to ${vocab.contact.Plural}`,
           }
         : null;
 
@@ -412,14 +413,14 @@ export default async function CampaignDetailPage({
     campaignContactRows.length === 0
       ? {
           title: "Next: qualify companies first",
-          body: "Contact qualification unlocks after at least one company is in Good.",
+          body: `${vocab.contact.Singular} qualification unlocks after at least one company is in Good.`,
           href: `/campaigns/${campaign.id}?stage=companies`,
           label: "Back to Companies",
         }
       : qualifiedContactCount > 0
         ? {
             title: "Next: write emails",
-            body: "Qualified contacts are ready for drafts. Generate, edit, and send from the Emails stage.",
+            body: `Qualified ${vocab.contact.plural} are ready for drafts. Generate, edit, and send from the Emails stage.`,
             href: `/campaigns/${campaign.id}?stage=emails`,
             label: "Continue to Emails",
           }
@@ -428,15 +429,15 @@ export default async function CampaignDetailPage({
   const emailsNext =
     stageContacts.length === 0
       ? {
-          title: "Next: attach contacts",
-          body: "No contacts on this campaign yet. Go to List, add a scored run, then return here to write drafts.",
+          title: `Next: attach ${vocab.contact.plural}`,
+          body: `No ${vocab.contact.plural} on this ${vocab.campaign.singular} yet. Go to ${vocab.list.Singular}, add a scored run, then return here to write drafts.`,
           href: `/campaigns/${campaign.id}?stage=list`,
-          label: "Go to List",
+          label: `Go to ${vocab.list.Singular}`,
         }
       : sentEmailCount > 0
         ? {
             title: "Next: review the report",
-            body: "After sends land, the Report stage summarizes activity across this campaign.",
+            body: `After sends land, the Report stage summarizes activity across this ${vocab.campaign.singular}.`,
             href: `/campaigns/${campaign.id}?stage=report`,
             label: "Open Report",
           }
@@ -446,7 +447,7 @@ export default async function CampaignDetailPage({
     generatedEmailCount === 0 && sentEmailCount === 0
       ? {
           title: "Next: start emailing",
-          body: "No campaign activity has been recorded yet. Generate and send from Emails.",
+          body: `No ${vocab.campaign.singular} activity has been recorded yet. Generate and send from Emails.`,
           href: `/campaigns/${campaign.id}?stage=emails`,
           label: "Go to Emails",
         }
@@ -469,22 +470,22 @@ export default async function CampaignDetailPage({
               href="/campaigns"
               className={SECONDARY_BUTTON_CLASS}
             >
-              Back to campaigns
+              Back to {vocab.campaign.plural}
             </Link>
             {canEditTemplate && campaignArchived ? (
               <UnarchiveForm
                 action={unarchiveCampaignAction}
                 id={campaign.id}
-                label="Unarchive campaign"
+                label={`Unarchive ${vocab.campaign.singular}`}
               />
             ) : canEditTemplate ? (
               <ConfirmDeleteForm
                 action={archiveCampaignAction}
                 hiddenFields={{ id: campaign.id }}
-                triggerLabel="Archive campaign"
-                confirmTitle={`Archive campaign "${campaign.name}"?`}
+                triggerLabel={`Archive ${vocab.campaign.singular}`}
+                confirmTitle={`Archive ${vocab.campaign.singular} "${campaign.name}"?`}
                 confirmBody={campaignArchiveConfirmBody()}
-                confirmButtonLabel="Archive campaign"
+                confirmButtonLabel={`Archive ${vocab.campaign.singular}`}
                 tone="warning"
                 pendingLabel="Archiving…"
               />
@@ -493,14 +494,14 @@ export default async function CampaignDetailPage({
               <ConfirmDeleteForm
                 action={deleteCampaignAction}
                 hiddenFields={{ id: campaign.id }}
-                triggerLabel="Delete campaign"
-                confirmTitle={`Delete campaign "${campaign.name}"?`}
+                triggerLabel={`Delete ${vocab.campaign.singular}`}
+                confirmTitle={`Delete ${vocab.campaign.singular} "${campaign.name}"?`}
                 confirmBody={campaignDeleteConfirmBody({
                   contactCount: campaign.contacts.length,
                   draftCount: generatedEmailCount,
                   sentCount: sentEmailCount,
                 })}
-                confirmButtonLabel="Delete campaign"
+                confirmButtonLabel={`Delete ${vocab.campaign.singular}`}
                 onSuccessNavigate="/campaigns"
               />
             ) : (
@@ -513,8 +514,8 @@ export default async function CampaignDetailPage({
       />
       {campaignArchived ? (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          This campaign is archived. History is intact. Unarchive it to generate
-          emails or change contacts.
+          This {vocab.campaign.singular} is archived. History is intact. Unarchive it to generate
+          emails or change {vocab.contact.plural}.
         </div>
       ) : null}
       {query.attached != null && query.attached !== "" ? (
@@ -524,8 +525,8 @@ export default async function CampaignDetailPage({
           className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950"
         >
           {Number.parseInt(query.attached, 10) > 0
-            ? `${query.attached} Ready to include contact${query.attached === "1" ? "" : "s"} attached from the scoring run.`
-            : "No Ready to include contacts to attach from that scoring run. Check before including and Left out stay on the score report."}
+            ? `${query.attached} Ready to include ${nounForCount(Number(query.attached), vocab.contact)} attached from the scoring run.`
+            : `No Ready to include ${vocab.contact.plural} to attach from that scoring run. Check before including and Left out stay on the score report.`}
         </div>
       ) : null}
       <CampaignStageRail
@@ -538,12 +539,12 @@ export default async function CampaignDetailPage({
         <CampaignStageShell next={setupNext}>
           <Panel
             title="4 Setup"
-            description="Campaign selections reuse approved setup records. Existing selections are shown read-only so qualification history is not silently reinterpreted."
+            description={`${vocab.campaign.Singular} selections reuse approved setup records. Existing selections are shown read-only so qualification history is not silently reinterpreted.`}
           >
             <div className="grid gap-4 md:grid-cols-2">
               <label className="text-sm">
                 <span className="font-medium text-slate-700">
-                  Campaign name
+                  {vocab.campaign.Singular} name
                 </span>
                 <input
                   value={campaign.name}
@@ -552,9 +553,9 @@ export default async function CampaignDetailPage({
                 />
               </label>
               {[
-                ["Product", campaign.product.id, campaign.product.name],
-                ["ICP", campaign.icp.id, campaign.icp.name],
-                ["Personas", "personas-in-play", personasLabel],
+                [vocab.product.Singular, campaign.product.id, campaign.product.name],
+                [vocab.icp.singular, campaign.icp.id, campaign.icp.name],
+                [vocab.persona.Plural, "personas-in-play", personasLabel],
                 [
                   "Offer",
                   campaign.offer?.id ?? "campaign-offer",
@@ -574,12 +575,12 @@ export default async function CampaignDetailPage({
               ))}
             </div>
           </Panel>
-          <Panel title="Campaign context">
+          <Panel title={`${vocab.campaign.Singular} context`}>
             <dl className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               <Meta label="Status" value={campaign.status} />
-              <Meta label="Product" value={campaign.product.name} />
-              <Meta label="ICP" value={campaign.icp.name} />
-              <Meta label="Personas in play" value={personasLabel} />
+              <Meta label={vocab.product.Singular} value={campaign.product.name} />
+              <Meta label={vocab.icp.singular} value={campaign.icp.name} />
+              <Meta label={`${vocab.persona.Plural} in play`} value={personasLabel} />
               <Meta label="Offer" value={offerName ?? "None (optional)"} />
               <Meta label="Call to action" value={offerCta} />
               <Meta label="Offer description" value={offerDescription} />
@@ -588,18 +589,18 @@ export default async function CampaignDetailPage({
           </Panel>
 
           <Panel
-            title="Campaign offer"
-            description="Optional. Used in email copy when present. Leave blank and continue to List if you do not have an offer yet."
+            title={`${vocab.campaign.Singular} offer`}
+            description={`Optional. Used in email copy when present. Leave blank and continue to ${vocab.list.Singular} if you do not have an offer yet.`}
           >
             {campaignArchived ? (
               <p className="text-sm text-slate-600">
-                Offer settings are read-only while this campaign is archived.
+                Offer settings are read-only while this {vocab.campaign.singular} is archived.
               </p>
             ) : !canEditTemplate ? (
               <div className="space-y-3">
                 <p className="text-sm text-slate-600">
-                  Shared campaign template is read-only. Use this campaign
-                  from the campaign list to create a personal copy.
+                  Shared {vocab.campaign.singular} template is read-only. Use this {vocab.campaign.singular}
+                  from the {vocab.campaign.singular} list to create a personal copy.
                 </p>
                 <dl className="grid gap-3 sm:grid-cols-2">
                   <Meta label="Offer" value={offerName} />
@@ -618,11 +619,11 @@ export default async function CampaignDetailPage({
 
           <Panel
             title="Email settings"
-            description="Default length and campaign-specific guidance. Length can be overridden on each draft."
+            description={`Default length and ${vocab.campaign.singular}-specific guidance. Length can be overridden on each draft.`}
           >
             {campaignArchived ? (
               <p className="text-sm text-slate-600">
-                Email settings are read-only while this campaign is archived.
+                Email settings are read-only while this {vocab.campaign.singular} is archived.
               </p>
             ) : !canEditTemplate ? (
               <dl className="grid gap-3 sm:grid-cols-2">
@@ -649,17 +650,17 @@ export default async function CampaignDetailPage({
       {currentStage === "emails" ? (
         <CampaignStageShell next={emailsNext}>
         <Panel
-          title={`Emails (${stageContacts.length} contacts)`}
-          description="Generate, edit, and send drafts for every contact in this campaign. Use Compare drafts to review several at once."
+          title={`Emails (${stageContacts.length} ${vocab.contact.plural})`}
+          description={`Generate, edit, and send drafts for every ${vocab.contact.singular} in this ${vocab.campaign.singular}. Use Compare drafts to review several at once.`}
         >
           <div className="mb-4 space-y-3 rounded-md border border-slate-200 bg-slate-50 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-medium text-slate-900">
-                  Campaign email settings
+                  {vocab.campaign.Singular} email settings
                 </p>
                 <p className="mt-0.5 text-xs text-slate-600">
-                  Default length and campaign-specific guidance. Length can be
+                  Default length and {vocab.campaign.singular}-specific guidance. Length can be
                   overridden on each draft.
                 </p>
               </div>
@@ -672,7 +673,7 @@ export default async function CampaignDetailPage({
             </div>
             {campaignArchived ? (
               <p className="text-sm text-slate-600">
-                Email settings are read-only while this campaign is archived.
+                Email settings are read-only while this {vocab.campaign.singular} is archived.
               </p>
             ) : !canEditTemplate ? (
               <dl className="grid gap-3 sm:grid-cols-2">
@@ -772,7 +773,7 @@ export default async function CampaignDetailPage({
                     draftScreen?.personalizationTier ?? "THIN",
                   personalizationLabel:
                     draftScreen?.personalizationLabel ??
-                    "Persona and product only",
+                    `${vocab.persona.Singular} and ${vocab.product.singular} only`,
                   personalizationDetail:
                     draftScreen?.personalizationDetail ??
                     "No usable company or contact research.",
@@ -841,8 +842,8 @@ export default async function CampaignDetailPage({
       {currentStage === "list" ? (
         <CampaignStageShell next={listNext}>
         <Panel
-          title="5 List"
-          description="Get contacts into this campaign. Research and score a list first if you have not already, then add the scored run here."
+          title={`5 ${vocab.list.Singular}`}
+          description={`Get ${vocab.contact.plural} into this ${vocab.campaign.singular}. Research and score ${vocab.list.aSingular} first if you have not already, then add the scored run here.`}
         >
           {campaignArchived || !canEditTemplate ? (
             <div className="space-y-4">
@@ -851,13 +852,13 @@ export default async function CampaignDetailPage({
                   href={listIndexHref({ campaignId: campaign.id })}
                   className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
                 >
-                  Select an Existing List To Be Researched and Scored
+                  Select an Existing {vocab.list.Singular} To Be Researched and Scored
                 </Link>
               </div>
               <p className="text-sm text-slate-600">
                 {campaignArchived
-                  ? "Contacts cannot be changed while this campaign is archived."
-                  : "Manager access is read-only. Only the campaign owner can change contacts."}
+                  ? `${vocab.contact.Plural} cannot be changed while this ${vocab.campaign.singular} is archived.`
+                  : `Manager access is read-only. Only the ${vocab.campaign.singular} owner can change ${vocab.contact.plural}.`}
               </p>
             </div>
           ) : (
@@ -893,7 +894,7 @@ export default async function CampaignDetailPage({
         <CampaignStageShell next={companiesNext}>
           <Panel
             title="6 Companies"
-            description={`Qualification against ${campaign.icp.name}, the campaign ICP only.`}
+            description={`Qualification against ${campaign.icp.name}, the ${vocab.campaign.singular} ${vocab.icp.singular} only.`}
           >
             <QualificationBuckets
               campaignId={campaign.id}
@@ -911,14 +912,14 @@ export default async function CampaignDetailPage({
       {currentStage === "contacts" ? (
         <CampaignStageShell next={contactsNext}>
           <Panel
-            title="7 Contacts"
-            description="Review all campaign contacts, including excluded rows with inline reasoning. Restore contacts individually or in bulk when the exclusion should not apply."
+            title={`7 ${vocab.contact.Plural}`}
+            description={`Review all ${vocab.campaign.singular} ${vocab.contact.plural}, including excluded rows with inline reasoning. Restore ${vocab.contact.plural} individually or in bulk when the exclusion should not apply.`}
           >
             <QualificationBuckets
               campaignId={campaign.id}
               scoringRunId={qualification.scoringRunId}
               rows={campaignContactRows}
-              emptyTitle="No contact qualification results yet"
+              emptyTitle={`No ${vocab.contact.singular} qualification results yet`}
               emptyActionHref={`/campaigns/${campaign.id}?stage=companies`}
               emptyActionLabel="Review companies"
               readOnly={!canEditTemplate}
@@ -931,7 +932,7 @@ export default async function CampaignDetailPage({
         <CampaignStageShell next={reportNext}>
           <Panel
             title="9 Report"
-            description="Activity across this whole campaign — companies, contacts, and emails."
+            description={`Activity across this whole ${vocab.campaign.singular} — companies, ${vocab.contact.plural}, and emails.`}
           >
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[
@@ -940,7 +941,7 @@ export default async function CampaignDetailPage({
                 ["Contacts qualified", qualifiedContactCount],
                 ["Emails generated", generatedEmailCount],
                 ["Emails sent", sentEmailCount],
-                ["Sequence positions reached", sequencePositionsReached],
+                [`${vocab.sequence.Singular} positions reached`, sequencePositionsReached],
               ].map(([label, value]) => (
                 <div
                   key={String(label)}
@@ -956,7 +957,7 @@ export default async function CampaignDetailPage({
             {generatedEmailCount === 0 && sentEmailCount === 0 ? (
               <div className="mt-5 rounded-md border border-dashed border-slate-300 p-5 text-center">
                 <p className="text-sm text-slate-600">
-                  No campaign activity has been recorded yet.
+                  No {vocab.campaign.singular} activity has been recorded yet.
                 </p>
               </div>
             ) : null}

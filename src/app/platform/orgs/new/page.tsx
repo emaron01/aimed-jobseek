@@ -4,6 +4,7 @@ import Link from "next/link";
 import { canMutatePlatform, requirePlatformOperator } from "@/lib/auth/authz";
 import { ActionFeedbackForm } from "@/components/ActionFeedbackForm";
 import { createPlatformOrganizationAction } from "@/app/actions/platform-orgs";
+import { vocabExamples } from "@/lib/product-config";
 
 export default async function PlatformCreateOrgPage() {
   const user = await requirePlatformOperator();
@@ -52,7 +53,7 @@ export default async function PlatformCreateOrgPage() {
             name="name"
             required
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-            placeholder="Acme Sales"
+            placeholder={vocabExamples.organizationNamePlaceholder}
           />
         </label>
         <fieldset className="space-y-2 text-sm">

@@ -21,6 +21,7 @@ import {
   releaseDailyEmailSendReservation,
   reserveDailyEmailSend,
 } from "@/lib/usage/quota";
+import { vocab } from "@/lib/product-config";
 
 const STALE_SEND_ATTEMPT_MS = 5 * 60 * 1000;
 
@@ -105,7 +106,7 @@ export async function sendEmailDraftWithConnectedMailbox(input: {
   }
   if (draft.campaignContact.campaign.ownerUserId !== input.userId) {
     throw new TenantError(
-      "This campaign is read-only because it belongs to another user.",
+      `This ${vocab.campaign.singular} is read-only because it belongs to another user.`,
     );
   }
   if (draft.status === "SENT" || draft.sentAt) {
@@ -113,7 +114,7 @@ export async function sendEmailDraftWithConnectedMailbox(input: {
   }
   const recipient = draft.campaignContact.contact.email?.trim();
   if (!recipient) {
-    throw new TenantError("Add an email address to this contact before sending.");
+    throw new TenantError(`Add an email address to this ${vocab.contact.singular} before sending.`);
   }
   const {
     assertCampaignNotArchived,

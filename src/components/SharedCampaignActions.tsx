@@ -1,6 +1,7 @@
 import { useSharedCampaignAction } from "@/app/actions/campaign-sharing";
 import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { vocab } from "@/lib/product-config";
 
 /**
  * Use a SHARED template by creating a PERSONAL configuration-only copy.
@@ -16,14 +17,14 @@ export function SharedCampaignActions({ campaignId }: { campaignId: string }) {
         <button
           type="submit"
           className={cn(PRIMARY_BUTTON_CLASS, "w-full !px-3 !py-1.5")}
-          title="Create a personal copy with the same product, ICP, personas, offer, and email guidance. Empty of lists and contacts."
+          title={`Create a personal copy with the same ${vocab.product.singular}, ${vocab.icp.singular}, ${vocab.persona.plural}, offer, and email guidance. Empty of ${vocab.list.plural} and ${vocab.contact.plural}.`}
         >
-          Use this campaign
+          Use this {vocab.campaign.singular}
         </button>
       </form>
       <p className="text-[11px] leading-snug text-slate-500">
-        Creates a personal copy you own and can edit. Setup is copied; lists,
-        contacts, drafts, and sends are not.
+        Creates a personal copy you own and can edit. Setup is copied; {vocab.list.plural},
+        {vocab.contact.plural}, drafts, and sends are not.
       </p>
     </div>
   );

@@ -14,6 +14,7 @@ import type {
   AiUsageMetadata,
 } from "@/lib/ai/types";
 import { ZodError } from "zod";
+import { vocab } from "@/lib/product-config";
 
 /**
  * Resolve the Responses API URL from a role-specific *_AI_MODEL_URL.
@@ -174,11 +175,11 @@ function roleLabel(config: AiConfig): string {
     case "interpretation":
       return "Interpretation";
     case "contact_research":
-      return "Contact research";
+      return `${vocab.contact.Singular} research`;
     case "product":
-      return "Product";
+      return vocab.product.Singular;
     case "persona":
-      return "Persona";
+      return vocab.persona.Singular;
     case "email":
       return "Email generation";
     case "email_facts":

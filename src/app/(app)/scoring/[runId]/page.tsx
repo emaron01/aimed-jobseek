@@ -48,6 +48,7 @@ import {
 } from "@/lib/lists/campaign-query";
 import { SaveAndReturnToCampaignButton } from "@/components/SaveAndReturnToCampaignButton";
 import { readQualificationBucket } from "@/lib/workflow/qualification";
+import { vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ runId: string }>;
@@ -184,8 +185,8 @@ export default async function ScoringReportPage({
         title="Score Report"
         description={
           campaign
-            ? `${runTitle}. Qualification by ICP criteria and persona title fit. Contacts are Ready to include, Check before including, or Left out — with a reason you can act on.`
-            : "Qualification by ICP criteria and persona title fit. Contacts are Ready to include, Check before including, or Left out — with a reason you can act on."
+            ? `${runTitle}. Qualification by ${vocab.icp.singular} criteria and ${vocab.persona.singular} title fit. ${vocab.contact.Plural} are Ready to include, Check before including, or Left out — with a reason you can act on.`
+            : `Qualification by ${vocab.icp.singular} criteria and ${vocab.persona.singular} title fit. ${vocab.contact.Plural} are Ready to include, Check before including, or Left out — with a reason you can act on.`
         }
         actions={
           <div className="flex flex-wrap gap-2">
@@ -196,7 +197,7 @@ export default async function ScoringReportPage({
               })}
               className={SECONDARY_BUTTON_CLASS}
             >
-              Back to list
+              Back to {vocab.list.singular}
             </Link>
           </div>
         }
@@ -210,12 +211,12 @@ export default async function ScoringReportPage({
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Meta label="Run" value={runTitle} />
-        <Meta label="List" value={run.contactList.name} />
-        <Meta label="Product" value={run.product.name} />
-        <Meta label="ICP" value={run.icp.name} />
-        <Meta label="Persona" value={run.persona?.name ?? "All personas"} />
-        <Meta label="Total Contacts" value={formatNumber(run.totalContacts)} />
-        <Meta label="Scored Contacts" value={formatNumber(run.scoredContacts)} />
+        <Meta label={vocab.list.Singular} value={run.contactList.name} />
+        <Meta label={vocab.product.Singular} value={run.product.name} />
+        <Meta label={vocab.icp.singular} value={run.icp.name} />
+        <Meta label={vocab.persona.Singular} value={run.persona?.name ?? "All personas"} />
+        <Meta label={`Total ${vocab.contact.Plural}`} value={formatNumber(run.totalContacts)} />
+        <Meta label={`Scored ${vocab.contact.Plural}`} value={formatNumber(run.scoredContacts)} />
         <Meta label="Status" value={run.status} />
         <Meta label="Created" value={formatDate(run.createdAt)} />
       </div>
@@ -223,11 +224,11 @@ export default async function ScoringReportPage({
       <div className="mb-6">
         <Panel
           title="AI Scoring"
-          description="Qualifies contacts using company ICP criteria and persona title fit. Contact role research runs when you generate email, not during scoring."
+          description={`Qualifies ${vocab.contact.plural} using company ${vocab.icp.singular} criteria and ${vocab.persona.singular} title fit. ${vocab.contact.Singular} role research runs when you generate email, not during scoring.`}
         >
           {readOnly ? (
             <p className="text-sm text-slate-600">
-              Only the list owner can run or rerun scoring.
+              Only the {vocab.list.singular} owner can run or rerun scoring.
             </p>
           ) : (
             <ScoreContactsPanel
@@ -241,11 +242,11 @@ export default async function ScoringReportPage({
       <div className="mb-6">
         <Panel
           title="Company Research"
-          description="Research is company-level and reusable across contacts, lists, and scoring runs in this organization."
+          description={`Research is company-level and reusable across ${vocab.contact.plural}, ${vocab.list.plural}, and scoring runs in this organization.`}
         >
           {readOnly ? (
             <p className="text-sm text-slate-600">
-              Only the list owner can start or retry research.
+              Only the {vocab.list.singular} owner can start or retry research.
             </p>
           ) : (
             <ResearchRunPanel
@@ -276,12 +277,12 @@ export default async function ScoringReportPage({
           data-testid="left-out-review-guidance"
         >
           <p className="font-medium">
-            Review contacts left out before moving on
+            Review {vocab.contact.plural} left out before moving on
           </p>
           <p className="mt-1">
             {leftOutCount === 1
-              ? "1 contact was left out of this run. Review them in the report below — you can restore any contact that should stay in play."
-              : `${leftOutCount} contacts were left out of this run. Review them in the report below — you can restore any of them that should stay in play.`}
+              ? `1 ${vocab.contact.singular} was left out of this run. Review them in the report below — you can restore any ${vocab.contact.singular} that should stay in play.`
+              : `${leftOutCount} ${vocab.contact.plural} were left out of this run. Review them in the report below — you can restore any of them that should stay in play.`}
           </p>
         </div>
       ) : null}
@@ -291,8 +292,8 @@ export default async function ScoringReportPage({
           title="AI roles for this run"
           description={
             scoringReadiness.contactResearchEnabled
-              ? "Scoring needs Contact scoring and Contact research. Company research is optional but shown so an unset role cannot hide."
-              : "Scoring needs Contact scoring. Contact research is disabled for this workspace — email personalization uses company research only. Company research is optional but shown so an unset role cannot hide."
+              ? `Scoring needs ${vocab.contact.Singular} scoring and ${vocab.contact.Singular} research. Company research is optional but shown so an unset role cannot hide.`
+              : `Scoring needs ${vocab.contact.Singular} scoring. ${vocab.contact.Singular} research is disabled for this workspace — email personalization uses company research only. Company research is optional but shown so an unset role cannot hide.`
           }
         >
           <AiRoleStatusList
@@ -312,7 +313,7 @@ export default async function ScoringReportPage({
             contactResearchEnabled: scoringReadiness.contactResearchEnabled,
           }).length > 0 ? (
             <p className="mt-3 text-sm text-amber-950">
-              Score Contacts stays disabled until every required role is
+              Score {vocab.contact.Plural} stays disabled until every required role is
               configured. Set the listed environment variables and restart.
             </p>
           ) : null}
@@ -324,7 +325,7 @@ export default async function ScoringReportPage({
         <div className="mb-6">
           <Panel
             title="Unmatched titles"
-            description="Review titles that did not match a persona. Approvals are saved on the persona so the next list can match them automatically."
+            description={`Review titles that did not match ${vocab.persona.aSingular}. Approvals are saved on the ${vocab.persona.singular} so the next ${vocab.list.singular} can match them automatically.`}
           >
             <TitleSuggestionReview
               runId={run.id}
@@ -439,7 +440,7 @@ export default async function ScoringReportPage({
           personaId={run.personaId}
           productName={run.product.name}
           icpName={run.icp.name}
-          personaName={run.persona?.name ?? "All personas"}
+          personaName={run.persona?.name ?? `All ${vocab.persona.plural}`}
           personas={personas.map((persona) => ({
             id: persona.id,
             name: persona.name,

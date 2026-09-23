@@ -154,7 +154,7 @@ describe("scoring run UI seam", () => {
     expect(formSrc).toContain("useActionState");
     expect(formSrc).toContain("createScoringRunAction");
     expect(formSrc).toContain('data-testid="scoring-run-status"');
-    expect(formSrc).toContain("All personas");
+    expect(formSrc).toContain("`All ${vocab.persona.plural}`");
     expect(formSrc).toContain("ALL_PERSONAS_VALUE");
     expect(formSrc).toContain("defaultProductId");
     expect(formSrc).toContain("defaultIcpId");

@@ -119,7 +119,7 @@ describe("campaign persona selection", () => {
     const form = readFileSync("src/components/NewCampaignForm.tsx", "utf8");
     expect(schema).toMatch(/personaId\s+String\?/);
     expect(schema).toContain("model CampaignPersona");
-    expect(form).toContain("Personas in play");
+    expect(form).toContain("{vocab.persona.Plural} in play");
     expect(form).not.toContain("Select persona");
   });
 });

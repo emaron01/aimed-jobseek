@@ -10,6 +10,7 @@ import {
   getScoringAiConfig,
 } from "@/lib/ai/config";
 import { AiConfigError } from "@/lib/ai/errors";
+import { vocab } from "@/lib/product-config";
 
 export type AiRoleCatalogEntry = {
   role: AiRole;
@@ -41,7 +42,7 @@ export const AI_ROLE_CATALOG: readonly AiRoleCatalogEntry[] = [
   },
   {
     role: "scoring",
-    label: "Contact scoring",
+    label: `${vocab.contact.Singular} scoring`,
     requiredEnv: [
       "SCORING_AI_PROVIDER",
       "SCORING_AI_MODEL",
@@ -53,7 +54,7 @@ export const AI_ROLE_CATALOG: readonly AiRoleCatalogEntry[] = [
   },
   {
     role: "contact_research",
-    label: "Contact research",
+    label: `${vocab.contact.Singular} research`,
     requiredEnv: [
       "CONTACT_RESEARCH_AI_PROVIDER",
       "CONTACT_RESEARCH_AI_MODEL",
@@ -65,7 +66,7 @@ export const AI_ROLE_CATALOG: readonly AiRoleCatalogEntry[] = [
   },
   {
     role: "interpretation",
-    label: "ICP and persona interpretation",
+    label: `${vocab.icp.singular} and ${vocab.persona.singular} interpretation`,
     requiredEnv: [
       "INTERPRETATION_AI_PROVIDER",
       "INTERPRETATION_AI_MODEL",
@@ -77,7 +78,7 @@ export const AI_ROLE_CATALOG: readonly AiRoleCatalogEntry[] = [
   },
   {
     role: "product",
-    label: "Product research",
+    label: `${vocab.product.Singular} research`,
     requiredEnv: [
       "PRODUCT_AI_PROVIDER",
       "PRODUCT_AI_MODEL",
@@ -93,7 +94,7 @@ export const AI_ROLE_CATALOG: readonly AiRoleCatalogEntry[] = [
   },
   {
     role: "persona",
-    label: "Persona research",
+    label: `${vocab.persona.Singular} research`,
     requiredEnv: [
       "PERSONA_AI_PROVIDER",
       "PERSONA_AI_MODEL",

@@ -12,6 +12,7 @@ import {
 import { formatProductCampaignOmission } from "@/lib/workflow/product-campaign-readiness";
 import { EmailGuidancePromptExamples } from "@/components/EmailGuidancePromptExamples";
 import { Field, SubmitButton } from "@/components/ui";
+import { vocab, vocabExamples } from "@/lib/product-config";
 
 type Option = { id: string; name: string; productId: string };
 type ProductOption = {
@@ -110,14 +111,14 @@ export function NewCampaignForm({
         </p>
       ) : null}
       <Field
-        label="Campaign Name"
+        label={`${vocab.campaign.Singular} Name`}
         name="name"
         required
         defaultValue={restored?.name}
       />
 
       <label className="block text-sm">
-        <span className="font-medium text-slate-700">Product</span>
+        <span className="font-medium text-slate-700">{vocab.product.Singular}</span>
         <select
           name="productId"
           required
@@ -134,7 +135,7 @@ export function NewCampaignForm({
           className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-slate-400 focus:ring-2"
         >
           <option value="" disabled>
-            Select product
+            Select {vocab.product.singular}
           </option>
           {products.map((product) => (
             <option
@@ -161,7 +162,7 @@ export function NewCampaignForm({
       </label>
 
       <label className="block text-sm">
-        <span className="font-medium text-slate-700">ICP</span>
+        <span className="font-medium text-slate-700">{vocab.icp.singular}</span>
         <select
           name="icpId"
           required
@@ -171,7 +172,7 @@ export function NewCampaignForm({
           className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-slate-400 focus:ring-2 disabled:bg-slate-50"
         >
           <option value="" disabled>
-            {productId ? "Select ICP" : "Select a product first"}
+            {productId ? `Select ${vocab.icp.singular}` : `Select ${vocab.product.aSingular} first`}
           </option>
           {productIcps.map((icp) => (
             <option key={icp.id} value={icp.id}>
@@ -182,20 +183,20 @@ export function NewCampaignForm({
       </label>
 
       <fieldset className="block text-sm md:col-span-2">
-        <legend className="font-medium text-slate-700">Personas in play</legend>
+        <legend className="font-medium text-slate-700">{vocab.persona.Plural} in play</legend>
         <p className="mt-1 text-xs text-slate-500">
-          Defaults to every persona for this product. Persona is a property of
-          the contact; this only limits which roles the campaign will email.
+          Defaults to every {vocab.persona.singular} for this {vocab.product.singular}. {vocab.persona.Singular} is a property of
+          the {vocab.contact.singular}; this only limits which roles the {vocab.campaign.singular} will email.
         </p>
         {allProductPersonasSelected ? (
           <input type="hidden" name="allPersonas" value="1" />
         ) : null}
         <div className="mt-2 space-y-2">
           {!productId ? (
-            <p className="text-sm text-slate-500">Select a product first</p>
+            <p className="text-sm text-slate-500">Select {vocab.product.aSingular} first</p>
           ) : productPersonas.length === 0 ? (
             <p className="text-sm text-slate-500">
-              This product has no personas yet.
+              This {vocab.product.singular} has no {vocab.persona.plural} yet.
             </p>
           ) : (
             productPersonas.map((persona) => (
@@ -225,12 +226,12 @@ export function NewCampaignForm({
 
       <div className="md:col-span-2 border-t border-slate-200 pt-4">
         <p className="mb-3 text-sm font-medium text-slate-900">
-          Campaign offer
+          {vocab.campaign.Singular} offer
         </p>
         <p className="mb-4 text-sm text-slate-600">
-          Optional. Offers are campaign-specific and used in email copy when
+          Optional. Offers are {vocab.campaign.singular}-specific and used in email copy when
           present. Leave blank if you do not have one yet — you can still create
-          the campaign and move to List.
+          the {vocab.campaign.singular} and move to {vocab.list.Singular}.
         </p>
         <div className="grid gap-4 md:grid-cols-2">
           <Field
@@ -238,12 +239,12 @@ export function NewCampaignForm({
             name="offerName"
             placeholder="Free Forecast Audit"
             defaultValue={restored?.offerName}
-            hint="Optional. Not required to create the campaign."
+            hint={`Optional. Not required to create the ${vocab.campaign.singular}.`}
           />
           <Field
             label="Primary CTA"
             name="offerCta"
-            placeholder="Book a demo"
+            placeholder={vocabExamples.offerCallToActionPlaceholder}
             defaultValue={restored?.offerCta}
             hint="Optional."
           />
@@ -299,7 +300,7 @@ export function NewCampaignForm({
           <label className="block text-sm">
             <span className="font-medium text-slate-700">Email guidance</span>
             <span className="mt-1 block text-xs text-slate-500">
-              Steers every generated email in this campaign, up to{" "}
+              Steers every generated email in this {vocab.campaign.singular}, up to{" "}
               {EMAIL_GUIDANCE_MAX_CHARS} characters.
             </span>
             <textarea
@@ -320,10 +321,10 @@ export function NewCampaignForm({
           {pending
             ? "Creating…"
             : canSubmit
-              ? "Create campaign"
+              ? `Create ${vocab.campaign.singular}`
               : productId && !productReady
-                ? "Finish product setup first"
-                : "Select product and ICP"}
+                ? `Finish ${vocab.product.singular} setup first`
+                : `Select ${vocab.product.singular} and ${vocab.icp.singular}`}
         </SubmitButton>
       </div>
     </form>

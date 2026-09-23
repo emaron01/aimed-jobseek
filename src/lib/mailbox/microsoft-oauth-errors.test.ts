@@ -58,11 +58,11 @@ describe("appAbsoluteUrl", () => {
   });
 
   it("builds redirects from APP_URL, not an internal host", async () => {
-    process.env.APP_URL = "https://www.myaimedoutreach.com";
+    process.env.APP_URL = "https://app.example.test";
     delete process.env.NEXT_PUBLIC_APP_URL;
     const { appAbsoluteUrl } = await import("@/lib/mailbox/microsoft-config");
     expect(appAbsoluteUrl("/settings/email?error=connection_retry")).toBe(
-      "https://www.myaimedoutreach.com/settings/email?error=connection_retry",
+      "https://app.example.test/settings/email?error=connection_retry",
     );
   });
 });

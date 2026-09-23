@@ -23,6 +23,9 @@ describe("org seat / invite policy", () => {
       }),
     ).toContain("limited to one user");
     expect(individualOrgAdminInviteBlockMessage()).toContain("Team");
+    expect(individualOrgAdminInviteBlockMessage()).toContain(
+      process.env.SUPPORT_EMAIL,
+    );
   });
 
   it("keeps comped access subject to the product seat policy", () => {

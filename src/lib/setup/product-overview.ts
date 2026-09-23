@@ -4,6 +4,7 @@
  */
 
 import type { SuggestedBuyerRole } from "@/lib/product-research/contract";
+import { vocab } from "@/lib/product-config";
 
 export type ProductCompletionState =
   | "approved"
@@ -100,7 +101,7 @@ export function formatPersonaCriteriaSummary(
 /**
  * Soft check: product name should plausibly match the website domain label.
  * Returns null when no warning; otherwise a short user-facing message.
- * Does not block save — typos like "salesforecater" vs "salesforecaster" should surface.
+ * Does not block save — typos like "acmecopr" vs "acmecorp" should surface.
  */
 export function productNameDomainMismatchWarning(
   name: string,
@@ -122,10 +123,10 @@ export function productNameDomainMismatchWarning(
     return null;
   }
 
-  return `Product name doesn’t look like it matches ${domainLabel} from the website URL. Check for typos — this name is used in research prompts and outreach.`;
+  return `${vocab.product.Singular} name doesn’t look like it matches ${domainLabel} from the website URL. Check for typos — this name is used in research prompts and ${vocab.outreach.singular}.`;
 }
 
-/** Hostname brand label: "https://www.salesforecaster.io" → "salesforecaster". */
+/** Hostname brand label: "https://www.acmecorp.example" → "acmecorp". */
 export function extractWebsiteDomainLabel(websiteUrl: string): string | null {
   try {
     const withProtocol = /:\/\//.test(websiteUrl)

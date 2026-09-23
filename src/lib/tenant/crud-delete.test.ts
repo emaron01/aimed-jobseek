@@ -123,7 +123,7 @@ describe("setup delete authorization policy", () => {
     );
     expect(src).toContain("ConfirmDeleteForm");
     expect(src).toContain("Historical scoring snapshots");
-    expect(src).toContain("ICPs");
+    expect(src).toContain("vocab.icp.plural");
   });
 
   it("campaign workspace delete confirmation shows contact, draft, and sent counts", async () => {
@@ -171,16 +171,16 @@ describe("setup delete authorization policy", () => {
       "utf8",
     );
     expect(page).toContain("CampaignStageShell");
-    expect(page).toContain("Continue to List");
+    expect(page).toContain("`Continue to ${vocab.list.Singular}`");
     expect(page).toContain("Continue to Companies");
-    expect(page).toContain("Continue to Contacts");
+    expect(page).toContain("`Continue to ${vocab.contact.Plural}`");
     expect(page).toContain("Continue to Emails");
     expect(page).toContain("An offer is optional");
     expect(offer).toContain("campaign-offer-next-step");
-    expect(offer).toContain("Continue to List");
-    expect(offer).toContain("Optional. Not required to save or continue to List.");
+    expect(offer).toContain("Continue to {vocab.list.Singular}");
+    expect(offer).toContain("Optional. Not required to save or continue to ${vocab.list.Singular}.");
     expect(manager).toContain("campaign-list-score-hint");
-    expect(manager).toContain("Go to Lists to research and score");
+    expect(manager).toContain("Go to {vocab.list.Plural} to research and score");
   });
 });
 
@@ -820,7 +820,7 @@ describe.skipIf(!hasDatabase)(
         fs.readFileSync("src/lib/tenant/data.ts", "utf8"),
       );
       expect(src).toContain("still referenced by");
-      expect(src).toContain("campaign(s)");
+      expect(src).toContain("${vocab.campaign.singular}(s)");
       expect(src).toContain("scoring run(s)");
       expect(src).toContain("archivedAt");
     });

@@ -11,6 +11,7 @@ import {
   updateCampaignOffer,
 } from "@/lib/campaign/settings";
 import { TenantError } from "@/lib/tenant/errors";
+import { vocab } from "@/lib/product-config";
 
 export type CampaignOfferActionResult = {
   ok: boolean;
@@ -36,7 +37,7 @@ export async function updateCampaignOfferAction(
   const campaignId = String(formData.get("campaignId") ?? "").trim();
   const values = readOffer(formData);
   if (!campaignId) {
-    return { ok: false, message: "Campaign is required.", values };
+    return { ok: false, message: `${vocab.campaign.Singular} is required.`, values };
   }
 
   try {
@@ -76,7 +77,7 @@ export async function updateCampaignOfferAction(
       message:
         error instanceof TenantError
           ? error.message
-          : "Unable to update the campaign offer. Please try again.",
+          : `Unable to update the ${vocab.campaign.singular} offer. Please try again.`,
       values,
     };
   }

@@ -23,6 +23,7 @@ import {
   type ProductDraftListField,
   type ProductDraftStringField,
 } from "@/lib/product-research/review";
+import { vocab } from "@/lib/product-config";
 
 const initial: ProductSetupActionResult | null = null;
 
@@ -236,7 +237,7 @@ export function ProductResynthesisReview({
       <div className="space-y-3">
         <p className="text-sm text-amber-900">
           {errorSafe ||
-            "Re-synthesis could not be completed. Your approved product was not changed."}
+            `Re-synthesis could not be completed. Your approved ${vocab.product.singular} was not changed.`}
         </p>
         <form action={retryAction} className="flex flex-wrap gap-2">
           <input type="hidden" name="productId" value={productId} />
@@ -263,8 +264,8 @@ export function ProductResynthesisReview({
     <div className="space-y-6" data-testid="product-resynthesis-review">
       <p className="text-sm text-slate-600">
         Review the proposed update for <strong>{productName}</strong>. Confirm
-        only replaces the fields listed below — your product id, campaigns,
-        ICPs, personas, and scoring runs stay linked. Cancel leaves the product
+        only replaces the fields listed below — your {vocab.product.singular} id, {vocab.campaign.plural},
+        {vocab.icp.plural}, {vocab.persona.plural}, and scoring runs stay linked. Cancel leaves the {vocab.product.singular}
         untouched.
       </p>
 

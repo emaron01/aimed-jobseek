@@ -5,6 +5,7 @@
 
 import type { ProductDraft } from "@/lib/product-research/contract";
 import { PRODUCT_URL_UNREADABLE_MESSAGE } from "@/lib/product-research/extraction-quality";
+import { vocab } from "@/lib/product-config";
 
 export type ProductReviewSource = {
   id: string;
@@ -79,7 +80,7 @@ export const PRODUCT_DRAFT_FIELD_HINTS: Record<
 > = {
   name: "The product name as you want it used in emails and scoring.",
   websiteUrl: "Primary product or company URL.",
-  description: "What this product is, in plain language.",
+  description: `What this ${vocab.product.singular} is, in plain language.`,
   valueProposition: "The core value a buyer gets.",
   problemsSolved: "One problem per line.",
   capabilities: "One capability per line.",
@@ -405,7 +406,7 @@ export function describeProductSourceLead(input: {
     return {
       kind: "failed_read",
       sentence: PRODUCT_URL_UNREADABLE_MESSAGE,
-      detail: `${extracted} Paste the product description into the paste field and try again.`,
+      detail: `${extracted} Paste the ${vocab.product.singular} description into the paste field and try again.`,
       names: [],
       failedUrls,
     };
@@ -417,7 +418,7 @@ export function describeProductSourceLead(input: {
       sentence:
         "We could not build a usable product profile from the material available.",
       detail:
-        "Almost every field was unknown. Paste the product description into the paste field and try again.",
+        `Almost every field was unknown. Paste the ${vocab.product.singular} description into the paste field and try again.`,
       names: describeReadSources(acquired).names,
       failedUrls,
     };

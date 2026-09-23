@@ -103,7 +103,7 @@ export const REVOPS_PERSONA_DRAFT_FIXTURE = {
     },
     {
       "note": null,
-      "claim": "SalesForecaster.io is designed for B2B teams that need stricter deal evidence without adding RevOps headcount.",
+      "claim": "ForecastWorks.io is designed for B2B teams that need stricter deal evidence without adding RevOps headcount.",
       "sourceIds": [
         "cmt3d2a6x000npr2op7op6q2m"
       ],

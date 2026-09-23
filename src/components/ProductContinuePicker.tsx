@@ -3,6 +3,7 @@ import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { vocab } from "@/lib/product-config";
 
 /** Substitute in `continuePathTemplate` (e.g. `/setup/{productId}/icps/new`). */
 export const PRODUCT_CONTINUE_PATH_PRODUCT_ID = "{productId}";
@@ -43,13 +44,13 @@ export function ProductContinuePicker({
   return (
     <div className="space-y-4">
       <label className="block text-sm text-slate-700">
-        <span className="mb-2 block font-medium text-slate-900">Product</span>
+        <span className="mb-2 block font-medium text-slate-900">{vocab.product.Singular}</span>
         <select
           className="w-full max-w-md rounded-md border border-slate-300 bg-white px-3 py-2"
           value={productId}
           onChange={(event) => setProductId(event.target.value)}
         >
-          <option value="">Select a product</option>
+          <option value="">Select {vocab.product.aSingular}</option>
           {products.map((product) => (
             <option key={product.id} value={product.id}>
               {product.name}

@@ -29,6 +29,7 @@ import {
 import { buildPersonaInterpretationMessages } from "@/lib/interpretation/persona-prompt";
 import { sanitizePersonaInterpretedCriteria } from "@/lib/interpretation/persona-sanitize";
 import type { PersonaAuthoritativeFields } from "@/lib/persona/save";
+import { vocab } from "@/lib/product-config";
 
 function criterionRowToSnapshot(row: PersonaCriterion): CriterionSnapshot {
   return {
@@ -126,7 +127,7 @@ export async function updatePersonaCriterionManual(input: {
   });
   if (!existing) {
     throw new TenantError(
-      "Persona criterion not found in the active organization.",
+      `${vocab.persona.Singular} criterion not found in the active organization.`,
     );
   }
 
@@ -212,7 +213,7 @@ async function persistLegacyCriteria(
     where: { id: personaId, organizationId },
   });
   if (!persona) {
-    throw new TenantError("Persona not found in the active organization.");
+    throw new TenantError(`${vocab.persona.Singular} not found in the active organization.`);
   }
 
   const count = await prisma.personaCriterion.count({
@@ -243,7 +244,7 @@ export async function interpretPersonaDefinition(input: {
     include: { product: true, criteria: { orderBy: { sortOrder: "asc" } } },
   });
   if (!persona) {
-    throw new TenantError("Persona not found in the active organization.");
+    throw new TenantError(`${vocab.persona.Singular} not found in the active organization.`);
   }
 
   const fields = personaToAuthoritativeFields(persona);
@@ -259,7 +260,7 @@ export async function interpretPersonaDefinition(input: {
 
   if (!hasAuthoritativeInput) {
     throw new TenantError(
-      "Persona requires a definition or role fields before interpretation.",
+      `${vocab.persona.Singular} requires a definition or role fields before interpretation.`,
     );
   }
 
@@ -297,7 +298,7 @@ export async function interpretPersonaDefinition(input: {
 
     if (aiDrafts.length === 0) {
       throw new TenantError(
-        "Interpretation produced no usable criteria. Adjust the Persona definition and try again.",
+        `Interpretation produced no usable criteria. Adjust the ${vocab.persona.Singular} definition and try again.`,
       );
     }
 

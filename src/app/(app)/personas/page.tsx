@@ -5,6 +5,7 @@ import { EmptyState, PageHeader, PRIMARY_BUTTON_CLASS, TenantMissing } from "@/c
 import { cn } from "@/lib/utils";
 import { listPersonas, listProducts } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
+import { vocab } from "@/lib/product-config";
 
 export default async function PersonasPage({
   searchParams,
@@ -19,8 +20,8 @@ export default async function PersonasPage({
     return (
       <div>
         <PageHeader
-          title="Personas"
-          description="Buyer personas across your products."
+          title={vocab.persona.Plural}
+          description={`${vocab.buyer.Singular} ${vocab.persona.plural} across your ${vocab.product.plural}.`}
         />
         <TenantMissing />
       </div>
@@ -37,8 +38,8 @@ export default async function PersonasPage({
   return (
     <div>
       <PageHeader
-        title="Personas"
-        description="Org-wide persona list. Open a persona to manage titles, criteria, and rebuilds."
+        title={vocab.persona.Plural}
+        description={`Org-wide ${vocab.persona.singular} list. Open ${vocab.persona.aSingular} to manage titles, criteria, and rebuilds.`}
         actions={
           canCreate ? (
             <Link
@@ -49,14 +50,14 @@ export default async function PersonasPage({
               }
               className={PRIMARY_BUTTON_CLASS}
             >
-              New persona
+              New {vocab.persona.singular}
             </Link>
           ) : (
             <span
-              title="Add a product first"
+              title={`Add ${vocab.product.aSingular} first`}
               className="inline-flex cursor-not-allowed items-center justify-center rounded-md bg-slate-300 px-3.5 py-2 text-sm font-medium text-slate-500"
             >
-              New persona
+              New {vocab.persona.singular}
             </span>
           )
         }
@@ -76,22 +77,22 @@ export default async function PersonasPage({
 
       {personas.length === 0 ? (
         <EmptyState
-          title="No personas yet"
-          description="A persona is a buyer role you score and email against — titles, responsibilities, and discriminators that separate good fits from bad ones."
+          title={`No ${vocab.persona.plural} yet`}
+          description={`${vocab.persona.ASingular} is ${vocab.buyer.aSingular} role you score and email against — titles, responsibilities, and discriminators that separate good fits from bad ones.`}
           actions={
             canCreate ? (
               <Link
                 href="/personas/new"
                 className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
               >
-                New persona
+                New {vocab.persona.singular}
               </Link>
             ) : (
               <Link
                 href="/products/new"
                 className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
               >
-                New product
+                New {vocab.product.singular}
               </Link>
             )
           }
@@ -101,8 +102,8 @@ export default async function PersonasPage({
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-slate-500">
               <tr>
-                <th className="px-4 py-3 font-medium">Persona</th>
-                <th className="px-4 py-3 font-medium">Product</th>
+                <th className="px-4 py-3 font-medium">{vocab.persona.Singular}</th>
+                <th className="px-4 py-3 font-medium">{vocab.product.Singular}</th>
                 <th className="px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>

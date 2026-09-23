@@ -5,19 +5,20 @@ import { StartFreeTrialButton } from "@/components/billing/StartFreeTrialButton"
 import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
 import type { CatalogPlanEntry } from "@/lib/billing/billing-catalog";
 import { cn } from "@/lib/utils";
-
-const ENTERPRISE_CONTACT = "mailto:erik@salesforecaster.io";
+import { features, supportMailtoHref, vocab } from "@/lib/product-config";
 
 export function PlanSelector({
   plans,
   trialPeriodDays,
   disabledReason,
   priceLabels,
+  supportEmail,
 }: {
   plans: CatalogPlanEntry[];
   trialPeriodDays: number | null;
   disabledReason?: string | null;
   priceLabels: Record<string, string | null>;
+  supportEmail: string;
 }) {
   const standard =
     plans.find((p) => p.planCode === "STANDARD" && p.active) ?? null;
@@ -45,11 +46,11 @@ export function PlanSelector({
             selected={selected === "STANDARD"}
             onSelect={() => setSelected("STANDARD")}
             title={standard.displayName}
-            tagline={standard.tagline || "For individual salespeople"}
+            tagline={standard.tagline || `For individual ${vocab.salesperson.plural}`}
             priceLabel={priceLabels.STANDARD}
           />
         ) : null}
-        {team ? (
+        {features.teamPlanDisplay && team ? (
           <PlanCard
             selected={selected === "TEAM"}
             onSelect={() => setSelected("TEAM")}
@@ -58,7 +59,7 @@ export function PlanSelector({
             priceLabel={priceLabels.TEAM}
           />
         ) : null}
-        {enterprise ? (
+        {features.enterprisePlanDisplay && enterprise ? (
           <PlanCard
             selected={selected === "ENTERPRISE"}
             onSelect={() => setSelected("ENTERPRISE")}
@@ -93,7 +94,7 @@ export function PlanSelector({
             </div>
           ) : null}
 
-          {selected === "TEAM" ? (
+          {features.teamSeats && selected === "TEAM" ? (
             <label className="block text-sm text-slate-700">
               Seats (2–10)
               <select
@@ -110,14 +111,14 @@ export function PlanSelector({
             </label>
           ) : null}
 
-          {selected === "ENTERPRISE" ? (
+          {selected === "ENTERPRISE" && features.contactSales ? (
             <a
-              href={ENTERPRISE_CONTACT}
+              href={supportMailtoHref(supportEmail)}
               className={cn(PRIMARY_BUTTON_CLASS, "w-full !px-4 !py-3")}
             >
               Contact us
             </a>
-          ) : (
+          ) : selected === "ENTERPRISE" ? null : (
             <StartFreeTrialButton
               disabledReason={disabledReason}
               trialPeriodDays={trialPeriodDays}

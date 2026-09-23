@@ -13,6 +13,7 @@ import {
   BILLING_PLAN_ENTERPRISE,
 } from "@/lib/billing/plans";
 import { billingPlanLabel } from "@/lib/billing/billing-state";
+import { brand, vocab } from "@/lib/product-config";
 
 describe("billing.catalog", () => {
   it("seeds Standard with current floors and marketing bullets", () => {
@@ -25,6 +26,7 @@ describe("billing.catalog", () => {
     expect(standard!.entitlementFloors.paid.companyResearchLimit).toBe(100);
     expect(standard!.entitlementFloors.paid.dailyAiGenerationLimit).toBe(500);
     expect(standard!.companyCredits?.blockSize).toBe(100);
+    expect(standard!.tagline).toBe(`For individual ${vocab.salesperson.plural}`);
     expect(standard!.featureBullets.length).toBeGreaterThan(2);
     expect(PLATFORM_SETTING_BILLING_CATALOG).toBe("billing.catalog");
   });
@@ -37,6 +39,9 @@ describe("billing.catalog", () => {
     expect(team?.entitlementFloors.paid.companiesPerSeat).toBe(150);
     expect(team?.entitlementFloors.paid.seatMin).toBe(2);
     expect(team?.entitlementFloors.paid.seatMax).toBe(10);
+    expect(enterprise?.featureBullets.some((b) => b.includes(brand.appName))).toBe(
+      true,
+    );
     expect(enterprise?.sellable).toBe(false);
     expect(enterprise?.entitlementFloors.paid.seatMax).toBeNull();
     expect(team?.companyCredits?.blockSize).toBe(100);

@@ -29,6 +29,7 @@ import {
   assertCanViewOwnedWork,
   getWorkActor,
 } from "@/lib/work/ownership";
+import { vocab } from "@/lib/product-config";
 
 function requiredString(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -64,7 +65,7 @@ async function startResearchRun(input: {
     where: { id: input.contactListId, organizationId },
     select: { ownerUserId: true },
   });
-  if (!list) throw new TenantError("Contact list was not found.");
+  if (!list) throw new TenantError(`${vocab.contact.Singular} ${vocab.list.singular} was not found.`);
   assertCanModifyOwnedWork(actor, list.ownerUserId, "Contact list");
 
   const result = await createResearchRun({
@@ -102,7 +103,7 @@ export async function researchCompaniesForContactListAction(
   const forceRefresh = requiredString(formData, "forceRefresh") === "1";
 
   if (!contactListId) {
-    return { ok: false, message: "Contact list is required." };
+    return { ok: false, message: `${vocab.contact.Singular} ${vocab.list.singular} is required.` };
   }
 
   try {
@@ -112,7 +113,7 @@ export async function researchCompaniesForContactListAction(
       where: { id: contactListId, organizationId: actor.organizationId },
       select: { ownerUserId: true },
     });
-    if (!list) throw new TenantError("Contact list was not found.");
+    if (!list) throw new TenantError(`${vocab.contact.Singular} ${vocab.list.singular} was not found.`);
     assertCanModifyOwnedWork(actor, list.ownerUserId, "Contact list");
     if (!forceRefresh) {
       const plan = await getCompaniesNeedingResearchForContactList(contactListId);
@@ -308,7 +309,7 @@ export async function refreshCompanyResearchAction(
         where: { id: contactListId, organizationId: actor.organizationId },
         select: { ownerUserId: true },
       });
-      if (!list) throw new TenantError("Contact list was not found.");
+      if (!list) throw new TenantError(`${vocab.contact.Singular} ${vocab.list.singular} was not found.`);
       assertCanModifyOwnedWork(actor, list.ownerUserId, "Contact list");
     }
     const result = await researchCompany(companyId, { force: true });

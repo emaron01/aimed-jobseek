@@ -119,7 +119,7 @@ export const CRO_PERSONA_DRAFT_FIXTURE = {
     },
     {
       "note": null,
-      "claim": "SalesForecaster.io is positioned to identify unsupported commits, validate deal evidence, surface qualification gaps, and provide executive forecast visibility.",
+      "claim": "ForecastWorks.io is positioned to identify unsupported commits, validate deal evidence, surface qualification gaps, and provide executive forecast visibility.",
       "sourceIds": [
         "cmt3d2a6x000npr2op7op6q2m"
       ],
@@ -270,7 +270,7 @@ export const CRO_PERSONA_DRAFT_FIXTURE = {
     "Ensure managers address deal risk and qualification gaps before forecast misses"
   ],
   "personaSpecificPositioning": [
-    "Position SalesForecaster.io as AI-powered forecast governance for revenue leaders who need to know which commits are real.",
+    "Position ForecastWorks.io as AI-powered forecast governance for revenue leaders who need to know which commits are real.",
     "Emphasize that Matthew challenges CRM forecast optimism against deal evidence, validates buying signals, and flags unsupported commits.",
     "Show how executive dashboards and continuous risk visibility can help leaders prioritize coaching before forecast meetings.",
     "For larger organizations, connect the platform to multi-manager rollups, expanded reporting, and broader revenue-governance needs without asserting undisclosed functionality."

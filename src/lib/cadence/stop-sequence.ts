@@ -4,6 +4,7 @@ import type { SequenceStopReason } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
 import { recomputeCampaignContactCadence } from "@/lib/cadence/recompute";
+import { vocab } from "@/lib/product-config";
 
 export async function stopSequenceForContact(input: {
   campaignContactId: string;
@@ -20,7 +21,7 @@ export async function stopSequenceForContact(input: {
   });
   if (!row) {
     throw new TenantError(
-      "Campaign contact does not belong to the active organization.",
+      `${vocab.campaign.Singular} ${vocab.contact.singular} does not belong to the active organization.`,
     );
   }
   const now = new Date();
@@ -49,7 +50,7 @@ export async function restoreSequenceForContact(input: {
   });
   if (!row) {
     throw new TenantError(
-      "Campaign contact does not belong to the active organization.",
+      `${vocab.campaign.Singular} ${vocab.contact.singular} does not belong to the active organization.`,
     );
   }
   if (
@@ -57,7 +58,7 @@ export async function restoreSequenceForContact(input: {
     row.sequenceStoppedReason !== "MAX_SEQUENCE"
   ) {
     throw new TenantError(
-      "Only manually stopped or max-sequence contacts can be restored.",
+      `Only manually stopped or max-${vocab.sequence.singular} ${vocab.contact.plural} can be restored.`,
     );
   }
   await prisma.campaignContact.update({

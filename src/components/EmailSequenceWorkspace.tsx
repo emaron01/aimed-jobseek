@@ -40,6 +40,7 @@ import {
   deeplinkSendDeclinedStorageKey,
   formatDailySendAdvisory,
 } from "@/lib/usage/send-advisory";
+import { vocab } from "@/lib/product-config";
 
 type SequenceDraft = {
   id: string;
@@ -113,7 +114,7 @@ export function EmailSequenceWorkspace({
   suggestedPersonaName = null,
   personaDecisionReason = null,
   personalizationTier = "THIN",
-  personalizationLabel = "Persona and product only",
+  personalizationLabel = `${vocab.persona.Singular} and ${vocab.product.singular} only`,
   personalizationDetail = "No usable company or contact research.",
   personalizationSources = "No company research available. No contact research available.",
   campaignEmailLength = "MEDIUM",
@@ -350,7 +351,7 @@ export function EmailSequenceWorkspace({
       setResult({
         ok: false,
         message: readOnly
-          ? "This campaign is archived and read-only."
+          ? `This ${vocab.campaign.singular} is archived and read-only.`
           : "This address is on the organization do-not-contact list.",
       });
       return;
@@ -721,7 +722,7 @@ export function EmailSequenceWorkspace({
         </div>
         {readOnly ? (
           <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            This campaign is archived and read-only.
+            This {vocab.campaign.singular} is archived and read-only.
           </p>
         ) : null}
         {suppressed ? (
@@ -732,7 +733,7 @@ export function EmailSequenceWorkspace({
         ) : null}
         <dl className="mt-3">
           <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            Contact status
+            {vocab.contact.Singular} status
           </dt>
           <dd className="mt-1 text-sm text-slate-900">{contactStatus}</dd>
         </dl>
@@ -756,14 +757,14 @@ export function EmailSequenceWorkspace({
                 />
               </svg>
               <span>
-                When this prospect replies, click the email they replied to,
+                When this {vocab.prospect.singular} replies, click the email they replied to,
                 choose Draft reply, and paste what they wrote — we will draft a
                 response you can send.
               </span>
             </p>
           ) : null}
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            Sequence
+            {vocab.sequence.Singular}
           </p>
           <div className="mt-2 space-y-2">
             {drafts.map((draft) => {
@@ -835,7 +836,7 @@ export function EmailSequenceWorkspace({
             }
             className={cn(SECONDARY_BUTTON_CLASS, "mt-3", "disabled:border-slate-200", "disabled:bg-slate-50", "disabled:text-slate-400", "!px-3")}
           >
-            + Add email to sequence
+            + Add email to {vocab.sequence.singular}
           </button>
           {!canAdd ? (
             <p className="mt-1 text-xs text-slate-500">{addDisabledReason}</p>
@@ -897,8 +898,8 @@ export function EmailSequenceWorkspace({
             ) : null}
             {result.referralSuggested ? (
               <p className="mt-1 text-xs font-medium text-amber-700">
-                Referral detected. A new contact may need to be added; no
-                contact was created automatically.
+                Referral detected. A new {vocab.contact.singular} may need to be added; no
+                {vocab.contact.singular} was created automatically.
               </p>
             ) : null}
             {result.recoveryAction === "RECONNECT" ||
@@ -931,7 +932,7 @@ export function EmailSequenceWorkspace({
               Length for this email
             </legend>
             <p className="mt-1 text-xs text-slate-500">
-              Campaign default is {emailLengthLabel(campaignEmailLength)}.
+              {vocab.campaign.Singular} default is {emailLengthLabel(campaignEmailLength)}.
             </p>
             <div className="mt-2 flex flex-wrap gap-3">
               {EMAIL_LENGTH_OPTIONS.map((value) => (
@@ -961,27 +962,27 @@ export function EmailSequenceWorkspace({
                 className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950"
                 data-testid="persona-confirmation-prompt"
               >
-                <p className="font-medium">This contact needs a persona</p>
+                <p className="font-medium">This {vocab.contact.singular} needs {vocab.persona.aSingular}</p>
                 <p className="mt-1 text-xs text-amber-900">
                   {personaDecisionReason ??
-                    "No persona was matched during scoring."}
+                    `No ${vocab.persona.singular} was matched during scoring.`}
                   {suggestedPersonaName
-                    ? ` Campaign default: ${suggestedPersonaName}.`
+                    ? ` ${vocab.campaign.Singular} default: ${suggestedPersonaName}.`
                     : ""}
                 </p>
               </div>
             ) : null}
             <label className="block text-sm">
-              <span className="font-medium text-slate-700">Persona for this email</span>
+              <span className="font-medium text-slate-700">{vocab.persona.Singular} for this email</span>
               {resolvedPersonaName && !needsPersonaConfirmation ? (
                 <span className="mt-1 block text-xs text-slate-500">
                   {hasPersonaDecision && resolvedPersonaId
-                    ? `Resolved persona: ${resolvedPersonaName}. Change before generating if needed.`
+                    ? `Resolved ${vocab.persona.singular}: ${resolvedPersonaName}. Change before generating if needed.`
                     : null}
                 </span>
               ) : needsPersonaConfirmation ? (
                 <span className="mt-1 block text-xs text-slate-500">
-                  Confirm which persona applies before generating.
+                  Confirm which {vocab.persona.singular} applies before generating.
                 </span>
               ) : null}
               <select
@@ -991,7 +992,7 @@ export function EmailSequenceWorkspace({
                 className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
               >
                 {personaOptions.length === 0 ? (
-                  <option value="">No personas available</option>
+                  <option value="">No {vocab.persona.plural} available</option>
                 ) : null}
                 {personaOptions.map((persona) => (
                   <option key={persona.id} value={persona.id}>
@@ -1022,7 +1023,7 @@ export function EmailSequenceWorkspace({
             {aiBusy
               ? "Generating…"
               : needsPersonaConfirmation
-                ? "Confirm persona & generate Email 1"
+                ? `Confirm ${vocab.persona.singular} & generate Email 1`
                 : "Generate Email 1"}
           </button>
         ) : (
@@ -1116,7 +1117,7 @@ export function EmailSequenceWorkspace({
                         ) : null}
                         {conflict.matchedGuard ? (
                           <p className="mt-1 text-xs text-amber-900">
-                            Product restriction: {conflict.matchedGuard}
+                            {vocab.product.Singular} restriction: {conflict.matchedGuard}
                           </p>
                         ) : null}
                       </li>
@@ -1217,7 +1218,7 @@ export function EmailSequenceWorkspace({
                       title={
                         contactEmail
                           ? `Open in ${option.label} with the current on-screen copy.`
-                          : "Add an email address to this contact first."
+                          : `Add an email address to this ${vocab.contact.singular} first.`
                       }
                       onClick={() => openInEmailClient(option.client)}
                       className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:text-slate-400"
@@ -1298,7 +1299,7 @@ export function EmailSequenceWorkspace({
                       title={
                         contactEmail
                           ? `Open this sent email in ${option.label}.`
-                          : "Add an email address to this contact first."
+                          : `Add an email address to this ${vocab.contact.singular} first.`
                       }
                       onClick={() => openInEmailClient(option.client)}
                       className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:text-slate-400"
@@ -1311,8 +1312,8 @@ export function EmailSequenceWorkspace({
                     disabled={!canDraftReply || aiBusy}
                     title={
                       canDraftReply
-                        ? "Paste the prospect reply."
-                        : "Open a sent email in this sequence to draft a reply."
+                        ? `Paste the ${vocab.prospect.singular} reply.`
+                        : `Open a sent email in this ${vocab.sequence.singular} to draft a reply.`
                     }
                     onClick={() => setShowReplyBox((value) => !value)}
                     className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:text-slate-400"
@@ -1342,7 +1343,7 @@ export function EmailSequenceWorkspace({
                       "!px-3",
                     )}
                   >
-                    + Add email to sequence
+                    + Add email to {vocab.sequence.singular}
                   </button>
                   {!sequenceStopped ? (
                     <button
@@ -1357,7 +1358,7 @@ export function EmailSequenceWorkspace({
                       }
                       className="rounded-md border border-rose-200 px-3 py-2 text-sm font-medium text-rose-800"
                     >
-                      Stop sequence
+                      Stop {vocab.sequence.singular}
                     </button>
                   ) : sequenceStoppedReason === "MANUAL_STOP" ||
                     sequenceStoppedReason === "MAX_SEQUENCE" ? (
@@ -1374,7 +1375,7 @@ export function EmailSequenceWorkspace({
                       }
                       className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium"
                     >
-                      Restore sequence
+                      Restore {vocab.sequence.singular}
                     </button>
                   ) : null}
                 </div>
@@ -1389,7 +1390,7 @@ export function EmailSequenceWorkspace({
                 </p>
                 <label className="block text-sm">
                   <span className="font-medium text-slate-700">
-                    Paste what the prospect wrote
+                    Paste what the {vocab.prospect.singular} wrote
                   </span>
                   <textarea
                     value={replyText}

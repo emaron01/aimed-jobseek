@@ -53,7 +53,7 @@ describe("test database guard", () => {
   it("allows loopback even when .env.local also names localhost", () => {
     expect(() =>
       assertSafeTestDatabaseUrl(
-        "postgresql://email_platform_test:email_platform_test@127.0.0.1:5433/email_platform_test",
+        "postgresql://aimedjobseek_test:aimedjobseek_test@127.0.0.1:5435/aimedjobseek_test",
         { productionHost: "localhost" },
       ),
     ).not.toThrow();
@@ -73,10 +73,10 @@ describe("test database guard", () => {
       DATABASE_URL:
         "postgresql://u:p@dpg-abc123-a.oregon-postgres.render.com/email_platform",
       TEST_DATABASE_URL:
-        "postgresql://email_platform_test:email_platform_test@127.0.0.1:5433/email_platform_test",
+        "postgresql://aimedjobseek_test:aimedjobseek_test@127.0.0.1:5435/aimedjobseek_test",
     };
     configureVitestDatabase(env);
-    expect(env.DATABASE_URL).toContain("127.0.0.1:5433");
+    expect(env.DATABASE_URL).toContain("127.0.0.1:5435");
   });
 
   it("hard-fails configure when TEST_DATABASE_URL is a Render host", () => {

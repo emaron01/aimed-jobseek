@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { vocab } from "@/lib/product-config";
 
 /**
  * Locked / canceled org → Stripe Checkout to start a new subscription.
@@ -46,8 +47,8 @@ export function ResubscribeCheckoutButton() {
         {pending ? "Redirecting…" : "Resubscribe"}
       </button>
       <p className="text-xs text-slate-500">
-        Opens Stripe Checkout. Within 30 days of cancel you keep contacts,
-        campaigns, and your opt-out list; after that only your setup remains.
+        Opens Stripe Checkout. Within 30 days of cancel you keep {vocab.contact.plural},
+        {vocab.campaign.plural}, and your opt-out list; after that only your setup remains.
       </p>
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
     </div>

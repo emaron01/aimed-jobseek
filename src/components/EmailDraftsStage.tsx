@@ -20,6 +20,7 @@ import {
   lookaheadGenerateEmailDraftAction,
   type LookaheadGenerateEmailDraftResult,
 } from "@/app/actions/email";
+import { vocab } from "@/lib/product-config";
 
 export type EmailDraftsStageContact = {
   campaignContactId: string;
@@ -350,7 +351,7 @@ export function EmailDraftsStage({
             }
             className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
           >
-            <option value="all">All contacts</option>
+            <option value="all">All {vocab.contact.plural}</option>
             <option value="ready_to_send">Ready to send</option>
           </select>
         </label>
@@ -374,11 +375,11 @@ export function EmailDraftsStage({
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)]">
           <nav
-            aria-label="Campaign contacts"
+            aria-label={`${vocab.campaign.Singular} ${vocab.contact.plural}`}
             className="rounded-md border border-slate-200 bg-slate-50 p-2"
           >
             <p className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-slate-500">
-              Contacts
+              {vocab.contact.Plural}
               {contactFilter === "ready_to_send"
                 ? ` (${visibleContacts.length})`
                 : ""}

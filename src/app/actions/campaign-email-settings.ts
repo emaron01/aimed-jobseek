@@ -7,6 +7,7 @@ import {
 } from "@/lib/campaign/save";
 import { updateCampaignEmailSettings } from "@/lib/campaign/settings";
 import { TenantError } from "@/lib/tenant/errors";
+import { vocab } from "@/lib/product-config";
 
 export async function updateCampaignEmailSettingsAction(
   _prev: CampaignEmailSettingsActionResult | null,
@@ -16,7 +17,7 @@ export async function updateCampaignEmailSettingsAction(
   const parsed = parseCampaignEmailSettingsFormData(formData);
 
   if (!campaignId) {
-    return { ok: false, message: "Campaign is required.", values: parsed.values };
+    return { ok: false, message: `${vocab.campaign.Singular} is required.`, values: parsed.values };
   }
 
   if (Object.keys(parsed.fieldErrors).length > 0) {

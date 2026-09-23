@@ -45,6 +45,7 @@ import {
   assertCanModifyOwnedWork,
   getWorkActor,
 } from "@/lib/work/ownership";
+import { vocab } from "@/lib/product-config";
 
 async function orgId(): Promise<string> {
   return requireOrganizationId();
@@ -153,7 +154,7 @@ export async function deleteProduct(id: string): Promise<{
 
   if (existing._count.campaigns > 0) {
     throw new TenantError(
-      `Product could not be deleted because it is still referenced by ${existing._count.campaigns} campaign(s). Remove or reassign those campaigns first.`,
+      `${vocab.product.Singular} could not be deleted because it is still referenced by ${existing._count.campaigns} ${vocab.campaign.singular}(s). Remove or reassign those ${vocab.campaign.plural} first.`,
     );
   }
 
@@ -176,7 +177,7 @@ export async function deleteProduct(id: string): Promise<{
     ]);
     return {
       mode: "archived",
-      message: `Product archived because ${existing._count.scoringRuns} scoring run(s) reference it. Historical scoring snapshots were preserved. The product no longer appears in setup.`,
+      message: `${vocab.product.Singular} archived because ${existing._count.scoringRuns} scoring run(s) reference it. Historical scoring snapshots were preserved. The ${vocab.product.singular} no longer appears in setup.`,
     };
   }
 
@@ -211,7 +212,7 @@ export async function deleteProduct(id: string): Promise<{
 
   return {
     mode: "deleted",
-    message: "Product deleted.",
+    message: `${vocab.product.Singular} deleted.`,
   };
 }
 
@@ -221,7 +222,7 @@ async function requireProductInOrg(productId: string): Promise<Product> {
     where: { id: productId, organizationId, archivedAt: null },
   });
   if (!product) {
-    throw new TenantError("Product does not belong to the active organization.");
+    throw new TenantError(`${vocab.product.Singular} does not belong to the active organization.`);
   }
   return product;
 }
@@ -319,7 +320,7 @@ export async function deleteIcp(id: string): Promise<{
 
   if (existing._count.campaigns > 0) {
     throw new TenantError(
-      `ICP could not be deleted because it is still referenced by ${existing._count.campaigns} campaign(s).`,
+      `${vocab.icp.singular} could not be deleted because it is still referenced by ${existing._count.campaigns} ${vocab.campaign.singular}(s).`,
     );
   }
 
@@ -330,12 +331,12 @@ export async function deleteIcp(id: string): Promise<{
     });
     return {
       mode: "archived",
-      message: `ICP archived because ${existing._count.scoringRuns} scoring run(s) reference it. Historical snapshots were preserved.`,
+      message: `${vocab.icp.singular} archived because ${existing._count.scoringRuns} scoring run(s) reference it. Historical snapshots were preserved.`,
     };
   }
 
   await prisma.icp.delete({ where: { id: existing.id } });
-  return { mode: "deleted", message: "ICP deleted." };
+  return { mode: "deleted", message: `${vocab.icp.singular} deleted.` };
 }
 
 // --- Personas ---
@@ -429,7 +430,7 @@ export async function deletePersona(id: string): Promise<{
     const campaignCount =
       existing._count.campaigns + existing._count.campaignPersonas;
     throw new TenantError(
-      `Persona could not be deleted because it is still referenced by ${campaignCount} campaign(s). Remove or reassign those campaigns first.`,
+      `${vocab.persona.Singular} could not be deleted because it is still referenced by ${campaignCount} ${vocab.campaign.singular}(s). Remove or reassign those ${vocab.campaign.plural} first.`,
     );
   }
 
@@ -441,7 +442,7 @@ export async function deletePersona(id: string): Promise<{
     });
     return {
       mode: "archived",
-      message: `Persona archived because ${existing._count.scoringRuns} scoring run(s) reference it. Historical scoring snapshots were not changed. The persona no longer appears in setup.`,
+      message: `${vocab.persona.Singular} archived because ${existing._count.scoringRuns} scoring run(s) reference it. Historical scoring snapshots were not changed. The ${vocab.persona.singular} no longer appears in setup.`,
     };
   }
 
@@ -455,7 +456,7 @@ export async function deletePersona(id: string): Promise<{
 
   return {
     mode: "deleted",
-    message: "Persona deleted.",
+    message: `${vocab.persona.Singular} deleted.`,
   };
 }
 
@@ -599,10 +600,10 @@ export async function importContactList(input: {
   const name = input.name.trim();
 
   if (!name) {
-    throw new TenantError("List name is required.");
+    throw new TenantError(`${vocab.list.Singular} name is required.`);
   }
   if (input.contacts.length === 0) {
-    throw new TenantError("No contacts to import.");
+    throw new TenantError(`No ${vocab.contact.plural} to import.`);
   }
 
   try {
@@ -685,7 +686,7 @@ export async function importContactList(input: {
     return result;
   } catch (error) {
     console.error("importContactList failed", error);
-    throw new TenantError("Import failed. No partial list was left behind.");
+    throw new TenantError(`Import failed. No partial ${vocab.list.singular} was left behind.`);
   }
 }
 
@@ -806,7 +807,7 @@ export async function listCampaigns(options?: {
     userId = await currentUserId();
   }
   if (!userId) {
-    throw new TenantError("Sign in required to list campaigns.");
+    throw new TenantError(`Sign in required to list ${vocab.campaign.plural}.`);
   }
 
   let canViewEveryCampaign = false;
@@ -905,27 +906,27 @@ export async function createCampaign(input: {
   ]);
 
   if (!product) {
-    throw new TenantError("Product does not belong to the active organization.");
+    throw new TenantError(`${vocab.product.Singular} does not belong to the active organization.`);
   }
   if (!icp) {
-    throw new TenantError("ICP does not belong to the active organization.");
+    throw new TenantError(`${vocab.icp.singular} does not belong to the active organization.`);
   }
   if (input.personaId && !fallbackPersona) {
-    throw new TenantError("Persona does not belong to the active organization.");
+    throw new TenantError(`${vocab.persona.Singular} does not belong to the active organization.`);
   }
   if (icp.productId !== product.id) {
-    throw new TenantError("ICP does not belong to the selected product.");
+    throw new TenantError(`${vocab.icp.singular} does not belong to the selected ${vocab.product.singular}.`);
   }
   if (fallbackPersona && fallbackPersona.productId !== product.id) {
-    throw new TenantError("Persona does not belong to the selected product.");
+    throw new TenantError(`${vocab.persona.Singular} does not belong to the selected ${vocab.product.singular}.`);
   }
   if (inPlayPersonas.length !== inPlayIds.length) {
     throw new TenantError(
-      "One or more personas do not belong to the active organization.",
+      `One or more ${vocab.persona.plural} do not belong to the active organization.`,
     );
   }
   if (inPlayPersonas.some((persona) => persona.productId !== product.id)) {
-    throw new TenantError("Persona does not belong to the selected product.");
+    throw new TenantError(`${vocab.persona.Singular} does not belong to the selected ${vocab.product.singular}.`);
   }
 
   const fallbackPersonaId =
@@ -957,7 +958,7 @@ export async function createCampaign(input: {
     });
     if (contacts.length !== contactIds.length) {
       throw new TenantError(
-        "One or more selected contacts do not belong to the active organization.",
+        `One or more selected ${vocab.contact.plural} do not belong to the active organization.`,
       );
     }
     if (
@@ -968,7 +969,7 @@ export async function createCampaign(input: {
       )
     ) {
       throw new TenantError(
-        "Contacts whose only lists are archived cannot be added to a campaign.",
+        `${vocab.contact.Plural} whose only ${vocab.list.plural} are archived cannot be added to ${vocab.campaign.aSingular}.`,
       );
     }
     if (
@@ -978,7 +979,7 @@ export async function createCampaign(input: {
       )
     ) {
       throw new TenantError(
-        "Contacts without an email address cannot be added to a campaign.",
+        `${vocab.contact.Plural} without an email address cannot be added to ${vocab.campaign.aSingular}.`,
       );
     }
     const { listActiveNormalizedEmails, contactMatchesSuppressionSet } =
@@ -989,7 +990,7 @@ export async function createCampaign(input: {
     );
     if (contacts.some((contact) => contactMatchesSuppressionSet(contact.email, suppressed))) {
       throw new TenantError(
-        "One or more selected contacts are on the organization do-not-contact list.",
+        `One or more selected ${vocab.contact.plural} are on the organization do-not-contact list.`,
       );
     }
   }
@@ -1065,7 +1066,7 @@ export async function deleteCampaign(id: string): Promise<{
 
   return {
     mode: "deleted",
-    message: `Campaign deleted. Removed ${impact.contactCount} contact(s), ${impact.draftCount} draft(s), and ${impact.sentCount} sent email(s).`,
+    message: `${vocab.campaign.Singular} deleted. Removed ${impact.contactCount} ${vocab.contact.singular}(s), ${impact.draftCount} draft(s), and ${impact.sentCount} sent email(s).`,
     impact,
   };
 }
@@ -1077,7 +1078,7 @@ export async function assertContactBelongsToOrg(contactId: string): Promise<void
     select: { id: true },
   });
   if (!contact) {
-    throw new TenantError("Contact does not belong to the active organization.");
+    throw new TenantError(`${vocab.contact.Singular} does not belong to the active organization.`);
   }
 }
 
@@ -1088,7 +1089,7 @@ export async function assertCampaignBelongsToOrg(campaignId: string): Promise<vo
     select: { id: true },
   });
   if (!campaign) {
-    throw new TenantError("Campaign does not belong to the active organization.");
+    throw new TenantError(`${vocab.campaign.Singular} does not belong to the active organization.`);
   }
 }
 
@@ -1223,30 +1224,30 @@ export async function createScoringRun(input: {
   ]);
 
   if (!list) {
-    throw new TenantError("Contact list does not belong to the active organization.");
+    throw new TenantError(`${vocab.contact.Singular} ${vocab.list.singular} does not belong to the active organization.`);
   }
   assertCanModifyOwnedWork(actor, list.ownerUserId, "Contact list");
   if (sourceCampaign) {
     assertCanModifyOwnedWork(actor, sourceCampaign.ownerUserId, "Campaign");
     if (sourceCampaign.ownerUserId !== list.ownerUserId) {
       throw new TenantError(
-        "A scoring run and its campaign must belong to the same user.",
+        `A scoring run and its ${vocab.campaign.singular} must belong to the same user.`,
       );
     }
   }
   if (list.archivedAt) {
     throw new TenantError(
-      "This list is archived and is read-only. Unarchive it before scoring.",
+      `This ${vocab.list.singular} is archived and is read-only. Unarchive it before scoring.`,
     );
   }
   if (!product) {
-    throw new TenantError("Product does not belong to the active organization.");
+    throw new TenantError(`${vocab.product.Singular} does not belong to the active organization.`);
   }
   if (!icp) {
-    throw new TenantError("ICP does not belong to the active organization.");
+    throw new TenantError(`${vocab.icp.singular} does not belong to the active organization.`);
   }
   if (icp.productId !== product.id) {
-    throw new TenantError("ICP does not belong to the selected product.");
+    throw new TenantError(`${vocab.icp.singular} does not belong to the selected ${vocab.product.singular}.`);
   }
 
   const personaRows = input.personaId
@@ -1266,7 +1267,7 @@ export async function createScoringRun(input: {
     );
   }
   if (personaRows.some((persona) => persona.productId !== product.id)) {
-    throw new TenantError("Persona does not belong to the selected product.");
+    throw new TenantError(`${vocab.persona.Singular} does not belong to the selected ${vocab.product.singular}.`);
   }
 
   const contacts = await prisma.contact.findMany({
@@ -1281,7 +1282,7 @@ export async function createScoringRun(input: {
   });
 
   if (contacts.length === 0) {
-    throw new TenantError("This list has no contacts to score.");
+    throw new TenantError(`This ${vocab.list.singular} has no ${vocab.contact.plural} to score.`);
   }
 
   // Best-effort company association before creating the run (tenant-scoped).

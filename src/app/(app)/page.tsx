@@ -10,6 +10,7 @@ import { getHomeWorkflow } from "@/lib/workflow/home";
 import { DueContactsPanel } from "@/components/DueContactsPanel";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
 import { canViewAllRepWork } from "@/lib/work/ownership";
+import { anyListFeatureEnabled, vocab } from "@/lib/product-config";
 
 function HomeNavLink({ href, label }: { href: string; label: string }) {
   return (
@@ -45,7 +46,7 @@ export default async function DashboardPage({
       <div>
         <PageHeader
           title="Home"
-          description="Organization-scoped overview of lists, contacts, and campaigns."
+          description={`Organization-scoped overview of ${vocab.list.plural}, ${vocab.contact.plural}, and ${vocab.campaign.plural}.`}
         />
         <TenantMissing />
       </div>
@@ -63,16 +64,18 @@ export default async function DashboardPage({
     <div className="mx-auto w-full max-w-6xl">
       <PageHeader
         title="Home"
-        description={`Work campaigns for ${organization.name} from qualification through sending.`}
+        description={`Work ${vocab.campaign.plural} for ${organization.name} from qualification through sending.`}
         actions={
           <>
             <ShowArchivedToggle
               href={includeArchived ? "/" : "/?archived=1"}
               includeArchived={includeArchived}
-              label="campaigns"
+              label={vocab.campaign.plural}
             />
-            <HomeNavLink href="/lists" label="Lists" />
-            <HomeNavLink href="/campaigns" label="Campaigns" />
+            {anyListFeatureEnabled() ? (
+              <HomeNavLink href="/lists" label={vocab.list.Plural} />
+            ) : null}
+            <HomeNavLink href="/campaigns" label={vocab.campaign.Plural} />
           </>
         }
       />
@@ -92,50 +95,49 @@ export default async function DashboardPage({
       ) : null}
 
       <div className="mt-8 mb-4 flex items-center justify-between gap-4">
-        <h2 className="text-xl font-semibold text-slate-900">Campaigns</h2>
+        <h2 className="text-xl font-semibold text-slate-900">{vocab.campaign.Plural}</h2>
         {workflow.setupComplete ? (
           <Link
             href="/campaigns/new"
             className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
           >
-            New campaign
+            New {vocab.campaign.singular}
           </Link>
         ) : (
           <button
             type="button"
             disabled
-            title="Finish product setup first"
+            title={`Finish ${vocab.product.singular} setup first`}
             className="cursor-not-allowed rounded-md bg-slate-300 px-3 py-2 text-sm font-medium text-slate-500"
           >
-            New campaign
+            New {vocab.campaign.singular}
           </button>
         )}
       </div>
       {!workflow.setupComplete ? (
         <p className="mb-4 text-sm text-slate-500">
-          Campaign creation unlocks after at least one product is approved with an
-          ICP that has criteria and a saved persona. Voice and email connection are
-          optional. Existing campaigns stay available.
+          {vocab.campaign.Singular} creation unlocks after at least one {vocab.product.singular} is approved with {vocab.icp.aSingular} that has criteria and a saved {vocab.persona.singular}. Voice and email connection are
+          optional. Existing {vocab.campaign.plural} stay available.
         </p>
       ) : null}
       {workflow.campaigns.length === 0 ? (
         <section className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
           <h3 className="font-semibold text-slate-900">
             {workflow.setupComplete
-              ? "Start your first campaign"
-              : "No campaigns yet"}
+              ? `Start your first ${vocab.campaign.singular}`
+              : `No ${vocab.campaign.plural} yet`}
           </h3>
           <p className="mt-1 text-sm text-slate-600">
             {workflow.setupComplete
-              ? "Select the setup you already approved, then attach a list."
-              : "Finish product setup to create a campaign."}
+              ? `Select the setup you already approved, then attach ${vocab.list.aSingular}.`
+              : `Finish ${vocab.product.singular} setup to create ${vocab.campaign.aSingular}.`}
           </p>
           {workflow.setupComplete ? (
             <Link
               href="/campaigns/new"
               className={cn(PRIMARY_BUTTON_CLASS, "mt-4", "!px-3")}
             >
-              New campaign
+              New {vocab.campaign.singular}
             </Link>
           ) : null}
         </section>
@@ -158,7 +160,7 @@ export default async function DashboardPage({
                     ) : null}
                   </h3>
                   <p className="mt-1 text-sm text-slate-600">
-                    {campaign.context || "Campaign setup"}
+                    {campaign.context || `${vocab.campaign.Singular} setup`}
                   </p>
                 </div>
                 {campaign.emailsToWrite > 0 ? (
@@ -177,7 +179,7 @@ export default async function DashboardPage({
                   <dd className="font-semibold">{campaign.qualified}</dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">Contacts</dt>
+                  <dt className="text-slate-500">{vocab.contact.Plural}</dt>
                   <dd className="font-semibold">{campaign.contacts}</dd>
                 </div>
                 <div>

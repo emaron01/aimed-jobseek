@@ -10,6 +10,7 @@ import type { EmailCompanyResearch } from "@/lib/email-generation/company-resear
 import { prisma } from "@/lib/prisma";
 import { resolveActiveOrganization } from "@/lib/auth/session";
 import { TenantError } from "@/lib/tenant/errors";
+import { vocab } from "@/lib/product-config";
 import { evidenceFragments } from "@/lib/campaign/offer-validation";
 import {
   isResearchFresh,
@@ -270,12 +271,12 @@ export async function loadEmailGenerationContext(
   });
   if (!campaignContact) {
     throw new TenantError(
-      "Campaign contact was not found in the active organization.",
+      `${vocab.campaign.Singular} ${vocab.contact.singular} was not found in the active organization.`,
     );
   }
   if (campaignContact.campaign.ownerUserId !== userId) {
     throw new TenantError(
-      "This campaign is read-only because it belongs to another user.",
+      `This ${vocab.campaign.singular} is read-only because it belongs to another user.`,
     );
   }
 
@@ -289,7 +290,7 @@ export async function loadEmailGenerationContext(
     campaign.icp.organizationId !== organizationId
   ) {
     throw new TenantError(
-      "Campaign contact relationships do not belong to the active organization.",
+      `${vocab.campaign.Singular} ${vocab.contact.singular} relationships do not belong to the active organization.`,
     );
   }
 
@@ -401,8 +402,8 @@ export async function loadEmailGenerationContext(
     throw new TenantError(
       resolved.needsConfirmation
         ? resolved.decisionReason ??
-          "Choose a persona for this contact before generating an email."
-        : "No persona is available for this contact.",
+          `Choose ${vocab.persona.aSingular} for this ${vocab.contact.singular} before generating an email.`
+        : `No ${vocab.persona.singular} is available for this ${vocab.contact.singular}.`,
     );
   }
   const emailLength = options?.emailLength ?? campaign.emailLength;

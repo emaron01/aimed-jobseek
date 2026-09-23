@@ -15,6 +15,7 @@ import { loadEffectiveTrialPeriod } from "@/lib/billing/effective-trial";
 import { stripeConfigured } from "@/lib/billing/stripe";
 import { OnboardingPlanSelector } from "@/components/billing/OnboardingPlanSelector";
 import { defaultBillingCatalogSetting } from "@/lib/billing/billing-catalog";
+import { getBrandDeployment } from "@/lib/product-config/deployment";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,7 @@ export default async function OnboardingSubscribePage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const { supportEmail } = getBrandDeployment();
   const { organization } = await requireOrgAdmin();
   const params = searchParams ? await searchParams : {};
   const checkoutState =
@@ -234,6 +236,7 @@ export default async function OnboardingSubscribePage({
         initialPlanCode={lockedPlanCode ?? BILLING_PLAN_STANDARD}
         initialSeatQuantity={lockedSeatQuantity}
         lockSelection={lockSelection}
+        supportEmail={supportEmail}
       />
     </div>
   );

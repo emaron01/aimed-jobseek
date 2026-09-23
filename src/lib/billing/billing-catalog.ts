@@ -15,6 +15,7 @@ import {
   type PlanEntitlements,
 } from "@/lib/billing/plans";
 import { DEFAULT_USAGE_POLICY_VALUES } from "@/lib/usage/defaults";
+import { brand, vocab } from "@/lib/product-config";
 
 export const PLATFORM_SETTING_BILLING_CATALOG = "billing.catalog";
 
@@ -288,7 +289,7 @@ export function defaultBillingCatalogSetting(): BillingCatalogSettingValue {
       {
         planCode: BILLING_PLAN_STANDARD,
         displayName: "Standard",
-        tagline: "For individual salespeople",
+        tagline: `For individual ${vocab.salesperson.plural}`,
         featureBullets: [
           "Research up to 100 companies on Standard",
           "Up to 50 curated emails per day (1,000 per month)",
@@ -326,7 +327,7 @@ export function defaultBillingCatalogSetting(): BillingCatalogSettingValue {
           "2–10 seats with self-serve seat adds",
           "150 researched companies per user",
           "Same email limits as Standard, per user",
-          "Shared campaigns across the team",
+          `Shared ${vocab.campaign.plural} across the team`,
           "Emails sent through each user's own mailbox",
         ],
         trialNote:
@@ -357,8 +358,8 @@ export function defaultBillingCatalogSetting(): BillingCatalogSettingValue {
         tagline: "For larger teams",
         featureBullets: [
           "Same per-user entitlements as Team",
-          "Seat cap set by Sales Forecaster for your org",
-          "Shared campaigns and admin activity views",
+          `Seat cap set by ${brand.appName} for your org`,
+          `Shared ${vocab.campaign.plural} and admin activity views`,
           "Contact us to get started",
         ],
         trialNote: "",

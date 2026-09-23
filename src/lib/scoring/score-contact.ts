@@ -26,6 +26,7 @@ import {
   deterministicContactQualification,
   type DeterministicQualificationSkipReason,
 } from "@/lib/workflow/qualification";
+import { vocab } from "@/lib/product-config";
 
 export type ScoreContactResult = {
   contactScoreId: string;
@@ -142,7 +143,7 @@ export async function scoreSingleContact(input: {
 
   if (!scoreRow) {
     throw new TenantError(
-      "Contact score not found in the active organization.",
+      `${vocab.contact.Singular} score not found in the active organization.`,
     );
   }
 

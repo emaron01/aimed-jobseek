@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { ProductCatalogPanel } from "@/components/ProductCatalogPanel";
 import { listProductsWithCounts } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
+import { vocab } from "@/lib/product-config";
 
 export default async function ProductsPage() {
   const organization = await getCurrentOrganization();
@@ -13,8 +14,8 @@ export default async function ProductsPage() {
     return (
       <div>
         <PageHeader
-          title="Products"
-          description="Define products, then attach ICPs and personas to each product."
+          title={vocab.product.Plural}
+          description={`Define ${vocab.product.plural}, then attach ${vocab.icp.plural} and ${vocab.persona.plural} to each ${vocab.product.singular}.`}
         />
         <TenantMissing />
       </div>
@@ -26,14 +27,14 @@ export default async function ProductsPage() {
   return (
     <div>
       <PageHeader
-        title="Products"
-        description="Products are reusable. Each product has its own ICPs and personas. Offers are defined later on each campaign."
+        title={vocab.product.Plural}
+        description={`${vocab.product.Plural} are reusable. Each ${vocab.product.singular} has its own ${vocab.icp.plural} and ${vocab.persona.plural}. Offers are defined later on each ${vocab.campaign.singular}.`}
         actions={
           <Link
             href="/products/new"
             className={PRIMARY_BUTTON_CLASS}
           >
-            New product
+            New {vocab.product.singular}
           </Link>
         }
       />
@@ -42,14 +43,14 @@ export default async function ProductsPage() {
 
       {products.length === 0 ? (
         <EmptyState
-          title="No products yet"
-          description="A product is what you sell — research it once, then define the ICPs and personas that belong to it."
+          title={`No ${vocab.product.plural} yet`}
+          description={`${vocab.product.ASingular} is what you sell — research it once, then define the ${vocab.icp.plural} and ${vocab.persona.plural} that belong to it.`}
           actions={
             <Link
               href="/products/new"
               className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
             >
-              New product
+              New {vocab.product.singular}
             </Link>
           }
         />

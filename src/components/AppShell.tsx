@@ -15,6 +15,7 @@ import {
 } from "@/lib/auth/user-menu";
 import { billingPlanLabel } from "@/lib/billing/billing-state";
 import { planAllowsReferrals } from "@/lib/billing/plans";
+import { features } from "@/lib/product-config";
 import {
   listOwnedBilledOrganizationsAsideFrom,
   listWorkspacesForUser,
@@ -107,7 +108,9 @@ export async function AppShell({
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
           menuModel={menuModel}
-          showReferrals={planAllowsReferrals(billingPlanCode)}
+          showReferrals={
+            features.referralProgram && planAllowsReferrals(billingPlanCode)
+          }
         />
         {pastDueReadOnly && !paymentLocked ? (
           <div

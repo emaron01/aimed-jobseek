@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { resolveTitleSuggestionAction } from "@/app/actions/scoring";
 import { PrimaryButton, SecondaryButton } from "@/components/ui";
+import { countedNoun, vocab } from "@/lib/product-config";
 
 export type TitleSuggestionView = {
   id: string;
@@ -30,9 +31,9 @@ export function TitleSuggestionReview({
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-600">
-        These titles did not match any persona's likely titles. Approve a
-        proposal to add the title permanently and score those contacts, assign
-        a different persona, or dismiss so this product is not asked again.
+        These titles did not match any {vocab.persona.singular}'s likely titles. Approve a
+        proposal to add the title permanently and score those {vocab.contact.plural}, assign
+        a different {vocab.persona.singular}, or dismiss so this {vocab.product.singular} is not asked again.
       </p>
       <div className="space-y-3">
         {pending.map((suggestion) => (
@@ -93,8 +94,7 @@ function TitleSuggestionRow({
           {suggestion.unmatchedTitle}
         </p>
         <p className="text-xs text-slate-500">
-          {suggestion.contactCount} contact
-          {suggestion.contactCount === 1 ? "" : "s"}
+          {countedNoun(suggestion.contactCount, vocab.contact)}
         </p>
       </div>
       <p className="mt-1 text-sm text-slate-700">
@@ -107,7 +107,7 @@ function TitleSuggestionRow({
           </>
         ) : (
           <span className="font-medium text-slate-800">
-            No persona match proposed
+            No {vocab.persona.singular} match proposed
           </span>
         )}
       </p>
@@ -123,14 +123,14 @@ function TitleSuggestionRow({
           {pending ? "Saving…" : "Approve"}
         </PrimaryButton>
         <label className="text-sm">
-          <span className="sr-only">Assign to persona</span>
+          <span className="sr-only">Assign to {vocab.persona.singular}</span>
           <select
             value={personaId}
             onChange={(event) => setPersonaId(event.target.value)}
             className="rounded-md border border-slate-300 bg-white px-2 py-2 text-sm"
             disabled={pending}
           >
-            <option value="">Assign to a different persona</option>
+            <option value="">Assign to a different {vocab.persona.singular}</option>
             {personas.map((persona) => (
               <option key={persona.id} value={persona.id}>
                 {persona.name}

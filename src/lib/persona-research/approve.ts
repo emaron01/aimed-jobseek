@@ -15,6 +15,7 @@ import {
 } from "@/lib/persona-research/project-signals";
 import { getResearchPolicy } from "@/lib/usage/policy";
 import { recordUsageEvent } from "@/lib/usage/events";
+import { vocab } from "@/lib/product-config";
 
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -50,10 +51,10 @@ export async function approvePersonaFromSetupRun(input: {
     where: { id: input.productId, organizationId: input.organizationId },
   });
   if (!product) {
-    throw new TenantError("Product not found in the active organization.");
+    throw new TenantError(`${vocab.product.Singular} not found in the active organization.`);
   }
   if (product.approvalStatus !== "APPROVED") {
-    throw new TenantError("Product must be approved before approving a Persona.");
+    throw new TenantError(`${vocab.product.Singular} must be approved before approving a ${vocab.persona.Singular}.`);
   }
 
   const run = await prisma.personaSetupRun.findFirst({
@@ -64,7 +65,7 @@ export async function approvePersonaFromSetupRun(input: {
     },
   });
   if (!run?.personaDraftJson) {
-    throw new TenantError("Persona setup run draft not found.");
+    throw new TenantError(`${vocab.persona.Singular} setup run draft not found.`);
   }
 
   const draft = run.personaDraftJson as PersonaAiDraft;

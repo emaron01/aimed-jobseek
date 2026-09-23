@@ -13,6 +13,7 @@ import {
   type PersonaReviewSource,
 } from "@/lib/persona-research/persona-briefing";
 import { buildSourceIndex } from "@/lib/research/source-index";
+import { vocab } from "@/lib/product-config";
 
 function ClaimLine({
   text,
@@ -258,7 +259,7 @@ export function PersonaBriefingDocument({
       </ResearchReadSection>
 
       <ResearchReadSection
-        title="What they want from the product"
+        title={`What they want from the ${vocab.product.singular}`}
         empty={briefing.desiredOutcomes.length === 0}
       >
         <ul className="list-disc space-y-2 pl-5 text-[17px]">
@@ -372,7 +373,7 @@ export function PersonaBriefingDocument({
           />
           <CriteriaGroup
             title="What excludes"
-            emptyLabel="No exclusions — no contact will be disqualified on persona fit alone."
+            emptyLabel={`No exclusions — no ${vocab.contact.singular} will be disqualified on ${vocab.persona.singular} fit alone.`}
             rows={criteriaGroups.excludes}
           />
           <CriteriaGroup

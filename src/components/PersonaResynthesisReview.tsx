@@ -21,6 +21,7 @@ import {
   draftFieldsToTextSnapshot,
   type PersonaResynthesisTextSnapshot,
 } from "@/lib/persona-research/resynthesize-approved-plan";
+import { vocab } from "@/lib/product-config";
 
 const initial: PersonaSetupActionResult | null = null;
 
@@ -270,7 +271,7 @@ export function PersonaResynthesisReview({
       <div className="space-y-3">
         <p className="text-sm text-amber-900">
           {errorSafe ||
-            "Persona rebuild could not be completed. Your current persona was not changed."}
+            `${vocab.persona.Singular} rebuild could not be completed. Your current ${vocab.persona.singular} was not changed.`}
         </p>
         <form action={retryAction} className="flex flex-wrap gap-2">
           <input type="hidden" name="productId" value={productId} />
@@ -307,7 +308,7 @@ export function PersonaResynthesisReview({
       label: "Primary responsibilities",
       formKey: "responsibilities",
     },
-    { key: "painPoints", label: "Pain points", formKey: "painPoints" },
+    { key: "painPoints", label: vocab.painPoint.Plural, formKey: "painPoints" },
     {
       key: "desiredOutcomes",
       label: "Desired outcomes",
@@ -324,8 +325,8 @@ export function PersonaResynthesisReview({
     <div className="space-y-6" data-testid="persona-resynthesis-review">
       <p className="text-sm text-slate-600">
         Review the proposed rebuild for <strong>{personaName}</strong>. Confirm
-        only replaces the fields listed below — your persona id, campaigns, and
-        scoring history stay linked. Cancel leaves the persona untouched.
+        only replaces the fields listed below — your {vocab.persona.singular} id, {vocab.campaign.plural}, and
+        scoring history stay linked. Cancel leaves the {vocab.persona.singular} untouched.
       </p>
 
       <div className="grid gap-4 md:grid-cols-2">

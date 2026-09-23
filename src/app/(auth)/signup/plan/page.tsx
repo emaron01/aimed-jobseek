@@ -9,6 +9,7 @@ import {
   BILLING_PLAN_TEAM,
 } from "@/lib/billing/plans";
 import { SignupPlanSelector } from "@/components/billing/SignupPlanSelector";
+import { getBrandDeployment } from "@/lib/product-config/deployment";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export const dynamic = "force-dynamic";
  * Stores plan + Team seat quantity in an httpOnly cookie, then /signup.
  */
 export default async function SignupPlanPage() {
+  const { supportEmail } = getBrandDeployment();
   const defaults = defaultBillingCatalogSetting();
   const [
     priceCatalog,
@@ -108,6 +110,7 @@ export default async function SignupPlanPage() {
           fallbackEnterprise,
           null,
         )}
+        supportEmail={supportEmail}
       />
 
       <p className="text-center text-sm text-slate-500">

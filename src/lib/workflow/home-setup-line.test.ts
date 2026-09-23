@@ -4,6 +4,7 @@ import {
   formatProductSetupClause,
 } from "@/lib/workflow/home-setup-line";
 import { getProductCampaignReadiness } from "@/lib/workflow/product-campaign-readiness";
+import { countedNoun, vocab } from "@/lib/product-config";
 
 describe("home setup line", () => {
   it("names each product that still needs work", () => {
@@ -30,7 +31,7 @@ describe("home setup line", () => {
       totalPersonas: 5,
     });
     expect(line.text).toBe(
-      "OT NOM ready · Mathew Sales Forecaster needs an ICP",
+      `OT NOM ready · Mathew Sales Forecaster needs ${vocab.icp.aSingular}`,
     );
     expect(line.href).toBe("/products");
   });
@@ -49,7 +50,9 @@ describe("home setup line", () => {
       totalIcps: 2,
       totalPersonas: 8,
     });
-    expect(line.text).toBe("Setup complete · 2 products · 2 ICPs · 8 personas");
+    expect(line.text).toBe(
+      `Setup complete · ${countedNoun(2, vocab.product)} · ${countedNoun(2, vocab.icp)} · ${countedNoun(8, vocab.persona)}`,
+    );
   });
 
   it("maps persona blocker to readable clause", () => {
@@ -62,6 +65,6 @@ describe("home setup line", () => {
           personas: [],
         }),
       ),
-    ).toBe("Acme needs a persona");
+    ).toBe(`Acme needs ${vocab.persona.aSingular}`);
   });
 });

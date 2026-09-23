@@ -25,7 +25,7 @@ describe("connected-send production language", () => {
       .map((file) => readFileSync(join(process.cwd(), file), "utf8"))
       .join("\n");
     expect(source).not.toMatch(
-      /SalesForecaster|forecast audit|forecast accuracy|revenue intelligence/i,
+      /ForecastWorks|forecast audit|forecast accuracy|revenue intelligence/i,
     );
   });
 

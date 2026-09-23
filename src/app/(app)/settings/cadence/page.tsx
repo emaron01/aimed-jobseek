@@ -7,6 +7,7 @@ import {
   updateOrganizationCadencePolicyAction,
 } from "@/app/actions/cadence";
 import { requireOrgAdmin } from "@/lib/org/authz";
+import { vocab } from "@/lib/product-config";
 
 export default async function CadenceSettingsPage() {
   const { organization } = await requireOrgAdmin();
@@ -79,11 +80,11 @@ export default async function CadenceSettingsPage() {
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
             />
             <span className="mt-1 block text-xs text-slate-500">
-              Only applies when max sequence is unlimited.
+              Only applies when max {vocab.sequence.singular} is unlimited.
             </span>
           </label>
           <label className="text-sm sm:col-span-2">
-            Max emails in sequence
+            Max emails in {vocab.sequence.singular}
             <select
               name="maxSequenceEmails"
               defaultValue={

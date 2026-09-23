@@ -22,6 +22,7 @@ import type {
 } from "@/lib/product-research/contract";
 import { normalizeSuggestedBuyerRoles } from "@/lib/setup/product-overview";
 import { PRODUCT_RESYNTHESIS_USER_CONTEXT_FLAG } from "@/lib/product-research/resynthesize-approved";
+import { vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ productId: string }>;
@@ -34,7 +35,7 @@ export default async function ProductResearchPage({ params }: PageProps) {
   if (!organization) {
     return (
       <div>
-        <PageHeader title="Product research" />
+        <PageHeader title={`${vocab.product.Singular} research`} />
         <TenantMissing />
       </div>
     );
@@ -154,13 +155,13 @@ export default async function ProductResearchPage({ params }: PageProps) {
       <div data-print-hide>
         <PageHeader
           title={`Research: ${product.name}`}
-          description="Research the Product once. Approve it. Then build Personas one at a time."
+          description={`Research the ${vocab.product.Singular} once. Approve it. Then build ${vocab.persona.Plural} one at a time.`}
           actions={
             <Link
               href={`/setup/${product.id}`}
               className={SECONDARY_BUTTON_CLASS}
             >
-              Product setup
+              {vocab.product.Singular} setup
             </Link>
           }
         />
@@ -175,8 +176,8 @@ export default async function ProductResearchPage({ params }: PageProps) {
         >
           <p className="font-medium">
             {failedRead
-              ? "We could not read your product website"
-              : "Product synthesis could not be completed"}
+              ? `We could not read your ${vocab.product.singular} website`
+              : `${vocab.product.Singular} synthesis could not be completed`}
           </p>
           <p className="mt-2">
             {failedUrlErrors[0] ||
@@ -185,9 +186,9 @@ export default async function ProductResearchPage({ params }: PageProps) {
           </p>
           <p className="mt-3 font-medium">What to do next</p>
           <p className="mt-1">
-            Paste the product description, or use{" "}
+            Paste the {vocab.product.singular} description, or use{" "}
             <strong>Upload materials</strong> below with a whitepaper, use
-            cases, datasheet, or product overview. That path works reliably for
+            cases, datasheet, or {vocab.product.singular} overview. That path works reliably for
             JavaScript-heavy sites.
           </p>
           {!failedRead ? (

@@ -16,6 +16,7 @@ import { TenantError } from "@/lib/tenant/errors";
 import { getResearchWorkerConcurrency } from "@/lib/research/config";
 import { isProviderLevelFailure } from "@/lib/research/failure-classification";
 import type { ResearchRunView } from "@/lib/research/run-types";
+import { vocab } from "@/lib/product-config";
 
 export type { ResearchRunView } from "@/lib/research/run-types";
 export {
@@ -230,7 +231,7 @@ export async function createResearchRun(
         ok: false,
         code: "ACTIVE_RUN",
         activeRunId: existing.id,
-        message: "A research run is already in progress for this list.",
+        message: `A research run is already in progress for this ${vocab.list.singular}.`,
       };
     }
   }
@@ -351,7 +352,7 @@ export async function createResearchRun(
         ok: false,
         code: "ACTIVE_RUN",
         activeRunId: active?.id ?? "",
-        message: "A research run is already in progress for this list.",
+        message: `A research run is already in progress for this ${vocab.list.singular}.`,
       };
     }
     throw error;

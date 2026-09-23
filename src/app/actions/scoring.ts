@@ -13,6 +13,7 @@ import {
   getWorkActor,
 } from "@/lib/work/ownership";
 import { TenantError } from "@/lib/tenant/getCurrentOrganization";
+import { vocab } from "@/lib/product-config";
 
 function requiredString(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -40,7 +41,7 @@ export async function createScoringRunAction(
   const allPersonas = personaRaw === ALL_PERSONAS_VALUE;
 
   if (!contactListId || !productId || !icpId || (!allPersonas && !personaRaw)) {
-    return { ok: false, message: "Product, ICP, and Persona are required." };
+    return { ok: false, message: `${vocab.product.Singular}, ${vocab.icp.singular}, and ${vocab.persona.Singular} are required.` };
   }
 
   try {

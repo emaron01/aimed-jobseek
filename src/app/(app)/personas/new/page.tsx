@@ -3,6 +3,7 @@ import { ProductContinuePicker } from "@/components/ProductContinuePicker";
 import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
 import { listProducts } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
+import { vocab } from "@/lib/product-config";
 
 export default async function NewPersonaPage({
   searchParams,
@@ -17,8 +18,8 @@ export default async function NewPersonaPage({
     return (
       <div>
         <PageHeader
-          title="New persona"
-          description="Build a buyer persona."
+          title={`New ${vocab.persona.singular}`}
+          description={`Build ${vocab.buyer.aSingular} ${vocab.persona.singular}.`}
         />
         <TenantMissing />
       </div>
@@ -37,14 +38,14 @@ export default async function NewPersonaPage({
   return (
     <div>
       <PageHeader
-        title="New persona"
-        description="Choose which product this persona belongs to, then continue to build it from suggested roles or from scratch."
+        title={`New ${vocab.persona.singular}`}
+        description={`Choose which ${vocab.product.singular} this ${vocab.persona.singular} belongs to, then continue to build it from suggested roles or from scratch.`}
         actions={
           <Link
             href="/personas"
             className={SECONDARY_BUTTON_CLASS}
           >
-            Back to personas
+            Back to {vocab.persona.plural}
           </Link>
         }
       />
@@ -52,11 +53,11 @@ export default async function NewPersonaPage({
       <section className="rounded-lg border border-slate-200 bg-white p-5">
         {products.length === 0 ? (
           <p className="text-sm text-slate-600">
-            Add a product on the{" "}
+            Add {vocab.product.aSingular} on the{" "}
             <Link href="/products/new" className="underline">
-              Products page
+              {vocab.product.Plural} page
             </Link>{" "}
-            before building a persona.
+            before building {vocab.persona.aSingular}.
           </p>
         ) : (
           <ProductContinuePicker
@@ -66,7 +67,7 @@ export default async function NewPersonaPage({
             }))}
             initialProductId={initialProductId}
             continuePathTemplate="/setup/{productId}#personas"
-            continueLabel="Continue to persona setup"
+            continueLabel={`Continue to ${vocab.persona.singular} setup`}
           />
         )}
       </section>

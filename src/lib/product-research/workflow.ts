@@ -10,6 +10,7 @@ import { PRODUCT_URL_UNREADABLE_MESSAGE } from "@/lib/product-research/extractio
 import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
 import type { ProductDraft } from "@/lib/product-research/contract";
+import { vocab } from "@/lib/product-config";
 
 /**
  * End-to-end: acquire/reuse evidence once → single synthesis → drafts for review.
@@ -34,7 +35,7 @@ export async function researchAndBuildProduct(input: {
     where: { id: input.productId, organizationId: input.organizationId },
   });
   if (!product) {
-    throw new TenantError("Product not found in the active organization.");
+    throw new TenantError(`${vocab.product.Singular} not found in the active organization.`);
   }
 
   const acquired = await acquireProductEvidence({
@@ -115,8 +116,8 @@ export async function researchAndBuildProduct(input: {
     correlationId: acquired.correlationId,
     status: acquired.partial ? "PARTIAL" : "NEEDS_REVIEW",
     message: acquired.partial
-      ? "Product draft ready for review (some sources failed)."
-      : "Product draft ready for review.",
+      ? `${vocab.product.Singular} draft ready for review (some sources failed).`
+      : `${vocab.product.Singular} draft ready for review.`,
     sourceCount: acquired.excerpts.length,
     suggestedPersonaCount: synth.result?.suggestedBuyerRoles.length ?? 0,
   };

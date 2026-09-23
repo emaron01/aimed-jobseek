@@ -4,6 +4,7 @@ import {
   TARGET_TITLES_FIELD,
 } from "@/lib/persona/manual-target-titles";
 import type { PersonaCriterionFormRow } from "@/lib/persona-research/project-signals";
+import { vocab } from "@/lib/product-config";
 
 export type PersonaResynthesisTextSnapshot = {
   definition: string;
@@ -95,11 +96,11 @@ export function buildPersonaResynthesisApplyPlan(input: {
 }): PersonaResynthesisApplyPlan {
   const preserved: PersonaResynthesisApplyPlanItem[] = [
     {
-      label: "Persona id",
-      detail: `${input.persona.id} — campaigns, scoring runs, and matched contacts stay linked.`,
+      label: `${vocab.persona.Singular} id`,
+      detail: `${input.persona.id} — ${vocab.campaign.plural}, scoring runs, and matched ${vocab.contact.plural} stay linked.`,
     },
     {
-      label: "Persona name",
+      label: `${vocab.persona.Singular} name`,
       detail: input.persona.name,
     },
   ];
@@ -156,7 +157,7 @@ export function buildPersonaResynthesisApplyPlan(input: {
 
   replaced.push({
     label: "Stored AI profile",
-    detail: "profileJson and persona messaging structures",
+    detail: `profileJson and ${vocab.persona.singular} messaging structures`,
   });
 
   return { preserved, replaced, fieldDiffs };

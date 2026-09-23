@@ -5,6 +5,7 @@ import {
   getOrganizationScopedView,
   recordPlatformOrgView,
 } from "@/lib/platform/orgs";
+import { vocab } from "@/lib/product-config";
 
 /**
  * Scoped read-only customer view for platform operators.
@@ -43,7 +44,7 @@ export default async function PlatformOrgScopedViewPage({
       </div>
 
       <section>
-        <h2 className="text-lg font-medium">Products</h2>
+        <h2 className="text-lg font-medium">{vocab.product.Plural}</h2>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
           {view.products.map((p) => (
             <li key={p.id}>{p.name}</li>
@@ -55,7 +56,7 @@ export default async function PlatformOrgScopedViewPage({
       </section>
 
       <section>
-        <h2 className="text-lg font-medium">ICPs</h2>
+        <h2 className="text-lg font-medium">{vocab.icp.plural}</h2>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
           {view.icps.map((i) => (
             <li key={i.id}>{i.name}</li>
@@ -67,7 +68,7 @@ export default async function PlatformOrgScopedViewPage({
       </section>
 
       <section>
-        <h2 className="text-lg font-medium">Personas</h2>
+        <h2 className="text-lg font-medium">{vocab.persona.Plural}</h2>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
           {view.personas.map((p) => (
             <li key={p.id}>{p.name}</li>
@@ -79,7 +80,7 @@ export default async function PlatformOrgScopedViewPage({
       </section>
 
       <section>
-        <h2 className="text-lg font-medium">Campaigns</h2>
+        <h2 className="text-lg font-medium">{vocab.campaign.Plural}</h2>
         <ul className="mt-2 space-y-3 text-sm">
           {view.campaigns.map((c) => (
             <li

@@ -18,6 +18,7 @@ import {
   SEAT_LIMIT_REACHED_MESSAGE,
   buildSeatSnapshot,
 } from "@/lib/org/seat-limits";
+import { getBrandDeployment } from "@/lib/product-config/deployment";
 
 /** @deprecated Prefer seat-limits; kept for tests/compat. */
 export const FUTURE_PREMIUM_SEAT_MIN = 2;
@@ -31,17 +32,11 @@ export function isCompedPlanCode(planCode: string | null | undefined): boolean {
 }
 
 export function individualOrgAdminInviteBlockMessage(): string {
-  const support =
-    process.env.SUPPORT_EMAIL?.trim() ||
-    process.env.TRANSACTIONAL_EMAIL_SUPPORT_EMAIL?.trim() ||
-    null;
-  const contact = support
-    ? `Contact ${support} if you need a team workspace now.`
-    : "Contact support if you need a team workspace now.";
+  const support = getBrandDeployment().supportEmail;
   return (
     "Individual Standard accounts are limited to one user. " +
     "Choose Team on subscribe, or upgrade from organization settings. " +
-    contact
+    `Contact ${support} if you need a team workspace now.`
   );
 }
 

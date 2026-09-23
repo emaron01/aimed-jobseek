@@ -10,6 +10,7 @@ import {
 import type { CampaignOfferFields } from "@/lib/campaign/offer-validation";
 import { Field, PRIMARY_BUTTON_CLASS, SubmitButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { vocab } from "@/lib/product-config";
 
 const initial: CampaignOfferActionResult | null = null;
 
@@ -52,17 +53,17 @@ export function CampaignOfferForm({
           data-testid="campaign-offer-next-step"
         >
           <p className="text-sm font-medium text-emerald-950">
-            Setup saved. Next: attach a list.
+            Setup saved. Next: attach {vocab.list.aSingular}.
           </p>
           <p className="mt-1 text-sm text-emerald-900">
-            An offer is optional. Continue to the List stage to research, score,
-            and add contacts.
+            An offer is optional. Continue to the {vocab.list.Singular} stage to research, score,
+            and add {vocab.contact.plural}.
           </p>
           <Link
             href={`/campaigns/${campaignId}?stage=list`}
             className={cn(PRIMARY_BUTTON_CLASS, "mt-3")}
           >
-            Continue to List
+            Continue to {vocab.list.Singular}
           </Link>
         </div>
       ) : null}
@@ -72,7 +73,7 @@ export function CampaignOfferForm({
           label="Offer Name"
           name="offerName"
           defaultValue={values.offerName}
-          hint="Optional. Not required to save or continue to List."
+          hint={`Optional. Not required to save or continue to ${vocab.list.Singular}.`}
         />
         <Field
           label="Primary CTA"

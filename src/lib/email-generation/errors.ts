@@ -17,6 +17,7 @@ import { isClaimGuardViolationCode } from "@/lib/email-generation/claim-conflict
 import { TenantError } from "@/lib/tenant/errors";
 import { PaymentLockError } from "@/lib/billing/payment-lock";
 import { UsageQuotaError } from "@/lib/usage/quota";
+import { vocab } from "@/lib/product-config";
 
 export type EmailGenerationErrorInfo = ProductSynthesisErrorInfo;
 
@@ -57,7 +58,7 @@ function userFacingDetail(
     const first = classified.validationIssues?.[0];
     if (first && isClaimGuardViolationCode(first.code)) {
       const detail = first.expected?.trim() || first.code;
-      return `Generated copy conflicts with product restrictions: ${detail}`;
+      return `Generated copy conflicts with ${vocab.product.singular} restrictions: ${detail}`;
     }
     if (first) {
       return `Email draft failed schema validation (${first.path}: ${first.code}). Please try again.`;

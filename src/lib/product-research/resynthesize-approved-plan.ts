@@ -7,6 +7,7 @@ import {
   emptyProductDraft,
   stringifyDraftList,
 } from "@/lib/product-research/review";
+import { vocab } from "@/lib/product-config";
 
 export type ProductResynthesisApplyPlanItem = {
   label: string;
@@ -66,11 +67,11 @@ export function buildProductResynthesisApplyPlan(input: {
 }): ProductResynthesisApplyPlan {
   const preserved: ProductResynthesisApplyPlanItem[] = [
     {
-      label: "Product id",
-      detail: `${input.product.id} — campaigns, ICPs, personas, and scoring runs stay linked.`,
+      label: `${vocab.product.Singular} id`,
+      detail: `${input.product.id} — ${vocab.campaign.plural}, ${vocab.icp.plural}, ${vocab.persona.plural}, and scoring runs stay linked.`,
     },
     {
-      label: "Product name",
+      label: `${vocab.product.Singular} name`,
       detail: input.product.name,
     },
   ];
@@ -105,7 +106,7 @@ export function buildProductResynthesisApplyPlan(input: {
 
   if (replaced.length > 0) {
     replaced.push({
-      label: "Stored product messaging",
+      label: `Stored ${vocab.product.singular} messaging`,
       detail: "messagingJson from the synthesis draft",
     });
   }

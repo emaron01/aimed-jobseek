@@ -10,6 +10,7 @@ import {
 } from "@/lib/tenant/getCurrentOrganization";
 import type { PersonaAiDraft } from "@/lib/persona-research/contract";
 import { getResearchPolicy } from "@/lib/usage/policy";
+import { vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ productId: string; runId: string }>;
@@ -22,7 +23,7 @@ export default async function PersonaSetupRunPage({ params }: PageProps) {
   if (!organization) {
     return (
       <div>
-        <PageHeader title="Persona review" />
+        <PageHeader title={`${vocab.persona.Singular} review`} />
         <TenantMissing />
       </div>
     );
@@ -69,8 +70,8 @@ export default async function PersonaSetupRunPage({ params }: PageProps) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Persona draft: ${product.name}`}
-        description="Review and save to make this Persona authoritative."
+        title={`${vocab.persona.Singular} draft: ${product.name}`}
+        description={`Review and save to make this ${vocab.persona.Singular} authoritative.`}
         actions={
           <Link
             href={`/setup/${product.id}/research`}

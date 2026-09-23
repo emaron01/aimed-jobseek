@@ -12,6 +12,7 @@ import {
   assertCanModifyOwnedWork,
   getWorkActor,
 } from "@/lib/work/ownership";
+import { vocab } from "@/lib/product-config";
 
 export function campaignArchiveConfirmBody(): string {
   return [
@@ -32,11 +33,11 @@ export async function archiveCampaign(id: string): Promise<{
     select: { id: true, ownerUserId: true, archivedAt: true },
   });
   if (!existing) {
-    throw new TenantError("Campaign not found in the active organization.");
+    throw new TenantError(`${vocab.campaign.Singular} not found in the active organization.`);
   }
   assertCanModifyOwnedWork(actor, existing.ownerUserId, "Campaign");
   if (existing.archivedAt) {
-    return { mode: "archived", message: "Campaign is already archived." };
+    return { mode: "archived", message: `${vocab.campaign.Singular} is already archived.` };
   }
   await prisma.campaign.update({
     where: { id: existing.id },
@@ -48,7 +49,7 @@ export async function archiveCampaign(id: string): Promise<{
   await recomputeCampaignCadenceForCampaign(existing.id, organizationId);
   return {
     mode: "archived",
-    message: "Campaign archived. It is hidden from Home and the campaign list until you unarchive it.",
+    message: `${vocab.campaign.Singular} archived. It is hidden from Home and the ${vocab.campaign.singular} list until you unarchive it.`,
   };
 }
 
@@ -63,11 +64,11 @@ export async function unarchiveCampaign(id: string): Promise<{
     select: { id: true, ownerUserId: true, archivedAt: true },
   });
   if (!existing) {
-    throw new TenantError("Campaign not found in the active organization.");
+    throw new TenantError(`${vocab.campaign.Singular} not found in the active organization.`);
   }
   assertCanModifyOwnedWork(actor, existing.ownerUserId, "Campaign");
   if (!existing.archivedAt) {
-    return { mode: "unarchived", message: "Campaign is not archived." };
+    return { mode: "unarchived", message: `${vocab.campaign.Singular} is not archived.` };
   }
   await prisma.campaign.update({
     where: { id: existing.id },
@@ -79,6 +80,6 @@ export async function unarchiveCampaign(id: string): Promise<{
   await recomputeCampaignCadenceForCampaign(existing.id, organizationId);
   return {
     mode: "unarchived",
-    message: "Campaign unarchived. It appears in Home and the campaign list again.",
+    message: `${vocab.campaign.Singular} unarchived. It appears in Home and the ${vocab.campaign.singular} list again.`,
   };
 }

@@ -15,6 +15,7 @@ import { formatCriterionDisplay } from "@/lib/criteria/types";
 import { ResearchReadSection } from "@/components/research-document";
 import type { IcpCriterionReviewRow } from "@/components/IcpCriteriaReview";
 import { listToCommaString } from "@/lib/utils";
+import { vocab } from "@/lib/product-config";
 
 function ReadCriterionRow({ criterion }: { criterion: IcpCriterionReviewRow }) {
   const evidenceClass = normalizeEvidenceClass(criterion.evidenceClass);
@@ -186,7 +187,7 @@ export function IcpBriefingDocument({
         {metaLine ? <p className="text-sm text-slate-600">{metaLine}</p> : null}
       </header>
 
-      <ResearchReadSection title="Ideal customer definition" empty={!definition?.trim()}>
+      <ResearchReadSection title={`${vocab.idealCustomer.Singular} definition`} empty={!definition?.trim()}>
         {definition?.trim() ? (
           <p className="text-[17px] leading-7 text-slate-800">{definition.trim()}</p>
         ) : null}

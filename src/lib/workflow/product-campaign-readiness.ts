@@ -4,6 +4,18 @@
  * criteria rows, and has at least one saved persona.
  */
 
+import { vocab } from "@/lib/product-config";
+
+/** Blocker text is shown to users and matched by the Home setup summaries. */
+export const PRODUCT_READINESS_BLOCKERS = Object.freeze({
+  notStarted: `${vocab.product.Singular} setup not started`,
+  needsReview: `${vocab.product.Singular} needs review and approval`,
+  draft: `${vocab.product.Singular} is still a draft`,
+  notApproved: `${vocab.product.Singular} is not approved`,
+  needsIcp: `Needs ${vocab.icp.aSingular} with criteria`,
+  needsPersona: `Needs at least one saved ${vocab.persona.singular}`,
+});
+
 export type ProductCampaignReadinessInput = {
   approvalStatus: string;
   icps: Array<{ criteria: unknown[] }>;
@@ -28,23 +40,23 @@ export function getProductCampaignReadiness(
 
   if (product.approvalStatus !== "APPROVED") {
     if (product.approvalStatus === "NOT_STARTED") {
-      blockers.push("Product setup not started");
+      blockers.push(PRODUCT_READINESS_BLOCKERS.notStarted);
     } else if (product.approvalStatus === "NEEDS_REVIEW") {
-      blockers.push("Product needs review and approval");
+      blockers.push(PRODUCT_READINESS_BLOCKERS.needsReview);
     } else if (product.approvalStatus === "DRAFT") {
-      blockers.push("Product is still a draft");
+      blockers.push(PRODUCT_READINESS_BLOCKERS.draft);
     } else {
-      blockers.push("Product is not approved");
+      blockers.push(PRODUCT_READINESS_BLOCKERS.notApproved);
     }
   }
 
   const icpsWithCriteria = product.icps.filter(hasInterpretedCriteria);
   if (icpsWithCriteria.length === 0) {
-    blockers.push("Needs an ICP with criteria");
+    blockers.push(PRODUCT_READINESS_BLOCKERS.needsIcp);
   }
 
   if (product.personas.length === 0) {
-    blockers.push("Needs at least one saved persona");
+    blockers.push(PRODUCT_READINESS_BLOCKERS.needsPersona);
   }
 
   return {

@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
 import { normalizeSuppressionEmail } from "@/lib/suppression/normalize";
 import { suppressionOptOutConfirmBody } from "@/lib/suppression/confirm-copy";
+import { vocab } from "@/lib/product-config";
 
 export { normalizeSuppressionEmail, suppressionOptOutConfirmBody };
 
@@ -16,10 +17,10 @@ const SUPPRESSED_EMAIL_MESSAGE =
   "This email address is on the organization do-not-contact list and cannot be emailed.";
 
 const ARCHIVED_CAMPAIGN_MESSAGE =
-  "This campaign is archived. Unarchive it before generating emails or changing contacts.";
+  `This ${vocab.campaign.singular} is archived. Unarchive it before generating emails or changing ${vocab.contact.plural}.`;
 
 const ARCHIVED_LIST_MESSAGE =
-  "This list is archived and is read-only. Unarchive it before scoring or attaching contacts.";
+  `This ${vocab.list.singular} is archived and is read-only. Unarchive it before scoring or attaching ${vocab.contact.plural}.`;
 
 export async function findActiveSuppression(
   organizationId: string,
@@ -66,7 +67,7 @@ export async function assertCampaignNotArchived(
     select: { id: true, archivedAt: true },
   });
   if (!campaign) {
-    throw new TenantError("Campaign was not found in the active organization.");
+    throw new TenantError(`${vocab.campaign.Singular} was not found in the active organization.`);
   }
   if (campaign.archivedAt) {
     throw new TenantError(ARCHIVED_CAMPAIGN_MESSAGE);
@@ -84,7 +85,7 @@ export async function assertListNotArchived(
   });
   if (!list) {
     throw new TenantError(
-      "Contact list does not belong to the active organization.",
+      `${vocab.contact.Singular} ${vocab.list.singular} does not belong to the active organization.`,
     );
   }
   if (list.archivedAt) {
@@ -219,15 +220,15 @@ export async function suppressContactById(input: {
     select: { id: true, email: true, ownerUserId: true },
   });
   if (!contact) {
-    throw new TenantError("Contact does not belong to the active organization.");
+    throw new TenantError(`${vocab.contact.Singular} does not belong to the active organization.`);
   }
   if (contact.ownerUserId !== input.actorUserId) {
     throw new TenantError(
-      "This contact is read-only because it belongs to another user.",
+      `This ${vocab.contact.singular} is read-only because it belongs to another user.`,
     );
   }
   if (!contact.email) {
-    throw new TenantError("Add an email address before opting this contact out.");
+    throw new TenantError(`Add an email address before opting this ${vocab.contact.singular} out.`);
   }
   return suppressEmail({
     organizationId: input.organizationId,
@@ -248,15 +249,15 @@ export async function releaseContactById(input: {
     select: { id: true, email: true, ownerUserId: true },
   });
   if (!contact) {
-    throw new TenantError("Contact does not belong to the active organization.");
+    throw new TenantError(`${vocab.contact.Singular} does not belong to the active organization.`);
   }
   if (contact.ownerUserId !== input.actorUserId) {
     throw new TenantError(
-      "This contact is read-only because it belongs to another user.",
+      `This ${vocab.contact.singular} is read-only because it belongs to another user.`,
     );
   }
   if (!contact.email) {
-    throw new TenantError("This contact has no email address to restore.");
+    throw new TenantError(`This ${vocab.contact.singular} has no email address to restore.`);
   }
   return releaseSuppression({
     organizationId: input.organizationId,

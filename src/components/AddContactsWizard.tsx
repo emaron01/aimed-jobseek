@@ -25,6 +25,7 @@ import {
 } from "@/lib/import";
 import { PRIMARY_BUTTON_CLASS, PrimaryButton, SecondaryButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { vocab, vocabExamples } from "@/lib/product-config";
 
 type Step =
   | "choose"
@@ -226,7 +227,7 @@ export function AddContactsWizard() {
 
   return (
     <>
-      <PrimaryButton onClick={openWizard}>Add Contacts</PrimaryButton>
+      <PrimaryButton onClick={openWizard}>Add {vocab.contact.Plural}</PrimaryButton>
 
       {open ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-8">
@@ -234,10 +235,10 @@ export function AddContactsWizard() {
             <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">
-                  Add Contacts
+                  Add {vocab.contact.Plural}
                 </h3>
                 <p className="mt-1 text-sm text-slate-600">
-                  Paste or upload contacts, map columns, then import into this
+                  Paste or upload {vocab.contact.plural}, map columns, then import into this
                   organization.
                 </p>
               </div>
@@ -258,7 +259,7 @@ export function AddContactsWizard() {
               {step === "choose" ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <ChoiceCard
-                    title="Paste Contacts"
+                    title={`Paste ${vocab.contact.Plural}`}
                     description="Paste rows copied from Excel, Sheets, Apollo, or CSV text."
                     onClick={() => {
                       setMode("paste");
@@ -282,13 +283,13 @@ export function AddContactsWizard() {
                 <div className="space-y-4">
                   <label className="block text-sm">
                     <span className="font-medium text-slate-700">
-                      Paste tabular contacts
+                      Paste tabular {vocab.contact.plural}
                     </span>
                     <textarea
                       value={pasteText}
                       onChange={(event) => setPasteText(event.target.value)}
                       rows={12}
-                      placeholder={"First Name\tLast Name\tEmail\tTitle\tCompany\nJohn\tSmith\tjohn@acme.com\tVP Sales\tAcme"}
+                      placeholder={vocabExamples.contactImportPastePlaceholder}
                       className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs text-slate-900 outline-none ring-slate-400 focus:ring-2"
                     />
                   </label>
@@ -519,7 +520,7 @@ export function AddContactsWizard() {
                       disabled={counts.valid + counts.warning === 0 || pending}
                       onClick={() => setStep("name")}
                     >
-                      Name List
+                      Name {vocab.list.Singular}
                     </PrimaryButton>
                   </div>
                 </div>
@@ -528,7 +529,7 @@ export function AddContactsWizard() {
               {step === "name" ? (
                 <div className="space-y-4">
                   <label className="block text-sm">
-                    <span className="font-medium text-slate-700">List name</span>
+                    <span className="font-medium text-slate-700">{vocab.list.Singular} name</span>
                     <input
                       value={listName}
                       onChange={(event) => setListName(event.target.value)}
@@ -574,19 +575,19 @@ export function AddContactsWizard() {
               {step === "done" && importResult ? (
                 <div className="space-y-4">
                   <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                    Imported {importResult.importedCount} contacts into “
+                    Imported {importResult.importedCount} {vocab.contact.plural} into “
                     {listName}”.
                     {importResult.mergedCount > 0 ? (
                       <p className="mt-2">
                         {importResult.mergedCount} matched an existing person in
-                        this organization and were linked to this list
+                        this organization and were linked to this {vocab.list.singular}
                         (incoming non-empty fields win).
                       </p>
                     ) : null}
                     {importResult.titleChangedCount > 0 ? (
                       <p className="mt-2">
                         {importResult.titleChangedCount} had a title change
-                        recorded (previous title kept for persona-matching
+                        recorded (previous title kept for {vocab.persona.singular}-matching
                         audit).
                       </p>
                     ) : null}
@@ -613,7 +614,7 @@ export function AddContactsWizard() {
                         router.push(`/lists/${importResult.listId}`);
                       }}
                     >
-                      View list
+                      View {vocab.list.singular}
                     </PrimaryButton>
                     <SecondaryButton
                       onClick={() => {
@@ -621,7 +622,7 @@ export function AddContactsWizard() {
                         router.push("/contacts");
                       }}
                     >
-                      View all contacts
+                      View all {vocab.contact.plural}
                     </SecondaryButton>
                     <SecondaryButton onClick={close}>Done</SecondaryButton>
                   </div>

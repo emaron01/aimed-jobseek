@@ -133,7 +133,7 @@ describe("campaign save UI seam", () => {
     expect(formSrc).toContain('data-testid="campaign-action-status"');
     expect(scoreReport).toContain("useActionState");
     expect(scoreReport).toContain('data-testid="campaign-action-status"');
-    expect(formSrc).toContain("Personas in play");
+    expect(formSrc).toContain("{vocab.persona.Plural} in play");
     expect(formSrc).toContain('name="personaIds"');
     expect(formSrc).toContain('name="allPersonas"');
     expect(scoreReport).toContain('name="allPersonas"');
@@ -147,7 +147,7 @@ describe("campaign save UI seam", () => {
       "export async function updateCampaignEmailSettingsAction",
     );
     expect(detailPage).toContain("CampaignEmailSettingsForm");
-    expect(detailPage).toContain("Campaign email settings");
+    expect(detailPage).toContain("{vocab.campaign.Singular} email settings");
     expect(detailPage).toContain('?stage=setup');
   });
 });

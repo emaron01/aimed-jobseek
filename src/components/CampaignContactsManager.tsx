@@ -13,6 +13,7 @@ import {
   PRIMARY_BUTTON_CLASS,
   SECONDARY_BUTTON_CLASS,
 } from "@/components/ui";
+import { vocab } from "@/lib/product-config";
 
 const initial: CampaignContactsActionResult | null = null;
 
@@ -76,7 +77,7 @@ export function CampaignContactsManager({
           href={listIndexHref({ campaignId })}
           className={PRIMARY_BUTTON_CLASS}
         >
-          Select an Existing List To Be Researched and Scored
+          Select an Existing {vocab.list.Singular} To Be Researched and Scored
         </Link>
         <button
           type="submit"
@@ -116,8 +117,8 @@ export function CampaignContactsManager({
             </select>
           </label>
           <p className="text-sm text-slate-600">
-            Only completed scores from runs matching this campaign&apos;s
-            Product, ICP, and Persona are available.
+            Only completed scores from runs matching this {vocab.campaign.singular}&apos;s
+            {vocab.product.Singular}, {vocab.icp.singular}, and {vocab.persona.Singular} are available.
           </p>
           {runState ? (
             <p
@@ -136,24 +137,24 @@ export function CampaignContactsManager({
           className="rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-950"
           data-testid="campaign-list-score-hint"
         >
-          <p className="font-medium">No scored runs for this campaign yet</p>
+          <p className="font-medium">No scored runs for this {vocab.campaign.singular} yet</p>
           <p className="mt-1">
-            Select a list, research companies, then score for this campaign.
-            When a run completes, choose Save and return to campaign on the
-            score report to attach Ready to include contacts.
+            Select {vocab.list.aSingular}, research companies, then score for this {vocab.campaign.singular}.
+            When a run completes, choose Save and return to {vocab.campaign.singular} on the
+            score report to attach Ready to include {vocab.contact.plural}.
           </p>
           <Link
             href={listIndexHref({ campaignId })}
             className="mt-2 inline-flex font-medium underline"
           >
-            Go to Lists to research and score
+            Go to {vocab.list.Plural} to research and score
           </Link>
         </div>
       )}
 
       <section className="border-t border-slate-200 pt-5">
         <h3 className="text-sm font-semibold text-slate-900">
-          Search existing contacts
+          Search existing {vocab.contact.plural}
         </h3>
         <form method="get" className="mt-3 flex flex-wrap items-end gap-3">
           <label className="min-w-64 flex-1 text-sm">
@@ -232,14 +233,14 @@ export function CampaignContactsManager({
                 disabled={contactPending}
                 className={PRIMARY_BUTTON_CLASS}
               >
-                {contactPending ? "Adding…" : "Add selected contacts"}
+                {contactPending ? "Adding…" : `Add selected ${vocab.contact.plural}`}
               </button>
             </>
           ) : (
             <p className="text-sm text-slate-600">
               {search
-                ? "No unattached contacts match this search."
-                : "No unattached contacts are available."}
+                ? `No unattached ${vocab.contact.plural} match this search.`
+                : `No unattached ${vocab.contact.plural} are available.`}
             </p>
           )}
         </form>

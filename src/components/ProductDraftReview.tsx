@@ -37,6 +37,7 @@ import {
   buildSourceIndex,
   sourceMarkerNumbers,
 } from "@/lib/research/source-index";
+import { vocab } from "@/lib/product-config";
 
 const initialResult: ProductSetupActionResult | null = null;
 
@@ -386,7 +387,7 @@ export function ProductDraftReview({
           <div>
             <h3 className="text-xl font-semibold text-slate-900">
               {editing ? (
-                <span className="sr-only">Edit product profile</span>
+                <span className="sr-only">Edit {vocab.product.singular} profile</span>
               ) : (
                 name
               )}
@@ -409,7 +410,7 @@ export function ProductDraftReview({
         {editing ? (
           <div className="space-y-5">
             <EditField
-              label="Product name"
+              label={`${vocab.product.Singular} name`}
               name="name"
               hint={PRODUCT_DRAFT_FIELD_HINTS.name}
               value={name}
@@ -433,7 +434,7 @@ export function ProductDraftReview({
               minRows={4}
             />
             <EditField
-              label="Value proposition"
+              label={vocab.valueProposition.Singular}
               name="valueProposition"
               hint={PRODUCT_DRAFT_FIELD_HINTS.valueProposition}
               value={profile.valueProposition ?? ""}
@@ -461,7 +462,7 @@ export function ProductDraftReview({
               onChange={(value) => setList("differentiators", value)}
             />
             <EditField
-              label="Who it's for — buyer functions"
+              label={`Who it's for — ${vocab.buyer.singular} functions`}
               name="relevantBuyerFunctions"
               hint={PRODUCT_DRAFT_FIELD_HINTS.relevantBuyerFunctions}
               value={listValue("relevantBuyerFunctions")}
@@ -496,7 +497,7 @@ export function ProductDraftReview({
               onChange={(value) => setString("deploymentContext", value)}
             />
             <EditField
-              label="Pricing / deal context"
+              label={`Pricing / ${vocab.deal.singular} context`}
               name="pricingAovContext"
               hint={PRODUCT_DRAFT_FIELD_HINTS.pricingAovContext}
               value={profile.pricingAovContext ?? ""}
@@ -517,7 +518,7 @@ export function ProductDraftReview({
               onChange={(value) => setList("proofPoints", value)}
             />
             <EditField
-              label="Customer evidence"
+              label={`${vocab.customer.Singular} evidence`}
               name="customerEvidence"
               hint={PRODUCT_DRAFT_FIELD_HINTS.customerEvidence}
               value={listValue("customerEvidence")}
@@ -669,7 +670,7 @@ export function ProductDraftReview({
               {(profile.relevantBuyerFunctions ?? []).length > 0 ? (
                 <div>
                   <p className="text-sm font-medium text-slate-600">
-                    Buyer functions
+                    {vocab.buyer.Singular} functions
                   </p>
                   <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px]">
                     {(profile.relevantBuyerFunctions ?? []).map((item) => (
@@ -685,7 +686,7 @@ export function ProductDraftReview({
                 </div>
               ) : (
                 <p className="text-sm text-slate-500">
-                  Buyer functions: none recorded from the material.
+                  {vocab.buyer.Singular} functions: none recorded from the material.
                 </p>
               )}
               {(profile.relevantIndustries ?? []).length > 0 ? (
@@ -900,7 +901,7 @@ export function ProductDraftReview({
             {pending ? "Saving…" : "Approve this profile"}
           </SubmitButton>
           <p className="mt-2 text-sm text-slate-500">
-            This becomes the authoritative product record. Personas, scoring,
+            This becomes the authoritative {vocab.product.singular} record. {vocab.persona.Plural}, scoring,
             and every email use it.
           </p>
           <Status result={state} />

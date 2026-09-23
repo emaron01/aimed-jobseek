@@ -11,6 +11,7 @@ import type {
   PersonaAiDraft,
 } from "@/lib/persona-research/contract";
 import { EXCLUSION_TESTABILITY_VALUES } from "@/lib/persona-research/contract";
+import { vocab } from "@/lib/product-config";
 
 export const PERSONA_SIGNAL_CRITERION_TYPES = {
   positiveRoleSignal: "positive_role_signal",
@@ -753,7 +754,7 @@ export function projectPersonaSignalsToCriteria(
     pushUnique({
       name: normalized.name,
       criterionType: normalized.criterionType,
-      description: "Positive role signal — evidence this buyer role fits.",
+      description: `Positive role signal — evidence this ${vocab.buyer.singular} role fits.`,
       operator: "EXISTS",
       importance: "HIGH",
       isRequired: normalized.isRequired ?? false,
@@ -782,7 +783,7 @@ export function projectPersonaSignalsToCriteria(
     pushUnique({
       name: normalized.name,
       criterionType: normalized.criterionType,
-      description: "Negative role signal — evidence against this buyer role.",
+      description: `Negative role signal — evidence against this ${vocab.buyer.singular} role.`,
       operator: "EXISTS",
       importance: "CRITICAL",
       isRequired: false,
@@ -806,7 +807,7 @@ export function projectPersonaSignalsToCriteria(
     pushUnique({
       name: normalized.name,
       criterionType: normalized.criterionType,
-      description: "Ownership area for this buyer role.",
+      description: `Ownership area for this ${vocab.buyer.singular} role.`,
       operator: "EXISTS",
       importance: "CRITICAL",
       isRequired: normalized.isRequired ?? false,
@@ -830,7 +831,7 @@ export function projectPersonaSignalsToCriteria(
     pushUnique({
       name: normalized.name,
       criterionType: normalized.criterionType,
-      description: "KPI or accountability for this buyer role.",
+      description: `KPI or accountability for this ${vocab.buyer.singular} role.`,
       operator: "EXISTS",
       importance: "HIGH",
       isRequired: normalized.isRequired ?? false,

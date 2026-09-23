@@ -36,6 +36,7 @@ import {
   type CriteriaEditorBoxes,
   type PersonaCriterionFormRow,
 } from "@/lib/persona-research/project-signals";
+import { vocab, vocabExamples } from "@/lib/product-config";
 
 const initial: PersonaSetupActionResult | null = null;
 
@@ -54,14 +55,14 @@ const BOX_META: Array<{
   {
     key: "exclusions",
     label: "Exclusions (disqualifiers)",
-    hint: "One exclusion per line. Contacts matching these are disqualified.",
+    hint: `One exclusion per line. ${vocab.contact.Plural} matching these are disqualified.`,
     placeholder: "e.g. Pure marketing scope only",
   },
   {
     key: "ownershipAreas",
     label: "Ownership areas",
     hint: "One ownership area per line.",
-    placeholder: "e.g. Sales forecasting process",
+    placeholder: vocabExamples.personaOwnershipAreaPlaceholder,
   },
   {
     key: "responsibilities",
@@ -241,7 +242,7 @@ function PersonaCriteriaEditor({
               <BoxResearchGuidance notes={guidance} />
               {meta.key === "exclusions" && exclusionsEmpty ? (
                 <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                  This persona has no exclusion criteria — no contact will be
+                  This {vocab.persona.singular} has no exclusion criteria — no {vocab.contact.singular} will be
                   disqualified.
                 </p>
               ) : null}
@@ -445,7 +446,7 @@ export function PersonaDraftReview({
       <div className="space-y-3">
         <p className="text-sm text-amber-900">
           {errorSafe ||
-            "Persona synthesis could not be completed. Research evidence was preserved."}
+            `${vocab.persona.Singular} synthesis could not be completed. Research evidence was preserved.`}
         </p>
         <form action={retryAction} className="flex gap-2">
           <input type="hidden" name="productId" value={productId} />
@@ -455,7 +456,7 @@ export function PersonaDraftReview({
             value={personaSetupRunId}
           />
           <SecondaryButton type="submit" disabled={retryPending}>
-            {retryPending ? "Retrying…" : "Retry Persona Synthesis"}
+            {retryPending ? "Retrying…" : `Retry ${vocab.persona.Singular} Synthesis`}
           </SecondaryButton>
         </form>
         {retry ? (
@@ -531,7 +532,7 @@ export function PersonaDraftReview({
         {editing ? (
           <div className="grid gap-4 md:grid-cols-2" data-print-hide>
             <DraftEditField
-              label="Persona Name"
+              label={`${vocab.persona.Singular} Name`}
               name="name"
               required
               value={formState.name}
@@ -587,7 +588,7 @@ export function PersonaDraftReview({
             </div>
             <div className="md:col-span-2">
               <DraftEditField
-                label="Pain Points"
+                label={vocab.painPoint.TitlePlural}
                 name="painPoints"
                 value={formState.painPoints}
                 onChange={(value) =>
@@ -598,14 +599,14 @@ export function PersonaDraftReview({
             </div>
             <div className="md:col-span-2">
               <DraftEditField
-                label="Desired Outcomes From Your Solution"
+                label={`Desired Outcomes From Your ${vocab.solution.Singular}`}
                 name="desiredOutcomes"
                 value={formState.desiredOutcomes}
                 onChange={(value) =>
                   setFormState((prev) => ({ ...prev, desiredOutcomes: value }))
                 }
                 multiline
-                hint="Outcomes from using the product — not campaign CTAs."
+                hint={`Outcomes from using the ${vocab.product.singular} — not ${vocab.campaign.singular} CTAs.`}
               />
             </div>
             <div className="md:col-span-2">
@@ -634,7 +635,7 @@ export function PersonaDraftReview({
 
         <div className="border-t border-slate-200 pt-5" data-print-hide>
           <SubmitButton disabled={pending}>
-            {pending ? "Saving…" : "Review & Save Persona"}
+            {pending ? "Saving…" : `Review & Save ${vocab.persona.Singular}`}
           </SubmitButton>
           {state ? (
             <p
