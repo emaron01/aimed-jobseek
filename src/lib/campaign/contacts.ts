@@ -13,6 +13,7 @@ import {
 import type { QualificationBucketRow } from "@/components/QualificationBuckets";
 import { readExclusionDetails } from "@/lib/scoring/exclusion-detail";
 import { scoringRunPersonaWhere } from "@/lib/campaign/personas";
+import { applicationPersonaWhere } from "@/lib/hiring-team/scope";
 import { vocab } from "@/lib/product-config";
 
 const campaignDetailInclude = {
@@ -43,8 +44,14 @@ const campaignDetailInclude = {
   },
   personasInPlay: {
     include: {
-      persona: { select: { id: true, name: true, updatedAt: true } },
+      persona: {
+        select: { id: true, name: true, updatedAt: true, campaignId: true },
+      },
     },
+  },
+  hiringTeamRoles: {
+    where: { archivedAt: null },
+    select: { id: true, name: true, updatedAt: true, campaignId: true },
   },
   offer: {
     select: {
@@ -484,8 +491,7 @@ async function compatibleScoringRunWhere(
     prisma.persona.findMany({
       where: {
         organizationId,
-        productId: campaign.productId,
-        archivedAt: null,
+        ...applicationPersonaWhere(campaign.id),
       },
       select: { id: true },
     }),

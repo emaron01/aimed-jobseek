@@ -32,6 +32,7 @@ const evidenceRefSchema = z.object({
     .array(z.enum(["CUSTOMER_EVIDENCE", "WEB_EVIDENCE", "MODEL_INFERENCE"]))
     .optional()
     .default([]),
+  kind: z.enum(["FACT", "INFERENCE"]).optional(),
 });
 
 const criterionDraftSchema = z.object({
@@ -85,6 +86,9 @@ export const personaAiDraftSchema = z.object({
   likelyObjections: stringList,
   terminology: stringList,
   messagingNotes: stringList,
+  interviewStage: optionalString,
+  evaluates: z.array(z.string()).optional(),
+  communicationApproach: z.array(z.string()).optional(),
   personaSpecificPositioning: stringList,
   proofPointsToEmphasize: stringList,
   researchGuidance: stringList,
@@ -152,4 +156,4 @@ export function parsePersonaAiResponse(
   };
 }
 
-export const PERSONA_SYNTHESIS_PROMPT_VERSION = "8";
+export const PERSONA_SYNTHESIS_PROMPT_VERSION = "9";

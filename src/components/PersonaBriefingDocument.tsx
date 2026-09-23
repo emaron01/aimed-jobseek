@@ -140,7 +140,7 @@ export function PersonaBriefingDocument({
         ) : null}
         {briefing.buyingRole ? (
           <p className="mt-2 text-sm text-slate-600">
-            Buying role: {briefing.buyingRole}
+            {vocab.persona.Singular}: {briefing.buyingRole}
           </p>
         ) : null}
       </ResearchReadSection>

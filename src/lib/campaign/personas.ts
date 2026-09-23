@@ -70,11 +70,17 @@ export function resolveCampaignPersonaIds(input: {
   productPersonaIds: string[];
 }): string[] {
   if (input.inPlayPersonaIds.length > 0) {
-    return input.inPlayPersonaIds.filter((id) =>
+    const scoped = input.inPlayPersonaIds.filter((id) =>
       input.productPersonaIds.includes(id),
     );
+    if (scoped.length > 0) return scoped;
   }
-  if (input.fallbackPersonaId) return [input.fallbackPersonaId];
+  if (
+    input.fallbackPersonaId &&
+    input.productPersonaIds.includes(input.fallbackPersonaId)
+  ) {
+    return [input.fallbackPersonaId];
+  }
   return [...input.productPersonaIds];
 }
 

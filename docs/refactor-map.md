@@ -164,7 +164,7 @@ The application is a `Campaign` with its required `productId` (the Profile) and 
 
 **Classification: ADAPT the builder and the differentiation check. NEW for the template library and per-application instances.**
 
-Decided: personas are created per application, not during profile build. Evidence becomes the job requirement plus `CompanyResearch`, not `ProductEvidenceBundle`. Instances need to be born on the application. `CampaignPersona` links a persona to a campaign but the persona row still belongs to the product, so a persona built for one application is visible to every application under that Profile unless something scopes it. How instances are scoped, and whether templates are a new table, is open (question 13). `Persona.productId` is `onDelete: Restrict` and required, and the vision keeps upstream identifiers, which argues against making it optional.
+Decided: personas are created per application, not during profile build. Evidence becomes the job requirement plus `CompanyResearch`, not `ProductEvidenceBundle`. Instances need to be born on the application. `Persona.campaignId` scopes a role to one application; null keeps older product-level rows. `Persona.productId` stays required. Templates are `PersonaTemplate` rows per organization (question 13, resolved).
 
 Differentiation: the Jaccard helper stays. The prompt rule that already says "articulate what distinguishes this role" (`src/lib/persona-research/prompt.ts`, rule 14) is the hook; its examples are buyer roles and quota-carrying reps and must be rewritten.
 
@@ -256,7 +256,7 @@ Decided: Standard only, organization of one, one Stripe plan. Seats, invites, te
 | --- | --- | --- |
 | Job posting parser | NEW | New model plus an action beside `src/lib/campaign/save.ts`. Text extraction can call the same paste path as product sources |
 | Application-level employer fit | NEW entry point, ADAPT scoring | Reuses `resolveIcpQualification` without a `ScoringRun` or `ContactList`. Needs its own stored result on the application |
-| Per-application personas and account templates | NEW scope, ADAPT builder | Scoping is open question 13 |
+| Per-application personas and account templates | NEW scope, ADAPT builder | `Persona.campaignId` plus `PersonaTemplate` (question 13, resolved) |
 | One-at-a-time contact add | NEW action, ADAPT persona resolution | Creates `Contact` and `CampaignContact`. Calls title fit and `resolveContactPersonaDecision` |
 | Consultation agent | NEW | New transcript and answer rows. Writes to the profile. Answers are claim trace sources |
 | `ApplicationAsset` and DOCX rendering | NEW model and renderer, ADAPT generation chain | Sibling of `src/lib/email-generation/`. DOCX rendered on demand from JSON. Email stays on `EmailDraft` |
@@ -413,7 +413,7 @@ The vision's Decisions log settles Target Employers, lists, contacts, email, `Ap
 
 **Removing the persona prompt after profile is a readiness change.** "Needs at least one saved persona" in `src/lib/workflow/product-campaign-readiness.ts` gates campaign creation and drives the setup rail. Remove it for the seeker path without weakening the other blockers (approved product, ICP with criteria). Stop `suggestedBuyerRoles` in `src/lib/product-research/prompt.ts` in the same change.
 
-**Per-application personas need real scoping.** `CampaignPersona` links a product-owned persona to a campaign. A persona built for one application would appear under every application for that Profile. Decide the scoping (question 13) before building the persona step.
+**Per-application personas are scoped.** `Persona.campaignId` set means the role belongs to that application. Null keeps older product-level rows. Account templates are `PersonaTemplate`. Selectors list only the current application's roles (question 13, resolved).
 
 **Attachments need a rendered file at send time.** DOCX is not stored, so Graph send must render from `ApplicationAsset` content when the seeker attaches it and add a `fileAttachment` to the payload built by `buildMicrosoftGraphSendMailPayload`. Graph's inline attachment size limit applies; larger files need an upload session. The download step for handoff paths should reuse the same renderer.
 
@@ -438,7 +438,7 @@ The vision's Decisions log settles Target Employers, lists, contacts, email, `Ap
 3. Profile: retarget product synthesis at a person, drop `suggestedBuyerRoles`, and remove the persona blocker from the setup rail. Keep approval and `manuallyEditedFields`.
 4. Target Employers: employer content for ICP interpretation and criteria. Auto-select when one exists.
 5. Application on `Campaign` with required `icpId`, job-paste parser, company resolve, research prompt aimed at hiring and risk, and the application-level employer-fit score shown as a non-blocking signal.
-6. Per-application personas (after question 13) and the one-at-a-time contact add with title fit and `resolveContactPersonaDecision`.
+6. Per-application personas (`Persona.campaignId`, `PersonaTemplate`) and the one-at-a-time contact add with title fit and `resolveContactPersonaDecision`.
 7. Consultation transcript writing back to the profile, plumbed into claim-origin trusted text.
 8. Contact-free generation context. Email on the new content, restricted to contacts with an email address. Then `ApplicationAsset` with LinkedIn copy, cover letter, and resume, DOCX rendering on demand, and the fail-closed resume guard.
 9. Graph `fileAttachment` from the renderer, and the download step on handoff paths.
@@ -459,7 +459,7 @@ The vision's Decisions log settles Target Employers, lists, contacts, email, `Ap
 10. **OPEN.** Consultation: what ends the Q&A, and may the seeker skip it? There is no product rule in the vision and no pattern in the code.
 11. **OPEN.** Who supplies the DOCX styles for resume and cover letter? Nothing in the repo is a template. Rendering on demand is decided; the layout is not.
 12. **OPEN.** LinkedIn is paste-only in the vision. Confirm there will be no LinkedIn API.
-13. **OPEN.** Account-level persona templates: new table, or `Persona` rows with a sentinel product? The required `productId` FK makes the sentinel a hidden product, which is a stub. Also: how is a per-application persona scoped so it does not appear under other applications?
+13. **RESOLVED.** Account-level templates are `PersonaTemplate` rows, created from product configuration for each organization. A per-application role is a `Persona` with `campaignId` set. `productId` stays required and points at the Personal Profile. Selectors show only that application's roles.
 14. **RESOLVED.** Hiring and growth are stored on `CompanyResearch.hiringSignals`. They are not written into `buyingSignals`. `estimatedAov` is left null for job-seeker research.
 15. **OPEN.** The referral sentence is the only user-facing "Aimed Outreach" left. Is the referral program itself staying?
 16. **OPEN.** Hiding Contact Sales removes `erik@salesforecaster.io` from the three plan selectors, but the code stays. Which support address does AimedJobSeek use, and should the hidden code read it from `SUPPORT_EMAIL`?
@@ -505,12 +505,13 @@ Nouns now come from `src/lib/product-config/vocabulary.ts`. The sentences below 
 - `src/lib/icp/save.ts` — "Describe the kind of company you want to work for before saving. Interpretation uses this definition."
 - `src/components/IcpDetailsForm.tsx` — "Positive Employer Signals"
 
-### Hiring Team / personas (4)
+### Hiring Team / personas (4) — done
 
-- `src/components/PersonaBriefingDocument.tsx` — "Buying role: {…}"
-- `src/lib/scoring/config.ts` — dimension label "Positive Buying Signals"
-- `src/app/(app)/setup/[productId]/page.tsx` — "Relevant {Hiring Team role} functions"
-- `src/components/ProductDraftReview.tsx` — "Who it's for — {Hiring Team role} functions"
+- `src/components/PersonaBriefingDocument.tsx` — "{Hiring Team role}: {…}"
+- `src/lib/scoring/config.ts` — "Positive Buying Signals" stays. It is a stored scoring dimension name, not a sentence shown as Hiring Team copy, and scoring prompts were not changed.
+- `src/app/(app)/setup/[productId]/page.tsx` — "Career functions"
+- `src/components/ProductDraftReview.tsx` — "Career functions"
+- `src/lib/product-research/review.ts` — "Career functions" and "One career function per line."
 
 ### Applications / campaigns (8) — done
 

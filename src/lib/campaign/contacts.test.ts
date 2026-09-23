@@ -240,6 +240,10 @@ describe.skipIf(!hasDatabase)(
         },
       });
       campaignId = campaign.id;
+      await prisma.persona.update({
+        where: { id: persona.id },
+        data: { campaignId },
+      });
       await prisma.campaignContact.create({
         data: {
           organizationId: orgAId,

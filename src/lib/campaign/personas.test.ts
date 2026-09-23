@@ -75,6 +75,13 @@ describe("campaign persona selection", () => {
         productPersonaIds: ["p1", "p2"],
       }),
     ).toEqual(["p1", "p2"]);
+    expect(
+      resolveCampaignPersonaIds({
+        fallbackPersonaId: "other_application",
+        inPlayPersonaIds: ["other_application"],
+        productPersonaIds: ["p1"],
+      }),
+    ).toEqual(["p1"]);
   });
 
   it("treats an all-personas scoring run as compatible with any campaign on the same product and ICP", () => {

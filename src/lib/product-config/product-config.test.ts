@@ -26,7 +26,8 @@ describe("vocabulary", () => {
     expect(vocab.icp.nav).toBe("Target Employers");
     expect(vocab.persona.singular).toBe("Hiring Team role");
     expect(vocab.persona.nav).toBe("Hiring Team");
-    expect(vocab.product.nav).toBe("Profile");
+    expect(vocab.product.nav).toBe("Personal Profile");
+    expect(vocab.product.singular).toBe("Personal Profile");
     expect(vocab.prospect.plural).toBe("contacts");
     expect(vocab.account.singular).toBe("employer");
     expect(nounForCount(1, vocab.contact)).toBe("contact");

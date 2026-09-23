@@ -256,7 +256,7 @@ export default async function SetupProductPage({ params }: PageProps) {
                 text={profile.direction.seniority?.text}
               />
               <PrintList
-                title="Functions"
+                title="Career functions"
                 items={factTexts(profile.direction.functions)}
               />
               <PrintList

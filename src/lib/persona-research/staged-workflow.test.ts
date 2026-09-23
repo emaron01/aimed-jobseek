@@ -87,9 +87,10 @@ describe("persona synthesis differentiation prompt", () => {
         },
       ],
     });
-    expect(messages[0]!.content).toContain("existingApprovedPersonas");
-    expect(messages[0]!.content).toContain("daily experience and accountability");
-    expect(messages[0]!.content).toContain("manufactured contrast");
+    expect(messages[0]!.content).toContain("INFERENCE");
+    expect(messages[0]!.content).toContain("Keep this role distinct");
+    expect(messages[0]!.content).not.toContain("GTM");
+    expect(messages[1]!.content).toContain("existingApprovedPersonas");
     expect(messages[1]!.content).toContain("Role A");
     expect(messages[1]!.content).toContain("Shared operational delay pain");
   });
@@ -136,7 +137,7 @@ describe("Persona evidence sufficiency + progressive search triggers", () => {
   it("persona policy defaults exist separately from product", () => {
     expect(DEFAULT_RESEARCH_POLICY_VALUES.maxSearchQueriesPerPersona).toBe(2);
     expect(DEFAULT_RESEARCH_POLICY_VALUES.maxSourcesPerPersona).toBe(8);
-    expect(PERSONA_SYNTHESIS_PROMPT_VERSION).toBe("8");
+    expect(PERSONA_SYNTHESIS_PROMPT_VERSION).toBe("9");
   });
 
   it("selects role-relevant product evidence without Product re-fetch", () => {

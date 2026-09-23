@@ -198,11 +198,13 @@ export default async function CampaignDetailPage({
     icpId: campaign.icpId,
     campaignPersonaId: campaign.personaId,
     campaignPersonaName: campaign.persona?.name ?? null,
-    inPlay: campaign.personasInPlay.map((row) => ({
-      personaId: row.personaId,
-      name: row.persona.name,
-    })),
-    productPersonas: campaign.product.personas,
+    inPlay: campaign.personasInPlay
+      .filter((row) => row.persona.campaignId === campaign.id)
+      .map((row) => ({
+        personaId: row.personaId,
+        name: row.persona.name,
+      })),
+    productPersonas: campaign.hiringTeamRoles,
     contacts: campaign.contacts.map((entry) => ({
       campaignContactId: entry.id,
       contactId: entry.contact.id,
@@ -246,17 +248,8 @@ export default async function CampaignDetailPage({
   }
 
   const personaUpdatedAtById = new Map<string, string>();
-  for (const persona of campaign.product.personas) {
+  for (const persona of campaign.hiringTeamRoles) {
     personaUpdatedAtById.set(persona.id, persona.updatedAt.toISOString());
-  }
-  for (const row of campaign.personasInPlay) {
-    personaUpdatedAtById.set(row.persona.id, row.persona.updatedAt.toISOString());
-  }
-  if (campaign.persona) {
-    personaUpdatedAtById.set(
-      campaign.persona.id,
-      campaign.persona.updatedAt.toISOString(),
-    );
   }
   const productUpdatedAt = campaign.product.updatedAt.toISOString();
 
@@ -314,9 +307,15 @@ export default async function CampaignDetailPage({
     (row) => row.bucket === "GOOD",
   ).length;
   const personasLabel = campaignPersonasDisplayName({
-    fallbackPersonaName: campaign.persona?.name,
-    inPlayNames: campaign.personasInPlay.map((row) => row.persona.name),
-    productPersonaCount: campaign.product.personas.length,
+    fallbackPersonaName: campaign.hiringTeamRoles.some(
+      (persona) => persona.id === campaign.persona?.id,
+    )
+      ? campaign.persona?.name
+      : null,
+    inPlayNames: campaign.personasInPlay
+      .filter((row) => row.persona.campaignId === campaign.id)
+      .map((row) => row.persona.name),
+    productPersonaCount: campaign.hiringTeamRoles.length,
   });
   // Product + ICP are set at create time. Offer is optional — saving an empty
   // offer succeeds, and List must unlock without one.

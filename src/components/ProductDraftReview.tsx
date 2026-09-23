@@ -773,7 +773,7 @@ export function ProductDraftReview({
               />
               {profile.direction.functions.length > 0 ? (
                 <div>
-                  <p className="text-sm font-medium text-slate-600">Functions</p>
+                  <p className="text-sm font-medium text-slate-600">Career functions</p>
                   <FactList
                     items={profile.direction.functions}
                     sources={sources}

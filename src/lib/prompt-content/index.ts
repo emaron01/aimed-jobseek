@@ -15,3 +15,4 @@ export { PROFILE_SYNTHESIS_SYSTEM_INSTRUCTIONS } from "./profile-synthesis";
 export { ICP_INTERPRETATION_SYSTEM_INSTRUCTIONS } from "./icp-interpretation";
 export { JOB_REQUIREMENT_SYSTEM_INSTRUCTIONS } from "./job-requirement";
 export { COMPANY_RESEARCH_SYSTEM_INSTRUCTIONS } from "./company-research";
+export { PERSONA_SYNTHESIS_SYSTEM_INSTRUCTIONS } from "./persona-synthesis";

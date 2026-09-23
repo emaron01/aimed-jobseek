@@ -23,6 +23,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { vocab } from "@/lib/product-config";
 import { normalizeCompanyName, parseStringArray } from "@/lib/research";
+import { syncApplicationHiringTeam } from "@/lib/hiring-team/build";
 import { TenantError } from "@/lib/tenant/errors";
 import {
   researchCompany,
@@ -252,38 +253,45 @@ async function researchAndMaybeScore(input: {
   icpId: string;
   companyId: string;
 }): Promise<void> {
-  const profile = await loadCriteria(input.organizationId, input.icpId);
-  const result = await researchCompany(input.companyId, {
-    evidenceTargets: profile.targets,
-  });
-  const failure = researchFailureReason(result);
-  const research = result.research;
-  if (failure || !research || (research.status !== "COMPLETED" && research.status !== "PARTIAL")) {
+  try {
+    const profile = await loadCriteria(input.organizationId, input.icpId);
+    const result = await researchCompany(input.companyId, {
+      evidenceTargets: profile.targets,
+    });
+    const failure = researchFailureReason(result);
+    const research = result.research;
+    if (failure || !research || (research.status !== "COMPLETED" && research.status !== "PARTIAL")) {
+      await prisma.jobRequirement.update({
+        where: { campaignId: input.campaignId },
+        data: {
+          employerSkipReason:
+            failure ?? "Employer research did not finish, so fit was not scored.",
+        },
+      });
+      return;
+    }
+    const after = decisionAfterResearchIdentity(research?.identityAmbiguous === true);
+    if (!after.scoreFit) {
+      await prisma.jobRequirement.update({
+        where: { campaignId: input.campaignId },
+        data: {
+          employerDisposition: "AMBIGUOUS",
+          employerSkipReason: after.reason,
+        },
+      });
+      return;
+    }
     await prisma.jobRequirement.update({
       where: { campaignId: input.campaignId },
-      data: {
-        employerSkipReason:
-          failure ?? "Employer research did not finish, so fit was not scored.",
-      },
+      data: { employerDisposition: "IDENTIFIED", employerSkipReason: null },
     });
-    return;
-  }
-  const after = decisionAfterResearchIdentity(research?.identityAmbiguous === true);
-  if (!after.scoreFit) {
-    await prisma.jobRequirement.update({
-      where: { campaignId: input.campaignId },
-      data: {
-        employerDisposition: "AMBIGUOUS",
-        employerSkipReason: after.reason,
-      },
+    await scoreFit(input);
+  } finally {
+    await syncApplicationHiringTeam({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
     });
-    return;
   }
-  await prisma.jobRequirement.update({
-    where: { campaignId: input.campaignId },
-    data: { employerDisposition: "IDENTIFIED", employerSkipReason: null },
-  });
-  await scoreFit(input);
 }
 
 export async function attachParsedPosting(input: {
@@ -315,6 +323,10 @@ export async function attachParsedPosting(input: {
           companyId: null,
         }),
       });
+      await syncApplicationHiringTeam({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+      });
       return;
     }
     if (!companyId) {
@@ -343,7 +355,12 @@ export async function attachParsedPosting(input: {
       icpId: input.icpId,
       companyId,
     });
+    return;
   }
+  await syncApplicationHiringTeam({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+  });
 }
 
 function jobRequirementData(

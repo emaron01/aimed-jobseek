@@ -209,6 +209,10 @@ describe.skipIf(!hasDatabase)(
           personaId: persona.id,
         },
       });
+      await prisma.persona.update({
+        where: { id: persona.id },
+        data: { campaignId: campaign.id },
+      });
       const scoringRun = await prisma.scoringRun.create({
         data: {
           organizationId: orgA,

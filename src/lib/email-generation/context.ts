@@ -22,6 +22,7 @@ import {
   isResearchFresh,
   parseStringArray,
 } from "@/lib/research/freshness";
+import { applicationPersonaOptions } from "@/lib/hiring-team/scope";
 import { getResearchPolicy } from "@/lib/usage/policy";
 import {
   resolveEmailGenerationPersona,
@@ -593,17 +594,12 @@ export async function loadEmailDraftScreenStates(input: {
         .filter((id): id is string => Boolean(id)),
     ),
   );
-  const personaOptions =
-    input.inPlay.length > 0
-      ? input.inPlay.map((row) => ({ id: row.personaId, name: row.name }))
-      : input.productPersonas;
+  const personaOptions = applicationPersonaOptions({
+    applicationPersonas: input.productPersonas,
+    inPlay: input.inPlay,
+  });
   const personaNameById = new Map(
-    [
-      ...input.productPersonas.map((persona) => [persona.id, persona.name] as const),
-      ...(input.campaignPersonaId && input.campaignPersonaName
-        ? ([[input.campaignPersonaId, input.campaignPersonaName]] as const)
-        : []),
-    ],
+    input.productPersonas.map((persona) => [persona.id, persona.name] as const),
   );
 
   const [scores, contactResearchRows, companyResearchRows, researchPolicy] =

@@ -517,6 +517,7 @@ model Organization {
   offers                   Offer[]
   icps                     Icp[]
   personas                 Persona[]
+  personaTemplates         PersonaTemplate[]
   contactLists             ContactList[]
   contacts                 Contact[]
   companies                Company[]
@@ -1346,6 +1347,9 @@ model Persona {
   id                          String                @id @default(cuid())
   organizationId              String
   productId                   String
+  /// Set when this role belongs to one application. Null keeps older product-level rows.
+  campaignId                  String?
+  personaTemplateId           String?
   name                        String
   /// Authoritative natural-language persona / buyer-role definition (preserved).
   definition                  String?
@@ -1382,6 +1386,8 @@ model Persona {
 
   organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   product      Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  application  Campaign?          @relation("ApplicationHiringTeam", fields: [campaignId], references: [id], onDelete: Cascade)
+  personaTemplate PersonaTemplate? @relation(fields: [personaTemplateId], references: [id], onDelete: SetNull)
   criteria     PersonaCriterion[]
   campaigns     Campaign[]
   campaignPersonas CampaignPersona[]
@@ -1397,6 +1403,30 @@ model Persona {
   @@index([productId])
   @@index([organizationId, productId])
   @@index([organizationId, archivedAt])
+  @@index([campaignId])
+  @@index([organizationId, campaignId])
+  @@index([personaTemplateId])
+}
+
+/// Account-level starting point for a Hiring Team role. Instantiated per application.
+model PersonaTemplate {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  /// Stable key for product-configured defaults. Null for templates the seeker added.
+  templateKey        String?
+  name               String
+  likelyTitles       Json?
+  department         String?
+  whyThisRoleMatters String?
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  personas     Persona[]
+
+  @@unique([organizationId, templateKey])
+  @@index([organizationId])
 }
 
 /// Tenant-owned product source material (URL, paste, upload, note).
@@ -2185,6 +2215,7 @@ model Campaign {
   sourcedScoringRuns ScoringRun[]
   jobRequirement JobRequirement?
   applicationFit ApplicationFit?
+  hiringTeamRoles Persona[] @relation("ApplicationHiringTeam")
 
   @@index([organizationId])
   @@index([organizationId, createdAt])

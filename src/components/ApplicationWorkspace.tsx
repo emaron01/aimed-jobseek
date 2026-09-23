@@ -3,6 +3,11 @@ import {
   overrideApplicationFitAction,
   rescoreApplicationFitAction,
 } from "@/app/actions/application";
+import {
+  addApplicationRoleAction,
+  removeApplicationRoleAction,
+  saveRoleAsTemplateAction,
+} from "@/app/actions/hiring-team";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { displayedFitBucket, fitSignalLabels } from "@/lib/application/fit";
 import type { ApplicationFitOutcome } from "@/lib/application/fit";
@@ -129,6 +134,7 @@ export async function ApplicationWorkspace({
     : null;
 
   return (
+    <>
     <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-5" data-testid="application-workspace">
       <div>
         <h2 className="text-base font-semibold text-slate-900">Job requirement</h2>
@@ -294,6 +300,110 @@ export async function ApplicationWorkspace({
           </ApplicationActionForm>
         ) : null}
       </div>
+    </section>
+    <HiringTeamSection
+      campaignId={requirement.campaignId}
+      organizationId={organizationId}
+      canEdit={canEdit}
+    />
+    </>
+  );
+}
+
+async function HiringTeamSection({
+  campaignId,
+  organizationId,
+  canEdit,
+}: {
+  campaignId: string;
+  organizationId: string;
+  canEdit: boolean;
+}) {
+  const roles = await prisma.persona.findMany({
+    where: { organizationId, campaignId, archivedAt: null },
+    orderBy: { createdAt: "asc" },
+  });
+  const fieldClass = "mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm";
+  return (
+    <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-5" data-testid="hiring-team">
+      <div>
+        <h2 className="text-base font-semibold text-slate-900">{vocab.persona.nav}</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Roles for this {vocab.campaign.singular} only. They are built from the job requirement and employer research.
+        </p>
+      </div>
+      {roles.length === 0 ? (
+        <p className="text-sm text-slate-600">No {vocab.persona.plural} yet.</p>
+      ) : (
+        <ul className="space-y-4">
+          {roles.map((role) => (
+            <li key={role.id} className="space-y-2 rounded-md border border-slate-200 p-4" data-testid="hiring-team-role">
+              <h3 className="text-sm font-semibold text-slate-900">{role.name}</h3>
+              <p className="text-sm text-slate-700">{textList(role.targetTitles).join(", ") || "No likely titles."}</p>
+              {role.department ? <p className="text-sm text-slate-700">{role.department}</p> : null}
+              {role.whyThisPersonaMatters ? (
+                <p className="text-sm text-slate-800">{role.whyThisPersonaMatters}</p>
+              ) : null}
+              {role.definition ? <p className="text-sm text-slate-800">{role.definition}</p> : null}
+              {role.painPoints ? <p className="text-sm text-slate-700">{role.painPoints}</p> : null}
+              {role.desiredOutcomes ? <p className="text-sm text-slate-700">{role.desiredOutcomes}</p> : null}
+              {role.messagingNotes ? <p className="text-sm text-slate-700">{role.messagingNotes}</p> : null}
+              {role.setupStatus === "FAILED" || role.setupStatus === "PARTIAL" ? (
+                <p className="text-sm text-amber-900">{role.additionalContext}</p>
+              ) : null}
+              {canEdit ? (
+                <div className="flex flex-wrap gap-3">
+                  <ApplicationActionForm
+                    action={removeApplicationRoleAction}
+                    submitLabel="Remove role"
+                    testId={`remove-role-${role.id}`}
+                  >
+                    <input type="hidden" name="campaignId" value={campaignId} />
+                    <input type="hidden" name="personaId" value={role.id} />
+                  </ApplicationActionForm>
+                  <ApplicationActionForm
+                    action={saveRoleAsTemplateAction}
+                    submitLabel="Save as template"
+                    testId={`save-role-template-${role.id}`}
+                  >
+                    <input type="hidden" name="campaignId" value={campaignId} />
+                    <input type="hidden" name="personaId" value={role.id} />
+                  </ApplicationActionForm>
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {canEdit ? (
+        <ApplicationActionForm
+          action={addApplicationRoleAction}
+          submitLabel={`Add ${vocab.persona.singular}`}
+          testId="add-hiring-team-role"
+        >
+          <input type="hidden" name="campaignId" value={campaignId} />
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">Name</span>
+            <input name="name" required className={fieldClass} />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">Likely titles</span>
+            <textarea name="likelyTitles" rows={3} className={fieldClass} />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">Department</span>
+            <input name="department" className={fieldClass} />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">Why this role matters</span>
+            <textarea name="whyThisRoleMatters" rows={2} className={fieldClass} />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">Notes</span>
+            <textarea name="notes" rows={2} className={fieldClass} />
+          </label>
+        </ApplicationActionForm>
+      ) : null}
     </section>
   );
 }

@@ -38,6 +38,17 @@ export default async function SettingsIndexPage() {
         </li>
         <li>
           <Link
+            href="/settings/hiring-team"
+            className="font-medium text-slate-900 underline-offset-2 hover:underline"
+          >
+            {vocab.persona.nav} templates
+          </Link>
+          <p className="text-slate-600">
+            Starting points for the {vocab.persona.plural} on each {vocab.campaign.singular}.
+          </p>
+        </li>
+        <li>
+          <Link
             href="/settings/voice"
             className="font-medium text-slate-900 underline-offset-2 hover:underline"
           >

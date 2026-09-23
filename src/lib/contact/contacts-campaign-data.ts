@@ -3,6 +3,7 @@ import "server-only";
 import type { Prisma, QualificationBucket } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { scoringRunPersonaWhere } from "@/lib/campaign/personas";
+import { applicationPersonaWhere } from "@/lib/hiring-team/scope";
 import {
   formatContactCampaignLine,
   resolveContactCampaignQualification,
@@ -232,8 +233,7 @@ async function compatibleScoringRunWhere(
     prisma.persona.findMany({
       where: {
         organizationId,
-        productId: campaign.productId,
-        archivedAt: null,
+        ...applicationPersonaWhere(campaign.id),
       },
       select: { id: true },
     }),

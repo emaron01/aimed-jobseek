@@ -1,10 +1,11 @@
 "use client";
 
 import { useActionState, type ReactNode } from "react";
-import type { ApplicationActionResult } from "@/app/actions/application";
 import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
 
-const initial: ApplicationActionResult | null = null;
+type ActionResult = { ok: boolean; message: string };
+
+const initial: ActionResult | null = null;
 
 export function ApplicationActionForm({
   action,
@@ -13,9 +14,9 @@ export function ApplicationActionForm({
   children,
 }: {
   action: (
-    prev: ApplicationActionResult | null,
+    prev: ActionResult | null,
     formData: FormData,
-  ) => Promise<ApplicationActionResult>;
+  ) => Promise<ActionResult>;
   submitLabel: string;
   testId: string;
   children: ReactNode;

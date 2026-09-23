@@ -6,6 +6,7 @@ import type {
   UsageCategory,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { ensureDefaultPersonaTemplates } from "@/lib/hiring-team/templates";
 import { recordAdminAuditEvent } from "@/lib/auth/audit";
 import { aggregateUsage } from "@/lib/usage/events";
 import { countActiveResearchedCompanies } from "@/lib/usage/active-companies";
@@ -1223,6 +1224,7 @@ export async function createPlatformOrganization(input: {
         timezone: input.timezone?.trim() || DEFAULT_ORGANIZATION_TIMEZONE,
       },
     });
+    await ensureDefaultPersonaTemplates(tx, org.id);
     await tx.organizationUsagePolicy.create({
       data: {
         organizationId: org.id,

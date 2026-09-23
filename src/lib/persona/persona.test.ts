@@ -47,6 +47,8 @@ function asPersona(partial: typeof SALES_LEADER_FIXTURE): Persona {
     id: "persona_fixture",
     organizationId: "org_fixture",
     productId: "product_fixture",
+    campaignId: null,
+    personaTemplateId: null,
     name: partial.name,
     definition: partial.definition,
     additionalContext: partial.additionalContext,

@@ -61,10 +61,10 @@ function noun(spec: NounSpec): NounForms {
 
 export const vocab = Object.freeze({
   product: noun({
-    singular: "profile",
-    plural: "profiles",
+    singular: "Personal Profile",
+    plural: "Personal Profiles",
     article: "a",
-    nav: "Profile",
+    nav: "Personal Profile",
   }),
   icp: noun({
     singular: "Target Employer profile",
