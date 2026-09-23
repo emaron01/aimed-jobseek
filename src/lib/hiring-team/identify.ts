@@ -4,8 +4,6 @@ import {
   type HiringTeamJobEvidence,
   type HiringTeamResearchEvidence,
 } from "@/lib/hiring-team/evidence";
-import type { PersonaDifferentiationInput } from "@/lib/persona/persona-differentiation";
-import { findNearDuplicatePersonaPairs } from "@/lib/persona/persona-differentiation";
 
 export type Involvement = "DIRECT" | "INDIRECT";
 export type ClaimKind = "FACT" | "INFERENCE";
@@ -24,22 +22,6 @@ export type IdentifiedHiringRole = {
   involvement: Involvement;
   whyInvolved: string;
   evidence: RoleEvidence[];
-};
-
-export type AnnotatedText = {
-  text: string;
-  kind: ClaimKind;
-};
-
-export type HiringTeamNarrative = {
-  overview: AnnotatedText;
-  impact: AnnotatedText;
-  needs: AnnotatedText[];
-  concerns: AnnotatedText[];
-  interviewStage: AnnotatedText | null;
-  evaluates: AnnotatedText[];
-  talkingPoints: AnnotatedText[];
-  communication: AnnotatedText[];
 };
 
 const JOB_SOURCE = "job-requirement";
@@ -233,142 +215,6 @@ export function identifyHiringTeamRoles(input: {
   });
 }
 
-function scorecardLines(job: HiringTeamJobEvidence): string[] {
-  return [
-    job.scorecard.mission?.text ?? "",
-    ...job.scorecard.outcomes.map((item) => item.text),
-    ...job.scorecard.competencies.map((item) => item.text),
-  ]
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
-function stageFor(role: IdentifiedHiringRole): string | null {
-  if (role.involvement !== "DIRECT") return null;
-  if (role.roleKey === "recruiter") return "recruiter screen";
-  if (role.roleKey === "hiring_manager") {
-    return "hiring manager chronological walk-through";
-  }
-  if (role.roleKey === "hiring_manager_executive") return "executive";
-  return "panel competency interview";
-}
-
-export function draftHiringTeamRole(
-  role: IdentifiedHiringRole,
-  job: HiringTeamJobEvidence,
-): HiringTeamNarrative {
-  const lines = scorecardLines(job);
-  const needsSource = lines.length > 0 ? lines : job.requiredItems;
-  const needs = (needsSource.length > 0 ? needsSource : [role.whyInvolved]).map(
-    (text) => ({
-      text: `They need the hire to deliver: ${text}`,
-      kind: "INFERENCE" as const,
-    }),
-  );
-  const evidenceClaim = role.evidence[0]?.claim ?? role.whyInvolved;
-  const concerns = [
-    {
-      text: `${role.name} will press on ${evidenceClaim}`,
-      kind: "INFERENCE" as const,
-    },
-  ];
-  const stage = stageFor(role);
-  const talkingPoints = [
-    {
-      text: `${role.name}: connect a story to ${evidenceClaim}`,
-      kind: "INFERENCE" as const,
-    },
-    {
-      text:
-        role.involvement === "DIRECT"
-          ? `${role.name} asks about ${evidenceClaim} in the interview.`
-          : `If the hiring manager asks about ${role.name}, use ${evidenceClaim}`,
-      kind: "INFERENCE" as const,
-    },
-  ];
-  const communication =
-    role.involvement === "DIRECT" && role.roleKey === "hiring_manager"
-      ? `${role.name} wants the work in time order, including why you moved on.`
-      : role.roleKey === "recruiter"
-        ? `${role.name} screens the posting requirements before anyone else.`
-        : role.involvement === "DIRECT"
-          ? `${role.name} evaluates how you work with ${role.department ?? "their team"}.`
-          : `${role.name} is the cross-functional check, not the owner of the hire.`;
-  return {
-    overview: {
-      text: `${role.name} owns ${role.department ?? "their function"} relative to this hire. ${role.whyInvolved}`,
-      kind: role.evidence[0]?.kind ?? "INFERENCE",
-    },
-    impact: {
-      text: `${role.name} feels this hire through ${role.whyInvolved}`,
-      kind: "INFERENCE",
-    },
-    needs,
-    concerns,
-    interviewStage: stage ? { text: stage, kind: "INFERENCE" } : null,
-    evaluates:
-      role.involvement === "DIRECT"
-        ? (job.scorecard.competencies.length > 0
-            ? job.scorecard.competencies
-            : job.requiredItems
-          ).map((item) => ({
-            text: typeof item === "string" ? item : item.text,
-            kind: "INFERENCE" as const,
-          }))
-        : [],
-    talkingPoints,
-    communication: [{ text: communication, kind: "INFERENCE" }],
-  };
-}
-
-export function narrativeLists(narrative: HiringTeamNarrative): {
-  painPoints: string[];
-  messagingNotes: string[];
-} {
-  return {
-    painPoints: [
-      narrative.impact.text,
-      ...narrative.concerns.map((item) => item.text),
-    ],
-    messagingNotes: [
-      ...narrative.talkingPoints.map((item) => item.text),
-      ...narrative.communication.map((item) => item.text),
-      narrative.interviewStage?.text ?? "",
-    ].filter(Boolean),
-  };
-}
-
-/** Keeps peer pain and messaging from collapsing into one voice. */
-export function differentiateNarratives(input: {
-  roles: IdentifiedHiringRole[];
-  narratives: HiringTeamNarrative[];
-}): HiringTeamNarrative[] {
-  const next = input.narratives.map((narrative) => ({
-    ...narrative,
-    talkingPoints: [...narrative.talkingPoints],
-    communication: [...narrative.communication],
-  }));
-  const peers: PersonaDifferentiationInput[] = next.map((narrative, index) => {
-    const lists = narrativeLists(narrative);
-    return {
-      id: input.roles[index]?.roleKey ?? String(index),
-      name: input.roles[index]?.name ?? "Role",
-      painPoints: lists.painPoints,
-      messagingNotes: lists.messagingNotes,
-    };
-  });
-  const pairs = findNearDuplicatePersonaPairs(peers);
-  for (const pair of pairs) {
-    const index = peers.findIndex((peer) => peer.id === pair.personaB.id);
-    const role = input.roles[index];
-    if (!role || index < 0) continue;
-    next[index]?.talkingPoints.push({
-      text: `Distinct from ${pair.personaA.name}: ${role.name} is ${role.involvement.toLowerCase()} and cares about ${role.whyInvolved}`,
-      kind: "INFERENCE",
-    });
-  }
-  return next;
-}
 
 export function roleKeyFromModel(input: {
   name: string;

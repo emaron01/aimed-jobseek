@@ -1,14 +1,31 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+const isPersonaAiConfigured = vi.hoisted(() => vi.fn(() => false));
+const generateStructured = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/ai", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai")>();
+  return {
+    ...actual,
+    isPersonaAiConfigured,
+    getPersonaAiProvider: () => ({ generateStructured }),
+  };
+});
 import { readFileSync } from "node:fs";
 import {
   hiringTeamEvidenceExcerpts,
 } from "@/lib/hiring-team/evidence";
+import { synthesizeHiringTeamRole } from "@/lib/hiring-team/ai";
 import {
-  differentiateNarratives,
-  draftHiringTeamRole,
+  assessHiringTeamDraft,
+  fieldRestatesJobRequirement,
+  jobRequirementLines,
+  narrativeFromDraft,
+  type HiringTeamDraftFields,
+} from "@/lib/hiring-team/draft-quality";
+import {
   hiringManagerTitles,
   identifyHiringTeamRoles,
-  narrativeLists,
 } from "@/lib/hiring-team/identify";
 import type { HiringTeamJobEvidence } from "@/lib/hiring-team/evidence";
 import { HIRING_TEAM_IDENTIFICATION_PROMPT_VERSION } from "@/lib/hiring-team/contract";
@@ -25,13 +42,43 @@ import {
 } from "@/lib/hiring-team/build";
 import { isUneditedDefaultTemplate } from "@/lib/hiring-team/templates";
 import { findNearDuplicatePersonaPairs } from "@/lib/persona/persona-differentiation";
-import { PERSONA_SYNTHESIS_PROMPT_VERSION } from "@/lib/persona-research/contract";
+import {
+  personaAiDraftSchema,
+  PERSONA_SYNTHESIS_PROMPT_VERSION,
+} from "@/lib/persona-research/contract";
 import { buildPersonaSynthesisMessages } from "@/lib/persona-research/prompt";
 import { NORMAL_JOB_MODEL, NORMAL_JOB_POSTING } from "@/lib/job-requirement/fixtures";
 import { normalizeParsedJobRequirement } from "@/lib/job-requirement/normalize";
 import { vocab } from "@/lib/product-config";
 import { buildSidebarNavItems } from "@/lib/auth/user-menu";
 import { hasTestDatabase } from "@/test/database";
+
+function substantiveDirectorDraft(): HiringTeamDraftFields {
+  return {
+    overview:
+      "The Director of Engineering owns delivery of the warehouse robot fleet, on-call load, team capacity, and the hiring bar for engineers who ship motion software.",
+    pressures: [
+      "They are measured on fleet uptime and how quickly the motion service recovers after an incident, so an open senior seat leaves that load on them.",
+    ],
+    impact:
+      "This hire takes the motion-service on-call rotation off the director and lets them keep the fleet reliability plan on schedule.",
+    needs: [
+      "In the first months, own production incidents on the motion service through resolution.",
+      "Set a hiring bar the director can defend when the next engineer is interviewed.",
+    ],
+    concerns: [
+      "They will doubt a candidate who has not owned a production robotics service through an incident.",
+    ],
+    interviewStage: "hiring manager chronological walk-through",
+    evaluates: ["Whether the candidate has owned production outcomes, not only designed them."],
+    talkingPoints: [
+      "Describe how you would sit with the reliability rotation in the first month and take the overnight pages.",
+    ],
+    communication: [
+      "They want the work in the order it happened, with the outcome you owned.",
+    ],
+  };
+}
 
 function fixtureJob(overrides: Partial<HiringTeamJobEvidence> = {}): HiringTeamJobEvidence {
   const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
@@ -52,6 +99,11 @@ function fixtureJob(overrides: Partial<HiringTeamJobEvidence> = {}): HiringTeamJ
 }
 
 describe("hiring team evidence and selectors", () => {
+  afterEach(() => {
+    isPersonaAiConfigured.mockReturnValue(false);
+    generateStructured.mockReset();
+  });
+
   it("uses the reporting line as the Hiring Manager title", () => {
     expect(
       hiringManagerTitles({
@@ -103,33 +155,146 @@ describe("hiring team evidence and selectors", () => {
     ).toBe("Controller");
   });
 
-  it("drafts impact and talking points and keeps roles distinct", () => {
+  it("rejects persona fields that only restate the job requirement", () => {
+    const lines = jobRequirementLines(fixtureJob());
+    expect(
+      fieldRestatesJobRequirement("They need the hire to deliver: 5 years of Python", lines),
+    ).toBe(true);
+    expect(
+      fieldRestatesJobRequirement(
+        "Hiring Manager will press on Reports to: Director of Engineering",
+        lines,
+      ),
+    ).toBe(true);
+    const accepted = assessHiringTeamDraft({
+      involvement: "DIRECT",
+      jobLines: lines,
+      fields: substantiveDirectorDraft(),
+    });
+    expect(accepted.ok).toBe(true);
+    const restated = assessHiringTeamDraft({
+      involvement: "DIRECT",
+      jobLines: lines,
+      fields: {
+        ...substantiveDirectorDraft(),
+        needs: [
+          "They need the hire to deliver: 5 years of Python",
+          "They need the hire to deliver: Leads incident response",
+        ],
+      },
+    });
+    expect(restated.ok).toBe(false);
+    const identifySource = readFileSync("src/lib/hiring-team/identify.ts", "utf8");
+    const buildSource = readFileSync("src/lib/hiring-team/build.ts", "utf8");
+    expect(identifySource).not.toContain("feels this hire");
+    expect(identifySource).not.toContain("connect a story");
+    expect(identifySource).not.toContain("draftHiringTeamRole");
+    expect(buildSource).not.toContain("applyModelDraft");
+    expect(buildSource).not.toContain("evidence draft");
+  });
+
+  it("stores a model draft only after it stops restating the job, and keeps identification when synthesis cannot run", async () => {
     const job = fixtureJob();
-    const roles = identifyHiringTeamRoles({
-      job,
-      research: null,
-      includeResearch: false,
-    });
-    const narratives = differentiateNarratives({
-      roles,
-      narratives: roles.map((role) => draftHiringTeamRole(role, job)),
-    });
-    expect(narratives.every((item) => item.impact.text.length > 0)).toBe(true);
-    expect(narratives.every((item) => item.talkingPoints.length > 0)).toBe(true);
-    const indirect = roles.findIndex((role) => role.involvement === "INDIRECT");
-    expect(narratives[indirect]?.interviewStage).toBeNull();
-    const pairs = findNearDuplicatePersonaPairs(
-      narratives.map((narrative, index) => {
-        const lists = narrativeLists(narrative);
-        return {
-          id: roles[index]!.roleKey,
-          name: roles[index]!.name,
-          painPoints: lists.painPoints,
-          messagingNotes: lists.messagingNotes,
-        };
+    const lines = jobRequirementLines(job);
+    const good = substantiveDirectorDraft();
+    const narrative = narrativeFromDraft({
+      involvement: "DIRECT",
+      evidenceText: "Reports to: Director of Engineering",
+      fields: good,
+      draft: personaAiDraftSchema.parse({
+        name: "Hiring Manager",
+        roleSummary: good.overview,
+        evidenceRefs: [
+          {
+            claim: "owns delivery of the warehouse robot fleet",
+            kind: "FACT",
+          },
+        ],
       }),
-    );
-    expect(pairs).toEqual([]);
+    });
+    expect(narrative.overview.kind).toBe("INFERENCE");
+
+    isPersonaAiConfigured.mockReturnValue(false);
+    const unavailable = await synthesizeHiringTeamRole({
+      roleName: "Hiring Manager",
+      likelyTitles: ["Director of Engineering"],
+      department: "Engineering",
+      whyThisRoleMatters: "The posting says this job reports to Director of Engineering.",
+      involvement: "DIRECT",
+      notes: null,
+      excerpts: [],
+      peers: [],
+      jobLines: lines,
+      evidenceText: "Reports to: Director of Engineering",
+    });
+    expect(unavailable.ok).toBe(false);
+    if (!unavailable.ok) expect(unavailable.status).toBe("PARTIAL");
+    expect(generateStructured).not.toHaveBeenCalled();
+
+    isPersonaAiConfigured.mockReturnValue(true);
+    generateStructured
+      .mockResolvedValueOnce({
+        data: {
+          personaDraft: personaAiDraftSchema.parse({
+            name: "Hiring Manager",
+            roleSummary: "Feels the hire through the reporting line.",
+            impact: "Presses on the reporting line.",
+            needsFromHire: [
+              "They need the hire to deliver: 5 years of Python",
+              "They need the hire to deliver: Leads incident response",
+            ],
+            candidateConcerns: ["Hiring Manager will press on Reports to: Director of Engineering"],
+            talkingPoints: ["Connect a story to the reporting line."],
+            communicationApproach: ["Connect a story to Reports to: Director of Engineering"],
+            interviewStage: "hiring manager chronological walk-through",
+            organizationalPressures: ["Presses on Reports to: Director of Engineering"],
+          }),
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          personaDraft: personaAiDraftSchema.parse({
+            name: "Hiring Manager",
+            roleSummary: good.overview,
+            organizationalPressures: good.pressures,
+            impact: good.impact,
+            needsFromHire: good.needs,
+            candidateConcerns: good.concerns,
+            talkingPoints: good.talkingPoints,
+            communicationApproach: good.communication,
+            interviewStage: good.interviewStage,
+            evaluates: good.evaluates,
+            evidenceRefs: [
+              {
+                claim: "owns delivery of the warehouse robot fleet",
+                kind: "INFERENCE",
+              },
+            ],
+          }),
+        },
+      });
+    const drafted = await synthesizeHiringTeamRole({
+      roleName: "Hiring Manager",
+      likelyTitles: ["Director of Engineering"],
+      department: "Engineering",
+      whyThisRoleMatters: "The posting says this job reports to Director of Engineering.",
+      involvement: "DIRECT",
+      notes: null,
+      excerpts: [],
+      peers: [],
+      jobLines: lines,
+      evidenceText: "Reports to: Director of Engineering",
+    });
+    expect(generateStructured).toHaveBeenCalledTimes(2);
+    const retryPayload = JSON.stringify(generateStructured.mock.calls[1]?.[0]?.messages);
+    expect(retryPayload).toContain("synthesisRejection");
+    expect(drafted.ok).toBe(true);
+    if (drafted.ok) {
+      expect(drafted.narrative.overview.text).toContain("fleet");
+      expect(drafted.narrative.needs.some((item) => item.text.includes("5 years of Python"))).toBe(
+        false,
+      );
+    }
   });
 
   it("keeps seeker templates and removes only unedited defaults", () => {
@@ -235,7 +400,7 @@ describe("hiring team evidence and selectors", () => {
   });
 
   it("synthesizes Hiring Team roles as inference and bumps the prompt version", () => {
-    expect(PERSONA_SYNTHESIS_PROMPT_VERSION).toBe("10");
+    expect(PERSONA_SYNTHESIS_PROMPT_VERSION).toBe("11");
     expect(HIRING_TEAM_IDENTIFICATION_PROMPT_VERSION).toBe("1");
     const prompt = readFileSync("src/lib/prompt-content/persona-synthesis.ts", "utf8");
     expect(prompt).toContain("FACT");
@@ -264,6 +429,8 @@ describe("hiring team evidence and selectors", () => {
     expect(messages[0]?.content).toContain("INFERENCE");
     expect(messages[0]?.content).toContain("Talking points");
     expect(messages[0]?.content).toContain("Impact");
+    expect(messages[0]?.content).toContain("organizationalPressures");
+    expect(messages[0]?.content).toContain("Do not restate");
     expect(messages[0]?.content).not.toContain("GTM");
     expect(messages[1]?.content).toContain("Recruiter");
   });
@@ -388,8 +555,10 @@ describe.skipIf(!hasTestDatabase())("hiring team per application", () => {
       evidence?: Array<{ text: string }>;
     };
     expect(stored.includeResearch).toBe(false);
-    expect(stored.narrative?.impact?.text).toBeTruthy();
-    expect((stored.narrative?.talkingPoints ?? []).length).toBeGreaterThan(0);
+    expect(stored.narrative ?? null).toBeNull();
+    expect(manager?.definition ?? null).toBeNull();
+    expect(manager?.setupStatus).toBe("PARTIAL");
+    expect(JSON.stringify(manager?.profileJson)).toContain("identification only");
     expect(stored.evidence?.[0]?.text).not.toContain("second site");
     const beforeIds = rolesA.map((role) => role.id).sort();
 
@@ -458,9 +627,11 @@ describe.skipIf(!hasTestDatabase())("hiring team per application", () => {
       personaId: other.id,
     });
     const rebuilt = await prisma.persona.findFirst({ where: { id: other.id } });
-    expect(rebuilt?.setupStatus).toBe("NEEDS_REVIEW");
-    const rebuiltJson = rebuilt?.profileJson as { narrative?: { impact?: { text?: string } } };
-    expect(rebuiltJson.narrative?.impact?.text).toBeTruthy();
+    expect(rebuilt?.setupStatus).toBe("PARTIAL");
+    expect(rebuilt?.definition ?? null).toBeNull();
+    const rebuiltJson = rebuilt?.profileJson as { narrative?: unknown; modelNote?: string };
+    expect(rebuiltJson.narrative ?? null).toBeNull();
+    expect(rebuiltJson.modelNote).toContain("identification only");
 
     await removeApplicationHiringTeamRole({
       organizationId,

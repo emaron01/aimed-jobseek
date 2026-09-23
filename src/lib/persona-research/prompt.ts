@@ -63,6 +63,7 @@ ${PERSONA_SYNTHESIS_SYSTEM_INSTRUCTIONS}`;
         primaryResponsibilities: ["string"],
         ownershipAreas: ["string"],
         kpisAndAccountabilities: ["string"],
+        organizationalPressures: ["string"],
         painPoints: ["string"],
         desiredOutcomesFromSolution: ["string"],
         messagingNotes: ["string"],

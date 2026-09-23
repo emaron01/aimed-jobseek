@@ -332,7 +332,9 @@ function annotatedList(value: unknown): Array<{ text: string; kind: string }> {
 
 function readNarrative(value: unknown): {
   involvement: string | null;
+  modelNote: string | null;
   overview: string | null;
+  pressures: Array<{ text: string; kind: string }>;
   impact: { text: string; kind: string } | null;
   needs: Array<{ text: string; kind: string }>;
   concerns: Array<{ text: string; kind: string }>;
@@ -343,10 +345,15 @@ function readNarrative(value: unknown): {
   identificationEvidence: Array<{ text: string; kind: string }>;
 } | null {
   if (!value || typeof value !== "object") return null;
-  const row = value as { narrative?: unknown; involvement?: unknown; identification?: unknown };
+  const row = value as {
+    narrative?: unknown;
+    involvement?: unknown;
+    identification?: unknown;
+    modelNote?: unknown;
+  };
   const narrative = row.narrative;
-  if (!narrative || typeof narrative !== "object") return null;
-  const body = narrative as Record<string, unknown>;
+  const body =
+    narrative && typeof narrative === "object" ? (narrative as Record<string, unknown>) : null;
   const one = (entry: unknown) => {
     if (!entry || typeof entry !== "object") return null;
     const item = entry as { text?: unknown; kind?: unknown };
@@ -366,16 +373,26 @@ function readNarrative(value: unknown): {
       : [];
   return {
     involvement: typeof row.involvement === "string" ? row.involvement : null,
-    overview: one(body.overview)?.text ?? null,
-    impact: one(body.impact),
-    needs: annotatedList(body.needs),
-    concerns: annotatedList(body.concerns),
-    interviewStage: one(body.interviewStage),
-    evaluates: annotatedList(body.evaluates),
-    talkingPoints: annotatedList(body.talkingPoints),
-    communication: annotatedList(body.communication),
+    modelNote: typeof row.modelNote === "string" && row.modelNote.trim() ? row.modelNote.trim() : null,
+    overview: body ? (one(body.overview)?.text ?? null) : null,
+    pressures: body ? annotatedList(body.pressures) : [],
+    impact: body ? one(body.impact) : null,
+    needs: body ? annotatedList(body.needs) : [],
+    concerns: body ? annotatedList(body.concerns) : [],
+    interviewStage: body ? one(body.interviewStage) : null,
+    evaluates: body ? annotatedList(body.evaluates) : [],
+    talkingPoints: body ? annotatedList(body.talkingPoints) : [],
+    communication: body ? annotatedList(body.communication) : [],
     identificationEvidence: evidence,
   };
+}
+
+function hiringTeamStatusLabel(setupStatus: string, approvalStatus: string): string {
+  if (approvalStatus === "APPROVED") return "Approved";
+  if (setupStatus === "FAILED") return "Synthesis failed";
+  if (setupStatus === "PARTIAL") return "Identification only";
+  if (setupStatus === "NEEDS_REVIEW") return "Needs review";
+  return "Identification only";
 }
 
 function KindMark({ kind }: { kind: string }) {
@@ -430,7 +447,9 @@ async function HiringTeamSection({
                       {narrative.involvement === "DIRECT" ? "Direct" : "Indirect"}
                     </span>
                   ) : null}
-                  <span className="text-xs text-slate-500">{role.approvalStatus === "APPROVED" ? "Approved" : "Needs review"}</span>
+                  <span className="text-xs text-slate-500">
+                    {hiringTeamStatusLabel(role.setupStatus, role.approvalStatus)}
+                  </span>
                 </div>
                 <p className="text-sm text-slate-700">{textList(role.targetTitles).join(", ") || "No likely titles."}</p>
                 {role.department ? <p className="text-sm text-slate-700">{role.department}</p> : null}
@@ -444,6 +463,7 @@ async function HiringTeamSection({
                 ) : null}
                 {narrative ? (
                   <>
+                    <AnnotatedBlock title="Pressures" items={narrative.pressures} />
                     <AnnotatedBlock title="What they need" items={narrative.needs} />
                     <AnnotatedBlock title="Concerns" items={narrative.concerns} />
                     {narrative.interviewStage ? (
@@ -458,7 +478,12 @@ async function HiringTeamSection({
                     <AnnotatedBlock title="Why they were identified" items={narrative.identificationEvidence} />
                   </>
                 ) : null}
-                {role.additionalContext ? <p className="text-sm text-amber-900">{role.additionalContext}</p> : null}
+                {narrative?.modelNote ? (
+                  <p className="text-sm text-amber-900">{narrative.modelNote}</p>
+                ) : null}
+                {role.additionalContext ? (
+                  <p className="text-sm text-slate-700">{role.additionalContext}</p>
+                ) : null}
                 {canEdit ? (
                   <div className="space-y-3">
                     <ApplicationActionForm action={updateApplicationRoleAction} submitLabel="Save edits" testId={`edit-role-${role.id}`}>
@@ -490,7 +515,15 @@ async function HiringTeamSection({
                         <input type="hidden" name="campaignId" value={campaignId} />
                         <input type="hidden" name="personaId" value={role.id} />
                       </ApplicationActionForm>
-                      <ApplicationActionForm action={rebuildApplicationRoleAction} submitLabel="Rebuild" testId={`rebuild-role-${role.id}`}>
+                      <ApplicationActionForm
+                        action={rebuildApplicationRoleAction}
+                        submitLabel={
+                          role.setupStatus === "PARTIAL" || role.setupStatus === "FAILED"
+                            ? "Retry synthesis"
+                            : "Rebuild"
+                        }
+                        testId={`rebuild-role-${role.id}`}
+                      >
                         <input type="hidden" name="campaignId" value={campaignId} />
                         <input type="hidden" name="personaId" value={role.id} />
                       </ApplicationActionForm>

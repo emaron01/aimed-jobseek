@@ -4,7 +4,14 @@ import {
   hiringTeamIdentificationSchema,
   type HiringTeamIdentificationResult,
 } from "@/lib/hiring-team/contract";
+import {
+  assessHiringTeamDraft,
+  fieldsFromPersonaDraft,
+  narrativeFromDraft,
+  type HiringTeamNarrative,
+} from "@/lib/hiring-team/draft-quality";
 import { buildHiringTeamIdentificationMessages } from "@/lib/hiring-team/prompt";
+import type { Involvement } from "@/lib/hiring-team/identify";
 import type { PersonaDifferentiationInput } from "@/lib/persona/persona-differentiation";
 import {
   parsePersonaAiResponse,
@@ -12,6 +19,11 @@ import {
 } from "@/lib/persona-research/contract";
 import { buildPersonaSynthesisMessages } from "@/lib/persona-research/prompt";
 import type { EvidenceExcerpt } from "@/lib/product-research/prompt";
+
+const SYNTHESIS_UNAVAILABLE =
+  "Persona synthesis is not configured. This role shows its identification only. Retry after Persona AI is configured.";
+const SYNTHESIS_FAILED =
+  "Persona synthesis did not produce a specific draft. This role shows its identification only.";
 
 export async function identifyRolesWithModel(input: {
   evidence: EvidenceExcerpt[];
@@ -58,13 +70,19 @@ export async function draftRoleWithModel(input: {
   notes: string | null;
   excerpts: EvidenceExcerpt[];
   peers: PersonaDifferentiationInput[];
+  rejection?: string[];
 }): Promise<{ ok: true; draft: PersonaAiDraft } | { ok: false; message: string }> {
   if (!isPersonaAiConfigured()) {
-    return {
-      ok: false,
-      message: "Persona AI is not configured, so this role keeps the evidence draft.",
-    };
+    return { ok: false, message: SYNTHESIS_UNAVAILABLE };
   }
+  const rejection = (input.rejection ?? []).map((item) => item.trim()).filter(Boolean);
+  const userContext =
+    input.notes || rejection.length > 0
+      ? {
+          ...(input.notes ? { notes: input.notes } : {}),
+          ...(rejection.length > 0 ? { synthesisRejection: rejection } : {}),
+        }
+      : null;
   try {
     const response = await getPersonaAiProvider().generateStructured({
       ...structuredOutputRequest("personaSynthesis"),
@@ -88,7 +106,7 @@ export async function draftRoleWithModel(input: {
           confidence: "MEDIUM",
           evidenceRefs: [],
         },
-        userContext: input.notes ? { notes: input.notes } : null,
+        userContext,
         productEvidence: input.excerpts,
         personaEvidence: [],
         icpContext: null,
@@ -108,7 +126,59 @@ export async function draftRoleWithModel(input: {
     );
     return {
       ok: false,
-      message: "This Hiring Team role could not be drafted by the model. The evidence draft is still here.",
+      message: `${SYNTHESIS_FAILED} ${message}`,
     };
   }
+}
+
+export type HiringTeamSynthesisResult =
+  | { ok: true; narrative: HiringTeamNarrative }
+  | { ok: false; status: "PARTIAL" | "FAILED"; message: string };
+
+/** Calls the model, rejects restated job text, and retries that rejection once. */
+export async function synthesizeHiringTeamRole(input: {
+  roleName: string;
+  likelyTitles: string[];
+  department: string | null;
+  whyThisRoleMatters: string | null;
+  involvement: Involvement;
+  notes: string | null;
+  excerpts: EvidenceExcerpt[];
+  peers: PersonaDifferentiationInput[];
+  jobLines: string[];
+  evidenceText: string;
+}): Promise<HiringTeamSynthesisResult> {
+  if (!isPersonaAiConfigured()) {
+    return { ok: false, status: "PARTIAL", message: SYNTHESIS_UNAVAILABLE };
+  }
+  let rejection: string[] = [];
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const model = await draftRoleWithModel({ ...input, rejection });
+    if (!model.ok) {
+      return { ok: false, status: "FAILED", message: model.message };
+    }
+    const fields = fieldsFromPersonaDraft(model.draft);
+    const assessment = assessHiringTeamDraft({
+      fields,
+      jobLines: input.jobLines,
+      involvement: input.involvement,
+    });
+    if (assessment.ok) {
+      return {
+        ok: true,
+        narrative: narrativeFromDraft({
+          draft: model.draft,
+          fields,
+          evidenceText: input.evidenceText,
+          involvement: input.involvement,
+        }),
+      };
+    }
+    rejection = assessment.reasons;
+  }
+  return {
+    ok: false,
+    status: "FAILED",
+    message: `${SYNTHESIS_FAILED} ${rejection.join(" ")}`,
+  };
 }

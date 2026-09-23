@@ -137,7 +137,7 @@ describe("Persona evidence sufficiency + progressive search triggers", () => {
   it("persona policy defaults exist separately from product", () => {
     expect(DEFAULT_RESEARCH_POLICY_VALUES.maxSearchQueriesPerPersona).toBe(2);
     expect(DEFAULT_RESEARCH_POLICY_VALUES.maxSourcesPerPersona).toBe(8);
-    expect(PERSONA_SYNTHESIS_PROMPT_VERSION).toBe("10");
+    expect(PERSONA_SYNTHESIS_PROMPT_VERSION).toBe("11");
   });
 
   it("selects role-relevant product evidence without Product re-fetch", () => {

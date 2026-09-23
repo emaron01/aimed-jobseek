@@ -1,17 +1,16 @@
 import { Prisma } from "@prisma/client";
 import type { HiringTeamJobEvidence, HiringTeamResearchEvidence } from "@/lib/hiring-team/evidence";
 import { hiringTeamEvidenceExcerpts } from "@/lib/hiring-team/evidence";
-import { draftRoleWithModel, identifyRolesWithModel } from "@/lib/hiring-team/ai";
+import { identifyRolesWithModel, synthesizeHiringTeamRole } from "@/lib/hiring-team/ai";
+import {
+  jobRequirementLines,
+  type HiringTeamNarrative,
+} from "@/lib/hiring-team/draft-quality";
 import {
   acceptModelRoles,
-  differentiateNarratives,
-  draftHiringTeamRole,
   evidenceTextFor,
   identifyHiringTeamRoles,
   mergeIdentifiedRoles,
-  narrativeLists,
-  type AnnotatedText,
-  type HiringTeamNarrative,
   type IdentifiedHiringRole,
 } from "@/lib/hiring-team/identify";
 import type { PersonaDifferentiationInput } from "@/lib/persona/persona-differentiation";
@@ -62,7 +61,7 @@ function profilePayload(input: {
   includeResearch: boolean;
   excerpts: ReturnType<typeof hiringTeamEvidenceExcerpts>;
   role: IdentifiedHiringRole;
-  narrative: HiringTeamNarrative;
+  narrative: HiringTeamNarrative | null;
   modelNote: string | null;
 }): Prisma.InputJsonValue {
   return {
@@ -155,107 +154,85 @@ async function identifiedRoles(input: {
   };
 }
 
-async function narrativesFor(input: {
+type RoleDraft = {
+  narrative: HiringTeamNarrative | null;
+  status: "NEEDS_REVIEW" | "PARTIAL" | "FAILED";
+  message: string | null;
+};
+
+async function draftsFor(input: {
   roles: IdentifiedHiringRole[];
   job: HiringTeamJobEvidence;
+  researchText: string;
   excerpts: ReturnType<typeof hiringTeamEvidenceExcerpts>;
-}): Promise<{ narratives: HiringTeamNarrative[]; modelNote: string | null }> {
-  const drafted = input.roles.map((role) => draftHiringTeamRole(role, input.job));
-  const peers: PersonaDifferentiationInput[] = [];
-  let modelNote: string | null = null;
-  const withModel: HiringTeamNarrative[] = [];
-  for (let index = 0; index < input.roles.length; index += 1) {
-    const role = input.roles[index]!;
-    const base = drafted[index]!;
-    const model = await draftRoleWithModel({
+  notesFor?: (role: IdentifiedHiringRole) => string | null;
+  peers?: PersonaDifferentiationInput[];
+}): Promise<RoleDraft[]> {
+  const jobLines = jobRequirementLines(input.job);
+  const peers: PersonaDifferentiationInput[] = [...(input.peers ?? [])];
+  const drafts: RoleDraft[] = [];
+  for (const role of input.roles) {
+    const outcome = await synthesizeHiringTeamRole({
       roleName: role.name,
       likelyTitles: role.likelyTitles,
       department: role.department,
       whyThisRoleMatters: role.whyInvolved,
       involvement: role.involvement,
-      notes: null,
+      notes: input.notesFor?.(role) ?? null,
       excerpts: input.excerpts,
       peers,
+      jobLines,
+      evidenceText: input.researchText,
     });
-    const narrative = model.ok ? applyModelDraft(base, model.draft, role) : base;
-    if (!model.ok && !model.message.includes("not configured")) {
-      modelNote = model.message;
+    if (!outcome.ok) {
+      drafts.push({ narrative: null, status: outcome.status, message: outcome.message });
+      continue;
     }
-    withModel.push(narrative);
-    const lists = narrativeLists(narrative);
+    drafts.push({ narrative: outcome.narrative, status: "NEEDS_REVIEW", message: null });
     peers.push({
       id: role.roleKey,
       name: role.name,
-      painPoints: lists.painPoints,
-      messagingNotes: lists.messagingNotes,
+      painPoints: [
+        ...outcome.narrative.pressures.map((item) => item.text),
+        outcome.narrative.impact.text,
+        ...outcome.narrative.concerns.map((item) => item.text),
+      ],
+      messagingNotes: [
+        ...outcome.narrative.talkingPoints.map((item) => item.text),
+        ...outcome.narrative.communication.map((item) => item.text),
+      ],
     });
   }
-  return {
-    narratives: differentiateNarratives({ roles: input.roles, narratives: withModel }),
-    modelNote,
-  };
+  return drafts;
 }
 
-function applyModelDraft(
-  base: HiringTeamNarrative,
-  draft: {
-    roleSummary?: string | null;
-    impact?: string | null;
-    talkingPoints?: string[];
-    needsFromHire?: string[];
-    candidateConcerns?: string[];
-    interviewStage?: string | null;
-    evaluates?: string[];
-    communicationApproach?: string[];
-    primaryResponsibilities?: string[];
-  },
-  role: IdentifiedHiringRole,
-): HiringTeamNarrative {
-  const texts = (values: string[] | undefined, fallback: AnnotatedText[]) => {
-    const cleaned = (values ?? []).map((value) => value.trim()).filter(Boolean);
-    if (cleaned.length === 0) return fallback;
-    return cleaned.map((text) => ({ text, kind: "INFERENCE" as const }));
-  };
-  const stage =
-    role.involvement === "DIRECT"
-      ? draft.interviewStage?.trim()
-        ? { text: draft.interviewStage.trim(), kind: "INFERENCE" as const }
-        : base.interviewStage
-      : null;
-  return {
-    overview: {
-      text: draft.roleSummary?.trim() || base.overview.text,
-      kind: base.overview.kind,
-    },
-    impact: {
-      text: draft.impact?.trim() || base.impact.text,
-      kind: "INFERENCE",
-    },
-    needs: texts(draft.needsFromHire, base.needs),
-    concerns: texts(draft.candidateConcerns, base.concerns),
-    interviewStage: stage,
-    evaluates: texts(draft.evaluates, base.evaluates),
-    talkingPoints: texts(draft.talkingPoints, base.talkingPoints),
-    communication: texts(draft.communicationApproach, base.communication),
-  };
-}
-
-function personaFields(role: IdentifiedHiringRole, narrative: HiringTeamNarrative) {
-  const lists = narrativeLists(narrative);
+function personaFields(role: IdentifiedHiringRole, draft: RoleDraft) {
+  const narrative = draft.narrative;
   return {
     name: role.name,
     targetTitles: role.likelyTitles,
     department: role.department,
     whyThisPersonaMatters: role.whyInvolved,
-    definition: narrative.overview.text,
-    responsibilities: joined(narrative.needs.map((item) => item.text)),
-    painPoints: joined(lists.painPoints),
-    desiredOutcomes: joined(narrative.needs.map((item) => item.text)),
-    messagingNotes: joined(lists.messagingNotes),
+    definition: narrative?.overview.text ?? null,
+    responsibilities: narrative ? joined(narrative.needs.map((item) => item.text)) : null,
+    painPoints: narrative
+      ? joined([
+          ...narrative.pressures.map((item) => item.text),
+          ...narrative.concerns.map((item) => item.text),
+        ])
+      : null,
+    desiredOutcomes: narrative ? joined(narrative.needs.map((item) => item.text)) : null,
+    messagingNotes: narrative
+      ? joined([
+          ...narrative.talkingPoints.map((item) => item.text),
+          ...narrative.communication.map((item) => item.text),
+          narrative.interviewStage?.text ?? "",
+        ])
+      : null,
     suggestionKey: role.roleKey,
     interpretationPromptVersion: PERSONA_SYNTHESIS_PROMPT_VERSION,
-    setupStatus: "NEEDS_REVIEW" as const,
-    approvalStatus: "NEEDS_REVIEW" as const,
+    setupStatus: draft.status,
+    approvalStatus: draft.narrative ? ("NEEDS_REVIEW" as const) : ("NOT_STARTED" as const),
   };
 }
 
@@ -275,15 +252,19 @@ export async function syncApplicationHiringTeam(input: {
     research: loaded.research,
     includeResearch: loaded.includeResearch,
   });
-  const { narratives, modelNote: draftNote } = await narrativesFor({
+  const drafts = await draftsFor({
     roles,
     job: loaded.job,
+    researchText: evidenceTextFor({
+      job: loaded.job,
+      research: loaded.research,
+      includeResearch: loaded.includeResearch,
+    }),
     excerpts,
   });
-  const note = draftNote ?? modelNote;
   for (let index = 0; index < roles.length; index += 1) {
     const role = roles[index]!;
-    const narrative = narratives[index]!;
+    const draft = drafts[index]!;
     const existing = await prisma.persona.findFirst({
       where: {
         organizationId: input.organizationId,
@@ -293,13 +274,13 @@ export async function syncApplicationHiringTeam(input: {
       },
     });
     if (existing && seekerEdited(existing.manuallyEditedFields)) continue;
-    const fields = personaFields(role, narrative);
+    const fields = personaFields(role, draft);
     const profileJson = profilePayload({
       includeResearch: loaded.includeResearch,
       excerpts,
       role,
-      narrative,
-      modelNote: note,
+      narrative: draft.narrative,
+      modelNote: draft.message ?? modelNote,
     });
     if (existing) {
       await prisma.persona.update({
@@ -449,15 +430,16 @@ export async function rebuildApplicationHiringTeamRole(input: {
     },
     select: { id: true, name: true, painPoints: true, messagingNotes: true },
   });
-  const base = draftHiringTeamRole(role, loaded.job);
-  const model = await draftRoleWithModel({
-    roleName: role.name,
-    likelyTitles: role.likelyTitles,
-    department: role.department,
-    whyThisRoleMatters: role.whyInvolved,
-    involvement: role.involvement,
-    notes: persona.additionalContext,
+  const [draft] = await draftsFor({
+    roles: [role],
+    job: loaded.job,
+    researchText: evidenceTextFor({
+      job: loaded.job,
+      research: loaded.research,
+      includeResearch: loaded.includeResearch,
+    }),
     excerpts,
+    notesFor: () => persona.additionalContext,
     peers: peers.map((peer) => ({
       id: peer.id,
       name: peer.name,
@@ -465,21 +447,24 @@ export async function rebuildApplicationHiringTeamRole(input: {
       messagingNotes: parsePersonaListField(peer.messagingNotes),
     })),
   });
-  const narrative = model.ok ? applyModelDraft(base, model.draft, role) : base;
-  const fields = personaFields(role, narrative);
+  if (!draft) {
+    throw new TenantError(
+      `This ${vocab.persona.singular} could not be drafted. Retry synthesis.`,
+    );
+  }
+  const fields = personaFields(role, draft);
   await prisma.persona.update({
     where: { id: persona.id },
     data: {
       ...fields,
       suggestionKey: persona.suggestionKey ?? role.roleKey,
       manuallyEditedFields: [],
-      additionalContext: model.ok ? persona.additionalContext : model.message,
       profileJson: profilePayload({
         includeResearch: loaded.includeResearch,
         excerpts,
         role,
-        narrative,
-        modelNote: model.ok ? null : model.message.includes("not configured") ? null : model.message,
+        narrative: draft.narrative,
+        modelNote: draft.message,
       }),
     },
   });
