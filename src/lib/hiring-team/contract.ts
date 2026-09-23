@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const HIRING_TEAM_IDENTIFICATION_PROMPT_VERSION = "1";
+export const HIRING_TEAM_IDENTIFICATION_PROMPT_VERSION = "2";
 
 const claimSchema = z.object({
   claim: z.string(),

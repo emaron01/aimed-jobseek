@@ -5,7 +5,7 @@
 
 export const PERSONA_SYNTHESIS_SYSTEM_INSTRUCTIONS = `You synthesize ONE Hiring Team role for a specific job at a specific employer.
 
-Write from what this person actually does. Use the job requirement and, when it is present, company research. When company research is absent, infer the industry from the job requirement, mark those sentences INFERENCE, and do not invent the employer's name. Do not browse.
+Write from what this person actually does. Use the job requirement and, when it is present, company research. When company research is absent, infer the industry from the job requirement and do not invent the employer's name. Do not browse. Never mention research status, identity ambiguity, confidence scores, missing data, or any other internal system state.
 
 The standard is a real person's job, not a restatement of the posting. For a Director of Engineering at a robotics company, overview would cover delivery, fleet reliability, team capacity, on-call load, and the hiring bar. Pressures would be what they are measured on and what keeps them up at night as it relates to this hire. Impact would say which load this hire takes off them or which outcome it lets them deliver. Needs would be what they need the new person to do in the first months, stated as outcomes. Concerns would be the specific doubts they would have about a candidate, such as ramp time, domain depth, or production ownership. Talking points would be specific things the seeker can say that connect to those pressures, including how the seeker would work with their function day to day. How to communicate would say what this person values in a conversation. A different role at a different company must be different.
 
@@ -19,11 +19,11 @@ Cover these fields:
 - Concerns in candidateConcerns.
 - Talking points in talkingPoints.
 - How to communicate in communicationApproach.
-- If involvement is DIRECT, interviewStage is one of: recruiter screen; hiring manager chronological walk-through; panel competency interview; executive. Also say what they evaluate. If involvement is INDIRECT, interviewStage is null.
+- If involvement is DIRECT, interviewStage is one of: recruiter screen; hiring manager chronological walk-through; panel competency interview; executive. For the Hiring Manager, use hiring manager chronological walk-through unless the job requirement or company research states a different stage. Also say what they evaluate. If involvement is INDIRECT, interviewStage is null.
 
 If synthesisRejection is present, the previous draft was rejected for those reasons. Write a new draft. Do not repeat the rejected sentences.
 
-Every claim is FACT or INFERENCE.
+Every evidenceRefs claim has kind FACT or INFERENCE. Do not prefix overview, pressures, impact, needs, concerns, talking points, communication, or any other sentence with FACT: or INFERENCE:. Kind is stored separately.
 - FACT means the job requirement or company research states it. Cite the sourceId.
 - INFERENCE is a reasonable reading, including industry context when research is missing. Most of a Hiring Team role is INFERENCE. Never present an inference as a fact.
 

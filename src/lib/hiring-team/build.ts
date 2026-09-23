@@ -7,10 +7,8 @@ import {
   type HiringTeamNarrative,
 } from "@/lib/hiring-team/draft-quality";
 import {
-  acceptModelRoles,
+  applyHiringTeamIdentificationGuardrails,
   evidenceTextFor,
-  identifyHiringTeamRoles,
-  mergeIdentifiedRoles,
   type IdentifiedHiringRole,
 } from "@/lib/hiring-team/identify";
 import type { PersonaDifferentiationInput } from "@/lib/persona/persona-differentiation";
@@ -63,6 +61,8 @@ function profilePayload(input: {
   role: IdentifiedHiringRole;
   narrative: HiringTeamNarrative | null;
   modelNote: string | null;
+  corrections?: Array<{ roleKey: string; reason: string }>;
+  dropped?: Array<{ name: string; reason: string }>;
 }): Prisma.InputJsonValue {
   return {
     includeResearch: input.includeResearch,
@@ -76,6 +76,8 @@ function profilePayload(input: {
     identification: input.role,
     narrative: input.narrative,
     modelNote: input.modelNote,
+    corrections: input.corrections ?? [],
+    dropped: input.dropped ?? [],
   } as unknown as Prisma.InputJsonValue;
 }
 
@@ -133,24 +135,31 @@ async function identifiedRoles(input: {
   job: HiringTeamJobEvidence;
   research: HiringTeamResearchEvidence | null;
   includeResearch: boolean;
-}): Promise<{ roles: IdentifiedHiringRole[]; modelNote: string | null }> {
-  const fromEvidence = identifyHiringTeamRoles(input);
+  existing?: Array<{ suggestionKey: string | null; name: string; titles: string[] }>;
+}): Promise<{
+  roles: IdentifiedHiringRole[];
+  modelNote: string | null;
+  corrections: Array<{ roleKey: string; reason: string }>;
+  dropped: Array<{ name: string; reason: string }>;
+}> {
   const excerpts = hiringTeamEvidenceExcerpts(input);
   const model = await identifyRolesWithModel({ evidence: excerpts });
-  if (!model.ok) {
-    return {
-      roles: fromEvidence,
-      modelNote: model.message.includes("not configured") ? null : model.message,
-    };
-  }
-  const accepted = acceptModelRoles({
-    roles: model.data.roles,
+  const guarded = applyHiringTeamIdentificationGuardrails({
+    roles: model.ok ? model.data.roles : [],
+    job: input.job,
     evidenceText: evidenceTextFor(input),
-    reportingLine: input.job.reportingLine,
+    existing: input.existing,
   });
+  const notes = [
+    model.ok ? null : model.message,
+    ...guarded.corrections.map((item) => item.reason),
+    ...guarded.dropped.map((item) => `${item.name}: ${item.reason}`),
+  ].filter(Boolean);
   return {
-    roles: mergeIdentifiedRoles(fromEvidence, accepted),
-    modelNote: null,
+    roles: guarded.roles,
+    modelNote: notes.length > 0 ? notes.join(" ") : null,
+    corrections: guarded.corrections,
+    dropped: guarded.dropped,
   };
 }
 
@@ -183,6 +192,7 @@ async function draftsFor(input: {
       peers,
       jobLines,
       evidenceText: input.researchText,
+      isHiringManager: role.roleKey === "hiring_manager",
     });
     if (!outcome.ok) {
       drafts.push({ narrative: null, status: outcome.status, message: outcome.message });
@@ -242,10 +252,23 @@ export async function syncApplicationHiringTeam(input: {
 }): Promise<void> {
   const loaded = await loadApplication(input.organizationId, input.campaignId);
   if (!loaded.job) return;
-  const { roles, modelNote } = await identifiedRoles({
+  const existingRows = await prisma.persona.findMany({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: loaded.campaign.id,
+      archivedAt: null,
+    },
+    select: { suggestionKey: true, name: true, targetTitles: true },
+  });
+  const { roles, modelNote, corrections, dropped } = await identifiedRoles({
     job: loaded.job,
     research: loaded.research,
     includeResearch: loaded.includeResearch,
+    existing: existingRows.map((row) => ({
+      suggestionKey: row.suggestionKey,
+      name: row.name,
+      titles: parseStringArray(row.targetTitles),
+    })),
   });
   const excerpts = hiringTeamEvidenceExcerpts({
     job: loaded.job,
@@ -281,6 +304,8 @@ export async function syncApplicationHiringTeam(input: {
       role,
       narrative: draft.narrative,
       modelNote: draft.message ?? modelNote,
+      corrections,
+      dropped,
     });
     if (existing) {
       await prisma.persona.update({
@@ -394,10 +419,23 @@ export async function rebuildApplicationHiringTeamRole(input: {
       `This ${vocab.campaign.singular} has no job requirement to rebuild from.`,
     );
   }
-  const { roles } = await identifiedRoles({
+  const existingRows = await prisma.persona.findMany({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      archivedAt: null,
+    },
+    select: { suggestionKey: true, name: true, targetTitles: true },
+  });
+  const { roles, corrections, dropped } = await identifiedRoles({
     job: loaded.job,
     research: loaded.research,
     includeResearch: loaded.includeResearch,
+    existing: existingRows.map((row) => ({
+      suggestionKey: row.suggestionKey,
+      name: row.name,
+      titles: parseStringArray(row.targetTitles),
+    })),
   });
   const role =
     roles.find((item) => item.roleKey === persona.suggestionKey) ??
@@ -465,6 +503,8 @@ export async function rebuildApplicationHiringTeamRole(input: {
         role,
         narrative: draft.narrative,
         modelNote: draft.message,
+        corrections,
+        dropped,
       }),
     },
   });

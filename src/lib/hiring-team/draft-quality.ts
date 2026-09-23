@@ -32,8 +32,22 @@ export type HiringTeamDraftFields = {
   communication: string[];
 };
 
+const CLAIM_PREFIX = /^\s*(FACT|INFERENCE)\s*:\s*/i;
+const SYSTEM_STATE =
+  /\b(research status|identity ambiguous|identityambiguous|confidence\s*(is|=|score)|missing (company )?research|research is (incomplete|missing|absent|unavailable)|company research (is )?(incomplete|missing|absent)|incomplete company research|prompt version|not configured)\b/i;
+
+export function stripClaimPrefix(text: string): string {
+  return text.replace(CLAIM_PREFIX, "").trim();
+}
+
+export function mentionsInternalSystemState(text: string): boolean {
+  return SYSTEM_STATE.test(text);
+}
+
 function clean(values: Array<string | null | undefined> | null | undefined): string[] {
-  return (values ?? []).map((value) => (value ?? "").trim()).filter(Boolean);
+  return (values ?? [])
+    .map((value) => stripClaimPrefix(value ?? ""))
+    .filter(Boolean);
 }
 
 export function jobRequirementLines(job: HiringTeamJobEvidence): string[] {
@@ -78,17 +92,31 @@ function list(values: string[]): string {
   return values.map((value) => value.trim()).filter(Boolean).join(". ");
 }
 
+export const HIRING_MANAGER_WALKTHROUGH = "hiring manager chronological walk-through";
+
+export function applyHiringManagerInterviewStage(
+  stage: string | null,
+  evidenceText: string,
+): string {
+  const fallback = HIRING_MANAGER_WALKTHROUGH;
+  const cleaned = stripClaimPrefix(stage ?? "");
+  if (!cleaned) return fallback;
+  if (cleaned.toLowerCase() === fallback) return fallback;
+  if (evidenceText.toLowerCase().includes(cleaned.toLowerCase())) return cleaned;
+  return fallback;
+}
+
 export function fieldsFromPersonaDraft(draft: PersonaAiDraft): HiringTeamDraftFields {
   const responsibilities = clean(draft.primaryResponsibilities);
   const ownership = clean(draft.ownershipAreas);
   const overview =
-    draft.roleSummary?.trim() ||
+    stripClaimPrefix(draft.roleSummary ?? "") ||
     [...responsibilities, ...ownership].filter(Boolean).join(". ");
   const pressures = clean(draft.organizationalPressures);
   return {
     overview,
     pressures: pressures.length > 0 ? pressures : clean(draft.painPoints),
-    impact: draft.impact?.trim() ?? "",
+    impact: stripClaimPrefix(draft.impact ?? ""),
     needs:
       clean(draft.needsFromHire).length > 0
         ? clean(draft.needsFromHire)
@@ -97,7 +125,7 @@ export function fieldsFromPersonaDraft(draft: PersonaAiDraft): HiringTeamDraftFi
       clean(draft.candidateConcerns).length > 0
         ? clean(draft.candidateConcerns)
         : clean(draft.likelyObjections),
-    interviewStage: draft.interviewStage?.trim() || null,
+    interviewStage: stripClaimPrefix(draft.interviewStage ?? "") || null,
     evaluates: clean(draft.evaluates),
     talkingPoints: clean(draft.talkingPoints),
     communication: clean(draft.communicationApproach),
@@ -140,6 +168,22 @@ export function assessHiringTeamDraft(input: {
   requireList("How to communicate", input.fields.communication, 1);
   if (input.involvement === "DIRECT") {
     requireText("Interview stage", input.fields.interviewStage ?? "");
+  }
+  const systemStateFields = [
+    input.fields.overview,
+    input.fields.impact,
+    input.fields.interviewStage ?? "",
+    ...input.fields.pressures,
+    ...input.fields.needs,
+    ...input.fields.concerns,
+    ...input.fields.talkingPoints,
+    ...input.fields.communication,
+    ...input.fields.evaluates,
+  ];
+  if (systemStateFields.some((field) => mentionsInternalSystemState(field))) {
+    reasons.push(
+      "A field mentions internal system state such as research status, ambiguity, confidence, or missing data.",
+    );
   }
   if (list(input.fields.needs) && fieldRestatesJobRequirement(list(input.fields.needs), input.jobLines)) {
     reasons.push("Needs restate the job requirement as a list.");
@@ -191,7 +235,7 @@ export function narrativeFromDraft(input: {
     concerns: input.fields.concerns.map(mark),
     interviewStage:
       input.involvement === "DIRECT" && input.fields.interviewStage
-        ? mark(input.fields.interviewStage)
+        ? mark(stripClaimPrefix(input.fields.interviewStage))
         : null,
     evaluates: input.fields.evaluates.map(mark),
     talkingPoints: input.fields.talkingPoints.map(mark),

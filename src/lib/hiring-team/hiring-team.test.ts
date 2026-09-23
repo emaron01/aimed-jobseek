@@ -17,16 +17,26 @@ import {
 } from "@/lib/hiring-team/evidence";
 import { synthesizeHiringTeamRole } from "@/lib/hiring-team/ai";
 import {
+  applyHiringManagerInterviewStage,
   assessHiringTeamDraft,
   fieldRestatesJobRequirement,
+  HIRING_MANAGER_WALKTHROUGH,
   jobRequirementLines,
+  mentionsInternalSystemState,
   narrativeFromDraft,
+  stripClaimPrefix,
   type HiringTeamDraftFields,
 } from "@/lib/hiring-team/draft-quality";
 import {
+  applyHiringTeamIdentificationGuardrails,
+  evidenceTextFor,
   hiringManagerTitles,
-  identifyHiringTeamRoles,
 } from "@/lib/hiring-team/identify";
+import {
+  FINANCIAL_CONTROLLER_IDENTIFICATION_FIXTURE,
+  NORMAL_JOB_IDENTIFICATION_FIXTURE,
+  NURSE_MANAGER_IDENTIFICATION_FIXTURE,
+} from "@/lib/hiring-team/identification-fixtures";
 import type { HiringTeamJobEvidence } from "@/lib/hiring-team/evidence";
 import { HIRING_TEAM_IDENTIFICATION_PROMPT_VERSION } from "@/lib/hiring-team/contract";
 import { applicationPersonaOptions } from "@/lib/hiring-team/scope";
@@ -47,9 +57,16 @@ import {
   PERSONA_SYNTHESIS_PROMPT_VERSION,
 } from "@/lib/persona-research/contract";
 import { buildPersonaSynthesisMessages } from "@/lib/persona-research/prompt";
-import { NORMAL_JOB_MODEL, NORMAL_JOB_POSTING } from "@/lib/job-requirement/fixtures";
+import {
+  FINANCIAL_CONTROLLER_MODEL,
+  FINANCIAL_CONTROLLER_POSTING,
+  NORMAL_JOB_MODEL,
+  NORMAL_JOB_POSTING,
+  NURSE_MANAGER_MODEL,
+  NURSE_MANAGER_POSTING,
+} from "@/lib/job-requirement/fixtures";
 import { normalizeParsedJobRequirement } from "@/lib/job-requirement/normalize";
-import { vocab } from "@/lib/product-config";
+import { hiringTeamConfig, vocab } from "@/lib/product-config";
 import { buildSidebarNavItems } from "@/lib/auth/user-menu";
 import { hasTestDatabase } from "@/test/database";
 
@@ -77,6 +94,26 @@ function substantiveDirectorDraft(): HiringTeamDraftFields {
     communication: [
       "They want the work in the order it happened, with the outcome you owned.",
     ],
+  };
+}
+
+function jobFromParsed(
+  model: Parameters<typeof normalizeParsedJobRequirement>[0],
+  posting: string,
+): HiringTeamJobEvidence {
+  const parsed = normalizeParsedJobRequirement(model, posting);
+  return {
+    title: parsed.title,
+    companyName: parsed.companyName,
+    location: parsed.location,
+    workArrangement: parsed.workArrangement,
+    employmentType: parsed.employmentType,
+    seniority: parsed.seniority,
+    reportingLine: parsed.reportingLine,
+    responsibilities: parsed.responsibilities,
+    requiredItems: parsed.requiredItems,
+    preferredItems: parsed.preferredItems,
+    scorecard: parsed.scorecard,
   };
 }
 
@@ -113,46 +150,95 @@ describe("hiring team evidence and selectors", () => {
     ).toEqual(["Director of Engineering", "Hiring Manager"]);
   });
 
-  it("identifies direct and indirect roles from the fixture posting, not a fixed list", () => {
-    const roles = identifyHiringTeamRoles({
-      job: fixtureJob(),
+  it("enforces reporting line, grounding, semantic dedupe, and stable keys on model output", () => {
+    const job = fixtureJob();
+    const evidenceText = evidenceTextFor({
+      job,
       research: null,
       includeResearch: false,
     });
-    expect(roles.some((role) => role.involvement === "DIRECT")).toBe(true);
-    expect(roles.some((role) => role.involvement === "INDIRECT")).toBe(true);
-    const names = roles.map((role) => role.name).sort();
-    expect(names).not.toEqual(
-      [
-        "Cross-functional Team Lead",
-        "HR / People Partner",
-        "Hiring Manager",
-        "Hiring Manager's Executive",
-        "Recruiter",
-      ].sort(),
-    );
-    const manager = roles.find((role) => role.roleKey === "hiring_manager");
+    const first = applyHiringTeamIdentificationGuardrails({
+      roles: NORMAL_JOB_IDENTIFICATION_FIXTURE,
+      job,
+      evidenceText,
+    });
+    const manager = first.roles.find((role) => role.roleKey === "hiring_manager");
     expect(manager?.likelyTitles[0]).toBe("Director of Engineering");
-    expect(manager?.evidence.some((item) => item.kind === "FACT")).toBe(true);
-    expect(roles.some((role) => /robot|reliab|product manager/i.test(role.name))).toBe(true);
+    expect(first.corrections.some((item) => item.roleKey === "hiring_manager")).toBe(true);
+    expect(first.roles.filter((role) => role.roleKey === "hiring_manager")).toHaveLength(1);
+    expect(first.dropped.some((item) => /marketing|cmo/i.test(item.name))).toBe(true);
+    expect(first.roles.filter((role) => /reliability/i.test(role.name))).toHaveLength(1);
+    expect(first.roles.length).toBeLessThanOrEqual(hiringTeamConfig.maxIdentifiedRoles);
+    const identifySource = readFileSync("src/lib/hiring-team/identify.ts", "utf8");
+    expect(identifySource).not.toContain("INDIRECT_SIGNALS");
+    expect(identifySource).not.toContain("panelRoles");
+    expect(identifySource).not.toMatch(/robot\w*\s*\||reliab\\w|ros2|incident response/);
 
-    const accountant = identifyHiringTeamRoles({
-      job: fixtureJob({
-        title: "Accountant",
-        companyName: "Northwind Books",
-        reportingLine: "Controller",
-        responsibilities: ["Close the monthly books"],
-        requiredItems: ["CPA"],
-        preferredItems: [],
-        scorecard: { mission: null, outcomes: [], competencies: [] },
-      }),
-      research: null,
-      includeResearch: false,
+    const second = applyHiringTeamIdentificationGuardrails({
+      roles: [
+        {
+          name: "Reliability or Incident Response Lead",
+          likelyTitles: ["Reliability Engineering Lead"],
+          department: "Engineering",
+          involvement: "INDIRECT",
+          whyInvolved: "The mission is to make warehouse robots reliable, so a reliability lead is affected by the hire.",
+          evidence: [
+            { claim: "The mission of this role is to make warehouse robots reliable.", kind: "FACT" },
+          ],
+        },
+      ],
+      job,
+      evidenceText,
+      existing: first.roles.map((role) => ({
+        suggestionKey: role.roleKey,
+        name: role.name,
+        titles: role.likelyTitles,
+      })),
     });
-    expect(accountant.some((role) => /robot/i.test(role.name))).toBe(false);
-    expect(
-      accountant.find((role) => role.roleKey === "hiring_manager")?.likelyTitles[0],
-    ).toBe("Controller");
+    const reliability = first.roles.find((role) => /reliability/i.test(role.name));
+    expect(second.roles.find((role) => /reliability/i.test(role.name))?.roleKey).toBe(
+      reliability?.roleKey,
+    );
+
+    const nurseJob = jobFromParsed(NURSE_MANAGER_MODEL, NURSE_MANAGER_POSTING);
+    const nurse = applyHiringTeamIdentificationGuardrails({
+      roles: NURSE_MANAGER_IDENTIFICATION_FIXTURE,
+      job: nurseJob,
+      evidenceText: evidenceTextFor({ job: nurseJob, research: null, includeResearch: false }),
+    });
+    expect(nurse.roles.find((role) => role.roleKey === "hiring_manager")?.likelyTitles[0]).toBe(
+      "Director of Nursing",
+    );
+    expect(nurse.roles.some((role) => /charge nurse/i.test(role.name))).toBe(true);
+    expect(nurse.roles.some((role) => /robot/i.test(role.name))).toBe(false);
+
+    const financeJob = jobFromParsed(FINANCIAL_CONTROLLER_MODEL, FINANCIAL_CONTROLLER_POSTING);
+    const finance = applyHiringTeamIdentificationGuardrails({
+      roles: FINANCIAL_CONTROLLER_IDENTIFICATION_FIXTURE,
+      job: financeJob,
+      evidenceText: evidenceTextFor({
+        job: financeJob,
+        research: null,
+        includeResearch: false,
+      }),
+    });
+    expect(finance.roles.find((role) => role.roleKey === "hiring_manager")?.likelyTitles[0]).toBe(
+      "Chief Financial Officer",
+    );
+    expect(finance.roles.some((role) => /accounting/i.test(role.name))).toBe(true);
+    expect(finance.roles.some((role) => /robot/i.test(role.name))).toBe(false);
+
+    const empty = applyHiringTeamIdentificationGuardrails({
+      roles: [],
+      job: financeJob,
+      evidenceText: evidenceTextFor({
+        job: financeJob,
+        research: null,
+        includeResearch: false,
+      }),
+    });
+    expect(empty.roles).toHaveLength(1);
+    expect(empty.roles[0]?.likelyTitles[0]).toBe("Chief Financial Officer");
   });
 
   it("rejects persona fields that only restate the job requirement", () => {
@@ -191,6 +277,29 @@ describe("hiring team evidence and selectors", () => {
     expect(identifySource).not.toContain("draftHiringTeamRole");
     expect(buildSource).not.toContain("applyModelDraft");
     expect(buildSource).not.toContain("evidence draft");
+    expect(stripClaimPrefix("INFERENCE: Owns delivery of the warehouse robot fleet.")).toBe(
+      "Owns delivery of the warehouse robot fleet.",
+    );
+    expect(mentionsInternalSystemState("incomplete company research and ambiguous identity")).toBe(
+      true,
+    );
+    expect(mentionsInternalSystemState("They own fleet reliability and the hiring bar.")).toBe(
+      false,
+    );
+    expect(
+      applyHiringManagerInterviewStage("panel competency interview", "Reports to: Director of Engineering"),
+    ).toBe(HIRING_MANAGER_WALKTHROUGH);
+    const systemStateDraft = assessHiringTeamDraft({
+      involvement: "DIRECT",
+      jobLines: lines,
+      fields: {
+        ...substantiveDirectorDraft(),
+        pressures: [
+          "The recruiter must keep the search moving despite incomplete company research.",
+        ],
+      },
+    });
+    expect(systemStateDraft.ok).toBe(false);
   });
 
   it("stores a model draft only after it stops restating the job, and keeps identification when synthesis cannot run", async () => {
@@ -400,8 +509,8 @@ describe("hiring team evidence and selectors", () => {
   });
 
   it("synthesizes Hiring Team roles as inference and bumps the prompt version", () => {
-    expect(PERSONA_SYNTHESIS_PROMPT_VERSION).toBe("11");
-    expect(HIRING_TEAM_IDENTIFICATION_PROMPT_VERSION).toBe("1");
+    expect(PERSONA_SYNTHESIS_PROMPT_VERSION).toBe("12");
+    expect(HIRING_TEAM_IDENTIFICATION_PROMPT_VERSION).toBe("2");
     const prompt = readFileSync("src/lib/prompt-content/persona-synthesis.ts", "utf8");
     expect(prompt).toContain("FACT");
     expect(prompt).toContain("INFERENCE");
@@ -431,6 +540,8 @@ describe("hiring team evidence and selectors", () => {
     expect(messages[0]?.content).toContain("Impact");
     expect(messages[0]?.content).toContain("organizationalPressures");
     expect(messages[0]?.content).toContain("Do not restate");
+    expect(messages[0]?.content).toContain("Do not prefix");
+    expect(messages[0]?.content).toContain("internal system state");
     expect(messages[0]?.content).not.toContain("GTM");
     expect(messages[1]?.content).toContain("Recruiter");
   });
@@ -620,13 +731,22 @@ describe.skipIf(!hasTestDatabase())("hiring team per application", () => {
       (await prisma.persona.findFirst({ where: { id: manager!.id } }))?.approvalStatus,
     ).toBe("APPROVED");
 
-    const other = rolesA.find((role) => role.id !== manager!.id)!;
+    expect(rolesA).toHaveLength(1);
+    const addedForRebuild = await addApplicationHiringTeamRole({
+      organizationId,
+      campaignId: appA.id,
+      name: "Staff Engineer interviewer",
+      likelyTitles: ["Staff Engineer"],
+      department: "Engineering",
+      whyThisRoleMatters: "Judges technical depth on this service.",
+      notes: "Panel.",
+    });
     await rebuildApplicationHiringTeamRole({
       organizationId,
       campaignId: appA.id,
-      personaId: other.id,
+      personaId: addedForRebuild.personaId,
     });
-    const rebuilt = await prisma.persona.findFirst({ where: { id: other.id } });
+    const rebuilt = await prisma.persona.findFirst({ where: { id: addedForRebuild.personaId } });
     expect(rebuilt?.setupStatus).toBe("PARTIAL");
     expect(rebuilt?.definition ?? null).toBeNull();
     const rebuiltJson = rebuilt?.profileJson as { narrative?: unknown; modelNote?: string };
@@ -636,9 +756,13 @@ describe.skipIf(!hasTestDatabase())("hiring team per application", () => {
     await removeApplicationHiringTeamRole({
       organizationId,
       campaignId: appA.id,
-      personaId: other.id,
+      personaId: addedForRebuild.personaId,
     });
-    expect(await prisma.persona.findFirst({ where: { id: other.id, archivedAt: null } })).toBeNull();
+    expect(
+      await prisma.persona.findFirst({
+        where: { id: addedForRebuild.personaId, archivedAt: null },
+      }),
+    ).toBeNull();
 
     const added = await addTemplateToApplication({
       organizationId,

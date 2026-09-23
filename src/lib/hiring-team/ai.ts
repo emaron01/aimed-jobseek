@@ -5,6 +5,7 @@ import {
   type HiringTeamIdentificationResult,
 } from "@/lib/hiring-team/contract";
 import {
+  applyHiringManagerInterviewStage,
   assessHiringTeamDraft,
   fieldsFromPersonaDraft,
   narrativeFromDraft,
@@ -147,6 +148,7 @@ export async function synthesizeHiringTeamRole(input: {
   peers: PersonaDifferentiationInput[];
   jobLines: string[];
   evidenceText: string;
+  isHiringManager?: boolean;
 }): Promise<HiringTeamSynthesisResult> {
   if (!isPersonaAiConfigured()) {
     return { ok: false, status: "PARTIAL", message: SYNTHESIS_UNAVAILABLE };
@@ -158,6 +160,12 @@ export async function synthesizeHiringTeamRole(input: {
       return { ok: false, status: "FAILED", message: model.message };
     }
     const fields = fieldsFromPersonaDraft(model.draft);
+    if (input.isHiringManager) {
+      fields.interviewStage = applyHiringManagerInterviewStage(
+        fields.interviewStage,
+        input.evidenceText,
+      );
+    }
     const assessment = assessHiringTeamDraft({
       fields,
       jobLines: input.jobLines,
