@@ -196,21 +196,32 @@ function assignMissingGlobal(
  * Prefer a successful @napi-rs/canvas load; only stub what is still missing.
  * Never overwrites globals that are already defined.
  */
-export async function installPdfjsNodePolyfills(options?: {
-  /** Test seam — override canvas load (return null to force stub path). */
-  loadCanvas?: () => Promise<PdfjsCanvasGlobals | null> | PdfjsCanvasGlobals | null;
-}): Promise<PdfjsPolyfillReport> {
+function applyPdfjsNodePolyfills(
+  canvas: PdfjsCanvasGlobals | null,
+): PdfjsPolyfillReport {
   const g = globalThis as Record<string, unknown>;
-  const canvas = options?.loadCanvas
-    ? await options.loadCanvas()
-    : await loadNapiCanvas();
-
   return {
     canvasLoaded: Boolean(canvas),
     DOMMatrix: assignMissingGlobal(g, "DOMMatrix", canvas, StubDOMMatrix),
     ImageData: assignMissingGlobal(g, "ImageData", canvas, StubImageData),
     Path2D: assignMissingGlobal(g, "Path2D", canvas, StubPath2D),
   };
+}
+
+export async function installPdfjsNodePolyfills(options?: {
+  /** Test seam — override canvas load (return null to force stub path). */
+  loadCanvas?: () => Promise<PdfjsCanvasGlobals | null> | PdfjsCanvasGlobals | null;
+}): Promise<PdfjsPolyfillReport> {
+  // Keep the sync loadCanvas path fully synchronous so tests can clear
+  // globals and assign in the same turn (no microtask race on globalThis).
+  if (options?.loadCanvas) {
+    const loaded = options.loadCanvas();
+    if (loaded && typeof (loaded as Promise<unknown>).then === "function") {
+      return applyPdfjsNodePolyfills(await loaded);
+    }
+    return applyPdfjsNodePolyfills(loaded as PdfjsCanvasGlobals | null);
+  }
+  return applyPdfjsNodePolyfills(await loadNapiCanvas());
 }
 
 async function extractPdfText(bytes: Uint8Array): Promise<ExtractResult> {

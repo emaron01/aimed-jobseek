@@ -11,7 +11,9 @@ import {
   loadExistingEmailDraftContext,
   loadEmailReplyContext,
 } from "@/lib/email-generation/context";
-import { ADDITIONAL_GUIDANCE_MAX_CHARS } from "@/lib/email-generation/prompt";
+import {
+  additionalGuidanceRejection,
+} from "@/lib/email-generation/prompt";
 import {
   buildFollowUpEmailPrompt,
   buildReplyEmailPrompt,
@@ -158,16 +160,9 @@ export async function generateEmailDraftAction(
   personaId?: string | null,
   emailLength?: string | null,
 ): Promise<GenerateEmailDraftActionResult> {
+  const rejected = additionalGuidanceRejection(additionalGuidance);
+  if (rejected) return rejected;
   const normalizedGuidance = additionalGuidance?.trim() || null;
-  if (
-    normalizedGuidance &&
-    normalizedGuidance.length > ADDITIONAL_GUIDANCE_MAX_CHARS
-  ) {
-    return {
-      ok: false,
-      message: `What should change must be ${ADDITIONAL_GUIDANCE_MAX_CHARS} characters or fewer.`,
-    };
-  }
 
   try {
     const user = await requireVerifiedForAiSpend();
@@ -412,16 +407,9 @@ export async function regenerateEmailDraftAction(
   personaId?: string | null,
   emailLength?: string | null,
 ): Promise<GenerateEmailDraftActionResult> {
+  const rejected = additionalGuidanceRejection(additionalGuidance);
+  if (rejected) return rejected;
   const normalizedGuidance = additionalGuidance?.trim() || null;
-  if (
-    normalizedGuidance &&
-    normalizedGuidance.length > ADDITIONAL_GUIDANCE_MAX_CHARS
-  ) {
-    return {
-      ok: false,
-      message: `What should change must be ${ADDITIONAL_GUIDANCE_MAX_CHARS} characters or fewer.`,
-    };
-  }
 
   try {
     const user = await requireVerifiedForAiSpend();

@@ -1,13 +1,79 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { seedContactOnList } from "@/test/contact-seed";
+import { getScoringReadiness } from "@/lib/scoring/engine";
+import { TenantError } from "@/lib/tenant/getCurrentOrganization";
+
+const { findFirst } = vi.hoisted(() => ({
+  findFirst: vi.fn(),
+}));
+
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    scoringRun: { findFirst },
+    contactScore: { findMany: vi.fn() },
+  },
+}));
+
+vi.mock("@/lib/work/ownership", () => ({
+  getWorkActor: async () => ({
+    organizationId: "org_b",
+    userId: "user_b",
+    canViewAll: true,
+  }),
+  assertCanModifyOwnedWork: vi.fn(),
+}));
+
+vi.mock("@/lib/tenant/getCurrentOrganization", () => {
+  class TenantError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = "TenantError";
+    }
+  }
+  return { TenantError };
+});
+
+vi.mock("@/lib/ai/config", () => ({
+  isContactResearchAiConfigured: () => false,
+  isScoringAiConfigured: () => false,
+}));
+
+vi.mock("@/lib/ai/roles", () => ({
+  listUnconfiguredScoringRoles: () => [],
+}));
+
+vi.mock("@/lib/scoring/score-contact", () => ({
+  scoreSingleContact: vi.fn(),
+}));
+
+vi.mock("@/lib/usage/policy-service", () => ({
+  getResearchPolicy: async () => ({ contactResearchEnabled: false }),
+}));
+
+describe("scoring engine tenant isolation (Phase 3C)", () => {
+  it("blocks cross-tenant scoring run access", async () => {
+    findFirst.mockResolvedValueOnce(null);
+
+    await expect(getScoringReadiness("run_a")).rejects.toBeInstanceOf(
+      TenantError,
+    );
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: "run_a",
+          organizationId: "org_b",
+        }),
+      }),
+    );
+  });
+});
 
 const hasDatabase = Boolean(process.env.DATABASE_URL?.trim());
 
-describe.skipIf(!hasDatabase)("scoring engine tenant isolation (Phase 3C)", () => {
+describe.skipIf(!hasDatabase)("scoring engine persistence (Phase 3C)", () => {
   let prisma: import("@prisma/client").PrismaClient;
   let ready = false;
   let orgAId = "";
-  let orgBId = "";
   let runAId = "";
   let scoreAId = "";
 
@@ -35,15 +101,7 @@ describe.skipIf(!hasDatabase)("scoring engine tenant isolation (Phase 3C)", () =
         status: "ACTIVE",
       },
     });
-    const orgB = await prisma.organization.create({
-      data: {
-        name: `[TEST] ScoreEngine B ${suffix}`,
-        slug: `test-score-engine-b-${suffix}`,
-        status: "ACTIVE",
-      },
-    });
     orgAId = orgA.id;
-    orgBId = orgB.id;
     const owner = await prisma.user.create({
       data: {
         email: `score-engine-owner-${suffix}@example.test`,
@@ -156,17 +214,6 @@ describe.skipIf(!hasDatabase)("scoring engine tenant isolation (Phase 3C)", () =
       },
     });
     scoreAId = score.id;
-  });
-
-  it("blocks cross-tenant scoring run access", async () => {
-    if (!ready) return;
-    process.env.DEV_ORGANIZATION_ID = orgBId;
-    const { getScoringReadiness } = await import("@/lib/scoring/engine");
-    const { TenantError } = await import("@/lib/tenant/getCurrentOrganization");
-
-    await expect(getScoringReadiness(runAId)).rejects.toBeInstanceOf(
-      TenantError,
-    );
   });
 
   it("persists ContactScore provenance fields without API key", async () => {

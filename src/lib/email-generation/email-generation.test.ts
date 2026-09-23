@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import type { EmailGenerationContext } from "@/lib/email-generation/context";
 import {
+  additionalGuidanceRejection,
+  ADDITIONAL_GUIDANCE_MAX_CHARS,
   buildEmailPrompt,
   emailPromptOptionsForContext,
   replyStrategy,
@@ -1152,15 +1154,22 @@ describe("sequence and claim guards", () => {
 });
 
 describe("email generation action and UI seams", () => {
-  it("rejects regeneration guidance over 200 characters before generation", async () => {
-    const { generateEmailDraftAction } = await import("@/app/actions/email");
-    const result = await generateEmailDraftAction(
-      "campaign_contact_1",
-      "x".repeat(201),
+  it("rejects regeneration guidance over 200 characters before generation", () => {
+    // Pure helper — do not import @/app/actions/email here. That module
+    // graph initializes Prisma and AI/mailbox clients and exceeds 5s under
+    // parallel load.
+    expect(additionalGuidanceRejection("x".repeat(201))).toEqual({
+      ok: false,
+      message: `What should change must be ${ADDITIONAL_GUIDANCE_MAX_CHARS} characters or fewer.`,
+    });
+    expect(additionalGuidanceRejection("x".repeat(200))).toBeNull();
+    const action = readFileSync("src/app/actions/email.ts", "utf8");
+    const generateBody = action.slice(
+      action.indexOf("export async function generateEmailDraftAction"),
     );
-
-    expect(result.ok).toBe(false);
-    expect(result.message).toMatch(/200 characters or fewer/i);
+    expect(generateBody.indexOf("additionalGuidanceRejection")).toBeLessThan(
+      generateBody.indexOf("requireVerifiedForAiSpend"),
+    );
   });
 
   it("returns a typed result and renders the generated draft inline", () => {
@@ -1197,7 +1206,7 @@ describe("email generation action and UI seams", () => {
     expect(action).toContain("prepareEmailGenerationMessages");
     expect(action).toContain("generateEmailDraft");
     expect(action).toContain("requireVerifiedForAiSpend");
-    expect(action).toContain("ADDITIONAL_GUIDANCE_MAX_CHARS");
+    expect(action).toContain("additionalGuidanceRejection");
     expect(form).toContain("Generate Email");
     expect(form.match(/\+ Add email to \{vocab\.sequence\.singular\}/g)).toHaveLength(2);
     expect(form.lastIndexOf("+ Add email to {vocab.sequence.singular}")).toBeLessThan(

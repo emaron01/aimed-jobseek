@@ -71,7 +71,7 @@ async function writeDocxFixture(path: string, text: string): Promise<void> {
   writeFileSync(path, buf);
 }
 
-describe("extractDocumentText uploads", () => {
+describe.sequential("extractDocumentText uploads", () => {
   beforeAll(async () => {
     mkdirSync(FIXTURE_DIR, { recursive: true });
     const productLine =
@@ -112,7 +112,13 @@ describe("extractDocumentText uploads", () => {
       ].join("\n"),
     );
     await writeDocxFixture(join(FIXTURE_DIR, "sample.docx"), productLine);
-  });
+    // Warm pdf-parse / pdfjs (and a real parse) outside the 5s per-test budget.
+    await extractDocumentText({
+      filename: "sample.pdf",
+      mimeType: "application/pdf",
+      bytes: readFileSync(join(FIXTURE_DIR, "sample.pdf")),
+    });
+  }, 30_000);
 
   it("extracts TXT", async () => {
     const bytes = readFileSync(join(FIXTURE_DIR, "sample.txt"));
@@ -181,7 +187,7 @@ describe("extractDocumentText uploads", () => {
   });
 });
 
-describe("installPdfjsNodePolyfills canvas vs stub", () => {
+describe.sequential("installPdfjsNodePolyfills canvas vs stub", () => {
   let prior: ReturnType<typeof snapshotGlobals>;
 
   afterEach(() => {
@@ -268,9 +274,6 @@ describe("installPdfjsNodePolyfills canvas vs stub", () => {
   });
 
   it("default load uses real canvas when available, otherwise stubs", async () => {
-    prior = snapshotGlobals();
-    clearPdfjsGlobals();
-
     let canvasModule: {
       DOMMatrix?: unknown;
       ImageData?: unknown;
@@ -286,10 +289,25 @@ describe("installPdfjsNodePolyfills canvas vs stub", () => {
     } catch {
       canvasModule = null;
     }
+    const canvas = canvasModule
+      ? (canvasModule.default ?? canvasModule)
+      : null;
 
-    const report = await installPdfjsNodePolyfills();
-    if (canvasModule) {
-      const canvas = canvasModule.default ?? canvasModule;
+    prior = snapshotGlobals();
+    clearPdfjsGlobals();
+    // Inject the resolved canvas so a parallel file cannot leave a leftover
+    // DOMMatrix that would report as "existing".
+    const report = await installPdfjsNodePolyfills({
+      loadCanvas: () =>
+        canvas
+          ? {
+              DOMMatrix: canvas.DOMMatrix,
+              ImageData: canvas.ImageData,
+              Path2D: canvas.Path2D,
+            }
+          : null,
+    });
+    if (canvas?.DOMMatrix) {
       expect(report.canvasLoaded).toBe(true);
       expect(report.DOMMatrix).toBe("napi-canvas");
       expect(globalThis.DOMMatrix).toBe(canvas.DOMMatrix);

@@ -1,91 +1,68 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createResearchRun } from "@/lib/research/runs-service";
 
-const hasDatabase = Boolean(process.env.DATABASE_URL?.trim());
+const { findFirst, create } = vi.hoisted(() => ({
+  findFirst: vi.fn(),
+  create: vi.fn(),
+}));
 
-describe.skipIf(!hasDatabase)("research runs", () => {
-  let prisma: import("@prisma/client").PrismaClient;
-  let ready = false;
-  let orgId = "";
-  let userId = "";
-  let listId = "";
-  let suffix = "";
+vi.mock("@prisma/client", () => ({
+  Prisma: {
+    PrismaClientKnownRequestError: class PrismaClientKnownRequestError extends Error {},
+  },
+}));
 
-  beforeAll(async () => {
-    const { PrismaClient } = await import("@prisma/client");
-    prisma = new PrismaClient();
+vi.mock("@/lib/prisma-client", () => ({
+  prisma: {
+    researchRun: {
+      findFirst,
+      create,
+    },
+  },
+}));
 
-    try {
-      await prisma.$queryRaw`SELECT "id" FROM "ResearchRun" LIMIT 0`;
-    } catch {
-      console.warn(
-        "Skipping research run DB tests: apply research_run migration first.",
-      );
-      return;
-    }
+vi.mock("@/lib/tenant/company-research-service", () => ({
+  getCompaniesNeedingResearchForContactList: vi.fn(),
+  researchCompany: vi.fn(),
+}));
 
-    ready = true;
-    suffix = Date.now().toString(36);
+vi.mock("@/lib/tenant/request-context", () => ({
+  runWithTenantContext: async (
+    _ctx: unknown,
+    fn: () => Promise<unknown>,
+  ) => fn(),
+}));
 
-    const org = await prisma.organization.create({
-      data: {
-        name: `[TEST] Research Run Org ${suffix}`,
-        slug: `test-research-run-${suffix}`,
-        status: "ACTIVE",
-      },
-    });
-    orgId = org.id;
-
-    const user = await prisma.user.create({
-      data: {
-        email: `research-run-${suffix}@example.com`,
-        emailNormalized: `research-run-${suffix}@example.com`,
-      },
-    });
-    userId = user.id;
-
-    const list = await prisma.contactList.create({
-      data: {
-        organizationId: orgId,
-        ownerUserId: userId,
-        name: `List ${suffix}`,
-        sourceType: "PASTE",
-        createdByUserId: userId,
-      },
-    });
-    listId = list.id;
+describe("research runs", () => {
+  beforeEach(() => {
+    findFirst.mockReset();
+    create.mockReset();
   });
 
   it("rejects a second active run for the same list", async () => {
-    if (!ready) return;
-
-    const { createResearchRun } = await import("@/lib/research/runs");
-
-    await prisma.researchRun.create({
-      data: {
-        organizationId: orgId,
-        contactListId: listId,
-        initiatedByUserId: userId,
-        status: "PENDING",
-        totalCompanies: 1,
-      },
+    findFirst.mockResolvedValue({
+      id: "run_active",
+      organizationId: "org_1",
+      contactListId: "list_1",
+      status: "PENDING",
+      workerHeartbeatAt: new Date(),
+      startedAt: new Date(),
+      createdAt: new Date(),
     });
 
     const second = await createResearchRun({
-      organizationId: orgId,
-      contactListId: listId,
-      initiatedByUserId: userId,
+      organizationId: "org_1",
+      contactListId: "list_1",
+      initiatedByUserId: "user_1",
       forceRefresh: true,
     });
+
     expect(second.ok).toBe(false);
     if (!second.ok && second.code === "ACTIVE_RUN") {
-      expect(second.activeRunId).toBeTruthy();
+      expect(second.activeRunId).toBe("run_active");
     } else {
       expect.fail("expected ACTIVE_RUN");
     }
-
-    await prisma.researchRun.updateMany({
-      where: { contactListId: listId },
-      data: { status: "CANCELLED" },
-    });
+    expect(create).not.toHaveBeenCalled();
   });
 });

@@ -88,7 +88,7 @@ function runTsxProbe(probe: string): {
   delete env.NEXT_RUNTIME;
   // Force Prisma to fail fast if a probe touches the DB (no hang on missing local DB).
   env.DATABASE_URL =
-    "postgresql://boundary:boundary@127.0.0.1:1/boundary?connect_timeout=1";
+    "postgresql://boundary:boundary@127.0.0.1:1/boundary?connect_timeout=1&pool_timeout=1&socket_timeout=1";
 
   const result = spawnSync(
     process.execPath,
@@ -160,10 +160,13 @@ console.log("WORKER_SERVICE_OK", HEARTBEAT_STALE_MS, researchWorkerShutdown.requ
     expect(result.status).toBe(0);
   });
 
-  it("execution path (allowance + researchCompany) does not load server-only prisma", async () => {
-    // This is what the old test missed: credits were reached only after a run
-    // claimed work and called assertUsageAllowed → getEffectiveCompanyResearchAllowance.
-    const probe = `
+  it(
+    "execution path (allowance + researchCompany) does not load server-only prisma",
+    async () => {
+      // Must spawn a real Node/tsx process and evaluate the worker graph —
+      // Vitest's server-only stub would hide the failure. Prisma is pointed at
+      // a refused port so queries fail fast; 15s covers compile + three calls.
+      const probe = `
 function withTimeout(promise, ms) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("PROBE_TIMEOUT")), ms);
@@ -191,7 +194,7 @@ async function main() {
         organizationId: "org_boundary_probe",
         baseLimit: 25,
       }),
-      3000,
+      400,
     );
   } catch (error) {
     if (isBoundaryError(error)) {
@@ -208,7 +211,7 @@ async function main() {
         resource: "ACTIVE_RESEARCHED_COMPANY",
         wouldConsumeNewActiveCompanySlot: true,
       }),
-      3000,
+      400,
     );
   } catch (error) {
     if (isBoundaryError(error)) {
@@ -223,7 +226,7 @@ async function main() {
         { organizationId: "org_boundary_probe", userId: "user_boundary_probe" },
         () => researchCompany("company_boundary_probe"),
       ),
-      3000,
+      400,
     );
   } catch (error) {
     if (isBoundaryError(error)) {
@@ -243,11 +246,13 @@ main().catch((error) => {
   console.log("WORKER_EXEC_PATH_OK");
 });
 `;
-    const result = runTsxProbe(probe);
-    expect(result.stderr).not.toMatch(/server-only|Client Component/i);
-    expect(result.stdout).toContain("WORKER_EXEC_PATH_OK");
-    expect(result.status).toBe(0);
-  });
+      const result = runTsxProbe(probe);
+      expect(result.stderr).not.toMatch(/server-only|Client Component/i);
+      expect(result.stdout).toContain("WORKER_EXEC_PATH_OK");
+      expect(result.status).toBe(0);
+    },
+    15_000,
+  );
 
   it("worker script source imports the service, not the server-only wrapper", () => {
     const script = readFileSync(join(ROOT, CLI_ENTRY), "utf8");

@@ -19,6 +19,20 @@ import {
 export const EMAIL_GENERATION_PROMPT_VERSION = "18";
 export const ADDITIONAL_GUIDANCE_MAX_CHARS = 200;
 
+/** Pure length gate — call before any auth, Prisma, or model work. */
+export function additionalGuidanceRejection(
+  additionalGuidance?: string | null,
+): { ok: false; message: string } | null {
+  const normalized = additionalGuidance?.trim() || null;
+  if (normalized && normalized.length > ADDITIONAL_GUIDANCE_MAX_CHARS) {
+    return {
+      ok: false,
+      message: `What should change must be ${ADDITIONAL_GUIDANCE_MAX_CHARS} characters or fewer.`,
+    };
+  }
+  return null;
+}
+
 export type EmailPromptOptions = {
   personalization: PersonalizationDecision;
   requiredMotionSpecifics: RequiredMotionSpecific[];
