@@ -3,6 +3,8 @@ import type { JobScorecard, ScorecardItem } from "@/lib/job-requirement/types";
 import {
   planConsultationWithModel,
   extractWithModel,
+  polishAnswerWithModel,
+  groundStatementWithModel,
 } from "@/lib/consultation/ai";
 import {
   evidenceTargets,
@@ -17,6 +19,11 @@ import {
   planQuestionRound,
   seniorityWarrantsChronology,
 } from "@/lib/consultation/questions";
+import {
+  bannedPhraseHits,
+  validateGroundedStatement,
+  type GroundingSource,
+} from "@/lib/consultation/output-quality";
 import { nextConsultationStatus } from "@/lib/consultation/state";
 import {
   appendConfirmedFact,
@@ -107,15 +114,24 @@ function targetsFromRequirement(requirement: {
 async function hiringTeam(
   organizationId: string,
   campaignId: string,
-): Promise<Array<{ name: string; whyThisRoleMatters: string | null }>> {
+) {
   const roles = await prisma.persona.findMany({
     where: { organizationId, campaignId, archivedAt: null },
     orderBy: { createdAt: "asc" },
-    select: { name: true, whyThisPersonaMatters: true },
+    select: {
+      id: true,
+      name: true,
+      targetTitles: true,
+      whyThisPersonaMatters: true,
+      profileJson: true,
+    },
   });
   return roles.map((role) => ({
+    id: role.id,
     name: role.name,
+    likelyTitles: parseStringArray(role.targetTitles),
     whyThisRoleMatters: role.whyThisPersonaMatters,
+    personaContext: role.profileJson,
   }));
 }
 
@@ -213,6 +229,11 @@ async function addTurn(input: {
   followUp?: boolean;
   skipped?: boolean;
   seekerAuthored?: boolean;
+  questionContext?: {
+    requirementInterpretation: string | null;
+    hiringTeamRoleId: string;
+    whoCaresNote: string;
+  };
 }) {
   const sequence = await nextSequence(input.sessionId);
   return prisma.consultationTurn.create({
@@ -226,6 +247,8 @@ async function addTurn(input: {
       followUp: input.followUp ?? false,
       skipped: input.skipped ?? false,
       seekerAuthored: input.seekerAuthored ?? false,
+      questionContextJson:
+        (input.questionContext as Prisma.InputJsonValue | undefined) ?? undefined,
     },
   });
 }
@@ -241,6 +264,130 @@ function extractionReferencesInternalState(extracted: {
     ...extracted.demonstratedTargets.map((item) => item.explanation),
     extracted.followUpQuestion ?? "",
   ].some((text) => INTERNAL_SYSTEM_STATE.test(text));
+}
+
+function polishingSources(input: {
+  answer: string;
+  turnId: string;
+  profile: ReturnType<typeof parseCandidateProfile>;
+}): GroundingSource[] {
+  return [
+    { id: `answer:${input.turnId}`, text: input.answer },
+    ...profileEvidenceItems(input.profile)
+      .filter((item) => item.kind === "FACT")
+      .map((item) => ({ id: item.id, text: item.text })),
+  ];
+}
+
+async function extractAnswerWithQuality(input: {
+  answer: string;
+  question: string;
+  target: EvidenceTarget | null;
+  targets: EvidenceTarget[];
+}) {
+  let feedback: string[] = [];
+  for (
+    let attempt = 0;
+    attempt <= consultationConfig.qualityRegenerationAttempts;
+    attempt += 1
+  ) {
+    const extracted = await extractWithModel({
+      ...input,
+      qualityFeedback: feedback,
+    });
+    if (!extracted.ok) return extracted;
+    const narrative = [
+      ...extracted.data.demonstratedTargets.map((item) => item.explanation),
+      extracted.data.followUpQuestion ?? "",
+    ];
+    const errors: string[] = [];
+    if (extractionReferencesInternalState(extracted.data)) {
+      errors.push("Remove references to internal system state.");
+    }
+    const banned = bannedPhraseHits(
+      narrative,
+      consultationConfig.bannedPhrases,
+    );
+    if (banned.length > 0) {
+      errors.push(`Remove banned language: ${banned.join(", ")}.`);
+    }
+    if (errors.length === 0) return extracted;
+    feedback = errors;
+  }
+  return {
+    ok: false as const,
+    message:
+      "Consultation answer analysis did not pass quality checks. Retry consultation.",
+  };
+}
+
+async function polishAnswerWithQuality(input: {
+  answer: string;
+  story: {
+    situation: string;
+    task: string;
+    action: string;
+    result: string;
+  };
+  sources: GroundingSource[];
+}) {
+  let feedback: string[] = [];
+  for (
+    let attempt = 0;
+    attempt <= consultationConfig.qualityRegenerationAttempts;
+    attempt += 1
+  ) {
+    const polished = await polishAnswerWithModel({
+      ...input,
+      qualityFeedback: feedback,
+    });
+    if (!polished.ok) return polished;
+    const interviewErrors = validateGroundedStatement({
+      statement: polished.data.interviewAnswer,
+      sources: input.sources,
+      bannedPhrases: consultationConfig.bannedPhrases,
+      requireSentenceClaims: true,
+    });
+    const interviewWordCount = polished.data.interviewAnswer.text
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean).length;
+    if (
+      interviewWordCount < consultationConfig.interviewAnswerWordRange.min ||
+      interviewWordCount > consultationConfig.interviewAnswerWordRange.max
+    ) {
+      interviewErrors.push(
+        `The interview answer must be ${consultationConfig.interviewAnswerWordRange.min}-${consultationConfig.interviewAnswerWordRange.max} words so it can be spoken in about 60 to 90 seconds.`,
+      );
+    }
+    const bulletErrors = validateGroundedStatement({
+      statement: polished.data.resumeBullet,
+      sources: input.sources,
+      bannedPhrases: consultationConfig.bannedPhrases,
+      requireSentenceClaims: false,
+    });
+    if (/[\r\n]/.test(polished.data.resumeBullet.text)) {
+      bulletErrors.push("The resume bullet must be one line.");
+    }
+    const bulletClaim = polished.data.resumeBullet.claims[0];
+    if (
+      polished.data.resumeBullet.claims.length !== 1 ||
+      !bulletClaim ||
+      bulletClaim.text.trim() !== polished.data.resumeBullet.text.trim()
+    ) {
+      bulletErrors.push(
+        "The resume bullet must be returned as one fully grounded claim.",
+      );
+    }
+    const errors = [...new Set([...interviewErrors, ...bulletErrors])];
+    if (errors.length === 0) return polished;
+    feedback = errors;
+  }
+  return {
+    ok: false as const,
+    message:
+      "Consultation statements did not pass grounding checks. Retry consultation.",
+  };
 }
 
 async function failGeneration(sessionId: string, message: string): Promise<void> {
@@ -261,75 +408,104 @@ async function planAndStoreRound(input: {
   profile: ReturnType<typeof parseCandidateProfile>;
   requirement: { seniority: string | null; title: string | null };
   targets: EvidenceTarget[];
-  roles: Array<{ name: string; whyThisRoleMatters: string | null }>;
+  roles: Awaited<ReturnType<typeof hiringTeam>>;
 }): Promise<ReturnType<typeof planQuestionRound>> {
   await prisma.consultationSession.update({
     where: { id: input.sessionId },
     data: { generationStatus: "GENERATING", generationError: null },
   });
   const profileItems = profileEvidenceItems(input.profile);
-  const plan = await planConsultationWithModel({
-    targets: input.targets,
-    profileItems,
-    hiringTeam: input.roles,
-    chronologyRequested: seniorityWarrantsChronology({
-      seniority: input.requirement.seniority,
-      title: input.requirement.title,
-    }),
-    coveredTargetKeys: [...new Set([...input.askedKeys, ...input.skippedKeys])],
+  const chronologyRequested = seniorityWarrantsChronology({
+    seniority: input.requirement.seniority,
+    title: input.requirement.title,
   });
-  if (!plan.ok) {
-    await failGeneration(input.sessionId, plan.message);
-    return [];
-  }
-  const allNarrative = [
-    plan.data.commentary,
-    ...plan.data.assessments.flatMap((item) => [item.explanation, item.strategy]),
-    ...plan.data.questions.map((item) => item.text),
-  ];
-  if (allNarrative.some((text) => INTERNAL_SYSTEM_STATE.test(text))) {
-    await failGeneration(
-      input.sessionId,
-      "Consultation generation referenced internal system state. Retry consultation.",
-    );
-    return [];
-  }
-  let assessments: EvidenceAssessment[];
-  try {
-    assessments = verifyModelAssessments({
+  let feedback: string[] = [];
+  let accepted:
+    | {
+        plan: Extract<
+          Awaited<ReturnType<typeof planConsultationWithModel>>,
+          { ok: true }
+        >;
+        assessments: EvidenceAssessment[];
+        questions: ReturnType<typeof planQuestionRound>;
+      }
+    | null = null;
+  for (
+    let attempt = 0;
+    attempt <= consultationConfig.qualityRegenerationAttempts;
+    attempt += 1
+  ) {
+    const plan = await planConsultationWithModel({
       targets: input.targets,
       profileItems,
-      assessments: plan.data.assessments,
-      asOf: new Date(),
+      hiringTeam: input.roles,
+      chronologyRequested,
+      coveredTargetKeys: [...new Set([...input.askedKeys, ...input.skippedKeys])],
+      qualityFeedback: feedback,
     });
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Consultation assessment validation failed.";
-    await failGeneration(input.sessionId, message);
-    return [];
+    if (!plan.ok) {
+      await failGeneration(input.sessionId, plan.message);
+      return [];
+    }
+    const allNarrative = [
+      plan.data.commentary,
+      ...plan.data.assessments.flatMap((item) => [item.explanation, item.strategy]),
+      ...plan.data.questions.flatMap((item) => [
+        item.text,
+        item.requirementInterpretation ?? "",
+        item.whoCaresNote,
+      ]),
+    ];
+    const errors: string[] = [];
+    if (allNarrative.some((text) => INTERNAL_SYSTEM_STATE.test(text))) {
+      errors.push("Remove references to internal system state.");
+    }
+    const banned = bannedPhraseHits(
+      allNarrative,
+      consultationConfig.bannedPhrases,
+    );
+    if (banned.length > 0) {
+      errors.push(`Remove banned language: ${banned.join(", ")}.`);
+    }
+    let assessments: EvidenceAssessment[] = [];
+    let questions: ReturnType<typeof planQuestionRound> = [];
+    try {
+      assessments = verifyModelAssessments({
+        targets: input.targets,
+        profileItems,
+        assessments: plan.data.assessments,
+        asOf: new Date(),
+      });
+      questions = planQuestionRound({
+        assessments,
+        modelQuestions: plan.data.questions,
+        hiringTeam: input.roles,
+        askedKeys: input.askedKeys,
+        skippedKeys: input.skippedKeys,
+        includeChronology: chronologyRequested,
+        chronologyAsked: input.askedKeys.has("chronology"),
+      });
+    } catch (error) {
+      errors.push(
+        error instanceof Error
+          ? error.message
+          : "Consultation output validation failed.",
+      );
+    }
+    if (errors.length === 0) {
+      accepted = { plan, assessments, questions };
+      break;
+    }
+    feedback = errors;
   }
-  let questions: ReturnType<typeof planQuestionRound>;
-  try {
-    questions = planQuestionRound({
-      assessments,
-      modelQuestions: plan.data.questions,
-      askedKeys: input.askedKeys,
-      skippedKeys: input.skippedKeys,
-      includeChronology: seniorityWarrantsChronology({
-        seniority: input.requirement.seniority,
-        title: input.requirement.title,
-      }),
-      chronologyAsked: input.askedKeys.has("chronology"),
-    });
-  } catch (error) {
+  if (!accepted) {
     await failGeneration(
       input.sessionId,
-      error instanceof Error ? error.message : "Consultation question validation failed.",
+      "Consultation output did not pass quality checks. Retry consultation.",
     );
     return [];
   }
+  const { plan, assessments, questions } = accepted;
   await saveAssessments(input.organizationId, input.sessionId, assessments);
   for (const question of questions) {
     await addTurn({
@@ -339,6 +515,11 @@ async function planAndStoreRound(input: {
       body: question.text,
       targetKey: question.targetKey,
       followUp: question.followUp,
+      questionContext: {
+        requirementInterpretation: question.requirementInterpretation,
+        hiringTeamRoleId: question.hiringTeamRoleId,
+        whoCaresNote: question.whoCaresNote,
+      },
     });
   }
   await prisma.consultationSession.update({
@@ -463,6 +644,171 @@ export async function startConsultation(input: {
   });
 }
 
+async function processAnswerGeneration(input: {
+  organizationId: string;
+  sessionId: string;
+  turnId: string;
+  answerContext: string;
+  question: string;
+  target: EvidenceTarget | null;
+  targets: EvidenceTarget[];
+  profile: ReturnType<typeof parseCandidateProfile>;
+}): Promise<
+  | {
+      ok: true;
+      followUpQuestion: string | null;
+      missingStarElements: string[];
+    }
+  | { ok: false }
+> {
+  const extracted = await extractAnswerWithQuality({
+    answer: input.answerContext,
+    question: input.question,
+    target: input.target,
+    targets: input.targets,
+  });
+  if (!extracted.ok) {
+    await prisma.consultationTurn.update({
+      where: { id: input.turnId },
+      data: {
+        analysisJson: { status: "FAILED", message: extracted.message },
+      },
+    });
+    await failGeneration(input.sessionId, extracted.message);
+    return { ok: false };
+  }
+  const verified = proposalsFromExtraction({
+    answer: input.answerContext,
+    turnId: input.turnId,
+    extracted: extracted.data,
+    targets: input.targets,
+  });
+  const storyProposal = verified.proposals.find(
+    (proposal) => proposal.kind === "STORY" && proposal.story,
+  );
+  let polished: Awaited<ReturnType<typeof polishAnswerWithQuality>> | null =
+    null;
+  if (!verified.followUpQuestion && verified.missingStarElements.length === 0) {
+    if (!storyProposal?.story) {
+      const message =
+        "Consultation answer analysis did not return a fully grounded story. Retry consultation.";
+      await prisma.consultationTurn.update({
+        where: { id: input.turnId },
+        data: { analysisJson: { status: "FAILED", message } },
+      });
+      await failGeneration(input.sessionId, message);
+      return { ok: false };
+    }
+    polished = await polishAnswerWithQuality({
+      answer: input.answerContext,
+      story: {
+        situation: storyProposal.story.situation,
+        task: storyProposal.story.task,
+        action: storyProposal.story.action,
+        result: storyProposal.story.result,
+      },
+      sources: polishingSources({
+        answer: input.answerContext,
+        turnId: input.turnId,
+        profile: input.profile,
+      }),
+    });
+    if (!polished.ok) {
+      await prisma.consultationTurn.update({
+        where: { id: input.turnId },
+        data: {
+          analysisJson: { status: "FAILED", message: polished.message },
+        },
+      });
+      await failGeneration(input.sessionId, polished.message);
+      return { ok: false };
+    }
+  }
+  const operations: Prisma.PrismaPromise<unknown>[] = [
+    prisma.consultationProposal.deleteMany({
+      where: { turnId: input.turnId, status: "PENDING" },
+    }),
+    prisma.consultationTurn.update({
+      where: { id: input.turnId },
+      data: {
+        analysisJson: {
+          status: "READY",
+          answerContext: input.answerContext,
+          story: extracted.data.story,
+          dropped: verified.dropped,
+          missingStarElements: verified.missingStarElements,
+          demonstratedTargets: extracted.data.demonstratedTargets,
+        },
+      },
+    }),
+    prisma.consultationSession.update({
+      where: { id: input.sessionId },
+      data: { generationStatus: "READY", generationError: null },
+    }),
+    ...verified.proposals.map((proposal) =>
+      prisma.consultationProposal.create({
+        data: {
+          organizationId: input.organizationId,
+          sessionId: input.sessionId,
+          turnId: input.turnId,
+          kind: proposal.kind,
+          text: proposal.text,
+          storyJson:
+            (proposal.story as Prisma.InputJsonValue | null) ?? undefined,
+          competencyLinks:
+            (proposal.story?.competencyLinks as Prisma.InputJsonValue | null) ??
+            undefined,
+          profileItemId: proposal.profileItemId,
+        },
+      }),
+    ),
+  ];
+  if (polished?.ok) {
+    const statements = [
+      {
+        kind: "INTERVIEW_ANSWER" as const,
+        value: polished.data.interviewAnswer,
+      },
+      {
+        kind: "RESUME_BULLET" as const,
+        value: polished.data.resumeBullet,
+      },
+    ];
+    operations.push(
+      ...statements.map((statement) =>
+        prisma.consultationStatement.upsert({
+          where: {
+            turnId_kind: { turnId: input.turnId, kind: statement.kind },
+          },
+          create: {
+            organizationId: input.organizationId,
+            sessionId: input.sessionId,
+            turnId: input.turnId,
+            kind: statement.kind,
+            content: statement.value.text.trim(),
+            groundingJson: statement.value.claims,
+            promptVersion: CONSULTATION_PROMPT_VERSION,
+          },
+          update: {
+            status: "DRAFT",
+            content: statement.value.text.trim(),
+            groundingJson: statement.value.claims,
+            promptVersion: CONSULTATION_PROMPT_VERSION,
+            generation: { increment: 1 },
+            approvedAt: null,
+          },
+        }),
+      ),
+    );
+  }
+  await prisma.$transaction(operations);
+  return {
+    ok: true,
+    followUpQuestion: verified.followUpQuestion,
+    missingStarElements: verified.missingStarElements,
+  };
+}
+
 export async function retryConsultationGeneration(input: {
   organizationId: string;
   campaignId: string;
@@ -494,7 +840,7 @@ export async function retryConsultationGeneration(input: {
     if (!question) {
       throw new TenantError("The question for the failed answer was not found.");
     }
-    const { requirement } = await requireApplication(
+    const { requirement, profile } = await requireApplication(
       input.organizationId,
       input.campaignId,
     );
@@ -511,64 +857,18 @@ export async function retryConsultationGeneration(input: {
       .map((turn) => turn.body)
       .filter(Boolean)
       .join("\n");
-    const extracted = await extractWithModel({
-      answer: answerContext,
+    const processed = await processAnswerGeneration({
+      organizationId: input.organizationId,
+      sessionId: session.id,
+      turnId: failedAnswer.id,
+      answerContext,
       question: question.body,
       target: target ?? null,
       targets,
+      profile,
     });
-    if (!extracted.ok) {
-      await failGeneration(session.id, extracted.message);
-      return;
-    }
-    if (extractionReferencesInternalState(extracted.data)) {
-      await failGeneration(
-        session.id,
-        "Consultation answer analysis referenced internal system state. Retry consultation.",
-      );
-      return;
-    }
-    const verified = proposalsFromExtraction({
-      answer: answerContext,
-      turnId: failedAnswer.id,
-      extracted: extracted.data,
-      targets,
-    });
-    await prisma.$transaction([
-      prisma.consultationTurn.update({
-        where: { id: failedAnswer.id },
-        data: {
-          analysisJson: {
-            status: "READY",
-            dropped: verified.dropped,
-            missingStarElements: verified.missingStarElements,
-            demonstratedTargets: extracted.data.demonstratedTargets,
-          },
-        },
-      }),
-      prisma.consultationSession.update({
-        where: { id: session.id },
-        data: { generationStatus: "READY", generationError: null },
-      }),
-      ...verified.proposals.map((proposal) =>
-        prisma.consultationProposal.create({
-          data: {
-            organizationId: input.organizationId,
-            sessionId: session.id,
-            turnId: failedAnswer.id,
-            kind: proposal.kind,
-            text: proposal.text,
-            storyJson:
-              (proposal.story as Prisma.InputJsonValue | null) ?? undefined,
-            competencyLinks:
-              (proposal.story?.competencyLinks as Prisma.InputJsonValue | null) ??
-              undefined,
-            profileItemId: proposal.profileItemId,
-          },
-        }),
-      ),
-    ]);
-    if (verified.followUpQuestion) {
+    if (!processed.ok) return;
+    if (processed.followUpQuestion) {
       const followUpCount = turns.filter(
         (turn) =>
           turn.speaker === "CONSULTANT" &&
@@ -580,7 +880,7 @@ export async function retryConsultationGeneration(input: {
           organizationId: input.organizationId,
           sessionId: session.id,
           speaker: "CONSULTANT",
-          body: verified.followUpQuestion,
+          body: processed.followUpQuestion,
           targetKey: failedAnswer.targetKey,
           followUp: true,
         });
@@ -765,7 +1065,7 @@ export async function answerConsultationQuestion(input: {
     targetKey: input.targetKey,
     seekerAuthored: true,
   });
-  const { requirement } = await requireApplication(
+  const { requirement, profile } = await requireApplication(
     input.organizationId,
     input.campaignId,
   );
@@ -784,70 +1084,17 @@ export async function answerConsultationQuestion(input: {
   ]
     .filter(Boolean)
     .join("\n");
-  const extracted = await extractWithModel({
-    answer: answerContext,
+  const processed = await processAnswerGeneration({
+    organizationId: input.organizationId,
+    sessionId: session.id,
+    turnId: seekerTurn.id,
+    answerContext,
     question: question.body,
     target: target ?? null,
     targets,
+    profile,
   });
-  if (!extracted.ok) {
-    await prisma.consultationTurn.update({
-      where: { id: seekerTurn.id },
-      data: {
-        analysisJson: {
-          status: "FAILED",
-          message: extracted.message,
-        },
-      },
-    });
-    await failGeneration(session.id, extracted.message);
-    return;
-  }
-  if (extractionReferencesInternalState(extracted.data)) {
-    const message =
-      "Consultation answer analysis referenced internal system state. Retry consultation.";
-    await prisma.consultationTurn.update({
-      where: { id: seekerTurn.id },
-      data: { analysisJson: { status: "FAILED", message } },
-    });
-    await failGeneration(session.id, message);
-    return;
-  }
-  const verified = proposalsFromExtraction({
-    answer: answerContext,
-    turnId: seekerTurn.id,
-    extracted: extracted.data,
-    targets,
-  });
-  await prisma.consultationTurn.update({
-    where: { id: seekerTurn.id },
-    data: {
-      analysisJson: {
-        status: "READY",
-        dropped: verified.dropped,
-        missingStarElements: verified.missingStarElements,
-        demonstratedTargets: extracted.data.demonstratedTargets,
-      },
-    },
-  });
-  await prisma.consultationSession.update({
-    where: { id: session.id },
-    data: { generationStatus: "READY", generationError: null },
-  });
-  for (const proposal of verified.proposals) {
-    await prisma.consultationProposal.create({
-      data: {
-        organizationId: input.organizationId,
-        sessionId: session.id,
-        turnId: seekerTurn.id,
-        kind: proposal.kind,
-        text: proposal.text,
-        storyJson: proposal.story ?? undefined,
-        competencyLinks: proposal.story?.competencyLinks ?? undefined,
-        profileItemId: proposal.profileItemId,
-      },
-    });
-  }
+  if (!processed.ok) return;
   const followUpCount = turns.filter(
     (turn) =>
       turn.speaker === "CONSULTANT" &&
@@ -855,7 +1102,7 @@ export async function answerConsultationQuestion(input: {
       turn.followUp,
   ).length;
   if (
-    verified.followUpQuestion &&
+    processed.followUpQuestion &&
     input.targetKey !== "chronology" &&
     followUpCount < consultationConfig.maxFollowUpsPerTarget
   ) {
@@ -863,7 +1110,7 @@ export async function answerConsultationQuestion(input: {
       organizationId: input.organizationId,
       sessionId: session.id,
       speaker: "CONSULTANT",
-      body: verified.followUpQuestion,
+      body: processed.followUpQuestion,
       targetKey: input.targetKey,
       followUp: true,
     });
@@ -938,6 +1185,238 @@ export async function skipConsultationQuestion(input: {
   await finishIfPlanningIsComplete(session.id, next);
 }
 
+function completeStoryFromAnalysis(value: unknown): {
+  answerContext: string;
+  story: {
+    situation: string;
+    task: string;
+    action: string;
+    result: string;
+  };
+} | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as { answerContext?: unknown; story?: unknown };
+  if (typeof row.answerContext !== "string" || !row.story || typeof row.story !== "object") {
+    return null;
+  }
+  const story = row.story as Record<string, unknown>;
+  if (
+    typeof story.situation !== "string" ||
+    typeof story.task !== "string" ||
+    typeof story.action !== "string" ||
+    typeof story.result !== "string"
+  ) {
+    return null;
+  }
+  return {
+    answerContext: row.answerContext,
+    story: {
+      situation: story.situation,
+      task: story.task,
+      action: story.action,
+      result: story.result,
+    },
+  };
+}
+
+export async function regenerateConsultationStatement(input: {
+  organizationId: string;
+  statementId: string;
+}): Promise<void> {
+  const statement = await prisma.consultationStatement.findFirst({
+    where: { id: input.statementId, organizationId: input.organizationId },
+    include: { turn: true, session: true },
+  });
+  if (!statement) throw new TenantError("That polished statement was not found.");
+  const analyzed = completeStoryFromAnalysis(statement.turn.analysisJson);
+  if (!analyzed) {
+    throw new TenantError("That answer does not have a complete grounded story.");
+  }
+  const { profile } = await requireApplication(
+    input.organizationId,
+    statement.session.campaignId,
+  );
+  const polished = await polishAnswerWithQuality({
+    answer: analyzed.answerContext,
+    story: analyzed.story,
+    sources: polishingSources({
+      answer: analyzed.answerContext,
+      turnId: statement.turnId,
+      profile,
+    }),
+  });
+  if (!polished.ok) throw new TenantError(polished.message);
+  const value =
+    statement.kind === "INTERVIEW_ANSWER"
+      ? polished.data.interviewAnswer
+      : polished.data.resumeBullet;
+  const story = await prisma.profileStory.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      consultationTurnId: statement.turnId,
+    },
+    select: { id: true },
+  });
+  await prisma.$transaction([
+    prisma.consultationStatement.update({
+      where: { id: statement.id },
+      data: {
+        status: "DRAFT",
+        content: value.text.trim(),
+        groundingJson: value.claims,
+        promptVersion: CONSULTATION_PROMPT_VERSION,
+        generation: { increment: 1 },
+        approvedAt: null,
+      },
+    }),
+    ...(story
+      ? [
+          prisma.profileStory.update({
+            where: { id: story.id },
+            data:
+              statement.kind === "INTERVIEW_ANSWER"
+                ? {
+                    interviewAnswer: null,
+                    interviewAnswerApprovedAt: null,
+                  }
+                : { resumeBullet: null, resumeBulletApprovedAt: null },
+          }),
+        ]
+      : []),
+  ]);
+}
+
+export async function approveConsultationStatement(input: {
+  organizationId: string;
+  statementId: string;
+  content: string;
+}): Promise<void> {
+  const content = input.content.trim();
+  if (!content) throw new TenantError("A polished statement cannot be empty.");
+  const banned = bannedPhraseHits(
+    [content],
+    consultationConfig.bannedPhrases,
+  );
+  if (banned.length > 0) {
+    throw new TenantError("Remove the flagged wording before approval.");
+  }
+  const statement = await prisma.consultationStatement.findFirst({
+    where: { id: input.statementId, organizationId: input.organizationId },
+    include: { turn: true, session: true },
+  });
+  if (!statement) throw new TenantError("That polished statement was not found.");
+  if (statement.kind === "INTERVIEW_ANSWER") {
+    const wordCount = content.split(/\s+/).filter(Boolean).length;
+    if (
+      wordCount < consultationConfig.interviewAnswerWordRange.min ||
+      wordCount > consultationConfig.interviewAnswerWordRange.max
+    ) {
+      throw new TenantError(
+        `Keep the interview answer between ${consultationConfig.interviewAnswerWordRange.min} and ${consultationConfig.interviewAnswerWordRange.max} words.`,
+      );
+    }
+  } else if (/[\r\n]/.test(content)) {
+    throw new TenantError("Keep the resume bullet to one line.");
+  }
+  const analyzed = completeStoryFromAnalysis(statement.turn.analysisJson);
+  if (!analyzed) {
+    throw new TenantError("That answer does not have a complete grounded story.");
+  }
+  const { product, profile } = await requireApplication(
+    input.organizationId,
+    statement.session.campaignId,
+  );
+  const sources = polishingSources({
+    answer: analyzed.answerContext,
+    turnId: statement.turnId,
+    profile,
+  });
+  const grounding = await groundStatementWithModel({
+    statement: content,
+    kind: statement.kind,
+    sources,
+  });
+  if (!grounding.ok) throw new TenantError(grounding.message);
+  if (grounding.data.text.trim() !== content) {
+    throw new TenantError("Statement verification altered the supplied wording.");
+  }
+  const errors = validateGroundedStatement({
+    statement: grounding.data,
+    sources,
+    bannedPhrases: consultationConfig.bannedPhrases,
+    requireSentenceClaims: statement.kind === "INTERVIEW_ANSWER",
+  });
+  if (
+    statement.kind === "RESUME_BULLET" &&
+    (grounding.data.claims.length !== 1 ||
+      grounding.data.claims[0]?.text.trim() !== content)
+  ) {
+    errors.push("The resume bullet was not fully grounded.");
+  }
+  if (errors.length > 0) {
+    throw new TenantError(
+      "The statement contains content that is not supported by the answer or Personal Profile.",
+    );
+  }
+  const proposal = await prisma.consultationProposal.findFirst({
+    where: { turnId: statement.turnId, kind: "STORY" },
+    orderBy: { createdAt: "desc" },
+    select: { competencyLinks: true },
+  });
+  const existingStory = await prisma.profileStory.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      consultationTurnId: statement.turnId,
+    },
+  });
+  const now = new Date();
+  const polishedFields =
+    statement.kind === "INTERVIEW_ANSWER"
+      ? {
+          interviewAnswer: content,
+          interviewAnswerApprovedAt: now,
+        }
+      : {
+          resumeBullet: content,
+          resumeBulletApprovedAt: now,
+        };
+  await prisma.$transaction([
+    prisma.consultationStatement.update({
+      where: { id: statement.id },
+      data: {
+        status: "APPROVED",
+        content,
+        groundingJson: grounding.data.claims,
+        approvedAt: now,
+      },
+    }),
+    existingStory
+      ? prisma.profileStory.update({
+          where: { id: existingStory.id },
+          data: {
+            verbatimAnswer: analyzed.answerContext,
+            ...polishedFields,
+          },
+        })
+      : prisma.profileStory.create({
+          data: {
+            organizationId: input.organizationId,
+            productId: product.id,
+            situation: analyzed.story.situation,
+            task: analyzed.story.task,
+            action: analyzed.story.action,
+            result: analyzed.story.result,
+            competencyLinks:
+              (proposal?.competencyLinks as Prisma.InputJsonValue | null) ?? [],
+            consultationTurnId: statement.turnId,
+            seekerAuthored: true,
+            verbatimAnswer: analyzed.answerContext,
+            ...polishedFields,
+          },
+        }),
+  ]);
+}
+
 export async function confirmConsultationProposal(input: {
   organizationId: string;
   proposalId: string;
@@ -982,19 +1461,42 @@ export async function confirmConsultationProposal(input: {
     const links = Array.isArray(proposal.competencyLinks)
       ? proposal.competencyLinks
       : [];
-    await prisma.profileStory.create({
-      data: {
+    const existingStory = await prisma.profileStory.findFirst({
+      where: {
         organizationId: input.organizationId,
-        productId: product.id,
-        situation,
-        task,
-        action,
-        result,
-        competencyLinks: links,
         consultationTurnId: proposal.turnId,
-        seekerAuthored: true,
       },
     });
+    const analyzed = completeStoryFromAnalysis(proposal.turn.analysisJson);
+    if (existingStory) {
+      await prisma.profileStory.update({
+        where: { id: existingStory.id },
+        data: {
+          situation,
+          task,
+          action,
+          result,
+          competencyLinks: links,
+          verbatimAnswer:
+            analyzed?.answerContext ?? existingStory.verbatimAnswer,
+        },
+      });
+    } else {
+      await prisma.profileStory.create({
+        data: {
+          organizationId: input.organizationId,
+          productId: product.id,
+          situation,
+          task,
+          action,
+          result,
+          competencyLinks: links,
+          consultationTurnId: proposal.turnId,
+          seekerAuthored: true,
+          verbatimAnswer: analyzed?.answerContext ?? proposal.turn.body,
+        },
+      });
+    }
   }
   await prisma.consultationProposal.update({
     where: { id: proposal.id },

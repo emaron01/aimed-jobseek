@@ -21,6 +21,7 @@ export {
 export type { EmploymentTypeCode } from "./compensation";
 export {
   consultationConfig,
+  consultationStatementLabels,
   evidenceStrengthLabels,
   gapStrategyCopy,
 } from "./consultation";
@@ -40,3 +41,4 @@ export {
 export { FEATURE_FLAGS, anyListFeatureEnabled, features } from "./features";
 export type { FeatureFlag } from "./features";
 export { hiringTeamConfig } from "./hiring-team";
+export { applicationSummaryConfig } from "./application-summary";

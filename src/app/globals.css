@@ -19,6 +19,10 @@ body {
 }
 
 @media print {
+  @page {
+    margin: 0.65in;
+  }
+
   body {
     background: white;
     color: #0f172a;
@@ -39,5 +43,36 @@ body {
 
   .research-source-chip-popup {
     display: none !important;
+  }
+
+  .application-summary {
+    max-width: none !important;
+    font-size: 10.5pt;
+    line-height: 1.45;
+  }
+
+  .application-summary button,
+  .application-summary form,
+  nav,
+  header {
+    display: none !important;
+  }
+
+  .application-summary-section {
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 0 1rem !important;
+  }
+
+  .application-summary-section h2,
+  .application-summary-section h3,
+  .application-summary-section article {
+    break-after: avoid;
+    orphans: 3;
+    widows: 3;
+  }
+
+  .application-summary details > * {
+    display: block !important;
   }
 }

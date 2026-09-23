@@ -1,11 +1,15 @@
 import type { EvidenceAssessment } from "@/lib/consultation/assess";
 import { openGaps } from "@/lib/consultation/assess";
+import { questionRestatesTarget } from "@/lib/consultation/output-quality";
 import { consultationConfig } from "@/lib/product-config/consultation";
 
 export type PlannedQuestion = {
   targetKey: string;
   followUp: boolean;
   text: string;
+  requirementInterpretation: string | null;
+  hiringTeamRoleId: string;
+  whoCaresNote: string;
 };
 
 const SENIOR_ROLE =
@@ -35,7 +39,14 @@ function targetMeaning(text: string): string {
 
 export function planQuestionRound(input: {
   assessments: EvidenceAssessment[];
-  modelQuestions: Array<{ targetKey: string; text: string }>;
+  modelQuestions: Array<{
+    targetKey: string;
+    text: string;
+    requirementInterpretation: string | null;
+    hiringTeamRoleId: string;
+    whoCaresNote: string;
+  }>;
+  hiringTeam: Array<{ id: string; name: string }>;
   askedKeys: ReadonlySet<string>;
   skippedKeys: ReadonlySet<string>;
   includeChronology: boolean;
@@ -72,12 +83,32 @@ export function planQuestionRound(input: {
   const byKey = new Map(
     input.modelQuestions
       .filter((question) => validModelQuestion(question.text))
-      .map((question) => [question.targetKey, question.text.trim()]),
+      .map((question) => [question.targetKey, question]),
   );
+  const rolesById = new Map(input.hiringTeam.map((role) => [role.id, role]));
   const questions: PlannedQuestion[] = selected.map((gap) => {
-    const text = byKey.get(gap.key);
-    if (!text) {
+    const modelQuestion = byKey.get(gap.key);
+    if (!modelQuestion) {
       throw new Error(`Consultation AI did not write a valid question for ${gap.key}.`);
+    }
+    const text = modelQuestion.text.trim();
+    const role = rolesById.get(modelQuestion.hiringTeamRoleId);
+    if (
+      !role ||
+      !modelQuestion.whoCaresNote.trim() ||
+      !modelQuestion.whoCaresNote.toLowerCase().includes(role.name.toLowerCase())
+    ) {
+      throw new Error(
+        `Consultation AI did not ground the who-cares note for ${gap.key} in a Hiring Team role.`,
+      );
+    }
+    if (
+      modelQuestion.requirementInterpretation &&
+      questionRestatesTarget(text, gap.text)
+    ) {
+      throw new Error(
+        `Consultation AI repeated a vague requirement instead of translating ${gap.key}.`,
+      );
     }
     if (
       gap.experienceCalculation?.missingDateRoleIds.length &&
@@ -99,17 +130,32 @@ export function planQuestionRound(input: {
       targetKey: gap.key,
       followUp: false,
       text,
+      requirementInterpretation:
+        modelQuestion.requirementInterpretation?.trim() || null,
+      hiringTeamRoleId: role.id,
+      whoCaresNote: modelQuestion.whoCaresNote.trim(),
     };
   });
   if (input.includeChronology && !input.chronologyAsked) {
-    const text = byKey.get("chronology");
-    if (!text) {
+    const modelQuestion = byKey.get("chronology");
+    const role = modelQuestion
+      ? rolesById.get(modelQuestion.hiringTeamRoleId)
+      : null;
+    if (
+      !modelQuestion ||
+      !role ||
+      !modelQuestion.whoCaresNote.toLowerCase().includes(role.name.toLowerCase())
+    ) {
       throw new Error("Consultation AI did not write a valid chronology question.");
     }
     questions.push({
       targetKey: "chronology",
       followUp: false,
-      text,
+      text: modelQuestion.text.trim(),
+      requirementInterpretation:
+        modelQuestion.requirementInterpretation?.trim() || null,
+      hiringTeamRoleId: role.id,
+      whoCaresNote: modelQuestion.whoCaresNote.trim(),
     });
   }
   return questions.slice(0, consultationConfig.roundSize);

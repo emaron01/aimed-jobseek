@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   nameApplicationEmployerAction,
   overrideApplicationFitAction,
@@ -14,12 +15,14 @@ import {
 } from "@/app/actions/hiring-team";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { ConsultationSection } from "@/components/ConsultationSection";
+import { HiringTeamDisclosureGroup } from "@/components/HiringTeamDisclosureGroup";
 import { displayedFitBucket, fitSignalLabels } from "@/lib/application/fit";
 import type { ApplicationFitOutcome } from "@/lib/application/fit";
 import { readApplicationFitStale } from "@/lib/application/service";
 import type { JobScorecard, ScorecardItem } from "@/lib/job-requirement/types";
 import { prisma } from "@/lib/prisma";
-import { criterionFlags, vocab } from "@/lib/product-config";
+import { applicationSummaryConfig, criterionFlags, hiringTeamConfig, vocab } from "@/lib/product-config";
+import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
 import { parseStringArray } from "@/lib/research";
 
 function textList(value: unknown): string[] {
@@ -141,11 +144,19 @@ export async function ApplicationWorkspace({
   return (
     <>
     <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-5" data-testid="application-workspace">
-      <div>
-        <h2 className="text-base font-semibold text-slate-900">Job requirement</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Parsed from the pasted posting. Empty fields were not in the posting.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Job requirement</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Parsed from the pasted posting. Empty fields were not in the posting.
+          </p>
+        </div>
+        <Link
+          href={`/campaigns/${campaignId}/summary`}
+          className={SECONDARY_BUTTON_CLASS}
+        >
+          {applicationSummaryConfig.title}
+        </Link>
       </div>
       <dl className="grid gap-3 md:grid-cols-2">
         <Field label="Title" value={requirement.title} />
@@ -424,6 +435,169 @@ async function HiringTeamSection({
     }),
   ]);
   const fieldClass = "mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm";
+  const organizedRoles = roles.map((role) => ({
+    role,
+    narrative: readNarrative(role.profileJson),
+  }));
+  const directRoles = organizedRoles.filter(
+    ({ narrative }) => narrative?.involvement !== "INDIRECT",
+  );
+  const indirectRoles = organizedRoles.filter(
+    ({ narrative }) => narrative?.involvement === "INDIRECT",
+  );
+
+  const roleCard = ({
+    role,
+    narrative,
+  }: (typeof organizedRoles)[number]) => (
+    <details
+      key={role.id}
+      className="rounded-md border border-slate-200 p-4"
+      data-testid="hiring-team-role"
+    >
+      <summary className="cursor-pointer list-none space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h4 className="text-sm font-semibold text-slate-900">{role.name}</h4>
+          <span className="text-xs text-slate-500">
+            {hiringTeamStatusLabel(role.setupStatus, role.approvalStatus)}
+          </span>
+        </div>
+        <p className="text-sm text-slate-700">
+          {textList(role.targetTitles).join(", ") || "No likely titles."}
+        </p>
+        {role.whyThisPersonaMatters ? (
+          <p className="text-sm text-slate-800">{role.whyThisPersonaMatters}</p>
+        ) : null}
+      </summary>
+      <div className="mt-4 space-y-3 border-t border-slate-200 pt-4">
+        {role.department ? (
+          <p className="text-sm text-slate-700">{role.department}</p>
+        ) : null}
+        {narrative?.overview ? (
+          <p className="text-sm text-slate-800">{narrative.overview}</p>
+        ) : role.definition ? (
+          <p className="text-sm text-slate-800">{role.definition}</p>
+        ) : null}
+        {narrative?.impact ? (
+          <p className="text-sm text-slate-800">
+            {narrative.impact.text}
+            <KindMark kind={narrative.impact.kind} />
+          </p>
+        ) : null}
+        {narrative ? (
+          <>
+            <AnnotatedBlock title="Pressures" items={narrative.pressures} />
+            <AnnotatedBlock title="What they need" items={narrative.needs} />
+            <AnnotatedBlock title="Concerns" items={narrative.concerns} />
+            {narrative.interviewStage ? (
+              <p className="text-sm text-slate-800">
+                Interview stage: {narrative.interviewStage.text}
+                <KindMark kind={narrative.interviewStage.kind} />
+              </p>
+            ) : null}
+            <AnnotatedBlock title="What they evaluate" items={narrative.evaluates} />
+            <AnnotatedBlock title="Talking points" items={narrative.talkingPoints} />
+            <AnnotatedBlock title="How to communicate" items={narrative.communication} />
+            <AnnotatedBlock
+              title="Why they were identified"
+              items={narrative.identificationEvidence}
+            />
+          </>
+        ) : null}
+        {narrative?.modelNote ? (
+          <p className="text-sm text-amber-900">{narrative.modelNote}</p>
+        ) : null}
+        {role.additionalContext ? (
+          <p className="text-sm text-slate-700">{role.additionalContext}</p>
+        ) : null}
+        {canEdit ? (
+          <div className="space-y-3 print:hidden">
+            <ApplicationActionForm
+              action={updateApplicationRoleAction}
+              submitLabel="Save edits"
+              testId={`edit-role-${role.id}`}
+            >
+              <input type="hidden" name="campaignId" value={campaignId} />
+              <input type="hidden" name="personaId" value={role.id} />
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Name</span>
+                <input name="name" required defaultValue={role.name} className={fieldClass} />
+              </label>
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Likely titles</span>
+                <textarea
+                  name="likelyTitles"
+                  rows={2}
+                  defaultValue={textList(role.targetTitles).join("\n")}
+                  className={fieldClass}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Department</span>
+                <input name="department" defaultValue={role.department ?? ""} className={fieldClass} />
+              </label>
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Why this role matters</span>
+                <textarea
+                  name="whyThisRoleMatters"
+                  rows={2}
+                  defaultValue={role.whyThisPersonaMatters ?? ""}
+                  className={fieldClass}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Notes</span>
+                <textarea
+                  name="notes"
+                  rows={2}
+                  defaultValue={role.additionalContext ?? ""}
+                  className={fieldClass}
+                />
+              </label>
+            </ApplicationActionForm>
+            <div className="flex flex-wrap gap-3">
+              <ApplicationActionForm
+                action={approveApplicationRoleAction}
+                submitLabel="Approve"
+                testId={`approve-role-${role.id}`}
+              >
+                <input type="hidden" name="campaignId" value={campaignId} />
+                <input type="hidden" name="personaId" value={role.id} />
+              </ApplicationActionForm>
+              <ApplicationActionForm
+                action={rebuildApplicationRoleAction}
+                submitLabel={
+                  role.setupStatus === "PARTIAL" || role.setupStatus === "FAILED"
+                    ? "Retry synthesis"
+                    : "Rebuild"
+                }
+                testId={`rebuild-role-${role.id}`}
+              >
+                <input type="hidden" name="campaignId" value={campaignId} />
+                <input type="hidden" name="personaId" value={role.id} />
+              </ApplicationActionForm>
+              <ApplicationActionForm
+                action={removeApplicationRoleAction}
+                submitLabel="Remove role"
+                testId={`remove-role-${role.id}`}
+              >
+                <input type="hidden" name="campaignId" value={campaignId} />
+                <input type="hidden" name="personaId" value={role.id} />
+              </ApplicationActionForm>
+              <ApplicationActionForm
+                action={saveRoleAsTemplateAction}
+                submitLabel="Save as template"
+                testId={`save-role-template-${role.id}`}
+              >
+                <input type="hidden" name="campaignId" value={campaignId} />
+                <input type="hidden" name="personaId" value={role.id} />
+              </ApplicationActionForm>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </details>
+  );
   return (
     <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-5" data-testid="hiring-team">
       <div>
@@ -435,113 +609,26 @@ async function HiringTeamSection({
       {roles.length === 0 ? (
         <p className="text-sm text-slate-600">No {vocab.persona.plural} yet.</p>
       ) : (
-        <ul className="space-y-4">
-          {roles.map((role) => {
-            const narrative = readNarrative(role.profileJson);
-            return (
-              <li key={role.id} className="space-y-3 rounded-md border border-slate-200 p-4" data-testid="hiring-team-role">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-sm font-semibold text-slate-900">{role.name}</h3>
-                  {narrative?.involvement ? (
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">
-                      {narrative.involvement === "DIRECT" ? "Direct" : "Indirect"}
-                    </span>
-                  ) : null}
-                  <span className="text-xs text-slate-500">
-                    {hiringTeamStatusLabel(role.setupStatus, role.approvalStatus)}
-                  </span>
-                </div>
-                <p className="text-sm text-slate-700">{textList(role.targetTitles).join(", ") || "No likely titles."}</p>
-                {role.department ? <p className="text-sm text-slate-700">{role.department}</p> : null}
-                {role.whyThisPersonaMatters ? <p className="text-sm text-slate-800">{role.whyThisPersonaMatters}</p> : null}
-                {narrative?.overview ? <p className="text-sm text-slate-800">{narrative.overview}</p> : role.definition ? <p className="text-sm text-slate-800">{role.definition}</p> : null}
-                {narrative?.impact ? (
-                  <p className="text-sm text-slate-800">
-                    {narrative.impact.text}
-                    <KindMark kind={narrative.impact.kind} />
-                  </p>
-                ) : null}
-                {narrative ? (
-                  <>
-                    <AnnotatedBlock title="Pressures" items={narrative.pressures} />
-                    <AnnotatedBlock title="What they need" items={narrative.needs} />
-                    <AnnotatedBlock title="Concerns" items={narrative.concerns} />
-                    {narrative.interviewStage ? (
-                      <p className="text-sm text-slate-800">
-                        Interview stage: {narrative.interviewStage.text}
-                        <KindMark kind={narrative.interviewStage.kind} />
-                      </p>
-                    ) : null}
-                    <AnnotatedBlock title="What they evaluate" items={narrative.evaluates} />
-                    <AnnotatedBlock title="Talking points" items={narrative.talkingPoints} />
-                    <AnnotatedBlock title="How to communicate" items={narrative.communication} />
-                    <AnnotatedBlock title="Why they were identified" items={narrative.identificationEvidence} />
-                  </>
-                ) : null}
-                {narrative?.modelNote ? (
-                  <p className="text-sm text-amber-900">{narrative.modelNote}</p>
-                ) : null}
-                {role.additionalContext ? (
-                  <p className="text-sm text-slate-700">{role.additionalContext}</p>
-                ) : null}
-                {canEdit ? (
-                  <div className="space-y-3">
-                    <ApplicationActionForm action={updateApplicationRoleAction} submitLabel="Save edits" testId={`edit-role-${role.id}`}>
-                      <input type="hidden" name="campaignId" value={campaignId} />
-                      <input type="hidden" name="personaId" value={role.id} />
-                      <label className="block text-sm">
-                        <span className="font-medium text-slate-700">Name</span>
-                        <input name="name" required defaultValue={role.name} className={fieldClass} />
-                      </label>
-                      <label className="block text-sm">
-                        <span className="font-medium text-slate-700">Likely titles</span>
-                        <textarea name="likelyTitles" rows={2} defaultValue={textList(role.targetTitles).join("\n")} className={fieldClass} />
-                      </label>
-                      <label className="block text-sm">
-                        <span className="font-medium text-slate-700">Department</span>
-                        <input name="department" defaultValue={role.department ?? ""} className={fieldClass} />
-                      </label>
-                      <label className="block text-sm">
-                        <span className="font-medium text-slate-700">Why this role matters</span>
-                        <textarea name="whyThisRoleMatters" rows={2} defaultValue={role.whyThisPersonaMatters ?? ""} className={fieldClass} />
-                      </label>
-                      <label className="block text-sm">
-                        <span className="font-medium text-slate-700">Notes</span>
-                        <textarea name="notes" rows={2} defaultValue={role.additionalContext ?? ""} className={fieldClass} />
-                      </label>
-                    </ApplicationActionForm>
-                    <div className="flex flex-wrap gap-3">
-                      <ApplicationActionForm action={approveApplicationRoleAction} submitLabel="Approve" testId={`approve-role-${role.id}`}>
-                        <input type="hidden" name="campaignId" value={campaignId} />
-                        <input type="hidden" name="personaId" value={role.id} />
-                      </ApplicationActionForm>
-                      <ApplicationActionForm
-                        action={rebuildApplicationRoleAction}
-                        submitLabel={
-                          role.setupStatus === "PARTIAL" || role.setupStatus === "FAILED"
-                            ? "Retry synthesis"
-                            : "Rebuild"
-                        }
-                        testId={`rebuild-role-${role.id}`}
-                      >
-                        <input type="hidden" name="campaignId" value={campaignId} />
-                        <input type="hidden" name="personaId" value={role.id} />
-                      </ApplicationActionForm>
-                      <ApplicationActionForm action={removeApplicationRoleAction} submitLabel="Remove role" testId={`remove-role-${role.id}`}>
-                        <input type="hidden" name="campaignId" value={campaignId} />
-                        <input type="hidden" name="personaId" value={role.id} />
-                      </ApplicationActionForm>
-                      <ApplicationActionForm action={saveRoleAsTemplateAction} submitLabel="Save as template" testId={`save-role-template-${role.id}`}>
-                        <input type="hidden" name="campaignId" value={campaignId} />
-                        <input type="hidden" name="personaId" value={role.id} />
-                      </ApplicationActionForm>
-                    </div>
-                  </div>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+        <div className="space-y-5">
+          <HiringTeamDisclosureGroup
+            groupKey="direct"
+            title={hiringTeamConfig.sections.direct}
+          >
+            {directRoles.map(roleCard)}
+          </HiringTeamDisclosureGroup>
+          <HiringTeamDisclosureGroup
+            groupKey="indirect"
+            title={hiringTeamConfig.sections.indirect}
+          >
+            {indirectRoles.length > 0 ? (
+              indirectRoles.map(roleCard)
+            ) : (
+              <p className="text-sm text-slate-500">
+                No indirect {vocab.persona.plural.toLowerCase()}.
+              </p>
+            )}
+          </HiringTeamDisclosureGroup>
+        </div>
       )}
       {canEdit ? (
         <ApplicationActionForm action={addApplicationRoleAction} submitLabel={`Add ${vocab.persona.singular}`} testId="add-hiring-team-role">

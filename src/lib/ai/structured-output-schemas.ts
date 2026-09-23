@@ -19,8 +19,11 @@ import { titleSuggestionAiResultSchema } from "@/lib/scoring/title-suggestion-co
 import {
   consultationPlanSchema,
   consultationExtractSchema,
+  consultationPolishSchema,
+  consultationStatementGroundingSchema,
 } from "@/lib/consultation/contract";
 import { hiringTeamIdentificationSchema } from "@/lib/hiring-team/contract";
+import { applicationSummaryGuidanceSchema } from "@/lib/application-summary/contract";
 
 export type StructuredOutputSchemaEntry = {
   schemaName: string;
@@ -133,6 +136,21 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   consultationExtract: {
     schemaName: "consultation_extract",
     schema: consultationExtractSchema,
+    usageOperations: ["CONSULTATION"],
+  },
+  consultationPolish: {
+    schemaName: "consultation_polish",
+    schema: consultationPolishSchema,
+    usageOperations: ["CONSULTATION"],
+  },
+  consultationStatementGrounding: {
+    schemaName: "consultation_statement_grounding",
+    schema: consultationStatementGroundingSchema,
+    usageOperations: ["CONSULTATION"],
+  },
+  applicationSummaryGuidance: {
+    schemaName: "application_summary_guidance",
+    schema: applicationSummaryGuidanceSchema,
     usageOperations: ["CONSULTATION"],
   },
   prospectReplyClassification: {

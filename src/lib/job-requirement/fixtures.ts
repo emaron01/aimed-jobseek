@@ -85,6 +85,30 @@ Requirements:
 
 The mission of this role is to keep the monthly close accurate and on time.`;
 
+export const ENTERPRISE_SALES_DIRECTOR_POSTING = `Director of Enterprise Sales
+Acme Data Systems
+Location: New York, NY
+Work arrangement: Hybrid
+Employment type: Full-time
+Seniority: Director
+Compensation: $180,000-$220,000 OTE
+Reports to: Chief Revenue Officer
+
+Responsibilities:
+- Build a repeatable enterprise sales motion
+- Lead complex deals with security, finance, and executive buyers
+- Improve forecast accuracy and coach account executives
+
+Requirements:
+- 8 years of enterprise B2B sales experience
+- Strong strategic thinking and problem-solving skills with the ability to drive results in a fast-paced, dynamic environment
+- Experience building executive relationships
+
+Preferred:
+- Experience selling data infrastructure
+
+The mission of this role is to grow enterprise revenue without sacrificing forecast discipline.`;
+
 export const NORMAL_JOB_MODEL = {
   title: "Senior Product Engineer",
   companyName: "Acme Robotics",
@@ -168,6 +192,54 @@ export const FINANCIAL_CONTROLLER_MODEL = {
     competencies: [
       { text: "CPA", inferred: false },
       { text: "Reviews audit workpapers", inferred: false },
+    ],
+  },
+};
+
+export const ENTERPRISE_SALES_DIRECTOR_MODEL = {
+  title: "Director of Enterprise Sales",
+  companyName: "Acme Data Systems",
+  location: "New York, NY",
+  workArrangement: "Hybrid",
+  employmentType: "Full-time",
+  seniority: "Director",
+  compensationRange: "$180,000-$220,000 OTE",
+  reportingLine: "Chief Revenue Officer",
+  responsibilities: [
+    "Build a repeatable enterprise sales motion",
+    "Lead complex deals with security, finance, and executive buyers",
+    "Improve forecast accuracy and coach account executives",
+  ],
+  requiredItems: [
+    "8 years of enterprise B2B sales experience",
+    "Strong strategic thinking and problem-solving skills with the ability to drive results in a fast-paced, dynamic environment",
+    "Experience building executive relationships",
+  ],
+  preferredItems: ["Experience selling data infrastructure"],
+  scorecard: {
+    mission: {
+      text: "grow enterprise revenue without sacrificing forecast discipline",
+      inferred: false,
+    },
+    outcomes: [
+      {
+        text: "Build a repeatable enterprise sales motion",
+        inferred: false,
+      },
+      {
+        text: "Improve forecast accuracy",
+        inferred: false,
+      },
+    ],
+    competencies: [
+      {
+        text: "Lead complex deals with security, finance, and executive buyers",
+        inferred: false,
+      },
+      {
+        text: "Coach account executives",
+        inferred: false,
+      },
     ],
   },
 };

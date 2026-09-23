@@ -522,6 +522,8 @@ model Organization {
   consultationTurns        ConsultationTurn[]
   consultationAssessments  ConsultationAssessment[]
   consultationProposals    ConsultationProposal[]
+  consultationStatements   ConsultationStatement[]
+  applicationSummaries     ApplicationSummary[]
   profileStories           ProfileStory[]
   contactLists             ContactList[]
   contacts                 Contact[]
@@ -2223,6 +2225,7 @@ model Campaign {
   applicationFit ApplicationFit?
   hiringTeamRoles Persona[] @relation("ApplicationHiringTeam")
   consultationSession ConsultationSession?
+  applicationSummary ApplicationSummary?
 
   @@index([organizationId])
   @@index([organizationId, createdAt])
@@ -2344,6 +2347,16 @@ enum ConsultationProposalKind {
   STORY
 }
 
+enum ConsultationStatementKind {
+  INTERVIEW_ANSWER
+  RESUME_BULLET
+}
+
+enum ConsultationStatementStatus {
+  DRAFT
+  APPROVED
+}
+
 /// One consultation per application. Answers stay verbatim. Nothing is written to the Personal Profile until confirmed.
 model ConsultationSession {
   id               String              @id @default(cuid())
@@ -2364,6 +2377,7 @@ model ConsultationSession {
   turns        ConsultationTurn[]
   assessments  ConsultationAssessment[]
   proposals    ConsultationProposal[]
+  statements   ConsultationStatement[]
 
   @@index([organizationId])
   @@index([productId])
@@ -2385,11 +2399,14 @@ model ConsultationTurn {
   seekerAuthored Boolean              @default(false)
   /// Model extraction plus guardrail drops. Never used as seeker-authored evidence.
   analysisJson   Json?
+  /// Model-written requirement interpretation and persona-grounded who-cares note.
+  questionContextJson Json?
   createdAt      DateTime             @default(now())
 
   organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   session      ConsultationSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   proposals    ConsultationProposal[]
+  statements   ConsultationStatement[]
 
   @@unique([sessionId, sequence])
   @@index([organizationId])
@@ -2444,6 +2461,31 @@ model ConsultationProposal {
   @@index([turnId])
 }
 
+model ConsultationStatement {
+  id               String                      @id @default(cuid())
+  organizationId   String
+  sessionId        String
+  turnId           String
+  kind             ConsultationStatementKind
+  status           ConsultationStatementStatus @default(DRAFT)
+  content          String
+  groundingJson    Json
+  promptVersion    String
+  generation       Int                         @default(1)
+  approvedAt       DateTime?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  session      ConsultationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  turn         ConsultationTurn    @relation(fields: [turnId], references: [id], onDelete: Cascade)
+
+  @@unique([turnId, kind])
+  @@index([organizationId])
+  @@index([sessionId])
+  @@index([status])
+}
+
 /// STAR story bank on the Personal Profile. Reused by later applications.
 model ProfileStory {
   id               String   @id @default(cuid())
@@ -2456,7 +2498,14 @@ model ProfileStory {
   competencyLinks  Json
   consultationTurnId String
   seekerAuthored   Boolean  @default(true)
+  /// Verbatim seeker answer plus separately approved reusable statements.
+  verbatimAnswer   String?
+  interviewAnswer String?
+  resumeBullet    String?
+  interviewAnswerApprovedAt DateTime?
+  resumeBulletApprovedAt DateTime?
   createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -2464,6 +2513,28 @@ model ProfileStory {
   @@index([organizationId])
   @@index([productId])
   @@index([consultationTurnId])
+}
+
+/// Generated interview cheat-sheet guidance for one application.
+/// Stored-data sections are assembled live; only model-written guidance is persisted.
+model ApplicationSummary {
+  id             String                       @id @default(cuid())
+  organizationId String
+  campaignId     String                       @unique
+  status         ConsultationGenerationStatus @default(GENERATING)
+  guidanceJson   Json?
+  sourceHash     String?
+  promptVersion  String
+  generationError String?
+  generatedAt    DateTime?
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([status])
 }
 
 /// Personas a campaign will email. Empty means all personas for the product.

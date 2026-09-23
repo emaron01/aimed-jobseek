@@ -6,12 +6,18 @@ import {
 import {
   consultationPlanSchema,
   consultationExtractSchema,
+  consultationPolishSchema,
+  consultationStatementGroundingSchema,
   type ConsultationPlanResult,
   type ConsultationExtractResult,
+  type ConsultationPolishResult,
+  type ConsultationStatementGroundingResult,
 } from "@/lib/consultation/contract";
 import {
   buildConsultationCoachMessages,
   buildConsultationExtractMessages,
+  buildConsultationPolishMessages,
+  buildConsultationStatementGroundingMessages,
 } from "@/lib/consultation/prompt";
 
 export type ConsultationPlanAiResult =
@@ -34,9 +40,16 @@ export async function planConsultationWithModel(input: {
     endDate?: string | null;
     roleId?: string | null;
   }>;
-  hiringTeam: Array<{ name: string; whyThisRoleMatters: string | null }>;
+  hiringTeam: Array<{
+    id: string;
+    name: string;
+    likelyTitles: string[];
+    whyThisRoleMatters: string | null;
+    personaContext: unknown;
+  }>;
   chronologyRequested: boolean;
   coveredTargetKeys: string[];
+  qualityFeedback?: string[];
 }): Promise<ConsultationPlanAiResult> {
   if (!isConsultationAiConfigured()) {
     return { ok: false, message: UNCONFIGURED };
@@ -68,6 +81,7 @@ export async function extractWithModel(input: {
   question: string;
   target: { key: string; kind: string; text: string } | null;
   targets: Array<{ key: string; kind: string; text: string }>;
+  qualityFeedback?: string[];
 }): Promise<
   | { ok: true; data: ConsultationExtractResult }
   | { ok: false; message: string }
@@ -93,6 +107,78 @@ export async function extractWithModel(input: {
     return {
       ok: false,
       message: "Consultation answer analysis failed. Retry consultation.",
+    };
+  }
+}
+
+export async function polishAnswerWithModel(input: {
+  answer: string;
+  story: {
+    situation: string;
+    task: string;
+    action: string;
+    result: string;
+  };
+  sources: Array<{ id: string; text: string }>;
+  qualityFeedback?: string[];
+}): Promise<
+  | { ok: true; data: ConsultationPolishResult }
+  | { ok: false; message: string }
+> {
+  if (!isConsultationAiConfigured()) {
+    return { ok: false, message: UNCONFIGURED };
+  }
+  try {
+    const response = await getConsultationAiProvider().generateStructured({
+      ...structuredOutputRequest("consultationPolish"),
+      messages: buildConsultationPolishMessages(input),
+      parseOutput: (raw) => ({
+        data: consultationPolishSchema.parse(raw),
+        coercedFields: [],
+      }),
+    });
+    return { ok: true, data: response.data };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown";
+    console.error(
+      JSON.stringify({ event: "consultation_polish_failed", message }),
+    );
+    return {
+      ok: false,
+      message: "Consultation statements could not be generated. Retry consultation.",
+    };
+  }
+}
+
+export async function groundStatementWithModel(input: {
+  statement: string;
+  kind: "INTERVIEW_ANSWER" | "RESUME_BULLET";
+  sources: Array<{ id: string; text: string }>;
+}): Promise<
+  | { ok: true; data: ConsultationStatementGroundingResult }
+  | { ok: false; message: string }
+> {
+  if (!isConsultationAiConfigured()) {
+    return { ok: false, message: UNCONFIGURED };
+  }
+  try {
+    const response = await getConsultationAiProvider().generateStructured({
+      ...structuredOutputRequest("consultationStatementGrounding"),
+      messages: buildConsultationStatementGroundingMessages(input),
+      parseOutput: (raw) => ({
+        data: consultationStatementGroundingSchema.parse(raw),
+        coercedFields: [],
+      }),
+    });
+    return { ok: true, data: response.data };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown";
+    console.error(
+      JSON.stringify({ event: "consultation_statement_grounding_failed", message }),
+    );
+    return {
+      ok: false,
+      message: "The edited statement could not be verified. Retry approval.",
     };
   }
 }

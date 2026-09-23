@@ -1,9 +1,11 @@
 import {
+  approveConsultationStatementAction,
   answerConsultationAction,
   completeConsultationAction,
   confirmConsultationProposalAction,
   dismissConsultationProposalAction,
   pauseConsultationAction,
+  regenerateConsultationStatementAction,
   retryConsultationAction,
   resumeConsultationAction,
   skipConsultationAction,
@@ -14,6 +16,7 @@ import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { prisma } from "@/lib/prisma";
 import {
   consultationConfig,
+  consultationStatementLabels,
   evidenceStrengthLabels,
   vocab,
 } from "@/lib/product-config";
@@ -60,6 +63,25 @@ function storyLinks(value: unknown): Array<{
       explanation: link.explanation,
     }];
   });
+}
+
+function questionContext(value: unknown): {
+  requirementInterpretation: string | null;
+  whoCaresNote: string;
+} | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  if (typeof row.whoCaresNote !== "string" || !row.whoCaresNote.trim()) {
+    return null;
+  }
+  return {
+    requirementInterpretation:
+      typeof row.requirementInterpretation === "string" &&
+      row.requirementInterpretation.trim()
+        ? row.requirementInterpretation.trim()
+        : null,
+    whoCaresNote: row.whoCaresNote.trim(),
+  };
 }
 
 function experienceCalculation(value: unknown): {
@@ -120,6 +142,7 @@ export async function ConsultationSection({
       assessments: { orderBy: { targetKey: "asc" } },
       turns: { orderBy: { sequence: "asc" } },
       proposals: { where: { status: "PENDING" }, orderBy: { createdAt: "asc" } },
+      statements: { orderBy: [{ turnId: "asc" }, { kind: "asc" }] },
     },
   });
   const openQuestions = (session?.turns ?? []).filter((turn) => {
@@ -253,6 +276,16 @@ export async function ConsultationSection({
           {openQuestions.map((question) => (
             <div key={question.id} className="space-y-2 rounded-md border border-slate-200 p-3" data-testid="consultation-question">
               <p className="text-sm text-slate-900">{question.body}</p>
+              {questionContext(question.questionContextJson)?.requirementInterpretation ? (
+                <p className="text-sm text-slate-600">
+                  {questionContext(question.questionContextJson)?.requirementInterpretation}
+                </p>
+              ) : null}
+              {questionContext(question.questionContextJson)?.whoCaresNote ? (
+                <p className="text-sm text-slate-700" data-testid="who-cares-note">
+                  {questionContext(question.questionContextJson)?.whoCaresNote}
+                </p>
+              ) : null}
               <ApplicationActionForm action={answerConsultationAction} submitLabel="Save answer" testId={`answer-${question.targetKey}`}>
                 <input type="hidden" name="campaignId" value={campaignId} />
                 <input type="hidden" name="targetKey" value={question.targetKey ?? ""} />
@@ -285,6 +318,65 @@ export async function ConsultationSection({
         <ApplicationActionForm action={resumeConsultationAction} submitLabel="Resume" testId="resume-consultation">
           <input type="hidden" name="campaignId" value={campaignId} />
         </ApplicationActionForm>
+      ) : null}
+
+      {session && session.statements.length > 0 ? (
+        <div className="space-y-3" data-testid="consultation-statements">
+          <h3 className="text-sm font-semibold text-slate-900">
+            {consultationStatementLabels.section}
+          </h3>
+          {session.statements.map((statement) => (
+            <div
+              key={statement.id}
+              className="space-y-2 rounded-md border border-slate-200 p-3"
+              data-testid={`consultation-statement-${statement.kind}`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <h4 className="text-sm font-medium text-slate-900">
+                  {consultationStatementLabels[statement.kind]}
+                </h4>
+                <span className="text-xs text-slate-500">
+                  {consultationStatementLabels[statement.status]}
+                </span>
+              </div>
+              {canEdit ? (
+                <>
+                  <ApplicationActionForm
+                    action={approveConsultationStatementAction}
+                    submitLabel={
+                      statement.status === "APPROVED"
+                        ? "Save approved edit"
+                        : "Approve statement"
+                    }
+                    testId={`approve-statement-${statement.id}`}
+                  >
+                    <input type="hidden" name="campaignId" value={campaignId} />
+                    <input type="hidden" name="statementId" value={statement.id} />
+                    <textarea
+                      name="content"
+                      required
+                      rows={statement.kind === "INTERVIEW_ANSWER" ? 6 : 3}
+                      defaultValue={statement.content}
+                      className={fieldClass}
+                    />
+                  </ApplicationActionForm>
+                  <ApplicationActionForm
+                    action={regenerateConsultationStatementAction}
+                    submitLabel="Regenerate statement"
+                    testId={`regenerate-statement-${statement.id}`}
+                  >
+                    <input type="hidden" name="campaignId" value={campaignId} />
+                    <input type="hidden" name="statementId" value={statement.id} />
+                  </ApplicationActionForm>
+                </>
+              ) : (
+                <p className="whitespace-pre-wrap text-sm text-slate-800">
+                  {statement.content}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
       ) : null}
 
       {session && session.proposals.length > 0 ? (

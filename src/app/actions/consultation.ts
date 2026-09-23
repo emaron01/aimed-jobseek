@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import {
   answerConsultationQuestion,
+  approveConsultationStatement,
   completeConsultation,
   confirmConsultationProposal,
   dismissConsultationProposal,
   pauseConsultation,
+  regenerateConsultationStatement,
   retryConsultationGeneration,
   resumeConsultation,
   skipConsultation,
@@ -239,5 +241,49 @@ export async function dismissConsultationProposalAction(
     return { ok: true, message: "Dismissed. Nothing was written to the profile." };
   } catch (error) {
     return fail(error, "The item could not be dismissed.");
+  }
+}
+
+export async function approveConsultationStatementAction(
+  _prev: ConsultationActionResult | null,
+  formData: FormData,
+): Promise<ConsultationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = campaignIdFrom(formData);
+    const statementId = String(formData.get("statementId") ?? "").trim();
+    if (!statementId) {
+      return { ok: false, message: "That polished statement was not found." };
+    }
+    await approveConsultationStatement({
+      organizationId,
+      statementId,
+      content: String(formData.get("content") ?? ""),
+    });
+    if (campaignId) revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: "Polished statement approved." };
+  } catch (error) {
+    return fail(error, "The polished statement could not be approved.");
+  }
+}
+
+export async function regenerateConsultationStatementAction(
+  _prev: ConsultationActionResult | null,
+  formData: FormData,
+): Promise<ConsultationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = campaignIdFrom(formData);
+    const statementId = String(formData.get("statementId") ?? "").trim();
+    if (!statementId) {
+      return { ok: false, message: "That polished statement was not found." };
+    }
+    await regenerateConsultationStatement({ organizationId, statementId });
+    if (campaignId) revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: "Polished statement regenerated." };
+  } catch (error) {
+    return fail(error, "The polished statement could not be regenerated.");
   }
 }

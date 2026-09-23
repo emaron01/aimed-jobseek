@@ -28,6 +28,7 @@ import {
 import { nextConsultationStatus } from "@/lib/consultation/state";
 import {
   answerConsultationQuestion,
+  approveConsultationStatement,
   completeConsultation,
   confirmConsultationProposal,
   dismissConsultationProposal,
@@ -49,6 +50,10 @@ import {
   NORMAL_JOB_POSTING,
 } from "@/lib/job-requirement/fixtures";
 import { consultationConfig } from "@/lib/product-config/consultation";
+import {
+  bannedPhraseHits,
+  validateGroundedStatement,
+} from "@/lib/consultation/output-quality";
 import { CONSULTATION_COACH_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content/consultation";
 import {
   parseCandidateProfile,
@@ -77,9 +82,17 @@ function installConsultationModelFixture() {
       answer?: string;
       target?: { key: string } | null;
       availableTargets?: Array<{ key: string; text: string }>;
+      hiringTeam?: Array<{ id: string; name: string }>;
+      allowedSources?: Array<{ id: string; text: string }>;
+      statement?: string;
+      kind?: "INTERVIEW_ANSWER" | "RESUME_BULLET";
     };
     if (request.schemaName === "consultation_plan") {
       const targets = payload.targets ?? [];
+      const hiringRole = payload.hiringTeam?.[0] ?? {
+        id: "hiring-manager",
+        name: "Hiring Manager",
+      };
       return {
         data: {
           commentary:
@@ -119,12 +132,69 @@ function installConsultationModelFixture() {
               text: /5 years of Python/i.test(target.text)
                 ? "Your Northwind and Contoso roles cover more than seven years, but the profile does not say where you used Python. In which roles did you use it, and what were the exact dates?"
                 : `Your Northwind payments work is relevant to ${target.text}. Walk me through one example: what was at stake, what did you do, and what changed?`,
+              requirementInterpretation: null,
+              hiringTeamRoleId: hiringRole.id,
+              whoCaresNote: `${hiringRole.name} needs to hear concrete evidence tied to this requirement.`,
             })),
             {
               targetKey: "chronology",
               text: "Starting with Northwind Analytics, walk me through your key accomplishments there and why you moved on from each role.",
+              requirementInterpretation: null,
+              hiringTeamRoleId: hiringRole.id,
+              whoCaresNote: `${hiringRole.name} needs to understand the progression of your work.`,
             },
           ],
+        },
+      };
+    }
+    if (request.schemaName === "consultation_polish") {
+      const source = payload.allowedSources?.[0] ?? {
+        id: "answer",
+        text: payload.answer ?? "",
+      };
+      const text =
+        source.text
+          .split(/\r?\n/)
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .at(-1) ?? source.text;
+      const support = [{ sourceId: source.id, quote: text }];
+      const interviewText = Array.from({ length: 8 }, () => text).join(" ");
+      const interview = {
+        text: interviewText,
+        claims: Array.from({ length: 8 }, () => ({ text, supports: support })),
+      };
+      const bullet = {
+        text,
+        claims: [{ text, supports: support }],
+      };
+      return {
+        data: {
+          interviewAnswer: interview,
+          resumeBullet: bullet,
+        },
+      };
+    }
+    if (request.schemaName === "consultation_statement_grounding") {
+      const text = payload.statement ?? "";
+      const claimTexts =
+        payload.kind === "INTERVIEW_ANSWER"
+          ? text.split(/(?<=[.!?])\s+/).filter(Boolean)
+          : [text];
+      const claims = claimTexts.map((claimText) => {
+        const source =
+          payload.allowedSources?.find((item) =>
+            item.text.includes(claimText),
+          ) ?? payload.allowedSources?.[0] ?? { id: "answer", text: claimText };
+        return {
+          text: claimText,
+          supports: [{ sourceId: source.id, quote: claimText }],
+        };
+      });
+      return {
+        data: {
+          text,
+          claims,
         },
       };
     }
@@ -165,7 +235,7 @@ function installConsultationModelFixture() {
         missingStarElements: complete ? [] : ["TASK", "ACTION", "RESULT", "METRIC"],
         followUpQuestion: complete
           ? null
-          : "On that Python backend work, what changed because of your contribution—ideally a concrete result or metric?",
+          : "On that Python backend work, what changed because of your contribution, ideally a concrete result or metric?",
       },
     };
   });
@@ -273,17 +343,25 @@ describe("consultation evidence and questions", () => {
       })),
       asOf: new Date("2026-09-23T00:00:00.000Z"),
     });
+    const hiringTeam = [{ id: "hm", name: "Hiring Manager" }];
     const modelQuestions = assessments.map((assessment) => ({
       targetKey: assessment.key,
       text: `In your Northwind work, what specific experience connects to ${assessment.text}, and what changed?`,
+      requirementInterpretation: null,
+      hiringTeamRoleId: "hm",
+      whoCaresNote: "The Hiring Manager needs concrete evidence of the outcome.",
     }));
     modelQuestions.push({
       targetKey: "chronology",
       text: "Starting with Northwind, walk me through your accomplishments and reasons for each move.",
+      requirementInterpretation: null,
+      hiringTeamRoleId: "hm",
+      whoCaresNote: "The Hiring Manager needs to understand the progression of your work.",
     });
     const round = planQuestionRound({
       assessments,
       modelQuestions,
+      hiringTeam,
       askedKeys: new Set(),
       skippedKeys: new Set(),
       includeChronology: seniorityWarrantsChronology({
@@ -299,6 +377,7 @@ describe("consultation evidence and questions", () => {
     const next = planQuestionRound({
       assessments,
       modelQuestions,
+      hiringTeam,
       askedKeys: new Set(),
       skippedKeys: new Set([covered]),
       includeChronology: false,
@@ -420,7 +499,11 @@ describe("consultation evidence and questions", () => {
         modelQuestions: [{
           targetKey: target.key,
           text: "Tell me more about how you used Python in that backend engineering role.",
+          requirementInterpretation: null,
+          hiringTeamRoleId: "hm",
+          whoCaresNote: "The Hiring Manager needs to understand your Python experience.",
         }],
+        hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
         askedKeys: new Set(),
         skippedKeys: new Set(),
         includeChronology: false,
@@ -433,7 +516,11 @@ describe("consultation evidence and questions", () => {
         modelQuestions: [{
           targetKey: target.key,
           text: "What month and year did you start and stop using Python in that role?",
+          requirementInterpretation: null,
+          hiringTeamRoleId: "hm",
+          whoCaresNote: "The Hiring Manager needs to verify the duration of your Python experience.",
         }],
+        hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
         askedKeys: new Set(),
         skippedKeys: new Set(),
         includeChronology: false,
@@ -487,7 +574,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("2");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("3");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("coach, not an interrogator");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("Never inflate fit");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -506,6 +593,74 @@ describe("consultation evidence and questions", () => {
     expect(assessment).not.toMatch(/Relevant evidence|No direct evidence|Strong match/i);
     expect(writeBack).not.toMatch(/split\([^)]*sentence|keyword/i);
   });
+
+  it("rejects unsupported facts and numbers in polished statements", () => {
+    const errors = validateGroundedStatement({
+      statement: {
+        text: "I increased revenue by $9M.",
+        claims: [
+          {
+            text: "I increased revenue by $9M.",
+            supports: [{ sourceId: "answer", quote: "I improved the service." }],
+          },
+        ],
+      },
+      sources: [{ id: "answer", text: "I improved the service." }],
+      bannedPhrases: consultationConfig.bannedPhrases,
+      requireSentenceClaims: true,
+    });
+    expect(errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("not connected"),
+        expect.stringContaining('$9M'),
+      ]),
+    );
+  });
+
+  it("translates a vague requirement into a concrete, role-grounded question", () => {
+    const assessment = {
+      key: "required:strategy",
+      kind: "REQUIRED" as const,
+      text: "Strong strategic thinking and problem-solving skills with the ability to drive results in a fast-paced, dynamic environment",
+      strength: "NONE" as const,
+      supportingFactIds: [],
+      strategy: "ACKNOWLEDGE" as const,
+      explanation: "No evidence yet.",
+      strategyText: "Ask for a concrete prioritization decision.",
+      verification: {
+        originalStrength: "NONE" as const,
+        invalidSupportingFactIds: [],
+        invalidRoleIds: [],
+        downgradeReasons: [],
+      },
+      experienceCalculation: null,
+    };
+    const [question] = planQuestionRound({
+      assessments: [assessment],
+      modelQuestions: [
+        {
+          targetKey: assessment.key,
+          text: "At Northwind, how did you decide which enterprise account to pursue when several deals competed for your team's time?",
+          requirementInterpretation:
+            "Prioritize scarce sales capacity and explain the commercial tradeoff.",
+          hiringTeamRoleId: "sales-vp",
+          whoCaresNote:
+            "The VP of Sales needs to hear how you make defensible account-priority decisions.",
+        },
+      ],
+      hiringTeam: [{ id: "sales-vp", name: "VP of Sales" }],
+      askedKeys: new Set(),
+      skippedKeys: new Set(),
+      includeChronology: false,
+      chronologyAsked: false,
+    });
+    expect(question?.text).not.toContain(assessment.text);
+    expect(question?.requirementInterpretation).toContain("Prioritize");
+    expect(question?.whoCaresNote).toContain("VP of Sales");
+    expect(
+      bannedPhraseHits([question!.text], consultationConfig.bannedPhrases),
+    ).toEqual([]);
+  });
 });
 
 describe.skipIf(!hasTestDatabase())("consultation session", () => {
@@ -517,6 +672,18 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
   let icpId = "";
   let campaignId = "";
   const profile = fixtureAlexChenProfile();
+  async function addHiringManager(campaignIdForRole: string) {
+    await prisma.persona.create({
+      data: {
+        organizationId,
+        productId,
+        campaignId: campaignIdForRole,
+        name: "Hiring Manager",
+        targetTitles: ["Director of Engineering"],
+        whyThisPersonaMatters: "Owns the role and its hiring decision.",
+      },
+    });
+  }
 
   beforeAll(async () => {
     const { PrismaClient } = await import("@prisma/client");
@@ -571,6 +738,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
         employerDisposition: "IDENTIFIED",
       },
     });
+    await addHiringManager(campaignId);
   });
 
   afterAll(async () => {
@@ -589,7 +757,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("2");
+    expect(session?.promptVersion).toBe("3");
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
     const incident = session?.assessments.find((item) => item.text === "Leads incident response");
@@ -616,6 +784,11 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     });
     expect(followUps[0]?.body).toContain("concrete result");
     expect(await prisma.consultationProposal.count({ where: { sessionId: session!.id } })).toBe(0);
+    expect(
+      await prisma.consultationStatement.count({
+        where: { sessionId: session!.id },
+      }),
+    ).toBe(0);
 
     await answerConsultationQuestion({
       organizationId,
@@ -637,6 +810,40 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     });
     expect(seeker?.body).toBe("I used Python for 5 years and cut failed jobs by 40%.");
     expect(seeker?.seekerAuthored).toBe(true);
+    const statements = await prisma.consultationStatement.findMany({
+      where: { turnId: seeker!.id },
+      orderBy: { kind: "asc" },
+    });
+    expect(statements).toHaveLength(2);
+    const interviewStatement = statements.find(
+      (statement) => statement.kind === "INTERVIEW_ANSWER",
+    );
+    const interviewWordCount =
+      interviewStatement?.content.trim().split(/\s+/).filter(Boolean).length ??
+      0;
+    expect(interviewWordCount).toBeGreaterThanOrEqual(
+      consultationConfig.interviewAnswerWordRange.min,
+    );
+    expect(interviewWordCount).toBeLessThanOrEqual(
+      consultationConfig.interviewAnswerWordRange.max,
+    );
+    expect(
+      statements.flatMap((statement) =>
+        bannedPhraseHits([statement.content], consultationConfig.bannedPhrases),
+      ),
+    ).toEqual([]);
+    await approveConsultationStatement({
+      organizationId,
+      statementId: statements[0]!.id,
+      content: statements[0]!.content,
+    });
+    const polishedStory = await prisma.profileStory.findFirst({
+      where: { consultationTurnId: seeker!.id },
+    });
+    expect(polishedStory?.verbatimAnswer).toContain("cut failed jobs by 40%");
+    expect(
+      polishedStory?.interviewAnswer ?? polishedStory?.resumeBullet,
+    ).toBe(statements[0]!.content);
 
     await confirmConsultationProposal({
       organizationId,
@@ -698,6 +905,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
         employerDisposition: "IDENTIFIED",
       },
     });
+    await addHiringManager(campaign.id);
     generateStructured.mockRejectedValueOnce(new Error("provider timeout"));
     await startConsultation({ organizationId, campaignId: campaign.id });
     const failed = await prisma.consultationSession.findUnique({
@@ -744,6 +952,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
         employerDisposition: "IDENTIFIED",
       },
     });
+    await addHiringManager(campaign.id);
     const before = await prisma.product.findUnique({ where: { id: productId } });
     const storiesBefore = await prisma.profileStory.count({ where: { productId } });
     await startConsultation({ organizationId, campaignId: campaign.id });
