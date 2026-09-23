@@ -11,25 +11,25 @@
     "db:migrate": "dotenv -e .env.local -e .env -- prisma migrate dev",
     "db:deploy": "dotenv -e .env.local -e .env -- prisma migrate deploy",
     "render:pre-deploy": "node scripts/render-pre-deploy.mjs",
-    "research:worker": "dotenv -e .env.local -e .env -- tsx scripts/research-worker.ts",
-    "research:worker:render": "tsx scripts/research-worker.ts",
+    "research:worker": "dotenv -e .env.local -e .env -- tsx --conditions=react-server scripts/research-worker.ts",
+    "research:worker:render": "tsx --conditions=react-server scripts/research-worker.ts",
     "db:studio": "dotenv -e .env.local -e .env -- prisma studio",
     "db:safety": "node scripts/db-safety-check.mjs",
     "db:up": "node scripts/start-local-postgres.mjs",
     "db:test:up": "docker compose up -d --wait postgres-test",
     "db:test:down": "docker compose down",
-    "db:test:migrate": "tsx scripts/migrate-test-db.ts",
-    "db:contact-collapse-preview": "dotenv -e .env.local -e .env -- tsx scripts/collapse-contacts.ts --preview",
-    "db:contact-collapse-apply": "dotenv -e .env.local -e .env -- tsx scripts/collapse-contacts.ts --apply",
+    "db:test:migrate": "tsx --conditions=react-server scripts/migrate-test-db.ts",
+    "db:contact-collapse-preview": "dotenv -e .env.local -e .env -- tsx --conditions=react-server scripts/collapse-contacts.ts --preview",
+    "db:contact-collapse-apply": "dotenv -e .env.local -e .env -- tsx --conditions=react-server scripts/collapse-contacts.ts --apply",
     "db:personal-ownership-report": "dotenv -e .env.local -e .env -- node scripts/report-personal-work-ownership.mjs",
-    "db:test:pollution-report": "tsx scripts/report-test-pollution.mjs",
+    "db:test:pollution-report": "tsx --conditions=react-server scripts/report-test-pollution.mjs",
     "db:seed": "dotenv -e .env.local -e .env -- tsx --conditions=react-server prisma/seed.ts",
-    "auth:bootstrap": "dotenv -e .env.local -e .env -- tsx scripts/auth-bootstrap.ts",
-    "platform:bootstrap-admin": "dotenv -e .env.local -e .env -- tsx scripts/platform-bootstrap-admin.ts",
-    "platform:provision-super-admin": "dotenv -e .env.local -e .env -- tsx scripts/platform-provision-super-admin.ts",
-    "billing:create-referral-coupons": "dotenv -e .env.local -e .env -- tsx scripts/create-referral-coupons.ts",
+    "auth:bootstrap": "dotenv -e .env.local -e .env -- tsx --conditions=react-server scripts/auth-bootstrap.ts",
+    "platform:bootstrap-admin": "dotenv -e .env.local -e .env -- tsx --conditions=react-server scripts/platform-bootstrap-admin.ts",
+    "platform:provision-super-admin": "tsx --conditions=react-server scripts/platform-provision-super-admin.ts",
+    "billing:create-referral-coupons": "dotenv -e .env.local -e .env -- tsx --conditions=react-server scripts/create-referral-coupons.ts",
     "test": "vitest run",
-    "test:smoke": "tsx scripts/smoke-routes.ts",
+    "test:smoke": "tsx --conditions=react-server scripts/smoke-routes.ts",
     "typecheck:scripts": "tsc -p scripts/ad-hoc/tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -67,8 +67,5 @@
     "tsx": "^4.23.12",
     "typescript": "^5",
     "vitest": "^4.1.11"
-  },
-  "prisma": {
-    "seed": "dotenv -e .env.local -e .env -- tsx --conditions=react-server prisma/seed.ts"
   }
 }

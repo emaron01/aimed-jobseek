@@ -12,6 +12,7 @@ import { provisionIndividualWorkspace } from "@/lib/auth/provision-service";
 import { recordAdminAuditEvent } from "@/lib/auth/audit-service";
 import { sendTransactionalEmail } from "@/lib/transactional-email/send-service";
 import { getTransactionalEmailConfig } from "@/lib/transactional-email/config-core";
+import { isPlatformSuperAdminProvisioningActive } from "@/lib/auth/platform-provision-flag";
 
 const authEnv = getAuthEnv();
 const ipAddress = getBetterAuthIpAddressOptions();
@@ -149,6 +150,10 @@ export const auth = betterAuth({
     // BETTER_AUTH_SECRET — rotating the secret invalidates outstanding links.
     expiresIn: 60 * 60 * 24,
     sendVerificationEmail: async ({ user, url }) => {
+      // CLI provisioner marks the account verified itself — do not email.
+      if (isPlatformSuperAdminProvisioningActive()) {
+        return;
+      }
       // Pass Better Auth's `url` through unchanged — never reconstruct it.
       try {
         const appUser = await prisma.user.findUnique({
@@ -189,20 +194,23 @@ export const auth = betterAuth({
           let seatQuantity: number | undefined;
           let maxSeats: number | undefined;
           // Loud on cookie failure — do not provision Team/Standard with silent defaults.
-          const { readPendingSignupIntent } = await import(
-            "@/lib/billing/pending-signup-intent-cookie"
-          );
-          const { defaultMaxSeatsForPlan } = await import(
-            "@/lib/org/seat-limits"
-          );
-          const intent = await readPendingSignupIntent();
-          if (intent?.companyName) {
-            companyName = intent.companyName;
-          }
-          if (intent?.planCode) {
-            planCode = intent.planCode;
-            seatQuantity = intent.seatQuantity;
-            maxSeats = defaultMaxSeatsForPlan(intent.planCode);
+          // Platform CLI provisioning has no request cookie jar; skip it entirely.
+          if (!isPlatformSuperAdminProvisioningActive()) {
+            const { readPendingSignupIntent } = await import(
+              "@/lib/billing/pending-signup-intent-cookie"
+            );
+            const { defaultMaxSeatsForPlan } = await import(
+              "@/lib/org/seat-limits"
+            );
+            const intent = await readPendingSignupIntent();
+            if (intent?.companyName) {
+              companyName = intent.companyName;
+            }
+            if (intent?.planCode) {
+              planCode = intent.planCode;
+              seatQuantity = intent.seatQuantity;
+              maxSeats = defaultMaxSeatsForPlan(intent.planCode);
+            }
           }
 
           const provisioned = await provisionIndividualWorkspace({

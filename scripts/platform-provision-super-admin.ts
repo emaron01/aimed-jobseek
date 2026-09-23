@@ -3,6 +3,9 @@
  *
  *   npm run platform:provision-super-admin
  *
+ * Render injects environment variables — `.env` / `.env.local` are optional
+ * (loaded here when present for local runs).
+ *
  * Required env (temporary — remove after success):
  *   PLATFORM_BOOTSTRAP_EMAIL
  *   PLATFORM_BOOTSTRAP_PASSWORD
@@ -63,7 +66,7 @@ async function main() {
     }
     process.exitCode = 1;
   } finally {
-    const { prisma } = await import("../src/lib/prisma");
+    const { prisma } = await import("../src/lib/prisma-client");
     await prisma.$disconnect();
   }
 }

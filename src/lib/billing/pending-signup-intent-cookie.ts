@@ -4,10 +4,12 @@
  *
  * Cookie read must succeed during HTTP signup so Team seats / company name apply.
  * Outside a Next request (smoke seed, CLI), set ALLOW_PENDING_SIGNUP_INTENT_SKIP=1
- * to opt into a null intent — never silently default in production signup.
+ * (or run under platform SUPER_ADMIN provisioning) to return a null intent
+ * without calling cookies() — never silently default in production signup.
  */
 
 import { cookies } from "next/headers";
+import { isPlatformSuperAdminProvisioningActive } from "@/lib/auth/platform-provision-flag";
 import { BILLING_PLAN_STANDARD } from "@/lib/billing/plans";
 import {
   buildPendingSignupIntent,
@@ -33,19 +35,21 @@ function allowIntentSkipOutsideRequest(): boolean {
 }
 
 export async function readPendingSignupIntent(): Promise<PendingSignupIntent | null> {
+  // Never call cookies() outside a request — Next logs
+  // "cookies was called outside a request scope" before throwing.
+  if (
+    allowIntentSkipOutsideRequest() ||
+    isPlatformSuperAdminProvisioningActive()
+  ) {
+    return null;
+  }
+
   let jar: Awaited<ReturnType<typeof cookies>>;
   try {
     jar = await cookies();
   } catch (error) {
     const detail =
       error instanceof Error ? error.message.slice(0, 300) : "unknown";
-    if (allowIntentSkipOutsideRequest()) {
-      console.warn(
-        "[billing] pending signup intent skipped (ALLOW_PENDING_SIGNUP_INTENT_SKIP=1):",
-        detail,
-      );
-      return null;
-    }
     throw new PendingSignupIntentCookieError(
       `Pending signup plan cookie could not be read (${detail}). Team/Standard seat count and company name cannot be applied — sign up again from /signup/plan in the browser so the cookie is available during account creation.`,
       { cause: error },

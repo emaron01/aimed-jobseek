@@ -39,6 +39,14 @@ describe("platform provision confirmation (unit)", () => {
         k.includes("SKIP_EMAIL_VERIFICATION"),
       ),
     ).toBe(false);
+    const betterAuth = await import("node:fs").then((fs) =>
+      fs.readFileSync("src/lib/auth/better-auth.ts", "utf8"),
+    );
+    expect(betterAuth).toContain("sendOnSignUp: true");
+    expect(betterAuth).toContain("isPlatformSuperAdminProvisioningActive()");
+    expect(betterAuth).toMatch(
+      /sendVerificationEmail:[\s\S]*isPlatformSuperAdminProvisioningActive/,
+    );
   });
 
   it("no public HTTP provisioning route exists", async () => {

@@ -51,7 +51,7 @@ async function main() {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
   } finally {
-    const { prisma } = await import("../src/lib/prisma");
+    const { prisma } = await import("../src/lib/prisma-client");
     await prisma.$disconnect();
   }
 }

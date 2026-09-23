@@ -4,7 +4,7 @@
  * Prefers Docker (`aimed-jobseek-postgres` on port 5434). If Docker is not
  * available, starts a dedicated PostgreSQL data directory under
  * `.local-postgres/` on the same port. Never uses the default Windows
- * PostgreSQL instance on 5432 or Aimed Outreach names/volumes.
+ * PostgreSQL instance on 5432 or any other project's names/volumes.
  */
 import { spawnSync } from "node:child_process";
 import {
@@ -208,7 +208,7 @@ function main() {
     `  URL:      postgresql://${USER}:***@127.0.0.1:${PORT}/${DATABASE}?schema=public`,
   );
   console.log("");
-  console.log("This instance is separate from Aimed Outreach (own port, user, database, and data directory/volume).");
+  console.log("This instance is dedicated (own port, user, database, and data directory/volume).");
 }
 
 try {

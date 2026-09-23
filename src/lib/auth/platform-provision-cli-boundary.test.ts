@@ -157,7 +157,30 @@ console.log("CLI_SERVICE_OK", PLATFORM_BOOTSTRAP_CONFIRM_VALUE);
   it("CLI script source imports the service, not the server-only wrapper", () => {
     const script = readFileSync(join(ROOT, CLI_ENTRY), "utf8");
     expect(script).toContain("platform-provision-service");
+    expect(script).toContain("prisma-client");
     expect(script).not.toContain('platform-provision"');
     expect(script).not.toContain("platform-provision'");
+    expect(script).not.toMatch(/from ["']\.\.\/src\/lib\/prisma["']/);
+    expect(script).not.toMatch(/import\(["']\.\.\/src\/lib\/prisma["']\)/);
+  });
+
+  it("CLI entry import graph never reaches server-only prisma", () => {
+    const graph = collectLocalImports(CLI_ENTRY);
+    expect(graph.has("src/lib/prisma-client.ts")).toBe(true);
+    expect(graph.has("src/lib/prisma.ts")).toBe(false);
+    expect(graph.has("src/lib/auth/platform-provision-service.ts")).toBe(true);
+  });
+
+  it("npm script uses react-server conditions and does not require env files", () => {
+    const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as {
+      scripts: Record<string, string>;
+      prisma?: unknown;
+    };
+    const script = pkg.scripts["platform:provision-super-admin"];
+    expect(script).toContain("--conditions=react-server");
+    expect(script).toContain("scripts/platform-provision-super-admin.ts");
+    expect(script).not.toMatch(/dotenv/);
+    expect(script).not.toMatch(/\.env\.local/);
+    expect(pkg.prisma).toBeUndefined();
   });
 });
