@@ -114,12 +114,14 @@ export async function extractWithModel(input: {
 export async function polishAnswerWithModel(input: {
   answer: string;
   story: {
-    situation: string;
-    task: string;
-    action: string;
-    result: string;
+    situation: string | null;
+    task: string | null;
+    action: string | null;
+    result: string | null;
   };
   sources: Array<{ id: string; text: string }>;
+  declinedFollowUp: boolean;
+  strengtheningNeeds: string[];
   qualityFeedback?: string[];
 }): Promise<
   | { ok: true; data: ConsultationPolishResult }

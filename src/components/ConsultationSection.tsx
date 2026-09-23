@@ -339,6 +339,17 @@ export async function ConsultationSection({
                   {consultationStatementLabels[statement.status]}
                 </span>
               </div>
+              {statement.strengtheningNote ? (
+                <p
+                  className="rounded-md bg-amber-50 p-3 text-sm text-amber-950"
+                  data-testid="consultation-strengthening-note"
+                >
+                  <span className="font-medium">
+                    {consultationStatementLabels.strengtheningNote}:
+                  </span>{" "}
+                  {statement.strengtheningNote}
+                </p>
+              ) : null}
               {canEdit ? (
                 <>
                   <ApplicationActionForm

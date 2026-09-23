@@ -22,6 +22,7 @@ import {
 import {
   bannedPhraseHits,
   validateGroundedStatement,
+  validateInterviewAnswerQuality,
   type GroundingSource,
 } from "@/lib/consultation/output-quality";
 import { nextConsultationStatus } from "@/lib/consultation/state";
@@ -321,15 +322,17 @@ async function extractAnswerWithQuality(input: {
   };
 }
 
-async function polishAnswerWithQuality(input: {
+export async function polishAnswerWithQuality(input: {
   answer: string;
   story: {
-    situation: string;
-    task: string;
-    action: string;
-    result: string;
+    situation: string | null;
+    task: string | null;
+    action: string | null;
+    result: string | null;
   };
   sources: GroundingSource[];
+  declinedFollowUp: boolean;
+  strengtheningNeeds: string[];
 }) {
   let feedback: string[] = [];
   for (
@@ -348,16 +351,41 @@ async function polishAnswerWithQuality(input: {
       bannedPhrases: consultationConfig.bannedPhrases,
       requireSentenceClaims: true,
     });
-    const interviewWordCount = polished.data.interviewAnswer.text
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean).length;
-    if (
-      interviewWordCount < consultationConfig.interviewAnswerWordRange.min ||
-      interviewWordCount > consultationConfig.interviewAnswerWordRange.max
-    ) {
+    interviewErrors.push(
+      ...validateInterviewAnswerQuality({
+        text: polished.data.interviewAnswer.text,
+        maxWords: consultationConfig.interviewAnswerMaxWords,
+        bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
+      }),
+    );
+    const note = polished.data.strengtheningNote?.trim() || null;
+    if (input.declinedFollowUp) {
+      if (!note) {
+        interviewErrors.push(
+          "The declined follow-up needs a concise strengthening note.",
+        );
+      } else {
+        const namedNeed = input.strengtheningNeeds.some((need) =>
+          note.toLowerCase().includes(need.toLowerCase()),
+        );
+        if (!namedNeed) {
+          interviewErrors.push(
+            "The strengthening note must name the STAR part that needs detail.",
+          );
+        }
+        const noteBanned = bannedPhraseHits(
+          [note],
+          consultationConfig.bannedPhrases,
+        );
+        if (noteBanned.length > 0 || INTERNAL_SYSTEM_STATE.test(note)) {
+          interviewErrors.push(
+            "The strengthening note used prohibited or internal language.",
+          );
+        }
+      }
+    } else if (note) {
       interviewErrors.push(
-        `The interview answer must be ${consultationConfig.interviewAnswerWordRange.min}-${consultationConfig.interviewAnswerWordRange.max} words so it can be spoken in about 60 to 90 seconds.`,
+        "A complete answer must not include a strengthening note.",
       );
     }
     const bulletErrors = validateGroundedStatement({
@@ -563,7 +591,12 @@ function askedAndSkipped(
   for (const turn of turns) {
     if (turn.speaker === "CONSULTANT" && turn.targetKey) askedKeys.add(turn.targetKey);
     if (turn.speaker === "SEEKER" && turn.skipped && turn.targetKey) {
-      skippedKeys.add(turn.targetKey);
+      const declinedFollowUp =
+        turn.analysisJson &&
+        typeof turn.analysisJson === "object" &&
+        (turn.analysisJson as { followUpDeclined?: unknown })
+          .followUpDeclined === true;
+      if (!declinedFollowUp) skippedKeys.add(turn.targetKey);
     }
     if (
       turn.speaker === "SEEKER" &&
@@ -712,6 +745,8 @@ async function processAnswerGeneration(input: {
         turnId: input.turnId,
         profile: input.profile,
       }),
+      declinedFollowUp: false,
+      strengtheningNeeds: [],
     });
     if (!polished.ok) {
       await prisma.consultationTurn.update({
@@ -786,12 +821,20 @@ async function processAnswerGeneration(input: {
             turnId: input.turnId,
             kind: statement.kind,
             content: statement.value.text.trim(),
+            strengtheningNote:
+              statement.kind === "INTERVIEW_ANSWER"
+                ? polished.data.strengtheningNote?.trim() || null
+                : null,
             groundingJson: statement.value.claims,
             promptVersion: CONSULTATION_PROMPT_VERSION,
           },
           update: {
             status: "DRAFT",
             content: statement.value.text.trim(),
+            strengtheningNote:
+              statement.kind === "INTERVIEW_ANSWER"
+                ? polished.data.strengtheningNote?.trim() || null
+                : null,
             groundingJson: statement.value.claims,
             promptVersion: CONSULTATION_PROMPT_VERSION,
             generation: { increment: 1 },
@@ -1123,6 +1166,164 @@ export async function answerConsultationQuestion(input: {
   });
 }
 
+function declinedPolishInput(value: unknown): {
+  answerContext: string;
+  story: {
+    situation: string | null;
+    task: string | null;
+    action: string | null;
+    result: string | null;
+  };
+  missingStarElements: string[];
+  analysis: Record<string, unknown>;
+} | null {
+  if (!value || typeof value !== "object") return null;
+  const analysis = value as Record<string, unknown>;
+  if (
+    typeof analysis.answerContext !== "string" ||
+    !analysis.story ||
+    typeof analysis.story !== "object" ||
+    !Array.isArray(analysis.missingStarElements)
+  ) {
+    return null;
+  }
+  const row = analysis.story as Record<string, unknown>;
+  const part = (name: string) =>
+    typeof row[name] === "string" && row[name].trim()
+      ? row[name].trim()
+      : null;
+  const missingStarElements = analysis.missingStarElements.filter(
+    (item): item is string => typeof item === "string",
+  );
+  if (missingStarElements.length === 0) return null;
+  return {
+    answerContext: analysis.answerContext,
+    story: {
+      situation: part("situation"),
+      task: part("task"),
+      action: part("action"),
+      result: part("result"),
+    },
+    missingStarElements,
+    analysis,
+  };
+}
+
+async function declineConsultationFollowUp(input: {
+  organizationId: string;
+  campaignId: string;
+  sessionId: string;
+  question: {
+    sequence: number;
+    targetKey: string | null;
+  };
+  turns: Awaited<ReturnType<typeof loadSessionTurns>>;
+}): Promise<void> {
+  const priorAnswer = [...input.turns]
+    .reverse()
+    .find(
+      (turn) =>
+        turn.speaker === "SEEKER" &&
+        !turn.skipped &&
+        turn.targetKey === input.question.targetKey &&
+        turn.sequence < input.question.sequence,
+    );
+  const analyzed = declinedPolishInput(priorAnswer?.analysisJson);
+  if (!priorAnswer || !analyzed || !input.question.targetKey) {
+    throw new TenantError(
+      "The answer behind this follow-up could not be prepared. Answer the follow-up or retry.",
+    );
+  }
+  const { profile } = await requireApplication(
+    input.organizationId,
+    input.campaignId,
+  );
+  const polished = await polishAnswerWithQuality({
+    answer: analyzed.answerContext,
+    story: analyzed.story,
+    sources: polishingSources({
+      answer: analyzed.answerContext,
+      turnId: priorAnswer.id,
+      profile,
+    }),
+    declinedFollowUp: true,
+    strengtheningNeeds: analyzed.missingStarElements,
+  });
+  if (!polished.ok) throw new TenantError(polished.message);
+  const nextSequence =
+    input.turns.reduce(
+      (maximum, turn) => Math.max(maximum, turn.sequence),
+      0,
+    ) + 1;
+  const statements = [
+    {
+      kind: "INTERVIEW_ANSWER" as const,
+      value: polished.data.interviewAnswer,
+      strengtheningNote: polished.data.strengtheningNote?.trim() || null,
+    },
+    {
+      kind: "RESUME_BULLET" as const,
+      value: polished.data.resumeBullet,
+      strengtheningNote: null,
+    },
+  ];
+  await prisma.$transaction([
+    prisma.consultationTurn.create({
+      data: {
+        organizationId: input.organizationId,
+        sessionId: input.sessionId,
+        sequence: nextSequence,
+        speaker: "SEEKER",
+        body: "",
+        targetKey: input.question.targetKey,
+        skipped: true,
+        seekerAuthored: true,
+        analysisJson: { followUpDeclined: true },
+      },
+    }),
+    prisma.consultationTurn.update({
+      where: { id: priorAnswer.id },
+      data: {
+        analysisJson: {
+          ...analyzed.analysis,
+          followUpDeclined: true,
+          strengtheningNote: polished.data.strengtheningNote,
+        } as Prisma.InputJsonValue,
+      },
+    }),
+    prisma.consultationSession.update({
+      where: { id: input.sessionId },
+      data: { generationStatus: "READY", generationError: null },
+    }),
+    ...statements.map((statement) =>
+      prisma.consultationStatement.upsert({
+        where: {
+          turnId_kind: { turnId: priorAnswer.id, kind: statement.kind },
+        },
+        create: {
+          organizationId: input.organizationId,
+          sessionId: input.sessionId,
+          turnId: priorAnswer.id,
+          kind: statement.kind,
+          content: statement.value.text.trim(),
+          strengtheningNote: statement.strengtheningNote,
+          groundingJson: statement.value.claims,
+          promptVersion: CONSULTATION_PROMPT_VERSION,
+        },
+        update: {
+          status: "DRAFT",
+          content: statement.value.text.trim(),
+          strengtheningNote: statement.strengtheningNote,
+          groundingJson: statement.value.claims,
+          promptVersion: CONSULTATION_PROMPT_VERSION,
+          generation: { increment: 1 },
+          approvedAt: null,
+        },
+      }),
+    ),
+  ]);
+}
+
 export async function skipConsultationQuestion(input: {
   organizationId: string;
   campaignId: string;
@@ -1135,8 +1336,24 @@ export async function skipConsultationQuestion(input: {
     throw new TenantError("The consultation is not waiting for an answer.");
   }
   const turns = await loadSessionTurns(session.id);
-  if (!unanswered(turns, input.targetKey)) {
+  const question = unanswered(turns, input.targetKey);
+  if (!question) {
     throw new TenantError("That question is not open.");
+  }
+  if (question.followUp) {
+    await declineConsultationFollowUp({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      sessionId: session.id,
+      question,
+      turns,
+    });
+    await continueAfterAnsweredRound({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      sessionId: session.id,
+    });
+    return;
   }
   await addTurn({
     organizationId: input.organizationId,
@@ -1193,9 +1410,16 @@ function completeStoryFromAnalysis(value: unknown): {
     action: string;
     result: string;
   };
+  missingStarElements: string[];
+  followUpDeclined: boolean;
 } | null {
   if (!value || typeof value !== "object") return null;
-  const row = value as { answerContext?: unknown; story?: unknown };
+  const row = value as {
+    answerContext?: unknown;
+    story?: unknown;
+    missingStarElements?: unknown;
+    followUpDeclined?: unknown;
+  };
   if (typeof row.answerContext !== "string" || !row.story || typeof row.story !== "object") {
     return null;
   }
@@ -1216,6 +1440,12 @@ function completeStoryFromAnalysis(value: unknown): {
       action: story.action,
       result: story.result,
     },
+    missingStarElements: Array.isArray(row.missingStarElements)
+      ? row.missingStarElements.filter(
+          (item): item is string => typeof item === "string",
+        )
+      : [],
+    followUpDeclined: row.followUpDeclined === true,
   };
 }
 
@@ -1244,6 +1474,8 @@ export async function regenerateConsultationStatement(input: {
       turnId: statement.turnId,
       profile,
     }),
+    declinedFollowUp: analyzed.followUpDeclined,
+    strengtheningNeeds: analyzed.missingStarElements,
   });
   if (!polished.ok) throw new TenantError(polished.message);
   const value =
@@ -1263,6 +1495,10 @@ export async function regenerateConsultationStatement(input: {
       data: {
         status: "DRAFT",
         content: value.text.trim(),
+        strengtheningNote:
+          statement.kind === "INTERVIEW_ANSWER"
+            ? polished.data.strengtheningNote?.trim() || null
+            : null,
         groundingJson: value.claims,
         promptVersion: CONSULTATION_PROMPT_VERSION,
         generation: { increment: 1 },
@@ -1306,13 +1542,14 @@ export async function approveConsultationStatement(input: {
   });
   if (!statement) throw new TenantError("That polished statement was not found.");
   if (statement.kind === "INTERVIEW_ANSWER") {
-    const wordCount = content.split(/\s+/).filter(Boolean).length;
-    if (
-      wordCount < consultationConfig.interviewAnswerWordRange.min ||
-      wordCount > consultationConfig.interviewAnswerWordRange.max
-    ) {
+    const qualityErrors = validateInterviewAnswerQuality({
+      text: content,
+      maxWords: consultationConfig.interviewAnswerMaxWords,
+      bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
+    });
+    if (qualityErrors.length > 0) {
       throw new TenantError(
-        `Keep the interview answer between ${consultationConfig.interviewAnswerWordRange.min} and ${consultationConfig.interviewAnswerWordRange.max} words.`,
+        "Revise the interview answer to remove repetition or structural language.",
       );
     }
   } else if (/[\r\n]/.test(content)) {

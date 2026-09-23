@@ -33,6 +33,7 @@ import {
   confirmConsultationProposal,
   dismissConsultationProposal,
   pauseConsultation,
+  polishAnswerWithQuality,
   retryConsultationGeneration,
   resumeConsultation,
   skipConsultation,
@@ -53,6 +54,7 @@ import { consultationConfig } from "@/lib/product-config/consultation";
 import {
   bannedPhraseHits,
   validateGroundedStatement,
+  validateInterviewAnswerQuality,
 } from "@/lib/consultation/output-quality";
 import { CONSULTATION_COACH_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content/consultation";
 import {
@@ -86,6 +88,9 @@ function installConsultationModelFixture() {
       allowedSources?: Array<{ id: string; text: string }>;
       statement?: string;
       kind?: "INTERVIEW_ANSWER" | "RESUME_BULLET";
+      declinedFollowUp?: boolean;
+      strengtheningNeeds?: string[];
+      qualityFeedback?: string[];
     };
     if (request.schemaName === "consultation_plan") {
       const targets = payload.targets ?? [];
@@ -152,6 +157,54 @@ function installConsultationModelFixture() {
         id: "answer",
         text: payload.answer ?? "",
       };
+      if (
+        payload.answer === "quality retry" &&
+        (payload.qualityFeedback?.length ?? 0) === 0
+      ) {
+        return {
+          data: {
+            interviewAnswer: {
+              text:
+                "I cut failed runs from 8% to 1%. The starting point was 8%.",
+              claims: [
+                {
+                  text: "I cut failed runs from 8% to 1%.",
+                  supports: [
+                    {
+                      sourceId: source.id,
+                      quote: "I cut failed runs from 8% to 1%.",
+                    },
+                  ],
+                },
+                {
+                  text: "The starting point was 8%.",
+                  supports: [
+                    {
+                      sourceId: source.id,
+                      quote: "I cut failed runs from 8% to 1%.",
+                    },
+                  ],
+                },
+              ],
+            },
+            resumeBullet: {
+              text: "I cut failed runs from 8% to 1%.",
+              claims: [
+                {
+                  text: "I cut failed runs from 8% to 1%.",
+                  supports: [
+                    {
+                      sourceId: source.id,
+                      quote: "I cut failed runs from 8% to 1%.",
+                    },
+                  ],
+                },
+              ],
+            },
+            strengtheningNote: null,
+          },
+        };
+      }
       const text =
         source.text
           .split(/\r?\n/)
@@ -159,10 +212,16 @@ function installConsultationModelFixture() {
           .filter(Boolean)
           .at(-1) ?? source.text;
       const support = [{ sourceId: source.id, quote: text }];
-      const interviewText = Array.from({ length: 8 }, () => text).join(" ");
+      const interviewClaims = text
+        .split(/(?<=[.!?])\s+/)
+        .filter(Boolean)
+        .map((claimText) => ({
+          text: claimText,
+          supports: [{ sourceId: source.id, quote: claimText }],
+        }));
       const interview = {
-        text: interviewText,
-        claims: Array.from({ length: 8 }, () => ({ text, supports: support })),
+        text,
+        claims: interviewClaims,
       };
       const bullet = {
         text,
@@ -172,6 +231,9 @@ function installConsultationModelFixture() {
         data: {
           interviewAnswer: interview,
           resumeBullet: bullet,
+          strengtheningNote: payload.declinedFollowUp
+            ? `The ${payload.strengtheningNeeds?.[0] ?? "Action"} would be stronger with more detail about what you personally did.`
+            : null,
         },
       };
     }
@@ -199,6 +261,27 @@ function installConsultationModelFixture() {
       };
     }
     const answer = payload.answer ?? "";
+    const thinInvoice =
+      answer ===
+      "Invoice generation had failed billing runs at 8%. I led the rewrite. Over two quarters, failed billing runs fell to under 1%.";
+    if (thinInvoice) {
+      return {
+        data: {
+          facts: [],
+          story: {
+            situation: "Invoice generation had failed billing runs at 8%.",
+            task: "I led the rewrite.",
+            action: "I led the rewrite.",
+            result:
+              "Over two quarters, failed billing runs fell to under 1%.",
+          },
+          demonstratedTargets: [],
+          missingStarElements: ["ACTION"],
+          followUpQuestion:
+            "When you led the rewrite, what did you personally change, what options did you weigh, and who did you work with?",
+        },
+      };
+    }
     const complete = /cut failed jobs by 40%/i.test(answer);
     const completeSpan = "I used Python for 5 years and cut failed jobs by 40%.";
     return {
@@ -574,7 +657,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("3");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("4");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("coach, not an interrogator");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("Never inflate fit");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -660,6 +743,81 @@ describe("consultation evidence and questions", () => {
     expect(
       bannedPhraseHits([question!.text], consultationConfig.bannedPhrases),
     ).toEqual([]);
+  });
+
+  it("rejects repeated facts and STAR meta-language, then regenerates", async () => {
+    const directErrors = validateInterviewAnswerQuality({
+      text:
+        "I cut failed runs from 8% to 1%. The starting point was 8%.",
+      maxWords: consultationConfig.interviewAnswerMaxWords,
+      bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
+    });
+    expect(directErrors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("described its structure"),
+        expect.stringContaining("repeated the same number"),
+      ]),
+    );
+
+    const polished = await polishAnswerWithQuality({
+      answer: "quality retry",
+      story: {
+        situation: "I inherited failed runs at 8%.",
+        task: "I needed to stabilize them.",
+        action: "I rewrote the failing path.",
+        result: "I cut failed runs from 8% to 1%.",
+      },
+      sources: [
+        {
+          id: "answer:quality",
+          text: "I cut failed runs from 8% to 1%.",
+        },
+      ],
+      declinedFollowUp: false,
+      strengtheningNeeds: [],
+    });
+    expect(polished.ok).toBe(true);
+    expect(generateStructured).toHaveBeenCalledTimes(2);
+    if (polished.ok) {
+      expect(polished.data.interviewAnswer.text).toBe(
+        "I cut failed runs from 8% to 1%.",
+      );
+    }
+  });
+
+  it("keeps a rich grounded answer natural and within the maximum", async () => {
+    const answer =
+      "At Northwind, failed invoice runs were delaying billing. I owned the fix and needed to reduce failures without disrupting payments. I reviewed incident patterns with the payments team, compared a patch with a rewrite, chose the rewrite, and tracked releases through on-call. Over two quarters, failed runs fell from 8% to under 1%.";
+    const polished = await polishAnswerWithQuality({
+      answer,
+      story: {
+        situation:
+          "At Northwind, failed invoice runs were delaying billing.",
+        task:
+          "I owned the fix and needed to reduce failures without disrupting payments.",
+        action:
+          "I reviewed incident patterns with the payments team, compared a patch with a rewrite, chose the rewrite, and tracked releases through on-call.",
+        result:
+          "Over two quarters, failed runs fell from 8% to under 1%.",
+      },
+      sources: [{ id: "answer:rich", text: answer }],
+      declinedFollowUp: false,
+      strengtheningNeeds: [],
+    });
+    expect(polished.ok).toBe(true);
+    if (polished.ok) {
+      expect(polished.data.strengtheningNote).toBeNull();
+      expect(
+        polished.data.interviewAnswer.text.split(/\s+/).length,
+      ).toBeLessThanOrEqual(consultationConfig.interviewAnswerMaxWords);
+      expect(
+        validateInterviewAnswerQuality({
+          text: polished.data.interviewAnswer.text,
+          maxWords: consultationConfig.interviewAnswerMaxWords,
+          bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
+        }),
+      ).toEqual([]);
+    }
   });
 });
 
@@ -757,7 +915,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("3");
+    expect(session?.promptVersion).toBe("4");
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
     const incident = session?.assessments.find((item) => item.text === "Leads incident response");
@@ -821,11 +979,8 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     const interviewWordCount =
       interviewStatement?.content.trim().split(/\s+/).filter(Boolean).length ??
       0;
-    expect(interviewWordCount).toBeGreaterThanOrEqual(
-      consultationConfig.interviewAnswerWordRange.min,
-    );
     expect(interviewWordCount).toBeLessThanOrEqual(
-      consultationConfig.interviewAnswerWordRange.max,
+      consultationConfig.interviewAnswerMaxWords,
     );
     expect(
       statements.flatMap((statement) =>

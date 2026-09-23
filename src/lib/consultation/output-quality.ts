@@ -74,6 +74,77 @@ function groundingTokens(text: string): Set<string> {
   );
 }
 
+function repetitionTokens(text: string): Set<string> {
+  const stem = (token: string) => {
+    if (token.length > 5 && token.endsWith("ing")) return token.slice(0, -3);
+    if (token.length > 4 && token.endsWith("ed")) return token.slice(0, -2);
+    if (token.length > 4 && token.endsWith("s")) return token.slice(0, -1);
+    return token;
+  };
+  return new Set(
+    normalized(text)
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .map(stem)
+      .filter(
+        (token) => token.length >= 4 && !GROUNDING_STOPWORDS.has(token),
+      ),
+  );
+}
+
+export function validateInterviewAnswerQuality(input: {
+  text: string;
+  maxWords: number;
+  bannedPhrases: readonly string[];
+}): string[] {
+  const errors: string[] = [];
+  const text = input.text.trim();
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  if (wordCount > input.maxWords) {
+    errors.push(`The interview answer exceeded ${input.maxWords} words.`);
+  }
+  const metaHits = bannedPhraseHits([text], input.bannedPhrases);
+  if (metaHits.length > 0) {
+    errors.push(
+      `The interview answer described its structure instead of telling the story: ${metaHits.join(", ")}.`,
+    );
+  }
+  if (!/\b(?:I|I'm|I've|I'd|I'll|my|mine|we|we're|we've|our|ours)\b/i.test(text)) {
+    errors.push("The interview answer was not written as natural first-person speech.");
+  }
+  const numberCounts = new Map<string, number>();
+  for (const token of numericTokens(text).map(normalized)) {
+    numberCounts.set(token, (numberCounts.get(token) ?? 0) + 1);
+  }
+  const repeatedNumbers = [...numberCounts]
+    .filter(([, count]) => count > 1)
+    .map(([token]) => token);
+  if (repeatedNumbers.length > 0) {
+    errors.push(
+      `The interview answer repeated the same number without adding information: ${repeatedNumbers.join(", ")}.`,
+    );
+  }
+  const sentences = sentenceParts(text).map((sentence) => ({
+    sentence,
+    tokens: repetitionTokens(sentence),
+  }));
+  for (let left = 0; left < sentences.length; left += 1) {
+    for (let right = left + 1; right < sentences.length; right += 1) {
+      const a = sentences[left]!;
+      const b = sentences[right]!;
+      if (a.tokens.size < 3 || b.tokens.size < 3) continue;
+      const overlap = [...a.tokens].filter((token) => b.tokens.has(token)).length;
+      const union = new Set([...a.tokens, ...b.tokens]).size;
+      if (union > 0 && overlap / union >= 0.6) {
+        errors.push(
+          `The interview answer restated the same fact in multiple sentences: "${a.sentence}" / "${b.sentence}".`,
+        );
+      }
+    }
+  }
+  return [...new Set(errors)];
+}
+
 export function validateGroundedStatement(input: {
   statement: GroundedStatement;
   sources: GroundingSource[];

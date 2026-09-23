@@ -67,7 +67,7 @@ ${CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS}`;
     target: input.target,
     availableTargets: input.targets,
     bannedPhrases: consultationConfig.bannedPhrases,
-    interviewAnswerWordRange: consultationConfig.interviewAnswerWordRange,
+    interviewAnswerMaxWords: consultationConfig.interviewAnswerMaxWords,
     qualityFeedback: input.qualityFeedback ?? [],
   });
   return [
@@ -79,12 +79,14 @@ ${CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS}`;
 export function buildConsultationPolishMessages(input: {
   answer: string;
   story: {
-    situation: string;
-    task: string;
-    action: string;
-    result: string;
+    situation: string | null;
+    task: string | null;
+    action: string | null;
+    result: string | null;
   };
   sources: Array<{ id: string; text: string }>;
+  declinedFollowUp: boolean;
+  strengtheningNeeds: string[];
   qualityFeedback?: string[];
 }): AiMessage[] {
   return [
@@ -102,8 +104,12 @@ ${CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS}`,
         story: input.story,
         allowedSources: input.sources,
         bannedPhrases: consultationConfig.bannedPhrases,
-        interviewAnswerWordRange:
-          consultationConfig.interviewAnswerWordRange,
+        interviewAnswerBannedPhrases:
+          consultationConfig.interviewAnswerBannedPhrases,
+        interviewAnswerMaxWords:
+          consultationConfig.interviewAnswerMaxWords,
+        declinedFollowUp: input.declinedFollowUp,
+        strengtheningNeeds: input.strengtheningNeeds,
         qualityFeedback: input.qualityFeedback ?? [],
       }),
     },

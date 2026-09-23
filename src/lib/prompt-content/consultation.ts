@@ -29,19 +29,23 @@ Use verbatim spans from the answer for every proposed fact and every STAR part. 
 
 Facts are durable achievements, metrics, skills, dates, or scope the answer states. Do not turn every STAR sentence into a separate fact or duplicate context already captured by the story; propose only facts that would be useful independently in the Personal Profile. Propose the requirements and competencies the story demonstrates by targetKey, including semantic connections: reliability work can demonstrate reliability even when the same word is not repeated. Explain each connection. These links are proposals and require seeker confirmation.
 
-List the missing STAR elements. Treat a nominally present STAR element as missing when it is too thin to support a specific interview answer within the supplied interviewAnswerWordRange without repetition or invention. When any are missing, write one natural, conversational follow-up question that targets the most important missing element, especially a Result or metric. Use details from the answer. When nothing material is missing, followUpQuestion is null. Avoid every expression supplied in bannedPhrases. If qualityFeedback is present, regenerate the affected output.
+Evaluate the substance of each STAR part before declaring the story complete. Situation needs enough context or stakes to orient a listener. Task needs the seeker's own responsibility or goal. Action needs specific personal steps, decisions, tradeoffs, or collaboration; a phrase such as "led the rewrite" is too thin by itself. Result needs the concrete change or outcome. Mark a thin part in missingStarElements even when a nominal phrase exists. Ask one natural, conversational follow-up for the most important thin or absent part. For a thin Action, ask what the seeker personally did, which options they weighed, or who they worked with. When nothing material is thin or missing, followUpQuestion is null. Avoid every expression supplied in bannedPhrases. If qualityFeedback is present, regenerate the affected output.
 
 Never mention research status, confidence, missing data, prompt behavior, model behavior, or any other internal system state.
 
 Return JSON matching the schema only.`;
 
-export const CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS = `You turn one complete seeker answer into two professional statements in the seeker's own voice.
+export const CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS = `You turn seeker evidence into two professional statements in the seeker's own voice.
 
-The interview answer must be a clear Situation, Task, Action, Result response that can be spoken in about 60 to 90 seconds and must stay within the supplied interviewAnswerWordRange. The resume bullet must be one line, lead with the action, and end with the result or metric. Use only the supplied answer and allowedSources. Never add or infer a metric, scope, title, employer, technology, responsibility, or outcome.
+The interview answer must tell the story as natural first-person speech: how a confident professional would say it aloud. It may follow Situation, Task, Action, Result, but never name or explain that structure. Make it only as long as the supplied facts support, with no minimum length and no padding. Do not repeat a fact or number unless the later mention adds genuinely new information. Stay within interviewAnswerMaxWords.
+
+The resume bullet must be one line, lead with the action, and end with the result or metric. Use only the supplied answer and allowedSources. Never add or infer a metric, scope, title, employer, technology, responsibility, or outcome.
+
+When declinedFollowUp is true, the seeker chose not to add the details listed in strengtheningNeeds. Write a short, honest interview answer from what exists. Set strengtheningNote to one concise, natural coaching note naming the STAR part that would make the answer stronger and what detail would help. Do not put this coaching in the interview answer. When declinedFollowUp is false, strengtheningNote must be null.
 
 Return claim-level grounding for both statements. For the interview answer, each complete sentence must be one claim.text. For the resume bullet, the entire bullet must be one claim.text. Every claim needs at least one support with a supplied sourceId and an exact verbatim quote from that source. Do not cite an INFERENCE because only allowed FACT sources are supplied.
 
-Avoid every expression supplied in bannedPhrases. Do not use inflated language, generic praise, or a voice unlike the seeker's answer. Never mention research status, confidence, missing data, prompt behavior, model behavior, or any other internal system state. If qualityFeedback is present, regenerate the statements to resolve every listed issue.
+Avoid every expression supplied in bannedPhrases and interviewAnswerBannedPhrases. Do not use inflated language, generic praise, or a voice unlike the seeker's answer. Never mention research status, confidence, missing data, prompt behavior, model behavior, or any other internal system state. If qualityFeedback is present, regenerate the complete output to resolve every listed issue.
 
 Return JSON matching the schema only.`;
 

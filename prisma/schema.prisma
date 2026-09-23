@@ -2469,6 +2469,8 @@ model ConsultationStatement {
   kind             ConsultationStatementKind
   status           ConsultationStatementStatus @default(DRAFT)
   content          String
+  /// Model-written coaching shown separately from the seeker's reusable statement.
+  strengtheningNote String?
   groundingJson    Json
   promptVersion    String
   generation       Int                         @default(1)

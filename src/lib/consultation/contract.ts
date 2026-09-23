@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONSULTATION_PROMPT_VERSION = "3";
+export const CONSULTATION_PROMPT_VERSION = "4";
 
 const strengthSchema = z.enum(["STRONG", "PARTIAL", "NONE"]);
 const strategyModeSchema = z.enum([
@@ -77,6 +77,7 @@ const groundedStatementSchema = z.object({
 export const consultationPolishSchema = z.object({
   interviewAnswer: groundedStatementSchema,
   resumeBullet: groundedStatementSchema,
+  strengtheningNote: z.string().nullable(),
 });
 
 export const consultationStatementGroundingSchema = groundedStatementSchema;
