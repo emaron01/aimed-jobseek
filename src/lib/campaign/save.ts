@@ -2,6 +2,7 @@
  * Campaign form parsing and safe action results (Node-safe, no server-only).
  */
 
+import { vocab } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 import {
   parseCampaignPersonaSelection,
@@ -56,6 +57,8 @@ export type CampaignEmailSettingsActionResult = {
 
 export type CampaignFormValues = {
   name: string;
+  postingText: string;
+  postingUrl: string;
   productId: string;
   icpId: string;
   personaId: string;
@@ -114,6 +117,8 @@ export function parseCampaignEmailSettingsFormData(formData: FormData): {
 export function readCampaignFormValues(formData: FormData): CampaignFormValues {
   return {
     name: readString(formData, "name"),
+    postingText: readString(formData, "postingText"),
+    postingUrl: readString(formData, "postingUrl"),
     productId: readString(formData, "productId"),
     icpId: readString(formData, "icpId"),
     personaId: readString(formData, "personaId"),
@@ -150,15 +155,29 @@ export function parseCampaignFormData(formData: FormData): {
     offerNotes: string | null;
     emailLength: CampaignEmailLength;
     emailGuidance: string | null;
+    postingText: string;
+    postingUrl: string | null;
   };
   fieldErrors: Partial<Record<keyof CampaignFormValues, string>>;
 } {
   const values = readCampaignFormValues(formData);
   const fieldErrors: Partial<Record<keyof CampaignFormValues, string>> = {};
 
-  if (!values.name) fieldErrors.name = "Campaign name is required.";
-  if (!values.productId) fieldErrors.productId = "Product is required.";
-  if (!values.icpId) fieldErrors.icpId = "ICP is required.";
+  if (!values.name) {
+    fieldErrors.name = `${vocab.campaign.Singular} name is required.`;
+  }
+  if (!values.postingText) {
+    fieldErrors.postingText = "Paste the job posting.";
+  }
+  if (values.postingUrl && !/^https?:\/\//i.test(values.postingUrl)) {
+    fieldErrors.postingUrl = "Posting URL must start with http:// or https://.";
+  }
+  if (!values.productId) {
+    fieldErrors.productId = `${vocab.product.Singular} is required.`;
+  }
+  if (!values.icpId) {
+    fieldErrors.icpId = `${vocab.icp.Singular} is required.`;
+  }
   const personas: CampaignPersonaSelection =
     parseCampaignPersonaSelection(formData);
   const emailSettings = parseCampaignEmailSettingsFormData(formData);
@@ -185,6 +204,8 @@ export function parseCampaignFormData(formData: FormData): {
       offerNotes: values.offerNotes || null,
       emailLength: emailSettings.fields.emailLength,
       emailGuidance: emailSettings.fields.emailGuidance,
+      postingText: values.postingText,
+      postingUrl: values.postingUrl || null,
     },
   };
 }
@@ -201,5 +222,5 @@ export function toSafeCampaignActionError(error: unknown): string {
       return "This campaign could not be created because of a relationship conflict.";
     }
   }
-  return "Unable to create campaign. Please try again.";
+  return `Unable to create ${vocab.campaign.singular}. Please try again.`;
 }

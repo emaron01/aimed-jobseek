@@ -37,6 +37,7 @@ import { recordUsageEvent } from "@/lib/usage/events";
 import { getResearchPolicy } from "@/lib/usage/policy";
 import { parseIcpInterpretedCriteria } from "@/lib/interpretation/schema";
 import { ICP_INTERPRETATION_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content";
+import { markApplicationFitsStaleForIcp } from "@/lib/application/fit-staleness";
 import { applyEmployerCriterionStrength } from "@/lib/interpretation/criterion-strength";
 import { vocab } from "@/lib/product-config";
 import type { AiMessage } from "@/lib/ai/types";
@@ -327,6 +328,7 @@ export async function updateIcpCriterionManual(input: {
       source: "MANUAL",
     },
   });
+  await markApplicationFitsStaleForIcp(input.organizationId, input.icpId);
   return criterionRowToSnapshot(updated);
 }
 
@@ -678,6 +680,11 @@ export async function persistGeneratedIcpCriteria(input: {
             .join("\n") || null,
       },
     });
+    await markApplicationFitsStaleForIcp(
+      input.organizationId,
+      input.icpId,
+      tx,
+    );
   });
 
   const criteria = await listIcpCriteria(input.organizationId, input.icpId);
@@ -813,6 +820,11 @@ export async function interpretIcpDefinition(input: {
               .join("\n") || null,
         },
       });
+      await markApplicationFitsStaleForIcp(
+        input.organizationId,
+        input.icpId,
+        tx,
+      );
     });
 
     const criteria = await listIcpCriteria(input.organizationId, input.icpId);

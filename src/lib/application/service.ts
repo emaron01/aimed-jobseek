@@ -1,0 +1,473 @@
+import type { Prisma, QualificationBucket } from "@prisma/client";
+import {
+  applicationFitStaleReason,
+  applyFitOverride,
+  computeApplicationEmployerFit,
+  displayedFitBucket,
+} from "@/lib/application/fit";
+import {
+  decideEmployerResearch,
+  decisionAfterResearchIdentity,
+  type EmployerMatch,
+} from "@/lib/job-requirement/employer";
+import type { ParsedJobRequirement } from "@/lib/job-requirement/types";
+import { JOB_REQUIREMENT_PROMPT_VERSION } from "@/lib/job-requirement/types";
+import { normalizeEvidenceClass } from "@/lib/criteria/evidence-class";
+import type { CompanyResearchActuals } from "@/lib/criteria/research-cascade";
+import type { CriterionSnapshot } from "@/lib/criteria/types";
+import { prisma } from "@/lib/prisma";
+import { vocab } from "@/lib/product-config";
+import { normalizeCompanyName, parseStringArray } from "@/lib/research";
+import { TenantError } from "@/lib/tenant/errors";
+import {
+  researchCompany,
+  resolveOrCreateCompany,
+} from "@/lib/tenant/company-research-service";
+
+const BUCKETS = ["GOOD", "NEEDS_REVIEW", "POOR_FIT", "EXCLUDED"] as const;
+
+function asBucket(value: string): QualificationBucket {
+  if ((BUCKETS as readonly string[]).includes(value)) {
+    return value as QualificationBucket;
+  }
+  throw new TenantError("Choose a valid employer-fit result.");
+}
+
+function jsonValue(value: unknown): Prisma.InputJsonValue {
+  return value as Prisma.InputJsonValue;
+}
+
+function researchActuals(row: {
+  companySummary: string | null;
+  whatTheySell: string | null;
+  businessModel: string | null;
+  companySizeContext: string | null;
+  relevantTechnologies: Prisma.JsonValue | null;
+  buyingSignals: Prisma.JsonValue | null;
+  hiringSignals: Prisma.JsonValue | null;
+  riskSignals: Prisma.JsonValue | null;
+  primaryMarkets: Prisma.JsonValue | null;
+} | null): CompanyResearchActuals | null {
+  if (!row) return null;
+  return {
+    companySummary: row.companySummary,
+    whatTheySell: row.whatTheySell,
+    businessModel: row.businessModel,
+    companySizeContext: row.companySizeContext,
+    relevantTechnologies: parseStringArray(row.relevantTechnologies),
+    buyingSignals: parseStringArray(row.buyingSignals),
+    hiringSignals: parseStringArray(row.hiringSignals),
+    riskSignals: parseStringArray(row.riskSignals),
+    primaryMarkets: parseStringArray(row.primaryMarkets),
+  };
+}
+
+async function loadCriteria(
+  organizationId: string,
+  icpId: string,
+): Promise<{ criteria: CriterionSnapshot[]; version: string | null; updatedAt: Date; targets: string[] }> {
+  const icp = await prisma.icp.findFirst({
+    where: { id: icpId, organizationId },
+    include: { criteria: { orderBy: { sortOrder: "asc" } } },
+  });
+  if (!icp) {
+    throw new TenantError(
+      `${vocab.icp.Singular} was not found for this ${vocab.campaign.singular}.`,
+    );
+  }
+  const criteria: CriterionSnapshot[] = icp.criteria.map((row) => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    criterionType: row.criterionType,
+    dataType: row.dataType,
+    operator: row.operator,
+    targetValue: row.targetValue,
+    minValue: row.minValue,
+    maxValue: row.maxValue,
+    importance: row.importance,
+    isRequired: row.isRequired,
+    isDisqualifier: row.isDisqualifier,
+    researchGuidance: row.researchGuidance,
+    evidenceClass: normalizeEvidenceClass(row.evidenceClass),
+    tier: row.tier,
+    isMandatory: row.isMandatory,
+    sortOrder: row.sortOrder,
+  }));
+  return {
+    criteria,
+    version: icp.interpretationPromptVersion,
+    updatedAt: icp.updatedAt,
+    targets: criteria
+      .map((criterion) => criterion.researchGuidance?.trim() ?? "")
+      .filter(Boolean),
+  };
+}
+
+async function companyMatches(
+  organizationId: string,
+  companyName: string | null,
+): Promise<EmployerMatch[]> {
+  const normalized = companyName ? normalizeCompanyName(companyName) : null;
+  if (!normalized) return [];
+  const rows = await prisma.company.findMany({
+    where: { organizationId, normalizedName: normalized },
+    include: {
+      research: { orderBy: { updatedAt: "desc" }, take: 1 },
+    },
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    identityAmbiguous: row.research[0]?.identityAmbiguous === true,
+  }));
+}
+
+async function scoreFit(input: {
+  organizationId: string;
+  campaignId: string;
+  icpId: string;
+  companyId: string;
+}): Promise<void> {
+  const profile = await loadCriteria(input.organizationId, input.icpId);
+  const research = await prisma.companyResearch.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      companyId: input.companyId,
+      status: { in: ["COMPLETED", "PARTIAL"] },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+  if (!research || research.identityAmbiguous) {
+    return;
+  }
+  const computed = computeApplicationEmployerFit({
+    criteria: profile.criteria,
+    company: {
+      industry: null,
+      employeeCount: null,
+      revenue: null,
+      location: null,
+    },
+    research: researchActuals(research),
+    interpretationPromptVersion: profile.version,
+  });
+  const now = new Date();
+  const data = {
+    bucket: computed.bucket,
+    outcomesJson: jsonValue(computed.outcomes),
+    computedAt: now,
+    companyResearchId: research.id,
+    companyResearchUpdatedAt: research.updatedAt,
+    icpUpdatedAt: profile.updatedAt,
+    interpretationPromptVersion: profile.version,
+    stale: false,
+    staleReason: null,
+  };
+  await prisma.applicationFit.upsert({
+    where: { campaignId: input.campaignId },
+    create: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      icpId: input.icpId,
+      ...data,
+    },
+    update: data,
+  });
+}
+
+function researchFailureReason(result: {
+  skipped?: boolean;
+  reason?: string;
+  researchFailed?: boolean;
+}): string | null {
+  if (result.researchFailed) {
+    return result.reason?.trim() || "Employer research failed, so fit was not scored.";
+  }
+  if (result.skipped && result.reason === "fresh") return null;
+  if (result.skipped && result.reason === "provider_unconfigured") {
+    return "Employer research is not configured, so fit was not scored.";
+  }
+  if (result.skipped && result.reason) return result.reason;
+  return null;
+}
+
+async function researchAndMaybeScore(input: {
+  organizationId: string;
+  campaignId: string;
+  icpId: string;
+  companyId: string;
+}): Promise<void> {
+  const profile = await loadCriteria(input.organizationId, input.icpId);
+  const result = await researchCompany(input.companyId, {
+    evidenceTargets: profile.targets,
+  });
+  const failure = researchFailureReason(result);
+  const research = result.research;
+  if (failure || !research || (research.status !== "COMPLETED" && research.status !== "PARTIAL")) {
+    await prisma.jobRequirement.update({
+      where: { campaignId: input.campaignId },
+      data: {
+        employerSkipReason:
+          failure ?? "Employer research did not finish, so fit was not scored.",
+      },
+    });
+    return;
+  }
+  const after = decisionAfterResearchIdentity(research?.identityAmbiguous === true);
+  if (!after.scoreFit) {
+    await prisma.jobRequirement.update({
+      where: { campaignId: input.campaignId },
+      data: {
+        employerDisposition: "AMBIGUOUS",
+        employerSkipReason: after.reason,
+      },
+    });
+    return;
+  }
+  await prisma.jobRequirement.update({
+    where: { campaignId: input.campaignId },
+    data: { employerDisposition: "IDENTIFIED", employerSkipReason: null },
+  });
+  await scoreFit(input);
+}
+
+export async function attachParsedPosting(input: {
+  organizationId: string;
+  campaignId: string;
+  rawText: string;
+  postingUrl: string | null;
+  parsed: ParsedJobRequirement;
+  icpId: string;
+}): Promise<void> {
+  const matches = await companyMatches(
+    input.organizationId,
+    input.parsed.companyName,
+  );
+  const decision = decideEmployerResearch({
+    rawText: input.rawText,
+    matches,
+  });
+  let companyId: string | null =
+    decision.disposition === "IDENTIFIED" ? decision.companyId : null;
+  if (decision.disposition === "IDENTIFIED" && decision.runResearch) {
+    const name = input.parsed.companyName?.trim();
+    if (!name) {
+      await prisma.jobRequirement.create({
+        data: jobRequirementData(input, {
+          disposition: "UNDISCLOSED",
+          reason:
+            "The posting did not name an employer. Research and fit are skipped until you supply the employer's name.",
+          companyId: null,
+        }),
+      });
+      return;
+    }
+    if (!companyId) {
+      const created = await resolveOrCreateCompany({ name });
+      if (!created) {
+        throw new TenantError(
+          "The employer could not be saved, so research did not run.",
+        );
+      }
+      companyId = created.id;
+    }
+  }
+
+  await prisma.jobRequirement.create({
+    data: jobRequirementData(input, {
+      disposition: decision.disposition,
+      reason: decision.disposition === "IDENTIFIED" ? null : decision.reason,
+      companyId,
+    }),
+  });
+
+  if (decision.disposition === "IDENTIFIED" && decision.runResearch && companyId) {
+    await researchAndMaybeScore({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      icpId: input.icpId,
+      companyId,
+    });
+  }
+}
+
+function jobRequirementData(
+  input: {
+    organizationId: string;
+    campaignId: string;
+    rawText: string;
+    postingUrl: string | null;
+    parsed: ParsedJobRequirement;
+  },
+  employer: {
+    disposition: "IDENTIFIED" | "AMBIGUOUS" | "UNDISCLOSED";
+    reason: string | null;
+    companyId: string | null;
+  },
+): Prisma.JobRequirementCreateInput {
+  const parsed = input.parsed;
+  return {
+    organization: { connect: { id: input.organizationId } },
+    campaign: { connect: { id: input.campaignId } },
+    rawText: input.rawText,
+    postingUrl: input.postingUrl,
+    title: parsed.title,
+    companyName: parsed.companyName,
+    location: parsed.location,
+    workArrangement: parsed.workArrangement,
+    employmentType: parsed.employmentType,
+    seniority: parsed.seniority,
+    compensationRange: parsed.compensationRange,
+    reportingLine: parsed.reportingLine,
+    responsibilities: jsonValue(parsed.responsibilities),
+    requiredItems: jsonValue(parsed.requiredItems),
+    preferredItems: jsonValue(parsed.preferredItems),
+    scorecardJson: jsonValue(parsed.scorecard),
+    employerDisposition: employer.disposition,
+    employerSkipReason: employer.reason,
+    company: employer.companyId
+      ? { connect: { id: employer.companyId } }
+      : undefined,
+    parserPromptVersion: JOB_REQUIREMENT_PROMPT_VERSION,
+  };
+}
+
+export async function nameApplicationEmployer(input: {
+  organizationId: string;
+  campaignId: string;
+  employerName: string;
+  companyId?: string | null;
+}): Promise<void> {
+  const requirement = await prisma.jobRequirement.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+    include: { campaign: { select: { icpId: true } } },
+  });
+  if (!requirement) {
+    throw new TenantError(
+      `This ${vocab.campaign.singular} has no job requirement.`,
+    );
+  }
+  const name = input.employerName.trim();
+  if (!name && !input.companyId) {
+    throw new TenantError("Enter the employer's name.");
+  }
+  let companyId = input.companyId ?? null;
+  if (companyId) {
+    const company = await prisma.company.findFirst({
+      where: { id: companyId, organizationId: input.organizationId },
+    });
+    if (!company) throw new TenantError("That employer was not found.");
+  } else {
+    const created = await resolveOrCreateCompany({ name });
+    if (!created) {
+      throw new TenantError("The employer could not be saved.");
+    }
+    companyId = created.id;
+  }
+  await prisma.jobRequirement.update({
+    where: { id: requirement.id },
+    data: {
+      suppliedEmployerName: name || undefined,
+      companyName: name || requirement.companyName,
+      companyId,
+      employerDisposition: "IDENTIFIED",
+      employerSkipReason: null,
+    },
+  });
+  await researchAndMaybeScore({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    icpId: requirement.campaign.icpId,
+    companyId,
+  });
+}
+
+export async function rescoreApplicationFit(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const requirement = await prisma.jobRequirement.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+    include: { campaign: { select: { icpId: true } } },
+  });
+  if (!requirement?.companyId || requirement.employerDisposition !== "IDENTIFIED") {
+    throw new TenantError(
+      "Employer fit can be rescored after the employer is confirmed.",
+    );
+  }
+  await scoreFit({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    icpId: requirement.campaign.icpId,
+    companyId: requirement.companyId,
+  });
+}
+
+export async function overrideApplicationFit(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  bucket: string;
+  reason: string;
+}): Promise<void> {
+  const fit = await prisma.applicationFit.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+  });
+  if (!fit) {
+    throw new TenantError("Score employer fit before overriding it.");
+  }
+  const next = applyFitOverride(
+    {
+      bucket: fit.bucket,
+      overrideBucket: fit.overrideBucket,
+      overrideReason: fit.overrideReason,
+      overriddenAt: fit.overriddenAt,
+      stale: fit.stale,
+      staleReason: fit.staleReason,
+      computedAt: fit.computedAt,
+      icpUpdatedAt: fit.icpUpdatedAt,
+      companyResearchUpdatedAt: fit.companyResearchUpdatedAt,
+      interpretationPromptVersion: fit.interpretationPromptVersion,
+    },
+    { bucket: asBucket(input.bucket), reason: input.reason, at: new Date() },
+  );
+  await prisma.applicationFit.update({
+    where: { id: fit.id },
+    data: {
+      overrideBucket: next.overrideBucket,
+      overrideReason: next.overrideReason,
+      overriddenAt: next.overriddenAt,
+      overriddenByUserId: input.userId,
+    },
+  });
+}
+
+export function readApplicationFitStale(input: {
+  stale: boolean;
+  staleReason: string | null;
+  computedAt: Date;
+  icpUpdatedAt: Date;
+  companyResearchUpdatedAt: Date | null;
+  interpretationPromptVersion: string | null;
+  currentIcpUpdatedAt: Date;
+  currentResearchUpdatedAt: Date | null;
+  currentPromptVersion: string | null;
+}): { stale: boolean; reason: string | null } {
+  const derived = applicationFitStaleReason({
+    computedAt: input.computedAt,
+    recordedIcpUpdatedAt: input.icpUpdatedAt,
+    recordedResearchUpdatedAt: input.companyResearchUpdatedAt,
+    recordedPromptVersion: input.interpretationPromptVersion,
+    currentIcpUpdatedAt: input.currentIcpUpdatedAt,
+    currentResearchUpdatedAt: input.currentResearchUpdatedAt,
+    currentPromptVersion: input.currentPromptVersion,
+  });
+  if (input.stale) {
+    return { stale: true, reason: input.staleReason ?? derived };
+  }
+  if (derived) return { stale: true, reason: derived };
+  return { stale: false, reason: null };
+}
+
+export { displayedFitBucket };

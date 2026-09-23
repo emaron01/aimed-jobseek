@@ -154,7 +154,7 @@ Two gaps between the decision and the code:
 
 **Classification: NEW parser. ADAPT company research. ADAPT `Campaign` as the application.**
 
-The application is a `Campaign` with its required `productId` (the Profile) and `icpId` (the selected Target Employer profile). Created from `src/app/actions/` the way `src/lib/campaign/save.ts` creates campaigns. The parsed job requirement should not be a `ProductSource`; it needs a new model or JSON on a new child of `Campaign`. Company research stays on `CompanyResearch`; the prompt content changes. `riskSignals` can hold employer risk without a rename. Hiring and growth do not have columns. Putting them into `buyingSignals` would lie about the column (open question 14).
+The application is a `Campaign` with its required `productId` (the Profile) and `icpId` (the selected Target Employer profile). Created from `src/app/actions/` the way `src/lib/campaign/save.ts` creates campaigns. The parsed job requirement should not be a `ProductSource`; it needs a new model or JSON on a new child of `Campaign`. Company research stays on `CompanyResearch`; the prompt content is in `src/lib/prompt-content/company-research.ts` (version 3). `riskSignals` holds employer risk. Hiring and growth are stored on `hiringSignals`, not in `buyingSignals`.
 
 ### Hiring-team personas (journey step 3 and the personas section)
 
@@ -460,7 +460,7 @@ The vision's Decisions log settles Target Employers, lists, contacts, email, `Ap
 11. **OPEN.** Who supplies the DOCX styles for resume and cover letter? Nothing in the repo is a template. Rendering on demand is decided; the layout is not.
 12. **OPEN.** LinkedIn is paste-only in the vision. Confirm there will be no LinkedIn API.
 13. **OPEN.** Account-level persona templates: new table, or `Persona` rows with a sentinel product? The required `productId` FK makes the sentinel a hidden product, which is a stub. Also: how is a per-application persona scoped so it does not appear under other applications?
-14. **OPEN.** May employer research add columns, or must hiring signals live in existing JSON? The vision forbids renaming. It does not forbid adding.
+14. **RESOLVED.** Hiring and growth are stored on `CompanyResearch.hiringSignals`. They are not written into `buyingSignals`. `estimatedAov` is left null for job-seeker research.
 15. **OPEN.** The referral sentence is the only user-facing "Aimed Outreach" left. Is the referral program itself staying?
 16. **OPEN.** Hiding Contact Sales removes `erik@salesforecaster.io` from the three plan selectors, but the code stays. Which support address does AimedJobSeek use, and should the hidden code read it from `SUPPORT_EMAIL`?
 17. **OPEN.** Outreach cadence anchor. The decision says anchored to the first send. `computeNextDueAt` measures each gap from the latest send. Does the decision mean the clock starts at the first send (no engine change), or that every due date is measured from the first send (engine change)?
@@ -512,16 +512,16 @@ Nouns now come from `src/lib/product-config/vocabulary.ts`. The sentences below 
 - `src/app/(app)/setup/[productId]/page.tsx` — "Relevant {Hiring Team role} functions"
 - `src/components/ProductDraftReview.tsx` — "Who it's for — {Hiring Team role} functions"
 
-### Applications / campaigns (8)
+### Applications / campaigns (8) — done
 
-- `src/lib/campaign/save.ts` — "Campaign name is required."
-- `src/lib/campaign/save.ts` — "Product is required."
-- `src/lib/campaign/save.ts` — "ICP is required."
-- `src/components/NewCampaignForm.tsx` — "{Application} offer"
-- `src/components/NewCampaignForm.tsx` — "Offers are {application}-specific and used in email copy when present."
-- `src/components/NewCampaignForm.tsx` — offer name placeholder "Free Forecast Audit"
-- `src/lib/product-config/vocabulary.ts` — `offerCallToActionPlaceholder`: "Book a demo"
-- `src/lib/scoring/score-contact.ts` — "Ready to include in outreach."
+- `src/lib/campaign/save.ts` — "{Application} name is required."
+- `src/lib/campaign/save.ts` — "{Profile} is required."
+- `src/lib/campaign/save.ts` — "{Target Employer profile} is required."
+- `src/components/NewCampaignForm.tsx` — posting paste and optional URL; the offer block is gone from new applications
+- `src/components/NewCampaignForm.tsx` — "{Application} guidance" steers materials for this application
+- `src/components/NewCampaignForm.tsx` — no "Free Forecast Audit" placeholder
+- `src/lib/product-config/vocabulary.ts` — `offerCallToActionPlaceholder`: "Request a conversation"
+- `src/lib/scoring/score-contact.ts` — "Meets the scored criteria."
 
 ### Contacts / lists (5)
 

@@ -36,7 +36,7 @@ export default async function NewCampaignPage() {
     <div>
       <PageHeader
         title={`New ${vocab.campaign.singular}`}
-        description={`Select the ${vocab.product.singular}, ${vocab.icp.singular}, and ${vocab.persona.plural} in play. ${vocab.icp.singular} and ${vocab.persona.singular} options are filtered by ${vocab.product.singular} and validated server-side.`}
+        description={`Paste a job posting. ${vocab.product.Singular} and ${vocab.icp.singular} are selected for you when you have exactly one; otherwise you choose.`}
         actions={
           <Link
             href="/campaigns"
@@ -82,7 +82,7 @@ export default async function NewCampaignPage() {
             data-testid="campaign-product-setup-required"
           >
             No {vocab.product.plural} are ready for {vocab.campaign.plural} yet. Each {vocab.product.singular} needs
-            approval, {vocab.icp.aSingular} with criteria, and at least one saved {vocab.persona.singular}.
+            approval and {vocab.icp.aSingular} with criteria.
           </p>
         ) : null}
         {unavailableProducts.length > 0 && readyProducts.length > 0 ? (

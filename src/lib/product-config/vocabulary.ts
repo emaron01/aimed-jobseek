@@ -190,7 +190,7 @@ export const vocabExamples = Object.freeze({
     "Organizational function (e.g. Engineering, People) — not “Hiring Leader”.",
   personaOwnershipAreaPlaceholder: "e.g. Engineering hiring process",
   organizationNamePlaceholder: "Acme Sales",
-  offerCallToActionPlaceholder: "Book a demo",
+  offerCallToActionPlaceholder: "Request a conversation",
 });
 
 export type VocabExampleKey = keyof typeof vocabExamples;

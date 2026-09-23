@@ -295,7 +295,7 @@ export async function updateIcp(
     productId?: unknown;
   };
 
-  return prisma.icp.update({
+  const updated = await prisma.icp.update({
     where: { id },
     data: {
       ...safeData,
@@ -303,6 +303,11 @@ export async function updateIcp(
       productId: existing.productId,
     },
   });
+  const { markApplicationFitsStaleForIcp } = await import(
+    "@/lib/application/fit-staleness"
+  );
+  await markApplicationFitsStaleForIcp(organizationId, id);
+  return updated;
 }
 
 export async function deleteIcp(id: string): Promise<{

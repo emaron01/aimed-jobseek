@@ -1,8 +1,9 @@
 /**
  * Research AI prompt versioning (application constant — not env).
+ * v3: job-seeker employer research. Hiring signals are separate from buyingSignals.
  * v2: OpenAI Responses + web_search production research prompt.
  */
-export const RESEARCH_PROMPT_VERSION = "2";
+export const RESEARCH_PROMPT_VERSION = "3";
 
 /** Default when RESEARCH_CONCURRENCY is unset. Tuned for Starter web (512 MB). */
 export const RESEARCH_CONCURRENCY_DEFAULT = 5;

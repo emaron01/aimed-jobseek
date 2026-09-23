@@ -515,6 +515,8 @@ export async function createCampaignAction(
         offerNotes: parsed.fields.offerNotes,
       },
     });
+    const { interpretJobPosting } = await import("@/lib/job-requirement/parse");
+    const parsedJob = await interpretJobPosting(parsed.fields.postingText);
     const campaign = await createCampaign({
       ...parsed.fields,
       contactIds: parsed.contactIds,
@@ -525,6 +527,29 @@ export async function createCampaignAction(
       },
       offerValidationHash: offerValidation.hash,
     });
+    try {
+      const { attachParsedPosting } = await import("@/lib/application/service");
+      await attachParsedPosting({
+        organizationId,
+        campaignId: campaign.id,
+        rawText: parsed.fields.postingText,
+        postingUrl: parsed.fields.postingUrl,
+        parsed: parsedJob,
+        icpId: parsed.fields.icpId,
+      });
+    } catch (attachError) {
+      const { prisma } = await import("@/lib/prisma");
+      await prisma.campaign.delete({ where: { id: campaign.id } }).catch((deleteError) => {
+        console.error(
+          JSON.stringify({
+            event: "application_create_rollback_failed",
+            message:
+              deleteError instanceof Error ? deleteError.message : "unknown",
+          }),
+        );
+      });
+      throw attachError;
+    }
     revalidatePath("/campaigns");
     revalidatePath("/");
     return {

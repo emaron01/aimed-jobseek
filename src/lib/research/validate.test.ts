@@ -17,6 +17,7 @@ describe("research source / confidence validation", () => {
         companySizeContext: null,
         relevantTechnologies: [],
         buyingSignals: [],
+        hiringSignals: [],
         riskSignals: [],
         confidence: "HIGH",
         sources: [
@@ -73,6 +74,7 @@ describe("research source / confidence validation", () => {
         companySizeContext: null,
         relevantTechnologies: [],
         buyingSignals: [],
+        hiringSignals: [],
         riskSignals: [],
         confidence: "MEDIUM",
         sources: [

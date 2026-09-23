@@ -37,6 +37,7 @@ export type CompanyListActuals = {
 export type CompanyResearchActuals = {
   relevantTechnologies?: string[] | null;
   buyingSignals?: string[] | null;
+  hiringSignals?: string[] | null;
   riskSignals?: string[] | null;
   primaryMarkets?: string[] | null;
   companySizeContext?: string | null;
@@ -365,6 +366,7 @@ const RESEARCH_TEXT_FIELDS: Array<keyof CompanyResearchActuals> = [
   "businessModel",
   "relevantTechnologies",
   "buyingSignals",
+  "hiringSignals",
   "riskSignals",
   "primaryMarkets",
 ];

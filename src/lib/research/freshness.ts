@@ -14,6 +14,7 @@ type CompanyResearchContent = {
   companySizeContext?: unknown;
   relevantTechnologies?: unknown;
   buyingSignals?: unknown;
+  hiringSignals?: unknown;
   riskSignals?: unknown;
   researchConfidence?: unknown;
 };
@@ -37,6 +38,7 @@ export function hasUsableCompanyResearchFields(
       hasText(research.companySizeContext) ||
       parseStringArray(research.relevantTechnologies).length ||
       parseStringArray(research.buyingSignals).length ||
+      parseStringArray(research.hiringSignals).length ||
       parseStringArray(research.riskSignals).length,
   );
 }

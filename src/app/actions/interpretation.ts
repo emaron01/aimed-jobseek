@@ -375,6 +375,10 @@ export async function decideIcpTargetedSearchAction(
 
     if (decision === "REMOVE") {
       await prisma.icpCriterion.delete({ where: { id: existing.id } });
+      const { markApplicationFitsStaleForIcp } = await import(
+        "@/lib/application/fit-staleness"
+      );
+      await markApplicationFitsStaleForIcp(organizationId, icpId);
       revalidateSetup(productId || undefined);
       return { ok: true, message: "Criterion removed." };
     }

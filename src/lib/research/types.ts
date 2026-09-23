@@ -44,6 +44,7 @@ export type CompanyResearchResult = {
   companySizeContext: string | null;
   relevantTechnologies: string[];
   buyingSignals: string[];
+  hiringSignals: string[];
   riskSignals: string[];
 
   confidence: ResearchConfidenceValue;
@@ -89,6 +90,8 @@ export type CompanyResearchInput = {
   location: string | null;
   /** When omitted, provider uses conservative creation-time defaults only as fallback. */
   depthPolicy?: CompanyResearchDepthPolicy;
+  /** Target Employer researchGuidance lines. They direct evidence search, not fit. */
+  evidenceTargets?: string[];
 };
 
 export interface CompanyResearchProvider {

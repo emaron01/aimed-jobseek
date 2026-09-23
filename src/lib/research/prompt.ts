@@ -1,4 +1,5 @@
 import type { AiMessage } from "@/lib/ai/types";
+import { COMPANY_RESEARCH_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content";
 import { RESEARCH_PROMPT_VERSION } from "@/lib/research/config";
 import type { CompanyResearchInput } from "@/lib/research/types";
 import type { RetrievedEvidenceBundle } from "@/lib/research/sources";
@@ -13,39 +14,29 @@ export function buildCompanyResearchMessages(input: {
   stage?: "initial" | "follow_up" | "final_synthesis";
   searchesRemaining?: number;
 }): AiMessage[] {
+  const evidenceTargets = (input.company.evidenceTargets ?? [])
+    .map((target) => target.trim())
+    .filter(Boolean);
   const system = `You are a production company research analyst.
 Prompt version: ${RESEARCH_PROMPT_VERSION}
 
-Your job is to produce reusable, product-independent company intelligence.
-
-CRITICAL RULES:
-1. Search before assuming uncertain company facts${input.webSearchEnabled ? " (web_search tool is enabled — use it when needed)" : ""}.
-2. Prefer primary sources: official website, product/pricing pages, docs, press releases.
-3. Use multiple sources when useful; resolve contradictions when possible.
-4. Clearly represent uncertainty. Do not invent pricing, AOV, technologies, customers, or markets.
-5. Do NOT cite URLs that were not returned by web search / provided evidence.
-6. Stop when further research is unlikely to materially improve the result. Do not chase AOV alone.
-7. Do NOT evaluate Product / ICP / Persona / Campaign fit — that is scoring.
-8. If company identity is ambiguous (common name, unclear domain), set identityCertainty to AMBIGUOUS, confidence LOW, and leave unsupported fields null.
-9. Estimated AOV only when credible evidence exists — prefer ranges (e.g. $25K–$75K). If insufficient, estimatedAov=null and explain in aovReasoning.
-10. Return a single JSON object matching the schema.
-11. The application owns the search budget. Do not request unbounded follow-up searches.
-
-Source priority: official company pages > reputable business/tech publications > review sites/directories. Do not elevate thin SEO pages to HIGH confidence.`;
+${COMPANY_RESEARCH_SYSTEM_INSTRUCTIONS}
+${input.webSearchEnabled ? "Web search is enabled — use it when needed." : "Web search is not enabled for this pass."}`;
 
   const user = JSON.stringify(
     {
       instruction:
         input.stage === "follow_up"
-          ? "Perform a targeted follow-up search for missing company research dimensions. Avoid repeating prior broad searches."
+          ? "Perform a targeted follow-up search for missing employer-research dimensions. Avoid repeating prior broad searches. Do not estimate deal size."
           : input.webSearchEnabled
             ? input.firstPartyFetchUnavailable
-              ? "Official company website could not be retrieved (blocked, empty, or unavailable). Research this company using web search. Answer: what they sell, who they sell to, markets, business model, relevant technologies, public buying/growth signals, public risk signals, and whether credible AOV/deal-size evidence exists."
-              : "Research this company. Answer: what they sell, who they sell to, markets, business model, relevant technologies, public buying/growth signals, public risk signals, and whether credible AOV/deal-size evidence exists."
-            : "Synthesize company research from the supplied first-party website evidence only. Do not invent facts absent from that evidence. If the evidence is thin, leave fields null/empty — web search will run next to fill gaps.",
+              ? "The official website could not be retrieved. Research this employer with web search: what it does, products, customers, business model, size, stage and funding, hiring and growth, employer risk, recent news, leadership, public culture, and work arrangement."
+              : "Research this employer: what it does, products, customers, business model, size, stage and funding, hiring and growth, employer risk, recent news, leadership, public culture, and work arrangement."
+            : "Synthesize employer research from the supplied first-party website evidence only. Do not invent facts absent from that evidence. If the evidence is thin, leave fields null or empty.",
       searchFocus: input.searchFocus ?? null,
       stage: input.stage ?? "initial",
       searchesRemaining: input.searchesRemaining ?? null,
+      evidenceTargets,
       company: {
         name: input.company.name,
         website: input.company.website,
@@ -58,17 +49,19 @@ Source priority: official company pages > reputable business/tech publications >
       firstPartyEvidenceExcerpts: input.evidence.excerpts,
       webSearchEnabled: input.webSearchEnabled,
       responseSchema: {
-        companySummary: "string|null",
-        whatTheySell: "string|null",
+        companySummary:
+          "string|null — what the company does, stage, funding, recent news, and leadership when evidenced",
+        whatTheySell: "string|null — products",
         customerTypes: ["string"],
         primaryMarkets: ["string"],
         businessModel: "string|null",
-        estimatedAov: "string|null e.g. $25K–$75K or null",
-        aovReasoning: "string|null",
+        estimatedAov: "null",
+        aovReasoning: "null",
         companySizeContext: "string|null",
         relevantTechnologies: ["string"],
-        buyingSignals: ["string"],
-        riskSignals: ["string"],
+        buyingSignals: [],
+        hiringSignals: ["string — hiring and growth only"],
+        riskSignals: ["string — layoffs, restructuring, funding trouble, leadership turnover"],
         confidence: "HIGH|MEDIUM|LOW",
         identityCertainty: "HIGH|MEDIUM|LOW|AMBIGUOUS",
         sources: [

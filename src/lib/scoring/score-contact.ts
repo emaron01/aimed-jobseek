@@ -94,7 +94,7 @@ function recommendedActionForBucket(
 ): string {
   switch (bucket) {
     case "GOOD":
-      return "Ready to include in outreach.";
+      return "Meets the scored criteria.";
     case "EXCLUDED":
       return reason;
     case "NEEDS_REVIEW":

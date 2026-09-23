@@ -11,6 +11,7 @@ import {
 } from "@/lib/interpretation/schema";
 import { personaAiResponseSchema } from "@/lib/persona-research/contract";
 import { productAiResponseSchema } from "@/lib/product-research/contract";
+import { jobRequirementAiResultSchema } from "@/lib/job-requirement/schema";
 import { companyResearchAiResultSchema } from "@/lib/research/assessment";
 import { productSourceDiscoverySchema } from "@/lib/research/source-discovery-contract";
 import { aiScoringAssessmentSchema } from "@/lib/scoring/assessment";
@@ -33,7 +34,8 @@ export type StructuredOutputSchemaEntry = {
     | "CAMPAIGN_OFFER_VALIDATED"
     | "EMAIL_REPLY_CLASSIFIED"
     | "PERSONA_WEB_SEARCH"
-    | "TITLE_SUGGESTION")[];
+    | "TITLE_SUGGESTION"
+    | "JOB_REQUIREMENT_PARSE")[];
 };
 
 /**
@@ -76,6 +78,11 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
     schemaName: "contact_role_research",
     schema: contactResearchAiResultSchema,
     usageOperations: ["CONTACT_RESEARCH_SYNTHESIS"],
+  },
+  jobRequirement: {
+    schemaName: "job_requirement_parse",
+    schema: jobRequirementAiResultSchema,
+    usageOperations: ["JOB_REQUIREMENT_PARSE"],
   },
   companyResearch: {
     schemaName: "CompanyResearchAiResult",

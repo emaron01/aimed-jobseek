@@ -184,6 +184,12 @@ enum QualificationBucket {
   EXCLUDED
 }
 
+enum JobEmployerDisposition {
+  IDENTIFIED
+  AMBIGUOUS
+  UNDISCLOSED
+}
+
 enum QualificationOverrideTarget {
   COMPANY
   CONTACT
@@ -252,6 +258,7 @@ enum UsageOperation {
   EMAIL_REPLY_CLASSIFIED
   EMAIL_DEEPLINK_OPENED
   TITLE_SUGGESTION
+  JOB_REQUIREMENT_PARSE
 }
 
 enum CriterionDataType {
@@ -561,6 +568,8 @@ model Organization {
   referralRedemptionsAsReferrer ReferralRedemption[] @relation("ReferrerRedemptions")
   referralRedemptionsAsReferee  ReferralRedemption[] @relation("RefereeRedemptions")
   supportTickets           SupportTicket[]
+  jobRequirements          JobRequirement[]
+  applicationFits          ApplicationFit[]
 
   @@index([status])
   @@index([accountType])
@@ -653,6 +662,7 @@ model User {
   contactMembershipsAdded  ContactListMembership[]       @relation("ContactMembershipAddedBy")
   sequenceStopsInitiated   CampaignContact[]             @relation("SequenceStoppedBy")
   ownedCampaigns           Campaign[]                    @relation("CampaignOwner")
+  applicationFitOverrides  ApplicationFit[]              @relation("ApplicationFitOverride")
   creditGrantsIssued       OrganizationCreditGrant[]     @relation("CreditGrantedBy")
   companyResearchCredits   CompanyResearchCredit[]       @relation("CompanyResearchCreditUser")
   spendReconciliationsCreated ProviderSpendReconciliation[] @relation("SpendReconciliationCreatedBy")
@@ -1255,8 +1265,9 @@ model Icp {
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   product      Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
   criteria     IcpCriterion[]
-  campaigns    Campaign[]
-  scoringRuns  ScoringRun[]
+  campaigns      Campaign[]
+  scoringRuns    ScoringRun[]
+  applicationFits ApplicationFit[]
 
   @@index([organizationId])
   @@index([organizationId, createdAt])
@@ -1770,9 +1781,10 @@ model Company {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  contacts     Contact[]
-  research     CompanyResearch[]
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contacts        Contact[]
+  research        CompanyResearch[]
+  jobRequirements JobRequirement[]
 
   @@unique([organizationId, normalizedDomain])
   @@index([organizationId])
@@ -1796,6 +1808,8 @@ model CompanyResearch {
   companySizeContext   String?
   relevantTechnologies Json?
   buyingSignals        Json?
+  /// Hiring and growth signals from job-seeker company research. Never copied into buyingSignals.
+  hiringSignals        Json?
   riskSignals          Json?
   /// True when automated research could not safely match evidence to this company.
   identityAmbiguous    Boolean               @default(false)
@@ -2154,9 +2168,11 @@ model Campaign {
   icp          Icp                 @relation(fields: [icpId], references: [id])
   persona      Persona?            @relation(fields: [personaId], references: [id])
   offer        Offer?              @relation(fields: [offerId], references: [id])
-  contacts     CampaignContact[]
+  contacts       CampaignContact[]
   personasInPlay CampaignPersona[]
   sourcedScoringRuns ScoringRun[]
+  jobRequirement JobRequirement?
+  applicationFit ApplicationFit?
 
   @@index([organizationId])
   @@index([organizationId, createdAt])
@@ -2168,6 +2184,73 @@ model Campaign {
   @@index([icpId])
   @@index([personaId])
   @@index([offerId])
+}
+
+/// Structured job requirement parsed from one pasted posting. One per application.
+model JobRequirement {
+  id                   String                  @id @default(cuid())
+  organizationId       String
+  campaignId           String                  @unique
+  rawText              String
+  postingUrl           String?
+  title                String?
+  companyName          String?
+  location             String?
+  workArrangement      String?
+  employmentType       String?
+  seniority            String?
+  compensationRange    String?
+  reportingLine        String?
+  responsibilities     Json?
+  requiredItems        Json?
+  preferredItems       Json?
+  scorecardJson        Json
+  employerDisposition  JobEmployerDisposition  @default(IDENTIFIED)
+  employerSkipReason   String?
+  suppliedEmployerName String?
+  companyId            String?
+  parserPromptVersion  String?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  company      Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([companyId])
+}
+
+/// Employer fit for one application. A mismatch is a signal; nothing downstream reads it as a gate.
+model ApplicationFit {
+  id                          String               @id @default(cuid())
+  organizationId              String
+  campaignId                  String               @unique
+  icpId                       String
+  interpretationPromptVersion String?
+  bucket                      QualificationBucket
+  outcomesJson                Json
+  computedAt                  DateTime
+  companyResearchId           String?
+  companyResearchUpdatedAt    DateTime?
+  icpUpdatedAt                DateTime
+  stale                       Boolean              @default(false)
+  staleReason                 String?
+  overrideBucket              QualificationBucket?
+  overrideReason              String?
+  overriddenAt                DateTime?
+  overriddenByUserId          String?
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  icp          Icp          @relation(fields: [icpId], references: [id], onDelete: Restrict)
+  overriddenBy User?        @relation("ApplicationFitOverride", fields: [overriddenByUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([icpId])
+  @@index([overriddenByUserId])
 }
 
 /// Personas a campaign will email. Empty means all personas for the product.

@@ -46,6 +46,7 @@ describe("research freshness", () => {
       companySizeContext: null,
       relevantTechnologies: null,
       buyingSignals: null,
+      hiringSignals: null,
       riskSignals: null,
       identityAmbiguous: false,
       researchConfidence: "HIGH" as const,

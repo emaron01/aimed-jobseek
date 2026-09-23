@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ApplicationWorkspace } from "@/components/ApplicationWorkspace";
 import { notFound } from "next/navigation";
 import { deleteCampaignAction, archiveCampaignAction, unarchiveCampaignAction } from "@/app/actions";
 import { CampaignContactsManager } from "@/components/CampaignContactsManager";
@@ -455,6 +456,11 @@ export default async function CampaignDetailPage({
 
   return (
     <div className="space-y-6">
+      <ApplicationWorkspace
+        campaignId={campaign.id}
+        organizationId={organization.id}
+        canEdit={canEditTemplate && !campaignArchived}
+      />
       <PageHeader
         title={campaign.name}
         description={`Stage ${stages.find((stage) => stage.key === currentStage)?.number}: ${stages.find((stage) => stage.key === currentStage)?.label}`}

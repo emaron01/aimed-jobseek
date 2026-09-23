@@ -32,6 +32,7 @@ export type SufficiencyInput = {
     primaryMarkets?: string[] | null;
     relevantTechnologies?: string[] | null;
     buyingSignals?: string[] | null;
+    hiringSignals?: string[] | null;
     riskSignals?: string[] | null;
     estimatedAov?: string | null;
   };
@@ -84,7 +85,8 @@ export function evaluateEvidenceSufficiency(
     companySizeContext: hasText(input.fields.companySizeContext),
     primaryMarkets: hasList(input.fields.primaryMarkets),
     relevantTechnologies: hasList(input.fields.relevantTechnologies),
-    buyingSignals: hasList(input.fields.buyingSignals),
+    buyingSignals:
+      hasList(input.fields.buyingSignals) || hasList(input.fields.hiringSignals),
     riskSignals: hasList(input.fields.riskSignals),
     estimatedAov: hasText(input.fields.estimatedAov),
   };
@@ -171,7 +173,7 @@ export function buildTargetedSearchFocus(
     companySizeContext: "company size, employees, or scale",
     primaryMarkets: "primary markets and geographies",
     relevantTechnologies: "technologies and integrations used",
-    buyingSignals: "buying or growth signals",
+    buyingSignals: "hiring and growth signals",
     riskSignals: "risk or churn signals",
     estimatedAov: "average order value",
   };

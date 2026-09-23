@@ -12,7 +12,7 @@ import {
 import { formatProductCampaignOmission } from "@/lib/workflow/product-campaign-readiness";
 import { EmailGuidancePromptExamples } from "@/components/EmailGuidancePromptExamples";
 import { Field, SubmitButton } from "@/components/ui";
-import { vocab, vocabExamples } from "@/lib/product-config";
+import { vocab } from "@/lib/product-config";
 
 type Option = { id: string; name: string; productId: string };
 type ProductOption = {
@@ -37,6 +37,7 @@ export function NewCampaignForm({
   const [productId, setProductId] = useState("");
   const [icpId, setIcpId] = useState("");
   const [personaIds, setPersonaIds] = useState<string[]>([]);
+  const [postingText, setPostingText] = useState("");
   const [state, formAction, pending] = useActionState(
     createCampaignAction,
     initial,
@@ -63,10 +64,28 @@ export function NewCampaignForm({
     productPersonas.length > 0 &&
     productPersonas.every((persona) => personaIds.includes(persona.id));
   const canSubmit =
+    Boolean(postingText.trim()) &&
     Boolean(productId) &&
     productReady &&
     Boolean(icpId) &&
     productIcps.some((icp) => icp.id === icpId);
+
+  useEffect(() => {
+    const ready = products.filter((product) => product.ready);
+    if (ready.length !== 1 || productId) return;
+    setProductId(ready[0].id);
+    setPersonaIds(
+      personas
+        .filter((persona) => persona.productId === ready[0].id)
+        .map((persona) => persona.id),
+    );
+  }, [products, personas, productId]);
+
+  useEffect(() => {
+    if (productIcps.length === 1 && icpId !== productIcps[0].id) {
+      setIcpId(productIcps[0].id);
+    }
+  }, [productIcps, icpId]);
 
   useEffect(() => {
     if (!state?.ok) return;
@@ -110,6 +129,31 @@ export function NewCampaignForm({
           {state.message}
         </p>
       ) : null}
+      <div className="md:col-span-2">
+        <label className="block text-sm">
+          <span className="font-medium text-slate-700">Job posting</span>
+          <span className="mt-1 block text-xs text-slate-500">
+            Paste the posting. The URL is stored for reference and is not fetched.
+          </span>
+          <textarea
+            name="postingText"
+            required
+            rows={8}
+            value={postingText}
+            onChange={(event) => setPostingText(event.target.value)}
+            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 focus:ring-2"
+          />
+        </label>
+        {state?.fieldErrors?.postingText ? (
+          <p className="mt-1 text-sm text-red-600">{state.fieldErrors.postingText}</p>
+        ) : null}
+      </div>
+      <Field
+        label="Posting URL"
+        name="postingUrl"
+        defaultValue={restored?.postingUrl}
+        hint="Optional. Not opened or fetched."
+      />
       <Field
         label={`${vocab.campaign.Singular} Name`}
         name="name"
@@ -224,51 +268,6 @@ export function NewCampaignForm({
         </div>
       </fieldset>
 
-      <div className="md:col-span-2 border-t border-slate-200 pt-4">
-        <p className="mb-3 text-sm font-medium text-slate-900">
-          {vocab.campaign.Singular} offer
-        </p>
-        <p className="mb-4 text-sm text-slate-600">
-          Optional. Offers are {vocab.campaign.singular}-specific and used in email copy when
-          present. Leave blank if you do not have one yet — you can still create
-          the {vocab.campaign.singular} and move to {vocab.list.Singular}.
-        </p>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field
-            label="Offer Name"
-            name="offerName"
-            placeholder="Free Forecast Audit"
-            defaultValue={restored?.offerName}
-            hint={`Optional. Not required to create the ${vocab.campaign.singular}.`}
-          />
-          <Field
-            label="Primary CTA"
-            name="offerCta"
-            placeholder={vocabExamples.offerCallToActionPlaceholder}
-            defaultValue={restored?.offerCta}
-            hint="Optional."
-          />
-          <div className="md:col-span-2">
-            <Field
-              label="Offer Description"
-              name="offerDescription"
-              as="textarea"
-              defaultValue={restored?.offerDescription}
-              hint="Optional."
-            />
-          </div>
-          <div className="md:col-span-2">
-            <Field
-              label="Offer Notes"
-              name="offerNotes"
-              as="textarea"
-              defaultValue={restored?.offerNotes}
-              hint="Optional."
-            />
-          </div>
-        </div>
-      </div>
-
       <div className="space-y-4 border-t border-slate-200 pt-4 md:col-span-2">
         <div>
           <p className="text-sm font-medium text-slate-900">Email length</p>
@@ -298,17 +297,19 @@ export function NewCampaignForm({
 
         <div>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Email guidance</span>
+            <span className="font-medium text-slate-700">
+              {vocab.campaign.Singular} guidance
+            </span>
             <span className="mt-1 block text-xs text-slate-500">
-              Steers every generated email in this {vocab.campaign.singular}, up to{" "}
-              {EMAIL_GUIDANCE_MAX_CHARS} characters.
+              Steers materials for this {vocab.campaign.singular}, up to{" "}
+              {EMAIL_GUIDANCE_MAX_CHARS} characters. Stored as application guidance.
             </span>
             <textarea
               name="emailGuidance"
               rows={3}
               maxLength={EMAIL_GUIDANCE_MAX_CHARS}
               defaultValue={restored?.emailGuidance}
-              placeholder="Focus on the feature that removes the most manual work"
+              placeholder="Emphasize the work that matches this role"
               className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 placeholder:text-slate-400 focus:ring-2"
             />
           </label>

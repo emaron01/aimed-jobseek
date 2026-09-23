@@ -27,6 +27,7 @@ function hasSubstantiveFindings(result: CompanyResearchAiResult): boolean {
       result.primaryMarkets.length ||
       result.relevantTechnologies.length ||
       result.buyingSignals.length ||
+      result.hiringSignals.length ||
       result.riskSignals.length,
   );
 }
@@ -91,6 +92,7 @@ export function validateCompanyResearchResult(
       companySizeContext: null,
       relevantTechnologies: [],
       buyingSignals: [],
+      hiringSignals: [],
       riskSignals: [],
       confidence: "LOW",
       sources: [],
@@ -122,6 +124,7 @@ export function validateCompanyResearchResult(
     companySizeContext: raw.companySizeContext,
     relevantTechnologies: raw.relevantTechnologies,
     buyingSignals: raw.buyingSignals,
+    hiringSignals: raw.hiringSignals,
     riskSignals: raw.riskSignals,
     confidence,
     sources,

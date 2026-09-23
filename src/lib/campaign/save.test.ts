@@ -24,6 +24,7 @@ describe("parseCampaignFormData", () => {
     const parsed = parseCampaignFormData(
       formFrom({
         name: "Q1 Outreach",
+        postingText: "Senior engineer at Acme",
         productId: "prod_1",
         icpId: "icp_1",
         personaId: "persona_1",
@@ -42,7 +43,8 @@ describe("parseCampaignFormData", () => {
     const parsed = parseCampaignFormData(
       formFrom({ name: "X", productId: "prod_1" }),
     );
-    expect(parsed.fieldErrors.icpId).toBe("ICP is required.");
+    expect(parsed.fieldErrors.icpId).toBe("Target Employer profile is required.");
+    expect(parsed.fieldErrors.postingText).toBe("Paste the job posting.");
     expect(parsed.fieldErrors.personaId).toBeUndefined();
     expect(parsed.fields.personaId).toBeNull();
     expect(parsed.fields.personaIds).toEqual([]);
@@ -52,6 +54,7 @@ describe("parseCampaignFormData", () => {
     const parsed = parseCampaignFormData(
       formFrom({
         name: "Q1 Outreach",
+        postingText: "Senior engineer at Acme",
         productId: "prod_1",
         icpId: "icp_1",
         allPersonas: "1",

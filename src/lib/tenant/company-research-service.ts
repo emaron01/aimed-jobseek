@@ -11,7 +11,9 @@ import type {
   ResearchConfidence,
   ResearchMethod,
 } from "@prisma/client";
+import { markApplicationFitsStaleForCompany } from "@/lib/application/fit-staleness";
 import { prisma } from "@/lib/prisma-client";
+import { jobSeekerResearchColumns } from "@/lib/research/job-seeker-columns";
 import {
   domainFromEmail,
   hasUsableCompanyResearchFields,
@@ -788,7 +790,12 @@ export async function saveCompanyResearch(input: {
       ? (prior.firstResearchedByUserId ?? null)
       : (input.researchedByUserId ?? null);
 
-    return tx.companyResearch.create({
+    const automated = (input.researchMethod ?? "AUTOMATED") === "AUTOMATED";
+    const seekerColumns = automated
+      ? jobSeekerResearchColumns(input.result)
+      : null;
+
+    const saved = await tx.companyResearch.create({
       data: {
         organizationId,
         companyId: company.id,
@@ -799,11 +806,20 @@ export async function saveCompanyResearch(input: {
         customerTypes: input.result.customerTypes,
         primaryMarkets: input.result.primaryMarkets,
         businessModel: input.result.businessModel,
-        estimatedAov: input.result.estimatedAov,
-        aovReasoning: input.result.aovReasoning,
+        estimatedAov: seekerColumns
+          ? seekerColumns.estimatedAov
+          : input.result.estimatedAov,
+        aovReasoning: seekerColumns
+          ? seekerColumns.aovReasoning
+          : input.result.aovReasoning,
         companySizeContext: input.result.companySizeContext,
         relevantTechnologies: input.result.relevantTechnologies,
-        buyingSignals: input.result.buyingSignals,
+        buyingSignals: seekerColumns
+          ? seekerColumns.buyingSignals
+          : input.result.buyingSignals,
+        hiringSignals: seekerColumns
+          ? seekerColumns.hiringSignals
+          : (input.result.hiringSignals ?? []),
         riskSignals: input.result.riskSignals,
         identityAmbiguous: input.identityAmbiguous ?? false,
         researchConfidence: input.result.confidence,
@@ -826,6 +842,8 @@ export async function saveCompanyResearch(input: {
         firstResearchedByUserId,
       },
     });
+    await markApplicationFitsStaleForCompany(tx, organizationId, company.id);
+    return saved;
   });
 }
 
@@ -853,7 +871,7 @@ export type ResearchCompanyResult = {
 
 export async function researchCompany(
   companyId: string,
-  options?: { force?: boolean },
+  options?: { force?: boolean; evidenceTargets?: string[] },
 ): Promise<ResearchCompanyResult> {
   // Tenant ownership check BEFORE any external API spend.
   const organizationId = await orgId();
@@ -1064,6 +1082,7 @@ export async function researchCompany(
       employeeCount: company.employeeCount,
       location: company.location,
       depthPolicy: researchPolicy,
+      evidenceTargets: options?.evidenceTargets,
     })) as CompanyResearchResult | AutomatedCompanyResearchResult;
 
     const provenance =

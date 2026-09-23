@@ -21,6 +21,7 @@ export const companyResearchAiResultSchema = z.object({
   companySizeContext: z.string().nullable(),
   relevantTechnologies: z.array(z.string()),
   buyingSignals: z.array(z.string()),
+  hiringSignals: z.array(z.string()),
   riskSignals: z.array(z.string()),
   confidence: z.enum(["HIGH", "MEDIUM", "LOW"]),
   /** Identity certainty — AMBIGUOUS forces partial/low-confidence handling. */
