@@ -1,9 +1,14 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteIcpAction, upsertIcpAction } from "@/app/actions";
-import { interpretIcpAction } from "@/app/actions/interpretation";
+import {
+  approveStarterTargetEmployerAction,
+  interpretIcpAction,
+  previewStarterTargetEmployerAction,
+} from "@/app/actions/interpretation";
+import { IcpCriteriaBriefing } from "@/components/IcpBriefingDocument";
 import { ConfirmDeleteForm } from "@/components/ConfirmDeleteForm";
 import { ExportPdfButton } from "@/components/ExportPdfButton";
 import { IcpBriefingDocument } from "@/components/IcpBriefingDocument";
@@ -18,7 +23,8 @@ import {
   type IcpClientRecord,
   type IcpFormValues,
 } from "@/lib/icp/save";
-import { vocab } from "@/lib/product-config";
+import { criterionFlags, vocab } from "@/lib/product-config";
+import type { StarterTargetEmployerDraft } from "@/lib/icp/save";
 
 type CriterionRow = IcpCriterionReviewRow;
 
@@ -54,12 +60,20 @@ function defaultsFromIcp(icp?: IcpClientRecord): Partial<IcpFormValues> {
 
 function NewIcpForm({
   productId,
-  productName,
+  profileApproved,
+  autoDraftFromProfile,
 }: {
   productId: string;
   productName?: string;
+  profileApproved?: boolean;
+  autoDraftFromProfile?: boolean;
 }) {
   const router = useRouter();
+  const [mode, setMode] = useState<"choose" | "scratch" | "draft">(
+    profileApproved ? "choose" : "scratch",
+  );
+  const [starterDraft, setStarterDraft] =
+    useState<StarterTargetEmployerDraft | null>(null);
   const [state, formAction, pending] = useActionState(
     upsertIcpAction,
     initialResult,
@@ -68,21 +82,37 @@ function NewIcpForm({
     interpretIcpAction,
     initialResult,
   );
+  const [previewState, previewAction, previewPending] = useActionState(
+    previewStarterTargetEmployerAction,
+    initialResult,
+  );
+  const [approveState, approveAction, approvePending] = useActionState(
+    approveStarterTargetEmployerAction,
+    initialResult,
+  );
 
-  const definitionPlaceholder = productName?.trim()
-    ? `Describe companies that should buy ${productName.trim()} — industry, size, geography, and other fit signals.`
-    : `Describe the companies that should buy this ${vocab.product.singular} — industry, size, geography, and other fit signals.`;
+  const definitionPlaceholder = `Describe the companies you want to work for — size, industry, stage, geography, work arrangement, culture, and anything you will not consider.`;
 
-  const restored = state && !state.ok ? state.values : undefined;
+  const activeState = mode === "draft" ? approveState : state;
+  const restored =
+    activeState && !activeState.ok ? activeState.values : undefined;
   const defaults: Partial<IcpFormValues> = useMemo(
-    () => restored ?? {},
-    [restored],
+    () => restored ?? (starterDraft
+      ? {
+          name: starterDraft.name,
+          definition: starterDraft.definition,
+          additionalContext: starterDraft.additionalContext,
+        }
+      : {}),
+    [restored, starterDraft],
   );
   const existingIcpId = String(state?.icpId || defaults.id || "").trim();
   const formKey =
-    state && !state.ok
-      ? `icp-fail-${state.message}-${defaults.definition?.slice(0, 24) ?? ""}`
-      : "icp-new";
+    activeState && !activeState.ok
+      ? `icp-fail-${activeState.message}-${defaults.definition?.slice(0, 24) ?? ""}`
+      : starterDraft
+        ? `icp-draft-${starterDraft.name}`
+        : "icp-new";
 
   useEffect(() => {
     if (!state?.ok || !state.icpId) return;
@@ -90,23 +120,86 @@ function NewIcpForm({
   }, [state, productId, router]);
 
   useEffect(() => {
+    if (!approveState?.ok || !approveState.icpId) return;
+    router.push(`/setup/${productId}/icps/${approveState.icpId}`);
+  }, [approveState, productId, router]);
+
+  useEffect(() => {
     if (interpretState?.ok) {
       router.refresh();
     }
   }, [interpretState, router]);
 
+  useEffect(() => {
+    if (previewState?.ok && previewState.starterDraft) {
+      setStarterDraft(previewState.starterDraft);
+      setMode("draft");
+    }
+  }, [previewState]);
+
+  const autoPreviewStarted = useRef(false);
+  useEffect(() => {
+    if (!autoDraftFromProfile || !profileApproved || autoPreviewStarted.current) {
+      return;
+    }
+    autoPreviewStarted.current = true;
+    const fd = new FormData();
+    fd.set("productId", productId);
+    previewAction(fd);
+  }, [autoDraftFromProfile, profileApproved, productId, previewAction]);
+
   function fieldHint(key: keyof IcpFormValues): string | undefined {
-    if (!state || state.ok) return undefined;
-    return state.fieldErrors?.[key];
+    if (!activeState || activeState.ok) return undefined;
+    return activeState.fieldErrors?.[key];
   }
+
+  if (profileApproved && mode === "choose") {
+    return (
+      <div
+        className="rounded-md border border-slate-200 p-4 space-y-4"
+        data-testid="icp-starter-offer"
+      >
+        <StatusBanner result={previewState} testId="icp-starter-preview-status" />
+        <p className="text-sm text-slate-700">
+          Draft {vocab.icp.aSingular} from your approved {vocab.product.singular}
+          {"'s"} direction and career goals, or write one from scratch.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <form action={previewAction}>
+            <input type="hidden" name="productId" value={productId} />
+            <SubmitButton disabled={previewPending}>
+              {previewPending
+                ? "Drafting…"
+                : `Draft from my ${vocab.product.Singular}`}
+            </SubmitButton>
+          </form>
+          <SecondaryButton type="button" onClick={() => setMode("scratch")}>
+            Write from scratch
+          </SecondaryButton>
+        </div>
+      </div>
+    );
+  }
+
+  const savePending = mode === "draft" ? approvePending : pending;
+  const saveAction = mode === "draft" ? approveAction : formAction;
 
   return (
     <div className="rounded-md border border-slate-200 p-4" data-testid="icp-form">
-      <StatusBanner result={state} />
+      <StatusBanner result={activeState} />
       <StatusBanner result={interpretState} testId="icp-interpret-status" />
+      <StatusBanner result={previewState} testId="icp-starter-preview-status" />
+      {mode === "draft" && starterDraft ? (
+        <p
+          className="mb-3 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900"
+          data-testid="starter-draft-inference"
+        >
+          {criterionFlags.inference}
+        </p>
+      ) : null}
       <form
         key={formKey}
-        action={formAction}
+        action={saveAction}
         className="grid gap-4 md:grid-cols-2"
         data-testid="icp-details-form"
       >
@@ -195,8 +288,27 @@ function NewIcpForm({
           defaultValue={defaults.requiredTechnologies}
           hint={fieldHint("requiredTechnologies")}
         />
+        {mode === "draft" && starterDraft ? (
+          <>
+            <input
+              type="hidden"
+              name="starterCriteriaJson"
+              value={JSON.stringify(starterDraft.criteria)}
+            />
+            <input
+              type="hidden"
+              name="interpretationSummary"
+              value={starterDraft.interpretationSummary ?? ""}
+            />
+            <input
+              type="hidden"
+              name="interpretationUndetermined"
+              value={starterDraft.interpretationUndetermined ?? ""}
+            />
+          </>
+        ) : null}
         <Field
-          label={`Positive ${vocab.buyingSignal.TitlePlural}`}
+          label={`Positive ${vocab.employerSignal.TitlePlural}`}
           name="positiveSignals"
           defaultValue={defaults.positiveSignals}
           hint={fieldHint("positiveSignals")}
@@ -216,10 +328,34 @@ function NewIcpForm({
             hint={fieldHint("notes")}
           />
         </div>
+        {mode === "draft" && starterDraft ? (
+          <div className="md:col-span-2" data-testid="starter-draft-criteria">
+            <IcpCriteriaBriefing
+              criteria={starterDraft.criteria}
+              interpretationSummary={starterDraft.interpretationSummary}
+              interpretationUndetermined={starterDraft.interpretationUndetermined}
+            />
+          </div>
+        ) : null}
         <div className="md:col-span-2 flex flex-wrap items-center gap-2">
-          <SubmitButton disabled={pending}>
-            {pending ? "Saving…" : `Save ${vocab.icp.singular}`}
+          <SubmitButton disabled={savePending}>
+            {savePending
+              ? "Saving…"
+              : mode === "draft"
+                ? `Approve and save ${vocab.icp.singular}`
+                : `Save ${vocab.icp.singular}`}
           </SubmitButton>
+          {profileApproved && mode !== "choose" ? (
+            <SecondaryButton
+              type="button"
+              onClick={() => {
+                setStarterDraft(null);
+                setMode("choose");
+              }}
+            >
+              Back
+            </SecondaryButton>
+          ) : null}
           {existingIcpId ? (
             <SecondaryButton
               type="button"
@@ -248,11 +384,15 @@ export function IcpDetailsForm({
   productName,
   icp,
   criteria,
+  profileApproved,
+  autoDraftFromProfile,
 }: {
   productId: string;
   productName?: string;
   icp?: IcpClientRecord;
   criteria: CriterionRow[];
+  profileApproved?: boolean;
+  autoDraftFromProfile?: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -265,9 +405,7 @@ export function IcpDetailsForm({
     initialResult,
   );
 
-  const definitionPlaceholder = productName?.trim()
-    ? `Describe companies that should buy ${productName.trim()} — industry, size, geography, and other fit signals.`
-    : `Describe the companies that should buy this ${vocab.product.singular} — industry, size, geography, and other fit signals.`;
+  const definitionPlaceholder = `Describe the companies you want to work for — size, industry, stage, geography, work arrangement, culture, and anything you will not consider.`;
 
   const restored = state && !state.ok ? state.values : undefined;
   const defaults = useMemo(
@@ -297,7 +435,14 @@ export function IcpDetailsForm({
   }
 
   if (!icp) {
-    return <NewIcpForm productId={productId} productName={productName} />;
+    return (
+      <NewIcpForm
+        productId={productId}
+        productName={productName}
+        profileApproved={profileApproved}
+        autoDraftFromProfile={autoDraftFromProfile}
+      />
+    );
   }
 
   return (
@@ -428,7 +573,7 @@ export function IcpDetailsForm({
               hint={fieldHint("requiredTechnologies")}
             />
             <Field
-              label={`Positive ${vocab.buyingSignal.TitlePlural}`}
+              label={`Positive ${vocab.employerSignal.TitlePlural}`}
               name="positiveSignals"
               defaultValue={defaults.positiveSignals}
               hint={fieldHint("positiveSignals")}

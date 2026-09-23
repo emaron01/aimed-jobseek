@@ -4,11 +4,14 @@
  */
 export {
   countedNoun,
+  criterionFlagLabels,
+  criterionFlags,
   nounForCount,
   vocab,
   vocabExamples,
 } from "./vocabulary";
 export type {
+  CriterionFlagKey,
   NounForm,
   NounForms,
   VocabExampleKey,

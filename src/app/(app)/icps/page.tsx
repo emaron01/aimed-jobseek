@@ -76,7 +76,7 @@ export default async function IcpsPage({
       {icps.length === 0 ? (
         <EmptyState
           title={`No ${vocab.icp.plural} yet`}
-          description={`${vocab.icp.ASingular} defines who you sell to — natural-language criteria interpreted for scoring and ${vocab.campaign.plural}.`}
+          description={`${vocab.icp.ASingular} describes the kind of company you want to work for — natural-language criteria interpreted for scoring and ${vocab.campaign.plural}.`}
           actions={
             canCreate ? (
               <Link

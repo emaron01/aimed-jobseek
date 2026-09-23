@@ -114,6 +114,11 @@ export const vocab = Object.freeze({
     plural: "buying signals",
     article: "a",
   }),
+  employerSignal: noun({
+    singular: "employer signal",
+    plural: "employer signals",
+    article: "an",
+  }),
   solution: noun({ singular: "solution", plural: "solutions", article: "a" }),
   deal: noun({ singular: "deal", plural: "deals", article: "a" }),
   demo: noun({ singular: "demo", plural: "demos", article: "a" }),
@@ -132,6 +137,30 @@ export const vocab = Object.freeze({
   quota: noun({ singular: "quota", plural: "quotas", article: "a" }),
   lead: noun({ singular: "lead", plural: "leads", article: "a" }),
 });
+
+/**
+ * Criterion flag labels. Stored meanings of isRequired / isDisqualifier
+ * are unchanged; these strings are display only.
+ */
+export const criterionFlags = Object.freeze({
+  required: "Must-have",
+  disqualifier: "Deal-breaker",
+  inference: "INFERENCE",
+  limitedPublicEvidence:
+    "Assessed from limited public evidence. Never presented as verified.",
+});
+
+export type CriterionFlagKey = keyof typeof criterionFlags;
+
+export function criterionFlagLabels(flags: {
+  isRequired?: boolean | null;
+  isDisqualifier?: boolean | null;
+}): string[] {
+  const labels: string[] = [];
+  if (flags.isRequired) labels.push(criterionFlags.required);
+  if (flags.isDisqualifier) labels.push(criterionFlags.disqualifier);
+  return labels;
+}
 
 export type VocabKey = keyof typeof vocab;
 export type NounForm = keyof NounForms;

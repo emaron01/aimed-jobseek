@@ -12,3 +12,4 @@
  */
 
 export { PROFILE_SYNTHESIS_SYSTEM_INSTRUCTIONS } from "./profile-synthesis";
+export { ICP_INTERPRETATION_SYSTEM_INSTRUCTIONS } from "./icp-interpretation";

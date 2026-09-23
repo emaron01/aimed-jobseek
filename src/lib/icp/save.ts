@@ -4,6 +4,7 @@
 
 import { parseCommaList } from "@/lib/utils";
 import { TenantError } from "@/lib/tenant/errors";
+import { criterionFlags, vocab } from "@/lib/product-config";
 
 export type IcpActionResult = {
   ok: boolean;
@@ -13,6 +14,40 @@ export type IcpActionResult = {
   /** Echo submitted values so the form can restore them after a failed save. */
   values?: IcpFormValues;
   fieldErrors?: Partial<Record<keyof IcpFormValues, string>>;
+  /** Present only for an unsaved starter draft. Never written until approve. */
+  starterDraft?: StarterTargetEmployerDraft;
+};
+
+export const STARTER_DRAFT_KIND = criterionFlags.inference;
+
+export type StarterCriterionRow = {
+  name: string;
+  description?: string | null;
+  criterionType: string;
+  dataType: string;
+  operator: string;
+  targetValue?: unknown;
+  minValue?: unknown;
+  maxValue?: unknown;
+  allowedValues?: unknown;
+  importance: string;
+  isRequired: boolean;
+  isDisqualifier: boolean;
+  researchGuidance?: string | null;
+  evidenceClass?: string | null;
+  tier?: string | null;
+  isMandatory?: boolean;
+  sortOrder: number;
+};
+
+export type StarterTargetEmployerDraft = {
+  kind: typeof STARTER_DRAFT_KIND;
+  name: string;
+  definition: string;
+  additionalContext: string;
+  criteria: StarterCriterionRow[];
+  interpretationSummary: string | null;
+  interpretationUndetermined: string | null;
 };
 
 export type IcpFormValues = {
@@ -267,14 +302,13 @@ export function parseIcpFormData(formData: FormData): {
   const fieldErrors: Partial<Record<keyof IcpFormValues, string>> = {};
 
   if (!values.productId) {
-    fieldErrors.productId = "Product is required.";
+    fieldErrors.productId = `${vocab.product.Singular} is required.`;
   }
   if (!values.name) {
-    fieldErrors.name = "ICP name is required.";
+    fieldErrors.name = `${vocab.icp.singular} name is required.`;
   }
   if (!values.definition.trim()) {
-    fieldErrors.definition =
-      "Describe your ideal customer before saving. Interpretation uses this definition.";
+    fieldErrors.definition = `Describe the kind of company you want to work for before saving. Interpretation uses this definition.`;
   }
 
   const minEmployees = toOptionalInt(values.minEmployees);
@@ -342,13 +376,13 @@ export function toSafeIcpActionError(error: unknown): string {
   if (error instanceof Error) {
     const msg = error.message.toLowerCase();
     if (msg.includes("unique") || msg.includes("duplicate")) {
-      return "An ICP with this name may already exist for this product.";
+      return `${vocab.icp.ASingular} with this name may already exist for this ${vocab.product.singular}.`;
     }
     if (msg.includes("foreign key") || msg.includes("restrict")) {
-      return "This ICP could not be saved because of a product relationship conflict.";
+      return `This ${vocab.icp.singular} could not be saved because of a ${vocab.product.singular} relationship conflict.`;
     }
   }
-  return "Unable to save ICP. Please try again.";
+  return `Unable to save ${vocab.icp.singular}. Please try again.`;
 }
 
 function toOptionalInt(raw: string): number | null {

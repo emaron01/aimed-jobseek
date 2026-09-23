@@ -2,20 +2,13 @@
 
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   createProductMinimalAction,
   researchAndBuildProductAction,
   retryProductSynthesisAction,
   type ProductSetupActionResult,
 } from "@/app/actions/product-setup";
-import { Field, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, SecondaryButton, SubmitButton } from "@/components/ui";
-import { cn } from "@/lib/utils";
-import type {
-  PersonaDraft,
-  SuggestedBuyerRole,
-  SuggestedPersona,
-} from "@/lib/product-research/contract";
+import { Field, SECONDARY_BUTTON_CLASS, SecondaryButton, SubmitButton } from "@/components/ui";
 import { vocab } from "@/lib/product-config";
 
 const initial: ProductSetupActionResult | null = null;
@@ -220,116 +213,3 @@ export function AssistedProductIntake({
 }
 
 export { ProductDraftReview } from "@/components/ProductDraftReview";
-
-export function SuggestedBuyerRolesPanel({
-  productId,
-  productApproved,
-  roles,
-}: {
-  productId: string;
-  productApproved: boolean;
-  roles: SuggestedBuyerRole[];
-}) {
-  if (!productApproved) {
-    return (
-      <div
-        className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
-        data-testid="suggested-buyer-roles-locked"
-      >
-        Save and approve the {vocab.product.Singular} first. Suggested {vocab.buyer.plural} become
-        available for building {vocab.persona.Plural} after {vocab.product.Singular} approval.
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4" data-testid="suggested-buyer-roles">
-      <div>
-        <h3 className="text-lg font-semibold text-slate-900">
-          Suggested {vocab.buyer.plural}
-        </h3>
-        <p className="mt-1 text-sm text-slate-600">
-          Recommendations only — not {vocab.persona.Plural} yet. Build one {vocab.persona.Singular} at a time.
-          Unused roles incur no {vocab.persona.Singular} research or synthesis cost.
-        </p>
-      </div>
-      {roles.length === 0 ? (
-        <p className="text-sm text-slate-500">
-          No suggested roles from {vocab.product.Singular} synthesis. You can still create a
-          custom {vocab.persona.Singular}.
-        </p>
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {roles.map((role) => (
-            <div
-              key={role.suggestionKey}
-              className="rounded-md border border-slate-200 bg-white p-4"
-            >
-              <p className="font-medium text-slate-900">{role.name}</p>
-              {role.whyThisRoleMatters ? (
-                <p className="mt-2 text-sm text-slate-600">
-                  {role.whyThisRoleMatters}
-                </p>
-              ) : null}
-              {role.likelyTitles.length > 0 ? (
-                <p className="mt-2 text-xs text-slate-500">
-                  Likely titles: {role.likelyTitles.join(", ")}
-                </p>
-              ) : null}
-              <p className="mt-3">
-                <Link
-                  href={`/setup/${productId}/personas/new?role=${encodeURIComponent(role.suggestionKey)}`}
-                  className={cn(PRIMARY_BUTTON_CLASS, "!px-3", "!py-1.5")}
-                >
-                  Build {vocab.persona.Singular}
-                </Link>
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-      <p className="text-sm">
-        <Link
-          href={`/setup/${productId}/personas/new`}
-          className="font-medium text-slate-800 underline"
-        >
-          Create Custom {vocab.persona.Singular}
-        </Link>
-        {" · "}
-        <Link href={`/setup/${productId}`} className="underline">
-          {vocab.product.Singular} {vocab.icp.plural} & {vocab.persona.Plural}
-        </Link>
-      </p>
-    </div>
-  );
-}
-
-/** @deprecated legacy combined draft UI — prefer SuggestedBuyerRolesPanel */
-export function SuggestedPersonasPanel({
-  productId,
-  setupRunId: _setupRunId,
-  suggestions,
-  drafts: _drafts,
-}: {
-  productId: string;
-  setupRunId: string;
-  suggestions: SuggestedPersona[];
-  drafts: PersonaDraft[];
-}) {
-  const roles: SuggestedBuyerRole[] = suggestions.map((s) => ({
-    suggestionKey: s.suggestionKey,
-    name: s.name,
-    likelyTitles: s.likelyTitles ?? [],
-    departmentFunction: s.departmentFunction ?? s.department ?? null,
-    whyThisRoleMatters: s.whyThisRoleMatters ?? s.whyThisPersonaMatters ?? null,
-    confidence: s.confidence ?? "MEDIUM",
-    evidenceRefs: s.evidenceRefs ?? [],
-  }));
-  return (
-    <SuggestedBuyerRolesPanel
-      productId={productId}
-      productApproved
-      roles={roles}
-    />
-  );
-}

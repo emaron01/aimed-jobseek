@@ -1,4 +1,4 @@
-import { vocab } from "@/lib/product-config";
+import { criterionFlags, vocab } from "@/lib/product-config";
 /**
  * ICP criterion evidence class: defaults, heuristics, labels, fingerprints, caps.
  */
@@ -62,6 +62,20 @@ const LIST_DATA_CRITERION_TYPES = new Set([
   "company_size",
 ]);
 
+const COMPANY_RESEARCH_CRITERION_TYPES = new Set([
+  "company_stage",
+  "stage",
+  "growth_trajectory",
+  "growth",
+  "work_arrangement",
+]);
+
+const SEMANTIC_CRITERION_TYPES = new Set([
+  "culture",
+  "values",
+  "culture_values",
+]);
+
 function criterionTypeSlug(value: string): string {
   return value.trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
@@ -76,8 +90,15 @@ export function inferEvidenceClassFromCriterion(input: {
   criterionType: string;
   description?: string | null;
 }): CriterionEvidenceClassValue {
-  if (LIST_DATA_CRITERION_TYPES.has(criterionTypeSlug(input.criterionType))) {
+  const typeSlug = criterionTypeSlug(input.criterionType);
+  if (LIST_DATA_CRITERION_TYPES.has(typeSlug)) {
     return "LIST_DATA";
+  }
+  if (SEMANTIC_CRITERION_TYPES.has(typeSlug)) {
+    return "SEMANTIC";
+  }
+  if (COMPANY_RESEARCH_CRITERION_TYPES.has(typeSlug)) {
+    return "COMPANY_RESEARCH";
   }
 
   const blob = [
@@ -97,17 +118,24 @@ export function inferEvidenceClassFromCriterion(input: {
     return "LIST_DATA";
   }
   if (
-    /\b(market|markets|what they sell|description|positioning|public signal|firmographic)\b/.test(
+    /\b(culture|values|psychological safety|how it feels|team norms)\b/.test(
+      blob,
+    )
+  ) {
+    return "SEMANTIC";
+  }
+  if (
+    /\b(market|markets|what they sell|description|positioning|public signal|firmographic|stage|growth|work arrangement|remote|hybrid)\b/.test(
       blob,
     ) &&
-    !/\b(salesforce|hubspot|crm|certif|building|facility|tooling|tech stack|competitor)\b/.test(
+    !/\b(salesforce|hubspot|crm|certif|building|facility|tooling|tech stack|competitor|greenhouse|lever)\b/.test(
       blob,
     )
   ) {
     return "COMPANY_RESEARCH";
   }
   if (
-    /\b(complex|multi-stakeholder|narrative|positioning fit|culture|maturity)\b/.test(
+    /\b(complex|multi-stakeholder|narrative|positioning fit|maturity)\b/.test(
       blob,
     )
   ) {
@@ -141,6 +169,9 @@ export function resolveIcpEvidenceClass(input: {
 
   if (inferred === "LIST_DATA" || inferred === "COMPANY_RESEARCH") {
     return inferred;
+  }
+  if (inferred === "SEMANTIC") {
+    return "SEMANTIC";
   }
   if (fromAi && fromAi !== "TARGETED_SEARCH") {
     return fromAi;
@@ -216,7 +247,11 @@ export function evidenceClassAvailabilityLabel(
         tone: "warning",
       };
     case "SEMANTIC":
-      return { class: evidenceClass, label: "AI judgment", tone: "neutral" };
+      return {
+        class: evidenceClass,
+        label: "Limited public evidence",
+        tone: "warning",
+      };
   }
 }
 
@@ -256,7 +291,9 @@ export function buildEvidenceClassSummary(
   }
   if (counts.SEMANTIC > 0) {
     parts.push(
-      `${counts.SEMANTIC} ${counts.SEMANTIC === 1 ? "needs" : "need"} AI judgment`,
+      `${counts.SEMANTIC} ${
+        counts.SEMANTIC === 1 ? "is" : "are"
+      } assessed from limited public evidence`,
     );
   }
   if (parts.length === 0) return `${total} criteria.`;
@@ -270,6 +307,15 @@ export const EXPECTATION_SETTING_LINE =
   "Some criteria can only be confirmed in a sales conversation. Contacts where a required criterion is unresolved will surface for review rather than being excluded.";
 
 export const TARGETED_SEARCH_SECTION_TITLE = "May not be verifiable online";
+
+export const LIMITED_PUBLIC_EVIDENCE_CRITERION_WARNING =
+  criterionFlags.limitedPublicEvidence;
+
+export function isLimitedPublicEvidenceClass(
+  evidenceClass: CriterionEvidenceClassValue | string | null | undefined,
+): boolean {
+  return normalizeEvidenceClass(evidenceClass) === "SEMANTIC";
+}
 export const TARGETED_SEARCH_SECTION_BODY =
   "These need a per-company lookup and often return nothing. Confirmed matches count in your favor. Missing evidence is never held against a company — those surface for review instead, and usually need a sales conversation to settle.";
 

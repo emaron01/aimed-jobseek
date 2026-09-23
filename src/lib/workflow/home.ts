@@ -8,7 +8,6 @@ import {
 } from "@/lib/criteria/evidence-class";
 import { getDueContactsForUser, type CampaignDueSummary } from "@/lib/cadence/dashboard";
 import { getMailboxConnectionView } from "@/lib/mailbox/data";
-import { normalizeSuggestedBuyerRoles } from "@/lib/setup/product-overview";
 import { voiceReadiness } from "@/lib/voice/types";
 import { buildHomeSetupLine } from "@/lib/workflow/home-setup-line";
 import {
@@ -108,12 +107,6 @@ export async function getHomeWorkflow(
             orderBy: { createdAt: "asc" },
             select: { id: true, name: true },
           },
-          setupRuns: {
-            where: { status: { in: ["NEEDS_REVIEW", "PARTIAL", "APPROVED"] } },
-            orderBy: { createdAt: "desc" },
-            take: 1,
-            select: { suggestedPersonasJson: true },
-          },
         },
       }),
       prisma.campaign.findMany({
@@ -191,9 +184,7 @@ export async function getHomeWorkflow(
   const productHref = activeProduct
     ? `/setup/${activeProduct.id}`
     : "/setup/new";
-  const suggestedRoleCount = normalizeSuggestedBuyerRoles(
-    activeProduct?.setupRuns[0]?.suggestedPersonasJson,
-  ).length;
+  const suggestedRoleCount = 0;
   const totalIcps = products.reduce(
     (count, product) =>
       count + product.icps.filter(hasInterpretedCriteria).length,

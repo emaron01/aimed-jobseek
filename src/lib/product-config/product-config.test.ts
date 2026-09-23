@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   brand,
   countedNoun,
+  criterionFlagLabels,
+  criterionFlags,
   FEATURE_FLAGS,
   features,
   nounForCount,
@@ -29,6 +31,11 @@ describe("vocabulary", () => {
     expect(vocab.account.singular).toBe("employer");
     expect(nounForCount(1, vocab.contact)).toBe("contact");
     expect(countedNoun(3, vocab.contact)).toBe("3 contacts");
+    expect(criterionFlags.required).toBe("Must-have");
+    expect(criterionFlags.disqualifier).toBe("Deal-breaker");
+    expect(criterionFlagLabels({ isRequired: true, isDisqualifier: true })).toEqual(
+      ["Must-have", "Deal-breaker"],
+    );
   });
 });
 

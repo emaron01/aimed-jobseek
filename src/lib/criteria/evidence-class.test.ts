@@ -911,11 +911,15 @@ describe("ICP interpretation prose + definition isolation", () => {
 
   it("prompt describes evidenceClass and the structured schema requires the key", () => {
     const icp = readFileSync("src/lib/interpretation/icp.ts", "utf8");
-    expect(icp).toContain("Assign evidenceClass using these definitions");
+    const content = readFileSync(
+      "src/lib/prompt-content/icp-interpretation.ts",
+      "utf8",
+    );
+    expect(content).toContain("Assign evidenceClass using these definitions");
     expect(icp).toContain(
       'evidenceClass: "LIST_DATA|COMPANY_RESEARCH|TARGETED_SEARCH|SEMANTIC"',
     );
-    expect(icp).toContain('"Industry is X" → LIST_DATA');
+    expect(content).toContain('"Industry is X" → LIST_DATA');
 
     const jsonSchema = zodToOpenAiStrictJsonSchema(
       icpInterpretationResultSchema,
@@ -943,21 +947,25 @@ describe("ICP interpretation prose + definition isolation", () => {
 });
 
 describe("prompt version + UI seams", () => {
-  it("ICP interpretation prompt version is 5 and asserted in prompt builder", () => {
-    expect(ICP_INTERPRETATION_PROMPT_VERSION).toBe("5");
+  it("ICP interpretation prompt version is 6 and asserted in prompt builder", () => {
+    expect(ICP_INTERPRETATION_PROMPT_VERSION).toBe("6");
     const icp = readFileSync("src/lib/interpretation/icp.ts", "utf8");
+    const content = readFileSync(
+      "src/lib/prompt-content/icp-interpretation.ts",
+      "utf8",
+    );
     expect(icp).toContain("TARGETED_SEARCH");
-    expect(icp).toContain("Uses Salesforce or HubSpot");
-    expect(icp).toContain("array of discrete");
+    expect(content).toContain("Uses Greenhouse or Lever");
+    expect(content).toContain("array of discrete");
     expect(icp).toContain("understoodSummary");
-    expect(icp).toContain("Always use LIST_DATA for these");
+    expect(content).toContain("Always use LIST_DATA for these");
     expect(icp).toContain("logIcpInterpretationEvidenceClasses");
     expect(icp).toContain("resolveIcpEvidenceClass");
     expect(icp).toContain("repairUnlockedIcpEvidenceClasses");
     expect(icp).not.toMatch(/Prefer this when unsure/);
-    expect(icp).not.toMatch(/data:\s*\{[\s\S]*definition:/);
+    expect(icp).not.toMatch(/data:\s*\{[\s\S]{0,400}definition:/);
     const types = readFileSync("src/lib/criteria/types.ts", "utf8");
-    expect(types).toContain('ICP_INTERPRETATION_PROMPT_VERSION = "5"');
+    expect(types).toContain('ICP_INTERPRETATION_PROMPT_VERSION = "6"');
     const evidenceClass = readFileSync("src/lib/criteria/evidence-class.ts", "utf8");
     expect(evidenceClass).toContain("Good to know");
     expect(evidenceClass).toContain("countsTowardTargetedSearchCap");
@@ -982,6 +990,8 @@ describe("prompt version + UI seams", () => {
     expect(ui).toContain("ICP_SECONDARY_TIER_HEADER");
     expect(ui).toContain("May not be verifiable online");
     expect(ui).toContain('data-testid="targeted-search-warning"');
+    expect(ui).toContain('data-testid="limited-public-evidence-warning"');
+    expect(ui).toContain("criterionFlagLabels");
     expect(ui).not.toContain("Evidence source");
     expect(ui).not.toContain("updateIcpEvidenceClassAction");
     expect(ui).not.toContain("From your list");

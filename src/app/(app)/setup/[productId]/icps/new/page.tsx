@@ -11,11 +11,13 @@ import { vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ productId: string }>;
+  searchParams: Promise<{ fromProfile?: string }>;
 };
 
-export default async function NewIcpPage({ params }: PageProps) {
+export default async function NewIcpPage({ params, searchParams }: PageProps) {
   const organization = await getCurrentOrganization();
   const { productId } = await params;
+  const { fromProfile } = await searchParams;
 
   if (!organization) {
     return (
@@ -52,6 +54,8 @@ export default async function NewIcpPage({ params }: PageProps) {
         productId={product.id}
         productName={product.name}
         criteria={[]}
+        profileApproved={product.approvalStatus === "APPROVED"}
+        autoDraftFromProfile={fromProfile === "1"}
       />
     </div>
   );

@@ -2,6 +2,8 @@
 
 import {
   evidenceClassAvailabilityLabel,
+  isLimitedPublicEvidenceClass,
+  LIMITED_PUBLIC_EVIDENCE_CRITERION_WARNING,
   normalizeEvidenceClass,
 } from "@/lib/criteria/evidence-class";
 import {
@@ -15,7 +17,7 @@ import { formatCriterionDisplay } from "@/lib/criteria/types";
 import { ResearchReadSection } from "@/components/research-document";
 import type { IcpCriterionReviewRow } from "@/components/IcpCriteriaReview";
 import { listToCommaString } from "@/lib/utils";
-import { vocab } from "@/lib/product-config";
+import { criterionFlagLabels, vocab } from "@/lib/product-config";
 
 function ReadCriterionRow({ criterion }: { criterion: IcpCriterionReviewRow }) {
   const evidenceClass = normalizeEvidenceClass(criterion.evidenceClass);
@@ -42,6 +44,14 @@ function ReadCriterionRow({ criterion }: { criterion: IcpCriterionReviewRow }) {
       >
         {availability.label}
       </span>
+      {criterionFlagLabels(criterion).map((label) => (
+        <span
+          key={label}
+          className="ml-2 inline-block rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700"
+        >
+          {label}
+        </span>
+      ))}
       {tier === "PRIMARY" && criterion.isMandatory ? (
         <span
           className="ml-2 text-xs font-medium text-red-800"
@@ -49,6 +59,14 @@ function ReadCriterionRow({ criterion }: { criterion: IcpCriterionReviewRow }) {
         >
           Mandatory
         </span>
+      ) : null}
+      {isLimitedPublicEvidenceClass(evidenceClass) ? (
+        <p
+          className="mt-1 text-sm text-amber-950"
+          data-testid="limited-public-evidence-warning"
+        >
+          {LIMITED_PUBLIC_EVIDENCE_CRITERION_WARNING}
+        </p>
       ) : null}
     </li>
   );

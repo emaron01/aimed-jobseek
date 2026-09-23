@@ -68,6 +68,8 @@ describe("ICP incomplete state", () => {
     expect(overviewSrc).toContain("{vocab.icp.singular} not set up yet");
     expect(overviewSrc).toContain("Add {vocab.icp.singular}");
     expect(overviewSrc).not.toContain("Commercial real-estate companies");
+    expect(overviewSrc).not.toContain("Suggested roles not yet built");
+    expect(overviewSrc).not.toContain("SuggestedBuyerRolesPanel");
   });
 });
 

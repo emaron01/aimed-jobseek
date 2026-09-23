@@ -35,10 +35,9 @@ import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
 import { recordUsageEvent } from "@/lib/usage/events";
 import { getResearchPolicy } from "@/lib/usage/policy";
-import {
-  icpInterpretationResultSchema,
-  parseIcpInterpretedCriteria,
-} from "@/lib/interpretation/schema";
+import { parseIcpInterpretedCriteria } from "@/lib/interpretation/schema";
+import { ICP_INTERPRETATION_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content";
+import { vocab } from "@/lib/product-config";
 import type { AiMessage } from "@/lib/ai/types";
 
 function criterionRowToSnapshot(row: IcpCriterion): CriterionSnapshot {
@@ -78,51 +77,9 @@ function buildIcpInterpretationMessages(input: {
   additionalContext: string | null;
   existingCriteria: CriterionSnapshot[];
 }): AiMessage[] {
-  const system = `You are a production ICP interpretation engine.
-Prompt version: ${ICP_INTERPRETATION_PROMPT_VERSION}
+  const system = `Prompt version: ${ICP_INTERPRETATION_PROMPT_VERSION}
 
-Convert natural-language ICP definitions into structured, auditable criteria for company research and scoring.
-
-RULES:
-1. Preserve the user's intent — do not invent requirements not implied by the definition.
-2. Each criterion must be evaluable from company research evidence when possible.
-3. Include researchGuidance describing what evidence to look for.
-4. Use appropriate dataType, operator, and target values.
-5. Mark disqualifiers with isDisqualifier=true when the definition implies hard exclusions.
-6. For operator IN / NOT_IN: targetValue MUST be a JSON array of discrete values.
-   Never put "or" / "and" inside a single string. Example: ["Salesforce", "HubSpot"] not
-   ["Salesforce or HubSpot"].
-7. Assign evidenceClass using these definitions:
-   - LIST_DATA: satisfiable from uploaded list fields (industry, employee count, revenue, geography, domain). Always use LIST_DATA for these — never TARGETED_SEARCH.
-   - COMPANY_RESEARCH: derivable from standard company research (description, markets, public signals, general firmographics).
-   - TARGETED_SEARCH: requires a specific per-company lookup that MAY NOT BE FINDABLE (tech stack / CRM / competitor products in use, certifications, facility counts, headcount by function). Use ONLY for those lookups. Do not default industry, size, revenue, or geography to TARGETED_SEARCH.
-   - SEMANTIC: requires AI judgment over evidence (fit narratives, positioning, complex buying motion).
-   Worked examples:
-   - "Industry is X" → LIST_DATA
-   - "Between 50 and 500 employees" → LIST_DATA
-   - "Company revenue between 50M and 100M" → LIST_DATA
-   - "Geography is United States" → LIST_DATA
-   - "Uses Salesforce or HubSpot" → TARGETED_SEARCH
-   - "Owns 25+ buildings" → TARGETED_SEARCH
-   - "Currently uses [competitor product]" → TARGETED_SEARCH
-   - "Sells complex multi-stakeholder deals" → SEMANTIC
-8. Assign tier using these definitions. The user may later change the assignment.
-    - PRIMARY: firmographics that define the customer (industry, size, revenue, business model, geography). Counts toward ICP fit.
-    - SECONDARY: tooling, tech stack, timing signals, initiatives in flight. Upside only — never a requirement.
-    Worked examples:
-    - "Industry is X" → PRIMARY
-    - "100+ employees" → PRIMARY
-    - "Uses Salesforce or HubSpot" → SECONDARY
-    - "Currently replacing VMware" → SECONDARY
-9. NEVER set a criterion as mandatory. Mandatory is a deliberate user choice after interpretation.
-10. Also return a short plain-language read-back:
-   - understoodSummary: 2–4 sentences describing what you understood from the user's definition.
-     Do not invent requirements. Do not rewrite their narrative as if it were your text.
-   - undetermined: a list of specific facts or constraints named in the definition that you
-     could not turn into a reliable criterion from the available wording (empty array if none).
-11. NEVER return a rewritten definition. The user's narrative is authoritative and is stored
-     separately — you only produce criteria plus this read-back.
-12. Return JSON matching the schema only.`;
+${ICP_INTERPRETATION_SYSTEM_INSTRUCTIONS}`;
 
   const user = JSON.stringify({
     product: {
@@ -530,6 +487,156 @@ function applyLockedEvidenceClass(
   };
 }
 
+export type GeneratedIcpInterpretation = {
+  understoodSummary: string;
+  undetermined: string[];
+  drafts: InterpretedCriterionDraft[];
+};
+
+function mapParsedCriteriaToDrafts(
+  parsed: ReturnType<typeof parseIcpInterpretedCriteria>,
+  existingSnapshots: CriterionSnapshot[],
+): InterpretedCriterionDraft[] {
+  return parsed.criteria.map((c) => {
+    const normalized = normalizeInOperatorValues({
+      operator: c.operator,
+      dataType: c.dataType,
+      targetValue: c.targetValue,
+      allowedValues: c.allowedValues,
+    });
+    const evidenceClass = resolveIcpEvidenceClass({
+      proposed: c.evidenceClass,
+      name: c.name,
+      criterionType: c.criterionType,
+      description: c.description,
+    });
+    const draft: InterpretedCriterionDraft = {
+      ...c,
+      targetValue: normalized.targetValue,
+      allowedValues: normalized.allowedValues,
+      evidenceClass,
+      tier: resolveProposedIcpCriterionTier({
+        proposedTier: c.tier,
+        name: c.name,
+        criterionType: c.criterionType,
+        description: c.description,
+        evidenceClass,
+        isDisqualifier: c.isDisqualifier,
+      }),
+      isMandatory: false,
+      source: "AI_INTERPRETED",
+    };
+    return applyLockedEvidenceClass(draft, existingSnapshots);
+  });
+}
+
+/** Interpret a definition without writing Icp or IcpCriterion rows. */
+export async function generateIcpInterpretation(input: {
+  productName: string;
+  productDescription: string | null;
+  definition: string;
+  additionalContext?: string | null;
+  existingCriteria?: CriterionSnapshot[];
+  logIcpId?: string;
+}): Promise<GeneratedIcpInterpretation> {
+  if (!isInterpretationAiConfigured()) {
+    throw new TenantError(
+      `AI interpretation is not configured. You can still write ${vocab.icp.aSingular} from scratch.`,
+    );
+  }
+
+  const existingSnapshots = input.existingCriteria ?? [];
+  const ai = getInterpretationAiProvider();
+  const response = await ai.generateStructured({
+    ...structuredOutputRequest("icpInterpretation"),
+    messages: buildIcpInterpretationMessages({
+      productName: input.productName,
+      productDescription: input.productDescription,
+      definition: input.definition,
+      additionalContext: input.additionalContext ?? null,
+      existingCriteria: existingSnapshots,
+    }),
+  });
+
+  const parsed = parseIcpInterpretedCriteria(response.data);
+  if (input.logIcpId) {
+    logIcpInterpretationEvidenceClasses({
+      icpId: input.logIcpId,
+      rawText: response.rawText,
+      parsed,
+    });
+  }
+
+  return {
+    understoodSummary: parsed.understoodSummary.trim(),
+    undetermined: parsed.undetermined
+      .map((item) => item.trim())
+      .filter(Boolean),
+    drafts: mapParsedCriteriaToDrafts(parsed, existingSnapshots),
+  };
+}
+
+export async function persistGeneratedIcpCriteria(input: {
+  organizationId: string;
+  icpId: string;
+  drafts: InterpretedCriterionDraft[];
+  understoodSummary: string;
+  undetermined: string[];
+}): Promise<{ criteria: CriterionSnapshot[]; version: number }> {
+  const icp = await prisma.icp.findFirst({
+    where: { id: input.icpId, organizationId: input.organizationId },
+  });
+  if (!icp) {
+    throw new TenantError(
+      `${vocab.icp.singular} not found in the active organization.`,
+    );
+  }
+
+  const policy = await getResearchPolicy(input.organizationId);
+  const cap = checkTargetedSearchCap({
+    criteria: input.drafts.map((d) => ({
+      name: d.name,
+      evidenceClass: normalizeEvidenceClass(d.evidenceClass),
+      tier: d.tier,
+    })),
+    maxAllowed: policy.maxTargetedSearchCriteriaPerIcp,
+  });
+  if (!cap.ok) {
+    throw new TenantError(cap.message);
+  }
+
+  const newVersion = icp.interpretationVersion + 1;
+  const now = new Date();
+
+  await prisma.$transaction(async (tx) => {
+    if (input.drafts.length > 0) {
+      await tx.icpCriterion.createMany({
+        data: input.drafts.map((d) =>
+          draftToCreateData(input.organizationId, input.icpId, d),
+        ),
+      });
+    }
+
+    await tx.icp.update({
+      where: { id: input.icpId },
+      data: {
+        interpretationVersion: newVersion,
+        interpretationPromptVersion: ICP_INTERPRETATION_PROMPT_VERSION,
+        lastInterpretedAt: now,
+        interpretationSummary: input.understoodSummary.trim() || null,
+        interpretationUndetermined:
+          input.undetermined
+            .map((item) => item.trim())
+            .filter(Boolean)
+            .join("\n") || null,
+      },
+    });
+  });
+
+  const criteria = await listIcpCriteria(input.organizationId, input.icpId);
+  return { criteria, version: newVersion };
+}
+
 export async function interpretIcpDefinition(input: {
   organizationId: string;
   icpId: string;
@@ -566,57 +673,21 @@ export async function interpretIcpDefinition(input: {
     null;
 
   try {
-    const ai = getInterpretationAiProvider();
     providerSummary = getAiConfigPublicSummary(getInterpretationAiConfig());
 
-    const response = await ai.generateStructured({
-      ...structuredOutputRequest("icpInterpretation"),
-      messages: buildIcpInterpretationMessages({
-        productName: icp.product.name,
-        productDescription: icp.product.description,
-        definition,
-        additionalContext: icp.additionalContext,
-        existingCriteria: existingSnapshots,
-      }),
+    const generated = await generateIcpInterpretation({
+      productName: icp.product.name,
+      productDescription: icp.product.description,
+      definition,
+      additionalContext: icp.additionalContext,
+      existingCriteria: existingSnapshots,
+      logIcpId: input.icpId,
     });
-
-    const parsed = parseIcpInterpretedCriteria(response.data);
-    logIcpInterpretationEvidenceClasses({
-      icpId: input.icpId,
-      rawText: response.rawText,
-      parsed,
-    });
-    const aiDrafts: InterpretedCriterionDraft[] = parsed.criteria.map((c) => {
-      const normalized = normalizeInOperatorValues({
-        operator: c.operator,
-        dataType: c.dataType,
-        targetValue: c.targetValue,
-        allowedValues: c.allowedValues,
-      });
-      const evidenceClass = resolveIcpEvidenceClass({
-        proposed: c.evidenceClass,
-        name: c.name,
-        criterionType: c.criterionType,
-        description: c.description,
-      });
-      const draft: InterpretedCriterionDraft = {
-        ...c,
-        targetValue: normalized.targetValue,
-        allowedValues: normalized.allowedValues,
-        evidenceClass,
-        tier: resolveProposedIcpCriterionTier({
-          proposedTier: c.tier,
-          name: c.name,
-          criterionType: c.criterionType,
-          description: c.description,
-          evidenceClass,
-          isDisqualifier: c.isDisqualifier,
-        }),
-        isMandatory: false,
-        source: "AI_INTERPRETED",
-      };
-      return applyLockedEvidenceClass(draft, existingSnapshots);
-    });
+    const aiDrafts = generated.drafts;
+    const parsed = {
+      understoodSummary: generated.understoodSummary,
+      undetermined: generated.undetermined,
+    };
 
     const plan = planCriterionReinterpretation({
       existing: criteriaAfterRepair.map((c) => ({

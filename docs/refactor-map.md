@@ -429,7 +429,7 @@ The vision's Decisions log settles Target Employers, lists, contacts, email, `Ap
 
 **Prompt content layer (established by the Profile slice).** Product-specific instructions, rules, and examples live in `src/lib/prompt-content/`. Payload assembly, version constants, model calls, and parsing stay in the shared generation modules (`src/lib/product-research/prompt.ts`, `contract.ts`, and the same pattern for later slices). Profile synthesis content is `src/lib/prompt-content/profile-synthesis.ts`, imported by the assembler. Later slices add a file beside it and import it from the existing assembler. Do not put sales or job-seeker instructions back into the assembler, and do not change other areas' prompts from a slice that is not theirs. Bump the version constant when content changes so stored `promptVersion` values stay meaningful.
 
-**Prompt split for remaining areas.** Machinery and sales content still share template literals for email, company research, persona synthesis, ICP interpretation, and scoring, especially `EMAIL_GENERATION_PROMPT_VERSION` 18. Follow the Profile slice pattern: extract content into `src/lib/prompt-content/`, leave version constants and payload keys where they are. ICP interpretation and scoring prompts are in scope for Target Employers.
+**Prompt split for remaining areas.** Machinery and sales content still share template literals for email, company research, persona synthesis, and scoring, especially `EMAIL_GENERATION_PROMPT_VERSION` 18. ICP interpretation content now lives in `src/lib/prompt-content/icp-interpretation.ts` (version 6). Follow the Profile slice pattern for the remaining areas: extract content into `src/lib/prompt-content/`, leave version constants and payload keys where they are. Scoring prompts stay as-is until a later slice.
 
 **Recommended build order.**
 
@@ -498,12 +498,12 @@ Nouns now come from `src/lib/product-config/vocabulary.ts`. The sentences below 
 - `src/lib/product-config/vocabulary.ts` — Hiring Team title/department examples no longer use CRO, VP Sales, Sales
 - `src/lib/product-research/review.ts` — "Personal site, portfolio, or GitHub URL"
 
-### Target Employers / ICP (4)
+### Target Employers / ICP (4) — done
 
-- `src/app/(app)/icps/page.tsx` — "A Target Employer profile defines who you sell to — natural-language criteria interpreted for scoring and applications."
-- `src/lib/icp/save.ts` — "ICP name is required."
-- `src/lib/icp/save.ts` — "Describe your ideal customer before saving. Interpretation uses this definition."
-- `src/components/IcpDetailsForm.tsx` — "Positive Buying Signals"
+- `src/app/(app)/icps/page.tsx` — `{Target Employer profile.ASingular} describes the kind of company you want to work for — natural-language criteria interpreted for scoring and {applications}.`
+- `src/lib/icp/save.ts` — `{Target Employer profile} name is required.`
+- `src/lib/icp/save.ts` — "Describe the kind of company you want to work for before saving. Interpretation uses this definition."
+- `src/components/IcpDetailsForm.tsx` — "Positive Employer Signals"
 
 ### Hiring Team / personas (4)
 

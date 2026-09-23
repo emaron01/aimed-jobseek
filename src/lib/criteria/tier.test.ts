@@ -156,13 +156,16 @@ describe("existing criterion tier migration", () => {
 
 describe("interpretation prompt includes tier proposal rules", () => {
   it("bumps ICP interpretation prompt version with tier rules", () => {
-    expect(ICP_INTERPRETATION_PROMPT_VERSION).toBe("5");
-    const icp = readFileSync("src/lib/interpretation/icp.ts", "utf8");
-    expect(icp).toContain("Assign tier using these definitions");
-    expect(icp).toContain("NEVER set a criterion as mandatory");
-    expect(icp).toContain("Currently replacing VMware");
+    expect(ICP_INTERPRETATION_PROMPT_VERSION).toBe("6");
+    const content = readFileSync(
+      "src/lib/prompt-content/icp-interpretation.ts",
+      "utf8",
+    );
+    expect(content).toContain("Assign tier using these definitions");
+    expect(content).toContain("NEVER set a criterion as mandatory");
+    expect(content).toContain("Recently opened a new office");
     const types = readFileSync("src/lib/criteria/types.ts", "utf8");
-    expect(types).toContain('ICP_INTERPRETATION_PROMPT_VERSION = "5"');
+    expect(types).toContain('ICP_INTERPRETATION_PROMPT_VERSION = "6"');
     const migration = readFileSync(
       "prisma/migrations/20260825120000_icp_criterion_tier_mandatory/migration.sql",
       "utf8",

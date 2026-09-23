@@ -18,7 +18,7 @@ AimedJobSeek helps job seekers pursue specific jobs with research-backed, person
 ## The user journey
 Setup order: Profile → Target Employers → Applications.
 
-1. Profile: the seeker uploads a resume and other documents, pastes their LinkedIn profile, and adds notes. The system researches and builds a structured candidate profile for review. This reuses product intake (uploads, paste, notes, URLs, Research & Build). Unlike product build, profile build does NOT generate personas and does not suggest buyer roles. The setup rail does not prompt for a persona after the profile.
+1. Profile: the seeker uploads a resume and other documents, pastes their LinkedIn profile, and adds notes. The profile is built from the seeker's supplied materials (uploads, pasted text, notes, and supplied URLs), with no web search for the person. This reuses product intake (uploads, paste, notes, URLs, Research & Build). Unlike product build, profile build does NOT generate personas and does not suggest buyer roles. The setup rail does not prompt for a persona after the profile.
 2. Target Employers: the seeker describes the kind of company they want to work for (culture, stage, size, industry, geography, work arrangement). This is the upstream ICP, with prompt content rewritten for employers; the model and scoring pipeline are reused. Multiple Target Employer profiles are allowed; when only one exists it is selected automatically.
 3. Application: the seeker pastes a job posting and selects a Target Employer profile. The system:
    - parses it into a structured job requirement

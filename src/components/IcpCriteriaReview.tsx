@@ -10,7 +10,9 @@ import {
 } from "@/app/actions/interpretation";
 import {
   criterionMaterialFingerprint,
+  isLimitedPublicEvidenceClass,
   isTargetedSearchDecisionStale,
+  LIMITED_PUBLIC_EVIDENCE_CRITERION_WARNING,
   normalizeEvidenceClass,
   type CriterionEvidenceClassValue,
   type TargetedSearchDecisionValue,
@@ -26,6 +28,7 @@ import {
   type IcpCriterionTierValue,
 } from "@/lib/criteria/tier";
 import { formatCriterionDisplay } from "@/lib/criteria/types";
+import { criterionFlagLabels, criterionFlags } from "@/lib/product-config";
 
 export type IcpCriterionReviewRow = {
   id?: string;
@@ -246,6 +249,19 @@ function CriterionCard({
           evidenceClass,
           tier: normalizeIcpCriterionTier(criterion.tier) ?? undefined,
         })}
+        {criterionFlagLabels(criterion).map((label) => (
+          <span
+            key={label}
+            className="ml-2 inline-block rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700"
+            data-testid={
+              label === criterionFlags.required
+                ? "criterion-flag-required"
+                : "criterion-flag-disqualifier"
+            }
+          >
+            {label}
+          </span>
+        ))}
       </p>
       <TierAndMandatoryForm
         key={`${criterion.id}-${criterion.tier}-${String(criterion.isMandatory)}`}
@@ -259,6 +275,14 @@ function CriterionCard({
           data-testid="targeted-search-warning"
         >
           {TARGETED_SEARCH_CRITERION_WARNING}
+        </p>
+      ) : null}
+      {isLimitedPublicEvidenceClass(evidenceClass) ? (
+        <p
+          className="mt-2 text-xs text-amber-950"
+          data-testid="limited-public-evidence-warning"
+        >
+          {LIMITED_PUBLIC_EVIDENCE_CRITERION_WARNING}
         </p>
       ) : null}
       {needsDecision ? (

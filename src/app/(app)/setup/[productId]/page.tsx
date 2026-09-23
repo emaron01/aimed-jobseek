@@ -9,30 +9,19 @@ import { ExportPdfButton } from "@/components/ExportPdfButton";
 import { PageHeader, Panel, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { listIcpCriteria } from "@/lib/interpretation/icp";
-import { listPersonaCriteria } from "@/lib/interpretation/persona";
 import { factTexts } from "@/lib/product-research/candidate-profile";
 import { productDraftFromApprovedProfile } from "@/lib/product-research/resynthesize-approved-plan";
-import { getProduct, listIcps, listPersonas } from "@/lib/tenant/data";
+import { getProduct, listIcps } from "@/lib/tenant/data";
 import {
   getCurrentOrganization,
   TenantError,
 } from "@/lib/tenant/getCurrentOrganization";
 import { prisma } from "@/lib/prisma";
 import {
-  formatLikelyTitles,
-  formatPersonaCriteriaSummary,
-  normalizeSuggestedBuyerRoles,
-  partitionSuggestedRoles,
   productCompletionLabel,
   productCompletionState,
-  summarizePersonaCriteriaCounts,
   truncateText,
 } from "@/lib/setup/product-overview";
-import {
-  findNearDuplicatePersonaPairs,
-  formatNearDuplicateWarning,
-  parsePersonaListField,
-} from "@/lib/persona/persona-differentiation";
 import { vocab } from "@/lib/product-config";
 
 type PageProps = {
@@ -121,9 +110,8 @@ export default async function SetupProductPage({ params }: PageProps) {
     throw error;
   }
 
-  const [icps, personas, impact, latestRun] = await Promise.all([
+  const [icps, impact] = await Promise.all([
     listIcps(product.id),
-    listPersonas(product.id),
     prisma.product.findFirst({
       where: { id: product.id, organizationId: organization.id },
       include: {
@@ -139,15 +127,6 @@ export default async function SetupProductPage({ params }: PageProps) {
           },
         },
       },
-    }),
-    prisma.productSetupRun.findFirst({
-      where: {
-        organizationId: organization.id,
-        productId: product.id,
-        status: { in: ["NEEDS_REVIEW", "PARTIAL", "APPROVED"] },
-      },
-      orderBy: { createdAt: "desc" },
-      select: { suggestedPersonasJson: true },
     }),
   ]);
 
@@ -174,42 +153,15 @@ export default async function SetupProductPage({ params }: PageProps) {
     return lines.join("\n");
   })();
 
-  const personaCriteriaMap = new Map<
-    string,
-    Awaited<ReturnType<typeof listPersonaCriteria>>
-  >();
   const icpCriteriaMap = new Map<
     string,
     Awaited<ReturnType<typeof listIcpCriteria>>
   >();
-  await Promise.all([
-    ...personas.map(async (persona) => {
-      personaCriteriaMap.set(
-        persona.id,
-        await listPersonaCriteria(organization.id, persona.id),
-      );
-    }),
-    ...icps.map(async (icp) => {
+  await Promise.all(
+    icps.map(async (icp) => {
       icpCriteriaMap.set(icp.id, await listIcpCriteria(organization.id, icp.id));
     }),
-  ]);
-
-  const nearDuplicatePersonaPairs = findNearDuplicatePersonaPairs(
-    personas.map((persona) => ({
-      id: persona.id,
-      name: persona.name,
-      painPoints: parsePersonaListField(persona.painPoints),
-      messagingNotes: parsePersonaListField(persona.messagingNotes),
-    })),
   );
-
-  const suggestedRoles = normalizeSuggestedBuyerRoles(
-    latestRun?.suggestedPersonasJson,
-  );
-  const { unbuiltSuggestions } = partitionSuggestedRoles({
-    savedPersonas: personas,
-    suggestedRoles,
-  });
 
   const completion = productCompletionState(product);
   const productBlurb = truncateText(
@@ -347,130 +299,9 @@ export default async function SetupProductPage({ params }: PageProps) {
           </div>
         </Panel>
 
-        {/* 2. Personas */}
         <div data-print-hide>
         <Panel
-          title={`2. ${vocab.persona.Plural}`}
-          description={`Saved ${vocab.buyer.plural} and suggested roles still available to build.`}
-        >
-          <div className="space-y-5">
-            <div>
-              <h4 className="text-sm font-semibold text-slate-900">
-                Saved {vocab.persona.plural}
-              </h4>
-              {nearDuplicatePersonaPairs.length > 0 ? (
-                <div className="mt-2 space-y-2">
-                  {nearDuplicatePersonaPairs.map((pair) => (
-                    <p
-                      key={`${pair.personaA.id}-${pair.personaB.id}`}
-                      className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950"
-                    >
-                      {formatNearDuplicateWarning(pair)}
-                    </p>
-                  ))}
-                </div>
-              ) : null}
-              {personas.length === 0 ? (
-                <p className="mt-2 text-sm text-slate-500">
-                  None saved yet. Build a suggested role or add a custom {vocab.persona.singular}.
-                </p>
-              ) : (
-                <ul className="mt-2 divide-y divide-slate-100">
-                  {personas.map((persona) => {
-                    const summary = summarizePersonaCriteriaCounts(
-                      personaCriteriaMap.get(persona.id) ?? [],
-                    );
-                    const titles = formatLikelyTitles(persona.targetTitles);
-                    return (
-                      <li
-                        key={persona.id}
-                        className="flex flex-wrap items-start justify-between gap-3 py-3"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-slate-900">
-                            {persona.name}
-                          </p>
-                          {titles ? (
-                            <p className="mt-0.5 text-sm text-slate-500">
-                              {titles}
-                            </p>
-                          ) : null}
-                          <p
-                            className={
-                              summary.needsReview > 0
-                                ? "mt-1 text-xs font-medium text-amber-800"
-                                : "mt-1 text-xs text-slate-500"
-                            }
-                          >
-                            {formatPersonaCriteriaSummary(summary)}
-                          </p>
-                          {summary.needsReview > 0 ? (
-                            <p className="mt-1 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-950">
-                              {summary.needsReview} need
-                              {summary.needsReview === 1 ? "s" : ""} review —
-                              not scored until classified on Edit.
-                            </p>
-                          ) : null}
-                        </div>
-                        <ActionLink
-                          href={`/setup/${product.id}/personas/manage/${persona.id}`}
-                        >
-                          Edit
-                        </ActionLink>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-
-            <div className="border-t border-slate-100 pt-4">
-              <h4 className="text-sm font-semibold text-slate-900">
-                Suggested roles not yet built
-              </h4>
-              {unbuiltSuggestions.length === 0 ? (
-                <p className="mt-2 text-sm text-slate-500">
-                  {suggestedRoles.length === 0
-                    ? `No suggested roles from ${vocab.product.singular} research yet.`
-                    : "All suggested roles have been built."}
-                </p>
-              ) : (
-                <ul className="mt-2 divide-y divide-slate-100">
-                  {unbuiltSuggestions.map((role) => (
-                    <li
-                      key={role.suggestionKey}
-                      className="flex flex-wrap items-start justify-between gap-3 py-3"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-slate-900">{role.name}</p>
-                        {role.whyThisRoleMatters ? (
-                          <p className="mt-0.5 text-sm text-slate-500">
-                            {truncateText(role.whyThisRoleMatters, 120)}
-                          </p>
-                        ) : null}
-                      </div>
-                      <ActionLink
-                        href={`/setup/${product.id}/personas/new?role=${encodeURIComponent(role.suggestionKey)}`}
-                        primary
-                      >
-                        Build {vocab.persona.Singular}
-                      </ActionLink>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="mt-3">
-                <ActionLink href={`/setup/${product.id}/personas/new`}>
-                  Add custom {vocab.persona.singular}
-                </ActionLink>
-              </div>
-            </div>
-          </div>
-        </Panel>
-
-        {/* 3. ICP */}
-        <Panel
-          title={`3. ${vocab.icp.singular}`}
+          title={`2. ${vocab.icp.singular}`}
           description={`${vocab.idealCustomer.Singular} profile for company-level fit.`}
         >
           {primaryIcp ? (
@@ -509,13 +340,28 @@ export default async function SetupProductPage({ params }: PageProps) {
                 {vocab.icp.singular} not set up yet
               </p>
               <p className="mt-1 text-sm text-amber-900/80">
-                Add {vocab.idealCustomer.aSingular} profile so company-level scoring has a
-                target. You can do this before or after building {vocab.persona.plural}.
+                {completion === "approved"
+                  ? `Draft ${vocab.idealCustomer.aSingular} profile from your approved ${vocab.product.singular}, or write one from scratch.`
+                  : `Add ${vocab.idealCustomer.aSingular} profile so later ${vocab.campaign.plural} can be scored against the kind of company you want.`}
               </p>
-              <div className="mt-3">
-                <ActionLink href={`/setup/${product.id}/icps/new`} primary>
-                  Add {vocab.icp.singular}
-                </ActionLink>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {completion === "approved" ? (
+                  <>
+                    <ActionLink
+                      href={`/setup/${product.id}/icps/new?fromProfile=1`}
+                      primary
+                    >
+                      Draft from my {vocab.product.Singular}
+                    </ActionLink>
+                    <ActionLink href={`/setup/${product.id}/icps/new`}>
+                      Write from scratch
+                    </ActionLink>
+                  </>
+                ) : (
+                  <ActionLink href={`/setup/${product.id}/icps/new`} primary>
+                    Add {vocab.icp.singular}
+                  </ActionLink>
+                )}
               </div>
             </div>
           )}

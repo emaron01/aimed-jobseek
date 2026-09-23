@@ -17,6 +17,12 @@ import {
 } from "@/lib/persona/save";
 import type { IcpActionResult } from "@/lib/icp/save";
 import {
+  approveStarterTargetEmployer,
+  previewStarterTargetEmployer,
+  starterDraftToActionResult,
+} from "@/lib/icp/starter-draft";
+import { readIcpFormValues } from "@/lib/icp/save";
+import {
   criterionMaterialFingerprint,
   normalizeEvidenceClass,
 } from "@/lib/criteria/evidence-class";
@@ -33,6 +39,94 @@ export type CriterionActionResult = {
 function revalidateSetup(productId?: string) {
   revalidatePath("/setup");
   if (productId) revalidatePath(`/setup/${productId}`);
+}
+
+export async function previewStarterTargetEmployerAction(
+  _prev: IcpActionResult | null,
+  formData: FormData,
+): Promise<IcpActionResult> {
+  const productId = String(formData.get("productId") || "").trim();
+  if (!productId) {
+    return {
+      ok: false,
+      message: `${vocab.product.Singular} is required.`,
+    };
+  }
+
+  try {
+    const organizationId = await requireOrganizationId();
+    const draft = await previewStarterTargetEmployer({
+      organizationId,
+      productId,
+    });
+    return {
+      ...starterDraftToActionResult(draft),
+      productId,
+      values: {
+        ...starterDraftToActionResult(draft).values!,
+        productId,
+      },
+    };
+  } catch (error) {
+    console.error(
+      "[icp] starter draft preview failed",
+      error instanceof Error ? error.message.slice(0, 300) : "unknown",
+    );
+    return {
+      ok: false,
+      message:
+        error instanceof TenantError
+          ? error.message
+          : `Could not draft ${vocab.icp.aSingular} from the ${vocab.product.singular}. You can write one from scratch.`,
+      productId,
+    };
+  }
+}
+
+export async function approveStarterTargetEmployerAction(
+  _prev: IcpActionResult | null,
+  formData: FormData,
+): Promise<IcpActionResult> {
+  const values = readIcpFormValues(formData);
+  const criteriaJson = String(formData.get("starterCriteriaJson") || "");
+  const interpretationSummary = String(
+    formData.get("interpretationSummary") || "",
+  );
+  const interpretationUndetermined = String(
+    formData.get("interpretationUndetermined") || "",
+  );
+
+  try {
+    const organizationId = await requireOrganizationId();
+    const { icpId } = await approveStarterTargetEmployer({
+      organizationId,
+      values,
+      criteriaJson,
+      interpretationSummary,
+      interpretationUndetermined,
+    });
+    revalidateSetup(values.productId || undefined);
+    return {
+      ok: true,
+      message: `${vocab.icp.singular} saved.`,
+      icpId,
+      productId: values.productId,
+    };
+  } catch (error) {
+    console.error(
+      "[icp] starter draft approve failed",
+      error instanceof Error ? error.message.slice(0, 300) : "unknown",
+    );
+    return {
+      ok: false,
+      message:
+        error instanceof TenantError
+          ? error.message
+          : `Unable to save ${vocab.icp.singular}. Please try again.`,
+      productId: values.productId || undefined,
+      values,
+    };
+  }
 }
 
 export async function interpretIcpAction(

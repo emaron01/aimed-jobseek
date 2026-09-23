@@ -49,7 +49,9 @@ describe("parseIcpFormData", () => {
         definition: "Long natural-language definition that must be preserved.",
       }),
     );
-    expect(parsed.fieldErrors.name).toBe("ICP name is required.");
+    expect(parsed.fieldErrors.name).toBe(
+      "Target Employer profile name is required.",
+    );
     expect(parsed.values.definition).toContain("must be preserved");
   });
 
@@ -73,7 +75,9 @@ describe("parseIcpFormData", () => {
         targetIndustries: "SaaS",
       }),
     );
-    expect(parsed.fieldErrors.definition).toMatch(/describe your ideal customer/i);
+    expect(parsed.fieldErrors.definition).toMatch(
+      /kind of company you want to work for/i,
+    );
   });
 });
 
