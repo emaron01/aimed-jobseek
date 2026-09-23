@@ -1,9 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  AssistedProductIntake,
-  SuggestedBuyerRolesPanel,
-} from "@/components/AssistedProductSetup";
+import { AssistedProductIntake } from "@/components/AssistedProductSetup";
 import { AddProductMaterialPanel } from "@/components/AddProductMaterialPanel";
 import { ProductDraftReview } from "@/components/ProductDraftReview";
 import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
@@ -15,12 +12,10 @@ import {
 } from "@/lib/tenant/getCurrentOrganization";
 import { productUrlResearchIsStale } from "@/lib/product-research/acquire";
 import { PRODUCT_URL_UNREADABLE_MESSAGE } from "@/lib/product-research/extraction-quality";
-import { isNearEmptyProductDraft } from "@/lib/product-research/review";
-import type {
-  ProductDraft,
-  ProductMessagingDraft,
-} from "@/lib/product-research/contract";
-import { normalizeSuggestedBuyerRoles } from "@/lib/setup/product-overview";
+import {
+  isNearEmptyProductDraft,
+  storedProfileFromJson,
+} from "@/lib/product-research/review";
 import { PRODUCT_RESYNTHESIS_USER_CONTEXT_FLAG } from "@/lib/product-research/resynthesize-approved";
 import { vocab } from "@/lib/product-config";
 
@@ -110,10 +105,7 @@ export default async function ProductResearchPage({ params }: PageProps) {
         : Promise.resolve(null),
     ]);
 
-  const draft = (latestRun?.productDraftJson as ProductDraft | null) ?? null;
-  const messaging =
-    (latestRun?.messagingDraftJson as ProductMessagingDraft | null) ?? null;
-  const roles = normalizeSuggestedBuyerRoles(latestRun?.suggestedPersonasJson);
+  const draft = storedProfileFromJson(latestRun?.productDraftJson ?? null);
 
   const sourcesForReview = sources.map((source) => {
     const charMatch = source.errorSafe?.match(/Extracted (\d+) characters/i);
@@ -126,9 +118,7 @@ export default async function ProductResearchPage({ params }: PageProps) {
   const failedRead =
     Boolean(latestFailedRun) &&
     (product.setupStatus === "FAILED" ||
-      isNearEmptyProductDraft(
-        (latestFailedRun?.productDraftJson as ProductDraft | null) ?? null,
-      ) ||
+      isNearEmptyProductDraft(latestFailedRun?.productDraftJson ?? null) ||
       sourcesForReview.some((s) => s.status === "FAILED" && s.sourceType === "URL"));
 
   const showSynthesisFailure =
@@ -155,7 +145,7 @@ export default async function ProductResearchPage({ params }: PageProps) {
       <div data-print-hide>
         <PageHeader
           title={`Research: ${product.name}`}
-          description={`Research the ${vocab.product.Singular} once. Approve it. Then build ${vocab.persona.Plural} one at a time.`}
+          description={`Research the ${vocab.product.singular} once. Approve it. Then define ${vocab.icp.plural}.`}
           actions={
             <Link
               href={`/setup/${product.id}`}
@@ -186,10 +176,9 @@ export default async function ProductResearchPage({ params }: PageProps) {
           </p>
           <p className="mt-3 font-medium">What to do next</p>
           <p className="mt-1">
-            Paste the {vocab.product.singular} description, or use{" "}
-            <strong>Upload materials</strong> below with a whitepaper, use
-            cases, datasheet, or {vocab.product.singular} overview. That path works reliably for
-            JavaScript-heavy sites.
+            Paste resume or LinkedIn profile text, or use{" "}
+            <strong>Upload materials</strong> below with a resume or other
+            documents. That path works reliably for JavaScript-heavy sites.
           </p>
           {!failedRead ? (
             <p className="mt-2 text-xs text-amber-800/80">
@@ -209,7 +198,6 @@ export default async function ProductResearchPage({ params }: PageProps) {
             websiteUrl={product.websiteUrl}
             sources={sourcesForReview.filter((s) => s.status !== "FAILED")}
             draft={draft}
-            messaging={messaging}
           />
         </section>
       ) : null}
@@ -259,18 +247,6 @@ export default async function ProductResearchPage({ params }: PageProps) {
         </section>
       )}
 
-      {latestRun || productApproved ? (
-        <section
-          className="rounded-lg border border-slate-200 bg-white p-5"
-          data-print-hide
-        >
-          <SuggestedBuyerRolesPanel
-            productId={product.id}
-            productApproved={productApproved}
-            roles={roles}
-          />
-        </section>
-      ) : null}
     </div>
   );
 }

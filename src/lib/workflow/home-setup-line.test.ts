@@ -55,7 +55,7 @@ describe("home setup line", () => {
     );
   });
 
-  it("maps persona blocker to readable clause", () => {
+  it("does not treat a missing persona as a setup blocker", () => {
     expect(
       formatProductSetupClause(
         "Acme",
@@ -65,6 +65,6 @@ describe("home setup line", () => {
           personas: [],
         }),
       ),
-    ).toBe(`Acme needs ${vocab.persona.aSingular}`);
+    ).toBe("Acme ready");
   });
 });

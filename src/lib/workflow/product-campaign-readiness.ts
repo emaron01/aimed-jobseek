@@ -1,7 +1,7 @@
 /**
  * Client-safe campaign readiness for a Product.
- * A product is selectable in New Campaign when approved, has an ICP with
- * criteria rows, and has at least one saved persona.
+ * A product is selectable in New Campaign when approved and has an ICP with
+ * criteria rows. Hiring Team roles are created later, per application.
  */
 
 import { vocab } from "@/lib/product-config";
@@ -13,7 +13,6 @@ export const PRODUCT_READINESS_BLOCKERS = Object.freeze({
   draft: `${vocab.product.Singular} is still a draft`,
   notApproved: `${vocab.product.Singular} is not approved`,
   needsIcp: `Needs ${vocab.icp.aSingular} with criteria`,
-  needsPersona: `Needs at least one saved ${vocab.persona.singular}`,
 });
 
 export type ProductCampaignReadinessInput = {
@@ -53,10 +52,6 @@ export function getProductCampaignReadiness(
   const icpsWithCriteria = product.icps.filter(hasInterpretedCriteria);
   if (icpsWithCriteria.length === 0) {
     blockers.push(PRODUCT_READINESS_BLOCKERS.needsIcp);
-  }
-
-  if (product.personas.length === 0) {
-    blockers.push(PRODUCT_READINESS_BLOCKERS.needsPersona);
   }
 
   return {

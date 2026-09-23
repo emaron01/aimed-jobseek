@@ -33,9 +33,9 @@ export function AddProductMaterialPanel({ productId }: { productId: string }) {
       <div>
         <h3 className="text-lg font-semibold text-slate-900">Add material</h3>
         <p className="mt-1 text-sm text-slate-600">
-          Upload, paste, or add notes about new {vocab.product.singular} material. We will
-          re-synthesize a draft for review — your approved profile stays in
-          place until you confirm.
+          Upload a resume or other documents, paste LinkedIn or resume text, or
+          add notes about goals and context. We will re-synthesize a draft for
+          review — your approved {vocab.product.singular} stays in place until you confirm.
         </p>
       </div>
 
@@ -46,16 +46,16 @@ export function AddProductMaterialPanel({ productId }: { productId: string }) {
           name="notes"
           as="textarea"
           rows={3}
-          placeholder="e.g. Updated positioning from Q3 launch deck"
-          hint="Optional context for the new material."
+          placeholder="e.g. Targeting staff engineer roles in Seattle"
+          hint="Optional context about goals, constraints, or what changed."
         />
         <Field
           label="Paste content"
           name="pastedContent"
           as="textarea"
           rows={6}
-          placeholder={`Paste new ${vocab.product.singular} material here`}
-          hint={`${vocab.product.Singular} copy, release notes, or a datasheet excerpt.`}
+          placeholder="Paste resume or LinkedIn profile text here"
+          hint="Resume text, LinkedIn profile text, or notes. LinkedIn URLs cannot be read automatically."
         />
         <label className="block text-sm">
           <span className="font-medium text-slate-700">Upload documents</span>

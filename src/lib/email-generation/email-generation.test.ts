@@ -818,6 +818,14 @@ describe("sequence and claim guards", () => {
     }
   });
 
+  it("excludes compensation from outreach and document generation context", () => {
+    const contextSrc = readFileSync("src/lib/email-generation/context.ts", "utf8");
+    const offerSrc = readFileSync("src/lib/campaign/offer-validation.ts", "utf8");
+    expect(contextSrc).toContain("omitCompensationFromUnknown");
+    expect(contextSrc).toContain("candidateProfileForGeneration");
+    expect(offerSrc).toContain("omitCompensationFromUnknown");
+  });
+
   it("compares sites, units, and hours without fixed term extractors", async () => {
     const { evidenceFragments, validateOfferSemantically } = await import(
       "@/lib/campaign/offer-validation"

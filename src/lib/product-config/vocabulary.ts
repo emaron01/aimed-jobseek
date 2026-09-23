@@ -153,13 +153,13 @@ export function countedNoun(count: number, forms: NounForms): string {
 export const vocabExamples = Object.freeze({
   contactImportPastePlaceholder:
     "First Name\tLast Name\tEmail\tTitle\tCompany\nJohn\tSmith\tjohn@acme.com\tVP Sales\tAcme",
-  personaLikelyTitlesPlaceholder: "CRO, VP Sales, Director of Sales",
+  personaLikelyTitlesPlaceholder: "Recruiter, Hiring Manager, Head of Engineering",
   personaLikelyTitlesHint:
-    "Literal job titles only — not generic labels like “Sales Leader”.",
-  personaDepartmentPlaceholder: "Sales",
+    "Literal job titles only — not generic labels like “Hiring Leader”.",
+  personaDepartmentPlaceholder: "Engineering",
   personaDepartmentHint:
-    "Organizational function (e.g. Sales, Finance) — not “Sales Leader”.",
-  personaOwnershipAreaPlaceholder: "e.g. Sales forecasting process",
+    "Organizational function (e.g. Engineering, People) — not “Hiring Leader”.",
+  personaOwnershipAreaPlaceholder: "e.g. Engineering hiring process",
   organizationNamePlaceholder: "Acme Sales",
   offerCallToActionPlaceholder: "Book a demo",
 });

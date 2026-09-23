@@ -17,30 +17,31 @@ import { PERSONA_SYNTHESIS_PROMPT_VERSION } from "@/lib/persona-research/contrac
 import { buildPersonaSynthesisMessages } from "@/lib/persona-research/prompt";
 import { DEFAULT_RESEARCH_POLICY_VALUES } from "@/lib/usage/defaults";
 
-describe("Product synthesis v3 — no full Persona drafts", () => {
-  it("accepts suggestedBuyerRoles without suggestionKey or persona drafts", () => {
+describe("Product synthesis v6 — candidate profile only", () => {
+  it("does not return suggestedBuyerRoles or persona drafts", () => {
     const ai = productAiResponseSchema.parse({
-      productDraft: { description: "Forecast software" },
-      productMessagingDraft: { primaryPositioning: "Confidence" },
-      suggestedBuyerRoles: [
-        {
-          name: "Chief Revenue Officer",
-          likelyTitles: ["CRO", "VP Sales"],
-          whyThisRoleMatters: "Owns forecast accuracy",
-          confidence: "HIGH",
+      candidateProfile: {
+        identity: {
+          name: {
+            id: "id_name",
+            kind: "FACT",
+            text: "Alex Chen",
+            provenance: [{ sourceId: "s1" }],
+          },
         },
-      ],
+        direction: {},
+      },
     });
-    expect(ai.suggestedBuyerRoles).toHaveLength(1);
+    expect(ai).not.toHaveProperty("suggestedBuyerRoles");
     expect(ai).not.toHaveProperty("personas");
-    expect(PRODUCT_SYNTHESIS_PROMPT_VERSION).toBe("5");
+    expect(PRODUCT_SYNTHESIS_PROMPT_VERSION).toBe("6");
 
     const result = transformProductAiResponse(ai);
-    expect(result.suggestedBuyerRoles[0]!.suggestionKey).toBeTruthy();
+    expect(result).not.toHaveProperty("suggestedBuyerRoles");
     expect(result).not.toHaveProperty("personaDrafts");
   });
 
-  it("prompt forbids full persona drafts", () => {
+  it("prompt forbids buyer roles and persona drafts", () => {
     const messages = buildProductSynthesisMessages({
       productName: "X",
       primaryUrl: null,
@@ -49,13 +50,12 @@ describe("Product synthesis v3 — no full Persona drafts", () => {
           sourceId: "1",
           sourceType: "USER_NOTE",
           displayName: "n",
-          text: "Sales forecast tool",
+          text: "Backend engineer resume",
         },
       ],
     });
-    expect(messages[0]!.content).toContain("suggestedBuyerRoles");
-    expect(messages[0]!.content).toContain("Do NOT return");
-    expect(messages[0]!.content).toContain("personaDrafts");
+    expect(messages[0]!.content).toContain("Do NOT return suggestedBuyerRoles");
+    expect(messages[0]!.content).toContain("persona drafts");
   });
 });
 
@@ -185,7 +185,8 @@ describe("architecture boundaries", () => {
       "src/lib/product-research/synthesize.ts",
       "utf8",
     );
-    expect(synth).toContain("suggestedBuyerRoles");
+    expect(synth).not.toContain("result.suggestedBuyerRoles");
+    expect(synth).toContain("suggestedPersonasJson: []");
     expect(synth).toContain("personaDraftsJson: Prisma.DbNull");
   });
 });

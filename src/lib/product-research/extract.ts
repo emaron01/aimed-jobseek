@@ -18,7 +18,7 @@ const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15 MiB
 
 /** Shared next step whenever a source cannot be read. */
 export const PASTE_MATERIALS_NEXT_STEP =
-  "Paste the product description into the paste field and try again.";
+  "Paste resume or LinkedIn profile text into the paste field and try again.";
 
 export const SUPPORTED_UPLOAD_EXTENSIONS = [
   ".pdf",

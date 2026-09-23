@@ -4,6 +4,7 @@
 
 import { toOptionalFloat } from "@/lib/utils";
 import { TenantError } from "@/lib/tenant/errors";
+import { vocab } from "@/lib/product-config";
 
 export type ProductActionResult = {
   ok: boolean;
@@ -54,7 +55,7 @@ export function parseProductFormData(formData: FormData): {
   const fieldErrors: Partial<Record<keyof ProductFormValues, string>> = {};
 
   if (!values.name) {
-    fieldErrors.name = "Product name is required.";
+    fieldErrors.name = `${vocab.product.Singular} name is required.`;
   }
 
   const aovRaw = formData.get("averageOrderValue");

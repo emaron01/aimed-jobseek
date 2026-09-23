@@ -108,7 +108,7 @@ export async function fetchProductPageUrl(
         ok: false,
         extractedCharCount: 0,
         errorSafe:
-          "This URL did not return readable page text. Paste the product description into the paste field and try again.",
+          "This URL did not return readable page text. Paste resume or LinkedIn profile text into the paste field and try again.",
       };
     }
     const html = await response.text();

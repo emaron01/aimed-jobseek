@@ -1,0 +1,28 @@
+Alex Chen
+Senior Software Engineer
+Seattle, WA · Open to hybrid · Willing to relocate within the US
+
+Summary
+Backend engineer who has shipped billing and identity systems at two B2B SaaS companies. Not a people manager.
+
+Experience
+Northwind Analytics — Senior Software Engineer
+Seattle, WA
+January 2021 – Present
+- Led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.
+- Owned on-call for the payments service (one week in four).
+
+Contoso Health — Software Engineer
+Remote
+June 2017 – December 2020
+- Built the member-identity API used by the patient portal.
+- Dates and team size for earlier internships are not listed.
+
+Education
+B.S. Computer Science, University of Washington, 2017
+
+Skills
+TypeScript, PostgreSQL, distributed systems, incident response
+
+Compensation
+Seeking $180,000–$200,000 base in Seattle.

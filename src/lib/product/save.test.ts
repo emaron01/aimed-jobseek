@@ -9,6 +9,7 @@ import {
   toSafeProductActionError,
 } from "@/lib/product/save";
 import { TenantError } from "@/lib/tenant/errors";
+import { vocab } from "@/lib/product-config";
 
 function formFrom(entries: Record<string, string>): FormData {
   const fd = new FormData();
@@ -40,7 +41,9 @@ describe("parseProductFormData", () => {
         description: "Preserve this description on failure.",
       }),
     );
-    expect(parsed.fieldErrors.name).toBe("Product name is required.");
+    expect(parsed.fieldErrors.name).toBe(
+      `${vocab.product.Singular} name is required.`,
+    );
     expect(parsed.values.description).toContain("Preserve this description");
   });
 

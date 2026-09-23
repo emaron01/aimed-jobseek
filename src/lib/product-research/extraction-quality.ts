@@ -7,7 +7,7 @@
 export const PRODUCT_URL_MIN_USABLE_CHARS = 200;
 
 export const PRODUCT_URL_UNREADABLE_MESSAGE =
-  "We could not read usable product content from this page — it likely renders with JavaScript or blocked automated access. Paste the product description into the paste field and try again.";
+  "We could not read usable page content from this URL — it likely renders with JavaScript or blocked automated access. Paste resume or LinkedIn profile text into the paste field and try again.";
 
 /**
  * True when extracted text is empty/near-empty or dominated by site navigation
@@ -61,5 +61,5 @@ export function formatProductUrlUnreadableError(input: {
   if (input.blockedOrEmpty && input.extractedCharCount === 0) {
     return PRODUCT_URL_UNREADABLE_MESSAGE;
   }
-  return `We could not read usable product content from this page (extracted ${input.extractedCharCount} characters of navigation chrome, not product detail). Paste the product description into the paste field and try again.`;
+  return `We could not read usable page content from this URL (extracted ${input.extractedCharCount} characters of navigation chrome, not page detail). Paste resume or LinkedIn profile text into the paste field and try again.`;
 }

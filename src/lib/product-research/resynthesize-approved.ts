@@ -13,8 +13,12 @@ import { isNearEmptyProductDraft } from "@/lib/product-research/review";
 import { resynthesizeFromBundle } from "@/lib/product-research/synthesize";
 import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
-import type { ProductDraft, ProductMessagingDraft } from "@/lib/product-research/contract";
+import type { ProductMessagingDraft } from "@/lib/product-research/contract";
 import { approveProductFromDraft } from "@/lib/product-research/approve";
+import {
+  productFieldsFromCandidateProfile,
+  type CandidateProfile,
+} from "@/lib/product-research/candidate-profile";
 import {
   buildProductResynthesisApplyPlan,
   mergeProtectedProductDraftFields,
@@ -161,7 +165,7 @@ export async function addProductSourcesAndResynthesize(input: {
     };
   }
 
-  const draft = (synth.result?.productDraft ?? null) as ProductDraft | null;
+  const draft = synth.result?.candidateProfile ?? null;
   if (isNearEmptyProductDraft(draft)) {
     return {
       setupRunId: synth.setupRunId,
@@ -196,7 +200,7 @@ export async function applyApprovedProductResynthesis(input: {
     websiteUrl: string | null;
     averageOrderValue: number | null;
   };
-  profile: ProductDraft;
+  profile: CandidateProfile;
   editedFields?: string[];
 }): Promise<void> {
   const product = await prisma.product.findFirst({
@@ -238,9 +242,8 @@ export async function applyApprovedProductResynthesis(input: {
     userId: input.userId,
     setupRunId: run.id,
     fields: {
+      ...productFieldsFromCandidateProfile(mergedProfile),
       name: input.fields.name,
-      description: mergedProfile.description ?? null,
-      valueProposition: mergedProfile.valueProposition ?? null,
       websiteUrl: input.fields.websiteUrl,
       averageOrderValue: input.fields.averageOrderValue,
     },

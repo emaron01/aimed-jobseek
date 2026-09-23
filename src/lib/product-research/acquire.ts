@@ -10,6 +10,8 @@ import { fetchProductPageUrl } from "@/lib/product-research/fetch-url";
 import { isUsableProductUrlExtraction } from "@/lib/product-research/extraction-quality";
 import {
   createCorrelationId,
+  isLinkedInProfileUrl,
+  LINKEDIN_PROFILE_BLOCKED_MESSAGE,
   normalizeProductSourceUrl,
   sha256Hex,
 } from "@/lib/product-research/url";
@@ -162,7 +164,11 @@ export async function acquireProductEvidence(input: {
     if (src.type === "URL") {
       const normalized = normalizeProductSourceUrl(src.url);
       if (!normalized) {
-        errors.push("Invalid product URL.");
+        errors.push("Invalid URL.");
+        continue;
+      }
+      if (isLinkedInProfileUrl(normalized)) {
+        errors.push(LINKEDIN_PROFILE_BLOCKED_MESSAGE);
         continue;
       }
 

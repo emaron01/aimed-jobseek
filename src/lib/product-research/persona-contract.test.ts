@@ -7,76 +7,73 @@ import {
   productAiResponseSchema,
   productSynthesisResultSchema,
 } from "@/lib/product-research/contract";
-import {
-  assignSuggestionKeys,
-  transformProductAiResponse,
-} from "@/lib/product-research/transform";
+import { transformProductAiResponse } from "@/lib/product-research/transform";
 import { buildProductSynthesisMessages } from "@/lib/product-research/prompt";
 
-describe("Product AI buyer-role contract (v3)", () => {
-  it("does not require suggestionKey from AI", () => {
+describe("Product AI candidate-profile contract (v6)", () => {
+  it("does not accept suggestedBuyerRoles on the synthesis result", () => {
     const parsed = productAiResponseSchema.parse({
-      productDraft: { description: "Forecast tool" },
-      productMessagingDraft: { primaryPositioning: "Confidence" },
-      suggestedBuyerRoles: [
-        {
-          name: "Chief Revenue Officer",
-          likelyTitles: ["CRO"],
-          whyThisRoleMatters: "Owns forecast outcomes",
-          confidence: "HIGH",
+      candidateProfile: {
+        identity: {
+          name: {
+            id: "id_name",
+            kind: "FACT",
+            text: "Alex Chen",
+            provenance: [{ sourceId: "s1" }],
+          },
         },
-      ],
+        direction: {},
+      },
     });
-    expect(parsed.suggestedBuyerRoles[0]!.name).toBe("Chief Revenue Officer");
-    expect(PRODUCT_SYNTHESIS_PROMPT_VERSION).toBe("5");
+    expect(parsed.candidateProfile.identity.name?.text).toBe("Alex Chen");
+    expect(parsed).not.toHaveProperty("suggestedBuyerRoles");
+    expect(PRODUCT_SYNTHESIS_PROMPT_VERSION).toBe("6");
   });
 
-  it("requires non-empty buyer role name", () => {
+  it("rejects FACT items without a source", () => {
     expect(() =>
       productAiResponseSchema.parse({
-        productDraft: {},
-        productMessagingDraft: {},
-        suggestedBuyerRoles: [{ name: "   " }],
+        candidateProfile: {
+          identity: {
+            name: {
+              id: "id_name",
+              kind: "FACT",
+              text: "Alex Chen",
+              provenance: [],
+            },
+          },
+          direction: {},
+        },
       }),
     ).toThrow();
   });
 
-  it("app generates unique suggestionKeys for buyer roles", () => {
+  it("transform returns only the candidate profile", () => {
     const ai = productAiResponseSchema.parse({
-      productDraft: {},
-      productMessagingDraft: {},
-      suggestedBuyerRoles: [
-        { name: "Sales Leadership" },
-        { name: "Sales Leadership" },
-      ],
+      candidateProfile: {
+        identity: {},
+        direction: {},
+      },
     });
     const result = transformProductAiResponse(ai);
-    expect(result.suggestedBuyerRoles).toHaveLength(2);
-    expect(result.suggestedBuyerRoles[0]!.suggestionKey).not.toBe(
-      result.suggestedBuyerRoles[1]!.suggestionKey,
-    );
+    expect(result).not.toHaveProperty("suggestedBuyerRoles");
     expect(productSynthesisResultSchema.parse(result)).toBeTruthy();
   });
 
-  it("assignSuggestionKeys is collision-safe", () => {
-    const keys = assignSuggestionKeys(["CRO", "CRO"]);
-    expect(new Set(keys).size).toBe(2);
-  });
-
-  it("prompt asks for suggestedBuyerRoles only", () => {
+  it("prompt forbids suggestedBuyerRoles", () => {
     const messages = buildProductSynthesisMessages({
-      productName: "Forecast App",
+      productName: "Alex Chen",
       primaryUrl: null,
       excerpts: [
         {
           sourceId: "s1",
           sourceType: "USER_NOTE",
           displayName: "Notes",
-          text: "Helps CROs forecast.",
+          text: "Backend engineer in Seattle.",
         },
       ],
     });
-    expect(messages[0]!.content).toContain("suggestedBuyerRoles");
-    expect(messages[0]!.content).toContain("Do NOT return suggestionKey");
+    expect(messages[0]!.content).toContain("Do NOT return suggestedBuyerRoles");
+    expect(messages[0]!.content).not.toContain("Do NOT return suggestionKey");
   });
 });

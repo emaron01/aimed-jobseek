@@ -1,9 +1,14 @@
 /**
- * Product review helpers: source lead-in, form parse for every productDraft
- * field, and evidence-chip matching. Domain-agnostic.
+ * Candidate profile review helpers: source lead-in, form parse, and field labels.
  */
 
-import type { ProductDraft } from "@/lib/product-research/contract";
+import {
+  emptyCandidateProfile,
+  isNearEmptyCandidateProfile,
+  parseCandidateProfile,
+  parseCandidateProfileSafe,
+  type CandidateProfile,
+} from "@/lib/product-research/candidate-profile";
 import { PRODUCT_URL_UNREADABLE_MESSAGE } from "@/lib/product-research/extraction-quality";
 import { vocab } from "@/lib/product-config";
 
@@ -18,258 +23,205 @@ export type ProductReviewSource = {
   extractedCharCount?: number | null;
 };
 
-export type ProductDraftEvidenceRef = {
-  claim: string;
-  sourceIds: string[];
-  note?: string | null;
-};
-
-export const PRODUCT_DRAFT_STRING_FIELDS = [
-  "description",
-  "valueProposition",
-  "pricingAovContext",
-  "deploymentContext",
-] as const;
-
-export const PRODUCT_DRAFT_LIST_FIELDS = [
+export const CANDIDATE_PROFILE_FIELD_PATHS = [
+  "identity.name",
+  "identity.headline",
+  "identity.location",
+  "identity.workArrangementPreference",
+  "identity.relocationOpenness",
+  "positioning",
+  "direction.targetTitles",
+  "direction.seniority",
+  "direction.functions",
+  "direction.careerGoals",
+  "experience",
+  "skills",
   "problemsSolved",
-  "capabilities",
   "differentiators",
-  "primaryUseCases",
-  "relevantBuyerFunctions",
-  "relevantIndustries",
-  "businessOutcomes",
-  "proofPoints",
-  "customerEvidence",
-  "terminology",
-  "unknownFields",
+  "education",
+  "credentials",
+  "domainVocabulary",
+  "compensation",
+  "gaps",
 ] as const;
 
-export type ProductDraftStringField =
-  (typeof PRODUCT_DRAFT_STRING_FIELDS)[number];
-export type ProductDraftListField = (typeof PRODUCT_DRAFT_LIST_FIELDS)[number];
+export type CandidateProfileFieldPath =
+  (typeof CANDIDATE_PROFILE_FIELD_PATHS)[number];
 
-/** Fields the review form used to render — everything else was invisible. */
-export const PREVIOUSLY_RENDERED_DRAFT_FIELDS = [
-  "description",
-  "valueProposition",
-  "unknownFields",
-  "evidenceRefs",
-] as const;
-
-export const PREVIOUSLY_DROPPED_FROM_FORM: Array<
-  ProductDraftStringField | ProductDraftListField
-> = [
-  "problemsSolved",
-  "capabilities",
-  "differentiators",
-  "primaryUseCases",
-  "relevantBuyerFunctions",
-  "relevantIndustries",
-  "businessOutcomes",
-  "pricingAovContext",
-  "deploymentContext",
-  "proofPoints",
-  "customerEvidence",
-  "terminology",
-];
-
-export const PRODUCT_DRAFT_FIELD_HINTS: Record<
-  ProductDraftStringField | ProductDraftListField | "evidenceRefs" | "name" | "websiteUrl",
+export const CANDIDATE_PROFILE_FIELD_LABELS: Record<
+  CandidateProfileFieldPath | "name" | "websiteUrl",
   string
 > = {
-  name: "The product name as you want it used in emails and scoring.",
-  websiteUrl: "Primary product or company URL.",
-  description: `What this ${vocab.product.singular} is, in plain language.`,
-  valueProposition: "The core value a buyer gets.",
-  problemsSolved: "One problem per line.",
-  capabilities: "One capability per line.",
-  differentiators: "One differentiator per line.",
-  primaryUseCases: "One use case per line.",
-  relevantBuyerFunctions: "One buyer function or role family per line.",
-  relevantIndustries: "One industry or market per line.",
-  businessOutcomes: "One outcome per line.",
-  pricingAovContext: "How it is priced or typical deal size, if known.",
-  deploymentContext: "How it is sold or deployed (sales motion, delivery).",
-  proofPoints: "One proof point per line.",
-  customerEvidence: "One customer or case reference per line.",
-  terminology: "One term per line, including product-coined language.",
-  unknownFields:
-    "Field names with no supporting evidence. One name per line. Do not invent values for these.",
-  evidenceRefs: "Supporting claims tied to sources. One claim per row.",
-};
-
-export const PRODUCT_DRAFT_FIELD_LABELS: Record<
-  string,
-  string
-> = {
-  description: "Description",
-  valueProposition: "Value proposition",
-  problemsSolved: "Problems it solves",
-  capabilities: "Capabilities",
+  name: `${vocab.product.Singular} name`,
+  websiteUrl: "Personal site, portfolio, or GitHub URL",
+  "identity.name": "Name",
+  "identity.headline": "Current headline",
+  "identity.location": "Location",
+  "identity.workArrangementPreference": "Work arrangement preference",
+  "identity.relocationOpenness": "Relocation openness",
+  positioning: "Positioning statement",
+  "direction.targetTitles": "Target titles",
+  "direction.seniority": "Seniority",
+  "direction.functions": "Functions",
+  "direction.careerGoals": "Career goals",
+  experience: "Experience",
+  skills: "Skills and competencies",
+  problemsSolved: "Problems solved for employers",
   differentiators: "Differentiators",
-  primaryUseCases: "Use cases",
-  relevantBuyerFunctions: "Buyer functions",
-  relevantIndustries: "Industries",
-  businessOutcomes: "Business outcomes",
-  pricingAovContext: "Pricing / deal context",
-  deploymentContext: "How it is sold",
-  proofPoints: "Proof points",
-  customerEvidence: "Customer evidence",
-  terminology: "Language",
-  unknownFields: "Unknown fields",
-  evidenceRefs: "Evidence",
+  education: "Education",
+  credentials: "Credentials",
+  domainVocabulary: "Domain vocabulary",
+  compensation: "Compensation expectations (private)",
+  gaps: "Gaps",
 };
 
-export function parseNewlineList(value: string): string[] {
-  return value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
+export const CANDIDATE_PROFILE_FIELD_HINTS: Record<
+  CandidateProfileFieldPath | "name" | "websiteUrl",
+  string
+> = {
+  name: `The ${vocab.product.singular} name as you want it shown in ${vocab.campaign.plural} and generated documents.`,
+  websiteUrl:
+    "Personal site, portfolio, or GitHub. Do not use a LinkedIn URL — paste that profile text instead.",
+  "identity.headline": "Current title or how you describe your work today.",
+  "identity.name": "Your name as it should appear on the profile.",
+  "identity.location": "City and region, if stated.",
+  "identity.workArrangementPreference":
+    "Remote, hybrid, on-site, or other arrangement you stated.",
+  "identity.relocationOpenness": "Whether you are open to relocating, if stated.",
+  positioning: `The candidate's value proposition — written in plain language, not resume phrasing.`,
+  "direction.targetTitles": "One target title per line.",
+  "direction.seniority": "Seniority the materials support.",
+  "direction.functions": "One function per line.",
+  "direction.careerGoals": "One goal per line.",
+  experience: "Roles from the materials. Do not invent dates or employers.",
+  skills: "One skill per line.",
+  problemsSolved: "One problem per line.",
+  differentiators: "One differentiator per line.",
+  education: "One education item per line.",
+  credentials: "One credential per line.",
+  domainVocabulary: "One term per line.",
+  compensation:
+    "Private. Stored on the profile and never sent to outreach or document generation.",
+  gaps: "Missing dates, achievements without results, or unclear scope.",
+};
 
-export function emptyProductDraft(): ProductDraft {
-  return {
-    description: null,
-    valueProposition: null,
-    problemsSolved: [],
-    capabilities: [],
-    differentiators: [],
-    primaryUseCases: [],
-    relevantBuyerFunctions: [],
-    relevantIndustries: [],
-    businessOutcomes: [],
-    pricingAovContext: null,
-    deploymentContext: null,
-    proofPoints: [],
-    customerEvidence: [],
-    terminology: [],
-    unknownFields: [],
-    evidenceRefs: [],
-  };
-}
-
-function optionalFormString(formData: FormData, name: string): string | null {
-  const value = String(formData.get(name) ?? "").trim();
-  return value || null;
-}
-
-function parseEvidenceRefsJson(raw: string): ProductDraft["evidenceRefs"] {
-  if (!raw.trim()) return [];
+export function parseCandidateProfileFromFormData(
+  formData: FormData,
+): CandidateProfile {
+  const raw = String(formData.get("candidateProfileJson") ?? "").trim();
+  if (!raw) {
+    throw new Error("Candidate profile is missing from the review form.");
+  }
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((row) => {
-        if (!row || typeof row !== "object") return null;
-        const rec = row as Record<string, unknown>;
-        const claim = String(rec.claim ?? "").trim();
-        if (!claim) return null;
-        const sourceIds = Array.isArray(rec.sourceIds)
-          ? rec.sourceIds.map(String).map((id) => id.trim()).filter(Boolean)
-          : String(rec.sourceIds ?? "")
-              .split(",")
-              .map((id) => id.trim())
-              .filter(Boolean);
-        const noteRaw = rec.note;
-        const note =
-          noteRaw == null || String(noteRaw).trim() === ""
-            ? null
-            : String(noteRaw).trim();
-        return { claim, sourceIds, note };
-      })
-      .filter((row): row is NonNullable<typeof row> => row != null);
+    parsed = JSON.parse(raw);
   } catch {
-    return [];
+    throw new Error("Candidate profile form data is not valid JSON.");
+  }
+  const result = parseCandidateProfileSafe(parsed);
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+  return result.profile;
+}
+
+/** @deprecated Use parseCandidateProfileFromFormData */
+export function productDraftFromFormData(formData: FormData): CandidateProfile {
+  return parseCandidateProfileFromFormData(formData);
+}
+
+export function stringifyProfileSection(value: unknown): string {
+  return JSON.stringify(value ?? null);
+}
+
+function sectionValue(
+  profile: CandidateProfile,
+  path: CandidateProfileFieldPath,
+): unknown {
+  switch (path) {
+    case "identity.name":
+      return profile.identity.name;
+    case "identity.headline":
+      return profile.identity.headline;
+    case "identity.location":
+      return profile.identity.location;
+    case "identity.workArrangementPreference":
+      return profile.identity.workArrangementPreference;
+    case "identity.relocationOpenness":
+      return profile.identity.relocationOpenness;
+    case "positioning":
+      return profile.positioning;
+    case "direction.targetTitles":
+      return profile.direction.targetTitles;
+    case "direction.seniority":
+      return profile.direction.seniority;
+    case "direction.functions":
+      return profile.direction.functions;
+    case "direction.careerGoals":
+      return profile.direction.careerGoals;
+    case "experience":
+      return profile.experience;
+    case "skills":
+      return profile.skills;
+    case "problemsSolved":
+      return profile.problemsSolved;
+    case "differentiators":
+      return profile.differentiators;
+    case "education":
+      return profile.education;
+    case "credentials":
+      return profile.credentials;
+    case "domainVocabulary":
+      return profile.domainVocabulary;
+    case "compensation":
+      return profile.compensation;
+    case "gaps":
+      return profile.gaps;
+    default: {
+      const _exhaustive: never = path;
+      return _exhaustive;
+    }
   }
 }
 
-/**
- * Read every productDraftJson field from the review form.
- * List fields are newline-separated. evidenceRefs is JSON.
- */
-export function productDraftFromFormData(formData: FormData): ProductDraft {
-  const draft: ProductDraft = {
-    description: optionalFormString(formData, "description"),
-    valueProposition: optionalFormString(formData, "valueProposition"),
-    problemsSolved: parseNewlineList(String(formData.get("problemsSolved") ?? "")),
-    capabilities: parseNewlineList(String(formData.get("capabilities") ?? "")),
-    differentiators: parseNewlineList(
-      String(formData.get("differentiators") ?? ""),
-    ),
-    primaryUseCases: parseNewlineList(
-      String(formData.get("primaryUseCases") ?? ""),
-    ),
-    relevantBuyerFunctions: parseNewlineList(
-      String(formData.get("relevantBuyerFunctions") ?? ""),
-    ),
-    relevantIndustries: parseNewlineList(
-      String(formData.get("relevantIndustries") ?? ""),
-    ),
-    businessOutcomes: parseNewlineList(
-      String(formData.get("businessOutcomes") ?? ""),
-    ),
-    pricingAovContext: optionalFormString(formData, "pricingAovContext"),
-    deploymentContext: optionalFormString(formData, "deploymentContext"),
-    proofPoints: parseNewlineList(String(formData.get("proofPoints") ?? "")),
-    customerEvidence: parseNewlineList(
-      String(formData.get("customerEvidence") ?? ""),
-    ),
-    terminology: parseNewlineList(String(formData.get("terminology") ?? "")),
-    unknownFields: parseNewlineList(String(formData.get("unknownFields") ?? "")),
-    evidenceRefs: parseEvidenceRefsJson(
-      String(formData.get("evidenceRefsJson") ?? ""),
-    ),
-  };
-  return reconcileUnknownFields(draft);
-}
-
-function fieldHasContent(
-  draft: ProductDraft,
-  key: string,
-): boolean {
-  if (key === "evidenceRefs") return (draft.evidenceRefs?.length ?? 0) > 0;
-  const value = draft[key as keyof ProductDraft];
-  if (Array.isArray(value)) return value.length > 0;
-  if (typeof value === "string") return value.trim().length > 0;
-  return false;
-}
-
-/** Drop unknown markers once the matching field has content. */
-export function reconcileUnknownFields(draft: ProductDraft): ProductDraft {
-  const unknownFields = (draft.unknownFields ?? []).filter(
-    (key) => key.trim() && !fieldHasContent(draft, key.trim()),
-  );
-  return { ...draft, unknownFields };
-}
-
-export function stringifyDraftList(values: string[] | undefined): string {
-  return (values ?? []).join("\n");
-}
-
-function listsEqual(a: string[] | undefined, b: string[] | undefined): boolean {
-  const left = a ?? [];
-  const right = b ?? [];
-  if (left.length !== right.length) return false;
-  return left.every((item, index) => item === right[index]);
-}
-
-export function diffProductDraftFields(
-  original: ProductDraft | null,
-  next: ProductDraft,
+export function diffCandidateProfileFields(
+  original: CandidateProfile | null,
+  next: CandidateProfile,
 ): string[] {
-  const baseline = original ?? emptyProductDraft();
+  const baseline = original ?? emptyCandidateProfile();
   const edited: string[] = [];
-  for (const key of PRODUCT_DRAFT_STRING_FIELDS) {
-    if ((baseline[key] ?? null) !== (next[key] ?? null)) edited.push(key);
+  for (const path of CANDIDATE_PROFILE_FIELD_PATHS) {
+    if (
+      stringifyProfileSection(sectionValue(baseline, path)) !==
+      stringifyProfileSection(sectionValue(next, path))
+    ) {
+      edited.push(path);
+    }
   }
-  for (const key of PRODUCT_DRAFT_LIST_FIELDS) {
-    if (!listsEqual(baseline[key], next[key])) edited.push(key);
-  }
-  const baselineRefs = JSON.stringify(baseline.evidenceRefs ?? []);
-  const nextRefs = JSON.stringify(next.evidenceRefs ?? []);
-  if (baselineRefs !== nextRefs) edited.push("evidenceRefs");
   return edited;
+}
+
+/** @deprecated Use diffCandidateProfileFields */
+export function diffProductDraftFields(
+  original: CandidateProfile | null,
+  next: CandidateProfile,
+): string[] {
+  return diffCandidateProfileFields(original, next);
+}
+
+export function emptyProductDraft(): CandidateProfile {
+  return emptyCandidateProfile();
+}
+
+export function isNearEmptyProductDraft(
+  draft: unknown,
+): boolean {
+  const parsed = parseCandidateProfileSafe(draft);
+  if (!parsed.ok) {
+    if (!draft || typeof draft !== "object") return true;
+    return true;
+  }
+  return isNearEmptyCandidateProfile(parsed.profile);
 }
 
 function joinReadable(parts: string[]): string {
@@ -295,8 +247,7 @@ export function describeReadSources(sources: ProductReviewSource[]): {
 } {
   const usable = sources.filter(
     (source) =>
-      source.status !== "FAILED" &&
-      source.sourceType !== "FAILED_URL",
+      source.status !== "FAILED" && source.sourceType !== "FAILED_URL",
   );
   const names = usable.map((source) => {
     if (source.sourceType === "URL" || source.sourceType === "WEB_SEARCH") {
@@ -316,7 +267,7 @@ export function describeReadSources(sources: ProductReviewSource[]): {
   const pastes = usable.filter((s) => s.sourceType === "PASTED_TEXT").length;
 
   const parts = [
-    countPhrase(urls, "your website", (n) => `${n} pages from your website`),
+    countPhrase(urls, "your site", (n) => `${n} pages from your site`),
     countPhrase(
       uploads,
       "1 uploaded document",
@@ -334,49 +285,21 @@ export function describeReadSources(sources: ProductReviewSource[]): {
   return { sentence, names };
 }
 
-const CORE_LIST_FIELDS = [
-  "problemsSolved",
-  "capabilities",
-  "differentiators",
-  "primaryUseCases",
-  "businessOutcomes",
-  "proofPoints",
-] as const;
-
-/**
- * Near-empty synthesis (title restatement + everything unknown) is a failed
- * read, not a completed product profile.
- */
-export function isNearEmptyProductDraft(draft: ProductDraft | null | undefined): boolean {
-  if (!draft) return true;
-  const emptyLists = CORE_LIST_FIELDS.filter((key) => {
-    const value = draft[key];
-    return !Array.isArray(value) || value.length === 0;
-  }).length;
-  const unknownCount = draft.unknownFields?.length ?? 0;
-  const description = (draft.description ?? "").trim();
-  const descriptionThin = description.length < 80;
-  return (
-    (emptyLists >= 5 && unknownCount >= 5) ||
-    (emptyLists >= 4 && unknownCount >= 6 && descriptionThin)
-  );
-}
-
 export type ProductSourceLead = {
   kind: "read_ok" | "failed_read";
   sentence: string;
   detail: string | null;
   names: string[];
-  failedUrls: Array<{ url: string; extractedCharCount: number | null; errorSafe: string | null }>;
+  failedUrls: Array<{
+    url: string;
+    extractedCharCount: number | null;
+    errorSafe: string | null;
+  }>;
 };
 
-/**
- * Lead copy for the research review. Failed/empty URL reads must not claim
- * "We read your website."
- */
 export function describeProductSourceLead(input: {
   sources: ProductReviewSource[];
-  draft?: ProductDraft | null;
+  draft?: unknown;
 }): ProductSourceLead {
   const failedUrls = input.sources
     .filter(
@@ -385,7 +308,7 @@ export function describeProductSourceLead(input: {
         (source.status === "FAILED" || Boolean(source.errorSafe)),
     )
     .map((source) => ({
-      url: source.originalUrl || source.displayName || "the product URL",
+      url: source.originalUrl || source.displayName || "the supplied URL",
       extractedCharCount: source.extractedCharCount ?? null,
       errorSafe: source.errorSafe ?? null,
     }));
@@ -406,7 +329,7 @@ export function describeProductSourceLead(input: {
     return {
       kind: "failed_read",
       sentence: PRODUCT_URL_UNREADABLE_MESSAGE,
-      detail: `${extracted} Paste the ${vocab.product.singular} description into the paste field and try again.`,
+      detail: `${extracted} Paste resume or LinkedIn text into the paste field and try again.`,
       names: [],
       failedUrls,
     };
@@ -415,10 +338,9 @@ export function describeProductSourceLead(input: {
   if (nearEmpty) {
     return {
       kind: "failed_read",
-      sentence:
-        "We could not build a usable product profile from the material available.",
+      sentence: `We could not build a usable ${vocab.product.singular} from the material available.`,
       detail:
-        `Almost every field was unknown. Paste the ${vocab.product.singular} description into the paste field and try again.`,
+        "Almost every field was unknown. Paste resume or LinkedIn text into the paste field and try again.",
       names: describeReadSources(acquired).names,
       failedUrls,
     };
@@ -434,29 +356,6 @@ export function describeProductSourceLead(input: {
   };
 }
 
-function normalizeForMatch(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-export function evidenceRefsForText(
-  text: string,
-  refs: ProductDraftEvidenceRef[],
-): ProductDraftEvidenceRef[] {
-  const needle = normalizeForMatch(text);
-  if (!needle) return [];
-  return refs.filter((ref) => {
-    const claim = normalizeForMatch(ref.claim);
-    if (!claim) return false;
-    if (claim === needle) return true;
-    if (claim.includes(needle) || needle.includes(claim)) return true;
-    const claimTokens = new Set(claim.split(" ").filter((t) => t.length > 2));
-    const textTokens = needle.split(" ").filter((t) => t.length > 2);
-    if (textTokens.length === 0 || claimTokens.size === 0) return false;
-    const overlap = textTokens.filter((token) => claimTokens.has(token)).length;
-    return overlap / Math.min(textTokens.length, claimTokens.size) >= 0.6;
-  });
-}
-
 export function sourceLabelForId(
   sourceId: string,
   sources: ProductReviewSource[],
@@ -468,3 +367,10 @@ export function sourceLabelForId(
   }
   return match.displayName;
 }
+
+export function storedProfileFromJson(raw: unknown): CandidateProfile | null {
+  const parsed = parseCandidateProfileSafe(raw);
+  return parsed.ok ? parsed.profile : null;
+}
+
+export { parseCandidateProfile, emptyCandidateProfile };

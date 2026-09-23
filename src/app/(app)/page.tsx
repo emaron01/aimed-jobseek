@@ -116,7 +116,7 @@ export default async function DashboardPage({
       </div>
       {!workflow.setupComplete ? (
         <p className="mb-4 text-sm text-slate-500">
-          {vocab.campaign.Singular} creation unlocks after at least one {vocab.product.singular} is approved with {vocab.icp.aSingular} that has criteria and a saved {vocab.persona.singular}. Voice and email connection are
+          {vocab.campaign.Singular} creation unlocks after at least one {vocab.product.singular} is approved with {vocab.icp.aSingular} that has criteria. Voice and email connection are
           optional. Existing {vocab.campaign.plural} stay available.
         </p>
       ) : null}

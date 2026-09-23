@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ProductResynthesisReview } from "@/components/ProductResynthesisReview";
 import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
-import type { ProductDraft } from "@/lib/product-research/contract";
+import type { CandidateProfile } from "@/lib/product-research/candidate-profile";
 import { PRODUCT_RESYNTHESIS_USER_CONTEXT_FLAG } from "@/lib/product-research/resynthesize-approved";
 import { productDraftFromApprovedProfile } from "@/lib/product-research/resynthesize-approved-plan";
 import { getProduct } from "@/lib/tenant/data";
@@ -52,7 +52,7 @@ export default async function ProductResynthesisReviewPage({ params }: PageProps
     notFound();
   }
 
-  const draft = (run.productDraftJson as ProductDraft | null) ?? null;
+  const draft = (run.productDraftJson as CandidateProfile | null) ?? null;
   const failed = run.status === "FAILED";
 
   return (

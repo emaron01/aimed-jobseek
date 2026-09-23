@@ -82,7 +82,6 @@ describe("home workflow", () => {
   it.each([
     ["Product", []],
     ["ICP", [productFixture({ icps: [] })]],
-    ["Persona", [productFixture({ personas: [] })]],
   ])(
     "renders pre-setup state when %s is missing",
     async (_missing, products) => {

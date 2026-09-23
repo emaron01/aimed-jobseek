@@ -1,72 +1,121 @@
 /**
- * Transform PRODUCT_AI response → app ProductSynthesisResult with suggestionKeys.
+ * Transform PRODUCT_AI response → app ProductSynthesisResult.
+ * suggestedBuyerRoles are never persisted.
  */
 
+import {
+  parseCandidateProfile,
+  type CandidateProfile,
+  type ProfileExperienceRole,
+  type ProfileFactItem,
+  type ProvenanceRef,
+} from "@/lib/product-research/candidate-profile";
 import type {
   ProductAiResponse,
   ProductSynthesisResult,
-  SuggestedBuyerRole,
 } from "@/lib/product-research/contract";
 
-export function assignSuggestionKeys(names: string[]): string[] {
-  const used = new Set<string>();
-  return names.map((rawName, index) => {
-    const base =
-      rawName
-        .toLowerCase()
-        .normalize("NFKD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 48) || "role";
-    let key = `${base}-${index + 1}`;
-    let n = 2;
-    while (used.has(key)) {
-      key = `${base}-${index + 1}-${n}`;
-      n += 1;
-    }
-    used.add(key);
-    return key;
-  });
+function filterProvenance(
+  refs: ProvenanceRef[],
+  allowed?: Set<string>,
+): ProvenanceRef[] {
+  if (!allowed) return refs;
+  return refs.filter((ref) => allowed.has(ref.sourceId));
+}
+
+function filterFactItem(
+  item: ProfileFactItem,
+  allowed?: Set<string>,
+): ProfileFactItem {
+  return {
+    ...item,
+    provenance: filterProvenance(item.provenance, allowed),
+  };
+}
+
+function filterOptionalFact(
+  item: ProfileFactItem | null | undefined,
+  allowed?: Set<string>,
+): ProfileFactItem | null {
+  if (!item) return null;
+  return filterFactItem(item, allowed);
+}
+
+function filterRole(
+  role: ProfileExperienceRole,
+  allowed?: Set<string>,
+): ProfileExperienceRole {
+  return {
+    ...role,
+    provenance: filterProvenance(role.provenance, allowed),
+    achievements: role.achievements.map((item) => filterFactItem(item, allowed)),
+  };
+}
+
+function filterCandidateProfile(
+  profile: CandidateProfile,
+  allowed?: Set<string>,
+): CandidateProfile {
+  return {
+    ...profile,
+    identity: {
+      name: filterOptionalFact(profile.identity.name, allowed),
+      headline: filterOptionalFact(profile.identity.headline, allowed),
+      location: filterOptionalFact(profile.identity.location, allowed),
+      workArrangementPreference: filterOptionalFact(
+        profile.identity.workArrangementPreference,
+        allowed,
+      ),
+      relocationOpenness: filterOptionalFact(
+        profile.identity.relocationOpenness,
+        allowed,
+      ),
+    },
+    positioning: filterOptionalFact(profile.positioning, allowed),
+    direction: {
+      targetTitles: profile.direction.targetTitles.map((item) =>
+        filterFactItem(item, allowed),
+      ),
+      seniority: filterOptionalFact(profile.direction.seniority, allowed),
+      functions: profile.direction.functions.map((item) =>
+        filterFactItem(item, allowed),
+      ),
+      careerGoals: profile.direction.careerGoals.map((item) =>
+        filterFactItem(item, allowed),
+      ),
+    },
+    experience: profile.experience.map((role) => filterRole(role, allowed)),
+    skills: profile.skills.map((item) => filterFactItem(item, allowed)),
+    problemsSolved: profile.problemsSolved.map((item) =>
+      filterFactItem(item, allowed),
+    ),
+    differentiators: profile.differentiators.map((item) =>
+      filterFactItem(item, allowed),
+    ),
+    education: profile.education.map((item) => filterFactItem(item, allowed)),
+    credentials: profile.credentials.map((item) => filterFactItem(item, allowed)),
+    domainVocabulary: profile.domainVocabulary.map((item) =>
+      filterFactItem(item, allowed),
+    ),
+    compensation: profile.compensation
+      ? {
+          ...profile.compensation,
+          provenance: filterProvenance(profile.compensation.provenance, allowed),
+        }
+      : null,
+    gaps: profile.gaps,
+  };
 }
 
 export function transformProductAiResponse(
   ai: ProductAiResponse,
   options?: { allowedSourceIds?: Set<string> },
 ): ProductSynthesisResult {
-  const allowed = options?.allowedSourceIds;
-  const keys = assignSuggestionKeys(ai.suggestedBuyerRoles.map((r) => r.name));
-
-  const productDraft = {
-    ...ai.productDraft,
-    evidenceRefs: (ai.productDraft.evidenceRefs ?? []).map((ref) => ({
-      ...ref,
-      sourceIds: allowed
-        ? (ref.sourceIds ?? []).filter((id) => allowed.has(id))
-        : (ref.sourceIds ?? []),
-    })),
-  };
-
-  const suggestedBuyerRoles: SuggestedBuyerRole[] = ai.suggestedBuyerRoles.map(
-    (role, i) => ({
-      suggestionKey: keys[i]!,
-      name: role.name,
-      likelyTitles: role.likelyTitles,
-      departmentFunction: role.departmentFunction ?? null,
-      whyThisRoleMatters: role.whyThisRoleMatters ?? null,
-      confidence: role.confidence,
-      evidenceRefs: (role.evidenceRefs ?? []).map((ref) => ({
-        ...ref,
-        sourceIds: allowed
-          ? (ref.sourceIds ?? []).filter((id) => allowed.has(id))
-          : (ref.sourceIds ?? []),
-      })),
-    }),
+  const filtered = filterCandidateProfile(
+    ai.candidateProfile,
+    options?.allowedSourceIds,
   );
-
   return {
-    productDraft,
-    productMessagingDraft: ai.productMessagingDraft,
-    suggestedBuyerRoles,
+    candidateProfile: parseCandidateProfile(filtered),
   };
 }

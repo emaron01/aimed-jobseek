@@ -3,6 +3,8 @@
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
+  isLinkedInProfileUrl,
+  LINKEDIN_PROFILE_BLOCKED_MESSAGE,
   normalizeProductSourceUrl,
   sha256Hex,
 } from "@/lib/product-research/url";
@@ -39,6 +41,15 @@ describe("Product source identity", () => {
     expect(normalizeProductSourceUrl("https://example.com/a")).not.toBe(
       normalizeProductSourceUrl("https://example.com/b"),
     );
+  });
+
+  it("identifies LinkedIn profile URLs so intake can ask for pasted text", () => {
+    expect(isLinkedInProfileUrl("https://www.linkedin.com/in/alex-chen")).toBe(
+      true,
+    );
+    expect(isLinkedInProfileUrl("linkedin.com/in/alex-chen")).toBe(true);
+    expect(isLinkedInProfileUrl("https://github.com/alex-chen")).toBe(false);
+    expect(LINKEDIN_PROFILE_BLOCKED_MESSAGE).toMatch(/Paste your LinkedIn profile text/);
   });
 
   it("hashes pasted content for dedupe", async () => {
@@ -80,41 +91,41 @@ describe("Upload validation", () => {
 });
 
 describe("Product synthesis contract", () => {
-  it("validates suggestedBuyerRoles without suggestionKey", () => {
+  it("validates a candidate profile and rejects leftover buyer roles on the schema", () => {
     const parsed = productAiResponseSchema.parse({
-      productDraft: { description: "A tool", unknownFields: ["pricing"] },
-      productMessagingDraft: { primaryPositioning: "Save time" },
-      suggestedBuyerRoles: [
-        {
-          name: "CRO",
-          likelyTitles: ["CRO"],
-          whyThisRoleMatters: "Owns forecasting",
-          confidence: "HIGH",
+      candidateProfile: {
+        identity: {
+          name: {
+            id: "id_name",
+            kind: "FACT",
+            text: "Alex Chen",
+            provenance: [{ sourceId: "s1" }],
+          },
         },
-      ],
+        direction: {},
+      },
     });
-    expect(parsed.productDraft.unknownFields).toContain("pricing");
-    expect(parsed.suggestedBuyerRoles).toHaveLength(1);
-    expect(PRODUCT_SYNTHESIS_PROMPT_VERSION).toBe("5");
+    expect(parsed.candidateProfile.identity.name?.text).toBe("Alex Chen");
+    expect(parsed).not.toHaveProperty("suggestedBuyerRoles");
+    expect(PRODUCT_SYNTHESIS_PROMPT_VERSION).toBe("6");
   });
 
-  it("prompt separates messaging from scoring and forbids persona drafts", () => {
+  it("prompt forbids suggestedBuyerRoles and person web search", () => {
     const messages = buildProductSynthesisMessages({
-      productName: "Forecast App",
+      productName: "Alex Chen",
       primaryUrl: "https://example.com",
       excerpts: [
         {
           sourceId: "s1",
           sourceType: "URL",
           displayName: "Home",
-          text: "We help sales leaders forecast.",
+          text: "Backend engineer in Seattle.",
           url: "https://example.com",
         },
       ],
     });
-    expect(messages[0]!.content).toContain("suggestedBuyerRoles");
-    expect(messages[0]!.content).toContain("Do NOT score contacts");
-    expect(messages[0]!.content).toContain("personaDrafts");
+    expect(messages[0]!.content).toContain("Do NOT return suggestedBuyerRoles");
+    expect(messages[0]!.content).toContain("Do not invent a web search");
     expect(messages[1]!.content).toContain("domainsAbsent");
   });
 

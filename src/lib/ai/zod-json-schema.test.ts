@@ -22,14 +22,14 @@ function expectStrictObjectNodes(schema: unknown): void {
   expect(violations).toEqual([]);
 }
 
-function findEvidenceRefItemSchema(
+function findFactItemSchema(
   schema: Record<string, unknown>,
 ): Record<string, unknown> {
-  const productDraft = (schema.properties as Record<string, unknown>)
-    .productDraft as Record<string, unknown>;
-  const evidenceRefs = (productDraft.properties as Record<string, unknown>)
-    .evidenceRefs as Record<string, unknown>;
-  return evidenceRefs.items as Record<string, unknown>;
+  const candidateProfile = (schema.properties as Record<string, unknown>)
+    .candidateProfile as Record<string, unknown>;
+  const skills = (candidateProfile.properties as Record<string, unknown>)
+    .skills as Record<string, unknown>;
+  return skills.items as Record<string, unknown>;
 }
 
 function noteSchemaAcceptsNull(noteSchema: Record<string, unknown>): boolean {
@@ -207,15 +207,15 @@ describe("zodToOpenAiStrictJsonSchema", () => {
     expect(violations).toEqual([]);
   });
 
-  it("evidenceRefs items emit note as required with a null-permitting type", () => {
+  it("candidate profile fact items require kind and provenance", () => {
     const schema = zodToOpenAiStrictJsonSchema(productAiResponseSchema);
-    const itemSchema = findEvidenceRefItemSchema(schema);
+    const itemSchema = findFactItemSchema(schema);
     const required = itemSchema.required as string[];
-    const noteSchema = (itemSchema.properties as Record<string, unknown>)
-      .note as Record<string, unknown>;
 
-    expect(required).toContain("note");
-    expect(noteSchemaAcceptsNull(noteSchema)).toBe(true);
+    expect(required).toContain("id");
+    expect(required).toContain("kind");
+    expect(required).toContain("text");
+    expect(required).toContain("provenance");
   });
 
   it("maps z.unknown() optional fields to a JSON value union", () => {
@@ -230,48 +230,30 @@ describe("zodToOpenAiStrictJsonSchema", () => {
   });
 });
 
-describe("parseProductAiResponse note handling", () => {
-  const base = {
-    productDraft: {},
-    productMessagingDraft: {},
-    suggestedBuyerRoles: [{ name: "CRO" }],
-  };
-
-  it("parses when note is explicitly null", () => {
+describe("parseProductAiResponse candidate profile handling", () => {
+  it("parses a candidate profile and strips leftover buyer roles", () => {
     const { data } = parseProductAiResponse({
-      ...base,
-      productDraft: {
-        evidenceRefs: [
-          { claim: "Runs forecast call", sourceIds: [], note: null },
-        ],
+      candidateProfile: {
+        identity: {},
+        direction: {},
+        skills: [],
       },
+      suggestedBuyerRoles: [{ name: "CRO" }],
     });
-    expect(data.productDraft.evidenceRefs[0]!.note).toBeNull();
+    expect(data.candidateProfile.skills).toEqual([]);
+    expect(data).not.toHaveProperty("suggestedBuyerRoles");
   });
 
-  it("parses when note is absent", () => {
+  it("parses when array fields are omitted under strict output", () => {
     const { data } = parseProductAiResponse({
-      ...base,
-      productDraft: {
-        evidenceRefs: [{ claim: "Runs forecast call", sourceIds: [] }],
+      candidateProfile: {
+        identity: {},
+        direction: {},
       },
     });
-    expect(data.productDraft.evidenceRefs[0]!.note).toBeNull();
-  });
-
-  it("parses when array fields are explicitly null under strict output", () => {
-    const { data } = parseProductAiResponse({
-      productDraft: {
-        description: null,
-        problemsSolved: null,
-        evidenceRefs: null,
-      },
-      productMessagingDraft: { coreValueThemes: null },
-      suggestedBuyerRoles: null,
-    });
-    expect(data.productDraft.problemsSolved).toEqual([]);
-    expect(data.productDraft.evidenceRefs).toEqual([]);
-    expect(data.suggestedBuyerRoles).toEqual([]);
+    expect(data.candidateProfile.problemsSolved).toEqual([]);
+    expect(data.candidateProfile.experience).toEqual([]);
+    expect(data.candidateProfile.gaps).toEqual([]);
   });
 });
 
@@ -295,9 +277,10 @@ describe("openai-responses strict request body", () => {
               {
                 type: "output_text",
                 text: JSON.stringify({
-                  productDraft: {},
-                  productMessagingDraft: {},
-                  suggestedBuyerRoles: [],
+                  candidateProfile: {
+                    identity: {},
+                    direction: {},
+                  },
                 }),
               },
             ],

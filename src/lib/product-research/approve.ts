@@ -5,10 +5,14 @@ import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
 import type {
   PersonaDraft,
-  ProductDraft,
   ProductMessagingDraft,
   SuggestedPersona,
 } from "@/lib/product-research/contract";
+import {
+  parseCandidateProfileSafe,
+  productFieldsFromCandidateProfile,
+  type CandidateProfile,
+} from "@/lib/product-research/candidate-profile";
 import { vocab } from "@/lib/product-config";
 
 function asStringArray(value: unknown): string[] {
@@ -43,7 +47,7 @@ export async function approveProductFromDraft(input: {
     websiteUrl: string | null;
     averageOrderValue: number | null;
   };
-  profile?: ProductDraft | null;
+  profile?: CandidateProfile | null;
   messaging?: ProductMessagingDraft | null;
   /** Fields the user touched in this save — become protected. */
   editedFields?: string[];
@@ -71,19 +75,26 @@ export async function approveProductFromDraft(input: {
     input.editedFields ?? [],
   );
 
+  const submittedProfile = input.profile ?? run.productDraftJson;
+  const parsedProfile = parseCandidateProfileSafe(submittedProfile);
+  if (!parsedProfile.ok) {
+    throw new TenantError(parsedProfile.error);
+  }
+  const mirrored = productFieldsFromCandidateProfile(parsedProfile.profile);
+
   await prisma.product.update({
     where: { id: product.id },
     data: {
       name: input.fields.name,
-      description: input.fields.description,
-      valueProposition: input.fields.valueProposition,
+      description: input.fields.description ?? mirrored.description,
+      valueProposition:
+        input.fields.valueProposition ?? mirrored.valueProposition,
       websiteUrl: input.fields.websiteUrl,
       averageOrderValue:
         input.fields.averageOrderValue != null
           ? new Prisma.Decimal(input.fields.averageOrderValue)
           : null,
-      profileJson: (input.profile ??
-        run.productDraftJson) as Prisma.InputJsonValue,
+      profileJson: parsedProfile.profile as unknown as Prisma.InputJsonValue,
       messagingJson: (input.messaging ??
         run.messagingDraftJson) as Prisma.InputJsonValue,
       manuallyEditedFields: protectedPaths as unknown as Prisma.InputJsonValue,

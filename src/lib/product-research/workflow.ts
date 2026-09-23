@@ -9,7 +9,6 @@ import { isNearEmptyProductDraft } from "@/lib/product-research/review";
 import { PRODUCT_URL_UNREADABLE_MESSAGE } from "@/lib/product-research/extraction-quality";
 import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
-import type { ProductDraft } from "@/lib/product-research/contract";
 import { vocab } from "@/lib/product-config";
 
 /**
@@ -82,7 +81,7 @@ export async function researchAndBuildProduct(input: {
     };
   }
 
-  const draft = (synth.result?.productDraft ?? null) as ProductDraft | null;
+  const draft = synth.result?.candidateProfile ?? null;
   if (isNearEmptyProductDraft(draft)) {
     await prisma.product.update({
       where: { id: product.id },
@@ -119,6 +118,6 @@ export async function researchAndBuildProduct(input: {
       ? `${vocab.product.Singular} draft ready for review (some sources failed).`
       : `${vocab.product.Singular} draft ready for review.`,
     sourceCount: acquired.excerpts.length,
-    suggestedPersonaCount: synth.result?.suggestedBuyerRoles.length ?? 0,
+    suggestedPersonaCount: 0,
   };
 }

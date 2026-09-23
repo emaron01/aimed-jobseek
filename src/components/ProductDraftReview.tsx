@@ -17,20 +17,18 @@ import { ExportPdfButton } from "@/components/ExportPdfButton";
 import { SourceMarkers } from "@/components/research-document";
 import { SECONDARY_CHIP_CLASS, SecondaryButton, SubmitButton } from "@/components/ui";
 import type {
-  ProductDraft,
-  ProductMessagingDraft,
-} from "@/lib/product-research/contract";
+  CandidateProfile,
+  ProfileExperienceRole,
+  ProfileFactItem,
+} from "@/lib/product-research/candidate-profile";
 import {
-  PRODUCT_DRAFT_FIELD_HINTS,
-  PRODUCT_DRAFT_FIELD_LABELS,
+  emptyCandidateProfile,
+  parseCandidateProfileSafe,
+} from "@/lib/product-research/candidate-profile";
+import {
+  CANDIDATE_PROFILE_FIELD_HINTS,
   describeProductSourceLead,
-  emptyProductDraft,
-  evidenceRefsForText,
   sourceLabelForId,
-  stringifyDraftList,
-  type ProductDraftEvidenceRef,
-  type ProductDraftListField,
-  type ProductDraftStringField,
   type ProductReviewSource,
 } from "@/lib/product-research/review";
 import {
@@ -41,23 +39,9 @@ import { vocab } from "@/lib/product-config";
 
 const initialResult: ProductSetupActionResult | null = null;
 
-function normalizeDraft(draft: ProductDraft): ProductDraft {
-  return {
-    ...emptyProductDraft(),
-    ...draft,
-    problemsSolved: draft.problemsSolved ?? [],
-    capabilities: draft.capabilities ?? [],
-    differentiators: draft.differentiators ?? [],
-    primaryUseCases: draft.primaryUseCases ?? [],
-    relevantBuyerFunctions: draft.relevantBuyerFunctions ?? [],
-    relevantIndustries: draft.relevantIndustries ?? [],
-    businessOutcomes: draft.businessOutcomes ?? [],
-    proofPoints: draft.proofPoints ?? [],
-    customerEvidence: draft.customerEvidence ?? [],
-    terminology: draft.terminology ?? [],
-    unknownFields: draft.unknownFields ?? [],
-    evidenceRefs: draft.evidenceRefs ?? [],
-  };
+function normalizeProfile(draft: CandidateProfile): CandidateProfile {
+  const parsed = parseCandidateProfileSafe(draft);
+  return parsed.ok ? parsed.profile : emptyCandidateProfile();
 }
 
 function Status({ result }: { result: ProductSetupActionResult | null }) {
@@ -75,26 +59,37 @@ function Status({ result }: { result: ProductSetupActionResult | null }) {
   );
 }
 
-function EvidenceChip({
-  refs,
+function KindBadge({ kind }: { kind: "FACT" | "INFERENCE" }) {
+  return (
+    <span
+      className={
+        kind === "FACT"
+          ? "ml-2 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800"
+          : "ml-2 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900"
+      }
+      data-testid={`profile-kind-${kind}`}
+    >
+      {kind}
+    </span>
+  );
+}
+
+function ProvenanceChip({
+  sourceIds,
   sources,
   sourceIndex,
 }: {
-  refs: ProductDraftEvidenceRef[];
+  sourceIds: string[];
   sources: ProductReviewSource[];
   sourceIndex: Map<string, number>;
 }) {
   const [open, setOpen] = useState(false);
-  if (refs.length === 0) return null;
-  const first = refs[0]!;
+  if (sourceIds.length === 0) return null;
   const label =
-    first.sourceIds
+    sourceIds
       .map((id) => sourceLabelForId(id, sources))
       .filter((name) => name !== "Source")[0] ?? "Source";
-  const markers = sourceMarkerNumbers(
-    [...new Set(refs.flatMap((ref) => ref.sourceIds))],
-    sourceIndex,
-  );
+  const markers = sourceMarkerNumbers([...new Set(sourceIds)], sourceIndex);
 
   return (
     <span className="research-source-chip relative ml-1 inline-block align-middle">
@@ -106,54 +101,22 @@ function EvidenceChip({
         onClick={() => setOpen((value) => !value)}
       >
         {label}
-        {refs.length > 1 ? ` +${refs.length - 1}` : ""}
+        {sourceIds.length > 1 ? ` +${sourceIds.length - 1}` : ""}
       </button>
       <span className="research-source-chip-print hidden rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600 print:inline">
         {label}
-        {refs.length > 1 ? ` +${refs.length - 1}` : ""}
       </span>
       {open ? (
         <span className="research-source-chip-popup absolute left-0 z-10 mt-1 w-72 rounded-md border border-slate-200 bg-white p-3 text-left text-xs text-slate-700 shadow-sm print:hidden">
-          {refs.map((ref, index) => (
-            <span key={`${ref.claim}-${index}`} className="block">
-              {index > 0 ? <span className="my-2 block border-t border-slate-100" /> : null}
-              <span className="block text-slate-900">{ref.claim}</span>
-              <span className="mt-1 block text-slate-500">
-                {ref.sourceIds.length > 0
-                  ? ref.sourceIds
-                      .map((id) => sourceLabelForId(id, sources))
-                      .join(" · ")
-                  : "Source not named"}
-              </span>
-              {ref.note ? (
-                <span className="mt-1 block text-slate-500">{ref.note}</span>
-              ) : null}
+          {sourceIds.map((id) => (
+            <span key={id} className="block text-slate-500">
+              {sourceLabelForId(id, sources)}
             </span>
           ))}
         </span>
       ) : null}
       <SourceMarkers numbers={markers} />
     </span>
-  );
-}
-
-function ReadItem({
-  text,
-  refs,
-  sources,
-  sourceIndex,
-}: {
-  text: string;
-  refs: ProductDraftEvidenceRef[];
-  sources: ProductReviewSource[];
-  sourceIndex: Map<string, number>;
-}) {
-  const matched = evidenceRefsForText(text, refs);
-  return (
-    <li className="leading-relaxed text-slate-800">
-      {text}
-      <EvidenceChip refs={matched} sources={sources} sourceIndex={sourceIndex} />
-    </li>
   );
 }
 
@@ -180,6 +143,55 @@ function ReadSection({
   );
 }
 
+function FactLine({
+  item,
+  sources,
+  sourceIndex,
+}: {
+  item: ProfileFactItem | null | undefined;
+  sources: ProductReviewSource[];
+  sourceIndex: Map<string, number>;
+}) {
+  if (!item?.text?.trim()) return null;
+  return (
+    <p className="text-[17px] leading-7 text-slate-800">
+      {item.text}
+      <KindBadge kind={item.kind} />
+      <ProvenanceChip
+        sourceIds={item.provenance.map((ref) => ref.sourceId)}
+        sources={sources}
+        sourceIndex={sourceIndex}
+      />
+    </p>
+  );
+}
+
+function FactList({
+  items,
+  sources,
+  sourceIndex,
+}: {
+  items: ProfileFactItem[];
+  sources: ProductReviewSource[];
+  sourceIndex: Map<string, number>;
+}) {
+  return (
+    <ul className="list-disc space-y-2 pl-5 text-[17px]">
+      {items.map((item) => (
+        <li key={item.id} className="leading-relaxed text-slate-800">
+          {item.text}
+          <KindBadge kind={item.kind} />
+          <ProvenanceChip
+            sourceIds={item.provenance.map((ref) => ref.sourceId)}
+            sources={sources}
+            sourceIndex={sourceIndex}
+          />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function EditField({
   label,
   name,
@@ -190,7 +202,7 @@ function EditField({
   singleLine = false,
 }: {
   label: string;
-  name: string;
+  name?: string;
   hint: string;
   value: string;
   onChange: (value: string) => void;
@@ -225,6 +237,78 @@ function EditField({
   );
 }
 
+function updateOptionalFact(
+  current: ProfileFactItem | null | undefined,
+  text: string,
+  id: string,
+): ProfileFactItem | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  if (current) return { ...current, text: trimmed };
+  return { id, kind: "INFERENCE", text: trimmed, provenance: [] };
+}
+
+function updateFactList(
+  current: ProfileFactItem[],
+  value: string,
+  idPrefix: string,
+): ProfileFactItem[] {
+  const lines = value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return lines.map((text, index) => {
+    const existing = current[index];
+    if (existing) return { ...existing, text };
+    return {
+      id: `${idPrefix}_${index + 1}`,
+      kind: "INFERENCE" as const,
+      text,
+      provenance: [],
+    };
+  });
+}
+
+function RoleBlock({
+  role,
+  sources,
+  sourceIndex,
+}: {
+  role: ProfileExperienceRole;
+  sources: ProductReviewSource[];
+  sourceIndex: Map<string, number>;
+}) {
+  const dates = [role.startDate, role.endDate ?? "Present"]
+    .filter(Boolean)
+    .join(" – ");
+  return (
+    <div className="space-y-2">
+      <p className="text-[17px] font-medium text-slate-900">
+        {[role.title, role.employer].filter(Boolean).join(" · ") || "Role"}
+        <KindBadge kind={role.kind} />
+        <ProvenanceChip
+          sourceIds={role.provenance.map((ref) => ref.sourceId)}
+          sources={sources}
+          sourceIndex={sourceIndex}
+        />
+      </p>
+      <p className="text-sm text-slate-500">
+        {[dates, role.location].filter(Boolean).join(" · ")}
+      </p>
+      {role.summary ? (
+        <p className="text-[17px] leading-7 text-slate-800">{role.summary}</p>
+      ) : null}
+      {role.achievements.length > 0 ? (
+        <FactList
+          items={role.achievements}
+          sources={sources}
+          sourceIndex={sourceIndex}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 export function ProductDraftReview({
   productId,
   setupRunId,
@@ -232,15 +316,14 @@ export function ProductDraftReview({
   websiteUrl,
   sources,
   draft,
-  messaging,
 }: {
   productId: string;
   setupRunId: string;
   productName: string;
   websiteUrl: string | null;
   sources: ProductReviewSource[];
-  draft: ProductDraft;
-  messaging: ProductMessagingDraft | null;
+  draft: CandidateProfile;
+  messaging?: unknown;
 }) {
   const [state, action, pending] = useActionState(
     saveApprovedProductAction,
@@ -250,14 +333,14 @@ export function ProductDraftReview({
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(productName);
   const [url, setUrl] = useState(websiteUrl ?? "");
-  const [profile, setProfile] = useState<ProductDraft>(() =>
-    normalizeDraft(draft),
+  const [profile, setProfile] = useState<CandidateProfile>(() =>
+    normalizeProfile(draft),
   );
 
   useEffect(() => {
     setName(productName);
     setUrl(websiteUrl ?? "");
-    setProfile(normalizeDraft(draft));
+    setProfile(normalizeProfile(draft));
   }, [draft, productName, websiteUrl]);
 
   useEffect(() => {
@@ -271,31 +354,10 @@ export function ProductDraftReview({
     () => describeProductSourceLead({ sources, draft: profile }),
     [sources, profile],
   );
-  const refs = profile.evidenceRefs ?? [];
   const sourceIndex = useMemo(
     () => buildSourceIndex(sources, (source) => source.id),
     [sources],
   );
-  const unknownLabels = (profile.unknownFields ?? []).map(
-    (key) => PRODUCT_DRAFT_FIELD_LABELS[key] ?? key,
-  );
-
-  function setString(field: ProductDraftStringField, value: string) {
-    setProfile((prev) => ({ ...prev, [field]: value }));
-  }
-
-  function setList(field: ProductDraftListField, value: string) {
-    setProfile((prev) => ({
-      ...prev,
-      [field]: value.split(/\r?\n/),
-    }));
-  }
-
-  function listValue(field: ProductDraftListField): string {
-    return stringifyDraftList(profile[field]);
-  }
-
-  const hiddenWhenEditing = !editing;
 
   return (
     <div
@@ -331,55 +393,13 @@ export function ProductDraftReview({
         <input type="hidden" name="setupRunId" value={setupRunId} />
         <input
           type="hidden"
-          name="evidenceRefsJson"
-          value={JSON.stringify(refs)}
+          name="candidateProfileJson"
+          value={JSON.stringify(profile)}
         />
-        {hiddenWhenEditing ? (
+        {!editing ? (
           <>
             <input type="hidden" name="name" value={name} />
             <input type="hidden" name="websiteUrl" value={url} />
-            <input
-              type="hidden"
-              name="description"
-              value={profile.description ?? ""}
-            />
-            <input
-              type="hidden"
-              name="valueProposition"
-              value={profile.valueProposition ?? ""}
-            />
-            <input
-              type="hidden"
-              name="pricingAovContext"
-              value={profile.pricingAovContext ?? ""}
-            />
-            <input
-              type="hidden"
-              name="deploymentContext"
-              value={profile.deploymentContext ?? ""}
-            />
-            {(
-              [
-                "problemsSolved",
-                "capabilities",
-                "differentiators",
-                "primaryUseCases",
-                "relevantBuyerFunctions",
-                "relevantIndustries",
-                "businessOutcomes",
-                "proofPoints",
-                "customerEvidence",
-                "terminology",
-                "unknownFields",
-              ] as ProductDraftListField[]
-            ).map((field) => (
-              <input
-                key={field}
-                type="hidden"
-                name={field}
-                value={stringifyDraftList(profile[field])}
-              />
-            ))}
           </>
         ) : null}
 
@@ -387,7 +407,7 @@ export function ProductDraftReview({
           <div>
             <h3 className="text-xl font-semibold text-slate-900">
               {editing ? (
-                <span className="sr-only">Edit {vocab.product.singular} profile</span>
+                <span className="sr-only">Edit {vocab.product.singular}</span>
               ) : (
                 name
               )}
@@ -412,382 +432,458 @@ export function ProductDraftReview({
             <EditField
               label={`${vocab.product.Singular} name`}
               name="name"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.name}
+              hint={CANDIDATE_PROFILE_FIELD_HINTS.name}
               value={name}
               onChange={setName}
               singleLine
             />
             <EditField
-              label="Website URL"
+              label="Personal site, portfolio, or GitHub"
               name="websiteUrl"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.websiteUrl}
+              hint={CANDIDATE_PROFILE_FIELD_HINTS.websiteUrl}
               value={url}
               onChange={setUrl}
               singleLine
             />
             <EditField
-              label="What it is"
-              name="description"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.description}
-              value={profile.description ?? ""}
-              onChange={(value) => setString("description", value)}
+              label="Name"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS["identity.name"]}
+              value={profile.identity.name?.text ?? ""}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  identity: {
+                    ...prev.identity,
+                    name: updateOptionalFact(prev.identity.name, value, "id_name"),
+                  },
+                }))
+              }
+              singleLine
+            />
+            <EditField
+              label="Current headline"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS["identity.headline"]}
+              value={profile.identity.headline?.text ?? ""}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  identity: {
+                    ...prev.identity,
+                    headline: updateOptionalFact(
+                      prev.identity.headline,
+                      value,
+                      "id_headline",
+                    ),
+                  },
+                }))
+              }
+            />
+            <EditField
+              label="Location"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS["identity.location"]}
+              value={profile.identity.location?.text ?? ""}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  identity: {
+                    ...prev.identity,
+                    location: updateOptionalFact(
+                      prev.identity.location,
+                      value,
+                      "id_location",
+                    ),
+                  },
+                }))
+              }
+              singleLine
+            />
+            <EditField
+              label="Work arrangement"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS["identity.workArrangementPreference"]}
+              value={profile.identity.workArrangementPreference?.text ?? ""}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  identity: {
+                    ...prev.identity,
+                    workArrangementPreference: updateOptionalFact(
+                      prev.identity.workArrangementPreference,
+                      value,
+                      "id_work_arrangement",
+                    ),
+                  },
+                }))
+              }
+              singleLine
+            />
+            <EditField
+              label="Relocation"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS["identity.relocationOpenness"]}
+              value={profile.identity.relocationOpenness?.text ?? ""}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  identity: {
+                    ...prev.identity,
+                    relocationOpenness: updateOptionalFact(
+                      prev.identity.relocationOpenness,
+                      value,
+                      "id_relocation",
+                    ),
+                  },
+                }))
+              }
+              singleLine
+            />
+            <EditField
+              label="Positioning statement"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS.positioning}
+              value={profile.positioning?.text ?? ""}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  positioning: updateOptionalFact(
+                    prev.positioning,
+                    value,
+                    "id_positioning",
+                  ),
+                }))
+              }
               minRows={4}
             />
             <EditField
-              label={vocab.valueProposition.Singular}
-              name="valueProposition"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.valueProposition}
-              value={profile.valueProposition ?? ""}
-              onChange={(value) => setString("valueProposition", value)}
+              label="Target titles"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS["direction.targetTitles"]}
+              value={profile.direction.targetTitles.map((item) => item.text).join("\n")}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  direction: {
+                    ...prev.direction,
+                    targetTitles: updateFactList(
+                      prev.direction.targetTitles,
+                      value,
+                      "id_title",
+                    ),
+                  },
+                }))
+              }
             />
             <EditField
-              label="Problems it solves"
-              name="problemsSolved"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.problemsSolved}
-              value={listValue("problemsSolved")}
-              onChange={(value) => setList("problemsSolved", value)}
+              label="Seniority"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS["direction.seniority"]}
+              value={profile.direction.seniority?.text ?? ""}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  direction: {
+                    ...prev.direction,
+                    seniority: updateOptionalFact(
+                      prev.direction.seniority,
+                      value,
+                      "id_seniority",
+                    ),
+                  },
+                }))
+              }
             />
             <EditField
-              label="What it does"
-              name="capabilities"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.capabilities}
-              value={listValue("capabilities")}
-              onChange={(value) => setList("capabilities", value)}
+              label="Functions"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS["direction.functions"]}
+              value={profile.direction.functions.map((item) => item.text).join("\n")}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  direction: {
+                    ...prev.direction,
+                    functions: updateFactList(
+                      prev.direction.functions,
+                      value,
+                      "id_fn",
+                    ),
+                  },
+                }))
+              }
             />
             <EditField
-              label="What makes it different"
-              name="differentiators"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.differentiators}
-              value={listValue("differentiators")}
-              onChange={(value) => setList("differentiators", value)}
+              label="Career goals"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS["direction.careerGoals"]}
+              value={profile.direction.careerGoals.map((item) => item.text).join("\n")}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  direction: {
+                    ...prev.direction,
+                    careerGoals: updateFactList(
+                      prev.direction.careerGoals,
+                      value,
+                      "id_goal",
+                    ),
+                  },
+                }))
+              }
             />
             <EditField
-              label={`Who it's for — ${vocab.buyer.singular} functions`}
-              name="relevantBuyerFunctions"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.relevantBuyerFunctions}
-              value={listValue("relevantBuyerFunctions")}
-              onChange={(value) => setList("relevantBuyerFunctions", value)}
+              label="Skills and competencies"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS.skills}
+              value={profile.skills.map((item) => item.text).join("\n")}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  skills: updateFactList(prev.skills, value, "skill"),
+                }))
+              }
             />
             <EditField
-              label="Who it's for — industries"
-              name="relevantIndustries"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.relevantIndustries}
-              value={listValue("relevantIndustries")}
-              onChange={(value) => setList("relevantIndustries", value)}
+              label="Problems solved for employers"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS.problemsSolved}
+              value={profile.problemsSolved.map((item) => item.text).join("\n")}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  problemsSolved: updateFactList(
+                    prev.problemsSolved,
+                    value,
+                    "prob",
+                  ),
+                }))
+              }
             />
             <EditField
-              label="How it's used"
-              name="primaryUseCases"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.primaryUseCases}
-              value={listValue("primaryUseCases")}
-              onChange={(value) => setList("primaryUseCases", value)}
+              label="Differentiators"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS.differentiators}
+              value={profile.differentiators.map((item) => item.text).join("\n")}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  differentiators: updateFactList(
+                    prev.differentiators,
+                    value,
+                    "diff",
+                  ),
+                }))
+              }
             />
             <EditField
-              label="Business outcomes"
-              name="businessOutcomes"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.businessOutcomes}
-              value={listValue("businessOutcomes")}
-              onChange={(value) => setList("businessOutcomes", value)}
+              label="Education"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS.education}
+              value={profile.education.map((item) => item.text).join("\n")}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  education: updateFactList(prev.education, value, "edu"),
+                }))
+              }
             />
             <EditField
-              label="How it's sold"
-              name="deploymentContext"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.deploymentContext}
-              value={profile.deploymentContext ?? ""}
-              onChange={(value) => setString("deploymentContext", value)}
+              label="Credentials"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS.credentials}
+              value={profile.credentials.map((item) => item.text).join("\n")}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  credentials: updateFactList(prev.credentials, value, "cred"),
+                }))
+              }
             />
             <EditField
-              label={`Pricing / ${vocab.deal.singular} context`}
-              name="pricingAovContext"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.pricingAovContext}
-              value={profile.pricingAovContext ?? ""}
-              onChange={(value) => setString("pricingAovContext", value)}
+              label="Domain vocabulary"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS.domainVocabulary}
+              value={profile.domainVocabulary.map((item) => item.text).join("\n")}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  domainVocabulary: updateFactList(
+                    prev.domainVocabulary,
+                    value,
+                    "term",
+                  ),
+                }))
+              }
             />
             <EditField
-              label="Language"
-              name="terminology"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.terminology}
-              value={listValue("terminology")}
-              onChange={(value) => setList("terminology", value)}
-            />
-            <EditField
-              label="Proof points"
-              name="proofPoints"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.proofPoints}
-              value={listValue("proofPoints")}
-              onChange={(value) => setList("proofPoints", value)}
-            />
-            <EditField
-              label={`${vocab.customer.Singular} evidence`}
-              name="customerEvidence"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.customerEvidence}
-              value={listValue("customerEvidence")}
-              onChange={(value) => setList("customerEvidence", value)}
-            />
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-slate-800">Evidence</p>
-              <p className="text-xs text-slate-500">
-                {PRODUCT_DRAFT_FIELD_HINTS.evidenceRefs}
-              </p>
-              {refs.map((ref, index) => (
-                <div
-                  key={`ref-${index}`}
-                  className="space-y-2 rounded-md border border-slate-200 p-3"
-                >
-                  <AutosizeTextarea
-                    value={ref.claim}
-                    minRows={2}
-                    onChange={(event) => {
-                      const next = [...refs];
-                      next[index] = { ...ref, claim: event.target.value };
-                      setProfile((prev) => ({ ...prev, evidenceRefs: next }));
-                    }}
-                    className="w-full resize-none overflow-hidden rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                  <input
-                    value={ref.sourceIds.join(", ")}
-                    placeholder="Source ids, comma-separated"
-                    onChange={(event) => {
-                      const next = [...refs];
-                      next[index] = {
-                        ...ref,
-                        sourceIds: event.target.value
-                          .split(",")
-                          .map((id) => id.trim())
-                          .filter(Boolean),
-                      };
-                      setProfile((prev) => ({ ...prev, evidenceRefs: next }));
-                    }}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                  <input
-                    value={ref.note ?? ""}
-                    placeholder="Optional note"
-                    onChange={(event) => {
-                      const next = [...refs];
-                      next[index] = {
-                        ...ref,
-                        note: event.target.value || null,
-                      };
-                      setProfile((prev) => ({ ...prev, evidenceRefs: next }));
-                    }}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                </div>
-              ))}
-              <SecondaryButton
-                type="button"
-                onClick={() =>
-                  setProfile((prev) => ({
-                    ...prev,
-                    evidenceRefs: [
-                      ...(prev.evidenceRefs ?? []),
-                      { claim: "", sourceIds: [], note: null },
-                    ],
-                  }))
-                }
-              >
-                Add evidence claim
-              </SecondaryButton>
-            </div>
-            <EditField
-              label="Fields left unknown"
-              name="unknownFields"
-              hint={PRODUCT_DRAFT_FIELD_HINTS.unknownFields}
-              value={listValue("unknownFields")}
-              onChange={(value) => setList("unknownFields", value)}
-              minRows={2}
+              label="Compensation expectations (private)"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS.compensation}
+              value={profile.compensation?.text ?? ""}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  compensation: value.trim()
+                    ? {
+                        id: prev.compensation?.id ?? "comp_1",
+                        kind: prev.compensation?.kind ?? "INFERENCE",
+                        text: value.trim(),
+                        provenance: prev.compensation?.provenance ?? [],
+                      }
+                    : null,
+                }))
+              }
             />
           </div>
         ) : (
           <article className="space-y-8">
             <ReadSection
-              title="What it is"
-              empty={!profile.description && !profile.valueProposition}
-            >
-              {profile.description ? (
-                <p className="text-[17px] leading-7 text-slate-800">
-                  {profile.description}
-                  <EvidenceChip
-                    refs={evidenceRefsForText(profile.description, refs)}
-                    sources={sources}
-                    sourceIndex={sourceIndex}
-                  />
-                </p>
-              ) : null}
-              {profile.valueProposition ? (
-                <p className="text-[17px] leading-7 text-slate-800">
-                  {profile.valueProposition}
-                  <EvidenceChip
-                    refs={evidenceRefsForText(profile.valueProposition, refs)}
-                    sources={sources}
-                    sourceIndex={sourceIndex}
-                  />
-                </p>
-              ) : null}
-            </ReadSection>
-
-            <ReadSection
-              title="Problems it solves"
-              empty={(profile.problemsSolved ?? []).length === 0}
-            >
-              <ul className="list-disc space-y-2 pl-5 text-[17px]">
-                {(profile.problemsSolved ?? []).map((item) => (
-                  <ReadItem key={item} text={item} refs={refs} sources={sources} sourceIndex={sourceIndex} />
-                ))}
-              </ul>
-            </ReadSection>
-
-            <ReadSection
-              title="What it does"
-              empty={(profile.capabilities ?? []).length === 0}
-            >
-              <ul className="list-disc space-y-2 pl-5 text-[17px]">
-                {(profile.capabilities ?? []).map((item) => (
-                  <ReadItem key={item} text={item} refs={refs} sources={sources} sourceIndex={sourceIndex} />
-                ))}
-              </ul>
-            </ReadSection>
-
-            <ReadSection
-              title="What makes it different"
-              empty={(profile.differentiators ?? []).length === 0}
-            >
-              <ul className="list-disc space-y-2 pl-5 text-[17px]">
-                {(profile.differentiators ?? []).map((item) => (
-                  <ReadItem key={item} text={item} refs={refs} sources={sources} sourceIndex={sourceIndex} />
-                ))}
-              </ul>
-            </ReadSection>
-
-            <ReadSection
-              title="Who it's for"
+              title="Identity"
               empty={
-                (profile.relevantBuyerFunctions ?? []).length === 0 &&
-                (profile.relevantIndustries ?? []).length === 0
+                !profile.identity.name &&
+                !profile.identity.headline &&
+                !profile.identity.location
               }
             >
-              {(profile.relevantBuyerFunctions ?? []).length > 0 ? (
-                <div>
-                  <p className="text-sm font-medium text-slate-600">
-                    {vocab.buyer.Singular} functions
-                  </p>
-                  <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px]">
-                    {(profile.relevantBuyerFunctions ?? []).map((item) => (
-                      <ReadItem
-                        key={item}
-                        text={item}
-                        refs={refs}
-                        sources={sources}
-                        sourceIndex={sourceIndex}
-                      />
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500">
-                  {vocab.buyer.Singular} functions: none recorded from the material.
-                </p>
-              )}
-              {(profile.relevantIndustries ?? []).length > 0 ? (
-                <div>
-                  <p className="text-sm font-medium text-slate-600">Industries</p>
-                  <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px]">
-                    {(profile.relevantIndustries ?? []).map((item) => (
-                      <ReadItem
-                        key={item}
-                        text={item}
-                        refs={refs}
-                        sources={sources}
-                        sourceIndex={sourceIndex}
-                      />
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500">
-                  Industries: none recorded from the material.
-                </p>
-              )}
+              <FactLine
+                item={profile.identity.name}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
+              <FactLine
+                item={profile.identity.headline}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
+              <FactLine
+                item={profile.identity.location}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
+              <FactLine
+                item={profile.identity.workArrangementPreference}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
+              <FactLine
+                item={profile.identity.relocationOpenness}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
+            </ReadSection>
+
+            <ReadSection title="Positioning" empty={!profile.positioning}>
+              <FactLine
+                item={profile.positioning}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
             </ReadSection>
 
             <ReadSection
-              title="How it's used"
+              title="Direction"
               empty={
-                (profile.primaryUseCases ?? []).length === 0 &&
-                (profile.businessOutcomes ?? []).length === 0
+                profile.direction.targetTitles.length === 0 &&
+                !profile.direction.seniority &&
+                profile.direction.functions.length === 0 &&
+                profile.direction.careerGoals.length === 0
               }
             >
-              {(profile.primaryUseCases ?? []).length > 0 ? (
-                <ul className="list-disc space-y-2 pl-5 text-[17px]">
-                  {(profile.primaryUseCases ?? []).map((item) => (
-                    <ReadItem
-                      key={item}
-                      text={item}
-                      refs={refs}
-                      sources={sources}
-                      sourceIndex={sourceIndex}
-                    />
-                  ))}
-                </ul>
-              ) : null}
-              {(profile.businessOutcomes ?? []).length > 0 ? (
+              {profile.direction.targetTitles.length > 0 ? (
                 <div>
-                  <p className="text-sm font-medium text-slate-600">Outcomes</p>
-                  <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px]">
-                    {(profile.businessOutcomes ?? []).map((item) => (
-                      <ReadItem
-                        key={item}
-                        text={item}
-                        refs={refs}
-                        sources={sources}
-                        sourceIndex={sourceIndex}
-                      />
-                    ))}
-                  </ul>
+                  <p className="text-sm font-medium text-slate-600">Target titles</p>
+                  <FactList
+                    items={profile.direction.targetTitles}
+                    sources={sources}
+                    sourceIndex={sourceIndex}
+                  />
+                </div>
+              ) : null}
+              <FactLine
+                item={profile.direction.seniority}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
+              {profile.direction.functions.length > 0 ? (
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Functions</p>
+                  <FactList
+                    items={profile.direction.functions}
+                    sources={sources}
+                    sourceIndex={sourceIndex}
+                  />
+                </div>
+              ) : null}
+              {profile.direction.careerGoals.length > 0 ? (
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Career goals</p>
+                  <FactList
+                    items={profile.direction.careerGoals}
+                    sources={sources}
+                    sourceIndex={sourceIndex}
+                  />
                 </div>
               ) : null}
             </ReadSection>
 
-            <ReadSection
-              title="How it's sold"
-              empty={!profile.deploymentContext && !profile.pricingAovContext}
-            >
-              {profile.deploymentContext ? (
-                <p className="text-[17px] leading-7 text-slate-800">
-                  {profile.deploymentContext}
-                  <EvidenceChip
-                    refs={evidenceRefsForText(profile.deploymentContext, refs)}
+            <ReadSection title="Experience" empty={profile.experience.length === 0}>
+              <div className="space-y-6">
+                {profile.experience.map((role) => (
+                  <RoleBlock
+                    key={role.id}
+                    role={role}
                     sources={sources}
                     sourceIndex={sourceIndex}
                   />
-                </p>
-              ) : null}
-              {profile.pricingAovContext ? (
-                <p className="text-[17px] leading-7 text-slate-800">
-                  {profile.pricingAovContext}
-                  <EvidenceChip
-                    refs={evidenceRefsForText(profile.pricingAovContext, refs)}
-                    sources={sources}
-                    sourceIndex={sourceIndex}
-                  />
-                </p>
-              ) : null}
+                ))}
+              </div>
+            </ReadSection>
+
+            <ReadSection title="Skills and competencies" empty={profile.skills.length === 0}>
+              <FactList
+                items={profile.skills}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
             </ReadSection>
 
             <ReadSection
-              title="Language"
-              empty={(profile.terminology ?? []).length === 0}
+              title="Problems solved for employers"
+              empty={profile.problemsSolved.length === 0}
+            >
+              <FactList
+                items={profile.problemsSolved}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
+            </ReadSection>
+
+            <ReadSection
+              title="Differentiators"
+              empty={profile.differentiators.length === 0}
+            >
+              <FactList
+                items={profile.differentiators}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
+            </ReadSection>
+
+            <ReadSection title="Education" empty={profile.education.length === 0}>
+              <FactList
+                items={profile.education}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
+            </ReadSection>
+
+            <ReadSection title="Credentials" empty={profile.credentials.length === 0}>
+              <FactList
+                items={profile.credentials}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
+            </ReadSection>
+
+            <ReadSection
+              title="Domain vocabulary"
+              empty={profile.domainVocabulary.length === 0}
             >
               <ul className="flex flex-wrap gap-2">
-                {(profile.terminology ?? []).map((term) => (
+                {profile.domainVocabulary.map((term) => (
                   <li
-                    key={term}
+                    key={term.id}
                     className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-800"
                   >
-                    {term}
-                    <EvidenceChip
-                      refs={evidenceRefsForText(term, refs)}
+                    {term.text}
+                    <KindBadge kind={term.kind} />
+                    <ProvenanceChip
+                      sourceIds={term.provenance.map((ref) => ref.sourceId)}
                       sources={sources}
                       sourceIndex={sourceIndex}
                     />
@@ -797,71 +893,41 @@ export function ProductDraftReview({
             </ReadSection>
 
             <ReadSection
-              title="Proof"
-              empty={
-                (profile.proofPoints ?? []).length === 0 &&
-                (profile.customerEvidence ?? []).length === 0
-              }
+              title="Compensation expectations (private)"
+              empty={!profile.compensation?.text}
             >
-              {(profile.proofPoints ?? []).length > 0 ? (
-                <ul className="list-disc space-y-2 pl-5 text-[17px]">
-                  {(profile.proofPoints ?? []).map((item) => (
-                    <ReadItem
-                      key={item}
-                      text={item}
-                      refs={refs}
-                      sources={sources}
-                      sourceIndex={sourceIndex}
-                    />
-                  ))}
-                </ul>
-              ) : null}
-              {(profile.customerEvidence ?? []).length > 0 ? (
-                <div>
-                  <p className="text-sm font-medium text-slate-600">
-                    Customer evidence
-                  </p>
-                  <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px]">
-                    {(profile.customerEvidence ?? []).map((item) => (
-                      <ReadItem
-                        key={item}
-                        text={item}
-                        refs={refs}
-                        sources={sources}
-                        sourceIndex={sourceIndex}
-                      />
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
+              <p className="text-[17px] leading-7 text-slate-800">
+                {profile.compensation?.text}
+                {profile.compensation ? (
+                  <KindBadge kind={profile.compensation.kind} />
+                ) : null}
+              </p>
+              <p className="text-xs text-slate-500">
+                Private. Not sent to outreach or document generation.
+              </p>
             </ReadSection>
           </article>
         )}
 
-        {unknownLabels.length > 0 ? (
+        {profile.gaps.length > 0 ? (
           <aside
             className="rounded-lg border border-slate-200 bg-slate-50 px-5 py-4"
-            data-testid="unknown-fields-panel"
+            data-testid="profile-gaps-panel"
           >
             <h3 className="text-sm font-semibold text-slate-900">
-              We didn&apos;t claim these — no supporting evidence was found.
+              Gaps — no supporting evidence was found.
             </h3>
             <p className="mt-1 text-sm text-slate-600">
               Listing what was refused rather than invented.
             </p>
             <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-800">
-              {unknownLabels.map((label) => (
-                <li key={label}>{label}</li>
+              {profile.gaps.map((gap) => (
+                <li key={gap.id}>
+                  <span className="font-medium">{gap.area}:</span> {gap.detail}
+                </li>
               ))}
             </ul>
           </aside>
-        ) : null}
-
-        {messaging?.primaryPositioning ? (
-          <p className="text-sm text-slate-500">
-            Messaging guidance (not scoring evidence):{" "}
-            {messaging.primaryPositioning}
-          </p>
         ) : null}
 
         {sources.length > 0 ? (
@@ -873,23 +939,23 @@ export function ProductDraftReview({
               {sources.map((source) => {
                 const number = sourceIndex.get(source.id) ?? 0;
                 return (
-                <li key={source.id}>
-                  <p className="font-medium text-slate-900">
-                    {number > 0 ? (
-                      <span className="text-slate-500">[{number}] </span>
-                    ) : null}
-                    {source.displayName}
-                  </p>
-                  <p className="text-xs text-slate-500">{source.sourceType}</p>
-                  {source.originalUrl ? (
-                    <p className="break-all text-xs text-slate-600">
-                      {source.originalUrl}
+                  <li key={source.id}>
+                    <p className="font-medium text-slate-900">
+                      {number > 0 ? (
+                        <span className="text-slate-500">[{number}] </span>
+                      ) : null}
+                      {source.displayName}
                     </p>
-                  ) : null}
-                  {source.filename ? (
-                    <p className="text-xs text-slate-600">{source.filename}</p>
-                  ) : null}
-                </li>
+                    <p className="text-xs text-slate-500">{source.sourceType}</p>
+                    {source.originalUrl ? (
+                      <p className="break-all text-xs text-slate-600">
+                        {source.originalUrl}
+                      </p>
+                    ) : null}
+                    {source.filename ? (
+                      <p className="text-xs text-slate-600">{source.filename}</p>
+                    ) : null}
+                  </li>
                 );
               })}
             </ul>
@@ -901,8 +967,8 @@ export function ProductDraftReview({
             {pending ? "Saving…" : "Approve this profile"}
           </SubmitButton>
           <p className="mt-2 text-sm text-slate-500">
-            This becomes the authoritative {vocab.product.singular} record. {vocab.persona.Plural}, scoring,
-            and every email use it.
+            This becomes the authoritative {vocab.product.singular} record. Later{" "}
+            {vocab.campaign.plural} and generated documents use it.
           </p>
           <Status result={state} />
         </div>

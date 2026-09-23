@@ -11,6 +11,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
 import { recordUsageEvent } from "@/lib/usage/events";
+import { omitCompensationFromUnknown } from "@/lib/product-research/candidate-profile";
 
 export { offerValidationSchema };
 
@@ -118,7 +119,10 @@ export function campaignOfferGuardContext(input: {
       ...stringList(productMessaging.supportedClaims),
       ...stringList(personaMessaging.proofPoints),
       input.persona?.messagingNotes,
-      ...evidenceFragments(input.product.profileJson, "productProfile"),
+      ...evidenceFragments(
+        omitCompensationFromUnknown(input.product.profileJson),
+        "productProfile",
+      ),
       ...evidenceFragments(
         input.normalizedEvidenceJson,
         "approvedProductEvidence",

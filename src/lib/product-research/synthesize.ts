@@ -192,11 +192,9 @@ export async function synthesizeProductSetup(input: {
       data: {
         status: "NEEDS_REVIEW",
         productDraftJson:
-          result.productDraft as unknown as Prisma.InputJsonValue,
-        messagingDraftJson:
-          result.productMessagingDraft as unknown as Prisma.InputJsonValue,
-        suggestedPersonasJson:
-          result.suggestedBuyerRoles as unknown as Prisma.InputJsonValue,
+          result.candidateProfile as unknown as Prisma.InputJsonValue,
+        messagingDraftJson: Prisma.DbNull,
+        suggestedPersonasJson: [] as unknown as Prisma.InputJsonValue,
         personaDraftsJson: Prisma.DbNull,
         aiProvider: providerSummary.provider,
         aiModel: providerSummary.model,
@@ -237,7 +235,7 @@ export async function synthesizeProductSetup(input: {
         evidenceBundleId: input.evidenceBundleId,
         setupRunId: run.id,
         promptVersion: PRODUCT_SYNTHESIS_PROMPT_VERSION,
-        suggestedPersonaCount: result.suggestedBuyerRoles.length,
+        suggestedPersonaCount: 0,
         ...(response.coercedFields?.length
           ? { coercedFields: response.coercedFields }
           : {}),

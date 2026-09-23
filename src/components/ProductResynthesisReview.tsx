@@ -8,21 +8,12 @@ import {
   retryApprovedProductResynthesisAction,
   type ProductSetupActionResult,
 } from "@/app/actions/product-setup";
-import { AutosizeTextarea } from "@/components/AutosizeTextarea";
 import { SECONDARY_BUTTON_CLASS, SecondaryButton, SubmitButton } from "@/components/ui";
-import type { ProductDraft } from "@/lib/product-research/contract";
+import type { CandidateProfile } from "@/lib/product-research/candidate-profile";
 import {
   buildProductResynthesisApplyPlan,
   productDraftFromApprovedProfile,
 } from "@/lib/product-research/resynthesize-approved-plan";
-import {
-  PRODUCT_DRAFT_FIELD_LABELS,
-  PRODUCT_DRAFT_LIST_FIELDS,
-  PRODUCT_DRAFT_STRING_FIELDS,
-  stringifyDraftList,
-  type ProductDraftListField,
-  type ProductDraftStringField,
-} from "@/lib/product-research/review";
 import { vocab } from "@/lib/product-config";
 
 const initial: ProductSetupActionResult | null = null;
@@ -59,80 +50,6 @@ function ApplyPlanList({
   );
 }
 
-function FieldCompare({
-  label,
-  before,
-  after,
-  name,
-  onAfterChange,
-  multiline = true,
-}: {
-  label: string;
-  before: string;
-  after: string;
-  name: string;
-  onAfterChange: (value: string) => void;
-  multiline?: boolean;
-}) {
-  const changed = before.trim() !== after.trim();
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-4 py-2">
-        <h3 className="text-sm font-semibold text-slate-900">{label}</h3>
-        {changed ? (
-          <p className="mt-0.5 text-xs text-amber-800">Will change on confirm</p>
-        ) : (
-          <p className="mt-0.5 text-xs text-slate-500">Unchanged</p>
-        )}
-      </div>
-      <div className="grid gap-0 md:grid-cols-2">
-        <div className="border-b border-slate-100 p-4 md:border-b-0 md:border-r">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            Current
-          </p>
-          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
-            {before.trim() || "—"}
-          </p>
-        </div>
-        <div className="p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            Proposed
-          </p>
-          {multiline ? (
-            <AutosizeTextarea
-              name={name}
-              value={after}
-              minRows={4}
-              onChange={(event) => onAfterChange(event.target.value)}
-              className="mt-2 w-full resize-none overflow-hidden rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 focus:ring-2"
-            />
-          ) : (
-            <input
-              name={name}
-              value={after}
-              onChange={(event) => onAfterChange(event.target.value)}
-              className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 focus:ring-2"
-            />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-type CompareField =
-  | { kind: "string"; key: ProductDraftStringField }
-  | { kind: "list"; key: ProductDraftListField };
-
-const COMPARE_FIELDS: CompareField[] = [
-  ...PRODUCT_DRAFT_STRING_FIELDS.map(
-    (key) => ({ kind: "string", key }) as CompareField,
-  ),
-  ...PRODUCT_DRAFT_LIST_FIELDS.filter((key) => key !== "unknownFields").map(
-    (key) => ({ kind: "list", key }) as CompareField,
-  ),
-];
-
 export function ProductResynthesisReview({
   productId,
   productName,
@@ -150,10 +67,10 @@ export function ProductResynthesisReview({
   websiteUrl: string | null;
   setupRunId: string;
   evidenceBundleId: string;
-  draft: ProductDraft | null;
+  draft: CandidateProfile | null;
   failed?: boolean;
   errorSafe?: string | null;
-  beforeProfile: ProductDraft;
+  beforeProfile: CandidateProfile;
   manuallyEditedFields: unknown;
 }) {
   const router = useRouter();
@@ -166,7 +83,7 @@ export function ProductResynthesisReview({
     initial,
   );
 
-  const [profile, setProfile] = useState<ProductDraft>(() =>
+  const [profile, setProfile] = useState<CandidateProfile>(() =>
     productDraftFromApprovedProfile(draft ?? beforeProfile),
   );
 
@@ -190,8 +107,6 @@ export function ProductResynthesisReview({
     }
   }, [retry, productId, router]);
 
-  const afterProfile = useMemo(() => profile, [profile]);
-
   const applyPlan = useMemo(
     () =>
       buildProductResynthesisApplyPlan({
@@ -201,36 +116,10 @@ export function ProductResynthesisReview({
           manuallyEditedFields,
         },
         before: beforeProfile,
-        after: afterProfile,
+        after: profile,
       }),
-    [productId, productName, manuallyEditedFields, beforeProfile, afterProfile],
+    [productId, productName, manuallyEditedFields, beforeProfile, profile],
   );
-
-  function fieldBefore(field: CompareField): string {
-    if (field.kind === "string") {
-      return (beforeProfile[field.key] ?? "").trim();
-    }
-    return stringifyDraftList(beforeProfile[field.key]);
-  }
-
-  function fieldAfter(field: CompareField): string {
-    if (field.kind === "string") {
-      return (profile[field.key] ?? "").trim();
-    }
-    return stringifyDraftList(profile[field.key]);
-  }
-
-  function setFieldAfter(field: CompareField, value: string) {
-    setProfile((prev) => {
-      if (field.kind === "string") {
-        return { ...prev, [field.key]: value };
-      }
-      return {
-        ...prev,
-        [field.key]: value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
-      };
-    });
-  }
 
   if (failed || !draft) {
     return (
@@ -264,9 +153,9 @@ export function ProductResynthesisReview({
     <div className="space-y-6" data-testid="product-resynthesis-review">
       <p className="text-sm text-slate-600">
         Review the proposed update for <strong>{productName}</strong>. Confirm
-        only replaces the fields listed below — your {vocab.product.singular} id, {vocab.campaign.plural},
-        {vocab.icp.plural}, {vocab.persona.plural}, and scoring runs stay linked. Cancel leaves the {vocab.product.singular}
-        untouched.
+        only replaces the fields listed below — your {vocab.product.singular} id,{" "}
+        {vocab.campaign.plural}, and {vocab.icp.plural} stay linked. Cancel leaves
+        the {vocab.product.singular} untouched.
       </p>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -282,18 +171,43 @@ export function ProductResynthesisReview({
         />
       </div>
 
-      <div className="space-y-4">
-        {COMPARE_FIELDS.map((field) => (
-          <FieldCompare
-            key={field.key}
-            label={PRODUCT_DRAFT_FIELD_LABELS[field.key] ?? field.key}
-            before={fieldBefore(field)}
-            after={fieldAfter(field)}
-            name={field.key}
-            onAfterChange={(value) => setFieldAfter(field, value)}
-          />
-        ))}
-      </div>
+      {applyPlan.fieldDiffs.length > 0 ? (
+        <div className="space-y-4">
+          {applyPlan.fieldDiffs.map((diff) => (
+            <div
+              key={diff.field}
+              className="rounded-lg border border-slate-200 bg-white"
+            >
+              <div className="border-b border-slate-200 px-4 py-2">
+                <h3 className="text-sm font-semibold text-slate-900">
+                  {diff.label}
+                </h3>
+                <p className="mt-0.5 text-xs text-amber-800">
+                  Will change on confirm
+                </p>
+              </div>
+              <div className="grid gap-0 md:grid-cols-2">
+                <div className="border-b border-slate-100 p-4 md:border-b-0 md:border-r">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Current
+                  </p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
+                    {diff.before.trim() || "—"}
+                  </p>
+                </div>
+                <div className="p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Proposed
+                  </p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
+                    {diff.after.trim() || "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <form action={action} className="space-y-4 border-t border-slate-200 pt-5">
         <input type="hidden" name="productId" value={productId} />
@@ -302,25 +216,9 @@ export function ProductResynthesisReview({
         <input type="hidden" name="websiteUrl" value={websiteUrl ?? ""} />
         <input
           type="hidden"
-          name="evidenceRefsJson"
-          value={JSON.stringify(profile.evidenceRefs ?? [])}
+          name="candidateProfileJson"
+          value={JSON.stringify(profile)}
         />
-        {PRODUCT_DRAFT_STRING_FIELDS.map((key) => (
-          <input
-            key={key}
-            type="hidden"
-            name={key}
-            value={(profile[key] ?? "") as string}
-          />
-        ))}
-        {PRODUCT_DRAFT_LIST_FIELDS.map((key) => (
-          <input
-            key={key}
-            type="hidden"
-            name={key}
-            value={stringifyDraftList(profile[key])}
-          />
-        ))}
 
         <div className="flex flex-wrap gap-2">
           <SubmitButton disabled={pending}>

@@ -1,16 +1,20 @@
 /**
- * Product synthesis contract (v4) — Product draft + lightweight SuggestedBuyerRoles.
- * Full Persona drafts are produced later by PERSONA_AI (one role at a time).
+ * Candidate profile synthesis contract (v6).
+ * Prompt instructions live in `@/lib/prompt-content/profile-synthesis`.
+ * This file keeps payload assembly types, version, and parsing.
  */
 
 import { z } from "zod";
 import {
   normalizeAbsentNulls,
-  normalizeConfidenceValue,
-  normalizeEvidenceRefs,
   summarizeCoercedFields,
 } from "@/lib/ai/contract-normalize";
 import type { StructuredParseResult } from "@/lib/ai/types";
+import {
+  candidateProfileSchema,
+  emptyCandidateProfile,
+  type CandidateProfile,
+} from "@/lib/product-research/candidate-profile";
 
 const optionalString = z.string().nullable().optional();
 const stringList = z.array(z.string()).optional().default([]);
@@ -26,6 +30,7 @@ export const requiredRoleNameSchema = z
   .trim()
   .min(1, "Buyer role name is required");
 
+/** @deprecated Historical ProductDraft shape — read-only for leftover setup runs. */
 export const productDraftSchema = z.object({
   description: optionalString,
   valueProposition: optionalString,
@@ -57,7 +62,7 @@ export const productMessagingDraftSchema = z.object({
   terminologyToAvoid: stringList,
 });
 
-/** Lightweight AI buyer-role suggestion (not an authoritative Persona). */
+/** Lightweight AI buyer-role suggestion (not produced by profile synthesis). */
 export const suggestedBuyerRoleAiSchema = z.object({
   name: requiredRoleNameSchema,
   likelyTitles: stringList,
@@ -67,11 +72,9 @@ export const suggestedBuyerRoleAiSchema = z.object({
   evidenceRefs: z.array(evidenceRefSchema).optional().default([]),
 });
 
-/** Schema passed to PRODUCT_AI (no suggestionKey, no persona drafts). */
+/** Schema passed to PRODUCT_AI — candidate profile only. */
 export const productAiResponseSchema = z.object({
-  productDraft: productDraftSchema,
-  productMessagingDraft: productMessagingDraftSchema,
-  suggestedBuyerRoles: z.array(suggestedBuyerRoleAiSchema).max(8),
+  candidateProfile: candidateProfileSchema,
 });
 
 /** App-persisted SuggestedBuyerRole with application-owned key. */
@@ -86,9 +89,7 @@ export const suggestedBuyerRoleSchema = z.object({
 });
 
 export const productSynthesisResultSchema = z.object({
-  productDraft: productDraftSchema,
-  productMessagingDraft: productMessagingDraftSchema,
-  suggestedBuyerRoles: z.array(suggestedBuyerRoleSchema).max(8),
+  candidateProfile: candidateProfileSchema,
 });
 
 export type ProductDraft = z.infer<typeof productDraftSchema>;
@@ -97,73 +98,41 @@ export type SuggestedBuyerRole = z.infer<typeof suggestedBuyerRoleSchema>;
 export type ProductAiResponse = z.infer<typeof productAiResponseSchema>;
 export type ProductSynthesisResult = z.infer<typeof productSynthesisResultSchema>;
 
-/** Reproduced from production validation failure (Aug 2026). */
-export const PRODUCT_AI_MALFORMED_FIXTURE = {
-  productDraft: {
-    description: "Tool",
-    evidenceRefs: [{ sourceIds: ["s1"] }],
-  },
-  productMessagingDraft: { primaryPositioning: "Save time" },
-  suggestedBuyerRoles: [
-    {
-      name: "CRO",
-      likelyTitles: ["CRO"],
-      whyThisRoleMatters: "Owns forecast",
-      confidence: "High",
-      evidenceRefs: [{ sourceIds: ["s1"] }],
-    },
-    {
-      name: "VP Sales",
-      confidence: "Medium",
-      evidenceRefs: [{ sourceIds: ["s2"] }],
-    },
-    {
-      name: "RevOps",
-      confidence: "medium",
-      evidenceRefs: [{ sourceIds: ["s3"], note: null }],
-    },
-    {
-      name: "CFO",
-      confidence: "MEDIUM-HIGH",
-      evidenceRefs: [{ sourceIds: ["s4"] }],
-    },
-  ],
-} as const;
-
-function normalizeSuggestedBuyerRoles(
-  value: unknown,
+function stripForbiddenSynthesisKeys(
+  root: Record<string, unknown>,
   coercedFields: Set<string>,
-): unknown {
-  if (!Array.isArray(value)) return [];
-  return value.map((role, index) => {
-    if (!role || typeof role !== "object") return role;
-    const row = { ...(role as Record<string, unknown>) };
-    row.confidence = normalizeConfidenceValue(
-      row.confidence,
-      coercedFields,
-      `suggestedBuyerRoles[${index}].confidence`,
-    );
-    row.evidenceRefs = normalizeEvidenceRefs(
-      row.evidenceRefs,
-      coercedFields,
-      `suggestedBuyerRoles[${index}].evidenceRefs`,
-    );
-    return row;
-  });
+): Record<string, unknown> {
+  const next = { ...root };
+  if ("suggestedBuyerRoles" in next) {
+    delete next.suggestedBuyerRoles;
+    coercedFields.add("suggestedBuyerRoles");
+  }
+  if ("personas" in next) {
+    delete next.personas;
+    coercedFields.add("personas");
+  }
+  if ("personaDrafts" in next) {
+    delete next.personaDrafts;
+    coercedFields.add("personaDrafts");
+  }
+  return next;
 }
 
-function normalizeProductDraft(value: unknown, coercedFields: Set<string>): unknown {
-  if (!value || typeof value !== "object") return value ?? {};
-  const draft = { ...(value as Record<string, unknown>) };
-  draft.evidenceRefs = normalizeEvidenceRefs(
-    draft.evidenceRefs,
-    coercedFields,
-    "productDraft.evidenceRefs",
-  );
-  return draft;
+function candidateProfileFromRoot(root: Record<string, unknown>): unknown {
+  if (root.candidateProfile && typeof root.candidateProfile === "object") {
+    return root.candidateProfile;
+  }
+  if (
+    root.identity &&
+    typeof root.identity === "object" &&
+    !Array.isArray(root.identity)
+  ) {
+    return root;
+  }
+  return emptyCandidateProfile();
 }
 
-/** Defensive parse — normalizes ambiguous model output before strict validation. */
+/** Defensive parse — strips leftover sales keys, then validates the profile. */
 export function parseProductAiResponse(
   raw: unknown,
 ): StructuredParseResult<ProductAiResponse> {
@@ -171,29 +140,30 @@ export function parseProductAiResponse(
   if (!raw || typeof raw !== "object") {
     return {
       data: productAiResponseSchema.parse({
-        productDraft: {},
-        productMessagingDraft: {},
-        suggestedBuyerRoles: [],
+        candidateProfile: emptyCandidateProfile(),
       }),
       coercedFields: [],
     };
   }
 
-  const root = normalizeAbsentNulls(raw) as Record<string, unknown>;
+  const root = stripForbiddenSynthesisKeys(
+    normalizeAbsentNulls(raw) as Record<string, unknown>,
+    coercedFields,
+  );
+
   const normalized = {
-    ...root,
-    productDraft: normalizeProductDraft(root.productDraft, coercedFields),
-    productMessagingDraft: root.productMessagingDraft ?? {},
-    suggestedBuyerRoles: normalizeSuggestedBuyerRoles(
-      root.suggestedBuyerRoles,
-      coercedFields,
-    ),
+    candidateProfile: candidateProfileFromRoot(root),
   };
 
   return {
     data: productAiResponseSchema.parse(normalized),
     coercedFields: summarizeCoercedFields(coercedFields),
   };
+}
+
+export function synthesisHasSuggestedBuyerRoles(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  return "suggestedBuyerRoles" in (value as Record<string, unknown>);
 }
 
 /** @deprecated Use SuggestedBuyerRole — kept for reading legacy setup runs / UI aliases. */
@@ -225,4 +195,6 @@ export type PersonaDraft = {
   criteria?: Array<Record<string, unknown>>;
 };
 
-export const PRODUCT_SYNTHESIS_PROMPT_VERSION = "5";
+export type { CandidateProfile };
+
+export const PRODUCT_SYNTHESIS_PROMPT_VERSION = "6";

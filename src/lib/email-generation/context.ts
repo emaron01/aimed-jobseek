@@ -13,6 +13,11 @@ import { TenantError } from "@/lib/tenant/errors";
 import { vocab } from "@/lib/product-config";
 import { evidenceFragments } from "@/lib/campaign/offer-validation";
 import {
+  candidateProfileForGeneration,
+  factTexts,
+  omitCompensationFromUnknown,
+} from "@/lib/product-research/candidate-profile";
+import {
   isResearchFresh,
   parseStringArray,
 } from "@/lib/research/freshness";
@@ -410,6 +415,9 @@ export async function loadEmailGenerationContext(
 
   const productMessaging = objectValue(campaign.product.messagingJson);
   const productProfile = objectValue(campaign.product.profileJson);
+  const generationProfile = candidateProfileForGeneration(
+    campaign.product.profileJson,
+  );
   const personaMessaging = objectValue(personaRow.personaMessagingJson);
   const personaProfile = objectValue(personaRow.profileJson);
 
@@ -455,13 +463,18 @@ export async function loadEmailGenerationContext(
         campaign.product.valueProposition,
         ...stringList(productMessaging.proofPoints),
         ...stringList(productMessaging.supportedClaims),
-        ...evidenceFragments(campaign.product.profileJson, "productProfile"),
+        ...evidenceFragments(
+          omitCompensationFromUnknown(campaign.product.profileJson),
+          "productProfile",
+        ),
         ...evidenceFragments(
           approvedEvidence?.normalizedEvidenceJson,
           "approvedProductEvidence",
         ),
       ].filter((value): value is string => Boolean(value?.trim())),
-      problemsSolved: stringList(productProfile.problemsSolved),
+      problemsSolved: generationProfile
+        ? factTexts(generationProfile.problemsSolved)
+        : stringList(productProfile.problemsSolved),
       messaging: {
         primaryPositioning: stringList(
           productMessaging.primaryPositioning,

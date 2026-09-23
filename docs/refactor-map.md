@@ -427,7 +427,9 @@ The vision's Decisions log settles Target Employers, lists, contacts, email, `Ap
 
 **Company research reuse has a column problem.** The worker, cache, freshness, ambiguity flag, and per-user credit attribution are worth keeping. The stored questions are not. Prefer new nullable JSON (for example hiring signals) over stuffing hiring news into `buyingSignals`. Renaming `buyingSignals` fights the merge rule. Writing hiring text into it will confuse the next upstream cherry-pick.
 
-**Prompt split is the first structural change, and it is not a file move.** Machinery and sales content share template literals, especially `EMAIL_GENERATION_PROMPT_VERSION` 18. Extract content into a fork-only module. Leave version constants and payload keys where upstream can still patch them. Bump the version when content changes so stored `promptVersion` values stay meaningful. ICP interpretation and scoring prompts are now in scope, because Target Employers reuses them with employer content.
+**Prompt content layer (established by the Profile slice).** Product-specific instructions, rules, and examples live in `src/lib/prompt-content/`. Payload assembly, version constants, model calls, and parsing stay in the shared generation modules (`src/lib/product-research/prompt.ts`, `contract.ts`, and the same pattern for later slices). Profile synthesis content is `src/lib/prompt-content/profile-synthesis.ts`, imported by the assembler. Later slices add a file beside it and import it from the existing assembler. Do not put sales or job-seeker instructions back into the assembler, and do not change other areas' prompts from a slice that is not theirs. Bump the version constant when content changes so stored `promptVersion` values stay meaningful.
+
+**Prompt split for remaining areas.** Machinery and sales content still share template literals for email, company research, persona synthesis, ICP interpretation, and scoring, especially `EMAIL_GENERATION_PROMPT_VERSION` 18. Follow the Profile slice pattern: extract content into `src/lib/prompt-content/`, leave version constants and payload keys where they are. ICP interpretation and scoring prompts are in scope for Target Employers.
 
 **Recommended build order.**
 
@@ -475,26 +477,26 @@ Nouns now come from `src/lib/product-config/vocabulary.ts`. The sentences below 
 ### Home (2)
 
 - `src/app/(app)/page.tsx` — "Work {applications} for {org} from qualification through sending."
-- `src/app/(app)/page.tsx` — "{Application} creation unlocks after at least one {profile} is approved with {a Target Employer profile} that has criteria and a saved {Hiring Team role}." (still the sales setup gate: score-ready product + ICP + persona)
+- `src/app/(app)/page.tsx` — "{Application} creation unlocks after at least one {profile} is approved with {a Target Employer profile} that has criteria."
 
-### Profile / product setup (16)
+### Profile / product setup (16) — done
 
-- `src/app/(app)/products/page.tsx` — "A profile is what you sell — research it once, then define the Target Employer profiles and Hiring Team roles that belong to it."
-- `src/components/AssistedProductSetup.tsx` — "Tell us what you sell"
-- `src/components/AssistedProductSetup.tsx` — hint: "Anything important about the Hiring Team role, positioning, pricing, use case, or market…"
-- `src/lib/product/save.ts` — "Product name is required."
-- `src/lib/product-research/review.ts` — "The product name as you want it used in emails and scoring."
-- `src/lib/product-research/review.ts` — "The core value a buyer gets."
-- `src/lib/product-research/review.ts` — "One buyer function or role family per line."
-- `src/lib/product-research/review.ts` — "How it is priced or typical deal size, if known."
-- `src/lib/product-research/review.ts` — "How it is sold or deployed (sales motion, delivery)."
-- `src/lib/product-research/review.ts` — "One customer or case reference per line."
-- `src/lib/product-research/review.ts` — field labels: "Value proposition", "Buyer functions", "Pricing / deal context", "How it is sold", "Customer evidence"
-- `src/lib/product-research/extract.ts` — "Paste the product description into the paste field and try again."
-- `src/lib/product-research/extraction-quality.ts` — "We could not read usable product content from this page…"
-- `src/lib/product-research/fetch-url.ts` — "This URL did not return readable page text. Paste the product description…"
-- `src/lib/product-config/vocabulary.ts` — `personaLikelyTitlesPlaceholder` / department placeholders still use CRO, VP Sales, Sales
-- `src/lib/product-research/review.ts` — "Primary product or company URL."
+- `src/app/(app)/products/page.tsx` — `{Profile.ASingular} is built from your resume and other materials. Research it once, then define the {Target Employer profiles} that belong to it.`
+- `src/components/AssistedProductSetup.tsx` — "Tell us about your background"
+- `src/components/AssistedProductSetup.tsx` — hint: goals, target roles, constraints, or context
+- `src/lib/product/save.ts` — `{Profile.Singular} name is required.`
+- `src/lib/product-research/review.ts` — `{Profile.singular} name as you want it shown in {applications} and generated documents.`
+- `src/lib/product-research/review.ts` — positioning is the candidate's value proposition
+- `src/lib/product-research/review.ts` — functions are career functions, not buyer roles
+- `src/lib/product-research/review.ts` — compensation is private; not sent to generation
+- `src/lib/product-research/review.ts` — work arrangement and relocation, not sales motion
+- `src/lib/product-research/review.ts` — education and credentials replace customer evidence
+- `src/lib/product-research/review.ts` — field labels: identity, positioning, direction, experience, skills, gaps
+- `src/lib/product-research/extract.ts` — "Paste resume or LinkedIn profile text into the paste field and try again."
+- `src/lib/product-research/extraction-quality.ts` — unreadable URL asks for resume or LinkedIn text
+- `src/lib/product-research/fetch-url.ts` — unreadable URL asks for resume or LinkedIn text
+- `src/lib/product-config/vocabulary.ts` — Hiring Team title/department examples no longer use CRO, VP Sales, Sales
+- `src/lib/product-research/review.ts` — "Personal site, portfolio, or GitHub URL"
 
 ### Target Employers / ICP (4)
 

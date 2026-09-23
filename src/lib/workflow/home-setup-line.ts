@@ -14,9 +14,6 @@ export function formatProductSetupClause(
   if (blocker === PRODUCT_READINESS_BLOCKERS.needsIcp) {
     return `${productName} needs ${vocab.icp.aSingular}`;
   }
-  if (blocker === PRODUCT_READINESS_BLOCKERS.needsPersona) {
-    return `${productName} needs ${vocab.persona.aSingular}`;
-  }
   if (
     blocker === PRODUCT_READINESS_BLOCKERS.needsReview ||
     blocker === PRODUCT_READINESS_BLOCKERS.draft ||

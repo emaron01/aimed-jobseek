@@ -22,6 +22,20 @@ const TRACKING_PARAMS = new Set([
  * Collapses scheme/www/trailing slash/fragments/obvious tracking params.
  * Does not over-collapse genuinely different paths/query pages.
  */
+export const LINKEDIN_PROFILE_BLOCKED_MESSAGE =
+  "LinkedIn blocks automated reading. Paste your LinkedIn profile text instead of a LinkedIn URL.";
+
+export function isLinkedInProfileUrl(raw: string): boolean {
+  const normalized = normalizeProductSourceUrl(raw);
+  if (!normalized) return false;
+  try {
+    const host = new URL(normalized).hostname.toLowerCase();
+    return host === "linkedin.com" || host.endsWith(".linkedin.com");
+  } catch {
+    return false;
+  }
+}
+
 export function normalizeProductSourceUrl(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;

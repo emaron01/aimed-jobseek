@@ -36,7 +36,6 @@ function plural(count: number, singular: string): string {
 function shortProductGap(readiness: ProductCampaignReadiness): string {
   const blocker = readiness.blockers[0] ?? "needs setup";
   if (blocker === PRODUCT_READINESS_BLOCKERS.needsIcp) return `needs ${vocab.icp.aSingular}`;
-  if (blocker === PRODUCT_READINESS_BLOCKERS.needsPersona) return `needs ${vocab.persona.aSingular}`;
   if (
     blocker === PRODUCT_READINESS_BLOCKERS.needsReview ||
     blocker === PRODUCT_READINESS_BLOCKERS.draft ||

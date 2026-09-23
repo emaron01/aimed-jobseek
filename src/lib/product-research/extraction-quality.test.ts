@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { vocab } from "@/lib/product-config";
 import {
   formatProductUrlUnreadableError,
   isLikelySiteChromeExtraction,
@@ -9,7 +8,7 @@ import {
   describeProductSourceLead,
   isNearEmptyProductDraft,
 } from "@/lib/product-research/review";
-import type { ProductDraft } from "@/lib/product-research/contract";
+import { emptyCandidateProfile } from "@/lib/product-research/candidate-profile";
 
 const OPENTEXT_SHELL = `
 Network Management Software & Network Operations Management --> OpenText home page.
@@ -50,32 +49,7 @@ describe("product URL extraction quality", () => {
 
 describe("near-empty product draft", () => {
   it("treats all-unknown profiles as a failed read", () => {
-    const empty: ProductDraft = {
-      description: "Network Operations Management",
-      valueProposition: null,
-      problemsSolved: [],
-      capabilities: [],
-      differentiators: [],
-      primaryUseCases: [],
-      relevantBuyerFunctions: [],
-      relevantIndustries: [],
-      businessOutcomes: [],
-      pricingAovContext: null,
-      deploymentContext: null,
-      proofPoints: [],
-      customerEvidence: [],
-      terminology: [],
-      unknownFields: [
-        "problemsSolved",
-        "capabilities",
-        "differentiators",
-        "primaryUseCases",
-        "businessOutcomes",
-        "proofPoints",
-        "valueProposition",
-      ],
-      evidenceRefs: [],
-    };
+    const empty = emptyCandidateProfile();
     expect(isNearEmptyProductDraft(empty)).toBe(true);
 
     const lead = describeProductSourceLead({
@@ -97,11 +71,6 @@ describe("near-empty product draft", () => {
     expect(lead.kind).toBe("failed_read");
     expect(lead.sentence).not.toMatch(/We read your website/i);
     expect(lead.detail).toMatch(/8000 characters/i);
-    expect(lead.detail).toMatch(
-      new RegExp(
-        `Paste the ${vocab.product.singular} description into the paste field`,
-        "i",
-      ),
-    );
+    expect(lead.detail).toMatch(/Paste resume or LinkedIn text/i);
   });
 });

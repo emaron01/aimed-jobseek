@@ -38,25 +38,25 @@ describe("getProductCampaignReadiness", () => {
     expect(result.blockers).toContain(PRODUCT_READINESS_BLOCKERS.needsIcp);
   });
 
-  it("requires at least one persona", () => {
+  it("does not require a saved persona", () => {
     const result = getProductCampaignReadiness({
       ...complete,
       personas: [],
     });
-    expect(result.ready).toBe(false);
-    expect(result.blockers).toContain(PRODUCT_READINESS_BLOCKERS.needsPersona);
+    expect(result.ready).toBe(true);
+    expect(result.blockers).toEqual([]);
   });
 
-  it("lists every blocker when multiple are missing", () => {
+  it("lists every remaining blocker when multiple are missing", () => {
     const result = getProductCampaignReadiness({
       approvalStatus: "DRAFT",
       icps: [],
       personas: [],
     });
     expect(result.ready).toBe(false);
-    expect(result.blockers).toHaveLength(3);
+    expect(result.blockers).toHaveLength(2);
     expect(result.omissionReason).toContain("draft");
     expect(result.omissionReason).toContain(vocab.icp.singular);
-    expect(result.omissionReason).toContain(vocab.persona.singular);
+    expect(result.omissionReason).not.toContain(vocab.persona.singular);
   });
 });

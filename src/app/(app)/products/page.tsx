@@ -15,7 +15,7 @@ export default async function ProductsPage() {
       <div>
         <PageHeader
           title={vocab.product.Plural}
-          description={`Define ${vocab.product.plural}, then attach ${vocab.icp.plural} and ${vocab.persona.plural} to each ${vocab.product.singular}.`}
+          description={`Define ${vocab.product.aSingular}, then attach ${vocab.icp.plural} to it.`}
         />
         <TenantMissing />
       </div>
@@ -28,7 +28,7 @@ export default async function ProductsPage() {
     <div>
       <PageHeader
         title={vocab.product.Plural}
-        description={`${vocab.product.Plural} are reusable. Each ${vocab.product.singular} has its own ${vocab.icp.plural} and ${vocab.persona.plural}. Offers are defined later on each ${vocab.campaign.singular}.`}
+          description={`${vocab.product.ASingular} is the candidate record later ${vocab.campaign.plural} read from. After you approve it, define ${vocab.icp.plural}.`}
         actions={
           <Link
             href="/products/new"
@@ -44,7 +44,7 @@ export default async function ProductsPage() {
       {products.length === 0 ? (
         <EmptyState
           title={`No ${vocab.product.plural} yet`}
-          description={`${vocab.product.ASingular} is what you sell — research it once, then define the ${vocab.icp.plural} and ${vocab.persona.plural} that belong to it.`}
+          description={`${vocab.product.ASingular} is built from your resume and other materials. Research it once, then define the ${vocab.icp.plural} that belong to it.`}
           actions={
             <Link
               href="/products/new"

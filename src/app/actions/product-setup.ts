@@ -22,13 +22,14 @@ import { productUrlResearchIsStale } from "@/lib/product-research/acquire";
 import type { IngestSourceInput } from "@/lib/product-research/acquire";
 import type {
   PersonaDraft,
-  ProductDraft,
   ProductMessagingDraft,
   SuggestedPersona,
 } from "@/lib/product-research/contract";
+import { productFieldsFromCandidateProfile } from "@/lib/product-research/candidate-profile";
 import {
-  diffProductDraftFields,
-  productDraftFromFormData,
+  diffCandidateProfileFields,
+  parseCandidateProfileFromFormData,
+  storedProfileFromJson,
 } from "@/lib/product-research/review";
 import { prisma } from "@/lib/prisma";
 import { vocab } from "@/lib/product-config";
@@ -385,10 +386,10 @@ export async function applyProductResynthesisAction(
       where: { id: productId, organizationId },
       select: { name: true, websiteUrl: true },
     });
-    const originalDraft = (run.productDraftJson as ProductDraft | null) ?? null;
-    const profile = productDraftFromFormData(formData);
+    const originalDraft = storedProfileFromJson(run.productDraftJson);
+    const profile = parseCandidateProfileFromFormData(formData);
     const websiteUrl = String(formData.get("websiteUrl") || "").trim() || null;
-    const editedFields = diffProductDraftFields(originalDraft, profile);
+    const editedFields = diffCandidateProfileFields(originalDraft, profile);
     if (existingProduct && name !== existingProduct.name) {
       editedFields.push("name");
     }
@@ -414,7 +415,7 @@ export async function applyProductResynthesisAction(
     return {
       ok: true,
       message:
-        `${vocab.product.Singular} profile updated. ${vocab.persona.Plural}, ${vocab.icp.plural}, ${vocab.campaign.plural}, and scoring still use this ${vocab.product.singular}.`,
+        `${vocab.product.Singular} updated. ${vocab.icp.Plural} and ${vocab.campaign.plural} still use this ${vocab.product.singular}.`,
       productId,
       setupRunId,
       status: "APPROVED",
@@ -480,10 +481,10 @@ export async function saveApprovedProductAction(
       where: { id: productId, organizationId },
       select: { name: true, websiteUrl: true },
     });
-    const originalDraft = (run.productDraftJson as ProductDraft | null) ?? null;
-    const profile = productDraftFromFormData(formData);
+    const originalDraft = storedProfileFromJson(run.productDraftJson);
+    const profile = parseCandidateProfileFromFormData(formData);
     const websiteUrl = String(formData.get("websiteUrl") || "").trim() || null;
-    const editedFields = diffProductDraftFields(originalDraft, profile);
+    const editedFields = diffCandidateProfileFields(originalDraft, profile);
     if (existingProduct && name !== existingProduct.name) {
       editedFields.push("name");
     }
@@ -497,9 +498,8 @@ export async function saveApprovedProductAction(
       userId: user.id,
       setupRunId,
       fields: {
+        ...productFieldsFromCandidateProfile(profile),
         name,
-        description: profile.description ?? null,
-        valueProposition: profile.valueProposition ?? null,
         websiteUrl,
         averageOrderValue: toOptionalFloat(formData.get("averageOrderValue")),
       },
@@ -512,7 +512,7 @@ export async function saveApprovedProductAction(
     return {
       ok: true,
       message:
-        `${vocab.product.Singular} profile approved. ${vocab.persona.Plural}, scoring, and every email will use this record.`,
+        `${vocab.product.Singular} approved. ${vocab.campaign.Plural} and generated documents will use this record.`,
       productId,
       setupRunId,
     };

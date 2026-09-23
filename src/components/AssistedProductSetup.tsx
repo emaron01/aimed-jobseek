@@ -80,12 +80,13 @@ export function AssistedProductIntake({
     <div className="space-y-6" data-testid="assisted-product-intake">
       <div>
         <h3 className="text-lg font-semibold text-slate-900">
-          Tell us what you sell
+          Tell us about your background
         </h3>
         <p className="mt-1 text-sm text-slate-600">
-          Start with the materials you already use — datasheets, whitepapers,
-          decks, or use cases. {vocab.product.Singular} name is required; everything else is
-          optional. We draft your {vocab.product.Singular} and {vocab.persona.Plural} once for your review.
+          Start with the materials you already have — your resume, a pasted
+          LinkedIn profile, notes about goals, and personal site, portfolio, or
+          GitHub URLs. {vocab.product.Singular} name is required; everything else is optional.
+          We draft your {vocab.product.singular} once for your review.
         </p>
       </div>
 
@@ -106,8 +107,7 @@ export function AssistedProductIntake({
           <label className="flex cursor-pointer flex-col rounded-lg border border-slate-900 bg-slate-900 p-5 text-white transition hover:bg-slate-800">
             <span className="text-base font-semibold">Upload materials</span>
             <span className="mt-1 text-sm text-white/80">
-              Datasheets, whitepapers, decks, use cases, or {vocab.product.singular} overviews.
-              PDF, DOCX, TXT, MD · Max 15 MiB each.
+              Resume and other documents. PDF, DOCX, TXT, MD · Max 15 MiB each.
             </span>
             <input
               type="file"
@@ -122,18 +122,18 @@ export function AssistedProductIntake({
           <div className="rounded-lg border border-slate-300 bg-white p-5">
             <label className="block" htmlFor="pastedContent">
               <span className="text-base font-semibold text-slate-900">
-                Paste {vocab.product.singular} content
+                Paste resume or LinkedIn profile text
               </span>
               <span className="mt-1 block text-sm text-slate-500">
-                Paste from a brochure, whitepaper, {vocab.sales.singular} deck, datasheet,
-                {vocab.product.singular} sheet, or case study.
+                Paste your resume or LinkedIn profile text. LinkedIn blocks
+                automated reading, so a LinkedIn URL will not work.
               </span>
             </label>
             <textarea
               id="pastedContent"
               name="pastedContent"
               rows={8}
-              placeholder={`Paste ${vocab.product.singular} content here…`}
+              placeholder="Paste resume or LinkedIn profile text here…"
               className="mt-3 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 placeholder:text-slate-400 focus:ring-2"
             />
           </div>
@@ -144,23 +144,24 @@ export function AssistedProductIntake({
             label={`${vocab.product.Singular} Notes`}
             name="notes"
             as="textarea"
-            hint={`Anything important about the ${vocab.buyer.singular}, positioning, pricing, use case, or market that is not in the materials above.`}
+            hint="Anything important about your goals, target roles, constraints, or context that is not in the materials above."
           />
         </div>
 
         <div className="md:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
           <p className="text-sm text-slate-600">
-            Many {vocab.product.singular} pages cannot be read automatically — they load content
+            Many personal sites cannot be read automatically — they load content
             with JavaScript or block automated access. Uploading or pasting the
             materials you already have usually produces a better profile than a
-            website link alone.
+            link alone. For LinkedIn, paste the profile text; LinkedIn blocks
+            automated reading.
           </p>
           <Field
-            label={`${vocab.product.Singular} URL (optional)`}
+            label="Personal site, portfolio, or GitHub URL (optional)"
             name="primaryUrl"
             defaultValue={defaultUrl}
             placeholder="https://"
-            hint={`${vocab.product.ASingular} or ${vocab.solution.singular} page can help, but it is not required.`}
+            hint="A personal site, portfolio, or GitHub URL can help. Do not use a LinkedIn URL — paste that profile text instead."
           />
           <Field
             label="Additional URLs (optional)"
@@ -168,7 +169,7 @@ export function AssistedProductIntake({
             as="textarea"
             rows={2}
             placeholder="One URL per line"
-            hint="Pricing, features, or case-study pages if you have them."
+            hint="Additional personal site, portfolio, or GitHub pages. Do not add LinkedIn URLs."
           />
           {urlResearchStale ? (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">

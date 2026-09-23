@@ -10,6 +10,7 @@ import { PageHeader, Panel, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, Tenant
 import { cn } from "@/lib/utils";
 import { listIcpCriteria } from "@/lib/interpretation/icp";
 import { listPersonaCriteria } from "@/lib/interpretation/persona";
+import { factTexts } from "@/lib/product-research/candidate-profile";
 import { productDraftFromApprovedProfile } from "@/lib/product-research/resynthesize-approved-plan";
 import { getProduct, listIcps, listPersonas } from "@/lib/tenant/data";
 import {
@@ -286,50 +287,46 @@ export default async function SetupProductPage({ params }: PageProps) {
 
             <div className="mt-6 hidden space-y-5 print:block">
               <PrintProse
-                title="Description"
-                text={profile.description || product.description}
+                title="Headline"
+                text={profile.identity.headline?.text || product.description}
               />
               <PrintProse
-                title={vocab.valueProposition.Singular}
-                text={profile.valueProposition || product.valueProposition}
+                title="Positioning"
+                text={profile.positioning?.text || product.valueProposition}
               />
-              <PrintProse title="Website" text={product.websiteUrl} />
-              <PrintList title="Problems solved" items={profile.problemsSolved} />
-              <PrintList title="Capabilities" items={profile.capabilities} />
+              <PrintProse title="Personal site" text={product.websiteUrl} />
+              <PrintList
+                title="Target titles"
+                items={factTexts(profile.direction.targetTitles)}
+              />
+              <PrintProse
+                title="Seniority"
+                text={profile.direction.seniority?.text}
+              />
+              <PrintList
+                title="Functions"
+                items={factTexts(profile.direction.functions)}
+              />
+              <PrintList
+                title="Skills"
+                items={factTexts(profile.skills)}
+              />
+              <PrintList
+                title="Problems solved for employers"
+                items={factTexts(profile.problemsSolved)}
+              />
               <PrintList
                 title="Differentiators"
-                items={profile.differentiators}
+                items={factTexts(profile.differentiators)}
               />
               <PrintList
-                title="Primary use cases"
-                items={profile.primaryUseCases}
+                title="Education"
+                items={factTexts(profile.education)}
               />
               <PrintList
-                title={`Relevant ${vocab.buyer.singular} functions`}
-                items={profile.relevantBuyerFunctions}
+                title="Domain vocabulary"
+                items={factTexts(profile.domainVocabulary)}
               />
-              <PrintList
-                title="Relevant industries"
-                items={profile.relevantIndustries}
-              />
-              <PrintList
-                title="Business outcomes"
-                items={profile.businessOutcomes}
-              />
-              <PrintProse
-                title="Pricing / AOV context"
-                text={profile.pricingAovContext}
-              />
-              <PrintProse
-                title="Deployment context"
-                text={profile.deploymentContext}
-              />
-              <PrintList title="Proof points" items={profile.proofPoints} />
-              <PrintList
-                title={`${vocab.customer.Singular} evidence`}
-                items={profile.customerEvidence}
-              />
-              <PrintList title="Terminology" items={profile.terminology} />
             </div>
 
             <div
