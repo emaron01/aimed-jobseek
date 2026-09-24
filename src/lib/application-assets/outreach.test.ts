@@ -720,10 +720,14 @@ describe("application reminder cadence", () => {
       "src/app/actions/application-outreach.ts",
       "utf8",
     );
-    expect(action).not.toMatch(
-      /generateOutreachAsset\([\s\S]*?\);\s*revalidate\(id\)/,
+    const generateFn = action.slice(
+      action.indexOf("export async function generateOutreachAssetAction"),
+      action.indexOf("export async function markOutreachSentAction"),
     );
-    expect(action).toContain("if (!result.ok)");
+    expect(generateFn.indexOf("if (!result.ok)")).toBeGreaterThan(-1);
+    expect(generateFn.indexOf("if (!result.ok)")).toBeLessThan(
+      generateFn.indexOf("revalidate(id)"),
+    );
   });
 
   it("never writes CampaignContact.nextDueAt from the reminder action", () => {

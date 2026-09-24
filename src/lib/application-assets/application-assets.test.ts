@@ -856,10 +856,14 @@ describe("application asset seeker-facing labels", () => {
     );
 
     const action = readFileSync("src/app/actions/application-assets.ts", "utf8");
-    expect(action).not.toMatch(
-      /generateApplicationAsset\([\s\S]*?\);\s*revalidate\(id\)/,
+    const generateFn = action.slice(
+      action.indexOf("export async function generateApplicationAssetAction"),
+      action.indexOf("export async function approveApplicationAssetAction"),
     );
-    expect(action).toContain("if (!result.ok)");
+    expect(generateFn.indexOf("if (!result.ok)")).toBeGreaterThan(-1);
+    expect(generateFn.indexOf("if (!result.ok)")).toBeLessThan(
+      generateFn.indexOf("revalidate(id)"),
+    );
 
     const section = readFileSync(
       "src/components/ApplicationAssetsSection.tsx",

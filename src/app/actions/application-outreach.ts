@@ -224,18 +224,12 @@ export async function generateOutreachAssetAction(
         questions: result.questions,
       };
     }
-    return result.ok
-      ? {
-          ok: true,
-          message: `Version ${result.version} generated.`,
-          assetId: result.assetId,
-          version: result.version,
-        }
-      : {
-          ok: false,
-          message: result.message,
-          violations: result.violations,
-        };
+    return {
+      ok: true,
+      message: `Version ${result.version} generated.`,
+      assetId: result.assetId,
+      version: result.version,
+    };
   } catch (error) {
     return errorResult(error);
   }
