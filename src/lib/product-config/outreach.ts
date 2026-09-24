@@ -34,16 +34,16 @@ export const outreachConfig = Object.freeze({
     purposeProactive: "Proactive outreach",
     purposeFollowUp: "Follow-up",
     noContact: "No named contact",
+    roleConfirmed: "Role confirmed",
+    roleUnconfirmed: "Matched from title. Save a role to confirm it.",
     remindersTitle: "Follow-up reminders",
     remindersHelp:
       "Alerts only. Nothing is sent or blocked. Blank means no reminder for that slot.",
   },
   greetings: {
-    emailWithNamePrefix: "Dear ",
-    emailWithNameSuffix: ",",
+    withNamePrefix: "Hi ",
+    withNameSuffix: ",",
     emailNeutral: "Hello,",
-    linkedinWithNamePrefix: "Hi ",
-    linkedinWithNameSuffix: ",",
     linkedinNeutral: "Hi there,",
   },
   linkedinLimits: {
@@ -71,6 +71,21 @@ export const outreachConfig = Object.freeze({
   bannedLinkedInGreetings: ["dear hiring manager"],
   redirectAsk:
     "if you're not the right person, I'd appreciate a pointer to who is",
+  redirectPhrases: [
+    "if you're not the right person",
+    "if you are not the right person",
+    "if you're not the right contact",
+    "pointer to who is",
+    "pointer to whoever is",
+    "point me to the right person",
+  ],
+  genericRelevancePhrases: [
+    "given the role's collaboration with the team",
+    "given the role’s collaboration with the team",
+    "given the role's collaboration",
+    "collaboration with the team",
+  ],
+  threadRepetitionOverlap: 0.6,
   reminders: {
     defaultDay3: 3,
     defaultDay7: 7,
@@ -106,17 +121,23 @@ export function connectionNoteBodyBudget(greeting: string): number {
 
 export function outreachGreeting(input: {
   channel: "email" | "linkedin";
-  contactName: string | null;
+  firstName: string | null;
 }): string {
-  const name = input.contactName?.trim() ?? "";
-  if (input.channel === "email") {
-    return name
-      ? `${outreachConfig.greetings.emailWithNamePrefix}${name}${outreachConfig.greetings.emailWithNameSuffix}`
-      : outreachConfig.greetings.emailNeutral;
+  const first = (input.firstName?.trim().split(/\s+/)[0] ?? "");
+  if (!first) {
+    return input.channel === "email"
+      ? outreachConfig.greetings.emailNeutral
+      : outreachConfig.greetings.linkedinNeutral;
   }
-  return name
-    ? `${outreachConfig.greetings.linkedinWithNamePrefix}${name}${outreachConfig.greetings.linkedinWithNameSuffix}`
-    : outreachConfig.greetings.linkedinNeutral;
+  return `${outreachConfig.greetings.withNamePrefix}${first}${outreachConfig.greetings.withNameSuffix}`;
+}
+
+export function shouldIncludeRedirect(input: {
+  hasContact: boolean;
+  roleConfirmed: boolean;
+}): boolean {
+  if (!input.hasContact) return true;
+  return !input.roleConfirmed;
 }
 
 export function outreachGroupKey(input: {

@@ -375,6 +375,7 @@ export async function ApplicationWorkspace({
         linkedinUrl: row.contact.linkedinUrl,
         personaId: row.chosenPersonaId,
         personaName: row.chosenPersona?.name ?? null,
+        roleConfirmed: row.roleConfirmed,
       }))}
     />
     <ApplicationAssetsSection
@@ -427,6 +428,7 @@ export async function ApplicationWorkspace({
         linkedinUrl: row.contact.linkedinUrl,
         personaId: row.chosenPersonaId,
         personaName: row.chosenPersona?.name ?? null,
+        roleConfirmed: row.roleConfirmed,
       }))}
       assets={requirement.campaign.applicationAssets
         .filter((asset): asset is typeof asset & {

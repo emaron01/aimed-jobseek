@@ -16,6 +16,8 @@ import {
   productAiResponseSchema,
 } from "@/lib/product-research/contract";
 import { companyResearchAiResultSchema } from "@/lib/research/assessment";
+import { getProductAiConfig } from "@/lib/ai/config";
+import { createOpenAiResponsesProvider } from "@/lib/ai/providers/openai-responses";
 
 function expectStrictObjectNodes(schema: unknown): void {
   const violations = collectStrictObjectViolations(schema);
@@ -264,10 +266,7 @@ describe("openai-responses strict request body", () => {
     process.env.PRODUCT_AI_MODEL_URL = "https://api.openai.com/v1/responses";
     process.env.PRODUCT_AI_API_KEY = "sk-test";
 
-    const { getProductAiConfig } = await import("@/lib/ai/config");
-    const { createOpenAiResponsesProvider } =
-      await import("@/lib/ai/providers/openai-responses");
-
+    const tinySchema = z.object({ ok: z.boolean() });
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
       Response.json({
         output: [
@@ -276,12 +275,7 @@ describe("openai-responses strict request body", () => {
             content: [
               {
                 type: "output_text",
-                text: JSON.stringify({
-                  candidateProfile: {
-                    identity: {},
-                    direction: {},
-                  },
-                }),
+                text: JSON.stringify({ ok: true }),
               },
             ],
           },
@@ -294,9 +288,9 @@ describe("openai-responses strict request body", () => {
     const provider = createOpenAiResponsesProvider(getProductAiConfig());
     await provider.generateStructured({
       messages: [{ role: "user", content: "x" }],
-      schema: productAiResponseSchema,
+      schema: tinySchema,
       schemaName: "product_setup_synthesis",
-      parseOutput: parseProductAiResponse,
+      parseOutput: (raw) => ({ data: tinySchema.parse(raw), coercedFields: [] }),
     });
 
     expect(fetchMock).toHaveBeenCalled();

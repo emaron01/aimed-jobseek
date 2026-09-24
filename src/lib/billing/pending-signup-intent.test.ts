@@ -3,6 +3,11 @@ import {
   buildPendingSignupIntent,
   parsePendingSignupIntent,
 } from "@/lib/billing/pending-signup-intent";
+import { readPendingSignupIntent } from "@/lib/billing/pending-signup-intent-cookie";
+import {
+  beginPlatformSuperAdminProvisioning,
+  endPlatformSuperAdminProvisioning,
+} from "@/lib/auth/platform-provision-flag";
 
 const cookies = vi.fn();
 
@@ -43,39 +48,27 @@ describe("pending signup intent", () => {
 describe("readPendingSignupIntent outside a request", () => {
   const previousSkip = process.env.ALLOW_PENDING_SIGNUP_INTENT_SKIP;
 
-  afterEach(async () => {
+  afterEach(() => {
     cookies.mockReset();
     if (previousSkip == null) {
       delete process.env.ALLOW_PENDING_SIGNUP_INTENT_SKIP;
     } else {
       process.env.ALLOW_PENDING_SIGNUP_INTENT_SKIP = previousSkip;
     }
-    const { endPlatformSuperAdminProvisioning } = await import(
-      "@/lib/auth/platform-provision-flag"
-    );
     endPlatformSuperAdminProvisioning();
   });
 
   it("does not call cookies() when ALLOW_PENDING_SIGNUP_INTENT_SKIP=1", async () => {
     process.env.ALLOW_PENDING_SIGNUP_INTENT_SKIP = "1";
     cookies.mockRejectedValue(new Error("cookies was called outside a request scope"));
-    const { readPendingSignupIntent } = await import(
-      "@/lib/billing/pending-signup-intent-cookie"
-    );
     await expect(readPendingSignupIntent()).resolves.toBeNull();
     expect(cookies).not.toHaveBeenCalled();
   });
 
   it("does not call cookies() during platform SUPER_ADMIN provisioning", async () => {
     delete process.env.ALLOW_PENDING_SIGNUP_INTENT_SKIP;
-    const { beginPlatformSuperAdminProvisioning } = await import(
-      "@/lib/auth/platform-provision-flag"
-    );
     beginPlatformSuperAdminProvisioning();
     cookies.mockRejectedValue(new Error("cookies was called outside a request scope"));
-    const { readPendingSignupIntent } = await import(
-      "@/lib/billing/pending-signup-intent-cookie"
-    );
     await expect(readPendingSignupIntent()).resolves.toBeNull();
     expect(cookies).not.toHaveBeenCalled();
   });

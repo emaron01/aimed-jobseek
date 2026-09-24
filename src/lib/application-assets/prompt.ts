@@ -272,6 +272,8 @@ export function buildOutreachAssetMessages(
         greeting: input.greeting,
         signerName: input.signerName,
         confirmedHiringManagerRole: input.confirmedHiringManagerRole,
+        includeRedirect: input.includeRedirect,
+        redirectAsk: input.includeRedirect ? outreachConfig.redirectAsk : null,
         purpose: input.purpose,
         priorMessage: input.priorMessage,
         emailLength: input.emailLength,

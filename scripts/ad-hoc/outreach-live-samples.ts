@@ -275,6 +275,9 @@ async function generateValidated(
       greeting: input.greeting,
       signerName: input.signerName,
       confirmedHiringManagerRole: input.confirmedHiringManagerRole,
+      purpose: input.purpose,
+      includeRedirect: input.includeRedirect,
+      priorMessages: input.priorMessage ? [input.priorMessage] : [],
     });
     if (violations.length === 0) {
       return {
@@ -354,9 +357,10 @@ async function main() {
     const connectionNote = await generateValidated({
       context: hmContext,
       type: "LINKEDIN_CONNECTION_NOTE",
-      greeting: outreachGreeting({ channel: "linkedin", contactName: null }),
+      greeting: outreachGreeting({ channel: "linkedin", firstName: null }),
       signerName,
       confirmedHiringManagerRole: false,
+      includeRedirect: true,
       purpose: "PROACTIVE",
       emailLength: null,
       priorMessage: null,
@@ -370,9 +374,10 @@ async function main() {
     const inmail = await generateValidated({
       context: indirectContext,
       type: "LINKEDIN_INMAIL",
-      greeting: outreachGreeting({ channel: "linkedin", contactName: null }),
+      greeting: outreachGreeting({ channel: "linkedin", firstName: null }),
       signerName,
       confirmedHiringManagerRole: false,
+      includeRedirect: true,
       purpose: "PROACTIVE",
       emailLength: null,
       priorMessage: null,
@@ -389,10 +394,11 @@ async function main() {
     type: "EMAIL",
     greeting: outreachGreeting({
       channel: "email",
-      contactName: "Priya Shah",
+      firstName: "Priya",
     }),
     signerName,
     confirmedHiringManagerRole: false,
+    includeRedirect: false,
     purpose: "PROACTIVE",
     emailLength: "MEDIUM",
     priorMessage: null,
@@ -410,10 +416,11 @@ async function main() {
       type: "EMAIL",
       greeting: outreachGreeting({
         channel: "email",
-        contactName: "Priya Shah",
+        firstName: "Priya",
       }),
       signerName,
       confirmedHiringManagerRole: false,
+      includeRedirect: false,
       purpose: "FOLLOW_UP",
       emailLength: "SHORT",
       priorMessage: composeOutreachText(recruiterEmail.content),

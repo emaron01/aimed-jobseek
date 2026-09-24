@@ -16,12 +16,12 @@ import {
 import { prisma } from "@/lib/prisma";
 import {
   applicationAssetConfig,
-  connectionNoteBodyBudget,
   consultationConfig,
   isOutreachAssetType,
   outreachConfig,
   outreachGreeting,
   outreachGroupKey,
+  shouldIncludeRedirect,
   vocab,
 } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
@@ -46,15 +46,43 @@ function outreachPromptVersion(type: ApplicationAssetType): string {
   return OUTREACH_LINKEDIN_INMAIL_PROMPT_VERSION;
 }
 
-function contactDisplayName(contact: {
+function contactFirstName(contact: {
   firstName: string | null;
-  lastName: string | null;
 }): string | null {
-  const name = [contact.firstName, contact.lastName]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
-  return name || null;
+  const first = contact.firstName?.trim() ?? "";
+  return first || null;
+}
+
+function outreachSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function normalizeOutreachSentence(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function sentenceTokens(text: string): Set<string> {
+  return new Set(
+    normalizeOutreachSentence(text)
+      .split(/\s+/)
+      .filter((token) => token.length >= 4),
+  );
+}
+
+function sentencesOverlap(left: string, right: string): boolean {
+  const a = normalizeOutreachSentence(left);
+  const b = normalizeOutreachSentence(right);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const leftTokens = sentenceTokens(left);
+  const rightTokens = sentenceTokens(right);
+  if (leftTokens.size < 3 || rightTokens.size < 3) return false;
+  const overlap = [...leftTokens].filter((token) => rightTokens.has(token)).length;
+  const union = new Set([...leftTokens, ...rightTokens]).size;
+  return union > 0 && overlap / union >= outreachConfig.threadRepetitionOverlap;
 }
 
 function isSeekerSource(category: string): boolean {
@@ -136,6 +164,74 @@ export function hiringManagerClaimErrors(input: {
   return errors;
 }
 
+export function redirectLineErrors(input: {
+  text: string;
+  includeRedirect: boolean;
+}): string[] {
+  const lowered = input.text.toLowerCase();
+  const hit = outreachConfig.redirectPhrases.some((phrase) =>
+    lowered.includes(phrase),
+  );
+  if (input.includeRedirect && !hit) {
+    return [
+      `Add the configured redirect: ${outreachConfig.redirectAsk}.`,
+    ];
+  }
+  if (!input.includeRedirect && hit) {
+    return [
+      "Do not add a redirect line when this person's role is confirmed.",
+    ];
+  }
+  return [];
+}
+
+export function genericRelevanceErrors(text: string): string[] {
+  const lowered = text.toLowerCase();
+  for (const phrase of outreachConfig.genericRelevancePhrases) {
+    if (lowered.includes(phrase)) {
+      return [
+        "Explain why this Hiring Team role is relevant from that role's persona: their pressures, what the hire changes for them, or how the seeker's work would connect to theirs. Do not use a generic collaboration line.",
+      ];
+    }
+  }
+  return [];
+}
+
+export function threadRepetitionErrors(input: {
+  current: string;
+  priorBodies: string[];
+}): string[] {
+  if (input.priorBodies.length === 0) return [];
+  const currentSentences = outreachSentences(input.current);
+  const errors: string[] = [];
+  for (const prior of input.priorBodies) {
+    for (const priorSentence of outreachSentences(prior)) {
+      for (const current of currentSentences) {
+        if (sentencesOverlap(current, priorSentence)) {
+          errors.push(
+            "This follow-up repeats a sentence or proof point from an earlier message in the thread. Add something new or write a brief check-in.",
+          );
+        }
+      }
+    }
+  }
+  return [...new Set(errors)];
+}
+
+export function followUpLengthErrors(input: {
+  current: string;
+  original: string;
+}): string[] {
+  const currentWords = input.current.split(/\s+/).filter(Boolean).length;
+  const originalWords = input.original.split(/\s+/).filter(Boolean).length;
+  if (originalWords > 0 && currentWords >= originalWords) {
+    return [
+      "The follow-up must be shorter than the earlier message and add something new rather than repeating it.",
+    ];
+  }
+  return [];
+}
+
 function outreachSupportErrors(
   content: ApplicationAssetContent,
   context: ReadyApplicationGenerationContext,
@@ -177,6 +273,9 @@ export async function validateOutreachContent(input: {
   greeting: string;
   signerName: string;
   confirmedHiringManagerRole: boolean;
+  purpose: "PROACTIVE" | "FOLLOW_UP";
+  includeRedirect: boolean;
+  priorMessages?: Array<{ subject: string | null; body: string }>;
 }): Promise<string[]> {
   if (
     input.content.type !== "EMAIL" &&
@@ -208,7 +307,27 @@ export async function validateOutreachContent(input: {
         bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
       }),
     ),
+    ...redirectLineErrors({
+      text: composed.body,
+      includeRedirect: input.includeRedirect,
+    }),
+    ...(input.purpose === "PROACTIVE"
+      ? genericRelevanceErrors(composed.body)
+      : []),
   ];
+  const priorBodies = (input.priorMessages ?? []).map((message) => message.body);
+  if (input.purpose === "FOLLOW_UP" && priorBodies[0]) {
+    errors.push(
+      ...followUpLengthErrors({
+        current: composed.body,
+        original: priorBodies[0],
+      }),
+      ...threadRepetitionErrors({
+        current: composed.body,
+        priorBodies,
+      }),
+    );
+  }
   if (input.content.greeting !== input.greeting) {
     errors.push("The message changed the required greeting.");
   }
@@ -354,6 +473,7 @@ export async function generateOutreachAsset(input: {
     linkedinUrl: string | null;
   } | null = null;
   let confirmedHiringManagerRole = false;
+  let roleConfirmed = false;
   if (contactId) {
     const membership = await prisma.campaignContact.findFirst({
       where: {
@@ -382,11 +502,16 @@ export async function generateOutreachAsset(input: {
       };
     }
     contact = membership.contact;
+    roleConfirmed = membership.roleConfirmed;
     confirmedHiringManagerRole =
       membership.chosenPersona?.suggestionKey === "hiring_manager" ||
       (membership.chosenPersonaId === personaId &&
         context.persona?.suggestionKey === "hiring_manager");
   }
+  const includeRedirect = shouldIncludeRedirect({
+    hasContact: Boolean(contact),
+    roleConfirmed,
+  });
   if (
     input.purpose === "FOLLOW_UP" &&
     !input.followUpToAssetId?.trim()
@@ -398,6 +523,7 @@ export async function generateOutreachAsset(input: {
     };
   }
   let priorMessage: { subject: string | null; body: string } | null = null;
+  const priorMessages: Array<{ subject: string | null; body: string }> = [];
   let followUpToAssetId: string | null = null;
   if (input.purpose === "FOLLOW_UP") {
     const prior = await prisma.applicationAsset.findFirst({
@@ -424,12 +550,31 @@ export async function generateOutreachAsset(input: {
       };
     }
     priorMessage = composeOutreachText(parsed.data);
+    priorMessages.push(priorMessage);
+    let ancestorId = prior.followUpToAssetId;
+    while (ancestorId) {
+      const ancestor = await prisma.applicationAsset.findFirst({
+        where: {
+          id: ancestorId,
+          campaignId: input.campaignId,
+          organizationId: input.organizationId,
+        },
+      });
+      if (!ancestor) break;
+      const ancestorParsed = applicationAssetContentSchema.safeParse(
+        ancestor.contentJson,
+      );
+      if (ancestorParsed.success) {
+        priorMessages.push(composeOutreachText(ancestorParsed.data));
+      }
+      ancestorId = ancestor.followUpToAssetId;
+    }
     followUpToAssetId = prior.id;
   }
   const channel = input.type === "EMAIL" ? "email" : "linkedin";
   const greeting = outreachGreeting({
     channel,
-    contactName: contact ? contactDisplayName(contact) : null,
+    firstName: contact ? contactFirstName(contact) : null,
   });
   const signerName = context.profile.identity.name?.text ?? "";
   if (input.type === "EMAIL" && !signerName) {
@@ -452,6 +597,7 @@ export async function generateOutreachAsset(input: {
       greeting,
       signerName,
       confirmedHiringManagerRole,
+      includeRedirect,
       purpose: input.purpose,
       emailLength,
       priorMessage,
@@ -472,6 +618,9 @@ export async function generateOutreachAsset(input: {
       greeting,
       signerName,
       confirmedHiringManagerRole,
+      purpose: input.purpose,
+      includeRedirect,
+      priorMessages,
     });
     if (violations.length === 0) {
       const saved = await saveOutreachVersion({

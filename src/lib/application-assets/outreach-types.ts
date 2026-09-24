@@ -12,6 +12,7 @@ export type OutreachGenerationInput = {
   greeting: string;
   signerName: string;
   confirmedHiringManagerRole: boolean;
+  includeRedirect: boolean;
   purpose: "PROACTIVE" | "FOLLOW_UP";
   emailLength: EmailLength | null;
   priorMessage: { subject: string | null; body: string } | null;

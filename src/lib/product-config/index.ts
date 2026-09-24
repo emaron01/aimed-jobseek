@@ -50,5 +50,6 @@ export {
   outreachConfig,
   outreachGreeting,
   outreachGroupKey,
+  shouldIncludeRedirect,
 } from "./outreach";
 export type { OutreachAssetType } from "./outreach";

@@ -127,6 +127,7 @@ export async function addApplicationContact(input: {
       : undefined,
   });
   const chosenPersonaId = decision.personaId ?? override ?? matched.personaId;
+  const roleConfirmed = input.source === "POSTING" || Boolean(override);
 
   const email = input.email?.trim() || null;
   const normalizedEmail = email ? normalizeContactEmail(email) : null;
@@ -195,7 +196,7 @@ export async function addApplicationContact(input: {
     if (existingMembership) {
       await tx.campaignContact.update({
         where: { id: existingMembership.id },
-        data: { chosenPersonaId, selected: true },
+        data: { chosenPersonaId, selected: true, roleConfirmed },
       });
       return { contactId, campaignContactId: existingMembership.id };
     }
@@ -206,6 +207,7 @@ export async function addApplicationContact(input: {
         contactId,
         chosenPersonaId,
         selected: true,
+        roleConfirmed,
       },
       select: { id: true },
     });
@@ -257,7 +259,7 @@ export async function updateApplicationContactRole(input: {
   }
   await prisma.campaignContact.update({
     where: { id: membership.id },
-    data: { chosenPersonaId: input.personaId },
+    data: { chosenPersonaId: input.personaId, roleConfirmed: true },
   });
 }
 

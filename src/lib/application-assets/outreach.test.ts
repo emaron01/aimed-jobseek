@@ -5,6 +5,7 @@ import {
   addApplicationContact,
   ingestNamedJobContacts,
   matchHiringTeamRoleFromTitle,
+  updateApplicationContactRole,
 } from "@/lib/application/contacts";
 import {
   applicationReminderAnchor,
@@ -16,8 +17,12 @@ import {
 } from "@/lib/cadence/application-reminders";
 import { outreachEmailHandoff } from "@/lib/application-assets/handoff";
 import {
+  followUpLengthErrors,
+  genericRelevanceErrors,
   hiringManagerClaimErrors,
   outreachLimitErrors,
+  redirectLineErrors,
+  threadRepetitionErrors,
 } from "@/lib/application-assets/outreach";
 import {
   composeOutreachText,
@@ -30,6 +35,7 @@ import {
   features,
   outreachConfig,
   outreachGreeting,
+  shouldIncludeRedirect,
 } from "@/lib/product-config";
 import { buildSidebarNavItems } from "@/lib/auth/user-menu";
 import { buildHomeSetupRail } from "@/lib/workflow/home-setup-rail";
@@ -94,19 +100,99 @@ describe("sales-only entry points", () => {
 });
 
 describe("outreach greetings and claims", () => {
-  it("uses a neutral LinkedIn greeting and never Dear Hiring Manager", () => {
-    expect(outreachGreeting({ channel: "linkedin", contactName: null })).toBe(
+  it("uses the first name and configured greeting style", () => {
+    expect(outreachGreeting({ channel: "linkedin", firstName: null })).toBe(
       outreachConfig.greetings.linkedinNeutral,
     );
-    expect(outreachGreeting({ channel: "linkedin", contactName: null })).not.toMatch(
-      /dear hiring manager/i,
-    );
-    expect(outreachGreeting({ channel: "email", contactName: null })).toBe(
+    expect(outreachGreeting({ channel: "email", firstName: null })).toBe(
       outreachConfig.greetings.emailNeutral,
     );
-    expect(outreachGreeting({ channel: "email", contactName: "Priya Shah" })).toBe(
-      "Dear Priya Shah,",
+    expect(outreachGreeting({ channel: "email", firstName: "Priya" })).toBe(
+      `${outreachConfig.greetings.withNamePrefix}Priya${outreachConfig.greetings.withNameSuffix}`,
     );
+    expect(outreachGreeting({ channel: "email", firstName: "Priya Shah" })).toBe(
+      "Hi Priya,",
+    );
+    expect(outreachGreeting({ channel: "email", firstName: "Priya Shah" })).not.toMatch(
+      /dear priya shah/i,
+    );
+    expect(outreachGreeting({ channel: "linkedin", firstName: "Priya" })).toBe(
+      "Hi Priya,",
+    );
+  });
+
+  it("adds a redirect only for unconfirmed or missing contacts", () => {
+    expect(
+      shouldIncludeRedirect({ hasContact: false, roleConfirmed: false }),
+    ).toBe(true);
+    expect(
+      shouldIncludeRedirect({ hasContact: true, roleConfirmed: false }),
+    ).toBe(true);
+    expect(
+      shouldIncludeRedirect({ hasContact: true, roleConfirmed: true }),
+    ).toBe(false);
+    expect(
+      redirectLineErrors({
+        text: "If you're not the right person, I'd appreciate a pointer to who is.",
+        includeRedirect: true,
+      }),
+    ).toEqual([]);
+    expect(
+      redirectLineErrors({
+        text: "Would you have fifteen minutes this week?",
+        includeRedirect: true,
+      }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      redirectLineErrors({
+        text: "If you're not the right person, I'd appreciate a pointer to who is.",
+        includeRedirect: false,
+      }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("rejects generic relevance statements", () => {
+    expect(
+      genericRelevanceErrors(
+        "Given the role's collaboration with the team, I wanted to introduce myself.",
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(
+      genericRelevanceErrors(
+        "This hire changes how you review motion-planning designs each week.",
+      ),
+    ).toEqual([]);
+  });
+
+  it("flags a follow-up that repeats a thread sentence or is not shorter", () => {
+    const original =
+      "I led the rewrite of invoice generation that cut failed billing runs from 8% to under 1%. Would you have time to talk?";
+    const repeated =
+      "I led the rewrite of invoice generation that cut failed billing runs from 8% to under 1%. Checking in.";
+    expect(
+      threadRepetitionErrors({
+        current: repeated,
+        priorBodies: [original],
+      }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      followUpLengthErrors({
+        current: `${original} Checking in again this week.`,
+        original,
+      }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      followUpLengthErrors({
+        current: "Checking in on my earlier note. Any next step?",
+        original,
+      }),
+    ).toEqual([]);
+    expect(
+      threadRepetitionErrors({
+        current: "Checking in on my earlier note. Any next step?",
+        priorBodies: [original],
+      }),
+    ).toEqual([]);
   });
 
   it("rejects hiring-manager claims unless the role is confirmed", () => {
@@ -185,6 +271,7 @@ describe("outreach greetings and claims", () => {
       greeting,
       signerName: "Alex Chen",
       confirmedHiringManagerRole: false,
+      includeRedirect: true,
       purpose: "PROACTIVE",
       emailLength: null,
       priorMessage: null,
@@ -230,6 +317,8 @@ describe("outreach greetings and claims", () => {
       greeting: "Hello,",
       signerName: "Alex Chen",
       confirmedHiringManagerRole: false,
+      purpose: "PROACTIVE",
+      includeRedirect: true,
     });
     expect(errors).toEqual([]);
   });
@@ -459,6 +548,21 @@ describeDb("application contacts and reminders", () => {
       email: `priya-${suffix}@acme.example`,
     });
     expect(added.personaId).toBe(recruiterRoleId);
+    const titleMatched = await prisma.campaignContact.findFirst({
+      where: { campaignId, contact: { lastName: "Shah" } },
+    });
+    expect(titleMatched?.roleConfirmed).toBe(false);
+    await updateApplicationContactRole({
+      organizationId,
+      campaignId,
+      userId,
+      contactId: added.contactId,
+      personaId: recruiterRoleId,
+    });
+    const confirmed = await prisma.campaignContact.findFirst({
+      where: { campaignId, contact: { lastName: "Shah" } },
+    });
+    expect(confirmed?.roleConfirmed).toBe(true);
     await addApplicationContact({
       organizationId,
       campaignId,
@@ -473,6 +577,7 @@ describeDb("application contacts and reminders", () => {
       where: { campaignId, contact: { lastName: "Nguyen" } },
     });
     expect(overridden?.chosenPersonaId).toBe(hiringManagerRoleId);
+    expect(overridden?.roleConfirmed).toBe(true);
   });
 
   it("adds a recruiter named in a posting to the Recruiter role", async () => {
@@ -497,6 +602,7 @@ describeDb("application contacts and reminders", () => {
     });
     expect(row?.chosenPersona?.suggestionKey).toBe("recruiter");
     expect(row?.contact.email).toBe(`jordan-${suffix}@acme.example`);
+    expect(row?.roleConfirmed).toBe(true);
   });
 
   it("does not write nextDueAt when marking applied or sent", async () => {

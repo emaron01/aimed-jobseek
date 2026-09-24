@@ -35,6 +35,7 @@ type ContactRow = {
   linkedinUrl: string | null;
   personaId: string | null;
   personaName: string | null;
+  roleConfirmed: boolean;
 };
 
 type OutreachRow = {
@@ -189,6 +190,11 @@ export function ApplicationContactsSection({
               ) : (
                 <p className="mt-1 text-slate-600">{contact.personaName ?? "No role matched"}</p>
               )}
+              <p className="mt-1 text-xs text-slate-500">
+                {contact.roleConfirmed
+                  ? outreachConfig.labels.roleConfirmed
+                  : outreachConfig.labels.roleUnconfirmed}
+              </p>
             </li>
           ))}
         </ul>

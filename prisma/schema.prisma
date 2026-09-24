@@ -2648,6 +2648,8 @@ model CampaignContact {
   nextDueAt               DateTime?
   /// Rep-confirmed persona for this contact in this campaign (explicit decision).
   chosenPersonaId         String?
+  /// True when the role came from the posting or the seeker confirmed it.
+  roleConfirmed           Boolean               @default(false)
   createdAt               DateTime              @default(now())
   updatedAt               DateTime              @updatedAt
 
