@@ -35,6 +35,7 @@ import {
 import {
   interviewClarifyingQuestionsSchema,
   interviewGuideContentSchema,
+  interviewThankYouClarifyingQuestionsSchema,
 } from "@/lib/interview/contract";
 
 export type StructuredOutputSchemaEntry = {
@@ -204,6 +205,11 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   interviewGuide: {
     schemaName: "interview_stage_guide",
     schema: interviewGuideContentSchema,
+    usageOperations: ["APPLICATION_ASSET_GENERATION"],
+  },
+  interviewThankYouClarifyingQuestions: {
+    schemaName: "interview_thank_you_clarifying_questions",
+    schema: interviewThankYouClarifyingQuestionsSchema,
     usageOperations: ["APPLICATION_ASSET_GENERATION"],
   },
   prospectReplyClassification: {

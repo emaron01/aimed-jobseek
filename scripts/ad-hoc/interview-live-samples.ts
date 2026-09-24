@@ -1,6 +1,6 @@
 /**
- * Live interview guide and thank-you samples through ASSET_AI.
- * If ASSET_AI_* is absent, this script copies PERSONA_AI_* for this process only.
+ * Live interview guide, thank-you, and consultation-focus samples.
+ * Requires ASSET_AI_* and CONSULTATION_AI_* in .env.local.
  *
  *   npx dotenv -e .env.local -- tsx --conditions=react-server scripts/ad-hoc/interview-live-samples.ts
  */
@@ -9,23 +9,32 @@ import { generateOutreachWithModel } from "../../src/lib/application-assets/ai";
 import { validateOutreachContent } from "../../src/lib/application-assets/outreach";
 import { composeOutreachText } from "../../src/lib/application-assets/contract";
 import type { OutreachGenerationInput } from "../../src/lib/application-assets/outreach-types";
-import { getAiConfigPublicSummary, getAssetAiConfig } from "../../src/lib/ai/config";
-import type { ReadyApplicationGenerationContext } from "../../src/lib/generation/context";
 import {
-  generateInterviewGuideWithModel,
-} from "../../src/lib/interview/ai";
+  getAiConfigPublicSummary,
+  getAssetAiConfig,
+  getConsultationAiConfig,
+} from "../../src/lib/ai/config";
+import type { ReadyApplicationGenerationContext } from "../../src/lib/generation/context";
+import { generateInterviewThankYouClarifyingQuestions } from "../../src/lib/interview/ai";
+import { generateInterviewGuideWithModel } from "../../src/lib/interview/ai";
 import {
   validateInterviewGuideContent,
   type InterviewGuideContent,
 } from "../../src/lib/interview/guide";
 import type { InterviewGuidePromptInput } from "../../src/lib/interview/prompt";
+import { planConsultationWithModel } from "../../src/lib/consultation/ai";
+import {
+  evidenceTargets,
+  profileEvidenceItems,
+} from "../../src/lib/consultation/assess";
+import { matchConsultationFocus } from "../../src/lib/consultation/questions";
+import { normalizeParsedJobRequirement } from "../../src/lib/job-requirement/normalize";
 import {
   NORMAL_JOB_MODEL,
   NORMAL_JOB_POSTING,
 } from "../../src/lib/job-requirement/fixtures";
 import { fixtureAlexChenProfile } from "../../src/lib/product-research/fixtures/alex-chen-profile";
 import { applicationAssetConfig, outreachGreeting } from "../../src/lib/product-config";
-import { profileEvidenceItems } from "../../src/lib/consultation/assess";
 
 type ModuleLoad = (
   request: string,
@@ -43,36 +52,23 @@ patchedModule._load = function load(
   return moduleLoad(request, parent, isMain);
 };
 
-function mapPersonaAiToAssetAiIfNeeded(): string {
+function requireRole(prefix: "ASSET_AI" | "CONSULTATION_AI"): void {
   const required = [
-    "ASSET_AI_PROVIDER",
-    "ASSET_AI_MODEL",
-    "ASSET_AI_MODEL_URL",
-    "ASSET_AI_API_KEY",
+    `${prefix}_PROVIDER`,
+    `${prefix}_MODEL`,
+    `${prefix}_MODEL_URL`,
+    `${prefix}_API_KEY`,
   ] as const;
-  if (required.every((key) => process.env[key]?.trim())) {
-    return "ASSET_AI_* from environment";
+  const missing = required.filter((key) => !process.env[key]?.trim());
+  if (missing.length > 0) {
+    throw new Error(`${prefix}_* is not configured in .env.local.`);
   }
-  const persona = [
-    "PERSONA_AI_PROVIDER",
-    "PERSONA_AI_MODEL",
-    "PERSONA_AI_MODEL_URL",
-    "PERSONA_AI_API_KEY",
-  ] as const;
-  if (!persona.every((key) => process.env[key]?.trim())) {
-    throw new Error(
-      "Neither ASSET_AI_* nor PERSONA_AI_* is configured. Live samples cannot run.",
-    );
-  }
-  process.env.ASSET_AI_PROVIDER = process.env.PERSONA_AI_PROVIDER;
-  process.env.ASSET_AI_MODEL = process.env.PERSONA_AI_MODEL;
-  process.env.ASSET_AI_MODEL_URL = process.env.PERSONA_AI_MODEL_URL;
-  process.env.ASSET_AI_API_KEY = process.env.PERSONA_AI_API_KEY;
-  return "ASSET_AI_* mapped from PERSONA_AI_* for this process only";
 }
 
-const NOTES =
+const THIN_NOTES =
   "The hiring manager will focus on incident leadership.";
+const SEEKER_ANSWERS =
+  "We discussed my on-call rotation. Priya asked how I handle incident leadership, and I want to reinforce the invoice rewrite.";
 const STATEMENT =
   "I led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.";
 
@@ -99,7 +95,7 @@ function sources() {
   rows.push({
     id: "interview:recruiter:notesAfter",
     category: "APPLICATION",
-    text: NOTES,
+    text: THIN_NOTES,
   });
   return { profile, rows };
 }
@@ -139,7 +135,7 @@ function basePrompt(priorNotes: boolean): InterviewGuidePromptInput {
           {
             stageId: "recruiter",
             type: "RECRUITER_SCREEN",
-            notesAfter: NOTES,
+            notesAfter: THIN_NOTES,
           },
         ]
       : [],
@@ -180,16 +176,20 @@ function basePrompt(priorNotes: boolean): InterviewGuidePromptInput {
 async function generateGuide(label: string, priorNotes: boolean) {
   const input = basePrompt(priorNotes);
   let feedback: string[] = [];
-  for (let attempt = 0; attempt <= applicationAssetConfig.generation.qualityRegenerationAttempts; attempt += 1) {
+  const failures: Array<{ attempt: number; errors: string[] }> = [];
+  for (
+    let attempt = 0;
+    attempt <= applicationAssetConfig.generation.qualityRegenerationAttempts;
+    attempt += 1
+  ) {
     const generated = await generateInterviewGuideWithModel({
       ...input,
       qualityFeedback: feedback,
     });
     if (!generated.ok) {
+      failures.push({ attempt: attempt + 1, errors: [generated.message] });
+      console.error(JSON.stringify({ event: "interview_guide_validation_failed", label, attempt: attempt + 1, errors: [generated.message] }));
       feedback = [generated.message];
-      if (attempt === applicationAssetConfig.generation.qualityRegenerationAttempts) {
-        throw new Error(`${label} failed: ${generated.message}`);
-      }
       continue;
     }
     const errors = validateInterviewGuideContent({
@@ -203,9 +203,10 @@ async function generateGuide(label: string, priorNotes: boolean) {
       approvedStoryIds: [],
     });
     if (errors.length === 0) {
-      return { content: generated.data, attempts: attempt + 1 };
+      return { content: generated.data, attempts: attempt + 1, failures };
     }
-    console.error(JSON.stringify({ label, attempt: attempt + 1, errors }));
+    failures.push({ attempt: attempt + 1, errors });
+    console.error(JSON.stringify({ event: "interview_guide_validation_failed", label, attempt: attempt + 1, errors }));
     feedback = errors;
   }
   throw new Error(`${label} did not pass validation.`);
@@ -218,12 +219,36 @@ function summarizeGuide(content: InterviewGuideContent): string {
     ...content.interviewers.flatMap((row) => [
       row.whoTheyAre.text,
       row.whatTheyEvaluate.text,
-      ...row.likelyQuestions.map((item) => item.question.text),
+      ...row.likelyQuestions.flatMap((item) => [
+        item.question.text,
+        item.answerMaterial.text,
+        item.exampleAnswer.text,
+      ]),
     ]),
   ].join("\n");
 }
 
-async function thankYouEmail() {
+async function thankYouQuestions() {
+  let feedback: string[] = [];
+  for (let attempt = 0; attempt <= 2; attempt += 1) {
+    const generated = await generateInterviewThankYouClarifyingQuestions({
+      notes: THIN_NOTES,
+      qualityFeedback: feedback,
+    });
+    if (!generated.ok) {
+      feedback = [generated.message];
+      continue;
+    }
+    const questions = generated.data.questions.slice(0, 2);
+    if (questions.length > 0 && questions.every((question) => question.text.endsWith("?"))) {
+      return questions;
+    }
+    feedback = ["Write up to two short questions that end with a question mark."];
+  }
+  throw new Error("Thank-you clarifying questions did not pass.");
+}
+
+async function thankYouEmail(notes: string) {
   const profile = fixtureAlexChenProfile();
   const context = {
     organizationId: "org_live",
@@ -234,6 +259,7 @@ async function thankYouEmail() {
       ownerUserId: "user_live",
       applicationGuidance: null,
       appliedAt: new Date("2026-09-20T12:00:00.000Z"),
+      applicationProgress: "INTERVIEWING",
     },
     profile,
     requirement: {
@@ -268,7 +294,7 @@ async function thankYouEmail() {
     seekerAnswers: [],
     sources: [
       { id: "job:posting", text: NORMAL_JOB_POSTING, category: "JOB_REQUIREMENT", url: null },
-      { id: "application:notes", text: NOTES, category: "APPLICATION", url: null },
+      { id: "application:notes", text: notes, category: "APPLICATION", url: null },
       { id: "persona:recruiter", text: "Technical Recruiter coordinating this search.", category: "PERSONA", url: null },
     ],
   } as ReadyApplicationGenerationContext;
@@ -284,16 +310,20 @@ async function thankYouEmail() {
     purpose: "THANK_YOU",
     emailLength: "SHORT",
     priorMessage: null,
-    interviewStageNotes: NOTES,
+    interviewStageNotes: notes,
+    mentionApplied: false,
     regenerationInstruction: null,
     qualityFeedback: [],
   };
+  const failures: Array<{ attempt: number; errors: string[] }> = [];
   for (let attempt = 0; attempt <= 8; attempt += 1) {
     const generated = await generateOutreachWithModel({
       ...input,
       qualityFeedback: feedback,
     });
     if (!generated.ok) {
+      failures.push({ attempt: attempt + 1, errors: [generated.message] });
+      console.error(JSON.stringify({ event: "outreach_validation_failed", attempt: attempt + 1, errors: [generated.message] }));
       feedback = [generated.message];
       continue;
     }
@@ -305,39 +335,103 @@ async function thankYouEmail() {
       confirmedHiringManagerRole: false,
       purpose: "THANK_YOU",
       includeRedirect: false,
-      stageNotes: NOTES,
+      stageNotes: notes,
+      mentionApplied: false,
     });
     if (violations.length === 0) {
-      return { content: generated.data, attempts: attempt + 1 };
+      return { content: generated.data, attempts: attempt + 1, failures };
     }
+    failures.push({ attempt: attempt + 1, errors: violations });
+    console.error(JSON.stringify({ event: "outreach_validation_failed", attempt: attempt + 1, errors: violations }));
     feedback = violations;
   }
   throw new Error("Thank-you email did not pass validation.");
 }
 
+async function consultationFocusQuestion() {
+  const profile = fixtureAlexChenProfile();
+  const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
+  const targets = evidenceTargets({
+    requiredItems: parsed.requiredItems,
+    preferredItems: parsed.preferredItems,
+    scorecard: parsed.scorecard,
+  });
+  const focusTargetKey = matchConsultationFocus({
+    focusNote: THIN_NOTES,
+    targets,
+  });
+  if (!focusTargetKey) {
+    throw new Error("Could not match the new-gap focus to a consultation target.");
+  }
+  const plan = await planConsultationWithModel({
+    targets,
+    profileItems: profileEvidenceItems(profile),
+    hiringTeam: [
+      {
+        id: "hm",
+        name: "Hiring Manager",
+        likelyTitles: ["Director of Engineering"],
+        whyThisRoleMatters: "Owns incident leadership and on-call quality.",
+        personaContext: {},
+      },
+    ],
+    chronologyRequested: false,
+    coveredTargetKeys: [],
+    focusTargetKey,
+  });
+  if (!plan.ok) {
+    throw new Error(plan.message);
+  }
+  const focused =
+    plan.data.questions.find((question) => question.targetKey === focusTargetKey) ??
+    plan.data.questions[0];
+  if (!focused) {
+    throw new Error("Consultation planner did not write a focus question.");
+  }
+  return { focusTargetKey, question: focused.text, firstTargetKey: plan.data.questions[0]?.targetKey };
+}
+
 async function main() {
-  const mapped = mapPersonaAiToAssetAiIfNeeded();
-  const config = getAssetAiConfig();
-  console.log(JSON.stringify({ mapped, public: getAiConfigPublicSummary(config) }));
+  requireRole("ASSET_AI");
+  requireRole("CONSULTATION_AI");
+  console.log(
+    JSON.stringify({
+      asset: getAiConfigPublicSummary(getAssetAiConfig()),
+      consultation: getAiConfigPublicSummary(getConsultationAiConfig()),
+    }),
+  );
   const recruiter = await generateGuide("recruiter screen", false);
   const hiringManager = await generateGuide("hiring manager", true);
-  const thanks = await thankYouEmail();
+  const questions = await thankYouQuestions();
+  const thanks = await thankYouEmail(`${THIN_NOTES}\n${SEEKER_ANSWERS}`);
   const composed = composeOutreachText(thanks.content);
+  const consultation = await consultationFocusQuestion();
   console.log("\n=== Recruiter screen guide ===\n");
   console.log(summarizeGuide(recruiter.content));
-  console.log("\n=== Hiring manager guide (after incident-leadership notes) ===\n");
+  console.log("\n=== Hiring manager guide ===\n");
   console.log(summarizeGuide(hiringManager.content));
-  console.log("\n=== Thank-you email ===\n");
+  console.log("\n=== Harper questions for thin notes ===\n");
+  for (const question of questions) {
+    console.log(question.text);
+  }
+  console.log("\n=== Thank-you email after answers ===\n");
   console.log(composed.subject);
   console.log(composed.body);
+  console.log("\n=== First consultation question for new-gap focus ===\n");
+  console.log(consultation.question);
   console.log(
     JSON.stringify({
       recruiterAttempts: recruiter.attempts,
+      recruiterFailures: recruiter.failures,
       hiringManagerAttempts: hiringManager.attempts,
+      hiringManagerFailures: hiringManager.failures,
       thankYouAttempts: thanks.attempts,
+      thankYouFailures: thanks.failures,
       hiringManagerMentionsIncident: summarizeGuide(hiringManager.content)
         .toLowerCase()
         .includes("incident"),
+      consultationFocusTargetKey: consultation.focusTargetKey,
+      consultationFirstTargetKey: consultation.firstTargetKey,
     }),
   );
 }

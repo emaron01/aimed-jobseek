@@ -114,8 +114,28 @@ export async function InterviewStagesSection({
             const offer =
               stage.consultationOfferJson &&
               typeof stage.consultationOfferJson === "object"
-                ? (stage.consultationOfferJson as { text?: string })
+                ? (stage.consultationOfferJson as {
+                    text?: string;
+                    targetKey?: string;
+                  })
                 : null;
+            const thankYouClarify =
+              stage.thankYouClarifyJson &&
+              typeof stage.thankYouClarifyJson === "object"
+                ? (stage.thankYouClarifyJson as {
+                    questions?: Array<{ id: string; text: string }>;
+                    answers?: Array<{ id: string; answer: string }>;
+                    skipped?: boolean;
+                  })
+                : null;
+            const thankYouQuestions =
+              thankYouClarify?.questions?.filter((item) => item.id && item.text) ??
+              [];
+            const thankYouNeedsAnswers =
+              thankYouQuestions.length > 0 &&
+              !thankYouClarify?.skipped &&
+              !(thankYouClarify?.answers?.some((item) => item.answer?.trim()) ??
+                false);
             return (
               <article
                 key={stage.id}
@@ -292,7 +312,56 @@ export async function InterviewStagesSection({
                     </ApplicationActionForm>
 
                     {stage.notesAfter && stage.interviewers[0] ? (
-                      <div className="flex flex-wrap gap-2">
+                      <div className="space-y-3">
+                        {thankYouNeedsAnswers ? (
+                          <ApplicationActionForm
+                            action={generateOutreachAssetAction}
+                            submitLabel={
+                              interviewConfig.labels.answerThankYouQuestions
+                            }
+                            testId={`thank-you-answers-${stage.id}`}
+                          >
+                            <input type="hidden" name="campaignId" value={campaignId} />
+                            <input
+                              type="hidden"
+                              name="interviewStageId"
+                              value={stage.id}
+                            />
+                            <input
+                              type="hidden"
+                              name="contactId"
+                              value={stage.interviewers[0]!.contactId}
+                            />
+                            <input
+                              type="hidden"
+                              name="personaId"
+                              value={interviewerPersona(
+                                stage.interviewers[0]!.contactId,
+                              )}
+                            />
+                            <input type="hidden" name="type" value="EMAIL" />
+                            <input type="hidden" name="purpose" value="THANK_YOU" />
+                            <p className="text-sm text-slate-600">
+                              {interviewConfig.labels.thankYouClarifyHelp}
+                            </p>
+                            {thankYouQuestions.map((question) => (
+                              <label key={question.id} className="text-sm">
+                                {question.text}
+                                <input
+                                  type="hidden"
+                                  name="thankYouAnswerId"
+                                  value={question.id}
+                                />
+                                <textarea
+                                  name="thankYouAnswer"
+                                  rows={2}
+                                  className={fieldClass}
+                                />
+                              </label>
+                            ))}
+                          </ApplicationActionForm>
+                        ) : null}
+                        <div className="flex flex-wrap gap-2">
                         <ApplicationActionForm
                           action={generateOutreachAssetAction}
                           submitLabel={interviewConfig.labels.thankYouEmail}
@@ -312,6 +381,13 @@ export async function InterviewStagesSection({
                           />
                           <input type="hidden" name="type" value="EMAIL" />
                           <input type="hidden" name="purpose" value="THANK_YOU" />
+                          {thankYouNeedsAnswers ? (
+                            <input
+                              type="hidden"
+                              name="skipThankYouQuestions"
+                              value="1"
+                            />
+                          ) : null}
                         </ApplicationActionForm>
                         <ApplicationActionForm
                           action={generateOutreachAssetAction}
@@ -332,6 +408,13 @@ export async function InterviewStagesSection({
                           />
                           <input type="hidden" name="type" value="LINKEDIN_INMAIL" />
                           <input type="hidden" name="purpose" value="THANK_YOU" />
+                          {thankYouNeedsAnswers ? (
+                            <input
+                              type="hidden"
+                              name="skipThankYouQuestions"
+                              value="1"
+                            />
+                          ) : null}
                         </ApplicationActionForm>
                         <ApplicationActionForm
                           action={generateOutreachAssetAction}
@@ -353,6 +436,7 @@ export async function InterviewStagesSection({
                           <input type="hidden" name="type" value="EMAIL" />
                           <input type="hidden" name="purpose" value="CHECK_IN" />
                         </ApplicationActionForm>
+                        </div>
                       </div>
                     ) : null}
 
@@ -364,6 +448,13 @@ export async function InterviewStagesSection({
                       >
                         <input type="hidden" name="campaignId" value={campaignId} />
                         <input type="hidden" name="focusNote" value={offer.text} />
+                        {offer.targetKey ? (
+                          <input
+                            type="hidden"
+                            name="focusTargetKey"
+                            value={offer.targetKey}
+                          />
+                        ) : null}
                         <p className="text-sm text-slate-700">
                           {interviewConfig.labels.consultationOffer} {offer.text}
                         </p>

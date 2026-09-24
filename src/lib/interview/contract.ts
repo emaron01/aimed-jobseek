@@ -1,7 +1,8 @@
 import { z } from "zod";
 
-export const INTERVIEW_GUIDE_PROMPT_VERSION = "2";
+export const INTERVIEW_GUIDE_PROMPT_VERSION = "3";
 export const INTERVIEW_CLARIFY_PROMPT_VERSION = "1";
+export const INTERVIEW_THANK_YOU_CLARIFY_PROMPT_VERSION = "1";
 
 const supportSchema = z.object({
   sourceId: z.string().trim().min(1),
@@ -25,6 +26,17 @@ export const interviewClarifyingQuestionsSchema = z.object({
     .max(3),
 });
 
+export const interviewThankYouClarifyingQuestionsSchema = z.object({
+  questions: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1),
+        text: z.string().trim().min(1),
+      }),
+    )
+    .max(2),
+});
+
 export const interviewGuideContentSchema = z.object({
   purpose: interviewClaimSchema,
   interviewers: z.array(
@@ -37,6 +49,7 @@ export const interviewGuideContentSchema = z.object({
         z.object({
           question: interviewClaimSchema,
           answerMaterial: interviewClaimSchema,
+          exampleAnswer: interviewClaimSchema,
           statementIds: z.array(z.string()),
           storyIds: z.array(z.string()),
         }),
@@ -63,7 +76,35 @@ export type InterviewClaim = z.infer<typeof interviewClaimSchema>;
 export type InterviewClarifyingQuestions = z.infer<
   typeof interviewClarifyingQuestionsSchema
 >;
+export type InterviewThankYouClarifyingQuestions = z.infer<
+  typeof interviewThankYouClarifyingQuestionsSchema
+>;
 export type InterviewGuideContent = z.infer<typeof interviewGuideContentSchema>;
+
+export function interviewGuideCoachingTexts(
+  content: InterviewGuideContent,
+): string[] {
+  const texts: string[] = [content.purpose.text];
+  for (const interviewer of content.interviewers) {
+    texts.push(
+      interviewer.whoTheyAre.text,
+      interviewer.whatTheyEvaluate.text,
+      ...interviewer.likelyQuestions.flatMap((item) => [
+        item.question.text,
+        item.answerMaterial.text,
+      ]),
+      ...interviewer.questionsToAsk.map((item) => item.text),
+    );
+  }
+  texts.push(...content.talkingPoints.map((item) => item.text));
+  for (const role of content.chronologicalWalkthrough ?? []) {
+    texts.push(
+      ...role.accomplishments.map((item) => item.text),
+      role.reasonForLeaving,
+    );
+  }
+  return texts.filter((text) => text.trim());
+}
 
 export function interviewGuideTexts(content: InterviewGuideContent): string[] {
   const texts: string[] = [content.purpose.text];
@@ -74,6 +115,7 @@ export function interviewGuideTexts(content: InterviewGuideContent): string[] {
       ...interviewer.likelyQuestions.flatMap((item) => [
         item.question.text,
         item.answerMaterial.text,
+        item.exampleAnswer.text,
       ]),
       ...interviewer.questionsToAsk.map((item) => item.text),
     );
@@ -102,6 +144,7 @@ export function interviewGuideClaims(
       ...interviewer.likelyQuestions.flatMap((item) => [
         item.question,
         item.answerMaterial,
+        item.exampleAnswer,
       ]),
       ...interviewer.questionsToAsk,
     );

@@ -12,7 +12,7 @@ import {
   addApplicationContact,
   updateApplicationContactRole,
 } from "@/lib/application/contacts";
-import { isOutreachAssetType } from "@/lib/product-config";
+import { interviewConfig, isOutreachAssetType } from "@/lib/product-config";
 import { setApplicationProgress } from "@/lib/interview/stages";
 import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
@@ -25,6 +25,7 @@ export type ApplicationOutreachActionResult = {
   contactId?: string;
   personaId?: string | null;
   violations?: string[];
+  questions?: Array<{ id: string; text: string }>;
 };
 
 function campaignId(formData: FormData): string {
@@ -202,8 +203,20 @@ export async function generateOutreachAssetAction(
       emailLength,
       regenerationInstruction:
         String(formData.get("regenerationInstruction") ?? "").trim() || null,
+      skipThankYouQuestions: String(formData.get("skipThankYouQuestions") ?? "") === "1",
+      thankYouAnswers: formData.getAll("thankYouAnswerId").map((raw, index) => ({
+        id: String(raw),
+        answer: String(formData.getAll("thankYouAnswer")[index] ?? ""),
+      })),
     });
     revalidate(id);
+    if (result.ok && "needsClarification" in result) {
+      return {
+        ok: true,
+        message: interviewConfig.labels.thankYouClarifyHelp,
+        questions: result.questions,
+      };
+    }
     return result.ok
       ? {
           ok: true,

@@ -17,14 +17,18 @@ import {
 } from "@/lib/cadence/application-reminders";
 import { outreachEmailHandoff } from "@/lib/application-assets/handoff";
 import {
+  appliedMentionErrors,
   askAndRedirectCountErrors,
+  conversationThankErrors,
   finalSentencePunctuationErrors,
   followUpLengthErrors,
   genericRelevanceErrors,
   hiringManagerClaimErrors,
+  notesDescribeConversation,
   outreachLimitErrors,
   redirectLineErrors,
   thankYouNotesErrors,
+  thankYouSubjectErrors,
   threadRepetitionErrors,
   unsupportedRecipientFactErrors,
 } from "@/lib/application-assets/outreach";
@@ -231,6 +235,62 @@ describe("outreach greetings and claims", () => {
     ).toEqual([]);
   });
 
+  it("asks up to two questions when thank-you notes are thin", () => {
+    expect(
+      notesDescribeConversation(
+        "The hiring manager will focus on incident leadership.",
+      ),
+    ).toBe(false);
+    expect(
+      notesDescribeConversation(
+        "We discussed incident leadership. Priya asked how I handle on-call.",
+      ),
+    ).toBe(true);
+    expect(interviewConfig.thankYouClarifyingQuestionLimit).toBe(2);
+  });
+
+  it("rejects messages that mention applying after Interviewing", () => {
+    expect(
+      appliedMentionErrors({
+        text: "I’ve also submitted my application through the employer portal.",
+        mentionApplied: false,
+      }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      appliedMentionErrors({
+        text: "Thank you for the conversation about incident leadership.",
+        mentionApplied: false,
+      }),
+    ).toEqual([]);
+  });
+
+  it("rejects generic thank-you subjects", () => {
+    expect(
+      thankYouSubjectErrors({
+        subject: "Thank you for the update",
+        notes: "We discussed incident leadership and on-call ownership.",
+      }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      thankYouSubjectErrors({
+        subject: "Incident leadership follow-through",
+        notes: "We discussed incident leadership and on-call ownership.",
+      }),
+    ).toEqual([]);
+    expect(
+      conversationThankErrors({
+        text: "Thank you for the update about incident leadership.",
+        purpose: "THANK_YOU",
+      }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      conversationThankErrors({
+        text: "Thank you for the conversation about incident leadership.",
+        purpose: "THANK_YOU",
+      }),
+    ).toEqual([]);
+  });
+
   it("requires thank-you messages to cite notes and never use a redirect", () => {
     expect(
       thankYouNotesErrors({
@@ -386,6 +446,7 @@ describe("outreach greetings and claims", () => {
       emailLength: null,
       priorMessage: null,
       interviewStageNotes: null,
+      mentionApplied: true,
       regenerationInstruction: null,
       qualityFeedback: [],
     });

@@ -22,6 +22,7 @@ import {
 } from "@/lib/consultation/assess";
 import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
 import {
+  matchConsultationFocus,
   planQuestionRound,
   seniorityWarrantsChronology,
 } from "@/lib/consultation/questions";
@@ -455,6 +456,28 @@ describe("consultation evidence and questions", () => {
     });
     expect(round).toHaveLength(consultationConfig.roundSize);
     expect(round[0]?.targetKey.startsWith("required:")).toBe(true);
+
+    const incident = assessments.find((item) =>
+      /incident/i.test(item.text),
+    );
+    expect(incident).toBeTruthy();
+    const focused = planQuestionRound({
+      assessments,
+      modelQuestions,
+      hiringTeam,
+      askedKeys: new Set(),
+      skippedKeys: new Set(),
+      includeChronology: false,
+      chronologyAsked: false,
+      focusTargetKey: incident!.key,
+    });
+    expect(focused[0]?.targetKey).toBe(incident!.key);
+    expect(
+      matchConsultationFocus({
+        focusNote: "The hiring manager will focus on incident leadership.",
+        targets: assessments.map((item) => ({ key: item.key, text: item.text })),
+      }),
+    ).toBe(incident!.key);
     const covered = round[0]!.targetKey;
     const coveredText = assessments.find((item) => item.key === covered)!.text;
     const next = planQuestionRound({
@@ -657,12 +680,13 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("4");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("5");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("coach, not an interrogator");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("Never inflate fit");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
       "Never mention research status",
     );
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("focusTargetKey");
     const workspace = readFileSync("src/components/ConsultationSection.tsx", "utf8");
     expect(workspace).toContain("consultationConfig.displayName");
     expect(workspace).not.toContain("Avery");
@@ -915,7 +939,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("4");
+    expect(session?.promptVersion).toBe("5");
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
     const incident = session?.assessments.find((item) => item.text === "Leads incident response");

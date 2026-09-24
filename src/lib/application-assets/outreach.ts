@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import {
   applicationAssetConfig,
   consultationConfig,
+  isApplicationInterviewingOrLater,
   isOutreachAssetType,
   interviewConfig,
   outreachConfig,
@@ -26,6 +27,7 @@ import {
   vocab,
 } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
+import { generateInterviewThankYouClarifyingQuestions } from "@/lib/interview/ai";
 import { generateOutreachWithModel, validateAssetClaimsWithModel } from "./ai";
 import {
   applicationAssetContentSchema,
@@ -37,7 +39,7 @@ import {
   type ApplicationAssetContent,
   type AssetClaim,
 } from "./contract";
-import type { AssetGenerationResult } from "./outreach-types";
+import type { OutreachGenerationResult } from "./outreach-types";
 
 function outreachPromptVersion(type: ApplicationAssetType): string {
   if (type === "EMAIL") return OUTREACH_EMAIL_PROMPT_VERSION;
@@ -273,6 +275,85 @@ export function unsupportedRecipientFactErrors(input: {
   return [];
 }
 
+export function notesDescribeConversation(notes: string): boolean {
+  const lowered = notes.toLowerCase();
+  return interviewConfig.conversationNoteSignals.some((signal) =>
+    lowered.includes(signal),
+  );
+}
+
+export function appliedMentionErrors(input: {
+  text: string;
+  mentionApplied: boolean;
+}): string[] {
+  if (input.mentionApplied) return [];
+  const lowered = input.text.toLowerCase();
+  if (
+    outreachConfig.appliedMentionPhrases.some((phrase) =>
+      lowered.includes(phrase),
+    )
+  ) {
+    return [
+      "This application is already in interviews. Do not mention having applied or submitted an application.",
+    ];
+  }
+  return [];
+}
+
+export function thankYouSubjectErrors(input: {
+  subject: string | null;
+  notes: string;
+}): string[] {
+  const subject = input.subject?.trim() ?? "";
+  if (!subject) return [];
+  const normalized = subject.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  if (
+    outreachConfig.genericThankYouSubjects.some(
+      (phrase) => normalized === phrase || normalized === `${phrase}.`,
+    )
+  ) {
+    return [
+      "Write a subject that names a topic from the conversation. Do not use a generic thank-you subject.",
+    ];
+  }
+  const noteTokens = sentenceTokens(input.notes);
+  const subjectTokens = sentenceTokens(subject);
+  const overlap = [...noteTokens].filter((token) => subjectTokens.has(token)).length;
+  if (noteTokens.size > 0 && overlap < 1) {
+    return [
+      "The subject must reference a topic from the seeker's post-stage notes.",
+    ];
+  }
+  return [];
+}
+
+export function conversationThankErrors(input: {
+  text: string;
+  purpose: "PROACTIVE" | "FOLLOW_UP" | "THANK_YOU" | "CHECK_IN";
+}): string[] {
+  if (input.purpose !== "THANK_YOU") return [];
+  const lowered = input.text.toLowerCase();
+  if (
+    outreachConfig.thanksForInformationPhrases.some((phrase) =>
+      lowered.includes(phrase),
+    )
+  ) {
+    return [
+      "Thank the interviewer for the conversation. Do not thank them for information in place of the conversation.",
+    ];
+  }
+  if (
+    !outreachConfig.conversationThankPhrases.some((phrase) =>
+      lowered.includes(phrase),
+    )
+  ) {
+    return [
+      "Thank the interviewer for the conversation and reference a specific topic from the notes.",
+    ];
+  }
+  return [];
+}
+
 export function thankYouNotesErrors(input: {
   text: string;
   notes: string;
@@ -380,6 +461,7 @@ export async function validateOutreachContent(input: {
   includeRedirect: boolean;
   priorMessages?: Array<{ subject: string | null; body: string }>;
   stageNotes?: string | null;
+  mentionApplied?: boolean;
 }): Promise<string[]> {
   if (
     input.content.type !== "EMAIL" &&
@@ -440,6 +522,20 @@ export async function validateOutreachContent(input: {
     ...(input.purpose === "THANK_YOU" || input.purpose === "CHECK_IN"
       ? thankYouNotesErrors({
           text: bodyForQuality,
+          notes: input.stageNotes ?? "",
+        })
+      : []),
+    ...appliedMentionErrors({
+      text: `${composed.subject ?? ""} ${composed.body}`,
+      mentionApplied: input.mentionApplied ?? true,
+    }),
+    ...conversationThankErrors({
+      text: bodyForQuality,
+      purpose: input.purpose,
+    }),
+    ...(input.purpose === "THANK_YOU"
+      ? thankYouSubjectErrors({
+          subject: composed.subject,
           notes: input.stageNotes ?? "",
         })
       : []),
@@ -553,6 +649,52 @@ async function saveOutreachVersion(input: {
   );
 }
 
+type ThankYouClarifyState = {
+  questions: Array<{ id: string; text: string }>;
+  answers: Array<{ id: string; answer: string }>;
+  skipped: boolean;
+};
+
+function parseThankYouClarify(value: unknown): ThankYouClarifyState {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { questions: [], answers: [], skipped: false };
+  }
+  const row = value as {
+    questions?: unknown;
+    answers?: unknown;
+    skipped?: unknown;
+  };
+  const questions = Array.isArray(row.questions)
+    ? row.questions
+        .filter(
+          (item): item is { id: unknown; text: unknown } =>
+            Boolean(item) && typeof item === "object",
+        )
+        .map((item) => ({
+          id: String(item.id ?? "").trim(),
+          text: String(item.text ?? "").trim(),
+        }))
+        .filter((item) => item.id && item.text)
+    : [];
+  const answers = Array.isArray(row.answers)
+    ? row.answers
+        .filter(
+          (item): item is { id: unknown; answer: unknown } =>
+            Boolean(item) && typeof item === "object",
+        )
+        .map((item) => ({
+          id: String(item.id ?? "").trim(),
+          answer: String(item.answer ?? "").trim(),
+        }))
+        .filter((item) => item.id && item.answer)
+    : [];
+  return {
+    questions,
+    answers,
+    skipped: row.skipped === true,
+  };
+}
+
 export async function generateOutreachAsset(input: {
   organizationId: string;
   campaignId: string;
@@ -565,7 +707,9 @@ export async function generateOutreachAsset(input: {
   interviewStageId?: string | null;
   emailLength?: EmailLength | null;
   regenerationInstruction?: string | null;
-}): Promise<AssetGenerationResult> {
+  skipThankYouQuestions?: boolean;
+  thankYouAnswers?: Array<{ id: string; answer: string }>;
+}): Promise<OutreachGenerationResult> {
   if (!isOutreachAssetType(input.type)) {
     return {
       ok: false,
@@ -659,7 +803,7 @@ export async function generateOutreachAsset(input: {
         campaignId: input.campaignId,
         organizationId: input.organizationId,
       },
-      select: { notesAfter: true, outcome: true },
+      select: { notesAfter: true, outcome: true, thankYouClarifyJson: true },
     });
     if (!stage) {
       return { ok: false, message: "Interview stage was not found.", violations: [] };
@@ -672,7 +816,92 @@ export async function generateOutreachAsset(input: {
         violations: [],
       };
     }
+    if (input.purpose === "THANK_YOU") {
+      const stored = parseThankYouClarify(stage.thankYouClarifyJson);
+      const answers =
+        input.thankYouAnswers?.filter((row) => row.answer.trim()) ?? stored.answers;
+      const skipped = Boolean(input.skipThankYouQuestions) || stored.skipped;
+      if (!notesDescribeConversation(interviewStageNotes) && !skipped && answers.length === 0) {
+        let feedback: string[] = [];
+        let questions: Array<{ id: string; text: string }> = [];
+        for (
+          let attempt = 0;
+          attempt <= consultationConfig.qualityRegenerationAttempts;
+          attempt += 1
+        ) {
+          const generated = await generateInterviewThankYouClarifyingQuestions({
+            notes: interviewStageNotes,
+            qualityFeedback: feedback,
+          });
+          if (!generated.ok) {
+            return { ok: false, message: generated.message, violations: [] };
+          }
+          const limited = generated.data.questions.slice(
+            0,
+            interviewConfig.thankYouClarifyingQuestionLimit,
+          );
+          if (
+            limited.length === 0 ||
+            limited.some((question) => !question.text.trim().endsWith("?"))
+          ) {
+            feedback = [
+              "Write up to two short questions that end with a question mark.",
+            ];
+            continue;
+          }
+          questions = limited;
+          break;
+        }
+        if (questions.length === 0) {
+          return {
+            ok: false,
+            message: "Thank-you questions did not pass quality checks. Retry.",
+            violations: [],
+          };
+        }
+        await prisma.interviewStage.update({
+          where: { id: interviewStageId },
+          data: {
+            thankYouClarifyJson: {
+              questions,
+              answers: [],
+              skipped: false,
+            },
+          },
+        });
+        return { ok: true, needsClarification: true, questions };
+      }
+      if (answers.length > 0) {
+        interviewStageNotes = [interviewStageNotes, ...answers.map((row) => row.answer)]
+          .filter(Boolean)
+          .join("\n");
+        await prisma.interviewStage.update({
+          where: { id: interviewStageId },
+          data: {
+            thankYouClarifyJson: {
+              questions: stored.questions,
+              answers,
+              skipped: false,
+            },
+          },
+        });
+      } else if (skipped) {
+        await prisma.interviewStage.update({
+          where: { id: interviewStageId },
+          data: {
+            thankYouClarifyJson: {
+              questions: stored.questions,
+              answers: [],
+              skipped: true,
+            },
+          },
+        });
+      }
+    }
   }
+  const mentionApplied = !isApplicationInterviewingOrLater(
+    context.campaign.applicationProgress,
+  );
   const includeRedirect = interviewPurpose
     ? false
     : shouldIncludeRedirect({
@@ -769,10 +998,19 @@ export async function generateOutreachAsset(input: {
       emailLength,
       priorMessage,
       interviewStageNotes,
+      mentionApplied,
       regenerationInstruction: input.regenerationInstruction ?? null,
       qualityFeedback: feedback,
     });
     if (!generated.ok) {
+      console.error(
+        JSON.stringify({
+          event: "outreach_validation_failed",
+          purpose: input.purpose,
+          attempt: attempt + 1,
+          errors: [generated.message],
+        }),
+      );
       feedback = [generated.message];
       if (attempt === attempts) {
         return { ok: false, message: generated.message, violations: feedback };
@@ -790,6 +1028,7 @@ export async function generateOutreachAsset(input: {
       includeRedirect,
       priorMessages,
       stageNotes: interviewStageNotes,
+      mentionApplied,
     });
     if (violations.length === 0) {
       const saved = await saveOutreachVersion({
@@ -806,6 +1045,14 @@ export async function generateOutreachAsset(input: {
       });
       return { ok: true, assetId: saved.id, version: saved.version };
     }
+    console.error(
+      JSON.stringify({
+        event: "outreach_validation_failed",
+        purpose: input.purpose,
+        attempt: attempt + 1,
+        errors: violations,
+      }),
+    );
     feedback = violations;
   }
   return {

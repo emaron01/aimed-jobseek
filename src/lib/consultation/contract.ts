@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONSULTATION_PROMPT_VERSION = "4";
+export const CONSULTATION_PROMPT_VERSION = "5";
 
 const strengthSchema = z.enum(["STRONG", "PARTIAL", "NONE"]);
 const strategyModeSchema = z.enum([

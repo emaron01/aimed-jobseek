@@ -30,6 +30,7 @@ export function buildConsultationCoachMessages(input: {
   }>;
   chronologyRequested: boolean;
   coveredTargetKeys: string[];
+  focusTargetKey?: string | null;
   qualityFeedback?: string[];
 }): AiMessage[] {
   const system = `Prompt version: ${CONSULTATION_PROMPT_VERSION}
@@ -42,6 +43,7 @@ ${CONSULTATION_COACH_SYSTEM_INSTRUCTIONS}`;
     hiringTeam: input.hiringTeam,
     chronologyRequested: input.chronologyRequested,
     coveredTargetKeys: input.coveredTargetKeys,
+    focusTargetKey: input.focusTargetKey ?? null,
     bannedPhrases: consultationConfig.bannedPhrases,
     qualityFeedback: input.qualityFeedback ?? [],
   });

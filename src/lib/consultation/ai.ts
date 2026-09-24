@@ -49,6 +49,7 @@ export async function planConsultationWithModel(input: {
   }>;
   chronologyRequested: boolean;
   coveredTargetKeys: string[];
+  focusTargetKey?: string | null;
   qualityFeedback?: string[];
 }): Promise<ConsultationPlanAiResult> {
   if (!isConsultationAiConfigured()) {

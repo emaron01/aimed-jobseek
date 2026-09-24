@@ -44,6 +44,7 @@ export { hiringTeamConfig } from "./hiring-team";
 export { applicationSummaryConfig } from "./application-summary";
 export {
   interviewConfig,
+  isApplicationInterviewingOrLater,
   isApplicationProgress,
   isInterviewFormat,
   isInterviewStageOutcome,

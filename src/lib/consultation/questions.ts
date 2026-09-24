@@ -37,6 +37,39 @@ function targetMeaning(text: string): string {
     .trim();
 }
 
+export function matchConsultationFocus(input: {
+  focusTargetKey?: string | null;
+  focusNote?: string | null;
+  targets: Array<{ key: string; text: string }>;
+}): string | null {
+  const keyed = input.focusTargetKey?.trim();
+  if (keyed && input.targets.some((target) => target.key === keyed)) {
+    return keyed;
+  }
+  const note = input.focusNote?.trim().toLowerCase() ?? "";
+  if (!note) return null;
+  const noteTokens = new Set(
+    note
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length >= 4),
+  );
+  let best: { key: string; score: number } | null = null;
+  for (const target of input.targets) {
+    const matched = target.text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length >= 4 && noteTokens.has(token));
+    const score = matched.length;
+    const distinctive = matched.some((token) => token.length >= 6);
+    if ((score >= 2 || (score >= 1 && distinctive)) && (!best || score > best.score)) {
+      best = { key: target.key, score };
+    }
+  }
+  return best?.key ?? null;
+}
+
 export function planQuestionRound(input: {
   assessments: EvidenceAssessment[];
   modelQuestions: Array<{
@@ -51,22 +84,36 @@ export function planQuestionRound(input: {
   skippedKeys: ReadonlySet<string>;
   includeChronology: boolean;
   chronologyAsked: boolean;
+  focusTargetKey?: string | null;
 }): PlannedQuestion[] {
+  const askedKeys = new Set(input.askedKeys);
+  if (input.focusTargetKey) askedKeys.delete(input.focusTargetKey);
   const coveredMeanings = new Set(
     input.assessments
       .filter(
         (assessment) =>
-          input.askedKeys.has(assessment.key) ||
+          askedKeys.has(assessment.key) ||
           input.skippedKeys.has(assessment.key),
       )
       .map((assessment) => targetMeaning(assessment.text)),
   );
   const gaps = openGaps(input.assessments).filter(
     (gap) =>
-      !input.askedKeys.has(gap.key) &&
+      !askedKeys.has(gap.key) &&
       !input.skippedKeys.has(gap.key) &&
       !coveredMeanings.has(targetMeaning(gap.text)),
   );
+  const focus = input.focusTargetKey
+    ? input.assessments.find(
+        (assessment) => assessment.key === input.focusTargetKey,
+      )
+    : undefined;
+  if (focus && !gaps.some((gap) => gap.key === focus.key)) {
+    gaps.unshift(focus);
+  } else if (focus) {
+    const remaining = gaps.filter((gap) => gap.key !== focus.key);
+    gaps.splice(0, gaps.length, focus, ...remaining);
+  }
   const room = input.includeChronology && !input.chronologyAsked
     ? consultationConfig.roundSize - 1
     : consultationConfig.roundSize;

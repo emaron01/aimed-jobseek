@@ -54,6 +54,7 @@ export type ApplicationGenerationContext = {
     ownerUserId: string;
     applicationGuidance: string | null;
     appliedAt: Date | null;
+    applicationProgress: string | null;
   };
   profile: CandidateProfile | null;
   requirement: {
@@ -360,6 +361,7 @@ export async function loadApplicationGenerationContext(
       ownerUserId: campaign.ownerUserId,
       applicationGuidance: campaign.emailGuidance,
       appliedAt: campaign.appliedAt,
+      applicationProgress: campaign.applicationProgress,
     },
     profile: parsedProfile.ok ? parsedProfile.profile : null,
     requirement: requirement

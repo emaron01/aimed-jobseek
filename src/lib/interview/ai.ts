@@ -4,12 +4,15 @@ import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import {
   interviewClarifyingQuestionsSchema,
   interviewGuideContentSchema,
+  interviewThankYouClarifyingQuestionsSchema,
   type InterviewClarifyingQuestions,
   type InterviewGuideContent,
+  type InterviewThankYouClarifyingQuestions,
 } from "./contract";
 import {
   buildInterviewClarifyingMessages,
   buildInterviewGuideMessages,
+  buildInterviewThankYouClarifyingMessages,
   type InterviewGuidePromptInput,
 } from "./prompt";
 
@@ -56,6 +59,32 @@ export function generateInterviewClarifyingQuestions(input: {
         "interviewClarifyingQuestions",
         error,
         "Clarifying questions could not be generated. Retry.",
+      ),
+    );
+}
+
+export function generateInterviewThankYouClarifyingQuestions(input: {
+  notes: string;
+  qualityFeedback: string[];
+}): Promise<Result<InterviewThankYouClarifyingQuestions>> {
+  if (!isAssetAiConfigured()) {
+    return Promise.resolve({ ok: false, message: UNCONFIGURED });
+  }
+  return getAssetAiProvider()
+    .generateStructured({
+      ...structuredOutputRequest("interviewThankYouClarifyingQuestions"),
+      messages: buildInterviewThankYouClarifyingMessages(input),
+      parseOutput: (raw) => ({
+        data: interviewThankYouClarifyingQuestionsSchema.parse(raw),
+        coercedFields: [],
+      }),
+    })
+    .then((response) => ({ ok: true as const, data: response.data }))
+    .catch((error) =>
+      failure(
+        "interviewThankYouClarifyingQuestions",
+        error,
+        "Thank-you questions could not be generated. Retry.",
       ),
     );
 }

@@ -6,6 +6,14 @@ export type AssetGenerationResult =
   | { ok: true; assetId: string; version: number }
   | { ok: false; message: string; violations: string[] };
 
+export type OutreachGenerationResult =
+  | AssetGenerationResult
+  | {
+      ok: true;
+      needsClarification: true;
+      questions: Array<{ id: string; text: string }>;
+    };
+
 export type OutreachGenerationInput = {
   context: ReadyApplicationGenerationContext;
   type: OutreachAssetType;
@@ -17,6 +25,7 @@ export type OutreachGenerationInput = {
   emailLength: EmailLength | null;
   priorMessage: { subject: string | null; body: string } | null;
   interviewStageNotes: string | null;
+  mentionApplied: boolean;
   regenerationInstruction: string | null;
   qualityFeedback: string[];
 };

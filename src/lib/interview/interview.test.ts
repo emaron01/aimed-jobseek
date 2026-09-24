@@ -126,6 +126,67 @@ describe("interview guide rules", () => {
     ).toEqual([]);
   });
 
+  it("rejects first-person narration and allows labeled example answers", () => {
+    const narrating: InterviewGuideContent = {
+      purpose: claim("p", "I can lead incident response for this stage."),
+      interviewers: [],
+      talkingPoints: [claim("t1", "Use the billing rewrite.")],
+    };
+    expect(
+      validateInterviewGuideContent({
+        content: narrating,
+        sources: [],
+        stageType: "RECRUITER_SCREEN",
+        interviewerIds: [],
+        experience: [],
+        priorNoteSourceIds: [],
+        approvedStatementIds: [],
+        approvedStoryIds: [],
+      }).some((error) => error.toLowerCase().includes("second person")),
+    ).toBe(true);
+
+    const withExample: InterviewGuideContent = {
+      purpose: claim("p", "This stage decides whether you can lead incidents."),
+      interviewers: [
+        {
+          contactId: "contact_priya",
+          roleId: "persona_recruiter",
+          whoTheyAre: claim("w", "Priya screens for production reliability."),
+          whatTheyEvaluate: claim("e", "She will evaluate your incident ownership."),
+          likelyQuestions: [
+            {
+              question: claim("q", "Tell me about a production incident you led."),
+              answerMaterial: claim(
+                "a",
+                "Use your invoice rewrite and on-call week.",
+              ),
+              exampleAnswer: claim(
+                "x",
+                "I led the rewrite of invoice generation that cut failed billing runs.",
+              ),
+              statementIds: [],
+              storyIds: [],
+            },
+          ],
+          questionsToAsk: [claim("ask", "What does success look like in the first quarter?")],
+        },
+      ],
+      talkingPoints: [claim("t1", "Lead with your invoice rewrite.")],
+    };
+    expect(
+      validateInterviewGuideContent({
+        content: withExample,
+        sources: [],
+        stageType: "RECRUITER_SCREEN",
+        interviewerIds: ["contact_priya"],
+        experience: [],
+        priorNoteSourceIds: [],
+        approvedStatementIds: [],
+        approvedStoryIds: [],
+      }).filter((error) => error.toLowerCase().includes("second person")),
+    ).toEqual([]);
+  });
+
   it("requires earlier-stage notes to change the next guide", () => {
     const content: InterviewGuideContent = {
       purpose: claim("p", "This stage decides technical fit."),

@@ -2673,6 +2673,7 @@ model InterviewStage {
   expectedDecisionAt   DateTime?
   outcome              InterviewStageOutcome?
   consultationOfferJson Json?
+  thankYouClarifyJson  Json?
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
 

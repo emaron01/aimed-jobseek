@@ -76,9 +76,11 @@ export default async function InterviewGuidePage({ params }: PageProps) {
           <ApplicationActionForm
             action={generateInterviewGuideAction}
             submitLabel={
-              content
-                ? interviewConfig.labels.regenerateGuide
-                : interviewConfig.labels.generateGuide
+              view.stage.guide?.generationError
+                ? interviewConfig.labels.retryGuide
+                : content
+                  ? interviewConfig.labels.regenerateGuide
+                  : interviewConfig.labels.generateGuide
             }
             testId="interview-guide-generate"
           >
@@ -117,6 +119,12 @@ export default async function InterviewGuidePage({ params }: PageProps) {
                   <li key={item.question.id}>
                     <p>{item.question.text}</p>
                     <p className="mt-1 text-slate-600">{item.answerMaterial.text}</p>
+                    <p className="mt-2 text-sm text-slate-800">
+                      <span className="font-medium">
+                        {interviewConfig.labels.exampleAnswer}:
+                      </span>{" "}
+                      {item.exampleAnswer.text}
+                    </p>
                   </li>
                 ))}
               </ul>

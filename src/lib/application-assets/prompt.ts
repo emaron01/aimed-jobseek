@@ -38,7 +38,10 @@ function seekerSources(context: ApplicationGenerationContext) {
   );
 }
 
-function outreachCitableSources(context: ApplicationGenerationContext) {
+function outreachCitableSources(
+  context: ApplicationGenerationContext,
+  mentionApplied: boolean,
+) {
   return context.sources
     .filter((source) =>
       [
@@ -50,6 +53,7 @@ function outreachCitableSources(context: ApplicationGenerationContext) {
         "PERSONA",
       ].includes(source.category),
     )
+    .filter((source) => mentionApplied || source.id !== "application:status")
     .map((source) => ({
       id: source.id,
       category: source.category,
@@ -266,7 +270,9 @@ export function buildOutreachAssetMessages(
       content: JSON.stringify({
         ...commonPayload(input.context),
         applicationGuidance: input.context.campaign.applicationGuidance,
-        appliedAt: input.context.campaign.appliedAt,
+        appliedAt: input.mentionApplied ? input.context.campaign.appliedAt : null,
+        mentionApplied: input.mentionApplied,
+        applicationProgress: input.context.campaign.applicationProgress,
         voiceSamples: input.context.voiceSamples,
         seekerAnswers: input.context.seekerAnswers,
         greeting: input.greeting,
@@ -279,7 +285,10 @@ export function buildOutreachAssetMessages(
         interviewStageNotes: input.interviewStageNotes,
         emailLength: input.emailLength,
         wordTarget,
-        citableSources: outreachCitableSources(input.context),
+        citableSources: outreachCitableSources(
+          input.context,
+          input.mentionApplied,
+        ),
         characterLimits: {
           connectionNote: outreachConfig.linkedinLimits.connectionNoteChars,
           bodyMaxChars:

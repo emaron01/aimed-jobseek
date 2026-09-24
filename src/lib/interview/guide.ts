@@ -20,6 +20,7 @@ import {
   INTERVIEW_GUIDE_PROMPT_VERSION,
   interviewGuideClaims,
   interviewGuideContentSchema,
+  interviewGuideCoachingTexts,
   interviewGuideTexts,
   type InterviewClaim,
   type InterviewClarifyingQuestions,
@@ -321,6 +322,25 @@ export function validateInterviewGuideContent(input: {
 }): string[] {
   const errors: string[] = [];
   const texts = interviewGuideTexts(input.content);
+  const coachingTexts = interviewGuideCoachingTexts(input.content);
+  const firstPerson = /\b(I|I'm|I've|I'd|I'll|my|mine)\b/i;
+  for (const text of coachingTexts) {
+    if (firstPerson.test(text)) {
+      errors.push(
+        "Write the guide to the seeker in second person. Put first-person speech only in labeled example answers.",
+      );
+      break;
+    }
+  }
+  for (const interviewer of input.content.interviewers) {
+    for (const item of interviewer.likelyQuestions) {
+      if (!/\b(I|I'm|I've|I'd|I'll|my|mine)\b/i.test(item.exampleAnswer.text)) {
+        errors.push(
+          "Write each example answer as first-person words the seeker would say aloud.",
+        );
+      }
+    }
+  }
   const banned = bannedPhraseHits(texts, [
     ...consultationConfig.bannedPhrases,
     ...applicationAssetConfig.bannedPhrases,
@@ -541,16 +561,21 @@ export async function requestInterviewGuide(input: {
     },
   });
 
-  for (
-    let attempt = 0;
-    attempt <= consultationConfig.qualityRegenerationAttempts;
-    attempt += 1
-  ) {
+  const maxAttempts = applicationAssetConfig.generation.qualityRegenerationAttempts;
+  for (let attempt = 0; attempt <= maxAttempts; attempt += 1) {
     const generated = await generateInterviewGuideWithModel({
       ...promptInput,
       qualityFeedback: feedback,
     });
     if (!generated.ok) {
+      console.error(
+        JSON.stringify({
+          event: "interview_guide_validation_failed",
+          attempt: attempt + 1,
+          maxAttempts: maxAttempts + 1,
+          errors: [generated.message],
+        }),
+      );
       await prisma.interviewStageGuide.update({
         where: { stageId: input.stageId },
         data: { status: "FAILED", generationError: generated.message },
@@ -586,6 +611,14 @@ export async function requestInterviewGuide(input: {
       });
       return { status: "READY", stale: false };
     }
+    console.error(
+      JSON.stringify({
+        event: "interview_guide_validation_failed",
+        attempt: attempt + 1,
+        maxAttempts: maxAttempts + 1,
+        errors,
+      }),
+    );
     feedback = errors;
   }
   await prisma.interviewStageGuide.update({

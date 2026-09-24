@@ -225,6 +225,7 @@ export async function startInterviewGapConsultationAction(
       organizationId,
       campaignId: id,
       focusNote: String(formData.get("focusNote") ?? "").trim() || null,
+      focusTargetKey: String(formData.get("focusTargetKey") ?? "").trim() || null,
     });
     revalidate(id);
     return { ok: true, message: "Consultation started for this gap." };

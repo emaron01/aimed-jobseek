@@ -20,8 +20,14 @@ export const interviewConfig = Object.freeze({
     noOutcome: "No outcome yet",
     generateGuide: "Generate guide",
     regenerateGuide: "Regenerate guide",
+    retryGuide: "Retry guide",
     skipQuestions: "Skip and generate",
     answerQuestions: "Save answers and generate",
+    exampleAnswer: "Say this",
+    thankYouClarifyHelp:
+      "Answer or skip. These questions give the thank-you something specific from the conversation.",
+    skipThankYouQuestions: "Skip and generate the thank-you",
+    answerThankYouQuestions: "Save answers and generate the thank-you",
     openGuide: "Open guide",
     printGuide: "Print or Save as PDF",
     thankYouEmail: "Thank-you email",
@@ -68,7 +74,20 @@ export const interviewConfig = Object.freeze({
     recordNotesPrompt: "Record notes first, then generate the thank-you.",
   },
   clarifyingQuestionLimit: 3,
+  thankYouClarifyingQuestionLimit: 2,
   leaveReasonUnknownLabel: "Unknown. Ask before inventing a reason.",
+  conversationNoteSignals: [
+    "discussed",
+    "talked about",
+    "asked about",
+    "asked me",
+    "told me",
+    "said that",
+    "mentioned",
+    "walked through",
+    "we covered",
+    "reinforce",
+  ],
 } as const);
 
 export type InterviewStageTypeValue = keyof typeof interviewConfig.types;
@@ -96,4 +115,15 @@ export function isApplicationProgress(
   value: string,
 ): value is ApplicationProgressValue {
   return value in interviewConfig.progress;
+}
+
+export function isApplicationInterviewingOrLater(
+  progress: string | null | undefined,
+): boolean {
+  return (
+    progress === "INTERVIEWING" ||
+    progress === "OFFER" ||
+    progress === "REJECTED" ||
+    progress === "WITHDRAWN"
+  );
 }

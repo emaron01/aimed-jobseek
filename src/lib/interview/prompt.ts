@@ -2,6 +2,7 @@ import type { AiMessage } from "@/lib/ai/types";
 import {
   INTERVIEW_CLARIFY_SYSTEM_INSTRUCTIONS,
   INTERVIEW_GUIDE_SYSTEM_INSTRUCTIONS,
+  INTERVIEW_THANK_YOU_CLARIFY_SYSTEM_INSTRUCTIONS,
 } from "@/lib/prompt-content";
 import {
   applicationAssetConfig,
@@ -11,6 +12,7 @@ import {
 import {
   INTERVIEW_CLARIFY_PROMPT_VERSION,
   INTERVIEW_GUIDE_PROMPT_VERSION,
+  INTERVIEW_THANK_YOU_CLARIFY_PROMPT_VERSION,
 } from "./contract";
 
 export type InterviewGuidePromptInput = {
@@ -107,6 +109,7 @@ export function buildInterviewGuideMessages(
         consultationGaps: input.consultationGaps,
         personas: input.personas,
         citableSources: input.sources,
+        allowedSourceIds: input.sources.map((source) => source.id),
         requiredWalkthroughRoleIds: input.profileRoles.map((role) => role.roleId),
         unknownLeaveReasonRoleIds: input.profileRoles
           .filter((role) => !role.reasonForLeaving?.trim())
@@ -137,7 +140,8 @@ export function buildInterviewGuideMessages(
               likelyQuestions: [
                 {
                   question: "claim",
-                  answerMaterial: "claim",
+                  answerMaterial: "second-person coaching claim",
+                  exampleAnswer: "first-person words to say aloud",
                   statementIds: ["approved statement id"],
                   storyIds: ["approved story id"],
                 },
@@ -161,6 +165,34 @@ export function buildInterviewGuideMessages(
             text: "string",
             supports: [{ sourceId: "supplied source id", quote: "exact quote" }],
           },
+        },
+      }),
+    },
+  ];
+}
+
+export function buildInterviewThankYouClarifyingMessages(input: {
+  notes: string;
+  qualityFeedback: string[];
+}): AiMessage[] {
+  return [
+    {
+      role: "system",
+      content: `Prompt version: ${INTERVIEW_THANK_YOU_CLARIFY_PROMPT_VERSION}\n\n${INTERVIEW_THANK_YOU_CLARIFY_SYSTEM_INSTRUCTIONS}`,
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        consultantName: consultationConfig.displayName,
+        notes: input.notes,
+        maxQuestions: interviewConfig.thankYouClarifyingQuestionLimit,
+        bannedPhrases: [
+          ...consultationConfig.bannedPhrases,
+          ...applicationAssetConfig.bannedPhrases,
+        ],
+        qualityFeedback: input.qualityFeedback,
+        responseShape: {
+          questions: [{ id: "string", text: "one-sentence question" }],
         },
       }),
     },

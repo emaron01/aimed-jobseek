@@ -16,6 +16,7 @@ import {
 } from "@/lib/consultation/assess";
 import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
 import {
+  matchConsultationFocus,
   planQuestionRound,
   seniorityWarrantsChronology,
 } from "@/lib/consultation/questions";
@@ -437,6 +438,7 @@ async function planAndStoreRound(input: {
   requirement: { seniority: string | null; title: string | null };
   targets: EvidenceTarget[];
   roles: Awaited<ReturnType<typeof hiringTeam>>;
+  focusTargetKey?: string | null;
 }): Promise<ReturnType<typeof planQuestionRound>> {
   await prisma.consultationSession.update({
     where: { id: input.sessionId },
@@ -469,6 +471,7 @@ async function planAndStoreRound(input: {
       hiringTeam: input.roles,
       chronologyRequested,
       coveredTargetKeys: [...new Set([...input.askedKeys, ...input.skippedKeys])],
+      focusTargetKey: input.focusTargetKey ?? null,
       qualityFeedback: feedback,
     });
     if (!plan.ok) {
@@ -512,6 +515,7 @@ async function planAndStoreRound(input: {
         skippedKeys: input.skippedKeys,
         includeChronology: chronologyRequested,
         chronologyAsked: input.askedKeys.has("chronology"),
+        focusTargetKey: input.focusTargetKey ?? null,
       });
     } catch (error) {
       errors.push(
@@ -620,20 +624,56 @@ function askedAndSkipped(
   return { askedKeys, skippedKeys };
 }
 
+function resolveConsultationTargets(input: {
+  requirement: {
+    requiredItems: unknown;
+    preferredItems: unknown;
+    scorecardJson: unknown;
+  };
+  focusTargetKey?: string | null;
+  focusNote?: string | null;
+}): { targets: EvidenceTarget[]; focusTargetKey: string | null } {
+  const targets = targetsFromRequirement(input.requirement);
+  let focusTargetKey = matchConsultationFocus({
+    focusTargetKey: input.focusTargetKey,
+    focusNote: input.focusNote,
+    targets,
+  });
+  const note = input.focusNote?.trim() ?? "";
+  if (!focusTargetKey && note) {
+    focusTargetKey = "interview-note-focus";
+    targets.unshift({
+      key: focusTargetKey,
+      kind: "COMPETENCY",
+      text: note,
+    });
+  }
+  return { targets, focusTargetKey };
+}
+
 export async function startConsultation(input: {
   organizationId: string;
   campaignId: string;
   focusNote?: string | null;
+  focusTargetKey?: string | null;
 }): Promise<void> {
   const { campaign, requirement, profile } = await requireApplication(
     input.organizationId,
     input.campaignId,
   );
+  const hasFocus = Boolean(
+    input.focusNote?.trim() || input.focusTargetKey?.trim(),
+  );
+  const { targets, focusTargetKey } = resolveConsultationTargets({
+    requirement,
+    focusTargetKey: input.focusTargetKey,
+    focusNote: input.focusNote,
+  });
   const existing = await prisma.consultationSession.findUnique({
     where: { campaignId: input.campaignId },
   });
-  if (existing?.status === "DONE" && !input.focusNote) return;
-  if (existing?.status === "DONE" && input.focusNote) {
+  if (existing?.status === "DONE" && !hasFocus) return;
+  if (existing?.status === "DONE" && hasFocus) {
     await prisma.consultationSession.update({
       where: { id: existing.id },
       data: { status: "IN_PROGRESS", generationStatus: "READY" },
@@ -641,7 +681,8 @@ export async function startConsultation(input: {
   }
   if (
     existing?.status === "IN_PROGRESS" &&
-    existing.generationStatus !== "FAILED"
+    existing.generationStatus !== "FAILED" &&
+    !hasFocus
   ) {
     return;
   }
@@ -656,12 +697,12 @@ export async function startConsultation(input: {
       skippedKeys,
       profile,
       requirement,
-      targets: targetsFromRequirement(requirement),
+      targets,
       roles,
+      focusTargetKey,
     });
     return;
   }
-  const targets = targetsFromRequirement(requirement);
   const session = await prisma.consultationSession.create({
     data: {
       organizationId: input.organizationId,
@@ -681,6 +722,7 @@ export async function startConsultation(input: {
     requirement,
     targets,
     roles,
+    focusTargetKey,
   });
 }
 
