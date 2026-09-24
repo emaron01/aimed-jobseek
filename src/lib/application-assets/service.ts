@@ -160,12 +160,23 @@ function supportErrors(
     ids.add(claim.id);
     const isCoverLetterClose =
       content.type === "COVER_LETTER" && index === claims.length - 1;
+    const acknowledgeIds = new Set(
+      context.assessments
+        .filter((assessment) => assessment.strategy === "ACKNOWLEDGE")
+        .map((assessment) => `assessment:${assessment.targetKey}`),
+    );
+    const citesAcknowledgedGap = claim.supports.some((support) =>
+      acknowledgeIds.has(support.sourceId),
+    );
     const requiresSeekerSupport =
       content.type === "RESUME" ||
       content.type === "EMAIL" ||
       content.type === "LINKEDIN_CONNECTION_NOTE" ||
       content.type === "LINKEDIN_INMAIL" ||
-      (content.type === "COVER_LETTER" && index > 0 && !isCoverLetterClose);
+      (content.type === "COVER_LETTER" &&
+        index > 0 &&
+        !isCoverLetterClose &&
+        !citesAcknowledgedGap);
     let hasSeekerSupport = false;
     for (const support of claim.supports) {
       const source = sourceById.get(support.sourceId);
@@ -250,6 +261,102 @@ function resumeStructureErrors(
   return errors;
 }
 
+function identityProfileSourceIds(
+  profile: ReadyApplicationGenerationContext["profile"],
+): Set<string> {
+  return new Set(
+    [
+      profile.identity.name,
+      profile.identity.headline,
+      profile.identity.location,
+      profile.identity.email,
+      profile.identity.phone,
+      profile.identity.cityState,
+      profile.identity.linkedinUrl,
+      profile.identity.personalSite,
+      profile.identity.workArrangementPreference,
+      profile.identity.relocationOpenness,
+    ]
+      .filter(Boolean)
+      .map((item) => `profile:${item!.id}`),
+  );
+}
+
+function experienceRoleIdForSource(
+  sourceId: string,
+  profile: ReadyApplicationGenerationContext["profile"],
+): string | null {
+  if (!sourceId.startsWith("profile:")) return null;
+  const factId = sourceId.slice("profile:".length);
+  const role = profile.experience.find((item) => item.id === factId);
+  if (role) return role.id;
+  for (const item of profile.experience) {
+    if (item.achievements.some((achievement) => achievement.id === factId)) {
+      return item.id;
+    }
+  }
+  return null;
+}
+
+function isNonIdentityExperienceSource(
+  sourceId: string,
+  category: ReadyApplicationGenerationContext["sources"][number]["category"],
+  profile: ReadyApplicationGenerationContext["profile"],
+  identityIds: Set<string>,
+): boolean {
+  if (identityIds.has(sourceId)) return false;
+  if (category === "APPROVED_STATEMENT" || category === "APPROVED_STORY") {
+    return true;
+  }
+  return category === "PROFILE_FACT" && experienceRoleIdForSource(sourceId, profile) !== null;
+}
+
+export function coverLetterMixedTopicErrors(
+  content: CoverLetterAssetContent,
+  context: ReadyApplicationGenerationContext,
+): string[] {
+  const sourceById = new Map(context.sources.map((source) => [source.id, source]));
+  const acknowledgeIds = new Set(
+    context.assessments
+      .filter((assessment) => assessment.strategy === "ACKNOWLEDGE")
+      .map((assessment) => `assessment:${assessment.targetKey}`),
+  );
+  const identityIds = identityProfileSourceIds(context.profile);
+  const errors: string[] = [];
+  for (const paragraph of content.paragraphs) {
+    const cited = paragraph.supports
+      .map((support) => ({
+        sourceId: support.sourceId,
+        source: sourceById.get(support.sourceId),
+      }))
+      .filter((item): item is { sourceId: string; source: NonNullable<typeof item.source> } =>
+        Boolean(item.source),
+      );
+    const hasAcknowledgedGap = cited.some((item) => acknowledgeIds.has(item.sourceId));
+    const experienceCitations = cited.filter((item) =>
+      isNonIdentityExperienceSource(
+        item.sourceId,
+        item.source.category,
+        context.profile,
+        identityIds,
+      ),
+    );
+    if (hasAcknowledgedGap && experienceCitations.length > 0) {
+      errors.push(applicationAssetConfig.coverLetter.mixedTopic);
+      continue;
+    }
+    const roleIds = new Set(
+      cited
+        .map((item) => experienceRoleIdForSource(item.sourceId, context.profile))
+        .filter((roleId): roleId is string => Boolean(roleId)),
+    );
+    if (roleIds.size > 1) {
+      errors.push(applicationAssetConfig.coverLetter.mixedTopic);
+    }
+  }
+  return errors;
+}
+
 function coverLetterStructureErrors(
   content: CoverLetterAssetContent,
   context: ReadyApplicationGenerationContext,
@@ -307,6 +414,7 @@ function coverLetterStructureErrors(
       }
     }
   }
+  errors.push(...coverLetterMixedTopicErrors(content, context));
   return errors;
 }
 

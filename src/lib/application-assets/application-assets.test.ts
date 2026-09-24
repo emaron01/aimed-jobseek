@@ -19,6 +19,7 @@ import {
   closingParagraphMakesClaim,
   generateApplicationAsset,
 } from "@/lib/application-assets/service";
+import { COVER_LETTER_ASSET_PROMPT_VERSION } from "@/lib/application-assets/contract";
 import {
   type ResumeAssetContent,
   type CoverLetterAssetContent,
@@ -864,6 +865,133 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
       where: { campaignId },
       data: { identityConfirmation: "PENDING" },
     });
+  });
+
+  it("rejects and regenerates a cover letter that pairs an acknowledged gap with unrelated experience", async () => {
+    expect(COVER_LETTER_ASSET_PROMPT_VERSION).toBe("10");
+    const session =
+      (await prisma.consultationSession.findUnique({ where: { campaignId } })) ??
+      (await prisma.consultationSession.create({
+        data: {
+          organizationId,
+          campaignId,
+          productId,
+          promptVersion: "3",
+          status: "DONE",
+        },
+      }));
+    await prisma.consultationAssessment.upsert({
+      where: {
+        sessionId_targetKey: { sessionId: session.id, targetKey: "preferred:0" },
+      },
+      create: {
+        organizationId,
+        sessionId: session.id,
+        targetKey: "preferred:0",
+        kind: "PREFERRED",
+        text: "ROS2 experience is a gap.",
+        strength: "NONE",
+        supportingFactIds: [],
+        strategy: "ACKNOWLEDGE",
+        explanation: "The posting prefers ROS2 and the profile does not include it.",
+        strategyText: "I would ramp on ROS2 in the first weeks.",
+      },
+      update: {
+        text: "ROS2 experience is a gap.",
+        strength: "NONE",
+        strategy: "ACKNOWLEDGE",
+        explanation: "The posting prefers ROS2 and the profile does not include it.",
+        strategyText: "I would ramp on ROS2 in the first weeks.",
+      },
+    });
+
+    const mixed = (
+      payload: {
+        salutation: string;
+        signerName: string;
+        sources: Array<{ id: string; text: string; url: string | null }>;
+      },
+    ): CoverLetterAssetContent => {
+      const letter = validCoverLetter(payload);
+      letter.paragraphs = [
+        letter.paragraphs[0]!,
+        {
+          id: "cover-gap-mixed",
+          text: "ROS2 experience is a gap, and at Contoso Health I built the member-identity API used by the patient portal.",
+          supports: [
+            ...support("assessment:preferred:0", "ROS2 experience is a gap"),
+            ...support(
+              "profile:ach_3",
+              "Built the member-identity API used by the patient portal.",
+            ),
+          ],
+        },
+        letter.paragraphs[2]!,
+      ];
+      return letter;
+    };
+    const coherent = (
+      payload: {
+        salutation: string;
+        signerName: string;
+        sources: Array<{ id: string; text: string; url: string | null }>;
+      },
+    ): CoverLetterAssetContent => {
+      const letter = validCoverLetter(payload);
+      letter.paragraphs = [
+        letter.paragraphs[0]!,
+        {
+          id: "cover-gap",
+          text: "ROS2 experience is a gap, and I would ramp on it in the first weeks.",
+          supports: support("assessment:preferred:0", "ROS2 experience is a gap"),
+        },
+        letter.paragraphs[2]!,
+      ];
+      return letter;
+    };
+
+    let coverLetterCalls = 0;
+    generateStructured.mockImplementation(
+      async (request: { schemaName: string; messages: Array<{ content: string }> }) => {
+        if (request.schemaName === "application_cover_letter") {
+          const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
+            salutation: string;
+            signerName: string;
+            sources: Array<{ id: string; text: string; url: string | null }>;
+          };
+          coverLetterCalls += 1;
+          return {
+            data: coverLetterCalls === 1 ? mixed(payload) : coherent(payload),
+          };
+        }
+        if (request.schemaName === "application_asset_claim_validation") {
+          return { data: { violations: [] } };
+        }
+        return { data: validResume() };
+      },
+    );
+
+    const result = await generateApplicationAsset({
+      organizationId,
+      campaignId,
+      userId,
+      type: "COVER_LETTER",
+    });
+    expect(result.ok).toBe(true);
+    expect(coverLetterCalls).toBe(2);
+    const saved = await prisma.applicationAsset.findFirst({
+      where: { campaignId, type: "COVER_LETTER" },
+    });
+    const content = saved?.contentJson as unknown as CoverLetterAssetContent | undefined;
+    expect(content?.paragraphs).toBeTruthy();
+    for (const paragraph of content?.paragraphs ?? []) {
+      const sourceIds = paragraph.supports.map((item) => item.sourceId);
+      const citesGap = sourceIds.includes("assessment:preferred:0");
+      const citesContoso =
+        sourceIds.includes("profile:ach_3") || sourceIds.includes("profile:role_2");
+      expect(citesGap && citesContoso).toBe(false);
+      expect(paragraph.text).not.toMatch(/ROS2[\s\S]*member-identity API/i);
+    }
   });
 
   it("increments versions and keeps only one approved version per type", async () => {

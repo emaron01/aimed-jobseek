@@ -168,33 +168,50 @@ function IdentityVerificationPanel({
         >
           <p className="text-sm text-amber-950">{employerIdentityCopy.unmatched}</p>
           <div className="space-y-1 text-sm text-slate-800">
-            <p className="font-medium">{verification.candidate.name || "Unknown company"}</p>
+            <p className="font-medium">
+              {verification.candidate.name || employerIdentityCopy.unknownCompany}
+            </p>
             {verification.candidate.summary ? <p>{verification.candidate.summary}</p> : null}
             {verification.candidate.whatTheyDo ? (
-              <p>What they do: {verification.candidate.whatTheyDo}</p>
+              <p>
+                {employerIdentityCopy.candidateLabels.whatTheyDo}: {verification.candidate.whatTheyDo}
+              </p>
             ) : null}
-            {verification.candidate.location ? <p>Location: {verification.candidate.location}</p> : null}
+            {verification.candidate.location ? (
+              <p>
+                {employerIdentityCopy.candidateLabels.location}: {verification.candidate.location}
+              </p>
+            ) : null}
             {verification.candidate.sizeOrStage ? (
-              <p>Size or stage: {verification.candidate.sizeOrStage}</p>
+              <p>
+                {employerIdentityCopy.candidateLabels.sizeOrStage}: {verification.candidate.sizeOrStage}
+              </p>
             ) : null}
-            {verification.candidate.website ? <p>Website: {verification.candidate.website}</p> : null}
+            {verification.candidate.website ? (
+              <p>
+                {employerIdentityCopy.candidateLabels.website}: {verification.candidate.website}
+              </p>
+            ) : null}
           </div>
           <ul className="space-y-2" data-testid="employer-identity-checks">
             {verification.checks.map((check) => (
               <li key={check.key} className="text-sm text-slate-800">
-                <span className="font-medium capitalize">{check.key === "sizeOrStage" ? "Size or stage" : check.key}</span>
-                <span className="ml-2 rounded bg-white px-1.5 py-0.5 text-xs font-medium text-slate-800">
-                  {check.status === "MATCH"
-                    ? "Match"
-                    : check.status === "MISMATCH"
-                      ? "Mismatch"
-                      : "Not stated"}
+                <span className="font-medium">
+                  {employerIdentityCopy.checkLabels[check.key]}
                 </span>
+                <span className="ml-2 rounded bg-white px-1.5 py-0.5 text-xs font-medium text-slate-800">
+                  {employerIdentityCopy.status[check.status]}
+                </span>
+                <span className="mt-1 block text-slate-700">{check.reason}</span>
                 {check.postingEvidence ? (
-                  <span className="mt-1 block text-slate-600">Posting: {check.postingEvidence}</span>
+                  <span className="mt-1 block text-slate-600">
+                    {employerIdentityCopy.postingEvidence}: {check.postingEvidence}
+                  </span>
                 ) : null}
                 {check.researchEvidence ? (
-                  <span className="block text-slate-600">Research: {check.researchEvidence}</span>
+                  <span className="block text-slate-600">
+                    {employerIdentityCopy.researchEvidence}: {check.researchEvidence}
+                  </span>
                 ) : null}
               </li>
             ))}

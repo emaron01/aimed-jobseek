@@ -6,6 +6,7 @@ import {
   criterionFlags,
   FEATURE_FLAGS,
   features,
+  employerIdentityCopy,
   icpLabels,
   nounForCount,
   organizationNameFromSeeker,
@@ -48,6 +49,10 @@ describe("vocabulary", () => {
       "Alex Chen's workspace",
     );
     expect(signupCopy.emailLabel).toBe("Email");
+    expect(employerIdentityCopy.notStatedInPosting).toBe("Not stated in the posting");
+    expect(employerIdentityCopy.checkLabels.sizeOrStage).toBe("Size or stage");
+    expect(employerIdentityCopy.status.MATCH).toBe("Match");
+    expect(employerIdentityCopy.reasonTemplates.industryCompare).toContain("{posting}");
   });
 });
 

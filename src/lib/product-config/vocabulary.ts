@@ -194,6 +194,46 @@ export const employerIdentityCopy = Object.freeze({
   rejected: "You rejected this employer identity. Research will not be used.",
   staleDependents:
     "Employer identity could not be confirmed against the posting. Fit and anything that used this research are stale.",
+  checkLabels: Object.freeze({
+    industry: "Industry",
+    location: "Location",
+    sizeOrStage: "Size or stage",
+    website: "Website",
+  }),
+  candidateLabels: Object.freeze({
+    whatTheyDo: "What they do",
+    location: "Location",
+    sizeOrStage: "Size or stage",
+    website: "Website",
+  }),
+  status: Object.freeze({
+    MATCH: "Match",
+    MISMATCH: "Mismatch",
+    NOT_STATED: "Not stated",
+  }),
+  unknownCompany: "Unknown company",
+  postingEvidence: "Posting",
+  researchEvidence: "Research",
+  notStatedInPosting: "Not stated in the posting",
+  notStatedInResearch: "Not stated in the research",
+  kinds: Object.freeze({
+    commercialCompany: "a commercial {industry} company",
+    studentTeam: "a student robotics team",
+    highSchoolTeam: "a high school robotics team",
+  }),
+  reasonTemplates: Object.freeze({
+    industryCompare:
+      "The posting describes {posting}; the research found {research}.",
+    locationCompare:
+      "The posting locates the employer in {posting}; the research found {research}.",
+    sizeCompare: "The posting describes {posting}; the research found {research}.",
+    websiteCompare: "The posting names {posting}; the research found {research}.",
+    industryMatch:
+      "The posting and the research describe the same kind of company ({shared}).",
+    locationMatch: "The posting and the research agree on {shared}.",
+    sizeMatch: "The posting and the research agree on {shared}.",
+    websiteMatch: "The posting and the research name {shared}.",
+  }),
 });
 
 export type CriterionFlagKey = keyof typeof criterionFlags;

@@ -30,6 +30,8 @@ export const applicationAssetConfig = Object.freeze({
   coverLetter: {
     defaultSalutation: "Dear Hiring Manager,",
     paragraphs: { min: 3, max: 4 },
+    mixedTopic:
+      "Each paragraph must have one purpose. Do not combine an acknowledged gap with unrelated experience, or two unrelated experiences.",
   },
   bannedPhrases: [
     "I'm excited to apply",

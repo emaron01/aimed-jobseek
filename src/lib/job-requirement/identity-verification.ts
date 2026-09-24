@@ -18,6 +18,7 @@ export type IdentityCheck = {
   status: IdentityCheckStatus;
   postingEvidence: string | null;
   researchEvidence: string | null;
+  reason: string;
 };
 
 export type IdentityCandidate = {
@@ -40,6 +41,7 @@ const identityCheckSchema = z.object({
   status: z.enum(["MATCH", "MISMATCH", "NOT_STATED"]),
   postingEvidence: z.string().nullable(),
   researchEvidence: z.string().nullable(),
+  reason: z.string().min(1).optional(),
 });
 
 export const identityVerificationSchema = z.object({
@@ -79,13 +81,15 @@ export type ResearchIdentityInput = {
 };
 
 const STUDENT_ORG =
-  /\b(?:ftc|frc|fll|first tech challenge|first robotics|first inspir(?:e|es)|student team|student robotics|grades?\s*9|high[- ]school|community[- ]supported|not (?:a )?commercial)\b/i;
-const COMMERCIAL_EMPLOYMENT =
-  /\b(?:full[- ]time|part[- ]time|warehouse|production|compensation|salary|senior|staff|principal|\$\d)\b/i;
+  /\b(?:ftc|frc|fll|first tech challenge|first robotics|first inspir(?:e|es)|student team|student robotics|grades?\s*\d|high[- ]school|community[- ]supported|not (?:a )?commercial)\b/i;
+const COMMERCIAL_INDUSTRY =
+  /\b(?:warehouse|fulfillment|robotics|robots?|saas|software|healthcare|hospital|logistics|manufacturing|fintech)\b/i;
+const ROLE_OR_SENIORITY =
+  /\b(?:senior|staff|principal|junior|intern|lead|director|manager|engineer|recruiter|title|product engineer)\b/i;
 const STUDENT_SCALE =
   /\b(?:\d+\s+students?|student team|grades?\s*\d|high[- ]school team)\b/i;
 const COMMERCIAL_SCALE =
-  /\b(?:\d[\d,]*\s+employees?|growth[- ]stage|seed|series\s+[a-d]|headcount|enterprise)\b/i;
+  /\b(?:\d[\d,]*\s+employees?|growth[- ]stage|seed|series\s+[a-d]|headcount|enterprise|scale[- ]up)\b/i;
 const EDUCATION_HOST =
   /\b(?:firstinspires\.org|ftc-events|firstinspires|schoolwires|edublogs)\b/i;
 
@@ -149,11 +153,97 @@ function industryTokens(text: string): Set<string> {
       .filter(
         (token) =>
           token.length >= 5 &&
-          !["about", "their", "which", "company", "employer", "location"].includes(
-            token,
-          ),
+          !ROLE_OR_SENIORITY.test(token) &&
+          ![
+            "about",
+            "their",
+            "which",
+            "company",
+            "employer",
+            "location",
+            "experience",
+            "requirements",
+            "preferred",
+            "responsibilities",
+          ].includes(token),
       ),
   );
+}
+
+function fillReason(
+  template: string,
+  vars: Record<string, string>,
+): string {
+  return template.replace(/\{(\w+)\}/g, (_, key: string) => vars[key] ?? "");
+}
+
+function postingIndustryLabel(text: string): string | null {
+  const matches = text.match(new RegExp(COMMERCIAL_INDUSTRY.source, "gi")) ?? [];
+  const unique = [...new Set(matches.map((item) => item.toLowerCase()))].filter(
+    (token) => !ROLE_OR_SENIORITY.test(token),
+  );
+  if (unique.length === 0) return null;
+  const preferredOrder = [
+    "warehouse",
+    "fulfillment",
+    "logistics",
+    "manufacturing",
+    "healthcare",
+    "hospital",
+    "fintech",
+    "saas",
+    "software",
+    "robotics",
+  ];
+  const industry = unique
+    .map((token) => (token === "robots" ? "robotics" : token))
+    .filter((token, index, all) => all.indexOf(token) === index)
+    .sort((left, right) => {
+      const leftRank = preferredOrder.indexOf(left);
+      const rightRank = preferredOrder.indexOf(right);
+      return (leftRank === -1 ? preferredOrder.length : leftRank) -
+        (rightRank === -1 ? preferredOrder.length : rightRank);
+    })
+    .slice(0, 3)
+    .join(" ");
+  return fillReason(employerIdentityCopy.kinds.commercialCompany, { industry });
+}
+
+function researchIndustryLabel(text: string): string | null {
+  if (/\b(?:high[- ]school|grades?\s*\d)\b/i.test(text) && STUDENT_ORG.test(text)) {
+    return employerIdentityCopy.kinds.highSchoolTeam;
+  }
+  if (STUDENT_ORG.test(text)) return employerIdentityCopy.kinds.studentTeam;
+  return postingIndustryLabel(text);
+}
+
+function postingSizeLabel(text: string): string | null {
+  const match = text.match(COMMERCIAL_SCALE);
+  return match ? snippet(match[0]) : null;
+}
+
+function researchSizeLabel(text: string): string | null {
+  const preferred = [
+    /\b(?:\d[\d,]*|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+students?\b/i,
+    /\bhigh[- ]school team\b/i,
+    /\bstudent team\b/i,
+    /\bgrades?\s*\d+(?:\s*[-–]\s*\d+)?\b/i,
+  ];
+  for (const pattern of preferred) {
+    const match = text.match(pattern);
+    if (match) return snippet(match[0]);
+  }
+  return postingSizeLabel(text);
+}
+
+function check(
+  key: IdentityCheckKey,
+  status: IdentityCheckStatus,
+  postingEvidence: string | null,
+  researchEvidence: string | null,
+  reason: string,
+): IdentityCheck {
+  return { key, status, postingEvidence, researchEvidence, reason };
 }
 
 function researchSourceText(sources: unknown): string {
@@ -185,49 +275,74 @@ function checkIndustry(
   posting: string,
   research: string,
 ): IdentityCheck {
-  const postingCommercial = COMMERCIAL_EMPLOYMENT.test(posting);
+  const postingLabel = postingIndustryLabel(posting);
+  const researchLabel = researchIndustryLabel(research);
   const researchStudent = STUDENT_ORG.test(research);
   const postingTokens = industryTokens(posting);
   const researchTokens = industryTokens(research);
   const overlap = [...postingTokens].filter((token) => researchTokens.has(token));
-  if (postingCommercial && researchStudent) {
-    return {
-      key: "industry",
-      status: "MISMATCH",
-      postingEvidence: snippet(posting.match(COMMERCIAL_EMPLOYMENT)?.[0] ?? posting),
-      researchEvidence: snippet(research.match(STUDENT_ORG)?.[0] ?? research),
-    };
+  if (!postingLabel) {
+    return check(
+      "industry",
+      "NOT_STATED",
+      null,
+      researchLabel,
+      employerIdentityCopy.notStatedInPosting,
+    );
   }
-  if (overlap.length >= 2) {
-    return {
-      key: "industry",
-      status: "MATCH",
-      postingEvidence: snippet(overlap.slice(0, 4).join(", ")),
-      researchEvidence: snippet(overlap.slice(0, 4).join(", ")),
-    };
+  if (researchStudent && postingLabel) {
+    return check(
+      "industry",
+      "MISMATCH",
+      postingLabel,
+      researchLabel,
+      fillReason(employerIdentityCopy.reasonTemplates.industryCompare, {
+        posting: postingLabel,
+        research: researchLabel ?? employerIdentityCopy.kinds.studentTeam,
+      }),
+    );
   }
-  if (!research.trim() || researchTokens.size === 0) {
-    return {
-      key: "industry",
-      status: "NOT_STATED",
-      postingEvidence: snippet(posting),
-      researchEvidence: null,
-    };
+  if (overlap.length >= 2 && researchLabel) {
+    return check(
+      "industry",
+      "MATCH",
+      postingLabel,
+      researchLabel,
+      fillReason(employerIdentityCopy.reasonTemplates.industryMatch, {
+        shared: postingLabel,
+      }),
+    );
   }
-  if (postingCommercial && research.trim() && overlap.length === 0 && researchStudent) {
-    return {
-      key: "industry",
-      status: "MISMATCH",
-      postingEvidence: snippet(posting),
-      researchEvidence: snippet(research),
-    };
+  if (!researchLabel) {
+    return check(
+      "industry",
+      "NOT_STATED",
+      postingLabel,
+      null,
+      employerIdentityCopy.notStatedInResearch,
+    );
   }
-  return {
-    key: "industry",
-    status: overlap.length > 0 ? "MATCH" : "NOT_STATED",
-    postingEvidence: snippet(posting),
-    researchEvidence: snippet(research),
-  };
+  if (overlap.length === 0) {
+    return check(
+      "industry",
+      "MISMATCH",
+      postingLabel,
+      researchLabel,
+      fillReason(employerIdentityCopy.reasonTemplates.industryCompare, {
+        posting: postingLabel,
+        research: researchLabel,
+      }),
+    );
+  }
+  return check(
+    "industry",
+    "MATCH",
+    postingLabel,
+    researchLabel,
+    fillReason(employerIdentityCopy.reasonTemplates.industryMatch, {
+      shared: postingLabel,
+    }),
+  );
 }
 
 function checkLocation(
@@ -236,60 +351,102 @@ function checkLocation(
 ): IdentityCheck {
   const postingPlaces = extractLocations(postingLocation);
   const researchPlaces = extractLocations(researchLocation);
-  if (postingPlaces.length === 0 || researchPlaces.length === 0) {
-    return {
-      key: "location",
-      status: "NOT_STATED",
-      postingEvidence: snippet(postingLocation) || null,
-      researchEvidence: snippet(researchLocation) || null,
-    };
+  if (postingPlaces.length === 0) {
+    return check(
+      "location",
+      "NOT_STATED",
+      null,
+      researchPlaces[0] ?? null,
+      employerIdentityCopy.notStatedInPosting,
+    );
+  }
+  if (researchPlaces.length === 0) {
+    return check(
+      "location",
+      "NOT_STATED",
+      postingPlaces[0] ?? null,
+      null,
+      employerIdentityCopy.notStatedInResearch,
+    );
   }
   if (locationsOverlap(postingPlaces, researchPlaces)) {
-    return {
-      key: "location",
-      status: "MATCH",
-      postingEvidence: postingPlaces[0] ?? null,
-      researchEvidence: researchPlaces[0] ?? null,
-    };
+    return check(
+      "location",
+      "MATCH",
+      postingPlaces[0] ?? null,
+      researchPlaces[0] ?? null,
+      fillReason(employerIdentityCopy.reasonTemplates.locationMatch, {
+        shared: postingPlaces[0] ?? "",
+      }),
+    );
   }
-  return {
-    key: "location",
-    status: "MISMATCH",
-    postingEvidence: postingPlaces[0] ?? snippet(postingLocation),
-    researchEvidence: researchPlaces[0] ?? snippet(researchLocation),
-  };
+  return check(
+    "location",
+    "MISMATCH",
+    postingPlaces[0] ?? null,
+    researchPlaces[0] ?? null,
+    fillReason(employerIdentityCopy.reasonTemplates.locationCompare, {
+      posting: postingPlaces[0] ?? "",
+      research: researchPlaces[0] ?? "",
+    }),
+  );
 }
 
 function checkSize(
   posting: string,
   research: string,
 ): IdentityCheck {
-  const postingCommercial =
-    COMMERCIAL_EMPLOYMENT.test(posting) || COMMERCIAL_SCALE.test(posting);
-  const researchStudent = STUDENT_SCALE.test(research) || STUDENT_ORG.test(research);
-  const researchCommercial = COMMERCIAL_SCALE.test(research);
-  if (postingCommercial && researchStudent) {
-    return {
-      key: "sizeOrStage",
-      status: "MISMATCH",
-      postingEvidence: snippet(posting.match(COMMERCIAL_EMPLOYMENT)?.[0] ?? posting),
-      researchEvidence: snippet(research.match(STUDENT_SCALE)?.[0] ?? research.match(STUDENT_ORG)?.[0] ?? research),
-    };
+  const postingLabel = postingSizeLabel(posting);
+  const researchLabel = researchSizeLabel(research);
+  if (!postingLabel) {
+    return check(
+      "sizeOrStage",
+      "NOT_STATED",
+      null,
+      researchLabel,
+      employerIdentityCopy.notStatedInPosting,
+    );
   }
-  if (researchCommercial && postingCommercial) {
-    return {
-      key: "sizeOrStage",
-      status: "MATCH",
-      postingEvidence: snippet(posting.match(COMMERCIAL_EMPLOYMENT)?.[0] ?? posting),
-      researchEvidence: snippet(research.match(COMMERCIAL_SCALE)?.[0] ?? research),
-    };
+  const researchStudent = Boolean(research.match(STUDENT_SCALE));
+  if (researchStudent && researchLabel) {
+    return check(
+      "sizeOrStage",
+      "MISMATCH",
+      postingLabel,
+      researchLabel,
+      fillReason(employerIdentityCopy.reasonTemplates.sizeCompare, {
+        posting: postingLabel,
+        research: researchLabel,
+      }),
+    );
   }
-  return {
-    key: "sizeOrStage",
-    status: "NOT_STATED",
-    postingEvidence: snippet(posting) || null,
-    researchEvidence: snippet(research) || null,
-  };
+  if (COMMERCIAL_SCALE.test(research) && researchLabel) {
+    return check(
+      "sizeOrStage",
+      "MATCH",
+      postingLabel,
+      researchLabel,
+      fillReason(employerIdentityCopy.reasonTemplates.sizeMatch, {
+        shared: postingLabel,
+      }),
+    );
+  }
+  if (!researchLabel) {
+    return check(
+      "sizeOrStage",
+      "NOT_STATED",
+      postingLabel,
+      null,
+      employerIdentityCopy.notStatedInResearch,
+    );
+  }
+  return check(
+    "sizeOrStage",
+    "NOT_STATED",
+    postingLabel,
+    researchLabel,
+    employerIdentityCopy.notStatedInResearch,
+  );
 }
 
 function checkWebsite(
@@ -301,25 +458,38 @@ function checkWebsite(
     corpus([posting, suppliedWebsite]),
   );
   const researchDomains = extractDomains(research);
-  if (postingDomains.length === 0 && researchDomains.length === 0) {
-    return {
-      key: "website",
-      status: "NOT_STATED",
-      postingEvidence: null,
-      researchEvidence: null,
-    };
+  if (postingDomains.length === 0) {
+    return check(
+      "website",
+      "NOT_STATED",
+      null,
+      researchDomains[0] ?? null,
+      employerIdentityCopy.notStatedInPosting,
+    );
+  }
+  if (researchDomains.length === 0 && !EDUCATION_HOST.test(research)) {
+    return check(
+      "website",
+      "NOT_STATED",
+      postingDomains[0] ?? null,
+      null,
+      employerIdentityCopy.notStatedInResearch,
+    );
   }
   const researchEducation =
     researchDomains.some((domain) => EDUCATION_HOST.test(domain)) ||
     EDUCATION_HOST.test(research);
   const overlap = researchDomains.find((domain) => postingDomains.includes(domain));
   if (overlap) {
-    return {
-      key: "website",
-      status: "MATCH",
-      postingEvidence: postingDomains[0] ?? null,
-      researchEvidence: overlap,
-    };
+    return check(
+      "website",
+      "MATCH",
+      postingDomains[0] ?? null,
+      overlap,
+      fillReason(employerIdentityCopy.reasonTemplates.websiteMatch, {
+        shared: overlap,
+      }),
+    );
   }
   const suppliedDomains = extractDomains(suppliedWebsite ?? "");
   if (
@@ -327,41 +497,52 @@ function checkWebsite(
     researchDomains.length > 0 &&
     !researchDomains.some((domain) => suppliedDomains.includes(domain))
   ) {
-    return {
-      key: "website",
-      status: "MISMATCH",
-      postingEvidence: suppliedDomains[0] ?? null,
-      researchEvidence: researchDomains[0] ?? null,
-    };
+    return check(
+      "website",
+      "MISMATCH",
+      suppliedDomains[0] ?? null,
+      researchDomains[0] ?? null,
+      fillReason(employerIdentityCopy.reasonTemplates.websiteCompare, {
+        posting: suppliedDomains[0] ?? "",
+        research: researchDomains[0] ?? "",
+      }),
+    );
   }
   if ((postingDomains.length > 0 || suppliedDomains.length > 0) && researchEducation) {
-    return {
-      key: "website",
-      status: "MISMATCH",
-      postingEvidence: postingDomains[0] ?? suppliedDomains[0] ?? null,
-      researchEvidence: snippet(researchDomains[0] ?? research),
-    };
+    const researchHost = researchDomains[0] ?? snippet(research) ?? "";
+    return check(
+      "website",
+      "MISMATCH",
+      postingDomains[0] ?? suppliedDomains[0] ?? null,
+      snippet(researchDomains[0] ?? research),
+      fillReason(employerIdentityCopy.reasonTemplates.websiteCompare, {
+        posting: postingDomains[0] ?? suppliedDomains[0] ?? "",
+        research: researchHost,
+      }),
+    );
   }
-  return {
-    key: "website",
-    status: "NOT_STATED",
-    postingEvidence: postingDomains[0] ?? null,
-    researchEvidence: researchDomains[0] ?? null,
-  };
+  return check(
+    "website",
+    "NOT_STATED",
+    postingDomains[0] ?? null,
+    researchDomains[0] ?? null,
+    employerIdentityCopy.notStatedInResearch,
+  );
 }
 
 export function verifyEmployerIdentity(input: {
   posting: PostingIdentityInput;
   research: ResearchIdentityInput;
 }): IdentityVerification {
-  const postingText = corpus([
+  const postingBusinessText = corpus([
     input.posting.rawText,
-    input.posting.title,
     input.posting.companyName,
     input.posting.location,
-    input.posting.employmentType,
-    input.posting.seniority,
     input.posting.compensationRange,
+  ]);
+  const postingWebsiteText = corpus([
+    input.posting.rawText,
+    input.posting.companyName,
     input.posting.suppliedEmployerWebsite,
   ]);
   const researchText = corpus([
@@ -374,14 +555,14 @@ export function verifyEmployerIdentity(input: {
     researchSourceText(input.research.researchSources),
   ]);
   const checks: IdentityCheck[] = [
-    checkIndustry(postingText, researchText),
+    checkIndustry(postingBusinessText, researchText),
     checkLocation(
       corpus([input.posting.location, input.posting.rawText]),
       corpus([input.research.location, researchText]),
     ),
-    checkSize(postingText, researchText),
+    checkSize(postingBusinessText, researchText),
     checkWebsite(
-      postingText,
+      postingWebsiteText,
       researchText,
       input.posting.suppliedEmployerWebsite,
     ),
@@ -403,12 +584,45 @@ export function verifyEmployerIdentity(input: {
   };
 }
 
+function hydrateCheck(check: z.infer<typeof identityCheckSchema>): IdentityCheck {
+  return {
+    ...check,
+    reason: check.reason?.trim() || fallbackCheckReason(check),
+  };
+}
+
+function fallbackCheckReason(check: {
+  status: IdentityCheckStatus;
+  postingEvidence: string | null;
+  researchEvidence: string | null;
+}): string {
+  if (check.status === "NOT_STATED" && !check.postingEvidence) {
+    return employerIdentityCopy.notStatedInPosting;
+  }
+  if (check.status === "NOT_STATED") {
+    return employerIdentityCopy.notStatedInResearch;
+  }
+  if (check.status === "MATCH") {
+    return fillReason(employerIdentityCopy.reasonTemplates.industryMatch, {
+      shared: check.postingEvidence ?? check.researchEvidence ?? "",
+    });
+  }
+  return fillReason(employerIdentityCopy.reasonTemplates.industryCompare, {
+    posting: check.postingEvidence ?? employerIdentityCopy.notStatedInPosting,
+    research: check.researchEvidence ?? employerIdentityCopy.notStatedInResearch,
+  });
+}
+
 export function parseIdentityVerification(
   value: unknown,
 ): IdentityVerification | null {
   if (value == null) return null;
   const parsed = identityVerificationSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
+  if (!parsed.success) return null;
+  return {
+    ...parsed.data,
+    checks: parsed.data.checks.map(hydrateCheck),
+  };
 }
 
 export function mayUseEmployerResearch(input: {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { NORMAL_JOB_POSTING } from "@/lib/job-requirement/fixtures";
+import { employerIdentityCopy } from "@/lib/product-config";
 import {
   mayUseEmployerResearch,
   usableEmployerResearch,
@@ -75,7 +76,7 @@ describe("employer identity verification", () => {
     );
     expect(
       verification.checks.find((check) => check.key === "sizeOrStage")?.status,
-    ).toBe("MISMATCH");
+    ).toBe("NOT_STATED");
     expect(verification.checks.find((check) => check.key === "website")?.status).toBe(
       "MISMATCH",
     );
@@ -92,6 +93,47 @@ describe("employer identity verification", () => {
         { identityAmbiguous: false, companySummary: STUDENT_TEAM_RESEARCH.companySummary },
       ),
     ).toBeNull();
+  });
+
+  it("gives the student-team fixture like-with-like reasons a seeker can understand", () => {
+    const verification = verifyEmployerIdentity({
+      posting: fixturePosting(),
+      research: STUDENT_TEAM_RESEARCH,
+    });
+    const byKey = Object.fromEntries(
+      verification.checks.map((check) => [check.key, check]),
+    );
+    expect(byKey.industry?.reason).toBe(
+      employerIdentityCopy.reasonTemplates.industryCompare
+        .replace(
+          "{posting}",
+          employerIdentityCopy.kinds.commercialCompany.replace(
+            "{industry}",
+            "warehouse robotics",
+          ),
+        )
+        .replace("{research}", employerIdentityCopy.kinds.highSchoolTeam),
+    );
+    expect(byKey.location?.reason).toContain("austin");
+    expect(byKey.location?.reason).toContain("nevada city");
+    expect(byKey.sizeOrStage?.status).toBe("NOT_STATED");
+    expect(byKey.sizeOrStage?.reason).toBe(employerIdentityCopy.notStatedInPosting);
+    expect(byKey.sizeOrStage?.postingEvidence).toBeNull();
+    expect(byKey.website?.reason).toContain("firstinspires");
+    const evidence = verification.checks.flatMap((check) => [
+      check.postingEvidence,
+      check.researchEvidence,
+      check.reason,
+    ]);
+    for (const text of evidence) {
+      if (!text) continue;
+      expect(text).not.toMatch(/\bSenior\b/i);
+      expect(text).not.toMatch(/Product Engineer/i);
+      expect(text).not.toMatch(/Director of Engineering/i);
+      expect(text).not.toMatch(/Technical Recruiter/i);
+    }
+    expect(byKey.industry?.reason).toMatch(/commercial/i);
+    expect(byKey.industry?.reason).toMatch(/high school robotics team/i);
   });
 
   it("does not let downstream generation use unconfirmed mismatched research", () => {
