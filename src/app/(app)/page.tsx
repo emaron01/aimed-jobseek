@@ -7,6 +7,7 @@ import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { getCurrentUser } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import { getHomeWorkflow } from "@/lib/workflow/home";
+import { ApplicationRemindersPanel } from "@/components/ApplicationRemindersPanel";
 import { DueContactsPanel } from "@/components/DueContactsPanel";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
 import { canViewAllRepWork } from "@/lib/work/ownership";
@@ -46,7 +47,7 @@ export default async function DashboardPage({
       <div>
         <PageHeader
           title="Home"
-          description={`Organization-scoped overview of ${vocab.list.plural}, ${vocab.contact.plural}, and ${vocab.campaign.plural}.`}
+          description={`Organization-scoped overview of ${vocab.contact.plural} and ${vocab.campaign.plural}.`}
         />
         <TenantMissing />
       </div>
@@ -64,7 +65,7 @@ export default async function DashboardPage({
     <div className="mx-auto w-full max-w-6xl">
       <PageHeader
         title="Home"
-        description={`Work ${vocab.campaign.plural} for ${organization.name} from qualification through sending.`}
+        description={`Track ${vocab.campaign.plural} for ${organization.name}: apply through the employer portal, then write outreach when you find people on the Hiring Team.`}
         actions={
           <>
             <ShowArchivedToggle
@@ -90,7 +91,8 @@ export default async function DashboardPage({
         />
       </div>
 
-      {workflow.dueByCampaign.length > 0 ? (
+      <ApplicationRemindersPanel reminders={workflow.applicationReminders} />
+      {anyListFeatureEnabled() && workflow.dueByCampaign.length > 0 ? (
         <DueContactsPanel dueByCampaign={workflow.dueByCampaign} />
       ) : null}
 
@@ -116,7 +118,7 @@ export default async function DashboardPage({
       </div>
       {!workflow.setupComplete ? (
         <p className="mb-4 text-sm text-slate-500">
-          {vocab.campaign.Singular} creation unlocks after at least one {vocab.product.singular} is approved with {vocab.icp.aSingular} that has criteria. Voice and email connection are
+          {vocab.campaign.Singular} creation unlocks after at least one {vocab.product.singular} is approved with {vocab.icp.aSingular} that has criteria. Voice samples are
           optional. Existing {vocab.campaign.plural} stay available.
         </p>
       ) : null}
@@ -129,7 +131,7 @@ export default async function DashboardPage({
           </h3>
           <p className="mt-1 text-sm text-slate-600">
             {workflow.setupComplete
-              ? `Select the setup you already approved, then attach ${vocab.list.aSingular}.`
+              ? `Select the setup you already approved, then paste a job posting.`
               : `Finish ${vocab.product.singular} setup to create ${vocab.campaign.aSingular}.`}
           </p>
           {workflow.setupComplete ? (

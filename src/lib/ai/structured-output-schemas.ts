@@ -27,6 +27,9 @@ import { applicationSummaryGuidanceSchema } from "@/lib/application-summary/cont
 import {
   assetClaimValidationSchema,
   coverLetterAssetContentSchema,
+  emailAssetContentSchema,
+  linkedinInmailAssetContentSchema,
+  linkedinNoteAssetContentSchema,
   resumeAssetContentSchema,
 } from "@/lib/application-assets/contract";
 
@@ -167,6 +170,21 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   coverLetterAsset: {
     schemaName: "application_cover_letter",
     schema: coverLetterAssetContentSchema,
+    usageOperations: ["APPLICATION_ASSET_GENERATION"],
+  },
+  outreachEmailAsset: {
+    schemaName: "application_outreach_email",
+    schema: emailAssetContentSchema,
+    usageOperations: ["APPLICATION_ASSET_GENERATION"],
+  },
+  outreachLinkedinNoteAsset: {
+    schemaName: "application_outreach_linkedin_note",
+    schema: linkedinNoteAssetContentSchema,
+    usageOperations: ["APPLICATION_ASSET_GENERATION"],
+  },
+  outreachLinkedinInmailAsset: {
+    schemaName: "application_outreach_linkedin_inmail",
+    schema: linkedinInmailAssetContentSchema,
     usageOperations: ["APPLICATION_ASSET_GENERATION"],
   },
   applicationAssetClaimValidation: {

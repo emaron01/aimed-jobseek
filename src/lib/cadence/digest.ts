@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { sendTransactionalEmail } from "@/lib/transactional-email/send-service";
 import { ensureTransactionalTemplatesSeeded } from "@/lib/transactional-email/seed";
+import { countDueApplicationReminders } from "@/lib/cadence/application-reminders";
 import { countDueContactsForUser } from "@/lib/cadence/dashboard";
 
 const WEEKDAY_NAMES = [
@@ -256,10 +257,17 @@ export async function runCadenceDigestJob(
       }
     }
 
-    const dueCount = await countDueContactsForUser({
-      organizationId: organization.id,
-      userId: user.id,
-    });
+    const [contactDueCount, applicationDueCount] = await Promise.all([
+      countDueContactsForUser({
+        organizationId: organization.id,
+        userId: user.id,
+      }),
+      countDueApplicationReminders({
+        organizationId: organization.id,
+        userId: user.id,
+      }),
+    ]);
+    const dueCount = contactDueCount + applicationDueCount;
     if (dueCount === 0) {
       bumpSkip(result, "no_due_contacts", {
         userId: user.id,

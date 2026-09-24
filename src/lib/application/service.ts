@@ -23,6 +23,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { vocab } from "@/lib/product-config";
 import { normalizeCompanyName, parseStringArray } from "@/lib/research";
+import { ingestNamedJobContacts } from "@/lib/application/contacts";
 import { syncApplicationHiringTeam } from "@/lib/hiring-team/build";
 import { TenantError } from "@/lib/tenant/errors";
 import {
@@ -327,6 +328,12 @@ export async function attachParsedPosting(input: {
         organizationId: input.organizationId,
         campaignId: input.campaignId,
       });
+      await ingestNamedJobContacts({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        namedContacts: input.parsed.namedContacts,
+        companyName: input.parsed.companyName,
+      });
       return;
     }
     if (!companyId) {
@@ -355,11 +362,23 @@ export async function attachParsedPosting(input: {
       icpId: input.icpId,
       companyId,
     });
+    await ingestNamedJobContacts({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      namedContacts: input.parsed.namedContacts,
+      companyName: input.parsed.companyName,
+    });
     return;
   }
   await syncApplicationHiringTeam({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
+  });
+  await ingestNamedJobContacts({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    namedContacts: input.parsed.namedContacts,
+    companyName: input.parsed.companyName,
   });
 }
 
@@ -395,6 +414,7 @@ function jobRequirementData(
     requiredItems: jsonValue(parsed.requiredItems),
     preferredItems: jsonValue(parsed.preferredItems),
     scorecardJson: jsonValue(parsed.scorecard),
+    namedContactsJson: jsonValue(parsed.namedContacts),
     employerDisposition: employer.disposition,
     employerSkipReason: employer.reason,
     company: employer.companyId

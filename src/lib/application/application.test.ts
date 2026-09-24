@@ -87,6 +87,37 @@ describe("job requirement parser", () => {
     const again = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
     expect(again.scorecard.mission?.id).toBe(parsed.scorecard.mission?.id);
   });
+
+  it("keeps a recruiter named in the posting as FACT", () => {
+    expect(parsed.namedContacts).toEqual([
+      {
+        firstName: "Priya",
+        lastName: "Shah",
+        title: "Technical Recruiter",
+        email: "priya.shah@acmerobotics.example",
+        phone: "512-555-0148",
+      },
+    ]);
+    const invented = normalizeParsedJobRequirement(
+      {
+        ...NORMAL_JOB_MODEL,
+        namedContacts: [
+          ...NORMAL_JOB_MODEL.namedContacts,
+          {
+            firstName: "Invented",
+            lastName: "Person",
+            title: "Recruiter",
+            email: "invented@example.test",
+            phone: null,
+          },
+        ],
+      },
+      NORMAL_JOB_POSTING,
+    );
+    expect(invented.namedContacts.map((row) => row.firstName)).not.toContain(
+      "Invented",
+    );
+  });
 });
 
 describe("employer identity", () => {

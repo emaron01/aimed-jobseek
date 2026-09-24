@@ -37,6 +37,9 @@ vi.mock("@/lib/mailbox/data", () => ({
 vi.mock("@/lib/cadence/dashboard", () => ({
   getDueContactsForUser: vi.fn(async () => []),
 }));
+vi.mock("@/lib/cadence/application-reminders", () => ({
+  getDueApplicationReminders: vi.fn(async () => []),
+}));
 
 import { getHomeWorkflow } from "@/lib/workflow/home";
 

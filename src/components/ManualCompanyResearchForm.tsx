@@ -123,7 +123,7 @@ export function ManualCompanyResearchForm({
         defaultValue={listToText(defaults.relevantTechnologies)}
       />
       <Field
-        label={`${vocab.buyingSignal.TitlePlural} (one per line)`}
+        label="Hiring and growth signals (one per line)"
         name="buyingSignals"
         as="textarea"
         defaultValue={listToText(defaults.buyingSignals)}

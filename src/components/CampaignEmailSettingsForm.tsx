@@ -98,7 +98,7 @@ export function CampaignEmailSettingsForm({
       </div>
 
       <SubmitButton disabled={pending}>
-        {pending ? "Saving…" : "Save email settings"}
+        {pending ? "Saving…" : "Save application guidance"}
       </SubmitButton>
     </form>
   );

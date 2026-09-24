@@ -187,7 +187,9 @@ export async function renderApplicationAssetDocx(
         children:
           content.type === "RESUME"
             ? resumeChildren(content)
-            : coverLetterChildren(content),
+            : content.type === "COVER_LETTER"
+              ? coverLetterChildren(content)
+              : [],
       },
     ],
   });

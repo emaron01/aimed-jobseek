@@ -22,7 +22,7 @@ export const COMPANY_RESEARCH_FIELD_LABELS: Record<
   string
 > = {
   companySummary: "Company summary",
-  whatTheySell: "What they sell",
+  whatTheySell: "What they make or do",
   customerTypes: "Customer types",
   primaryMarkets: "Primary markets",
   businessModel: "Business model",
@@ -30,7 +30,7 @@ export const COMPANY_RESEARCH_FIELD_LABELS: Record<
   aovReasoning: "Deal size reasoning",
   companySizeContext: "Company size",
   relevantTechnologies: "Technologies",
-  buyingSignals: "Buying signals",
+  buyingSignals: "Hiring and growth signals",
   riskSignals: "Risk signals",
 };
 

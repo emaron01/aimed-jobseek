@@ -1,4 +1,4 @@
-import { anyListFeatureEnabled, vocab } from "@/lib/product-config";
+import { anyListFeatureEnabled, features, vocab } from "@/lib/product-config";
 /**
  * Pure menu/nav model for authenticated users.
  * Platform-only SUPER_ADMIN (no Organization) is a first-class case.
@@ -220,7 +220,9 @@ export function buildSidebarNavItems(input: {
       label: "Your Voice",
       separatorBefore: true,
     },
-    { href: "/settings/email", label: "Email Connection" },
+    ...(features.emailConnection
+      ? [{ href: "/settings/email", label: "Email Connection" }]
+      : []),
     { href: "/settings", label: "Settings" },
     { href: "/settings/account", label: "Account" },
   ];

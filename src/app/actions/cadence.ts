@@ -11,6 +11,11 @@ import {
   policyToCumulativeDisplay,
   validateCumulativeCadenceInput,
 } from "@/lib/cadence/display";
+import {
+  loadApplicationReminderPolicy,
+  parseOptionalReminderDay,
+  validateApplicationReminderInput,
+} from "@/lib/cadence/application-reminders";
 import { ensureOrganizationCadencePolicy } from "@/lib/cadence/defaults";
 import { recomputeCampaignContactCadenceBatch } from "@/lib/cadence/recompute";
 import {
@@ -220,9 +225,63 @@ export async function bulkGenerateDueForCampaignAction(
 }
 
 export async function loadCadencePolicyForSettings(organizationId: string) {
-  const policy = await ensureOrganizationCadencePolicy(organizationId);
+  const [policy, reminders] = await Promise.all([
+    ensureOrganizationCadencePolicy(organizationId),
+    loadApplicationReminderPolicy(organizationId),
+  ]);
   return {
     policy,
     display: policyToCumulativeDisplay(policy),
+    reminders,
   };
+}
+
+export async function updateApplicationReminderPolicyAction(
+  _prev: CadenceActionResult | null,
+  formData: FormData,
+): Promise<CadenceActionResult> {
+  try {
+    const { organization } = await requireOrgAdmin();
+    const reminderDay3 = parseOptionalReminderDay(formData.get("reminderDay3"));
+    const reminderDay7 = parseOptionalReminderDay(formData.get("reminderDay7"));
+    const reminderEmail4Days = parseOptionalReminderDay(
+      formData.get("reminderEmail4Days"),
+    );
+    const reminderRepeatDays = parseOptionalReminderDay(
+      formData.get("reminderRepeatDays"),
+    );
+    if (
+      Number.isNaN(reminderDay3) ||
+      Number.isNaN(reminderDay7) ||
+      Number.isNaN(reminderEmail4Days) ||
+      Number.isNaN(reminderRepeatDays)
+    ) {
+      return {
+        ok: false,
+        message:
+          "Reminder days must be blank or a whole number of days of at least 1.",
+      };
+    }
+    const reminders = {
+      reminderDay3,
+      reminderDay7,
+      reminderEmail4Days,
+      reminderRepeatDays,
+    };
+    const validation = validateApplicationReminderInput(reminders);
+    if (validation) return { ok: false, message: validation };
+    await prisma.organizationCadencePolicy.upsert({
+      where: { organizationId: organization.id },
+      update: reminders,
+      create: {
+        organizationId: organization.id,
+        ...reminders,
+      },
+    });
+    revalidatePath("/settings/cadence");
+    revalidatePath("/");
+    return { ok: true, message: "Reminder settings saved." };
+  } catch (error) {
+    return { ok: false, message: toSafeCadenceError(error) };
+  }
 }

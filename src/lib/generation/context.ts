@@ -18,7 +18,8 @@ export type GenerationSource = {
     | "JOB_REQUIREMENT"
     | "COMPANY_RESEARCH"
     | "ASSESSMENT"
-    | "PERSONA";
+    | "PERSONA"
+    | "APPLICATION";
   url: string | null;
 };
 
@@ -52,6 +53,7 @@ export type ApplicationGenerationContext = {
     name: string;
     ownerUserId: string;
     applicationGuidance: string | null;
+    appliedAt: Date | null;
   };
   profile: CandidateProfile | null;
   requirement: {
@@ -124,6 +126,7 @@ export type ApplicationGenerationContext = {
     sampleText: string;
     createdAt: Date;
   }>;
+  seekerAnswers: Array<{ id: string; text: string }>;
   sources: GenerationSource[];
 };
 
@@ -185,6 +188,11 @@ export async function loadApplicationGenerationContext(
           statements: {
             where: { status: "APPROVED" },
             orderBy: { approvedAt: "asc" },
+          },
+          turns: {
+            where: { speaker: "SEEKER", skipped: false },
+            orderBy: { sequence: "asc" },
+            select: { id: true, body: true },
           },
         },
       },
@@ -278,6 +286,14 @@ export async function loadApplicationGenerationContext(
       url: requirement.postingUrl,
     });
   }
+  if (campaign.appliedAt) {
+    addSource(sources, {
+      id: "application:status",
+      text: `Applied through the employer portal on ${campaign.appliedAt.toISOString().slice(0, 10)}.`,
+      category: "APPLICATION",
+      url: null,
+    });
+  }
   for (const assessment of campaign.consultationSession?.assessments ?? []) {
     addSource(sources, {
       id: `assessment:${assessment.targetKey}`,
@@ -343,6 +359,7 @@ export async function loadApplicationGenerationContext(
       name: campaign.name,
       ownerUserId: campaign.ownerUserId,
       applicationGuidance: campaign.emailGuidance,
+      appliedAt: campaign.appliedAt,
     },
     profile: parsedProfile.ok ? parsedProfile.profile : null,
     requirement: requirement
@@ -425,6 +442,9 @@ export async function loadApplicationGenerationContext(
       resumeBulletApprovedAt: story.resumeBulletApprovedAt,
     })),
     voiceSamples,
+    seekerAnswers: (campaign.consultationSession?.turns ?? [])
+      .map((turn) => ({ id: turn.id, text: turn.body.trim() }))
+      .filter((turn) => turn.text.length > 0),
     sources,
   };
 }

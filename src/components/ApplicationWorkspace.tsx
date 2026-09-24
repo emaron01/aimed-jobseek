@@ -16,6 +16,12 @@ import {
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { ConsultationSection } from "@/components/ConsultationSection";
 import { ApplicationAssetsSection } from "@/components/ApplicationAssetsSection";
+import {
+  ApplicationAppliedSection,
+  ApplicationContactsSection,
+  ApplicationOutreachSection,
+} from "@/components/ApplicationOutreachSections";
+import { isOutreachAssetType } from "@/lib/product-config";
 import { HiringTeamDisclosureGroup } from "@/components/HiringTeamDisclosureGroup";
 import { displayedFitBucket, fitSignalLabels } from "@/lib/application/fit";
 import type { ApplicationFitOutcome } from "@/lib/application/fit";
@@ -113,6 +119,21 @@ export async function ApplicationWorkspace({
           },
           applicationFit: true,
           product: { select: { profileJson: true } },
+          appliedAt: true,
+          contacts: {
+            include: {
+              contact: true,
+              chosenPersona: {
+                select: { id: true, name: true, suggestionKey: true },
+              },
+            },
+            orderBy: { createdAt: "asc" },
+          },
+          hiringTeamRoles: {
+            where: { archivedAt: null },
+            orderBy: { createdAt: "asc" },
+            select: { id: true, name: true, suggestionKey: true },
+          },
           applicationAssets: {
             orderBy: [{ type: "asc" }, { version: "desc" }],
           },
@@ -336,6 +357,26 @@ export async function ApplicationWorkspace({
       organizationId={organizationId}
       canEdit={canEdit}
     />
+    <ApplicationAppliedSection
+      campaignId={requirement.campaignId}
+      canEdit={canEdit}
+      appliedAt={requirement.campaign.appliedAt?.toISOString() ?? null}
+    />
+    <ApplicationContactsSection
+      campaignId={requirement.campaignId}
+      canEdit={canEdit}
+      roles={requirement.campaign.hiringTeamRoles}
+      contacts={requirement.campaign.contacts.map((row) => ({
+        contactId: row.contact.id,
+        firstName: row.contact.firstName,
+        lastName: row.contact.lastName,
+        title: row.contact.title,
+        email: row.contact.email,
+        linkedinUrl: row.contact.linkedinUrl,
+        personaId: row.chosenPersonaId,
+        personaName: row.chosenPersona?.name ?? null,
+      }))}
+    />
     <ApplicationAssetsSection
       campaignId={requirement.campaignId}
       canEdit={canEdit}
@@ -350,16 +391,59 @@ export async function ApplicationWorkspace({
             }))
           : []
       }
-      assets={requirement.campaign.applicationAssets.map((asset) => ({
-        id: asset.id,
-        type: asset.type,
-        version: asset.version,
-        status: asset.status,
-        content: asset.contentJson,
-        guidance: asset.guidance,
-        promptVersion: asset.promptVersion,
-        createdAt: asset.createdAt.toISOString(),
+      assets={requirement.campaign.applicationAssets
+        .filter(
+          (
+            asset,
+          ): asset is typeof asset & { type: "RESUME" | "COVER_LETTER" } =>
+            asset.type === "RESUME" || asset.type === "COVER_LETTER",
+        )
+        .map((asset) => ({
+          id: asset.id,
+          type: asset.type,
+          version: asset.version,
+          status: asset.status,
+          content: asset.contentJson,
+          guidance: asset.guidance,
+          promptVersion: asset.promptVersion,
+          createdAt: asset.createdAt.toISOString(),
+        }))}
+    />
+    <ApplicationOutreachSection
+      campaignId={requirement.campaignId}
+      canEdit={canEdit}
+      approvedResumeId={
+        requirement.campaign.applicationAssets.find(
+          (asset) => asset.type === "RESUME" && asset.status === "APPROVED",
+        )?.id ?? null
+      }
+      roles={requirement.campaign.hiringTeamRoles}
+      contacts={requirement.campaign.contacts.map((row) => ({
+        contactId: row.contact.id,
+        firstName: row.contact.firstName,
+        lastName: row.contact.lastName,
+        title: row.contact.title,
+        email: row.contact.email,
+        linkedinUrl: row.contact.linkedinUrl,
+        personaId: row.chosenPersonaId,
+        personaName: row.chosenPersona?.name ?? null,
       }))}
+      assets={requirement.campaign.applicationAssets
+        .filter((asset): asset is typeof asset & {
+          type: "EMAIL" | "LINKEDIN_CONNECTION_NOTE" | "LINKEDIN_INMAIL";
+        } => isOutreachAssetType(asset.type))
+        .map((asset) => ({
+          id: asset.id,
+          type: asset.type,
+          version: asset.version,
+          status: asset.status,
+          personaId: asset.personaId,
+          contactId: asset.contactId,
+          purpose: asset.purpose,
+          sentAt: asset.sentAt?.toISOString() ?? null,
+          emailLength: asset.emailLength,
+          content: asset.contentJson,
+        }))}
     />
     </>
   );

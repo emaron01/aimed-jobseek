@@ -145,9 +145,7 @@ describe("buildSidebarNavItems", () => {
       isPlatformOperator: false,
     });
     expect(items.some((i) => i.href === "/")).toBe(true);
-    expect(items.some((i) => i.href === "/lists" && i.label === vocab.list.Plural)).toBe(
-      true,
-    );
+    expect(items.some((i) => i.href === "/lists")).toBe(false);
     expect(
       items.some((i) => i.href === "/contacts" && i.label === vocab.contact.Plural),
     ).toBe(true);
@@ -165,11 +163,9 @@ describe("buildSidebarNavItems", () => {
       "/",
       "/campaigns",
       "/contacts",
-      "/lists",
       "/products",
       "/icps",
       "/settings/voice",
-      "/settings/email",
       "/settings",
       "/settings/account",
     ]);

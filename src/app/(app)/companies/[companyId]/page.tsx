@@ -50,13 +50,13 @@ export default async function CompanyResearchPage({ params }: PageProps) {
       <div data-print-hide>
         <PageHeader
           title="Company briefing"
-          description={`${vocab.prospect.Singular} intelligence for meeting prep. ${vocab.product.Singular}/${vocab.icp.singular} fit is scored separately.`}
+          description={`Employer research for this ${vocab.campaign.singular}. ${vocab.product.Singular}/${vocab.icp.singular} fit is scored separately.`}
           actions={
             <Link
-              href="/lists"
+              href="/campaigns"
               className={SECONDARY_BUTTON_CLASS}
             >
-              Back to {vocab.list.plural}
+              Back to {vocab.campaign.plural}
             </Link>
           }
         />

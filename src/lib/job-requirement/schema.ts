@@ -23,6 +23,17 @@ export const jobRequirementAiResultSchema = z.object({
     outcomes: z.array(scorecardItemSchema),
     competencies: z.array(scorecardItemSchema),
   }),
+  namedContacts: z
+    .array(
+      z.object({
+        firstName: z.string().nullable(),
+        lastName: z.string().nullable(),
+        title: z.string().nullable(),
+        email: z.string().nullable(),
+        phone: z.string().nullable(),
+      }),
+    )
+    .default([]),
 });
 
 export type JobRequirementAiResult = z.infer<typeof jobRequirementAiResultSchema>;

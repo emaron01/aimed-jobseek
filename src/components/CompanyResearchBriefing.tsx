@@ -189,7 +189,7 @@ export function CompanyResearchBriefing({
           </ResearchReadSection>
 
           <ResearchReadSection
-            title="What they sell"
+            title="What they make or do"
             empty={!defaults.whatTheySell}
           >
             {defaults.whatTheySell ? (
@@ -202,7 +202,7 @@ export function CompanyResearchBriefing({
           </ResearchReadSection>
 
           <ResearchReadSection
-            title="Who they sell to"
+            title="Who they serve"
             empty={customerTypes.length === 0 && primaryMarkets.length === 0}
           >
             {customerTypes.length > 0 ? (

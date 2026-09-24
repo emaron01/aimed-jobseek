@@ -51,7 +51,7 @@ export async function updateCampaignEmailSettingsAction(
       message:
         error instanceof TenantError
           ? error.message
-          : "Unable to update email settings. Please try again.",
+          : "Unable to update application guidance. Please try again.",
       values: parsed.values,
     };
   }

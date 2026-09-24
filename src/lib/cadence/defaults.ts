@@ -9,6 +9,10 @@ export const DEFAULT_CADENCE_POLICY = {
   day4IntervalDays: 15,
   repeatIntervalDays: 30,
   maxSequenceEmails: 4,
+  reminderDay3: 3,
+  reminderDay7: 7,
+  reminderEmail4Days: null,
+  reminderRepeatDays: null,
 } as const;
 
 export type CadencePolicyValues = Pick<
@@ -36,6 +40,10 @@ export async function ensureOrganizationCadencePolicy(
       day4IntervalDays: true,
       repeatIntervalDays: true,
       maxSequenceEmails: true,
+      reminderDay3: true,
+      reminderDay7: true,
+      reminderEmail4Days: true,
+      reminderRepeatDays: true,
     },
   });
   return row;

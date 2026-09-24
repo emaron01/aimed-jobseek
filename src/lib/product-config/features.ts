@@ -26,14 +26,16 @@ export const FEATURE_FLAGS = [
   "enterprisePlanDisplay",
   /** Referral program entry points. */
   "referralProgram",
+  /** Microsoft 365 connected-mailbox settings and send path. */
+  "emailConnection",
 ] as const;
 
 export type FeatureFlag = (typeof FEATURE_FLAGS)[number];
 
 export const features: Readonly<Record<FeatureFlag, boolean>> = Object.freeze({
-  listImport: true,
-  listBulkValidation: true,
-  listBulkScoring: true,
+  listImport: false,
+  listBulkValidation: false,
+  listBulkScoring: false,
   teamSeats: false,
   teamInvites: false,
   teamRoles: false,
@@ -42,6 +44,7 @@ export const features: Readonly<Record<FeatureFlag, boolean>> = Object.freeze({
   teamPlanDisplay: false,
   enterprisePlanDisplay: false,
   referralProgram: true,
+  emailConnection: false,
 });
 
 /** True when any list feature is visible (drives the Lists nav entry). */

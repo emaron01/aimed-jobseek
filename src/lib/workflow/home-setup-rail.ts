@@ -8,7 +8,7 @@ import {
   PRODUCT_READINESS_BLOCKERS,
   type ProductCampaignReadiness,
 } from "@/lib/workflow/product-campaign-readiness";
-import { countedNoun, vocab } from "@/lib/product-config";
+import { countedNoun, features, vocab } from "@/lib/product-config";
 
 export const HOME_SETUP_STEP_KEYS = [
   "voice",
@@ -146,14 +146,18 @@ export function buildHomeSetupRail(input: {
           ? `No ${vocab.icp.plural} yet`
           : countedNoun(input.icpCount, vocab.icp),
     },
-    {
-      number: 4,
-      key: "email",
-      label: "Email connection",
-      href: "/settings/email",
-      completed: input.emailConnected,
-      detail: emailDetail,
-    },
+    ...(features.emailConnection
+      ? [
+          {
+            number: 4,
+            key: "email" as const,
+            label: "Email connection",
+            href: "/settings/email",
+            completed: input.emailConnected,
+            detail: emailDetail,
+          },
+        ]
+      : []),
   ];
   return steps;
 }

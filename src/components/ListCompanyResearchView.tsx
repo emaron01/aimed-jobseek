@@ -119,7 +119,7 @@ export function ListCompanyResearchView({
                   <dl className="grid gap-2 text-sm sm:grid-cols-2">
                     {research.whatTheySell?.trim() ? (
                       <div className="sm:col-span-2">
-                        <dt className="font-medium text-slate-700">What they sell</dt>
+                        <dt className="font-medium text-slate-700">What they make or do</dt>
                         <dd className="mt-0.5 text-slate-600">
                           {research.whatTheySell.trim()}
                         </dd>
@@ -127,7 +127,7 @@ export function ListCompanyResearchView({
                     ) : null}
                     {formatCustomerAudience(research) ? (
                       <div className="sm:col-span-2">
-                        <dt className="font-medium text-slate-700">Who they sell to</dt>
+                        <dt className="font-medium text-slate-700">Who they serve</dt>
                         <dd className="mt-0.5 text-slate-600">
                           {formatCustomerAudience(research)}
                         </dd>

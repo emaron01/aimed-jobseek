@@ -65,7 +65,7 @@ export default async function ContactsPage({ searchParams }: PageProps) {
   const listId = query.listId?.trim() || undefined;
   const search = query.q?.trim() || undefined;
   const includeArchived = query.archived === "1";
-  const includeUnlisted = query.unlisted === "1";
+  const includeUnlisted = query.unlisted === "1" || !query.listId;
   const membership = await getMembershipForCurrentUser(organization.id);
   const showOwners = canViewAllRepWork(membership.membership.role);
 
@@ -98,7 +98,7 @@ export default async function ContactsPage({ searchParams }: PageProps) {
     <div>
       <PageHeader
         title={vocab.contact.Plural}
-        description={`${vocab.contact.Plural} on active ${vocab.list.plural}. Use Show archived to include archived ${vocab.list.plural} and cascade-archived ${vocab.contact.plural}.`}
+        description={`${vocab.contact.Plural} across ${vocab.campaign.plural}. Each row links to its ${vocab.campaign.singular}.`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <a
@@ -274,7 +274,17 @@ export default async function ContactsPage({ searchParams }: PageProps) {
                       {campaignLines.length > 0 ? (
                         <ul className="space-y-1">
                           {campaignLines.map((entry) => (
-                            <li key={entry.campaignId}>{entry.line}</li>
+                            <li key={entry.campaignId}>
+                              <a
+                                href={`/campaigns/${entry.campaignId}`}
+                                className="font-medium text-slate-800 underline-offset-2 hover:underline"
+                              >
+                                {entry.campaignName}
+                              </a>
+                              <span className="block text-xs text-slate-500">
+                                {entry.line}
+                              </span>
+                            </li>
                           ))}
                         </ul>
                       ) : (

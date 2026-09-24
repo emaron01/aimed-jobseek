@@ -91,4 +91,9 @@ export const applicationAssetConfig = Object.freeze({
   },
 } as const);
 
-export type ApplicationAssetTypeValue = "RESUME" | "COVER_LETTER";
+export type ApplicationAssetTypeValue =
+  | "RESUME"
+  | "COVER_LETTER"
+  | "EMAIL"
+  | "LINKEDIN_CONNECTION_NOTE"
+  | "LINKEDIN_INMAIL";

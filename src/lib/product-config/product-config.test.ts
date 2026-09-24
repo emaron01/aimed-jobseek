@@ -58,10 +58,11 @@ describe("brand", () => {
 });
 
 describe("feature flags", () => {
-  it("hides team and sales-plan UI while keeping lists and referrals", () => {
-    expect(features.listImport).toBe(true);
-    expect(features.listBulkValidation).toBe(true);
-    expect(features.listBulkScoring).toBe(true);
+  it("hides team, list, and mailbox UI while keeping referrals", () => {
+    expect(features.listImport).toBe(false);
+    expect(features.listBulkValidation).toBe(false);
+    expect(features.listBulkScoring).toBe(false);
+    expect(features.emailConnection).toBe(false);
     expect(features.referralProgram).toBe(true);
     expect(features.teamSeats).toBe(false);
     expect(features.teamInvites).toBe(false);

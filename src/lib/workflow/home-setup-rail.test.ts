@@ -47,9 +47,7 @@ describe("home setup rail", () => {
     expect(steps.find((step) => step.key === "voice")?.detail).toBe(
       "No samples yet",
     );
-    expect(steps.find((step) => step.key === "email")?.detail).toBe(
-      "Not connected",
-    );
+    expect(steps.find((step) => step.key === "email")).toBeUndefined();
     expect(steps.map((step) => step.key)).not.toContain("lists");
     expect(steps.map((step) => step.key)).not.toContain("contacts");
     expect(resolveHomeSetupFocus(steps)).toBe("voice");
@@ -93,7 +91,6 @@ describe("home setup rail", () => {
       "voice",
       "products",
       "icps",
-      "email",
     ]);
     expect(steps.find((step) => step.key === "icps")).toMatchObject({
       label: vocab.icp.nav,
@@ -114,12 +111,11 @@ describe("home setup rail", () => {
       emailReconnectRequired: false,
     });
     expect(steps.every((step) => step.completed)).toBe(true);
-    expect(resolveHomeSetupFocus(steps)).toBe("email");
+    expect(resolveHomeSetupFocus(steps)).toBe("icps");
     expect(steps.map((step) => step.href)).toEqual([
       "/settings/voice",
       "/products",
       "/icps",
-      "/settings/email",
     ]);
   });
 });

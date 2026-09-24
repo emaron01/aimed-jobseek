@@ -1,6 +1,7 @@
 import type {
   JobRequirementModelOutput,
   JobScorecard,
+  NamedJobContact,
   ParsedJobRequirement,
   ScorecardItem,
 } from "@/lib/job-requirement/types";
@@ -118,5 +119,30 @@ export function normalizeParsedJobRequirement(
       outcomes: scorecardList("outcome", scorecard.outcomes, posting),
       competencies: scorecardList("competency", scorecard.competencies, posting),
     },
+    namedContacts: namedContactsFromModel(model.namedContacts, posting),
   };
+}
+
+function namedContactsFromModel(
+  rows: JobRequirementModelOutput["namedContacts"],
+  rawText: string,
+): NamedJobContact[] {
+  if (!Array.isArray(rows)) return [];
+  const seen = new Set<string>();
+  const kept: NamedJobContact[] = [];
+  for (const row of rows) {
+    const firstName = statedOrNull(row?.firstName, rawText);
+    const lastName = statedOrNull(row?.lastName, rawText);
+    const title = statedOrNull(row?.title, rawText);
+    const email = statedOrNull(row?.email, rawText);
+    const phone = statedOrNull(row?.phone, rawText);
+    if (!firstName && !lastName && !email && !phone) continue;
+    const key = [firstName, lastName, email, phone]
+      .map((value) => (value ?? "").toLowerCase())
+      .join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    kept.push({ firstName, lastName, title, email, phone });
+  }
+  return kept;
 }

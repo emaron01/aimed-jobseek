@@ -40,7 +40,7 @@ import {
   deeplinkSendDeclinedStorageKey,
   formatDailySendAdvisory,
 } from "@/lib/usage/send-advisory";
-import { vocab } from "@/lib/product-config";
+import { features, vocab } from "@/lib/product-config";
 
 type SequenceDraft = {
   id: string;
@@ -1226,6 +1226,7 @@ export function EmailSequenceWorkspace({
                       Open in {option.label}
                     </button>
                   ))}
+                  {features.emailConnection ? (
                   <button
                     type="button"
                     disabled={
@@ -1244,6 +1245,7 @@ export function EmailSequenceWorkspace({
                       ? "Sending…"
                       : "Send with Microsoft 365"}
                   </button>
+                  ) : null}
                   <button
                     type="button"
                     disabled={handoffLocked}
@@ -1255,7 +1257,7 @@ export function EmailSequenceWorkspace({
                       : "I sent this — mark as sent"}
                   </button>
                 </div>
-                {mailboxConnection?.status !== "CONNECTED" ? (
+                {features.emailConnection && mailboxConnection?.status !== "CONNECTED" ? (
                   <a
                     href="/settings/email"
                     className="text-xs font-medium text-slate-700 underline"
@@ -1265,7 +1267,7 @@ export function EmailSequenceWorkspace({
                       : "Connect Microsoft 365 to send directly"}
                   </a>
                 ) : null}
-                {!emailSignature ? (
+                {features.emailConnection && !emailSignature ? (
                   <a
                     href="/settings/email"
                     className="text-xs font-medium text-slate-700 underline"

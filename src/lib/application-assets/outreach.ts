@@ -1,0 +1,556 @@
+import {
+  Prisma,
+  type ApplicationAssetType,
+  type ApplicationOutreachPurpose,
+  type EmailLength,
+} from "@prisma/client";
+import {
+  bannedPhraseHits,
+  mentionsInternalSystemState,
+  validateRepetitionAndMetaLanguage,
+} from "@/lib/consultation/output-quality";
+import {
+  loadApplicationGenerationContext,
+  type ReadyApplicationGenerationContext,
+} from "@/lib/generation/context";
+import { prisma } from "@/lib/prisma";
+import {
+  applicationAssetConfig,
+  connectionNoteBodyBudget,
+  consultationConfig,
+  isOutreachAssetType,
+  outreachConfig,
+  outreachGreeting,
+  outreachGroupKey,
+  vocab,
+} from "@/lib/product-config";
+import { TenantError } from "@/lib/tenant/errors";
+import { generateOutreachWithModel, validateAssetClaimsWithModel } from "./ai";
+import {
+  applicationAssetContentSchema,
+  assetClaims,
+  composeOutreachText,
+  OUTREACH_EMAIL_PROMPT_VERSION,
+  OUTREACH_LINKEDIN_INMAIL_PROMPT_VERSION,
+  OUTREACH_LINKEDIN_NOTE_PROMPT_VERSION,
+  type ApplicationAssetContent,
+  type AssetClaim,
+} from "./contract";
+import type { AssetGenerationResult } from "./outreach-types";
+
+function outreachPromptVersion(type: ApplicationAssetType): string {
+  if (type === "EMAIL") return OUTREACH_EMAIL_PROMPT_VERSION;
+  if (type === "LINKEDIN_CONNECTION_NOTE") {
+    return OUTREACH_LINKEDIN_NOTE_PROMPT_VERSION;
+  }
+  return OUTREACH_LINKEDIN_INMAIL_PROMPT_VERSION;
+}
+
+function contactDisplayName(contact: {
+  firstName: string | null;
+  lastName: string | null;
+}): string | null {
+  const name = [contact.firstName, contact.lastName]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  return name || null;
+}
+
+function isSeekerSource(category: string): boolean {
+  return (applicationAssetConfig.seekerSourceCategories as readonly string[]).includes(
+    category,
+  );
+}
+
+function isAllowedOutreachSource(category: string): boolean {
+  return (
+    isSeekerSource(category) ||
+    category === "APPLICATION" ||
+    category === "JOB_REQUIREMENT" ||
+    category === "PERSONA"
+  );
+}
+
+function citableSourceIds(
+  context: ReadyApplicationGenerationContext,
+): string[] {
+  return context.sources
+    .filter((source) => isAllowedOutreachSource(source.category))
+    .map((source) => source.id);
+}
+
+export function outreachLimitErrors(content: ApplicationAssetContent): string[] {
+  const composed = composeOutreachText(content);
+  const errors: string[] = [];
+  if (content.type === "LINKEDIN_CONNECTION_NOTE") {
+    if (composed.body.length > outreachConfig.linkedinLimits.connectionNoteChars) {
+      errors.push(
+        `The connection note is ${composed.body.length} characters. Rewrite it at or under ${outreachConfig.linkedinLimits.connectionNoteChars} characters. Do not truncate mid-sentence.`,
+      );
+    }
+  }
+  if (content.type === "LINKEDIN_INMAIL") {
+    if (
+      (composed.subject ?? "").length >
+      outreachConfig.linkedinLimits.inMailSubjectChars
+    ) {
+      errors.push(
+        `The InMail subject is ${(composed.subject ?? "").length} characters. Rewrite it at or under ${outreachConfig.linkedinLimits.inMailSubjectChars} characters.`,
+      );
+    }
+    if (composed.body.length > outreachConfig.linkedinLimits.inMailBodyChars) {
+      errors.push(
+        `The InMail body is ${composed.body.length} characters. Rewrite it at or under ${outreachConfig.linkedinLimits.inMailBodyChars} characters. Do not truncate mid-sentence.`,
+      );
+    }
+  }
+  return errors;
+}
+
+export function hiringManagerClaimErrors(input: {
+  text: string;
+  confirmedHiringManagerRole: boolean;
+  channel: "email" | "linkedin";
+}): string[] {
+  const lowered = input.text.toLowerCase();
+  const errors: string[] = [];
+  if (input.channel === "linkedin") {
+    for (const phrase of outreachConfig.bannedLinkedInGreetings) {
+      if (lowered.includes(phrase)) {
+        errors.push(
+          `LinkedIn messages must not use "${phrase}". Use the supplied greeting.`,
+        );
+      }
+    }
+  }
+  if (input.confirmedHiringManagerRole) return errors;
+  for (const phrase of outreachConfig.hiringManagerClaimPhrases) {
+    if (lowered.includes(phrase)) {
+      errors.push(
+        "Do not state or imply that the recipient is the hiring manager unless that role is confirmed for this contact.",
+      );
+      break;
+    }
+  }
+  return errors;
+}
+
+function outreachSupportErrors(
+  content: ApplicationAssetContent,
+  context: ReadyApplicationGenerationContext,
+): string[] {
+  const sourceById = new Map(context.sources.map((source) => [source.id, source]));
+  const errors: string[] = [];
+  const ids = new Set<string>();
+  for (const claim of assetClaims(content)) {
+    if (ids.has(claim.id)) errors.push(`Claim id ${claim.id} was duplicated.`);
+    ids.add(claim.id);
+    if (claim.supports.length === 0) continue;
+    let hasAllowedSupport = false;
+    for (const support of claim.supports) {
+      const source = sourceById.get(support.sourceId);
+      if (!source) {
+        const allowed = citableSourceIds(context).join(", ");
+        errors.push(
+          `Claim ${claim.id} cites unknown source "${support.sourceId}". Use one of these source ids: ${allowed}.`,
+        );
+        continue;
+      }
+      if (!source.text.toLowerCase().includes(support.quote.trim().toLowerCase())) {
+        errors.push(`Claim ${claim.id} cites words that are absent from its source.`);
+      }
+      if (isAllowedOutreachSource(source.category)) hasAllowedSupport = true;
+    }
+    if (!hasAllowedSupport) {
+      errors.push(
+        `Claim ${claim.id} must cite a supplied application, job, persona, Personal Profile FACT, or approved consultation source.`,
+      );
+    }
+  }
+  return errors;
+}
+
+export async function validateOutreachContent(input: {
+  content: ApplicationAssetContent;
+  context: ReadyApplicationGenerationContext;
+  greeting: string;
+  signerName: string;
+  confirmedHiringManagerRole: boolean;
+}): Promise<string[]> {
+  if (
+    input.content.type !== "EMAIL" &&
+    input.content.type !== "LINKEDIN_CONNECTION_NOTE" &&
+    input.content.type !== "LINKEDIN_INMAIL"
+  ) {
+    return ["The generated asset is not an outreach message."];
+  }
+  const claims = assetClaims(input.content);
+  const texts = claims.map((claim) => claim.text);
+  const composed = composeOutreachText(input.content);
+  const channel =
+    input.content.type === "EMAIL" ? "email" : "linkedin";
+  const errors = [
+    ...outreachSupportErrors(input.content, input.context),
+    ...outreachLimitErrors(input.content),
+    ...hiringManagerClaimErrors({
+      text: `${composed.subject ?? ""} ${composed.body}`,
+      confirmedHiringManagerRole: input.confirmedHiringManagerRole,
+      channel,
+    }),
+    ...bannedPhraseHits(texts, [
+      ...consultationConfig.bannedPhrases,
+      ...applicationAssetConfig.bannedPhrases,
+    ]).map((phrase) => `Remove configured banned language: ${phrase}.`),
+    ...texts.flatMap((text) =>
+      validateRepetitionAndMetaLanguage({
+        text,
+        bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
+      }),
+    ),
+  ];
+  if (input.content.greeting !== input.greeting) {
+    errors.push("The message changed the required greeting.");
+  }
+  if (input.content.type === "EMAIL" && input.content.signerName !== input.signerName) {
+    errors.push("The email changed the seeker's name.");
+  }
+  if (texts.some(mentionsInternalSystemState) || mentionsInternalSystemState(composed.body)) {
+    errors.push("Remove references to internal system state.");
+  }
+  if (errors.length > 0) return [...new Set(errors)];
+  const citedClaims = claims.filter((claim) => claim.supports.length > 0);
+  if (citedClaims.length === 0) return [];
+  const modelValidation = await validateAssetClaimsWithModel({
+    claims: citedClaims,
+    sources: input.context.sources,
+  });
+  if (!modelValidation.ok) return [modelValidation.message];
+  return [
+    ...new Set(
+      modelValidation.data.violations.map(
+        (violation) =>
+          `Claim ${violation.claimId} is unsupported: ${violation.reason}`,
+      ),
+    ),
+  ];
+}
+
+function claimTrace(
+  content: ApplicationAssetContent,
+  context: ReadyApplicationGenerationContext,
+) {
+  return assetClaims(content).map((claim: AssetClaim) => ({
+    claimId: claim.id,
+    text: claim.text,
+    supports: claim.supports,
+  }));
+}
+
+async function saveOutreachVersion(input: {
+  context: ReadyApplicationGenerationContext;
+  type: ApplicationAssetType;
+  personaId: string;
+  contactId: string | null;
+  purpose: ApplicationOutreachPurpose;
+  followUpToAssetId: string | null;
+  emailLength: EmailLength | null;
+  content: ApplicationAssetContent;
+  guidance: string | null;
+}): Promise<{ id: string; version: number }> {
+  const groupKey = outreachGroupKey({
+    type: input.type as "EMAIL" | "LINKEDIN_CONNECTION_NOTE" | "LINKEDIN_INMAIL",
+    personaId: input.personaId,
+    contactId: input.contactId,
+    purpose: input.purpose,
+  });
+  return prisma.$transaction(
+    async (tx) => {
+      const latest = await tx.applicationAsset.aggregate({
+        where: {
+          campaignId: input.context.campaign.id,
+          groupKey,
+        },
+        _max: { version: true },
+      });
+      const version = (latest._max.version ?? 0) + 1;
+      return tx.applicationAsset.create({
+        data: {
+          organizationId: input.context.organizationId,
+          campaignId: input.context.campaign.id,
+          type: input.type,
+          personaId: input.personaId,
+          contactId: input.contactId,
+          purpose: input.purpose,
+          followUpToAssetId: input.followUpToAssetId,
+          emailLength: input.emailLength,
+          groupKey,
+          version,
+          contentJson: input.content as unknown as Prisma.InputJsonValue,
+          claimTraceJson: claimTrace(
+            input.content,
+            input.context,
+          ) as unknown as Prisma.InputJsonValue,
+          guidance: input.guidance,
+          promptVersion: outreachPromptVersion(input.type),
+          status: "DRAFT",
+        },
+        select: { id: true, version: true },
+      });
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  );
+}
+
+export async function generateOutreachAsset(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  type: ApplicationAssetType;
+  personaId: string;
+  contactId?: string | null;
+  purpose: ApplicationOutreachPurpose;
+  followUpToAssetId?: string | null;
+  emailLength?: EmailLength | null;
+  regenerationInstruction?: string | null;
+}): Promise<AssetGenerationResult> {
+  if (!isOutreachAssetType(input.type)) {
+    return {
+      ok: false,
+      message: "Outreach type is invalid.",
+      violations: [],
+    };
+  }
+  const personaId = input.personaId.trim();
+  if (!personaId) {
+    return {
+      ok: false,
+      message: `${vocab.persona.Singular} is required.`,
+      violations: [],
+    };
+  }
+  const base = await loadApplicationGenerationContext(
+    input.campaignId,
+    input.userId,
+    { personaId },
+  );
+  if (base.organizationId !== input.organizationId) {
+    throw new TenantError(`${vocab.campaign.Singular} was not found.`);
+  }
+  if (!base.requirement || !base.profile || !base.persona) {
+    return {
+      ok: false,
+      message: `This ${vocab.campaign.singular} needs an approved ${vocab.product.singular}, job requirement, and ${vocab.persona.singular}.`,
+      violations: [],
+    };
+  }
+  const context = base as ReadyApplicationGenerationContext;
+  const contactId = input.contactId?.trim() || null;
+  let contact: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+    linkedinUrl: string | null;
+  } | null = null;
+  let confirmedHiringManagerRole = false;
+  if (contactId) {
+    const membership = await prisma.campaignContact.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        contactId,
+      },
+      include: {
+        contact: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            linkedinUrl: true,
+          },
+        },
+        chosenPersona: { select: { suggestionKey: true } },
+      },
+    });
+    if (!membership) {
+      return {
+        ok: false,
+        message: `${vocab.contact.Singular} was not found on this ${vocab.campaign.singular}.`,
+        violations: [],
+      };
+    }
+    contact = membership.contact;
+    confirmedHiringManagerRole =
+      membership.chosenPersona?.suggestionKey === "hiring_manager" ||
+      (membership.chosenPersonaId === personaId &&
+        context.persona?.suggestionKey === "hiring_manager");
+  }
+  if (
+    input.purpose === "FOLLOW_UP" &&
+    !input.followUpToAssetId?.trim()
+  ) {
+    return {
+      ok: false,
+      message: "A follow-up needs a sent message to reference.",
+      violations: [],
+    };
+  }
+  let priorMessage: { subject: string | null; body: string } | null = null;
+  let followUpToAssetId: string | null = null;
+  if (input.purpose === "FOLLOW_UP") {
+    const prior = await prisma.applicationAsset.findFirst({
+      where: {
+        id: input.followUpToAssetId!,
+        campaignId: input.campaignId,
+        organizationId: input.organizationId,
+        sentAt: { not: null },
+      },
+    });
+    if (!prior) {
+      return {
+        ok: false,
+        message: "The earlier message was not found or has not been marked sent.",
+        violations: [],
+      };
+    }
+    const parsed = applicationAssetContentSchema.safeParse(prior.contentJson);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        message: "The earlier message could not be read.",
+        violations: parsed.error.issues.map((issue) => issue.message),
+      };
+    }
+    priorMessage = composeOutreachText(parsed.data);
+    followUpToAssetId = prior.id;
+  }
+  const channel = input.type === "EMAIL" ? "email" : "linkedin";
+  const greeting = outreachGreeting({
+    channel,
+    contactName: contact ? contactDisplayName(contact) : null,
+  });
+  const signerName = context.profile.identity.name?.text ?? "";
+  if (input.type === "EMAIL" && !signerName) {
+    return {
+      ok: false,
+      message: "The Personal Profile needs a confirmed name before email can be generated.",
+      violations: [],
+    };
+  }
+  const emailLength =
+    input.type === "EMAIL" ? input.emailLength ?? "MEDIUM" : null;
+  let feedback: string[] = [];
+  const attempts =
+    applicationAssetConfig.generation.qualityRegenerationAttempts +
+    outreachConfig.generation.limitRegenerationAttempts;
+  for (let attempt = 0; attempt <= attempts; attempt += 1) {
+    const generated = await generateOutreachWithModel({
+      context,
+      type: input.type,
+      greeting,
+      signerName,
+      confirmedHiringManagerRole,
+      purpose: input.purpose,
+      emailLength,
+      priorMessage,
+      regenerationInstruction: input.regenerationInstruction ?? null,
+      qualityFeedback: feedback,
+    });
+    if (!generated.ok) {
+      feedback = [generated.message];
+      if (attempt === attempts) {
+        return { ok: false, message: generated.message, violations: feedback };
+      }
+      continue;
+    }
+    const content = generated.data;
+    const violations = await validateOutreachContent({
+      content,
+      context,
+      greeting,
+      signerName,
+      confirmedHiringManagerRole,
+    });
+    if (violations.length === 0) {
+      const saved = await saveOutreachVersion({
+        context,
+        type: input.type,
+        personaId,
+        contactId,
+        purpose: input.purpose,
+        followUpToAssetId,
+        emailLength,
+        content,
+        guidance: input.regenerationInstruction?.trim() || null,
+      });
+      return { ok: true, assetId: saved.id, version: saved.version };
+    }
+    feedback = violations;
+  }
+  return {
+    ok: false,
+    message:
+      "The message was not saved because it did not pass verification. Retry after reviewing the violations.",
+    violations: feedback,
+  };
+}
+
+export async function markOutreachSent(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  assetId: string;
+  sentAt: Date;
+}): Promise<void> {
+  const campaign = await prisma.campaign.findFirst({
+    where: {
+      id: input.campaignId,
+      organizationId: input.organizationId,
+      ownerUserId: input.userId,
+    },
+    select: { id: true },
+  });
+  if (!campaign) throw new TenantError(`${vocab.campaign.Singular} was not found.`);
+  const asset = await prisma.applicationAsset.findFirst({
+    where: {
+      id: input.assetId,
+      campaignId: input.campaignId,
+      organizationId: input.organizationId,
+    },
+    select: { id: true, type: true },
+  });
+  if (!asset || !isOutreachAssetType(asset.type)) {
+    throw new TenantError("Outreach message was not found.");
+  }
+  if (Number.isNaN(input.sentAt.getTime())) {
+    throw new TenantError("Sent date is invalid.");
+  }
+  await prisma.applicationAsset.update({
+    where: { id: asset.id },
+    data: { sentAt: input.sentAt, status: "APPROVED" },
+  });
+}
+
+export async function markApplicationApplied(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  appliedAt: Date;
+}): Promise<void> {
+  if (Number.isNaN(input.appliedAt.getTime())) {
+    throw new TenantError("Applied date is invalid.");
+  }
+  const updated = await prisma.campaign.updateMany({
+    where: {
+      id: input.campaignId,
+      organizationId: input.organizationId,
+      ownerUserId: input.userId,
+    },
+    data: { appliedAt: input.appliedAt },
+  });
+  if (updated.count === 0) {
+    throw new TenantError(`${vocab.campaign.Singular} was not found.`);
+  }
+}

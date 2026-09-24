@@ -3,6 +3,7 @@ import {
   getAssetValidationAiProvider,
   isAssetAiConfigured,
 } from "@/lib/ai";
+import { AiValidationError } from "@/lib/ai/errors";
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import type {
   ApplicationGenerationContext,
@@ -11,15 +12,21 @@ import type {
 import {
   assetClaimValidationSchema,
   coverLetterAssetContentSchema,
+  emailAssetContentSchema,
+  linkedinInmailAssetContentSchema,
+  linkedinNoteAssetContentSchema,
   resumeAssetContentSchema,
+  type ApplicationAssetContent,
   type AssetClaim,
   type AssetClaimValidation,
   type CoverLetterAssetContent,
   type ResumeAssetContent,
 } from "./contract";
+import type { OutreachGenerationInput } from "./outreach-types";
 import {
   buildAssetClaimValidationMessages,
   buildCoverLetterAssetMessages,
+  buildOutreachAssetMessages,
   buildResumeAssetMessages,
 } from "./prompt";
 
@@ -29,14 +36,21 @@ const UNCONFIGURED =
   "Application asset AI is not configured. Configure it, then retry.";
 
 function failure(operation: string, error: unknown, message: string) {
+  const issues = error instanceof AiValidationError ? error.issues : undefined;
   console.error(
     JSON.stringify({
       event: "application_asset_ai_failed",
       operation,
       message: error instanceof Error ? error.message : "unknown",
+      issues,
     }),
   );
-  return { ok: false as const, message };
+  const detail = issues?.length
+    ? ` ${issues
+        .map((issue) => `${issue.path}: ${issue.code}`)
+        .join("; ")}`
+    : "";
+  return { ok: false as const, message: `${message}${detail}` };
 }
 
 export function generateResumeWithModel(input: {
@@ -85,6 +99,56 @@ export function generateCoverLetterWithModel(input: {
         "The cover letter could not be generated. Retry.",
       ),
     );
+}
+
+export function generateOutreachWithModel(
+  input: OutreachGenerationInput,
+): Promise<Result<ApplicationAssetContent>> {
+  if (!isAssetAiConfigured()) return Promise.resolve({ ok: false, message: UNCONFIGURED });
+  const messages = buildOutreachAssetMessages(input);
+  const failed = (error: unknown) =>
+    failure(
+      "outreachAsset",
+      error,
+      "The outreach message could not be generated. Retry.",
+    );
+  if (input.type === "EMAIL") {
+    return getAssetAiProvider()
+      .generateStructured({
+        ...structuredOutputRequest("outreachEmailAsset"),
+        messages,
+        parseOutput: (raw) => ({
+          data: emailAssetContentSchema.parse(raw),
+          coercedFields: [],
+        }),
+      })
+      .then((response) => ({ ok: true as const, data: response.data }))
+      .catch(failed);
+  }
+  if (input.type === "LINKEDIN_CONNECTION_NOTE") {
+    return getAssetAiProvider()
+      .generateStructured({
+        ...structuredOutputRequest("outreachLinkedinNoteAsset"),
+        messages,
+        parseOutput: (raw) => ({
+          data: linkedinNoteAssetContentSchema.parse(raw),
+          coercedFields: [],
+        }),
+      })
+      .then((response) => ({ ok: true as const, data: response.data }))
+      .catch(failed);
+  }
+  return getAssetAiProvider()
+    .generateStructured({
+      ...structuredOutputRequest("outreachLinkedinInmailAsset"),
+      messages,
+      parseOutput: (raw) => ({
+        data: linkedinInmailAssetContentSchema.parse(raw),
+        coercedFields: [],
+      }),
+    })
+    .then((response) => ({ ok: true as const, data: response.data }))
+    .catch(failed);
 }
 
 export function validateAssetClaimsWithModel(input: {

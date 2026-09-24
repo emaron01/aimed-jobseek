@@ -44,3 +44,11 @@ export { hiringTeamConfig } from "./hiring-team";
 export { applicationSummaryConfig } from "./application-summary";
 export { applicationAssetConfig } from "./application-assets";
 export type { ApplicationAssetTypeValue } from "./application-assets";
+export {
+  connectionNoteBodyBudget,
+  isOutreachAssetType,
+  outreachConfig,
+  outreachGreeting,
+  outreachGroupKey,
+} from "./outreach";
+export type { OutreachAssetType } from "./outreach";

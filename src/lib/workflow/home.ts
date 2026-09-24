@@ -6,7 +6,12 @@ import {
   countsTowardTargetedSearchCap,
   normalizeEvidenceClass,
 } from "@/lib/criteria/evidence-class";
+import {
+  getDueApplicationReminders,
+  type ApplicationReminderRow,
+} from "@/lib/cadence/application-reminders";
 import { getDueContactsForUser, type CampaignDueSummary } from "@/lib/cadence/dashboard";
+import { anyListFeatureEnabled } from "@/lib/product-config";
 import { getMailboxConnectionView } from "@/lib/mailbox/data";
 import { voiceReadiness } from "@/lib/voice/types";
 import { buildHomeSetupLine } from "@/lib/workflow/home-setup-line";
@@ -60,6 +65,7 @@ export type HomeWorkflow = {
     emailsToWrite: number;
   }>;
   dueByCampaign: CampaignDueSummary[];
+  applicationReminders: ApplicationReminderRow[];
 };
 
 /** Criteria rows are the interpreted ICP. lastInterpretedAt is not required — legacy/manual backfill never sets it. */
@@ -83,7 +89,7 @@ export async function getHomeWorkflow(
     canViewAllRepWork?: boolean;
   },
 ): Promise<HomeWorkflow> {
-  const [products, campaigns, dueByCampaign, mailbox] =
+  const [products, campaigns, dueByCampaign, mailbox, applicationReminders] =
     await Promise.all([
       prisma.product.findMany({
         where: { organizationId, archivedAt: null },
@@ -136,7 +142,7 @@ export async function getHomeWorkflow(
           },
         },
       }),
-      options?.userId
+      options?.userId && anyListFeatureEnabled()
         ? getDueContactsForUser({
             organizationId,
             userId: options.userId,
@@ -149,6 +155,13 @@ export async function getHomeWorkflow(
             userId: options.userId,
           })
         : Promise.resolve(null),
+      options?.userId
+        ? getDueApplicationReminders({
+            organizationId,
+            userId: options.userId,
+            includeArchived: options.includeArchived,
+          })
+        : Promise.resolve([] as ApplicationReminderRow[]),
     ]);
 
   const voiceSampleCount =
@@ -331,5 +344,6 @@ export async function getHomeWorkflow(
       };
     }),
     dueByCampaign,
+    applicationReminders,
   };
 }

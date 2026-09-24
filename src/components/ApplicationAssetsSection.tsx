@@ -85,6 +85,7 @@ function AssetPreview({ content }: { content: ApplicationAssetContent }) {
       </article>
     );
   }
+  if (content.type !== "RESUME") return null;
   return (
     <article className="space-y-4 text-sm text-slate-800">
       <header className="text-center">
@@ -174,6 +175,7 @@ function mapClaimText(
   if (content.type === "COVER_LETTER") {
     return { ...content, paragraphs: content.paragraphs.map(replace) };
   }
+  if (content.type !== "RESUME") return content;
   return {
     ...content,
     header: {
@@ -202,6 +204,7 @@ function AssetEditor({
   const [result, action] = useActionState(saveEditedApplicationAssetAction, initial);
   const claims = useMemo(() => {
     if (content.type === "COVER_LETTER") return content.paragraphs;
+    if (content.type !== "RESUME") return [];
     return [
       ...content.summary,
       ...content.experience.flatMap((role) => role.bullets),

@@ -470,10 +470,10 @@ The vision's Decisions log settles Target Employers, lists, contacts, email, `Ap
 
 Nouns now come from `src/lib/product-config/vocabulary.ts`. The sentences below still describe selling, a product being sold, or sales workflow. They were left in place except where a noun swap broke grammar. LLM prompts were not changed and are not listed here.
 
-### Home (2)
+### Home (2) — done
 
-- `src/app/(app)/page.tsx` — "Work {applications} for {org} from qualification through sending."
-- `src/app/(app)/page.tsx` — "{Application} creation unlocks after at least one {profile} is approved with {a Target Employer profile} that has criteria."
+- `src/app/(app)/page.tsx` — Track applications: apply through the employer portal, then write outreach when you find people on the Hiring Team
+- `src/app/(app)/page.tsx` — Application creation unlocks after an approved Personal Profile with a Target Employer profile that has criteria. Voice samples are optional.
 
 ### Profile / product setup (16) — done
 
@@ -520,19 +520,19 @@ Nouns now come from `src/lib/product-config/vocabulary.ts`. The sentences below 
 - `src/lib/product-config/vocabulary.ts` — `offerCallToActionPlaceholder`: "Request a conversation"
 - `src/lib/scoring/score-contact.ts` — "Meets the scored criteria."
 
-### Contacts / lists (5)
+### Contacts / lists (5) — done
 
-- `src/app/(app)/companies/[companyId]/page.tsx` — "Contact intelligence for meeting prep."
-- `src/components/CompanyResearchBriefing.tsx` — "What they sell" / "Who they sell to"
-- `src/components/ListCompanyResearchView.tsx` — "What they sell" / "Who they sell to"
-- `src/components/ManualCompanyResearchForm.tsx` — "Buying Signals (one per line)"
-- `src/lib/research/company-briefing.ts` — label "What they sell"
+- `src/app/(app)/companies/[companyId]/page.tsx` — Employer research for this application
+- `src/components/CompanyResearchBriefing.tsx` — "What they make or do" / "Who they serve"
+- `src/components/ListCompanyResearchView.tsx` — "What they make or do" / "Who they serve"
+- `src/components/ManualCompanyResearchForm.tsx` — "Hiring and growth signals (one per line)"
+- `src/lib/research/company-briefing.ts` — label "What they make or do"
 
-### Email (3)
+### Email (3) — done
 
-- `src/app/(app)/campaigns/[id]/page.tsx` — "Default length and {application}-specific guidance." (settings still framed as campaign email generation)
-- `src/components/CampaignEmailSettingsForm.tsx` — "Save email settings"
-- `src/app/actions/campaign-email-settings.ts` — "Unable to update email settings. Please try again."
+- `src/app/(app)/campaigns/[id]/page.tsx` — Application guidance for generated materials
+- `src/components/CampaignEmailSettingsForm.tsx` — "Save application guidance"
+- `src/app/actions/campaign-email-settings.ts` — "Unable to update application guidance. Please try again."
 
 ### Billing (5)
 
@@ -542,9 +542,9 @@ Nouns now come from `src/lib/product-config/vocabulary.ts`. The sentences below 
 - `src/app/(auth)/login/page.tsx` — "Access your outbound workspace."
 - `src/app/(app)/settings/billing/page.tsx` — "After 30 days we permanently delete that {contact} and outbound…"
 
-### Emails and digest (1)
+### Emails and digest (1) — done
 
-- `src/lib/transactional-email/templates.ts` — cadence digest: "you have {n} contact(s) due for a follow-up" (sequence/outreach clock, not hiring-stage copy)
+- `src/lib/transactional-email/templates.ts` — cadence digest: follow-up reminders on Home (alerts only; nothing is sent)
 
 ### Admin (4)
 

@@ -1004,6 +1004,12 @@ model OrganizationCadencePolicy {
   repeatIntervalDays Int      @default(30)
   /// Max emails in sequence including initial. Null = unlimited (explicit opt-in).
   maxSequenceEmails  Int?     @default(4)
+  /// Application reminder days from the Applied date, or first sent outreach.
+  /// Null means no reminder for that slot. Blank in the UI is stored as null, never 0.
+  reminderDay3         Int?     @default(3)
+  reminderDay7         Int?     @default(7)
+  reminderEmail4Days   Int?
+  reminderRepeatDays   Int?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -1761,9 +1767,10 @@ model Contact {
   companyRecord    Company?                @relation(fields: [companyId], references: [id], onDelete: SetNull)
   archivedByList   ContactList?            @relation("ContactArchivedByList", fields: [archivedByListId], references: [id], onDelete: SetNull)
   memberships      ContactListMembership[]
-  scores           ContactScore[]
-  campaignContacts CampaignContact[]
-  contactResearch  ContactResearch[]
+  scores             ContactScore[]
+  campaignContacts   CampaignContact[]
+  contactResearch    ContactResearch[]
+  applicationAssets  ApplicationAsset[]
 
   @@unique([organizationId, ownerUserId, normalizedEmail])
   @@index([organizationId])
@@ -2210,6 +2217,8 @@ model Campaign {
   offerValidationHash String?
   emailLength         EmailLength        @default(MEDIUM)
   emailGuidance       String?
+  /// Date the seeker marked this application Applied. Null until marked.
+  appliedAt           DateTime?
   status              CampaignStatus     @default(DRAFT)
   /// Soft-archive: hidden from home/list by default; history intact, read-only.
   archivedAt          DateTime?
@@ -2263,6 +2272,8 @@ model JobRequirement {
   requiredItems        Json?
   preferredItems       Json?
   scorecardJson        Json
+  /// Named people captured from the posting (FACT). Shape: NamedJobContact[].
+  namedContactsJson    Json?
   employerDisposition  JobEmployerDisposition @default(IDENTIFIED)
   employerSkipReason   String?
   suppliedEmployerName String?
@@ -2365,6 +2376,14 @@ enum ConsultationStatementStatus {
 enum ApplicationAssetType {
   RESUME
   COVER_LETTER
+  EMAIL
+  LINKEDIN_CONNECTION_NOTE
+  LINKEDIN_INMAIL
+}
+
+enum ApplicationOutreachPurpose {
+  PROACTIVE
+  FOLLOW_UP
 }
 
 enum ApplicationAssetStatus {
@@ -2556,29 +2575,43 @@ model ApplicationSummary {
 
 /// Versioned resume or cover letter for one application. DOCX is rendered on demand.
 model ApplicationAsset {
-  id             String                 @id @default(cuid())
-  organizationId String
-  campaignId     String
-  type           ApplicationAssetType
-  personaId      String?
-  version        Int
-  contentJson    Json
-  claimTraceJson Json
-  guidance       String?
-  promptVersion  String
-  status         ApplicationAssetStatus @default(DRAFT)
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
+  id                String                      @id @default(cuid())
+  organizationId    String
+  campaignId        String
+  type              ApplicationAssetType
+  personaId         String?
+  contactId         String?
+  purpose           ApplicationOutreachPurpose?
+  followUpToAssetId String?
+  sentAt            DateTime?
+  emailLength       EmailLength?
+  /// Versioning key. Resume/cover letter use the type. Outreach uses type:persona:contact:purpose.
+  groupKey          String                      @default("default")
+  version           Int
+  contentJson       Json
+  claimTraceJson    Json
+  guidance          String?
+  promptVersion     String
+  status            ApplicationAssetStatus      @default(DRAFT)
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  persona      Persona?     @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  persona      Persona?           @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  contact      Contact?           @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  followUpTo   ApplicationAsset?  @relation("OutreachFollowUp", fields: [followUpToAssetId], references: [id], onDelete: SetNull)
+  followUps    ApplicationAsset[] @relation("OutreachFollowUp")
 
-  @@unique([campaignId, type, version])
+  @@unique([campaignId, groupKey, version])
   @@index([organizationId])
   @@index([campaignId, type])
+  @@index([campaignId, groupKey])
   @@index([personaId])
+  @@index([contactId])
+  @@index([followUpToAssetId])
   @@index([status])
+  @@index([sentAt])
 }
 
 /// Personas a campaign will email. Empty means all personas for the product.

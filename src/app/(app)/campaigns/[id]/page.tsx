@@ -54,7 +54,7 @@ import {
   listIndexHref,
 } from "@/lib/lists/campaign-query";
 import { prisma } from "@/lib/prisma";
-import { nounForCount, vocab } from "@/lib/product-config";
+import { anyListFeatureEnabled, nounForCount, vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -534,13 +534,15 @@ export default async function CampaignDetailPage({
             : `No Ready to include ${vocab.contact.plural} to attach from that scoring run. Check before including and Left out stay on the score report.`}
         </div>
       ) : null}
+      {anyListFeatureEnabled() ? (
       <CampaignStageRail
         campaignId={campaign.id}
         stages={stages}
         currentStage={currentStage}
       />
+      ) : null}
 
-      {currentStage === "setup" ? (
+      {anyListFeatureEnabled() && currentStage === "setup" ? (
         <CampaignStageShell next={setupNext}>
           <Panel
             title="4 Setup"
@@ -623,8 +625,8 @@ export default async function CampaignDetailPage({
           </Panel>
 
           <Panel
-            title="Email settings"
-            description={`Default length and ${vocab.campaign.singular}-specific guidance. Length can be overridden on each draft.`}
+            title={`${vocab.campaign.Singular} guidance`}
+            description={`Default length and ${vocab.campaign.singular}-specific guidance for generated materials.`}
           >
             {campaignArchived ? (
               <p className="text-sm text-slate-600">
@@ -652,7 +654,7 @@ export default async function CampaignDetailPage({
         </CampaignStageShell>
       ) : null}
 
-      {currentStage === "emails" ? (
+      {anyListFeatureEnabled() && currentStage === "emails" ? (
         <CampaignStageShell next={emailsNext}>
         <Panel
           title={`Emails (${stageContacts.length} ${vocab.contact.plural})`}
@@ -844,7 +846,7 @@ export default async function CampaignDetailPage({
         </CampaignStageShell>
       ) : null}
 
-      {currentStage === "list" ? (
+      {anyListFeatureEnabled() && currentStage === "list" ? (
         <CampaignStageShell next={listNext}>
         <Panel
           title={`5 ${vocab.list.Singular}`}
@@ -895,7 +897,7 @@ export default async function CampaignDetailPage({
         </CampaignStageShell>
       ) : null}
 
-      {currentStage === "companies" ? (
+      {anyListFeatureEnabled() && currentStage === "companies" ? (
         <CampaignStageShell next={companiesNext}>
           <Panel
             title="6 Companies"
@@ -914,7 +916,7 @@ export default async function CampaignDetailPage({
         </CampaignStageShell>
       ) : null}
 
-      {currentStage === "contacts" ? (
+      {anyListFeatureEnabled() && currentStage === "contacts" ? (
         <CampaignStageShell next={contactsNext}>
           <Panel
             title={`7 ${vocab.contact.Plural}`}
@@ -933,7 +935,7 @@ export default async function CampaignDetailPage({
         </CampaignStageShell>
       ) : null}
 
-      {currentStage === "report" ? (
+      {anyListFeatureEnabled() && currentStage === "report" ? (
         <CampaignStageShell next={reportNext}>
           <Panel
             title="9 Report"

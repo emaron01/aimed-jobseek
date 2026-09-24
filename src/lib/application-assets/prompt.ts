@@ -6,15 +6,27 @@ import type {
 import {
   ASSET_CLAIM_VALIDATION_INSTRUCTIONS,
   COVER_LETTER_ASSET_INSTRUCTIONS,
+  OUTREACH_EMAIL_INSTRUCTIONS,
+  OUTREACH_LINKEDIN_INMAIL_INSTRUCTIONS,
+  OUTREACH_LINKEDIN_NOTE_INSTRUCTIONS,
   RESUME_ASSET_INSTRUCTIONS,
 } from "@/lib/prompt-content";
-import { applicationAssetConfig, consultationConfig } from "@/lib/product-config";
+import {
+  applicationAssetConfig,
+  connectionNoteBodyBudget,
+  consultationConfig,
+  outreachConfig,
+} from "@/lib/product-config";
 import {
   ASSET_CLAIM_VALIDATION_PROMPT_VERSION,
   COVER_LETTER_ASSET_PROMPT_VERSION,
+  OUTREACH_EMAIL_PROMPT_VERSION,
+  OUTREACH_LINKEDIN_INMAIL_PROMPT_VERSION,
+  OUTREACH_LINKEDIN_NOTE_PROMPT_VERSION,
   RESUME_ASSET_PROMPT_VERSION,
   type AssetClaim,
 } from "./contract";
+import type { OutreachGenerationInput } from "./outreach-types";
 
 function seekerSources(context: ApplicationGenerationContext) {
   return context.sources.filter((source) =>
@@ -24,6 +36,25 @@ function seekerSources(context: ApplicationGenerationContext) {
       "APPROVED_STORY",
     ].includes(source.category),
   );
+}
+
+function outreachCitableSources(context: ApplicationGenerationContext) {
+  return context.sources
+    .filter((source) =>
+      [
+        "PROFILE_FACT",
+        "APPROVED_STATEMENT",
+        "APPROVED_STORY",
+        "APPLICATION",
+        "JOB_REQUIREMENT",
+        "PERSONA",
+      ].includes(source.category),
+    )
+    .map((source) => ({
+      id: source.id,
+      category: source.category,
+      text: source.text,
+    }));
 }
 
 function commonPayload(context: ReadyApplicationGenerationContext) {
@@ -168,6 +199,100 @@ export function buildCoverLetterAssetMessages(input: {
             supports: [{ sourceId: "supplied source id", quote: "exact quote" }],
           },
         },
+      }),
+    },
+  ];
+}
+
+function outreachClaimShape() {
+  return {
+    id: "unique string",
+    text: "string",
+    supports: [{ sourceId: "supplied source id", quote: "exact quote" }],
+  };
+}
+
+export function buildOutreachAssetMessages(
+  input: OutreachGenerationInput,
+): AiMessage[] {
+  const instructions =
+    input.type === "EMAIL"
+      ? OUTREACH_EMAIL_INSTRUCTIONS
+      : input.type === "LINKEDIN_CONNECTION_NOTE"
+        ? OUTREACH_LINKEDIN_NOTE_INSTRUCTIONS
+        : OUTREACH_LINKEDIN_INMAIL_INSTRUCTIONS;
+  const version =
+    input.type === "EMAIL"
+      ? OUTREACH_EMAIL_PROMPT_VERSION
+      : input.type === "LINKEDIN_CONNECTION_NOTE"
+        ? OUTREACH_LINKEDIN_NOTE_PROMPT_VERSION
+        : OUTREACH_LINKEDIN_INMAIL_PROMPT_VERSION;
+  const wordTarget =
+    input.type === "EMAIL" && input.emailLength
+      ? outreachConfig.emailWordTargets[input.emailLength]
+      : null;
+  const responseShape =
+    input.type === "EMAIL"
+      ? {
+          type: "EMAIL",
+          subject: "string",
+          greeting: "exact supplied greeting",
+          paragraphs: ["claim"],
+          signoff: "professional signoff",
+          signerName: "exact supplied signer name",
+          claim: outreachClaimShape(),
+        }
+      : input.type === "LINKEDIN_CONNECTION_NOTE"
+        ? {
+            type: "LINKEDIN_CONNECTION_NOTE",
+            greeting: "exact supplied greeting",
+            body: "claim",
+            claim: outreachClaimShape(),
+          }
+        : {
+            type: "LINKEDIN_INMAIL",
+            subject: "string",
+            greeting: "exact supplied greeting",
+            paragraphs: ["claim"],
+            claim: outreachClaimShape(),
+          };
+  return [
+    {
+      role: "system",
+      content: `Prompt version: ${version}\n\n${instructions}`,
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        ...commonPayload(input.context),
+        applicationGuidance: input.context.campaign.applicationGuidance,
+        appliedAt: input.context.campaign.appliedAt,
+        voiceSamples: input.context.voiceSamples,
+        seekerAnswers: input.context.seekerAnswers,
+        greeting: input.greeting,
+        signerName: input.signerName,
+        confirmedHiringManagerRole: input.confirmedHiringManagerRole,
+        purpose: input.purpose,
+        priorMessage: input.priorMessage,
+        emailLength: input.emailLength,
+        wordTarget,
+        citableSources: outreachCitableSources(input.context),
+        characterLimits: {
+          connectionNote: outreachConfig.linkedinLimits.connectionNoteChars,
+          bodyMaxChars:
+            input.type === "LINKEDIN_CONNECTION_NOTE"
+              ? connectionNoteBodyBudget(input.greeting)
+              : outreachConfig.linkedinLimits.inMailBodyChars,
+          inMailSubject: outreachConfig.linkedinLimits.inMailSubjectChars,
+          inMailBody: outreachConfig.linkedinLimits.inMailBodyChars,
+        },
+        bannedPhrases: [
+          ...consultationConfig.bannedPhrases,
+          ...applicationAssetConfig.bannedPhrases,
+        ],
+        regenerationInstruction: input.regenerationInstruction,
+        qualityFeedback: input.qualityFeedback,
+        responseShape,
       }),
     },
   ];

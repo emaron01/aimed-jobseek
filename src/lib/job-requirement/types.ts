@@ -1,4 +1,12 @@
-export const JOB_REQUIREMENT_PROMPT_VERSION = "1";
+export const JOB_REQUIREMENT_PROMPT_VERSION = "2";
+
+export type NamedJobContact = {
+  firstName: string | null;
+  lastName: string | null;
+  title: string | null;
+  email: string | null;
+  phone: string | null;
+};
 
 export type ScorecardItem = {
   id: string;
@@ -25,6 +33,7 @@ export type ParsedJobRequirement = {
   requiredItems: string[];
   preferredItems: string[];
   scorecard: JobScorecard;
+  namedContacts: NamedJobContact[];
 };
 
 export type JobRequirementModelOutput = {
@@ -44,4 +53,11 @@ export type JobRequirementModelOutput = {
     outcomes?: Array<{ text?: string | null; inferred?: boolean | null }> | null;
     competencies?: Array<{ text?: string | null; inferred?: boolean | null }> | null;
   } | null;
+  namedContacts?: Array<{
+    firstName?: string | null;
+    lastName?: string | null;
+    title?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  }> | null;
 };

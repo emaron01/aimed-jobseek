@@ -26,10 +26,9 @@ import {
   type CoverLetterAssetContent,
   type ResumeAssetContent,
 } from "./contract";
+import type { AssetGenerationResult } from "./outreach-types";
 
-export type AssetGenerationResult =
-  | { ok: true; assetId: string; version: number }
-  | { ok: false; message: string; violations: string[] };
+export type { AssetGenerationResult } from "./outreach-types";
 
 function words(value: string): string[] {
   return value.trim().split(/\s+/).filter(Boolean);
@@ -73,8 +72,15 @@ export function normalizeAssetSupportSourceIds(
         : support;
     }),
   });
-  if (content.type === "COVER_LETTER") {
+  if (
+    content.type === "COVER_LETTER" ||
+    content.type === "EMAIL" ||
+    content.type === "LINKEDIN_INMAIL"
+  ) {
     return { ...content, paragraphs: content.paragraphs.map(normalize) };
+  }
+  if (content.type === "LINKEDIN_CONNECTION_NOTE") {
+    return { ...content, body: normalize(content.body) };
   }
   return {
     ...content,
@@ -102,7 +108,7 @@ function claimTrace(
     text: claim.text,
     supports: claim.supports,
   }));
-  if (content.type === "COVER_LETTER") return claims;
+  if (content.type !== "RESUME") return claims;
   const roles = new Map(context.profile.experience.map((role) => [role.id, role]));
   return [
     ...claims,
@@ -156,6 +162,9 @@ function supportErrors(
       content.type === "COVER_LETTER" && index === claims.length - 1;
     const requiresSeekerSupport =
       content.type === "RESUME" ||
+      content.type === "EMAIL" ||
+      content.type === "LINKEDIN_CONNECTION_NOTE" ||
+      content.type === "LINKEDIN_INMAIL" ||
       (content.type === "COVER_LETTER" && index > 0 && !isCoverLetterClose);
     let hasSeekerSupport = false;
     for (const support of claim.supports) {
@@ -298,7 +307,7 @@ export async function validateAssetContent(input: {
         bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
       }),
     ),
-    ...(input.content.type === "COVER_LETTER"
+    ...(input.content.type !== "RESUME"
       ? validateRepetitionAndMetaLanguage({
           text: texts.join(" "),
           bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
@@ -325,7 +334,7 @@ export async function validateAssetContent(input: {
         input.hiddenRoleIds ?? [],
       ),
     );
-  } else {
+  } else if (input.content.type === "COVER_LETTER") {
     errors.push(
       ...coverLetterStructureErrors(
         input.content,
@@ -368,7 +377,7 @@ async function saveVersion(input: {
       const latest = await tx.applicationAsset.aggregate({
         where: {
           campaignId: input.context.campaign.id,
-          type: input.type,
+          groupKey: input.type,
         },
         _max: { version: true },
       });
@@ -379,6 +388,7 @@ async function saveVersion(input: {
           campaignId: input.context.campaign.id,
           type: input.type,
           personaId: input.personaId,
+          groupKey: input.type,
           version,
           contentJson: input.content as unknown as Prisma.InputJsonValue,
           claimTraceJson: claimTrace(
@@ -411,6 +421,13 @@ export async function generateApplicationAsset(input: {
   );
   if (base.organizationId !== input.organizationId) {
     throw new TenantError(`${vocab.campaign.Singular} was not found.`);
+  }
+  if (input.type !== "RESUME" && input.type !== "COVER_LETTER") {
+    return {
+      ok: false,
+      message: "Use outreach generation for email and LinkedIn messages.",
+      violations: [],
+    };
   }
   if (!base.requirement || !base.profile) {
     return {
@@ -541,14 +558,14 @@ export async function approveApplicationAsset(input: {
       campaignId: input.campaignId,
       organizationId: input.organizationId,
     },
-    select: { id: true, type: true },
+    select: { id: true, type: true, groupKey: true },
   });
   if (!asset) throw new TenantError("Application asset was not found.");
   await prisma.$transaction([
     prisma.applicationAsset.updateMany({
       where: {
         campaignId: input.campaignId,
-        type: asset.type,
+        groupKey: asset.groupKey,
         status: "APPROVED",
       },
       data: { status: "DRAFT" },

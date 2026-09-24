@@ -18,7 +18,9 @@ Requirements:
 Preferred:
 - ROS2 experience
 
-The mission of this role is to make warehouse robots reliable.`;
+The mission of this role is to make warehouse robots reliable.
+
+Recruiter: Priya Shah, Technical Recruiter, priya.shah@acmerobotics.example, 512-555-0148`;
 
 export const AGENCY_JOB_POSTING = `Staffing agency posting
 Our client is hiring a Senior Product Engineer.
@@ -140,6 +142,15 @@ export const NORMAL_JOB_MODEL = {
       { text: "Leads incident response", inferred: false },
     ],
   },
+  namedContacts: [
+    {
+      firstName: "Priya",
+      lastName: "Shah",
+      title: "Technical Recruiter",
+      email: "priya.shah@acmerobotics.example",
+      phone: "512-555-0148",
+    },
+  ],
 };
 
 export const NURSE_MANAGER_MODEL = {
@@ -167,6 +178,7 @@ export const NURSE_MANAGER_MODEL = {
       { text: "Reviews incident reports", inferred: false },
     ],
   },
+  namedContacts: [],
 };
 
 export const FINANCIAL_CONTROLLER_MODEL = {
@@ -194,6 +206,7 @@ export const FINANCIAL_CONTROLLER_MODEL = {
       { text: "Reviews audit workpapers", inferred: false },
     ],
   },
+  namedContacts: [],
 };
 
 export const ENTERPRISE_SALES_DIRECTOR_MODEL = {
@@ -242,4 +255,5 @@ export const ENTERPRISE_SALES_DIRECTOR_MODEL = {
       },
     ],
   },
+  namedContacts: [],
 };
