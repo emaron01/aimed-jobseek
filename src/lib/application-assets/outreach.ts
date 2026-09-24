@@ -18,6 +18,7 @@ import {
   applicationAssetConfig,
   consultationConfig,
   isOutreachAssetType,
+  interviewConfig,
   outreachConfig,
   outreachGreeting,
   outreachGroupKey,
@@ -196,6 +197,109 @@ export function genericRelevanceErrors(text: string): string[] {
   return [];
 }
 
+function isRedirectSentence(text: string): boolean {
+  const lowered = text.toLowerCase();
+  return outreachConfig.redirectPhrases.some((phrase) => lowered.includes(phrase));
+}
+
+function isAskSentence(text: string): boolean {
+  if (isRedirectSentence(text)) return false;
+  if (text.includes("?")) return true;
+  const lowered = text.toLowerCase();
+  return outreachConfig.askPhrases.some((phrase) => lowered.includes(phrase));
+}
+
+function outreachBodyForQuality(content: ApplicationAssetContent): string {
+  if (content.type === "EMAIL" || content.type === "LINKEDIN_INMAIL") {
+    return content.paragraphs.map((claim) => claim.text).join("\n");
+  }
+  if (content.type === "LINKEDIN_CONNECTION_NOTE") return content.body.text;
+  return "";
+}
+
+export function askAndRedirectCountErrors(text: string): string[] {
+  const sentences = outreachSentences(text);
+  const askCount = sentences.filter(isAskSentence).length;
+  const redirectCount = sentences.filter(isRedirectSentence).length;
+  const errors: string[] = [];
+  if (askCount > 1) {
+    errors.push("Use only one ask. Remove the extra request.");
+  }
+  if (redirectCount > 1) {
+    errors.push("Use only one redirect line.");
+  }
+  return errors;
+}
+
+export function finalSentencePunctuationErrors(text: string): string[] {
+  const sentences = outreachSentences(text);
+  const last = sentences[sentences.length - 1];
+  if (!last) return ["The message body was empty."];
+  if (!/[.!?]"?$/.test(last.trim())) {
+    return [
+      "The final sentence must end with a period, question mark, or exclamation point.",
+    ];
+  }
+  return [];
+}
+
+function isHedgedUnderstanding(text: string): boolean {
+  const lowered = text.toLowerCase();
+  return outreachConfig.seekerUnderstandingPhrases.some((phrase) =>
+    lowered.includes(phrase),
+  );
+}
+
+export function unsupportedRecipientFactErrors(input: {
+  text: string;
+  factTexts: string[];
+}): string[] {
+  const factHaystack = input.factTexts.join("\n").toLowerCase();
+  for (const sentence of outreachSentences(input.text)) {
+    const lowered = sentence.toLowerCase();
+    const aboutRecipientTeam =
+      /\b(?:your team|their team|the \w+ team)\b/.test(lowered);
+    if (!aboutRecipientTeam) continue;
+    const assertion = outreachConfig.recipientTeamAssertionPhrases.find(
+      (phrase) => lowered.includes(phrase),
+    );
+    if (!assertion) continue;
+    if (isHedgedUnderstanding(lowered)) continue;
+    if (factHaystack.includes(assertion)) continue;
+    return [
+      "Do not state inferences about the recipient's team or work as fact. Phrase them as the seeker's understanding, or cite a persona or research FACT.",
+    ];
+  }
+  return [];
+}
+
+export function thankYouNotesErrors(input: {
+  text: string;
+  notes: string;
+}): string[] {
+  const notes = input.notes.trim();
+  if (!notes) {
+    return ["Record post-stage notes before generating a thank-you or check-in."];
+  }
+  const lowered = input.text.toLowerCase();
+  for (const phrase of outreachConfig.genericGratitudePhrases) {
+    if (lowered.includes(phrase)) {
+      return [
+        "Reference a specific point from the seeker's post-stage notes. Do not use generic gratitude.",
+      ];
+    }
+  }
+  const noteTokens = sentenceTokens(notes);
+  const textTokens = sentenceTokens(input.text);
+  const overlap = [...noteTokens].filter((token) => textTokens.has(token)).length;
+  if (noteTokens.size > 0 && overlap < 2) {
+    return [
+      "The message must reference a specific point from the seeker's post-stage notes.",
+    ];
+  }
+  return [];
+}
+
 export function threadRepetitionErrors(input: {
   current: string;
   priorBodies: string[];
@@ -272,9 +376,10 @@ export async function validateOutreachContent(input: {
   greeting: string;
   signerName: string;
   confirmedHiringManagerRole: boolean;
-  purpose: "PROACTIVE" | "FOLLOW_UP";
+  purpose: "PROACTIVE" | "FOLLOW_UP" | "THANK_YOU" | "CHECK_IN";
   includeRedirect: boolean;
   priorMessages?: Array<{ subject: string | null; body: string }>;
+  stageNotes?: string | null;
 }): Promise<string[]> {
   if (
     input.content.type !== "EMAIL" &&
@@ -286,6 +391,19 @@ export async function validateOutreachContent(input: {
   const claims = assetClaims(input.content);
   const texts = claims.map((claim) => claim.text);
   const composed = composeOutreachText(input.content);
+  const bodyForQuality = outreachBodyForQuality(input.content);
+  const qualityTexts = [
+    ...texts,
+    ...(composed.subject ? [composed.subject] : []),
+  ];
+  const factTexts = input.context.sources
+    .filter(
+      (source) =>
+        source.category === "PERSONA" ||
+        source.category === "COMPANY_RESEARCH" ||
+        source.category === "JOB_REQUIREMENT",
+    )
+    .map((source) => source.text);
   const channel =
     input.content.type === "EMAIL" ? "email" : "linkedin";
   const errors = [
@@ -296,11 +414,11 @@ export async function validateOutreachContent(input: {
       confirmedHiringManagerRole: input.confirmedHiringManagerRole,
       channel,
     }),
-    ...bannedPhraseHits(texts, [
+    ...bannedPhraseHits(qualityTexts, [
       ...consultationConfig.bannedPhrases,
       ...applicationAssetConfig.bannedPhrases,
     ]).map((phrase) => `Remove configured banned language: ${phrase}.`),
-    ...texts.flatMap((text) =>
+    ...qualityTexts.flatMap((text) =>
       validateRepetitionAndMetaLanguage({
         text,
         bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
@@ -310,8 +428,20 @@ export async function validateOutreachContent(input: {
       text: composed.body,
       includeRedirect: input.includeRedirect,
     }),
+    ...askAndRedirectCountErrors(bodyForQuality),
+    ...finalSentencePunctuationErrors(bodyForQuality),
+    ...unsupportedRecipientFactErrors({
+      text: bodyForQuality,
+      factTexts,
+    }),
     ...(input.purpose === "PROACTIVE"
       ? genericRelevanceErrors(composed.body)
+      : []),
+    ...(input.purpose === "THANK_YOU" || input.purpose === "CHECK_IN"
+      ? thankYouNotesErrors({
+          text: bodyForQuality,
+          notes: input.stageNotes ?? "",
+        })
       : []),
   ];
   const priorBodies = (input.priorMessages ?? []).map((message) => message.body);
@@ -372,6 +502,7 @@ async function saveOutreachVersion(input: {
   contactId: string | null;
   purpose: ApplicationOutreachPurpose;
   followUpToAssetId: string | null;
+  interviewStageId: string | null;
   emailLength: EmailLength | null;
   content: ApplicationAssetContent;
   guidance: string | null;
@@ -381,6 +512,7 @@ async function saveOutreachVersion(input: {
     personaId: input.personaId,
     contactId: input.contactId,
     purpose: input.purpose,
+    interviewStageId: input.interviewStageId,
   });
   return prisma.$transaction(
     async (tx) => {
@@ -401,6 +533,7 @@ async function saveOutreachVersion(input: {
           contactId: input.contactId,
           purpose: input.purpose,
           followUpToAssetId: input.followUpToAssetId,
+          interviewStageId: input.interviewStageId,
           emailLength: input.emailLength,
           groupKey,
           version,
@@ -429,6 +562,7 @@ export async function generateOutreachAsset(input: {
   contactId?: string | null;
   purpose: ApplicationOutreachPurpose;
   followUpToAssetId?: string | null;
+  interviewStageId?: string | null;
   emailLength?: EmailLength | null;
   regenerationInstruction?: string | null;
 }): Promise<AssetGenerationResult> {
@@ -507,10 +641,44 @@ export async function generateOutreachAsset(input: {
       (membership.chosenPersonaId === personaId &&
         context.persona?.suggestionKey === "hiring_manager");
   }
-  const includeRedirect = shouldIncludeRedirect({
-    hasContact: Boolean(contact),
-    roleConfirmed,
-  });
+  const interviewPurpose =
+    input.purpose === "THANK_YOU" || input.purpose === "CHECK_IN";
+  let interviewStageNotes: string | null = null;
+  const interviewStageId = input.interviewStageId?.trim() || null;
+  if (interviewPurpose) {
+    if (!interviewStageId || !contactId) {
+      return {
+        ok: false,
+        message: "A thank-you or check-in needs a stage and an interviewer.",
+        violations: [],
+      };
+    }
+    const stage = await prisma.interviewStage.findFirst({
+      where: {
+        id: interviewStageId,
+        campaignId: input.campaignId,
+        organizationId: input.organizationId,
+      },
+      select: { notesAfter: true, outcome: true },
+    });
+    if (!stage) {
+      return { ok: false, message: "Interview stage was not found.", violations: [] };
+    }
+    interviewStageNotes = stage.notesAfter?.trim() || null;
+    if (!interviewStageNotes) {
+      return {
+        ok: false,
+        message: interviewConfig.labels.recordNotesFirst,
+        violations: [],
+      };
+    }
+  }
+  const includeRedirect = interviewPurpose
+    ? false
+    : shouldIncludeRedirect({
+        hasContact: Boolean(contact),
+        roleConfirmed,
+      });
   if (
     input.purpose === "FOLLOW_UP" &&
     !input.followUpToAssetId?.trim()
@@ -600,6 +768,7 @@ export async function generateOutreachAsset(input: {
       purpose: input.purpose,
       emailLength,
       priorMessage,
+      interviewStageNotes,
       regenerationInstruction: input.regenerationInstruction ?? null,
       qualityFeedback: feedback,
     });
@@ -620,6 +789,7 @@ export async function generateOutreachAsset(input: {
       purpose: input.purpose,
       includeRedirect,
       priorMessages,
+      stageNotes: interviewStageNotes,
     });
     if (violations.length === 0) {
       const saved = await saveOutreachVersion({
@@ -629,6 +799,7 @@ export async function generateOutreachAsset(input: {
         contactId,
         purpose: input.purpose,
         followUpToAssetId,
+        interviewStageId,
         emailLength,
         content,
         guidance: input.regenerationInstruction?.trim() || null,
@@ -690,13 +861,27 @@ export async function markApplicationApplied(input: {
   if (Number.isNaN(input.appliedAt.getTime())) {
     throw new TenantError("Applied date is invalid.");
   }
+  const campaign = await prisma.campaign.findFirst({
+    where: {
+      id: input.campaignId,
+      organizationId: input.organizationId,
+      ownerUserId: input.userId,
+    },
+    select: { id: true, applicationProgress: true },
+  });
+  if (!campaign) {
+    throw new TenantError(`${vocab.campaign.Singular} was not found.`);
+  }
   const updated = await prisma.campaign.updateMany({
     where: {
       id: input.campaignId,
       organizationId: input.organizationId,
       ownerUserId: input.userId,
     },
-    data: { appliedAt: input.appliedAt },
+    data: {
+      appliedAt: input.appliedAt,
+      applicationProgress: campaign.applicationProgress ?? "APPLIED",
+    },
   });
   if (updated.count === 0) {
     throw new TenantError(`${vocab.campaign.Singular} was not found.`);

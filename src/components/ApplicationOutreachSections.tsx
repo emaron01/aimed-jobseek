@@ -5,10 +5,12 @@ import {
   addApplicationContactAction,
   generateOutreachAssetAction,
   markApplicationAppliedAction,
+  setApplicationProgressAction,
   markOutreachSentAction,
   updateApplicationContactRoleAction,
   type ApplicationOutreachActionResult,
 } from "@/app/actions/application-outreach";
+import { interviewConfig } from "@/lib/product-config";
 import {
   applicationAssetContentSchema,
   composeOutreachText,
@@ -45,7 +47,7 @@ type OutreachRow = {
   status: "DRAFT" | "APPROVED";
   personaId: string | null;
   contactId: string | null;
-  purpose: "PROACTIVE" | "FOLLOW_UP" | null;
+  purpose: "PROACTIVE" | "FOLLOW_UP" | "THANK_YOU" | "CHECK_IN" | null;
   sentAt: string | null;
   emailLength: "SHORT" | "MEDIUM" | "LONG" | null;
   content: unknown;
@@ -82,12 +84,18 @@ export function ApplicationAppliedSection({
   campaignId,
   canEdit,
   appliedAt,
+  applicationProgress,
 }: {
   campaignId: string;
   canEdit: boolean;
   appliedAt: string | null;
+  applicationProgress: keyof typeof interviewConfig.progress | null;
 }) {
   const [state, action] = useActionState(markApplicationAppliedAction, initial);
+  const [progressState, progressAction] = useActionState(
+    setApplicationProgressAction,
+    initial,
+  );
   return (
     <section
       className="space-y-3 rounded-lg border border-slate-200 bg-white p-5"
@@ -100,9 +108,11 @@ export function ApplicationAppliedSection({
         <p className="mt-1 text-sm text-slate-600">{outreachConfig.labels.appliedHelp}</p>
       </div>
       <p className="text-sm font-medium text-slate-900" data-testid="application-status">
-        {appliedAt
-          ? `${outreachConfig.labels.appliedStatus} ${todayInputValue(appliedAt)}`
-          : outreachConfig.labels.notAppliedStatus}
+        {applicationProgress
+          ? interviewConfig.progress[applicationProgress]
+          : appliedAt
+            ? `${outreachConfig.labels.appliedStatus} ${todayInputValue(appliedAt)}`
+            : outreachConfig.labels.notAppliedStatus}
       </p>
       {canEdit ? (
         <form action={action} className="flex flex-wrap items-end gap-3">
@@ -119,7 +129,31 @@ export function ApplicationAppliedSection({
           <SubmitButton>{outreachConfig.labels.appliedStatus}</SubmitButton>
         </form>
       ) : null}
+      {canEdit ? (
+        <form action={progressAction} className="flex flex-wrap items-end gap-3">
+          <input type="hidden" name="campaignId" value={campaignId} />
+          <label className="text-sm">
+            <span className="font-medium text-slate-700">
+              {interviewConfig.labels.progressTitle}
+            </span>
+            <select
+              name="progress"
+              defaultValue={applicationProgress ?? ""}
+              className="mt-1 block rounded-md border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">—</option>
+              {Object.entries(interviewConfig.progress).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <SubmitButton>{interviewConfig.labels.progressTitle}</SubmitButton>
+        </form>
+      ) : null}
       <Status result={state} />
+      <Status result={progressState} />
     </section>
   );
 }

@@ -7,7 +7,7 @@ import {
   updateApplicationReminderPolicyAction,
 } from "@/app/actions/cadence";
 import { requireOrgAdmin } from "@/lib/org/authz";
-import { outreachConfig, vocab } from "@/lib/product-config";
+import { interviewConfig, outreachConfig, vocab } from "@/lib/product-config";
 
 export default async function CadenceSettingsPage() {
   const { organization } = await requireOrgAdmin();
@@ -70,6 +70,26 @@ export default async function CadenceSettingsPage() {
             <span className="mt-1 block text-xs text-slate-500">
               Blank means no reminder.
             </span>
+          </label>
+          <label className="text-sm sm:col-span-2">
+            {interviewConfig.reminders.thankYouKind} hours
+            <input
+              name="interviewThankYouHours"
+              type="number"
+              min={1}
+              defaultValue={reminders.interviewThankYouHours}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            />
+          </label>
+          <label className="text-sm sm:col-span-2">
+            {interviewConfig.reminders.checkInKind} business days
+            <input
+              name="interviewCheckInBusinessDays"
+              type="number"
+              min={1}
+              defaultValue={reminders.interviewCheckInBusinessDays}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            />
           </label>
           <label className="text-sm sm:col-span-2">
             Repeat (optional)

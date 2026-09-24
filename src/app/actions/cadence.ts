@@ -16,6 +16,7 @@ import {
   parseOptionalReminderDay,
   validateApplicationReminderInput,
 } from "@/lib/cadence/application-reminders";
+import { interviewConfig } from "@/lib/product-config";
 import { ensureOrganizationCadencePolicy } from "@/lib/cadence/defaults";
 import { recomputeCampaignContactCadenceBatch } from "@/lib/cadence/recompute";
 import {
@@ -262,11 +263,28 @@ export async function updateApplicationReminderPolicyAction(
           "Reminder days must be blank or a whole number of days of at least 1.",
       };
     }
+    const thankYouHours = parseOptionalReminderDay(
+      formData.get("interviewThankYouHours"),
+    );
+    const checkInDays = parseOptionalReminderDay(
+      formData.get("interviewCheckInBusinessDays"),
+    );
+    if (Number.isNaN(thankYouHours) || Number.isNaN(checkInDays)) {
+      return {
+        ok: false,
+        message:
+          "Interview reminder windows must be a whole number of at least 1.",
+      };
+    }
     const reminders = {
       reminderDay3,
       reminderDay7,
       reminderEmail4Days,
       reminderRepeatDays,
+      interviewThankYouHours:
+        thankYouHours ?? interviewConfig.reminders.defaultThankYouHours,
+      interviewCheckInBusinessDays:
+        checkInDays ?? interviewConfig.reminders.defaultCheckInBusinessDays,
     };
     const validation = validateApplicationReminderInput(reminders);
     if (validation) return { ok: false, message: validation };

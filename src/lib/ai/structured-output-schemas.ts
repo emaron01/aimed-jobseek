@@ -32,6 +32,10 @@ import {
   linkedinNoteAssetContentSchema,
   resumeAssetContentSchema,
 } from "@/lib/application-assets/contract";
+import {
+  interviewClarifyingQuestionsSchema,
+  interviewGuideContentSchema,
+} from "@/lib/interview/contract";
 
 export type StructuredOutputSchemaEntry = {
   schemaName: string;
@@ -190,6 +194,16 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   applicationAssetClaimValidation: {
     schemaName: "application_asset_claim_validation",
     schema: assetClaimValidationSchema,
+    usageOperations: ["APPLICATION_ASSET_GENERATION"],
+  },
+  interviewClarifyingQuestions: {
+    schemaName: "interview_clarifying_questions",
+    schema: interviewClarifyingQuestionsSchema,
+    usageOperations: ["APPLICATION_ASSET_GENERATION"],
+  },
+  interviewGuide: {
+    schemaName: "interview_stage_guide",
+    schema: interviewGuideContentSchema,
     usageOperations: ["APPLICATION_ASSET_GENERATION"],
   },
   prospectReplyClassification: {

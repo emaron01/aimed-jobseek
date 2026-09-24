@@ -85,6 +85,38 @@ export const outreachConfig = Object.freeze({
     "given the role's collaboration",
     "collaboration with the team",
   ],
+  askPhrases: [
+    "would you",
+    "are you open",
+    "would a brief",
+    "open to a",
+    "happy to chat",
+    "let me know if",
+    "could we",
+  ],
+  seekerUnderstandingPhrases: [
+    "my understanding",
+    "i understand",
+    "from what i've read",
+    "from the posting",
+    "it looks like",
+    "it sounds like",
+    "i read that",
+  ],
+  recipientTeamAssertionPhrases: [
+    "would be felt by",
+    "is felt by",
+    "felt by the",
+    "the team every week",
+    "your team always",
+    "the team always",
+  ],
+  genericGratitudePhrases: [
+    "thank you for your time",
+    "thanks for your time",
+    "thank you for the opportunity to interview",
+    "it was a pleasure speaking with you",
+  ],
   threadRepetitionOverlap: 0.6,
   reminders: {
     defaultDay3: 3,
@@ -144,12 +176,15 @@ export function outreachGroupKey(input: {
   type: OutreachAssetType;
   personaId: string | null;
   contactId: string | null;
-  purpose: "PROACTIVE" | "FOLLOW_UP";
+  purpose: "PROACTIVE" | "FOLLOW_UP" | "THANK_YOU" | "CHECK_IN";
+  interviewStageId?: string | null;
 }): string {
-  return [
+  const parts = [
     input.type,
     input.personaId ?? "none",
     input.contactId ?? "none",
     input.purpose,
-  ].join(":");
+  ];
+  if (input.interviewStageId) parts.push(input.interviewStageId);
+  return parts.join(":");
 }

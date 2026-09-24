@@ -13,6 +13,7 @@ import {
   updateApplicationContactRole,
 } from "@/lib/application/contacts";
 import { isOutreachAssetType } from "@/lib/product-config";
+import { setApplicationProgress } from "@/lib/interview/stages";
 import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 
@@ -116,6 +117,29 @@ export async function updateApplicationContactRoleAction(
   }
 }
 
+export async function setApplicationProgressAction(
+  _previous: ApplicationOutreachActionResult | null,
+  formData: FormData,
+): Promise<ApplicationOutreachActionResult> {
+  try {
+    const [user, organizationId] = await Promise.all([
+      requireCurrentUser(),
+      requireOrganizationId(),
+    ]);
+    const id = campaignId(formData);
+    await setApplicationProgress({
+      organizationId,
+      campaignId: id,
+      userId: user.id,
+      progress: String(formData.get("progress") ?? "").trim(),
+    });
+    revalidate(id);
+    return { ok: true, message: "Application status updated." };
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
 export async function markApplicationAppliedAction(
   _previous: ApplicationOutreachActionResult | null,
   formData: FormData,
@@ -155,7 +179,11 @@ export async function generateOutreachAssetAction(
     }
     const purposeRaw = String(formData.get("purpose") ?? "PROACTIVE");
     const purpose =
-      purposeRaw === "FOLLOW_UP" ? "FOLLOW_UP" : "PROACTIVE";
+      purposeRaw === "FOLLOW_UP" ||
+      purposeRaw === "THANK_YOU" ||
+      purposeRaw === "CHECK_IN"
+        ? purposeRaw
+        : "PROACTIVE";
     const lengthRaw = String(formData.get("emailLength") ?? "MEDIUM");
     const emailLength: EmailLength =
       lengthRaw === "SHORT" || lengthRaw === "LONG" ? lengthRaw : "MEDIUM";
@@ -169,6 +197,8 @@ export async function generateOutreachAssetAction(
       purpose,
       followUpToAssetId:
         String(formData.get("followUpToAssetId") ?? "").trim() || null,
+      interviewStageId:
+        String(formData.get("interviewStageId") ?? "").trim() || null,
       emailLength,
       regenerationInstruction:
         String(formData.get("regenerationInstruction") ?? "").trim() || null,

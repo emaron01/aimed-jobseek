@@ -99,6 +99,10 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
         },
       },
       applicationSummary: true,
+      interviewStages: {
+        include: { guide: { select: { id: true, status: true, updatedAt: true } } },
+        orderBy: { sortOrder: "asc" },
+      },
     },
   });
   if (!campaign) throw new TenantError(`${vocab.campaign.Singular} was not found.`);
@@ -149,6 +153,13 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
       story.updatedAt.toISOString(),
       story.interviewAnswerApprovedAt?.toISOString() ?? null,
       story.resumeBulletApprovedAt?.toISOString() ?? null,
+    ]),
+    interviewStages: campaign.interviewStages.map((stage) => [
+      stage.id,
+      stage.updatedAt.toISOString(),
+      stage.notesAfter,
+      stage.outcome,
+      stage.guide?.updatedAt.toISOString() ?? null,
     ]),
   };
   const sourceHash = createHash("sha256")
@@ -235,6 +246,7 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
     research,
     roles,
     stories,
+    stages: campaign.interviewStages,
     sources,
     sourceHash,
   };
@@ -411,6 +423,7 @@ export async function getApplicationSummaryView(input: {
     roles: data.roles,
     assessments: data.campaign.consultationSession?.assessments ?? [],
     stories: data.stories,
+    stages: data.stages,
     summary: data.campaign.applicationSummary,
     guidance: guidance?.success ? guidance.data : null,
     stale:

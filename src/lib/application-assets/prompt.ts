@@ -276,6 +276,7 @@ export function buildOutreachAssetMessages(
         redirectAsk: input.includeRedirect ? outreachConfig.redirectAsk : null,
         purpose: input.purpose,
         priorMessage: input.priorMessage,
+        interviewStageNotes: input.interviewStageNotes,
         emailLength: input.emailLength,
         wordTarget,
         citableSources: outreachCitableSources(input.context),

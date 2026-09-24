@@ -83,6 +83,7 @@ export async function addApplicationContact(input: {
   phone?: string | null;
   personaId?: string | null;
   source?: "SEEKER" | "POSTING";
+  confirmRole?: boolean;
 }): Promise<{
   contactId: string;
   campaignContactId: string;
@@ -127,7 +128,10 @@ export async function addApplicationContact(input: {
       : undefined,
   });
   const chosenPersonaId = decision.personaId ?? override ?? matched.personaId;
-  const roleConfirmed = input.source === "POSTING" || Boolean(override);
+  const roleConfirmed =
+    input.source === "POSTING" ||
+    Boolean(override) ||
+    Boolean(input.confirmRole);
 
   const email = input.email?.trim() || null;
   const normalizedEmail = email ? normalizeContactEmail(email) : null;

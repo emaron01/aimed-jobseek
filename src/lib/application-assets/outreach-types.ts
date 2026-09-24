@@ -13,9 +13,10 @@ export type OutreachGenerationInput = {
   signerName: string;
   confirmedHiringManagerRole: boolean;
   includeRedirect: boolean;
-  purpose: "PROACTIVE" | "FOLLOW_UP";
+  purpose: "PROACTIVE" | "FOLLOW_UP" | "THANK_YOU" | "CHECK_IN";
   emailLength: EmailLength | null;
   priorMessage: { subject: string | null; body: string } | null;
+  interviewStageNotes: string | null;
   regenerationInstruction: string | null;
   qualityFeedback: string[];
 };

@@ -51,6 +51,36 @@ enum CampaignStatus {
   COMPLETED
 }
 
+enum ApplicationProgress {
+  APPLIED
+  INTERVIEWING
+  OFFER
+  REJECTED
+  WITHDRAWN
+}
+
+enum InterviewStageType {
+  RECRUITER_SCREEN
+  HIRING_MANAGER
+  PANEL_COMPETENCY
+  EXECUTIVE
+  OTHER
+}
+
+enum InterviewFormat {
+  PHONE
+  VIDEO
+  ONSITE
+}
+
+enum InterviewStageOutcome {
+  ADVANCED
+  REJECTED
+  WITHDRAWN
+  OFFER
+  COMPLETED
+}
+
 enum EmailLength {
   SHORT
   MEDIUM
@@ -527,6 +557,9 @@ model Organization {
   consultationStatements        ConsultationStatement[]
   applicationSummaries          ApplicationSummary[]
   applicationAssets             ApplicationAsset[]
+  interviewStages               InterviewStage[]
+  interviewStageInterviewers    InterviewStageInterviewer[]
+  interviewStageGuides          InterviewStageGuide[]
   profileStories                ProfileStory[]
   contactLists                  ContactList[]
   contacts                      Contact[]
@@ -1010,6 +1043,10 @@ model OrganizationCadencePolicy {
   reminderDay7         Int?     @default(7)
   reminderEmail4Days   Int?
   reminderRepeatDays   Int?
+  /// Hours after a stage before a thank-you reminder is due.
+  interviewThankYouHours Int @default(24)
+  /// Business days after a stage when no expected decision date is set.
+  interviewCheckInBusinessDays Int @default(5)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -1771,6 +1808,7 @@ model Contact {
   campaignContacts   CampaignContact[]
   contactResearch    ContactResearch[]
   applicationAssets  ApplicationAsset[]
+  interviewStages    InterviewStageInterviewer[]
 
   @@unique([organizationId, ownerUserId, normalizedEmail])
   @@index([organizationId])
@@ -2219,6 +2257,8 @@ model Campaign {
   emailGuidance       String?
   /// Date the seeker marked this application Applied. Null until marked.
   appliedAt           DateTime?
+  /// Seeker-facing application progress. First interview stage sets INTERVIEWING.
+  applicationProgress ApplicationProgress?
   status              CampaignStatus     @default(DRAFT)
   /// Soft-archive: hidden from home/list by default; history intact, read-only.
   archivedAt          DateTime?
@@ -2240,6 +2280,7 @@ model Campaign {
   consultationSession ConsultationSession?
   applicationSummary  ApplicationSummary?
   applicationAssets   ApplicationAsset[]
+  interviewStages     InterviewStage[]
 
   @@index([organizationId])
   @@index([organizationId, createdAt])
@@ -2384,6 +2425,8 @@ enum ApplicationAssetType {
 enum ApplicationOutreachPurpose {
   PROACTIVE
   FOLLOW_UP
+  THANK_YOU
+  CHECK_IN
 }
 
 enum ApplicationAssetStatus {
@@ -2583,6 +2626,7 @@ model ApplicationAsset {
   contactId         String?
   purpose           ApplicationOutreachPurpose?
   followUpToAssetId String?
+  interviewStageId  String?
   sentAt            DateTime?
   emailLength       EmailLength?
   /// Versioning key. Resume/cover letter use the type. Outreach uses type:persona:contact:purpose.
@@ -2602,6 +2646,7 @@ model ApplicationAsset {
   contact      Contact?           @relation(fields: [contactId], references: [id], onDelete: SetNull)
   followUpTo   ApplicationAsset?  @relation("OutreachFollowUp", fields: [followUpToAssetId], references: [id], onDelete: SetNull)
   followUps    ApplicationAsset[] @relation("OutreachFollowUp")
+  interviewStage InterviewStage? @relation(fields: [interviewStageId], references: [id], onDelete: SetNull)
 
   @@unique([campaignId, groupKey, version])
   @@index([organizationId])
@@ -2610,8 +2655,76 @@ model ApplicationAsset {
   @@index([personaId])
   @@index([contactId])
   @@index([followUpToAssetId])
+  @@index([interviewStageId])
   @@index([status])
   @@index([sentAt])
+}
+
+model InterviewStage {
+  id                   String                 @id @default(cuid())
+  organizationId       String
+  campaignId           String
+  sortOrder            Int
+  type                 InterviewStageType
+  scheduledAt          DateTime
+  format               InterviewFormat
+  notesBefore          String?
+  notesAfter           String?
+  expectedDecisionAt   DateTime?
+  outcome              InterviewStageOutcome?
+  consultationOfferJson Json?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  organization  Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign      Campaign                     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  interviewers  InterviewStageInterviewer[]
+  guide         InterviewStageGuide?
+  outreachAssets ApplicationAsset[]
+
+  @@unique([campaignId, sortOrder])
+  @@index([organizationId])
+  @@index([campaignId])
+  @@index([scheduledAt])
+}
+
+model InterviewStageInterviewer {
+  id             String   @id @default(cuid())
+  organizationId String
+  stageId        String
+  contactId      String
+  createdAt      DateTime @default(now())
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stage        InterviewStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  contact      Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([stageId, contactId])
+  @@index([organizationId])
+  @@index([contactId])
+}
+
+model InterviewStageGuide {
+  id                       String                       @id @default(cuid())
+  organizationId           String
+  stageId                  String                       @unique
+  status                   ConsultationGenerationStatus @default(GENERATING)
+  clarifyingQuestionsJson  Json?
+  clarifyingAnswersJson    Json?
+  clarifyingSkipped        Boolean                      @default(false)
+  contentJson              Json?
+  sourceHash               String?
+  promptVersion            String
+  generationError          String?
+  generatedAt              DateTime?
+  createdAt                DateTime                     @default(now())
+  updatedAt                DateTime                     @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stage        InterviewStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([status])
 }
 
 /// Personas a campaign will email. Empty means all personas for the product.

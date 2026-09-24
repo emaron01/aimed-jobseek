@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ApplicationReminderRow } from "@/lib/cadence/application-reminders";
-import { outreachConfig, vocab } from "@/lib/product-config";
+import { applicationReminderLabel } from "@/lib/cadence/application-reminders";
+import { interviewConfig, outreachConfig, vocab } from "@/lib/product-config";
 
 export function ApplicationRemindersPanel({
   reminders,
@@ -21,7 +22,7 @@ export function ApplicationRemindersPanel({
       <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
         {reminders.map((row) => (
           <li
-            key={`${row.campaignId}:${row.day}`}
+            key={`${row.kind}:${row.campaignId}:${row.stageId ?? row.day}`}
             className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
           >
             <div>
@@ -32,7 +33,13 @@ export function ApplicationRemindersPanel({
                 {row.campaignName}
               </Link>
               <p className="text-sm text-slate-600">
-                Day {row.day} from {row.appliedAt ? "Applied" : "first sent message"}{" "}
+                {applicationReminderLabel(row)}
+                {row.kind === "OUTREACH"
+                  ? ` · Day ${row.day} from ${row.appliedAt ? interviewConfig.progress.APPLIED : "first sent message"}`
+                  : ""}
+                {row.recordNotesFirst
+                  ? ` · ${interviewConfig.reminders.recordNotesPrompt}`
+                  : ""}{" "}
                 · due {row.dueAt.toLocaleDateString()}
               </p>
             </div>

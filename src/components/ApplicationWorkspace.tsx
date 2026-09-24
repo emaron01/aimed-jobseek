@@ -14,6 +14,7 @@ import {
   updateApplicationRoleAction,
 } from "@/app/actions/hiring-team";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
+import { InterviewStagesSection } from "@/components/InterviewStagesSection";
 import { ConsultationSection } from "@/components/ConsultationSection";
 import { ApplicationAssetsSection } from "@/components/ApplicationAssetsSection";
 import {
@@ -120,6 +121,7 @@ export async function ApplicationWorkspace({
           applicationFit: true,
           product: { select: { profileJson: true } },
           appliedAt: true,
+          applicationProgress: true,
           contacts: {
             include: {
               contact: true,
@@ -361,6 +363,7 @@ export async function ApplicationWorkspace({
       campaignId={requirement.campaignId}
       canEdit={canEdit}
       appliedAt={requirement.campaign.appliedAt?.toISOString() ?? null}
+      applicationProgress={requirement.campaign.applicationProgress}
     />
     <ApplicationContactsSection
       campaignId={requirement.campaignId}
@@ -446,6 +449,16 @@ export async function ApplicationWorkspace({
           emailLength: asset.emailLength,
           content: asset.contentJson,
         }))}
+    />
+    <InterviewStagesSection
+      campaignId={requirement.campaignId}
+      organizationId={organizationId}
+      canEdit={canEdit}
+      roles={requirement.campaign.hiringTeamRoles}
+      contacts={requirement.campaign.contacts.map((row) => ({
+        contactId: row.contact.id,
+        personaId: row.chosenPersonaId,
+      }))}
     />
     </>
   );

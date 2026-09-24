@@ -2,6 +2,7 @@ import "server-only";
 
 import type { OrganizationCadencePolicy } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { interviewConfig } from "@/lib/product-config";
 
 export const DEFAULT_CADENCE_POLICY = {
   day2IntervalDays: 9,
@@ -13,6 +14,8 @@ export const DEFAULT_CADENCE_POLICY = {
   reminderDay7: 7,
   reminderEmail4Days: null,
   reminderRepeatDays: null,
+  interviewThankYouHours: interviewConfig.reminders.defaultThankYouHours,
+  interviewCheckInBusinessDays: interviewConfig.reminders.defaultCheckInBusinessDays,
 } as const;
 
 export type CadencePolicyValues = Pick<

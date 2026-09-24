@@ -34,6 +34,8 @@ export const profileFactItemSchema = z
 
 export type ProfileFactItem = z.infer<typeof profileFactItemSchema>;
 
+const optionalFact = profileFactItemSchema.nullable().optional().default(null);
+
 export const profileExperienceRoleSchema = z
   .object({
     id: z.string().trim().min(1),
@@ -45,6 +47,7 @@ export const profileExperienceRoleSchema = z
     location: z.string().nullable().optional().default(null),
     summary: z.string().nullable().optional().default(null),
     achievements: z.array(profileFactItemSchema).default([]),
+    reasonForLeaving: optionalFact,
     provenance: z.array(provenanceRefSchema).default([]),
   })
   .superRefine((role, ctx) => {
@@ -66,8 +69,6 @@ export const profileGapSchema = z.object({
 });
 
 export type ProfileGap = z.infer<typeof profileGapSchema>;
-
-const optionalFact = profileFactItemSchema.nullable().optional().default(null);
 
 export const candidateProfileSchema = z.object({
   schemaVersion: z.literal(PROFILE_SCHEMA_VERSION).default(PROFILE_SCHEMA_VERSION),

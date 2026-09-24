@@ -623,6 +623,7 @@ function askedAndSkipped(
 export async function startConsultation(input: {
   organizationId: string;
   campaignId: string;
+  focusNote?: string | null;
 }): Promise<void> {
   const { campaign, requirement, profile } = await requireApplication(
     input.organizationId,
@@ -631,7 +632,13 @@ export async function startConsultation(input: {
   const existing = await prisma.consultationSession.findUnique({
     where: { campaignId: input.campaignId },
   });
-  if (existing?.status === "DONE") return;
+  if (existing?.status === "DONE" && !input.focusNote) return;
+  if (existing?.status === "DONE" && input.focusNote) {
+    await prisma.consultationSession.update({
+      where: { id: existing.id },
+      data: { status: "IN_PROGRESS", generationStatus: "READY" },
+    });
+  }
   if (
     existing?.status === "IN_PROGRESS" &&
     existing.generationStatus !== "FAILED"

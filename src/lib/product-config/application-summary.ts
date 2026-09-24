@@ -17,6 +17,9 @@ export const applicationSummaryConfig = Object.freeze({
     hiringTeam: "Hiring Team at a glance",
     guidance: `${consultationConfig.displayName}'s guidance`,
     stories: "Your stories",
+    interviewStages: "Interview stages",
+    nextStage: "Next stage",
+    completedStages: "Completed stages",
   },
   cultureEvidenceLabel: "Based on limited public evidence",
 });

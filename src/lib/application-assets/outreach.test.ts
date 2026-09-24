@@ -17,12 +17,16 @@ import {
 } from "@/lib/cadence/application-reminders";
 import { outreachEmailHandoff } from "@/lib/application-assets/handoff";
 import {
+  askAndRedirectCountErrors,
+  finalSentencePunctuationErrors,
   followUpLengthErrors,
   genericRelevanceErrors,
   hiringManagerClaimErrors,
   outreachLimitErrors,
   redirectLineErrors,
+  thankYouNotesErrors,
   threadRepetitionErrors,
+  unsupportedRecipientFactErrors,
 } from "@/lib/application-assets/outreach";
 import {
   composeOutreachText,
@@ -33,6 +37,7 @@ import {
   anyListFeatureEnabled,
   connectionNoteBodyBudget,
   features,
+  interviewConfig,
   outreachConfig,
   outreachGreeting,
   shouldIncludeRedirect,
@@ -143,6 +148,102 @@ describe("outreach greetings and claims", () => {
         includeRedirect: true,
       }).length,
     ).toBeGreaterThan(0);
+    expect(
+      redirectLineErrors({
+        text: "If you're not the right person, I'd appreciate a pointer to who is.",
+        includeRedirect: false,
+      }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("rejects an em dash in a subject", async () => {
+    const { validateOutreachContent } = await import(
+      "@/lib/application-assets/outreach"
+    );
+    const errors = await validateOutreachContent({
+      content: {
+        type: "EMAIL",
+        subject: "Senior Product Engineer — production reliability",
+        greeting: "Hello,",
+        paragraphs: [
+          {
+            id: "p1",
+            text: "I applied through the employer portal.",
+            supports: [],
+          },
+        ],
+        signoff: "Thanks",
+        signerName: "Alex Chen",
+      },
+      context: {
+        sources: [],
+        campaign: { applicationGuidance: null, appliedAt: null },
+      } as never,
+      greeting: "Hello,",
+      signerName: "Alex Chen",
+      confirmedHiringManagerRole: false,
+      purpose: "PROACTIVE",
+      includeRedirect: false,
+    });
+    expect(errors.some((error) => error.includes("—") || error.toLowerCase().includes("banned"))).toBe(
+      true,
+    );
+  });
+
+  it("rejects a double ask, a double redirect, and a missing final period", () => {
+    expect(
+      askAndRedirectCountErrors(
+        "Would you have fifteen minutes this week? Are you open to a call next Tuesday?",
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(
+      askAndRedirectCountErrors(
+        "If you're not the right person, I'd appreciate a pointer to who is. If you are not the right person, point me to the right person.",
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(
+      finalSentencePunctuationErrors(
+        "I applied through the employer portal. Would you have time to talk",
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(
+      finalSentencePunctuationErrors(
+        "I applied through the employer portal. Would you have time to talk?",
+      ),
+    ).toEqual([]);
+  });
+
+  it("rejects an unsupported fact about the recipient's team", () => {
+    expect(
+      unsupportedRecipientFactErrors({
+        text: "The motion-planning work would be felt by the robotics team every week.",
+        factTexts: [
+          "Build the motion-planning service",
+          "Review designs with the robotics team",
+        ],
+      }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      unsupportedRecipientFactErrors({
+        text: "My understanding is that the role reviews designs with the robotics team.",
+        factTexts: ["Review designs with the robotics team"],
+      }),
+    ).toEqual([]);
+  });
+
+  it("requires thank-you messages to cite notes and never use a redirect", () => {
+    expect(
+      thankYouNotesErrors({
+        text: "Thank you for your time. I enjoyed our conversation.",
+        notes: "The hiring manager will focus on incident leadership.",
+      }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      thankYouNotesErrors({
+        text: "I appreciated your note that the hiring manager will focus on incident leadership. Would a brief follow-up be useful?",
+        notes: "The hiring manager will focus on incident leadership.",
+      }),
+    ).toEqual([]);
     expect(
       redirectLineErrors({
         text: "If you're not the right person, I'd appreciate a pointer to who is.",
@@ -284,6 +385,7 @@ describe("outreach greetings and claims", () => {
       purpose: "PROACTIVE",
       emailLength: null,
       priorMessage: null,
+      interviewStageNotes: null,
       regenerationInstruction: null,
       qualityFeedback: [],
     });
@@ -381,6 +483,9 @@ describe("application reminder cadence", () => {
         reminderDay7: 7,
         reminderEmail4Days: null,
         reminderRepeatDays: null,
+        interviewThankYouHours: interviewConfig.reminders.defaultThankYouHours,
+        interviewCheckInBusinessDays:
+          interviewConfig.reminders.defaultCheckInBusinessDays,
       }),
     ).toEqual([3, 7]);
     expect(
@@ -389,6 +494,9 @@ describe("application reminder cadence", () => {
         reminderDay7: null,
         reminderEmail4Days: null,
         reminderRepeatDays: null,
+        interviewThankYouHours: interviewConfig.reminders.defaultThankYouHours,
+        interviewCheckInBusinessDays:
+          interviewConfig.reminders.defaultCheckInBusinessDays,
       }),
     ).toEqual([]);
   });

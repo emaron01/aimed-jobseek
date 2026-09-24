@@ -9,7 +9,8 @@ import { requireCurrentUser } from "@/lib/auth/session";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
 import { canOpenCampaignDetail } from "@/lib/campaign/visibility";
 import type { JobScorecard } from "@/lib/job-requirement/types";
-import { applicationSummaryConfig } from "@/lib/product-config";
+import { applicationSummaryConfig, interviewConfig } from "@/lib/product-config";
+import { stageTypeLabel } from "@/lib/interview/stages";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
@@ -312,6 +313,49 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
             ))}
           </ul>
         </div>
+      </SummarySection>
+
+      <SummarySection title={applicationSummaryConfig.sections.interviewStages}>
+        {view.stages.length === 0 ? (
+          <p className="text-sm text-slate-500">No interview stages yet.</p>
+        ) : (
+          <>
+            <div>
+              <h3 className="font-medium text-slate-900">
+                {applicationSummaryConfig.sections.completedStages}
+              </h3>
+              <ul className="mt-2 space-y-3 text-sm text-slate-800">
+                {view.stages
+                  .filter((stage) => stage.outcome)
+                  .map((stage) => (
+                    <li key={stage.id}>
+                      <span className="font-medium">{stageTypeLabel(stage.type)}</span>
+                      {stage.notesAfter ? `: ${stage.notesAfter}` : ""}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+            {(() => {
+              const next = view.stages.find((stage) => !stage.outcome);
+              return next ? (
+                <div>
+                  <h3 className="font-medium text-slate-900">
+                    {applicationSummaryConfig.sections.nextStage}
+                  </h3>
+                  <p className="mt-2 text-sm text-slate-800">
+                    {stageTypeLabel(next.type)}
+                  </p>
+                  <Link
+                    href={`/campaigns/${id}/interviews/${next.id}`}
+                    className="mt-2 inline-block text-sm font-medium text-slate-700 underline print:hidden"
+                  >
+                    {interviewConfig.labels.openGuide}
+                  </Link>
+                </div>
+              ) : null;
+            })()}
+          </>
+        )}
       </SummarySection>
 
       <SummarySection title={applicationSummaryConfig.sections.guidance}>
