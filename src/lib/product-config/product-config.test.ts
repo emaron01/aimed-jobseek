@@ -30,6 +30,7 @@ describe("vocabulary", () => {
     expect(vocab.product.singular).toBe("Personal Profile");
     expect(vocab.prospect.plural).toBe("contacts");
     expect(vocab.account.singular).toBe("employer");
+    expect(vocab.seeker.plural).toBe("job seekers");
     expect(nounForCount(1, vocab.contact)).toBe("contact");
     expect(countedNoun(3, vocab.contact)).toBe("3 contacts");
     expect(criterionFlags.required).toBe("Must-have");
@@ -45,6 +46,9 @@ describe("brand", () => {
     expect(brand.appName).toBe("AimedJobSeek");
     expect(brand.transactionalSenderName).toBe("AimedJobSeek");
     expect(brand.defaultPageTitle).toBe("AimedJobSeek");
+    expect(brand.lockupEyebrow).toBe(vocab.campaign.Plural);
+    expect(brand.metaDescription).toContain(vocab.outreach.singular);
+    expect(brand.metaDescription).toContain(vocab.seeker.plural);
     expect(supportMailtoHref("help@example.test")).toBe(
       "mailto:help@example.test",
     );

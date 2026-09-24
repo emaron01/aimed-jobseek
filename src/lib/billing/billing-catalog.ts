@@ -289,12 +289,12 @@ export function defaultBillingCatalogSetting(): BillingCatalogSettingValue {
       {
         planCode: BILLING_PLAN_STANDARD,
         displayName: "Standard",
-        tagline: `For individual ${vocab.salesperson.plural}`,
+        tagline: `For individual ${vocab.seeker.plural}`,
         featureBullets: [
           "Research up to 100 companies on Standard",
           "Up to 50 curated emails per day (1,000 per month)",
-          "Outlook Desktop, Microsoft 365, and Google Workspace sending",
-          "Emails sent through your existing mailbox — replies come to you",
+          "Handoff to Outlook desktop, Outlook on the web, and Gmail",
+          "Emails send from your mailbox — replies come to you",
           "Add Company Research Credits in blocks of 100",
         ],
         trialNote:

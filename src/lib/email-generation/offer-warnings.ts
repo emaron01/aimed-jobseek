@@ -6,7 +6,8 @@ import type { EmailGenerationContext } from "@/lib/email-generation/context";
  * rep input is never challenged, so generation never surfaces warnings.
  */
 export function unacknowledgedOfferWarnings(
-  _context: EmailGenerationContext,
+  context: EmailGenerationContext,
 ): OfferConflict[] {
+  void context;
   return [];
 }

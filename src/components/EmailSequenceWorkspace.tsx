@@ -113,7 +113,7 @@ export function EmailSequenceWorkspace({
   suggestedPersonaId = null,
   suggestedPersonaName = null,
   personaDecisionReason = null,
-  personalizationTier = "THIN",
+  personalizationTier: unusedPersonalizationTier = "THIN",
   personalizationLabel = `${vocab.persona.Singular} and ${vocab.product.singular} only`,
   personalizationDetail = "No usable company or contact research.",
   personalizationSources = "No company research available. No contact research available.",
@@ -171,6 +171,7 @@ export function EmailSequenceWorkspace({
   }) => void;
   onSendComplete?: (draft: { id: string; sentAt: string }) => void;
 }) {
+  void unusedPersonalizationTier;
   const router = useRouter();
   const [drafts, setDrafts] = useState(initialDrafts);
   const [selectedId, setSelectedId] = useState<string | null>(
@@ -201,12 +202,18 @@ export function EmailSequenceWorkspace({
   } | null>(null);
   /** True only after a successful Open in Outlook/Gmail click in this session. */
   const [awaitingSendConfirm, setAwaitingSendConfirm] = useState(false);
-  const [selectedPersonaId, setSelectedPersonaId] = useState(
+  const defaultPersonaId =
     resolvedPersonaId ??
-      suggestedPersonaId ??
-      personaOptions[0]?.id ??
-      "",
-  );
+    suggestedPersonaId ??
+    personaOptions[0]?.id ??
+    "";
+  const [selectedPersonaId, setSelectedPersonaId] = useState(defaultPersonaId);
+  const personaSyncKey = `${campaignContactId}:${resolvedPersonaId ?? ""}:${suggestedPersonaId ?? ""}:${personaOptions.map((option) => option.id).join(",")}`;
+  const [appliedPersonaKey, setAppliedPersonaKey] = useState(personaSyncKey);
+  if (personaSyncKey !== appliedPersonaKey) {
+    setAppliedPersonaKey(personaSyncKey);
+    setSelectedPersonaId(defaultPersonaId);
+  }
   const latest = drafts.at(-1) ?? null;
   const selected =
     drafts.find((draft) => draft.id === selectedId) ?? latest ?? null;
@@ -233,26 +240,14 @@ export function EmailSequenceWorkspace({
   const editorsLocked = aiBusy || sendBusy !== null;
   const handoffLocked = sendBusy !== null || aiBusy;
 
-  useEffect(() => {
-    setSelectedPersonaId(
-      resolvedPersonaId ??
-        suggestedPersonaId ??
-        personaOptions[0]?.id ??
-        "",
-    );
-  }, [
-    campaignContactId,
-    resolvedPersonaId,
-    suggestedPersonaId,
-    personaOptions,
-  ]);
-
-  // Leaving a draft clears an unanswered prompt — do not re-open from stored handoffAt.
-  useEffect(() => {
+  const selectedDraftId = selected?.id ?? null;
+  const [appliedDraftId, setAppliedDraftId] = useState(selectedDraftId);
+  if (selectedDraftId !== appliedDraftId) {
+    setAppliedDraftId(selectedDraftId);
     setAwaitingSendConfirm(false);
     setDirty(false);
     setPersistFailure(null);
-  }, [selected?.id]);
+  }
 
   useEffect(() => {
     if (readOnly || suppressed || !onDraftOpenedForReview) return;

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { generateApplicationSummaryAction } from "@/app/actions/application-summary";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { PrintApplicationSummaryButton } from "@/components/PrintApplicationSummaryButton";
-import { PageHeader, Panel, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
 import { getApplicationSummaryView } from "@/lib/application-summary/service";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";

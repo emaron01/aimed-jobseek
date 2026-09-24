@@ -126,7 +126,7 @@ export default async function OrganizationSettingsPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-medium text-slate-900">Timezone</h2>
         <p className="text-sm text-slate-600">
-          Daily email quotas and the send advisory use this IANA timezone (not
+          Daily email limits and the send advisory use this IANA timezone (not
           server UTC alone).
         </p>
         <ActionFeedbackForm

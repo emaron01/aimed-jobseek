@@ -31,7 +31,7 @@ export function TitleSuggestionReview({
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-600">
-        These titles did not match any {vocab.persona.singular}'s likely titles. Approve a
+        These titles did not match any {vocab.persona.singular}&apos;s likely titles. Approve a
         proposal to add the title permanently and score those {vocab.contact.plural}, assign
         a different {vocab.persona.singular}, or dismiss so this {vocab.product.singular} is not asked again.
       </p>

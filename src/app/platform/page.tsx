@@ -143,7 +143,7 @@ export default async function PlatformHomePage() {
               -day retention window that still have {vocab.contact.plural}, {vocab.campaign.plural}, or
               suppressions. Open the org and run{" "}
               <span className="font-medium">
-                Delete {vocab.contact.singular} and outbound data
+                Delete {vocab.contact.singular} and {vocab.outreach.singular} data
               </span>
               {canMutate ? "" : " (SUPER_ADMIN only)"}.
             </p>

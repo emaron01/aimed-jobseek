@@ -46,7 +46,7 @@ export function PlanSelector({
             selected={selected === "STANDARD"}
             onSelect={() => setSelected("STANDARD")}
             title={standard.displayName}
-            tagline={standard.tagline || `For individual ${vocab.salesperson.plural}`}
+            tagline={standard.tagline || `For individual ${vocab.seeker.plural}`}
             priceLabel={priceLabels.STANDARD}
           />
         ) : null}

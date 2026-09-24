@@ -133,6 +133,11 @@ export const vocab = Object.freeze({
     plural: "salespeople",
     article: "a",
   }),
+  seeker: noun({
+    singular: "job seeker",
+    plural: "job seekers",
+    article: "a",
+  }),
   client: noun({ singular: "client", plural: "clients", article: "a" }),
   quota: noun({ singular: "quota", plural: "quotas", article: "a" }),
   lead: noun({ singular: "lead", plural: "leads", article: "a" }),

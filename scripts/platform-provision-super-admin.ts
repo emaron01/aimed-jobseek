@@ -21,7 +21,6 @@ config();
 
 async function main() {
   const {
-    PlatformProvisionError,
     provisionPlatformSuperAdmin,
     readPlatformProvisionEnv,
     signUpEmailViaBetterAuth,

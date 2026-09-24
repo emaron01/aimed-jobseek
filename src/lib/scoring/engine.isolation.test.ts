@@ -279,7 +279,6 @@ describe.skipIf(!hasDatabase)("scoring engine persistence (Phase 3C)", () => {
 
   it("one failed contact does not prevent others from remaining scoreable", async () => {
     if (!ready) return;
-    const suffix = Date.now().toString(36);
     const list = await prisma.contactList.findFirst({
       where: { organizationId: orgAId },
     });

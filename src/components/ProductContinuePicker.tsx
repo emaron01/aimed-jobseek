@@ -1,7 +1,7 @@
 "use client";
 import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { vocab } from "@/lib/product-config";
 
@@ -28,18 +28,13 @@ export function ProductContinuePicker({
   continueLabel: string;
 }) {
   const router = useRouter();
-  const [productId, setProductId] = useState(initialProductId ?? "");
-
-  useEffect(() => {
-    if (productId) return;
-    if (initialProductId) {
-      setProductId(initialProductId);
-      return;
-    }
-    if (products.length === 1) {
-      setProductId(products[0]!.id);
-    }
-  }, [initialProductId, productId, products]);
+  const [productId, setProductId] = useState(
+    initialProductId ?? (products.length === 1 ? products[0]!.id : ""),
+  );
+  if (!productId) {
+    const next = initialProductId ?? (products.length === 1 ? products[0]!.id : "");
+    if (next) setProductId(next);
+  }
 
   return (
     <div className="space-y-4">

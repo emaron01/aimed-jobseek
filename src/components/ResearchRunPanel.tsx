@@ -162,15 +162,16 @@ export function ResearchRunPanel({
   const [lastRun, setLastRun] = useState<ResearchRunView | null>(
     initialLastRun ?? null,
   );
-
-  useEffect(() => {
+  const [appliedActiveRun, setAppliedActiveRun] = useState(initialActiveRun);
+  if (initialActiveRun !== appliedActiveRun) {
+    setAppliedActiveRun(initialActiveRun);
     setActiveRun(initialActiveRun ?? null);
-  }, [initialActiveRun]);
-
-  useEffect(() => {
-    if (!initialLastRun) return;
+  }
+  const [appliedLastRun, setAppliedLastRun] = useState(initialLastRun);
+  if (initialLastRun && initialLastRun !== appliedLastRun) {
+    setAppliedLastRun(initialLastRun);
     setLastRun(initialLastRun);
-  }, [initialLastRun]);
+  }
 
   useEffect(() => {
     const run = activeRun;

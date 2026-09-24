@@ -102,9 +102,11 @@ describe("PRODUCT_AI_REASONING_EFFORT", () => {
 
   it("passes reasoning.effort from Product role config into Responses body", async () => {
     setProductResponsesEnv({ reasoningEffort: "low" });
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
-      okProductResponse(),
-    );
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      void url;
+      void init;
+      return okProductResponse();
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const provider = createOpenAiResponsesProvider(getProductAiConfig());
@@ -122,9 +124,11 @@ describe("PRODUCT_AI_REASONING_EFFORT", () => {
 
   it("passes configured effort without hard-coding low in the provider", async () => {
     setProductResponsesEnv({ reasoningEffort: "high" });
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
-      okProductResponse(),
-    );
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      void url;
+      void init;
+      return okProductResponse();
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     await createOpenAiResponsesProvider(getProductAiConfig()).generateStructured({
@@ -142,8 +146,10 @@ describe("PRODUCT_AI_REASONING_EFFORT", () => {
     const research = getResearchAiConfig();
     expect(research.reasoningEffort).toBeNull();
 
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
-      new Response(
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      void url;
+      void init;
+      return new Response(
         JSON.stringify({
           output: [
             {
@@ -161,8 +167,8 @@ describe("PRODUCT_AI_REASONING_EFFORT", () => {
           usage: { input_tokens: 1, output_tokens: 1 },
         }),
         { status: 200 },
-      ),
-    );
+      );
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     await createOpenAiResponsesProvider(research).generateStructured({
@@ -181,8 +187,10 @@ describe("PRODUCT_AI_REASONING_EFFORT", () => {
     const scoring = getScoringAiConfig();
     expect(scoring.reasoningEffort).toBeNull();
 
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
-      new Response(
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      void url;
+      void init;
+      return new Response(
         JSON.stringify({
           output: [
             {
@@ -193,8 +201,8 @@ describe("PRODUCT_AI_REASONING_EFFORT", () => {
           usage: { input_tokens: 1, output_tokens: 1 },
         }),
         { status: 200 },
-      ),
-    );
+      );
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     await createOpenAiResponsesProvider(scoring).generateStructured({

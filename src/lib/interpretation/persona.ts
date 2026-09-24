@@ -22,10 +22,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
 import { recordUsageEvent } from "@/lib/usage/events";
-import {
-  interpretationResultSchema,
-  parseInterpretedCriteria,
-} from "@/lib/interpretation/schema";
+import { parseInterpretedCriteria } from "@/lib/interpretation/schema";
 import { buildPersonaInterpretationMessages } from "@/lib/interpretation/persona-prompt";
 import { sanitizePersonaInterpretedCriteria } from "@/lib/interpretation/persona-sanitize";
 import type { PersonaAuthoritativeFields } from "@/lib/persona/save";

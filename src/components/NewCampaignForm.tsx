@@ -34,9 +34,17 @@ export function NewCampaignForm({
   personas: Option[];
 }) {
   const router = useRouter();
-  const [productId, setProductId] = useState("");
+  const readyProducts = products.filter((product) => product.ready);
+  const [productId, setProductId] = useState(
+    readyProducts.length === 1 ? readyProducts[0]!.id : "",
+  );
   const [icpId, setIcpId] = useState("");
-  const [personaIds, setPersonaIds] = useState<string[]>([]);
+  const [personaIds, setPersonaIds] = useState<string[]>(() => {
+    if (readyProducts.length !== 1) return [];
+    return personas
+      .filter((persona) => persona.productId === readyProducts[0]!.id)
+      .map((persona) => persona.id);
+  });
   const [postingText, setPostingText] = useState("");
   const [state, formAction, pending] = useActionState(
     createCampaignAction,
@@ -70,45 +78,36 @@ export function NewCampaignForm({
     Boolean(icpId) &&
     productIcps.some((icp) => icp.id === icpId);
 
-  useEffect(() => {
-    const ready = products.filter((product) => product.ready);
-    if (ready.length !== 1 || productId) return;
-    setProductId(ready[0].id);
-    setPersonaIds(
-      personas
-        .filter((persona) => persona.productId === ready[0].id)
-        .map((persona) => persona.id),
-    );
-  }, [products, personas, productId]);
+  if (productIcps.length === 1 && icpId !== productIcps[0]!.id) {
+    setIcpId(productIcps[0]!.id);
+  }
 
-  useEffect(() => {
-    if (productIcps.length === 1 && icpId !== productIcps[0].id) {
-      setIcpId(productIcps[0].id);
+  const restoreKey = restored
+    ? `${restored.productId ?? ""}:${restored.icpId ?? ""}:${restored.allPersonas ? "all" : restored.personaIds.join(",")}:${restored.personaId ?? ""}`
+    : "";
+  const [appliedRestoreKey, setAppliedRestoreKey] = useState("");
+  if (restoreKey && restoreKey !== appliedRestoreKey) {
+    setAppliedRestoreKey(restoreKey);
+    if (restored?.productId) setProductId(restored.productId);
+    if (restored?.icpId) setIcpId(restored.icpId);
+    if (restored?.allPersonas) {
+      setPersonaIds(
+        personas
+          .filter((persona) => persona.productId === restored.productId)
+          .map((persona) => persona.id),
+      );
+    } else if (restored && restored.personaIds.length > 0) {
+      setPersonaIds(restored.personaIds);
+    } else if (restored?.personaId) {
+      setPersonaIds([restored.personaId]);
     }
-  }, [productIcps, icpId]);
+  }
 
   useEffect(() => {
     if (!state?.ok) return;
     router.push(state.campaignId ? `/campaigns/${state.campaignId}` : "/");
     router.refresh();
   }, [state, router]);
-
-  useEffect(() => {
-    if (!restored) return;
-    if (restored.productId) setProductId(restored.productId);
-    if (restored.icpId) setIcpId(restored.icpId);
-    if (restored.allPersonas) {
-      setPersonaIds(
-        personas
-          .filter((persona) => persona.productId === restored.productId)
-          .map((persona) => persona.id),
-      );
-    } else if (restored.personaIds.length > 0) {
-      setPersonaIds(restored.personaIds);
-    } else if (restored.personaId) {
-      setPersonaIds([restored.personaId]);
-    }
-  }, [restored]);
 
   return (
     <form

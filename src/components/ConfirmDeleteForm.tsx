@@ -47,10 +47,12 @@ export function ConfirmDeleteForm({
   const [state, formAction, pending] = useActionState(action, null);
   const router = useRouter();
   const pathname = usePathname();
+  if (state?.ok && open) {
+    setOpen(false);
+  }
 
   useEffect(() => {
     if (!state?.ok) return;
-    setOpen(false);
     if (onSuccessNavigate) {
       const message = state.message || "Deleted.";
       // Never refresh the deleted record URL — that 404s before navigation.

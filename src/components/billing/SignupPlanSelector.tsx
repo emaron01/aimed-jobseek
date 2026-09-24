@@ -59,7 +59,7 @@ export function SignupPlanSelector({
             {
               code: BILLING_PLAN_STANDARD,
               label: standard.displayName,
-              blurb: standard.tagline || `For individual ${vocab.salesperson.plural}`,
+              blurb: standard.tagline || `For individual ${vocab.seeker.plural}`,
             },
             ...(features.teamPlanDisplay
               ? [

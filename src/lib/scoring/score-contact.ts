@@ -47,43 +47,6 @@ export type PersonaAssessmentRecord = {
   aiCalled: boolean;
 };
 
-function toResearchInput(
-  research: {
-    status: string;
-    researchConfidence: string | null;
-    companySummary: string | null;
-    whatTheySell: string | null;
-    customerTypes: unknown;
-    primaryMarkets: unknown;
-    businessModel: string | null;
-    estimatedAov: string | null;
-    aovReasoning: string | null;
-    companySizeContext: string | null;
-    relevantTechnologies: unknown;
-    buyingSignals: unknown;
-    riskSignals: unknown;
-    researchedAt: Date | null;
-  } | null,
-) {
-  if (!research) return null;
-  return {
-    status: research.status,
-    researchConfidence: research.researchConfidence,
-    companySummary: research.companySummary,
-    whatTheySell: research.whatTheySell,
-    customerTypes: parseStringArray(research.customerTypes),
-    primaryMarkets: parseStringArray(research.primaryMarkets),
-    businessModel: research.businessModel,
-    estimatedAov: research.estimatedAov,
-    aovReasoning: research.aovReasoning,
-    companySizeContext: research.companySizeContext,
-    relevantTechnologies: parseStringArray(research.relevantTechnologies),
-    buyingSignals: parseStringArray(research.buyingSignals),
-    riskSignals: parseStringArray(research.riskSignals),
-    researchedAt: research.researchedAt?.toISOString() ?? null,
-  };
-}
-
 function jsonValue(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
 }

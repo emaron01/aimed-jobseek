@@ -14,6 +14,8 @@ export async function disconnectMicrosoftMailboxAction(
   _previous: MailboxConnectionActionResult | null,
   _formData: FormData,
 ): Promise<MailboxConnectionActionResult> {
+  void _previous;
+  void _formData;
   try {
     const [user, organization] = await Promise.all([
       requireCurrentUser(),

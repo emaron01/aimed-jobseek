@@ -10,7 +10,6 @@ import {
   applicationAssetConfig,
   consultationConfig,
   interviewConfig,
-  vocab,
 } from "@/lib/product-config";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { parseStringArray } from "@/lib/research";

@@ -20,7 +20,6 @@ import {
   type CandidateProfile,
 } from "@/lib/product-research/candidate-profile";
 import {
-  buildProductResynthesisApplyPlan,
   mergeProtectedProductDraftFields,
   productDraftFromApprovedProfile,
 } from "@/lib/product-research/resynthesize-approved-plan";

@@ -26,25 +26,6 @@ export class InvitationError extends Error {
   }
 }
 
-function slugify(input: string): string {
-  const base = input
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 48);
-  return base || "workspace";
-}
-
-async function uniqueSlug(base: string): Promise<string> {
-  let candidate = base;
-  let n = 0;
-  while (await prisma.organization.findUnique({ where: { slug: candidate } })) {
-    n += 1;
-    candidate = `${base}-${n}`;
-  }
-  return candidate;
-}
-
 function hashToken(rawToken: string): string {
   return createHash("sha256").update(rawToken).digest("hex");
 }

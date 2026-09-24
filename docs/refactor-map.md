@@ -1,10 +1,18 @@
 # Refactor map
 
-Audit of this repo against `docs/product-vision.md`. Report only. No code was changed to produce it.
+Audit of this repo against `docs/product-vision.md`, updated to the built product.
 
-This workspace's only git remote is `https://github.com/emaron01/aimed-jobseek.git`. There is no Aimed Outreach remote checked out here, so "wrong in upstream" in section 7 is judged from this history, not from a diff against another tree.
+This workspace's only git remote is `https://github.com/emaron01/aimed-jobseek.git`.
 
 The vocabulary classifications cited below are from `docs/vocabulary-audit.md`.
+
+## Current built state
+
+The seeker journey is in place: Personal Profile, Target Employers, per-application job parse and employer research, Hiring Team identification, consultation, application assets (resume, cover letter, email, LinkedIn), desktop/web handoff, interview stages, and the Application Summary.
+
+**Not in the product.** Microsoft 365 mailbox connect and Graph send. Lists, list import, bulk scoring, and list-to-persona matching. Those routes and tables may still exist as leftover machinery; they are hidden and are not a seeker path.
+
+**Superseded.** Graph `fileAttachment` send, a download-only fallback for a connected mailbox, list-scoring as an application funnel, and "lists stay in the product but hidden" as the destination design. Handoff is the only send path. Lists are not a product feature.
 
 ## 1. System overview
 
@@ -24,7 +32,7 @@ The vocabulary classifications cited below are from `docs/vocabulary-audit.md`.
 | Service | Where | What it does |
 | --- | --- | --- |
 | Stripe | `src/lib/billing/`, `src/app/api/billing/` | Checkout, portal, webhooks, seats, company-research credit packs, referral coupons |
-| Microsoft Graph | `src/lib/mailbox/microsoft-graph.ts`, `src/app/api/mailbox/microsoft/` | Delegated mailbox connect and `sendMail`. `MailboxProvider` is only `MICROSOFT_365` |
+| Microsoft Graph | `src/lib/mailbox/microsoft-graph.ts`, `src/app/api/mailbox/microsoft/` | Leftover connected-mailbox code. Not a product send path. Seeker outreach uses desktop and web handoff |
 | Better Auth | `src/lib/auth/better-auth.ts`, `src/app/api/auth/[...all]/route.ts` | Sessions, email verification, password reset, OAuth account rows |
 | Transactional email | `src/lib/transactional-email/` | Console, SMTP (nodemailer), or Resend. Not the user's mailbox |
 | Web search | Inside the research AI provider | Used by company research, contact research, and product source discovery |
@@ -89,7 +97,7 @@ Disposition is against the vision: **keep** (use as-is), **adapt** (same machine
 | Transactional email | Verify, welcome, reset, invite, digest, usage warning, support ticket | `src/lib/transactional-email/templates.ts` | Keep the sender. Adapt digest copy if cadence stays |
 | Cadence and weekday digest | After a send, `nextDueAt` is set. Digest emails the owner how many follow-ups are due | `src/lib/cadence/`, `OrganizationCadencePolicy`, `DailyDigestSend` | Adapt only if interview follow-ups use the same clock. Otherwise hide. It is not interview-aware |
 | Support tickets | In-app form, platform queue, internal notes | `SupportTicket`, `src/app/(app)/support/page.tsx`, `src/app/platform/support/` | Keep |
-| Microsoft mailbox connect and send | OAuth, encrypted tokens, send from the user's mailbox, signature appended | `src/lib/mailbox/` | Keep. No attachment field is sent. See section 3 |
+| Microsoft mailbox connect and send | Leftover OAuth and Graph send | `src/lib/mailbox/` | Hide. Not a product path. Handoff only |
 | Manual "I sent it" | `EmailSentMethod.MANUAL_ASSERTION` and deeplink intent | `EmailDraft`, `EmailSendRecord` | Keep for LinkedIn paste and for mail the user sends themselves |
 | Suppression | Org-wide opt-out, bounce, do-not-contact, keyed by normalized email | `EmailSuppression`, `src/lib/suppression/` | Keep if email to hiring managers can be unwanted. The reasons are sales-list reasons and need copy, not a new table |
 | Voice samples | One or more pasted samples. Generation uses the first as style | `VoiceSample`, `src/lib/voice/samples.ts`, `src/app/(app)/settings/voice/page.tsx` | Keep. The email prompt's style rules are the application point |
@@ -98,11 +106,11 @@ Disposition is against the vision: **keep** (use as-is), **adapt** (same machine
 | Product synthesis also suggests buyer roles | `suggestedBuyerRoles` on the product setup run | `src/lib/product-research/prompt.ts`, `src/lib/product-research/contract.ts` | Adapt: the vision forbids persona generation during profile build. This output has to stop on that path, not be renamed |
 | ICP definition, criteria, evidence class, tiers | Natural-language definition interpreted into criteria. Primary vs secondary. Targeted-search decisions | `Icp`, `IcpCriterion`, `src/lib/interpretation/icp.ts`, `src/lib/criteria/` | Adapt only if Target Employers is a real saved object. The current ICP is "which companies should we sell to," scored across a list. A pasted job does not need that |
 | Persona builder | Name, titles, department, seniority, responsibilities, pain, outcomes, messaging notes, why this role matters. AI research from product evidence. Peer differentiation | `Persona`, `src/components/PersonaForm.tsx`, `src/lib/persona-research/`, `src/lib/persona/persona-differentiation.ts` | Adapt. Evidence source and when it runs must change. The form fields mostly fit a hiring-team stakeholder |
-| Lists and contact import | Paste or upload people. Collapse duplicates. Archive cascades | `ContactList`, `src/lib/import/`, `src/components/AddContactsWizard.tsx` | Hide as a prospecting list. A short list of people at one employer can reuse `Contact` without the scoring list |
+| Lists and contact import | Paste or upload people. Collapse duplicates. Archive cascades | `ContactList`, `src/lib/import/`, `src/components/AddContactsWizard.tsx` | Not in the product. UI hidden. Contacts are added one at a time on an application |
 | Companies | Deduped by domain inside the org. Research is org-scoped and reused across campaigns | `Company`, `CompanyResearch` | Keep the company record. One application resolves to one company |
 | Company research | What they sell, who they sell to, markets, model, AOV, technologies, buying signals, risk signals. Identity ambiguity. Freshness. Metered per user who first introduces the company | `src/lib/research/prompt.ts`, `src/lib/research/runs-service.ts` | Adapt the questions. The worker, freshness, ambiguity, and metering stay |
 | Contact role research | Public evidence of responsibilities, judged against persona criteria | `ContactResearch`, `src/lib/contact-research/service.ts` | Adapt the criteria it is pointed at. Useful for "what does this hiring manager own" |
-| Scoring and qualification buckets | Score a contact at a company against product, ICP, and persona. Buckets shown as "Ready to include", "Check before including", "Left out" | `src/lib/scoring/`, `QualificationBucket`, `src/components/QualificationBuckets.tsx` | Hide from the journey. It answers "is this prospect worth emailing," not "how does this candidate match this job." Consultation is a different comparison |
+| Scoring and qualification buckets | Score a contact at a company against product, ICP, and persona | `src/lib/scoring/`, `QualificationBucket`, `src/components/QualificationBuckets.tsx` | Not in the product. Application employer-fit is a non-blocking signal, not a list score |
 | Title suggestions | Map unmatched titles onto personas | `src/lib/scoring/title-suggestion-prompt.ts`, `TitleSuggestion` | Adapt only if imported titles still need to be matched to hiring-team stakeholders |
 | Campaign | Named effort owned by a user. Requires `productId` and `icpId`. Optional legacy single `personaId` plus `CampaignPersona` for several personas. Offer fields, email length, email guidance, status, archive, personal vs shared | `Campaign`, `src/lib/campaign/save.ts`, `src/app/(app)/campaigns/` | Adapt as the application shell only if those required FKs stay satisfiable. See section 8 |
 | Campaign stages | Setup, list, companies, contacts, emails, report | `src/lib/workflow/campaign-stages.ts` | Adapt the stage list. The current stages are the list-scoring funnel |
@@ -119,7 +127,7 @@ Disposition is against the vision: **keep** (use as-is), **adapt** (same machine
 | PDF via print | Print stylesheet, not a generated file | `src/components/ExportPdfButton.tsx` | Irrelevant to the DOCX requirement. Do not treat it as document generation |
 | Ad-hoc validators and persona fixtures | Scripts and JSON fixtures about a sales-forecasting product | `scripts/ad-hoc/`, `src/lib/persona-research/fixtures/` | Irrelevant to seekers. They lock tests to a sales subject. See section 6 |
 
-Billing catalog copy says sending works through "Outlook Desktop, Microsoft 365, and Google Workspace" (`src/lib/billing/billing-catalog.ts`). The schema enum `MailboxProvider` has only `MICROSOFT_365`. Google send is not implemented. That is a product bug relative to the catalog, independent of the fork.
+**Superseded.** Billing catalog Standard bullets now describe Outlook desktop, Outlook on the web, and Gmail handoff. There is no connected Microsoft 365 send path in the product.
 
 ## 3. Vision-to-code map
 
@@ -158,27 +166,17 @@ The application is a `Campaign` with its required `productId` (the Profile) and 
 
 ### Hiring-team personas (journey step 3 and the personas section)
 
-**Exists, at the wrong scope.** `Persona.productId` is required. Personas are built from the approved product (`src/lib/persona-research/prompt.ts` takes `productEvidence` and a `selectedBuyerRole`). `CampaignPersona` attaches existing personas to a campaign. Peer overlap is detected by token Jaccard in `src/lib/persona/persona-differentiation.ts`. The custom form is `src/components/PersonaForm.tsx` and `src/components/BuildPersonaForm.tsx` (name, likely titles, department, why this role matters, notes).
-
-**There is no account-level template library.** Every persona row belongs to one product.
-
-**Classification: ADAPT the builder and the differentiation check. NEW for the template library and per-application instances.**
-
-Decided: personas are created per application, not during profile build. Evidence becomes the job requirement plus `CompanyResearch`, not `ProductEvidenceBundle`. Instances need to be born on the application. `Persona.campaignId` scopes a role to one application; null keeps older product-level rows. `Persona.productId` stays required. Templates are `PersonaTemplate` rows per organization (question 13, resolved).
+**Complete.** Hiring Team roles are identified per application from the job requirement and employer research (`src/lib/hiring-team/`). The seeker reviews drafts, can save a template, and can add a template. `Persona.campaignId` scopes a role to one application. Personal Profile build does not create them.
 
 Differentiation: the Jaccard helper stays. The prompt rule that already says "articulate what distinguishes this role" (`src/lib/persona-research/prompt.ts`, rule 14) is the hook; its examples are buyer roles and quota-carrying reps and must be rewritten.
 
 ### Contacts roster (journey step 3)
 
-**Exists as a list-driven flow.** `Contact` already has every decided field: `firstName`, `lastName`, `title`, `email` (nullable), and `linkedinUrl`. `CampaignContact` joins a contact to a campaign and stores `chosenPersonaId`. Persona resolution is `resolveContactPersonaDecision` in `src/lib/campaign/contact-persona.ts`, which picks among override, chosen, matched, draft, and suggested persona ids and reports `needsConfirmation`. Title fit is `evaluatePersonaTitleGate` in `src/lib/scoring/title-fit.ts`. Contacts enter campaigns today through lists and scoring.
-
-**Classification: ADAPT.**
-
-Decided: contacts are added one at a time to the application's roster. Lists, bulk validation, bulk scoring, and list-to-persona matching are hidden, and their code stays. A single-contact add action that creates `Contact` plus `CampaignContact` is new code. Its persona suggestion should call title fit and `resolveContactPersonaDecision` directly. The `matchedPersonaId` input normally comes from a `ContactScore`, which requires a `ScoringRun` and a list, so the add path must supply the title-fit result in its place. The seeker's change is the existing override input. `Contact` has a unique key on `(organizationId, ownerUserId, normalizedEmail)` and `normalizedEmail` is null without an email, so contacts without email do not dedupe. Interviewers recorded at a stage are created through the same add action.
+**Complete.** Contacts are added one at a time to an application's roster (`src/lib/application/contacts.ts`). Title fit and `resolveContactPersonaDecision` suggest a Hiring Team role. Interviewers recorded at a stage use the same add path. List import and list scoring are not in the product.
 
 ### Consultation (journey step 4)
 
-**Exists per application.** `ConsultationSession` stores status, prompt version, and coach commentary. `ConsultationTurn` stores the ordered transcript, with seeker answers verbatim and `seekerAuthored`. `ConsultationAssessment` stores STRONG, PARTIAL, or NONE evidence against scorecard items and required and preferred requirements, linked to Personal Profile FACT ids. `ConsultationProposal` holds extracted facts and STAR stories until the seeker confirms them. Confirmed facts append to `Product.profileJson` with provenance pointing at the seeker turn. Confirmed STAR stories are `ProfileStory` rows linked to competencies. Prompt content is `src/lib/prompt-content/consultation.ts` (version 1). The consultant display name is `consultationConfig.displayName`.
+**Complete.** `ConsultationSession` stores status, prompt version, and coach commentary. `ConsultationTurn` stores the ordered transcript, with seeker answers verbatim and `seekerAuthored`. `ConsultationAssessment` stores STRONG, PARTIAL, or NONE evidence against scorecard items and required and preferred requirements, linked to Personal Profile FACT ids. `ConsultationProposal` holds extracted facts and STAR stories until the seeker confirms them. Confirmed facts append to `Product.profileJson` with provenance pointing at the seeker turn. Confirmed STAR stories are `ProfileStory` rows linked to competencies. Prompt content is `src/lib/prompt-content/consultation.ts`. The consultant display name is `consultationConfig.displayName`.
 
 **Classification: NEW, now in place.**
 
@@ -186,21 +184,11 @@ The seeker can skip the consultation, skip a question, pause and resume, or mark
 
 ### Assets (journey step 5)
 
-**Email exists.** Context assembly: `src/lib/email-generation/context.ts`, `prepare-email-generation.ts`. Fact selection: `semantic-fact-selector.ts`. Length: `EmailLength` and the structure block in `prompt.ts`. Voice: first `VoiceSample` inside that prompt. Output is subject and body on `EmailDraft`. Send is Graph or a manual assertion.
-
-**Resume, cover letter, and LinkedIn message do not exist.** No asset-type enum. No DOCX writer (`mammoth` only reads). LinkedIn is not a channel. The email prompt forbids sign-off and requires a subject and an actionable close, which is wrong for a LinkedIn note and wrong for a resume.
-
-**Classification: ADAPT email. NEW `ApplicationAsset` model, NEW asset types, NEW DOCX renderer.**
-
-Decided: email stays on `EmailDraft` with its `CampaignContact` relation unchanged, and requires a contact with an email address. The compose and send UI must refuse contacts whose `email` is null. Resume, cover letter, and LinkedIn copy are rows in a new `ApplicationAsset` model: type, application (`Campaign`), optional persona, version, structured JSON content, and the guidance that produced it. No contact. DOCX is rendered from the JSON on demand and not stored. A DOCX writer library is a new dependency. All types share the email chain: context, fact selection, and claim guard. That chain is keyed by a contact today (`loadEmailGenerationContext` in `context.ts` takes a `campaignContactId`), so the shared entry point must accept an application and optional persona without a contact. That is ADAPT on the machinery, not a copy of it.
+**Complete.** Resume, cover letter, email, and LinkedIn are `ApplicationAsset` rows (`src/lib/application-assets/`). Context is application-scoped (`src/lib/generation/context.ts`). DOCX is rendered on demand. Outreach is handed off to Outlook desktop, Outlook on the web, and Gmail. Legacy `EmailDraft` / Graph send remains in the tree and is not the seeker path.
 
 ### Interviews (journey step 6)
 
-**Does not exist.** No stage, interviewer, or interview-note model. Campaign stages in `src/lib/workflow/campaign-stages.ts` are setup, list, companies, contacts, emails, report. Follow-up email (`followUpGuidance` in `prompt.ts`) assumes a prior outbound email in a sequence, not a meeting that happened.
-
-**Classification: NEW stages and notes. ADAPT cadence surfaces.**
-
-Stages, interview dates, and notes attach to the application. Interviewers become roster contacts through the contacts add action. Decided: the interview clock is anchored to the stage's interview date. A thank-you is due about 24 hours after the interview. A status check-in is due N days after it if there is no response. N is not decided. The due item asks for notes. Content is generated on demand after notes exist, never by the scheduler. Home and the digest read only `CampaignContact.nextDueAt` today (`src/lib/cadence/dashboard.ts`, `src/lib/cadence/digest.ts`), so both need a second source of due items. How "no response" is detected for a check-in is not decided. Reply columns exist on `EmailDraft`, but an interview may have no email thread.
+**Complete.** `InterviewStage` rows hold type, date, notes, outcome, interviewers, and a generated guide. Interviewers become application contacts. Thank-you and check-in are `ApplicationAsset` outreach after notes. Thin thank-you notes can ask up to two clarifying questions; answers are seeker-authored FACT for generation and claim validation. Home and the digest read both application-outreach due items and interview-stage due items.
 
 ### Application outreach cadence
 
@@ -250,15 +238,16 @@ Decided: Standard only, organization of one, one Stripe plan. Seats, invites, te
 
 | Vision item | Classification | Where it attaches |
 | --- | --- | --- |
-| Job posting parser | NEW | New model plus an action beside `src/lib/campaign/save.ts`. Text extraction can call the same paste path as product sources |
-| Application-level employer fit | NEW entry point, ADAPT scoring | Reuses `resolveIcpQualification` without a `ScoringRun` or `ContactList`. Needs its own stored result on the application |
-| Per-application personas and account templates | NEW scope, ADAPT builder | `Persona.campaignId` plus `PersonaTemplate` (question 13, resolved) |
-| One-at-a-time contact add | NEW action, ADAPT persona resolution | Creates `Contact` and `CampaignContact`. Calls title fit and `resolveContactPersonaDecision` |
-| Consultation agent | NEW | New transcript and answer rows. Writes to the profile. Answers are claim trace sources |
-| `ApplicationAsset` and DOCX rendering | NEW model and renderer, ADAPT generation chain | Sibling of `src/lib/email-generation/`. DOCX rendered on demand from JSON. Email stays on `EmailDraft` |
-| Attachments on send | NEW on the Graph path, NEW download step | `buildMicrosoftGraphSendMailPayload` in `src/lib/email-generation/email-body.ts` takes `to`, `subject`, `body`, and signature. No attachment part. `sendMicrosoftGraph` in `src/lib/mailbox/microsoft-graph.ts` calls it. Handoff links (`OUTLOOK_WEB`, `OUTLOOK_DESKTOP`, `GMAIL_WEB` in `email-body.ts`) cannot carry files, so those paths get a download step |
-| Interview stages and interview clock | NEW | Stages, dates, notes under the application. A second due-item source for Home and the digest |
-| Fail-closed resume guard | NEW behavior on the existing guard | Refuses to save a resume with an untraceable fact |
+| Job posting parser | COMPLETE | Structured job requirement on the application |
+| Application-level employer fit | COMPLETE | Stored on the application as a non-blocking signal with seeker override |
+| Per-application Hiring Team and templates | COMPLETE | Identified from the job and employer research. `PersonaTemplate` is optional |
+| One-at-a-time contact add | COMPLETE | `src/lib/application/contacts.ts` |
+| Consultation agent | COMPLETE | Writes confirmed facts and stories to the Personal Profile |
+| `ApplicationAsset` and DOCX | COMPLETE | Resume, cover letter, email, LinkedIn. DOCX on demand |
+| Desktop and web handoff | COMPLETE | Outlook desktop, Outlook on the web, Gmail. No Graph send |
+| Interview stages and interview clock | COMPLETE | Guides, notes, thank-you FACT answers, Home/digest due items |
+| Application Summary | COMPLETE | Printable recap of the application |
+| Fail-closed claim guard | COMPLETE | Resume, cover letter, LinkedIn, and outreach refuse untraceable facts |
 
 ### Settled decisions checked against code
 
@@ -415,7 +404,7 @@ The vision's Decisions log settles Target Employers, lists, contacts, email, `Ap
 
 **Plan limits must not be added to `plans.ts`.** The decision says configuration. `plans.ts` already carries numeric defaults in code beside the `billing.catalog` setting. Put application and asset limits only in the catalog and have usage checks read them there.
 
-**Google send is advertised and absent.** Catalog bullets in `defaultBillingCatalogSetting` say "Outlook Desktop, Microsoft 365, and Google Workspace sending". Google is a handoff path by decision, with no attachment. Fix the catalog copy (seeded admin data) to say so.
+**Handoff catalog copy is current.** Standard bullets describe Outlook desktop, Outlook on the web, and Gmail handoff. There is no Microsoft 365 connected send.
 
 **Two-level guidance is already the right design.** Campaign `emailGuidance` plus per-draft "What should change?" with factual constraints winning (`prompt.ts` priority list). Apply that pair to every asset and store it on `ApplicationAsset` as decided. Do not invent a third guidance level.
 
@@ -429,29 +418,29 @@ The vision's Decisions log settles Target Employers, lists, contacts, email, `Ap
 
 **Recommended build order.**
 
-1. Vocabulary module and brand configuration, wired to nav, layout, transactional From name, referral text, and the billing catalog defaults. Hide lists, seats, invites, team roles, member management, Contact Sales, Premium, and Enterprise from the UI. No behavior change.
-2. Split prompt content from payload assembly for email, company research, persona synthesis, ICP interpretation, and scoring. Keep sales behavior until the new content is ready, behind the version constants, so the split is reviewable.
-3. Profile: retarget product synthesis at a person, drop `suggestedBuyerRoles`, and remove the persona blocker from the setup rail. Keep approval and `manuallyEditedFields`.
-4. Target Employers: employer content for ICP interpretation and criteria. Auto-select when one exists.
-5. Application on `Campaign` with required `icpId`, job-paste parser, company resolve, research prompt aimed at hiring and risk, and the application-level employer-fit score shown as a non-blocking signal.
-6. Per-application personas (`Persona.campaignId`, `PersonaTemplate`) and the one-at-a-time contact add with title fit and `resolveContactPersonaDecision`.
-7. Consultation transcript writing back to the profile, plumbed into claim-origin trusted text.
-8. Contact-free generation context. Email on the new content, restricted to contacts with an email address. Then `ApplicationAsset` with LinkedIn copy, cover letter, and resume, DOCX rendering on demand, and the fail-closed resume guard.
-9. Graph `fileAttachment` from the renderer, and the download step on handoff paths.
-10. Interview stages, interviewers as roster contacts, and the interview clock merged into Home and the digest. Job-seeker cadence defaults once the anchor question is answered.
-11. Application and asset entitlements in the billing catalog, with the single Standard plan in Stripe.
+1. **COMPLETE.** Vocabulary module and brand configuration. Lists, seats, invites, team roles, Contact Sales, Premium, and Enterprise hidden from the seeker UI.
+2. **PARTIAL.** Prompt content split for profile, ICP, consultation, assets, and outreach. Legacy email/scoring assemblers still hold sales-era content.
+3. **COMPLETE.** Personal Profile synthesis. No suggested buyer roles. Setup rail does not prompt for a Hiring Team role.
+4. **COMPLETE.** Target Employers. Auto-select when one exists.
+5. **COMPLETE.** Application, job parser, employer research, non-blocking employer-fit.
+6. **COMPLETE.** Per-application Hiring Team identification and one-at-a-time contact add.
+7. **COMPLETE.** Consultation writing back to the Personal Profile.
+8. **COMPLETE.** ApplicationAsset resume, cover letter, email, LinkedIn. Fail-closed claim guard. Desktop and web handoff.
+9. **SUPERSEDED.** Graph `fileAttachment`. Not a product path. Handoff only; documents download separately.
+10. **COMPLETE.** Interview stages, guides, thank-you FACT answers, interview clock on Home and in the digest.
+11. **OPEN.** Application and asset entitlements in the billing catalog (question 22).
 
 ## 9. Open questions
 
 1. **RESOLVED.** Target Employers is a real step. `Campaign.icpId` stays required. Every application is scored against a Target Employer profile with the existing ICP scoring; a mismatch is a visible, overridable signal, never a block. Multiple profiles are allowed and a single one is auto-selected. Setup order is Profile → Target Employers → Applications.
 2. **OPEN.** One profile per organization, or one profile per user? `Product` has no `ownerUserId`. `Campaign` does. With an organization of one these are the same today. Still open: may one seeker keep more than one Profile?
 3. **RESOLVED.** Standard plan only, organization of one. Seats, invites, team roles, member management, and shared campaigns stay in code and are hidden from the UI.
-4. **RESOLVED.** Lists are not imported in the seeker UI. List import, bulk validation, bulk scoring, and list-to-persona matching are hidden. Contacts are added one at a time to an application's roster.
+4. **RESOLVED.** Lists are not in the product. Contacts are added one at a time to an application's roster.
 5. **RESOLVED.** Bulk prospect scoring is hidden. ICP scoring of each application is visible as a non-blocking signal.
 6. **RESOLVED.** Limits are counted per application or generated asset, not per email, and are set by configuration. The values are question 22.
-7. **RESOLVED.** Microsoft 365 through Graph is the only direct send path and the only one that attaches. Outlook desktop and Google Workspace are handoff paths with a download step. The catalog's Google sending copy still needs correcting (section 8).
+7. **RESOLVED.** There is no Microsoft 365 integration. Desktop and web handoff only (Outlook desktop, Outlook on the web, Gmail). Documents download separately; handoff cannot attach.
 8. **RESOLVED.** The digest survives with two clocks, both on Home and in the digest: application outreach on the existing sequence clock with job-seeker intervals, and interview stages anchored to the interview date (thank-you about 24 hours after, check-in N days after with no response). Due items ask for notes. Content is generated on demand after notes, never on a timer. The anchor wording is question 17.
-9. **RESOLVED.** Every asset may state a skill, title, employer, date, credential, metric, or achievement only when it traces to the profile or a consultation answer. Assets may emphasize and order facts but never add them. Resume generation fails closed. Whether other asset types fail closed is question 20.
+9. **RESOLVED.** Every asset may state a skill, title, employer, date, credential, metric, or achievement only when it traces to the Personal Profile, a consultation answer, or a stage thank-you clarifying answer. Assets may emphasize and order facts but never add them. Resume, cover letter, LinkedIn, and outreach fail closed.
 10. **RESOLVED.** The seeker may skip the consultation, skip any question, pause and resume, or click Done. The consultation also ends when required, outcome, competency, and mission gaps are STRONG or skipped. Preferred gaps do not block the end. Materials can still be generated from the Personal Profile when consultation is skipped.
 11. **OPEN.** Who supplies the DOCX styles for resume and cover letter? Nothing in the repo is a template. Rendering on demand is decided; the layout is not.
 12. **OPEN.** LinkedIn is paste-only in the vision. Confirm there will be no LinkedIn API.
@@ -462,7 +451,7 @@ The vision's Decisions log settles Target Employers, lists, contacts, email, `Ap
 17. **OPEN.** Outreach cadence anchor. The decision says anchored to the first send. `computeNextDueAt` measures each gap from the latest send. Does the decision mean the clock starts at the first send (no engine change), or that every due date is measured from the first send (engine change)?
 18. **OPEN.** Job-seeker default intervals and maximum emails for the outreach clock. Current defaults are 9, 6, 15, then every 30 days, maximum 4.
 19. **OPEN.** Interview check-in: the value of N, and what counts as "a response" when the interview has no email thread.
-20. **OPEN.** Do cover letter, LinkedIn copy, and email fail closed like the resume, or keep today's flag-and-save?
+20. **RESOLVED.** Cover letter, LinkedIn, and outreach fail closed like the resume.
 21. **OPEN.** Where is the application-level employer-fit result stored, and is the seeker's override stored with it?
 22. **OPEN.** Plan limit values for applications and generated assets, and whether both are limited or only one.
 
@@ -534,22 +523,34 @@ Nouns now come from `src/lib/product-config/vocabulary.ts`. The sentences below 
 - `src/components/CampaignEmailSettingsForm.tsx` — "Save application guidance"
 - `src/app/actions/campaign-email-settings.ts` — "Unable to update application guidance. Please try again."
 
-### Billing (5)
+### Billing (5) — done
 
-- `src/lib/billing/billing-catalog.ts` — Standard tagline "For individual salespeople"
-- `src/lib/product-config/brand.ts` — lockup eyebrow `{Outbound}`; meta description "Multi-tenant outbound email platform"
-- `src/lib/product-config/brand.ts` — referral share: "research {contacts} and write outbound emails — it saves me the half hour per {employer}…"
-- `src/app/(auth)/login/page.tsx` — "Access your outbound workspace."
-- `src/app/(app)/settings/billing/page.tsx` — "After 30 days we permanently delete that {contact} and outbound…"
+- `src/lib/billing/billing-catalog.ts` — Standard tagline "For individual {job seekers}"; handoff bullets (Outlook desktop, Outlook on the web, Gmail)
+- `src/lib/product-config/brand.ts` — lockup eyebrow {Applications}; meta description research-backed {application} materials and {outreach} for {job seekers}
+- `src/lib/product-config/brand.ts` — referral share: research {employers} and write {outreach} — it saves me the half hour per {application}
+- `src/app/(auth)/login/page.tsx` — "Access your {application} workspace."
+- `src/app/(app)/settings/billing/page.tsx` — "After 30 days we permanently delete that {contact} and {outreach} data…"
 
 ### Emails and digest (1) — done
 
 - `src/lib/transactional-email/templates.ts` — cadence digest: follow-up reminders on Home (alerts only; nothing is sent)
 
-### Admin (4)
+### Admin (4) — done
 
-- `src/app/platform/email-templates/page.tsx` — "not customer outbound sales email."
-- `src/components/platform/PurgeContactOutboundPanel.tsx` — "Delete {contact} and outbound data"; "Removes CRM and outbound rows"
-- `src/app/platform/orgs/page.tsx` — "outbound data"
-- `src/app/platform/orgs/new/page.tsx` — Enterprise / multi-user org copy (hidden from seeker plan UI; still on the operator console)
+- `src/app/platform/email-templates/page.tsx` — "not {job seeker} {outreach}."
+- `src/components/platform/PurgeContactOutboundPanel.tsx` — "Delete {contact} and {outreach} data"; "Removes {contact}, {application}, and {outreach} rows"
+- `src/app/platform/orgs/page.tsx` — "{outreach} data"
+- `src/app/platform/orgs/new/page.tsx` — Enterprise — more than one member; first user is OWNER and can invite teammates
+
+### Remaining sales language after this cleanup
+
+Seeker-visible copy in the live journey uses the vocabulary module. Leftover sales-era sentences still exist on **hidden** list/scoring routes (`/lists`, `/scoring`, campaign stage rail when `anyListFeatureEnabled()` is true) and in the legacy email-sequence workspace ("Offer validation notes", "Send with Microsoft 365" behind `features.emailConnection`). Those screens are not in the product.
+
+Reported, not rewritten here:
+
+- `criterionFlags.disqualifier` is "Deal-breaker" — job-search idiom, not a sales pipeline.
+- Hiring Team interpretation prompts in `src/lib/interpretation/persona-prompt.ts` still describe "Desired Outcomes From Your Solution". Prompt-content rewrite is outside this cleanup.
+- Hidden team/enterprise plan selectors and list-import placeholders still mention Sales titles. They are not seeker-visible while those flags are off.
+- Product-level `/setup/[productId]/personas/new` still exists. It uses `vocab.buyer` (renders as Hiring Team role). Roles are identified per application; this page is leftover machinery.
+- `/contacts` still offers list filters. The Contacts nav item stays; list import is hidden.
 

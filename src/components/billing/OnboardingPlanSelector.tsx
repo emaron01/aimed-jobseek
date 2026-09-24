@@ -92,7 +92,7 @@ export function OnboardingPlanSelector({
               {
                 code: BILLING_PLAN_STANDARD,
                 label: "Standard",
-                blurb: `For individual ${vocab.salesperson.plural}`,
+                blurb: `For individual ${vocab.seeker.plural}`,
               },
               ...(features.teamPlanDisplay
                 ? [

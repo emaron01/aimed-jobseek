@@ -2,7 +2,7 @@
 import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { QualificationBucket } from "@prisma/client";
 import { EmailSequenceWorkspace } from "@/components/EmailSequenceWorkspace";
 import type { OfferConflict } from "@/lib/campaign/offer-validation";
@@ -155,6 +155,11 @@ export function EmailDraftsStage({
   const [contactFilter, setContactFilter] =
     useState<ContactListFilter>("all");
   const [stageContacts, setStageContacts] = useState(contacts);
+  const [contactsProp, setContactsProp] = useState(contacts);
+  if (contacts !== contactsProp) {
+    setContactsProp(contacts);
+    setStageContacts(contacts);
+  }
   const [selectedId, setSelectedId] = useState(() => {
     if (
       initialCampaignContactId &&
@@ -168,10 +173,6 @@ export function EmailDraftsStage({
   const [queueComplete, setQueueComplete] = useState(false);
   const triggeredReviewKeys = useRef(new Set<string>());
   const lookaheadRunId = useRef(0);
-
-  useEffect(() => {
-    setStageContacts(contacts);
-  }, [contacts]);
 
   const visibleContacts = useMemo(() => {
     // Opted-out and excluded contacts cannot be emailed — keep them out of the

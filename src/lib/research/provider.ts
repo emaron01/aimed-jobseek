@@ -416,7 +416,8 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
  * Intentionally does not fabricate company intelligence.
  */
 export class UnconfiguredCompanyResearchProvider implements CompanyResearchProvider {
-  async research(_input: CompanyResearchInput): Promise<CompanyResearchResult> {
+  async research(input: CompanyResearchInput): Promise<CompanyResearchResult> {
+    void input;
     throw new AiConfigError(
       "Automated company research is not configured. Use manual research or set RESEARCH_AI_* environment variables.",
     );

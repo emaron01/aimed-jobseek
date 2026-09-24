@@ -488,10 +488,8 @@ export default async function ScoringReportPage({
                 ? {
                     ...row.contact.companyRecord,
                     research: row.contact.companyRecord.research.map((r) => {
-                      const {
-                        researchConfidence: _researchConfidence,
-                        ...repVisibleResearch
-                      } = r;
+                      const { researchConfidence, ...repVisibleResearch } = r;
+                      void researchConfidence;
                       return {
                         ...repVisibleResearch,
                         researchedAt: r.researchedAt

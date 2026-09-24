@@ -36,7 +36,7 @@ import {
   type CriteriaEditorBoxes,
   type PersonaCriterionFormRow,
 } from "@/lib/persona-research/project-signals";
-import { vocab, vocabExamples } from "@/lib/product-config";
+import { hiringTeamConfig, vocab, vocabExamples } from "@/lib/product-config";
 
 const initial: PersonaSetupActionResult | null = null;
 
@@ -114,11 +114,12 @@ function PersonaCriteriaEditor({
   const [dismissedNeedsReview, setDismissedNeedsReview] = useState<string[]>(
     [],
   );
-
-  useEffect(() => {
+  const [appliedBaseline, setAppliedBaseline] = useState(baseline);
+  if (baseline !== appliedBaseline) {
+    setAppliedBaseline(baseline);
     setBoxes(criteriaToEditorBoxes(baseline));
     setDismissedNeedsReview([]);
-  }, [baseline]);
+  }
 
   useEffect(() => {
     const modifiedBoxes = (
@@ -381,12 +382,15 @@ export function PersonaDraftReview({
     [],
   );
 
-  useEffect(() => {
-    if (draft) {
-      setFormState(draftToFormState(draft));
-      setCriteriaJson(JSON.stringify(reviewResult.criteria));
-    }
-  }, [draft, reviewResult.criteria]);
+  const draftSyncKey = draft
+    ? `${draft.name}\0${JSON.stringify(reviewResult.criteria)}`
+    : "";
+  const [appliedDraftKey, setAppliedDraftKey] = useState(draftSyncKey);
+  if (draft && draftSyncKey !== appliedDraftKey) {
+    setAppliedDraftKey(draftSyncKey);
+    setFormState(draftToFormState(draft));
+    setCriteriaJson(JSON.stringify(reviewResult.criteria));
+  }
 
   useEffect(() => {
     if (state?.ok) {
@@ -599,14 +603,14 @@ export function PersonaDraftReview({
             </div>
             <div className="md:col-span-2">
               <DraftEditField
-                label={`Desired Outcomes From Your ${vocab.solution.Singular}`}
+                label={hiringTeamConfig.fields.outcomesLabel}
                 name="desiredOutcomes"
                 value={formState.desiredOutcomes}
                 onChange={(value) =>
                   setFormState((prev) => ({ ...prev, desiredOutcomes: value }))
                 }
                 multiline
-                hint={`Outcomes from using the ${vocab.product.singular} — not ${vocab.campaign.singular} CTAs.`}
+                hint={hiringTeamConfig.fields.outcomesHint}
               />
             </div>
             <div className="md:col-span-2">

@@ -45,6 +45,15 @@ export function ProductDetailsForm({ product }: { product: Product }) {
 
   const [name, setName] = useState(defaults.name);
   const [websiteUrl, setWebsiteUrl] = useState(defaults.websiteUrl);
+  const [defaultsKey, setDefaultsKey] = useState(
+    `${defaults.name}\0${defaults.websiteUrl}`,
+  );
+  const nextDefaultsKey = `${defaults.name}\0${defaults.websiteUrl}`;
+  if (nextDefaultsKey !== defaultsKey) {
+    setDefaultsKey(nextDefaultsKey);
+    setName(defaults.name);
+    setWebsiteUrl(defaults.websiteUrl);
+  }
   const warning = productNameDomainMismatchWarning(name, websiteUrl);
 
   useEffect(() => {
@@ -52,11 +61,6 @@ export function ProductDetailsForm({ product }: { product: Product }) {
       router.refresh();
     }
   }, [state, router]);
-
-  useEffect(() => {
-    setName(defaults.name);
-    setWebsiteUrl(defaults.websiteUrl);
-  }, [defaults.name, defaults.websiteUrl]);
 
   function fieldHint(key: keyof ProductFormValues): string | undefined {
     if (!state || state.ok) return undefined;

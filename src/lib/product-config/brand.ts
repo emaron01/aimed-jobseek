@@ -11,10 +11,10 @@ export const brand = Object.freeze({
   /** Display name on the From line of platform transactional email. */
   transactionalSenderName: APP_NAME,
   /** Small label above the app name in the sidebar lockup. */
-  lockupEyebrow: vocab.outbound.Singular,
+  lockupEyebrow: vocab.campaign.Plural,
   /** Document title when a page does not set its own. */
   defaultPageTitle: APP_NAME,
-  metaDescription: `Multi-tenant ${vocab.outbound.singular} email platform`,
+  metaDescription: `Research-backed ${vocab.campaign.singular} materials and ${vocab.outreach.singular} for ${vocab.seeker.plural}`,
   /** The app renders a text wordmark from `appName`; this is the only image asset. */
   faviconPath: "/favicon.ico",
   /** Product token for outbound HTTP User-Agent headers. */
@@ -39,8 +39,8 @@ export function referralShareMessage(input: {
   marketingDomain: string;
 }): string {
   return (
-    `I've been using ${brand.appName} to research ${vocab.prospect.plural} and write ${vocab.outbound.singular} emails — it saves ` +
-    `me the half hour per ${vocab.account.singular} I never actually had. Use code ${input.code} when you sign up and ` +
+    `I've been using ${brand.appName} to research ${vocab.account.plural} and write ${vocab.outreach.singular} — it saves ` +
+    `me the half hour per ${vocab.campaign.singular} I never actually had. Use code ${input.code} when you sign up and ` +
     `you'll get 10% off for as long as you use it. ${input.marketingDomain}`
   );
 }

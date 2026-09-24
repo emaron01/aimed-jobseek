@@ -77,7 +77,7 @@ export function normalizeEvidenceRefs(
     }
 
     const obj = item as Record<string, unknown>;
-    let claim =
+    const claim =
       typeof obj.claim === "string"
         ? obj.claim.trim()
         : typeof obj.text === "string"

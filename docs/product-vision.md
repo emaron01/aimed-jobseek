@@ -1,84 +1,84 @@
-# AimedJobSeek: Product Vision and Refactor Playbook
+# AimedJobSeek: Product Vision
 
-This is the source of truth for what this codebase is becoming. Read it before any task in this repo. When code and this document disagree, flag it; do not silently pick one.
+This is the source of truth for what AimedJobSeek is. Read it before any task in this repo. When code and this document disagree, flag it; do not silently pick one.
 
 ## What this product is
-AimedJobSeek helps job seekers pursue specific jobs with research-backed, personalized materials and outreach in their own voice. It is a fork of Aimed Outreach, an outbound sales email tool. The fork's research, persona, voice, generation, claim-guard, sequencing, sending, billing, auth, and admin capabilities are reused wherever they fit.
+
+AimedJobSeek helps job seekers pursue specific jobs with research-backed, personalized materials and outreach in their own voice. It is a fork of Aimed Outreach. Research, persona, voice, generation, claim-guard, billing, auth, and admin capabilities are reused wherever they fit. User-facing names come from `src/lib/product-config/`. Internal table and route names stay (Product, ICP, Persona, Campaign) to avoid a rename.
 
 ## Settled decisions
+
 - Separate repo (aimed-jobseek), Render service, and Postgres instance. Full upstream commit history retained.
 - Job discovery is cut-and-paste. The seeker finds a posting anywhere and pastes it in. No job-board integrations.
 - This repo does not sync with Aimed Outreach.
-- Internal identifiers (tables, columns, models, services, routes) keep their names to avoid the cost and risk of renaming, not for mergeability. Only user-facing text and prompt content change.
-- Prompt machinery (context assembly, fact selection, claim-guard mechanics, length control, voice application, versioning) stays in the shared generation layer. Prompt content (instructions, examples, structure) is product-specific and lives in its own layer, for clarity.
-- No hardcoded vocabulary or branding. All user-facing terms come from a single vocabulary source. This has caused repeated production problems and is non-negotiable.
+- Internal identifiers keep their names. Only user-facing text and prompt content change.
+- Prompt machinery stays in the shared generation layer. Prompt content lives in `src/lib/prompt-content/`.
+- No hardcoded vocabulary or branding. All user-facing terms come from the product configuration module.
 - Production-ready code only. No placeholders, stubs, or temporary fixes.
 - The EULA is managed by the super admin through the admin console. It is data, not code.
+- There is no Microsoft 365 mailbox integration in the product. Outreach is handed off to Outlook desktop, Outlook on the web, and Gmail. The seeker sends from their own mailbox.
+- Lists, list import, bulk validation, bulk scoring, and list-to-persona matching are not in the product. The seeker adds contacts one at a time on an application.
+- Hiring Team roles are identified per application from the job requirement and employer research. Personal Profile build does not create them.
+- Standard plan only in the seeker UI. Each account is an organization of one.
 
 ## The user journey
+
 Setup order: Personal Profile → Target Employers → Applications.
 
-1. Personal Profile: the seeker uploads a resume and other documents, pastes their LinkedIn profile, and adds notes. The Personal Profile is built from the seeker's supplied materials (uploads, pasted text, notes, and supplied URLs), with no web search for the person. This reuses product intake (uploads, paste, notes, URLs, Research & Build). Unlike product build, Personal Profile build does NOT generate personas and does not suggest buyer roles. The setup rail does not prompt for a persona after the Personal Profile.
-2. Target Employers: the seeker describes the kind of company they want to work for (culture, stage, size, industry, geography, work arrangement). This is the upstream ICP, with prompt content rewritten for employers; the model and scoring pipeline are reused. Multiple Target Employer profiles are allowed; when only one exists it is selected automatically.
-3. Application: the seeker pastes a job posting and selects a Target Employer profile. The system:
-   - parses it into a structured job requirement
-   - identifies the company and runs company research (reused; research emphasis shifts from buying signals to hiring, growth, and employer-risk signals)
-   - scores the company against the Target Employer profile using the existing ICP scoring; a mismatch is a visible signal the seeker can override, never a block
-   - builds hiring-team personas for this application
-   - keeps a roster of contacts, added one at a time
-4. Consultation: the system compares the job requirement to the Personal Profile and runs an interactive Q&A with the seeker to surface strong, specific details that set them apart from other applicants. Answers are written back to the Personal Profile, not just this application, so the Personal Profile improves with every application. Consultation answers are verified facts for claim guards.
-5. Assets, generated per application:
-   a. Tailored resume (document output, rendered as DOCX on demand)
-   b. Cover letter (document output, rendered as DOCX on demand)
-   c. Email, on demand, to a hiring-team contact who has an email address
-   d. LinkedIn message copy for pasting into LinkedIn outreach, per persona
-6. Interviews:
-   a. An interview guide per stage: overview, talking points, and questions to ask, by persona. Generic when little is known; curated from information already shared.
-   b. Stage updates: the seeker records what they learned (for example, "the recruiter says the next interviewer focuses on X"), and the next stage's guide adapts. The system may ask the seeker a few clarifying questions. Interviewers recorded at a stage become contacts on the application's roster.
-   c. Follow-up and thank-you emails and LinkedIn messages per interviewer, based on persona and interview notes. These come due on the interview-stage clock (see Decisions log) and are generated only after the seeker records notes.
+1. **Personal Profile.** The seeker uploads a resume and other documents, pastes LinkedIn text, and adds notes. The profile is built from supplied materials only — no web search for the person. Synthesis does not generate Hiring Team roles.
+2. **Target Employers.** The seeker describes the kind of company they want (culture, stage, size, industry, geography, work arrangement). Multiple profiles are allowed; when only one exists it is selected automatically.
+3. **Application.** The seeker pastes a job posting and selects a Target Employer profile. The system parses a structured job requirement, identifies the company, runs employer research, shows employer-fit as a non-blocking signal the seeker can override, identifies Hiring Team roles for this application, and keeps a roster of contacts added one at a time.
+4. **Consultation.** Harper compares the job requirement to the Personal Profile and runs a Q&A to surface specific, citable details. Confirmed answers and STAR stories write back to the Personal Profile. The seeker can skip the consultation, skip a question, pause, or mark Done. Answers are seeker-authored FACT for claim guards.
+5. **Application assets**, generated per application, fail closed on untraceable claims:
+   - Tailored resume (DOCX on demand)
+   - Cover letter (DOCX on demand)
+   - Email and LinkedIn outreach to a Hiring Team contact
+6. **Interview stages.** The seeker records stages, interviewers (who become roster contacts), notes, and outcomes. Each stage has a guide. Thank-you and check-in messages are generated only after notes exist. Thin notes can ask up to two clarifying questions; the seeker's answers are FACT for that stage's thank-you generation and claim validation.
+7. **Application Summary.** A printable recap of the job, employer research, Hiring Team, consultation, assets, outreach, and interview stages.
 
-## Personas are the hiring team
-Personas are the people involved in hiring and in the day-to-day work of the role: HR, recruiters, the hiring manager, the hiring manager's executive, and cross-functional team leaders. Each is defined by their relationship to the role's responsibilities and what matters to them. Personas drive outreach, interview guides, and follow-ups.
-- A stakeholder template library exists at the account level. The seeker saves a role they built and can add that template to an application. Templates are not created from a fixed list and do not auto-populate an application. Roles are identified from that application's job requirement and company research, then drafted and reviewed.
-- The custom persona builder (name, likely titles, department, why this role matters, notes) is reused. Its evidence source changes from product evidence to job requirement plus company research, plus differentiation from peer personas so the recruiter, hiring manager, and executive stay distinct.
-- Personas are created per application. Personal Profile build does not create them.
-- Contacts are real people at the company, added one at a time to an application's roster (name, title, optional email, LinkedIn URL, persona). Title-to-persona matching is suggested automatically and the seeker can change it.
+## Hiring Team
 
-## Guidance and regeneration
-Existing two-level guidance is reused: campaign-level guidance becomes application-level guidance, and per-draft "What should change?" applies to every asset type.
+Roles are the people involved in hiring and in the day-to-day work of the role. They are identified per application from the job requirement and employer research, then drafted and reviewed. The seeker can save a role as a template and add a template to an application; templates never auto-populate. Contacts are real people (name, title, optional email, LinkedIn URL, role). Title-to-role matching is suggested; the seeker can change it.
 
 ## Claim guards
-Claim guards must protect candidate facts. No generated asset may state a skill, title, employer, date, credential, metric, or achievement that cannot be traced to the Personal Profile or consultation answers. Assets may emphasize and order facts but never add them. Fabrication on a resume is a far more serious failure than in a sales email: resume generation fails closed on an untraceable fact.
 
-## Proposed concept mapping (user-facing names only; proposed, except Target Employers, which is confirmed)
-| Upstream concept | Job seeker concept |
+No generated asset may state a skill, title, employer, date, credential, metric, or achievement that cannot be traced to the Personal Profile, a confirmed consultation answer, or — for a thank-you — a seeker-authored clarifying answer for that stage. Assets may emphasize and order facts but never add them. Resume, cover letter, LinkedIn, and outreach fail closed on an untraceable fact.
+
+## Concept mapping (user-facing names)
+
+| Internal name | User-facing name |
 |---|---|
 | Product | Personal Profile |
-| ICP | Target Employers (confirmed) |
-| Persona | Hiring Team stakeholder |
+| ICP | Target Employer profile |
+| Persona | Hiring Team role |
 | Campaign | Application |
 | Contacts | Contacts |
 | Campaign email settings | Application guidance |
 
-## Genuinely new capabilities
-- Job posting parser into a structured job requirement
-- Per-application persona scoping with an account-level template library
-- Interactive consultation agent (multi-turn Q&A) that writes back to the Personal Profile
-- Generalized asset generation (resume, cover letter, email, LinkedIn) sharing one context, fact-selection, and claim-guard chain, with type-specific format and length constraints. Resume, cover letter, and LinkedIn copy are stored as structured content in a new ApplicationAsset model; DOCX is rendered from that content on demand, not stored as a file.
-- Attachments on send through Microsoft Graph for connected Microsoft 365 mailboxes, and a download step for handoff paths that cannot attach
-- Interview stages with carried-forward notes, stage guides, per-interviewer follow-ups, and an interview-date clock for thank-you and check-in reminders
+## Built capabilities
+
+- Job posting parser and structured job requirement
+- Per-application Hiring Team identification, review, and optional templates
+- One-at-a-time contact add with role suggestion
+- Consultation that writes confirmed facts and stories back to the Personal Profile
+- ApplicationAsset generation for resume, cover letter, email, and LinkedIn, with DOCX on demand
+- Desktop and web email handoff (Outlook desktop, Outlook on the web, Gmail). No connected-mailbox send path
+- Interview stages, guides, notes, clarifying questions, thank-you and check-in outreach
+- Application Summary
+- Two reminder clocks on Home and in the digest: application outreach after a send, and interview thank-you / check-in after the interview date
 
 ## Decisions log
-- Target Employers (ICP) stays. It describes the kind of company the seeker wants to work for. `Campaign.icpId` remains required. Every application is scored against a Target Employer profile using the existing ICP scoring; a mismatch is a visible signal the seeker can override, never a block. Multiple Target Employer profiles are allowed; when only one exists it is selected automatically. Setup order: Personal Profile → Target Employers → Applications. The ICP prompt content is rewritten for employers (culture, stage, size, industry, geography, work arrangement); the model and scoring pipeline are reused.
-- Lists: list import, bulk validation, bulk scoring, and list-to-persona matching are not requirements. The code stays; the UI is hidden.
-- Contacts: added one at a time to an application's roster. Fields: name, title, email (optional), LinkedIn URL, persona. Title-to-persona resolution reuses the existing resolved-persona logic, and the seeker can change it. Interviewers recorded at an interview stage become contacts on the roster.
-- Emails require a contact with an email address. `EmailDraft` and its contact relation are unchanged.
-- Resume, cover letter, and LinkedIn message copy are a new ApplicationAsset model: type, application, persona (optional), version, structured JSON content, and the guidance that produced it. No contact is required. DOCX is rendered from the structured content on demand, not stored as a file. All asset types share the context, fact-selection, and claim-guard chain used by email generation.
-- Attachments: Graph `sendMail` with `fileAttachment` for connected Microsoft 365. Handoff paths (Outlook desktop, Google Workspace) cannot attach; the UI must provide a download step for those paths.
-- Personal Profile build does not return `suggestedBuyerRoles`, and the setup rail does not prompt for a persona after the Personal Profile. Personas are created per application.
-- Cadence uses two clocks, both surfaced on Home and in the digest:
-  1. Application outreach: the existing sequence clock, anchored to the first send, with job-seeker default intervals.
-  2. Interview stages: anchored to the interview date recorded on the stage. A thank-you comes due within about 24 hours of the interview; a status check-in comes due if there is no response N days after it. The due item prompts the seeker to record notes. Content is generated on demand only after notes are recorded, never on a timer.
-- Standard plan only. Each account is an organization of one. Seats, invites, team roles, member management, Contact Sales, Premium, and Enterprise stay in code but are hidden from the UI. Stripe exposes one plan. Plan limits are set by configuration, not hardcoded, and will be defined per application or generated asset rather than per email.
-- Claim rule for every asset: a skill, title, employer, date, credential, metric, or achievement may appear only when it traces to the Personal Profile or a consultation answer. Assets may emphasize and order facts but never add them. Resume generation fails closed on an untraceable fact.
-- The concept mapping table remains proposed, except Target Employers, which is confirmed.
+
+- Target Employers stays. `Campaign.icpId` remains required. Employer-fit is a visible, overridable signal, never a block.
+- Lists and list scoring are not product features. Hidden list/scoring routes are leftover machinery, not a seeker path.
+- Contacts are added one at a time. Interviewers recorded at a stage become roster contacts.
+- Email and LinkedIn outreach require a contact. Email handoff needs an address; LinkedIn paste does not.
+- Resume, cover letter, and LinkedIn copy are `ApplicationAsset` rows. DOCX is rendered on demand, not stored.
+- There is no Microsoft Graph send or attachment path in the product. Handoff links cannot attach a file; the UI provides a download for documents.
+- Personal Profile build does not return suggested buyer roles and does not prompt for a Hiring Team role.
+- Cadence uses two clocks, both on Home and in the digest:
+  1. Application outreach, anchored to sends, with job-seeker intervals.
+  2. Interview stages, anchored to the interview date. A thank-you comes due about 24 hours after; a check-in comes due if there is no response N days later. Content is generated on demand after notes, never on a timer.
+- Thank-you clarifying answers are seeker-authored FACT for that stage. They are available to thank-you generation and claim validation.
+- Standard plan only in the seeker UI. Seats, invites, team roles, Contact Sales, Premium, and Enterprise stay in code and are hidden.
+- Claim rule: every asset fact traces to the Personal Profile, a consultation answer, or a stage thank-you answer. Fail closed.

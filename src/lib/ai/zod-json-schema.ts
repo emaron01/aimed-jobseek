@@ -125,7 +125,8 @@ export function buildOpenAiJsonSchemaFormat(
 export function sanitizeOpenAiStrictJsonSchema(
   node: Record<string, unknown>,
 ): Record<string, unknown> {
-  const { $schema: _schema, ...rest } = node;
+  const { $schema, ...rest } = node;
+  void $schema;
   return walkJsonSchema(rest) as Record<string, unknown>;
 }
 
@@ -161,7 +162,8 @@ function ensureNullable(
 }
 
 function stripDefault(node: Record<string, unknown>): Record<string, unknown> {
-  const { default: _default, ...rest } = node;
+  const { default: defaultValue, ...rest } = node;
+  void defaultValue;
   return rest;
 }
 

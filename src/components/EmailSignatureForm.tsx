@@ -28,13 +28,20 @@ export function EmailSignatureForm({
   );
   const [body, setBody] = useState(signature?.body ?? "");
   const [htmlBody, setHtmlBody] = useState(signature?.htmlBody ?? "");
+  const [appliedSignature, setAppliedSignature] = useState<string | null>(null);
+  const savedSignature =
+    state?.ok && state.signature ? state.signature : null;
+  const savedSignatureKey = savedSignature
+    ? `${savedSignature.body}\0${savedSignature.htmlBody ?? ""}`
+    : null;
+  if (savedSignature && savedSignatureKey !== appliedSignature) {
+    setAppliedSignature(savedSignatureKey);
+    setBody(savedSignature.body);
+    setHtmlBody(savedSignature.htmlBody ?? "");
+  }
 
   useEffect(() => {
     if (state?.ok) {
-      if (state.signature) {
-        setBody(state.signature.body);
-        setHtmlBody(state.signature.htmlBody ?? "");
-      }
       router.refresh();
     }
   }, [state, router]);
@@ -44,9 +51,8 @@ export function EmailSignatureForm({
       <div>
         <h2 className="text-lg font-medium text-slate-900">Email signature</h2>
         <p className="mt-1 text-sm text-slate-600">
-          Appended when you send with Microsoft 365 or open a draft in Outlook
-          or Gmail. The draft editor stays unsigned so you do not edit the
-          signature by accident.
+          Appended when you open a draft in Outlook or Gmail. The draft editor
+          stays unsigned so you do not edit the signature by accident.
         </p>
       </div>
 
@@ -82,7 +88,7 @@ export function EmailSignatureForm({
         </label>
         <label className="block text-sm">
           <span className="font-medium text-slate-700">
-            HTML (Connected Send only, optional)
+            HTML (optional)
           </span>
           <textarea
             name="htmlBody"
@@ -97,8 +103,8 @@ export function EmailSignatureForm({
           />
           <span className="mt-1 block text-xs text-slate-500">
             {htmlBody.trim().length} / {EMAIL_SIGNATURE_HTML_MAX_CHARS} — logos
-            and styled blocks go here. Used only for Microsoft 365 Connected
-            Send.
+            and styled blocks go here. Used when a connected mailbox send path
+            is enabled.
           </span>
         </label>
         <div>

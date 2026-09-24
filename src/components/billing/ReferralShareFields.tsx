@@ -29,7 +29,6 @@ export function useReferralShare(active: boolean) {
 
   useEffect(() => {
     if (!active || code) return;
-    setError(null);
     startTransition(async () => {
       try {
         const res = await fetch("/api/billing/referral-code", {

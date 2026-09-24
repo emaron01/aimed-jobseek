@@ -250,7 +250,7 @@ export function ScoreReportClient({
   productName,
   icpName,
   personaName,
-  personas: _personas = [],
+  personas = [],
   rows,
   mandatorySuggestions = [],
   readOnly = false,
@@ -267,6 +267,7 @@ export function ScoreReportClient({
   mandatorySuggestions?: MandatorySuggestionView[];
   readOnly?: boolean;
 }) {
+  void personas;
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -293,9 +294,12 @@ export function ScoreReportClient({
     router.refresh();
   }, [mandatoryState, router]);
 
+  if (campaignState?.ok && showCampaign) {
+    setShowCampaign(false);
+  }
+
   useEffect(() => {
     if (!campaignState?.ok) return;
-    setShowCampaign(false);
     router.push(
       campaignState.campaignId
         ? `/campaigns/${campaignState.campaignId}`

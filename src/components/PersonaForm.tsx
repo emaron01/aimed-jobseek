@@ -36,7 +36,7 @@ import {
 } from "@/lib/persona-research/persona-briefing";
 import { NEEDS_REVIEW_CLASSIFY_TARGETS } from "@/lib/persona-research/project-signals";
 import { cn, listToCommaString } from "@/lib/utils";
-import { vocab, vocabExamples } from "@/lib/product-config";
+import { hiringTeamConfig, vocab, vocabExamples } from "@/lib/product-config";
 
 type CriterionRow = {
   id?: string;
@@ -393,11 +393,11 @@ function NewPersonaForm({
         />
         <div className="md:col-span-2">
           <Field
-            label="Describe the person who buys / cares"
+            label={hiringTeamConfig.fields.definitionLabel}
             name="definition"
             as="textarea"
-            placeholder="The executive responsible for…"
-            hint={`Authoritative ${vocab.buyer.singular} narrative. Preserved as source data.`}
+            placeholder={hiringTeamConfig.fields.definitionPlaceholder}
+            hint={hiringTeamConfig.fields.definitionHint}
           />
         </div>
         <div className="md:col-span-2">
@@ -436,11 +436,10 @@ function NewPersonaForm({
         </div>
         <div className="md:col-span-2">
           <Field
-            label={`Desired Outcomes From Your ${vocab.solution.Singular}`}
+            label={hiringTeamConfig.fields.outcomesLabel}
             name="desiredOutcomes"
             as="textarea"
-            hint={`What does this person want to improve, achieve, reduce, or avoid by using ${vocab.solution.aSingular} like yours? Not ${vocab.campaign.aSingular} CTA (meeting, ${vocab.demo.singular}, reply).`}
-            placeholder="Reduce forecast administration time; improve forecast confidence…"
+            hint={hiringTeamConfig.fields.outcomesHint}
           />
         </div>
         <div className="md:col-span-2">
@@ -546,9 +545,12 @@ export function PersonaForm({
   );
   const metaLine = briefing ? formatPersonaBriefingMeta(briefing) : "";
 
+  if (saveState?.ok && editing) {
+    setEditing(false);
+  }
+
   useEffect(() => {
     if (saveState?.ok) {
-      setEditing(false);
       router.refresh();
     }
     if (interpretState?.ok) {
@@ -634,12 +636,12 @@ export function PersonaForm({
             />
             <div className="md:col-span-2">
               <Field
-                label="Describe the person who buys / cares"
+                label={hiringTeamConfig.fields.definitionLabel}
                 name="definition"
                 defaultValue={persona.definition ?? persona.responsibilities}
                 as="textarea"
-                placeholder="The executive responsible for…"
-                hint={`Authoritative ${vocab.buyer.singular} narrative. Preserved as source data.`}
+                placeholder={hiringTeamConfig.fields.definitionPlaceholder}
+                hint={hiringTeamConfig.fields.definitionHint}
               />
             </div>
             <div className="md:col-span-2">
@@ -683,12 +685,11 @@ export function PersonaForm({
             </div>
             <div className="md:col-span-2">
               <Field
-                label={`Desired Outcomes From Your ${vocab.solution.Singular}`}
+                label={hiringTeamConfig.fields.outcomesLabel}
                 name="desiredOutcomes"
                 defaultValue={persona.desiredOutcomes}
                 as="textarea"
-                hint={`What does this person want to improve, achieve, reduce, or avoid by using ${vocab.solution.aSingular} like yours? Not ${vocab.campaign.aSingular} CTA (meeting, ${vocab.demo.singular}, reply).`}
-                placeholder="Reduce forecast administration time; improve forecast confidence…"
+                hint={hiringTeamConfig.fields.outcomesHint}
               />
             </div>
             <div className="md:col-span-2">

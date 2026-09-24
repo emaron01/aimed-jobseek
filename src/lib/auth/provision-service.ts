@@ -255,7 +255,7 @@ export async function provisionIndividualWorkspace(input: {
             name: existingByEmail.name ?? userDisplayName,
           },
         });
-        let membership = await tx.organizationMembership.findFirst({
+        const membership = await tx.organizationMembership.findFirst({
           where: { userId: user.id },
           include: { organization: true },
         });

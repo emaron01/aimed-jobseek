@@ -202,7 +202,9 @@ describe("retry synthesis architecture (source inspection)", () => {
     );
     const { z } = await import("zod");
 
-    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      void url;
+      void init;
       return new Response(
         JSON.stringify({
           output: [

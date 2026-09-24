@@ -55,7 +55,7 @@ export default async function PlatformEmailTemplatesPage({
           Transactional email templates
         </h1>
         <p className="mt-1 text-sm text-slate-600">
-          Platform account emails only — not customer {vocab.outbound.singular} {vocab.sales.singular} email.
+          Platform account emails only — not {vocab.seeker.singular} {vocab.outreach.singular}.
           SUPER_ADMIN only.
         </p>
       </div>

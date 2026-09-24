@@ -93,8 +93,8 @@ export async function acquireProductEvidence(input: {
   const policy = await getResearchPolicy(input.organizationId);
   const correlationId = input.correlationId ?? createCorrelationId();
   const errors: string[] = [];
-  let sourceIds: string[] = [];
-  let excerpts: EvidenceExcerpt[] = [];
+  const sourceIds: string[] = [];
+  const excerpts: EvidenceExcerpt[] = [];
   let urlResearchPerformed = false;
 
   await prisma.product.update({
@@ -527,7 +527,7 @@ export async function appendProductSourcesToBundle(input: {
   const policy = await getResearchPolicy(input.organizationId);
   const correlationId = input.correlationId ?? createCorrelationId();
   const errors: string[] = [];
-  let sourceIds: string[] = [];
+  const sourceIds: string[] = [];
   const newExcerpts: EvidenceExcerpt[] = [];
 
   const parentBundle = input.parentBundleId

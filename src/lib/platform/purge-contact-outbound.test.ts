@@ -4,6 +4,7 @@ import {
   CONTACT_OUTBOUND_PURGE_CONFIRM_PHRASE,
   contactOutboundPurgeConfirmSummary,
 } from "@/lib/platform/purge-contact-outbound-shared";
+import { vocab } from "@/lib/product-config";
 
 describe("contact outbound purge policy", () => {
   it("names suppressions in the DELETE list", () => {
@@ -14,7 +15,7 @@ describe("contact outbound purge policy", () => {
     expect(
       summary.keeps.some((line) => /product|persona/i.test(line)),
     ).toBe(true);
-    expect(CONTACT_OUTBOUND_PURGE_CONFIRM_PHRASE).toBe("Purge contacts");
+    expect(CONTACT_OUTBOUND_PURGE_CONFIRM_PHRASE).toBe(`Purge ${vocab.contact.plural}`);
   });
 
   it("wires platform panel and audit action", () => {

@@ -337,15 +337,20 @@ export function ProductDraftReview({
     normalizeProfile(draft),
   );
 
-  useEffect(() => {
+  const draftKey = `${productName}\0${websiteUrl ?? ""}\0${JSON.stringify(draft)}`;
+  const [appliedDraftKey, setAppliedDraftKey] = useState(draftKey);
+  if (draftKey !== appliedDraftKey) {
+    setAppliedDraftKey(draftKey);
     setName(productName);
     setUrl(websiteUrl ?? "");
     setProfile(normalizeProfile(draft));
-  }, [draft, productName, websiteUrl]);
+  }
+  if (state?.ok && editing) {
+    setEditing(false);
+  }
 
   useEffect(() => {
     if (state?.ok) {
-      setEditing(false);
       router.refresh();
     }
   }, [state, router]);

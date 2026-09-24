@@ -11,6 +11,7 @@ import {
 } from "@/lib/consultation/output-quality";
 import {
   loadApplicationGenerationContext,
+  type GenerationSource,
   type ReadyApplicationGenerationContext,
 } from "@/lib/generation/context";
 import { prisma } from "@/lib/prisma";
@@ -416,7 +417,7 @@ export function followUpLengthErrors(input: {
   return [];
 }
 
-function outreachSupportErrors(
+export function outreachSupportErrors(
   content: ApplicationAssetContent,
   context: ReadyApplicationGenerationContext,
 ): string[] {
@@ -580,10 +581,7 @@ export async function validateOutreachContent(input: {
   ];
 }
 
-function claimTrace(
-  content: ApplicationAssetContent,
-  context: ReadyApplicationGenerationContext,
-) {
+function claimTrace(content: ApplicationAssetContent) {
   return assetClaims(content).map((claim: AssetClaim) => ({
     claimId: claim.id,
     text: claim.text,
@@ -636,7 +634,6 @@ async function saveOutreachVersion(input: {
           contentJson: input.content as unknown as Prisma.InputJsonValue,
           claimTraceJson: claimTrace(
             input.content,
-            input.context,
           ) as unknown as Prisma.InputJsonValue,
           guidance: input.guidance,
           promptVersion: outreachPromptVersion(input.type),
@@ -654,6 +651,41 @@ type ThankYouClarifyState = {
   answers: Array<{ id: string; answer: string }>;
   skipped: boolean;
 };
+
+export function thankYouAnswerSources(input: {
+  interviewStageId: string;
+  answers: Array<{ id: string; answer: string }>;
+}): GenerationSource[] {
+  return input.answers
+    .map((row) => ({
+      id: row.id.trim(),
+      answer: row.answer.trim(),
+    }))
+    .filter((row) => row.id && row.answer)
+    .map((row) => ({
+      id: `interview:${input.interviewStageId}:thankYouAnswer:${row.id}`,
+      text: row.answer,
+      category: "PROFILE_FACT" as const,
+      url: null,
+    }));
+}
+
+function withThankYouAnswerSources(
+  context: ReadyApplicationGenerationContext,
+  interviewStageId: string,
+  answers: Array<{ id: string; answer: string }>,
+): ReadyApplicationGenerationContext {
+  const extra = thankYouAnswerSources({ interviewStageId, answers });
+  if (extra.length === 0) return context;
+  const existing = new Set(context.sources.map((source) => source.id));
+  return {
+    ...context,
+    sources: [
+      ...context.sources,
+      ...extra.filter((source) => !existing.has(source.id)),
+    ],
+  };
+}
 
 function parseThankYouClarify(value: unknown): ThankYouClarifyState {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -740,7 +772,7 @@ export async function generateOutreachAsset(input: {
       violations: [],
     };
   }
-  const context = base as ReadyApplicationGenerationContext;
+  let context = base as ReadyApplicationGenerationContext;
   const contactId = input.contactId?.trim() || null;
   let contact: {
     id: string;
@@ -875,6 +907,7 @@ export async function generateOutreachAsset(input: {
         interviewStageNotes = [interviewStageNotes, ...answers.map((row) => row.answer)]
           .filter(Boolean)
           .join("\n");
+        context = withThankYouAnswerSources(context, interviewStageId, answers);
         await prisma.interviewStage.update({
           where: { id: interviewStageId },
           data: {

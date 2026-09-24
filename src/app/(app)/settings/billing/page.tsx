@@ -291,17 +291,18 @@ export default async function OrganizationBillingSettingsPage({
                 {billing?.canceledAt
                   ? ` (${formatBillingDate(billing.canceledAt)})`
                   : ""}
-                , we keep your {vocab.contact.singular} {vocab.list.plural}, research, scores, {vocab.campaign.plural},
+                , we keep your {vocab.contact.plural}, {vocab.campaign.plural}, research,
                 drafts, send history, and{" "}
                 <span className="font-medium">opt-out / suppression list</span>.
                 Resubscribe in that window and all of it unlocks with this
                 workspace.
               </p>
               <p>
-                After 30 days we permanently delete that {vocab.contact.singular} and outbound
-                data — including suppressions. Your account, {vocab.product.plural}, {vocab.icp.plural},
-                {vocab.persona.plural}, voice, signature, billing, and credit packs stay so you
-                can return and rebuild {vocab.list.plural}.
+                After 30 days we permanently delete that {vocab.contact.singular} and{" "}
+                {vocab.outreach.singular} data — including suppressions. Your account,{" "}
+                {vocab.product.plural}, {vocab.icp.plural}, {vocab.persona.plural}, voice,
+                signature, billing, and credit packs stay so you can return and rebuild{" "}
+                {vocab.campaign.plural}.
               </p>
             </>
           ) : billingStatus === "PAST_DUE" && !paymentLocked ? (

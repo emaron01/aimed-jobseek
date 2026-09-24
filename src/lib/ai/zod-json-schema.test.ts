@@ -267,8 +267,10 @@ describe("openai-responses strict request body", () => {
     process.env.PRODUCT_AI_API_KEY = "sk-test";
 
     const tinySchema = z.object({ ok: z.boolean() });
-    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
-      Response.json({
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      void url;
+      void init;
+      return Response.json({
         output: [
           {
             type: "message",
@@ -281,8 +283,8 @@ describe("openai-responses strict request body", () => {
           },
         ],
         usage: { input_tokens: 1, output_tokens: 1 },
-      }),
-    );
+      });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const provider = createOpenAiResponsesProvider(getProductAiConfig());

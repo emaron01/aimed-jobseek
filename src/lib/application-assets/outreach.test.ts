@@ -27,6 +27,8 @@ import {
   notesDescribeConversation,
   outreachLimitErrors,
   redirectLineErrors,
+  outreachSupportErrors,
+  thankYouAnswerSources,
   thankYouNotesErrors,
   thankYouSubjectErrors,
   threadRepetitionErrors,
@@ -289,6 +291,110 @@ describe("outreach greetings and claims", () => {
         purpose: "THANK_YOU",
       }),
     ).toEqual([]);
+  });
+
+  it("treats an answered thank-you clarifying question as seeker FACT that passes validation", async () => {
+    const answers = [
+      {
+        id: "q-on-call",
+        answer:
+          "We discussed my on-call rotation and the invoice rewrite I led that cut failed billing runs.",
+      },
+    ];
+    const sources = thankYouAnswerSources({
+      interviewStageId: "stage-thank-you",
+      answers,
+    });
+    expect(sources).toEqual([
+      {
+        id: "interview:stage-thank-you:thankYouAnswer:q-on-call",
+        text: answers[0]!.answer,
+        category: "PROFILE_FACT",
+        url: null,
+      },
+    ]);
+
+    const messages = buildOutreachAssetMessages({
+      context: {
+        sources,
+        campaign: {
+          id: "c1",
+          name: "App",
+          ownerUserId: "u1",
+          applicationGuidance: null,
+          appliedAt: null,
+        },
+      } as never,
+      type: "EMAIL",
+      greeting: "Hello,",
+      signerName: "Alex Chen",
+      confirmedHiringManagerRole: false,
+      includeRedirect: false,
+      purpose: "THANK_YOU",
+      emailLength: "MEDIUM",
+      priorMessage: null,
+      interviewStageNotes: answers[0]!.answer,
+      mentionApplied: false,
+      regenerationInstruction: null,
+      qualityFeedback: [],
+    });
+    const payload = JSON.parse(messages[1]!.content) as {
+      citableSources: Array<{ id: string; text: string }>;
+    };
+    expect(payload.citableSources).toEqual([
+      {
+        id: sources[0]!.id,
+        category: "PROFILE_FACT",
+        text: answers[0]!.answer,
+      },
+    ]);
+
+    const thankYou = {
+      type: "EMAIL" as const,
+      subject: "On-call rotation and invoice rewrite",
+      greeting: "Hello,",
+      paragraphs: [
+        {
+          id: "p1",
+          text: "Thank you for the conversation about my on-call rotation and the invoice rewrite I led. Would a brief follow-up be useful?",
+          supports: [
+            {
+              sourceId: sources[0]!.id,
+              quote: "on-call rotation and the invoice rewrite I led",
+            },
+          ],
+        },
+      ],
+      signoff: "Thanks",
+      signerName: "Alex Chen",
+    };
+    expect(
+      outreachSupportErrors(thankYou, {
+        sources,
+        campaign: { applicationGuidance: null, appliedAt: null },
+      } as never),
+    ).toEqual([]);
+
+    const { validateOutreachContent } = await import(
+      "@/lib/application-assets/outreach"
+    );
+    const errors = await validateOutreachContent({
+      content: { ...thankYou, paragraphs: [{ ...thankYou.paragraphs[0]!, supports: [] }] },
+      context: {
+        sources,
+        campaign: { applicationGuidance: null, appliedAt: null },
+      } as never,
+      greeting: "Hello,",
+      signerName: "Alex Chen",
+      confirmedHiringManagerRole: false,
+      purpose: "THANK_YOU",
+      includeRedirect: false,
+      stageNotes: answers[0]!.answer,
+      mentionApplied: false,
+    });
+    expect(errors).toEqual([]);
+    expect(thankYou.paragraphs[0]!.text).toContain("on-call rotation");
+    expect(thankYou.paragraphs[0]!.text).toContain("invoice rewrite");
   });
 
   it("requires thank-you messages to cite notes and never use a redirect", () => {

@@ -216,7 +216,7 @@ export async function startInterviewGapConsultationAction(
   formData: FormData,
 ): Promise<InterviewActionResult> {
   try {
-    const [user, organizationId] = await Promise.all([
+    const [, organizationId] = await Promise.all([
       requireCurrentUser(),
       requireOrganizationId(),
     ]);

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useRef,
   type TextareaHTMLAttributes,
@@ -20,18 +21,18 @@ export function AutosizeTextarea({
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
-  function resize() {
+  const resize = useCallback(() => {
     const el = ref.current;
     if (!el) return;
     const lineHeight = Number.parseFloat(getComputedStyle(el).lineHeight) || 20;
     const minHeight = lineHeight * minRows + 16;
     el.style.height = "auto";
     el.style.height = `${Math.max(minHeight, el.scrollHeight)}px`;
-  }
+  }, [minRows]);
 
   useEffect(() => {
     resize();
-  }, [value, defaultValue, minRows]);
+  }, [value, defaultValue, resize]);
 
   return (
     <textarea

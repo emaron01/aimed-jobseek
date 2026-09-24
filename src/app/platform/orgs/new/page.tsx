@@ -79,8 +79,8 @@ export default async function PlatformCreateOrgPage() {
               className="mt-1"
             />
             <span>
-              <span className="font-medium">Enterprise</span> — multi-user org;
-              first user is OWNER and can invite teammates.
+              <span className="font-medium">Enterprise</span> — more than one
+              member; first user is OWNER and can invite teammates.
             </span>
           </label>
         </fieldset>
@@ -108,7 +108,7 @@ export default async function PlatformCreateOrgPage() {
             />
             <span>
               <span className="font-medium">Billed</span> — Individual accounts
-              complete Stripe Checkout; Enterprise accounts are invoice-managed.
+              complete Stripe Checkout; Enterprise accounts are invoiced.
             </span>
           </label>
         </fieldset>

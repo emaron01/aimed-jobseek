@@ -33,7 +33,7 @@ export default async function VoiceSettingsPage() {
             href="/settings/email"
             className="font-medium text-slate-900 underline underline-offset-2"
           >
-            Email connection
+            Email signature
           </Link>
           .
         </p>

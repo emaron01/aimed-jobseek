@@ -78,7 +78,7 @@ export default async function CampaignsPage({
     <div>
       <PageHeader
         title={vocab.campaign.Plural}
-        description={`Each ${vocab.campaign.singular} selects ${vocab.product.aSingular}, ${vocab.icp.aSingular}, ${vocab.persona.plural} in play, and ${vocab.campaign.aSingular}-specific offer. Open ${vocab.campaign.aSingular} to attach ${vocab.contact.plural} and work through qualification and email.`}
+        description={`Each ${vocab.campaign.singular} is a job you are pursuing: ${vocab.product.aSingular}, ${vocab.icp.aSingular}, and the ${vocab.persona.plural} for that employer.`}
         actions={
           <>
             <ShowArchivedToggle
@@ -151,7 +151,7 @@ export default async function CampaignsPage({
               ? canManageCampaigns
                 ? `Every ${vocab.campaign.singular} owned by a member of this organization appears here.`
                 : `Shared ${vocab.campaign.plural} appear here for the whole organization. Ask an admin to share ${vocab.campaign.aSingular}, or create your own.`
-              : `${vocab.campaign.ASingular} ties your ${vocab.product.singular} setup to ${vocab.contact.aSingular} ${vocab.list.singular} — qualify companies, score ${vocab.contact.plural}, and write emails in one workspace.`
+              : `${vocab.campaign.ASingular} is a job you are pursuing. Paste a posting, identify the ${vocab.persona.plural}, and write ${vocab.outreach.singular}.`
           }
           actions={
             canCreate && effectiveView === CAMPAIGN_LIST_VIEW_MY ? (
@@ -184,7 +184,6 @@ export default async function CampaignsPage({
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">{vocab.product.Singular}</th>
                 <th className="px-4 py-3 font-medium">{vocab.icp.singular}</th>
-                <th className="px-4 py-3 font-medium">Offer</th>
                 <th className="px-4 py-3 font-medium">{vocab.contact.Plural}</th>
                 <th className="px-4 py-3 font-medium">Created</th>
                 <th className="px-4 py-3 font-medium"> </th>
@@ -239,9 +238,6 @@ export default async function CampaignsPage({
                     </td>
                     <td className="px-4 py-3 text-slate-600">
                       {campaign.icp.name}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {campaign.offerName ?? campaign.offer?.name ?? "—"}
                     </td>
                     <td className="px-4 py-3 text-slate-600">
                       {campaign._count.contacts}

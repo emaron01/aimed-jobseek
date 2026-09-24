@@ -48,7 +48,7 @@ function LoginForm() {
         Sign in
       </h1>
       <p className="mt-1 text-sm text-slate-600">
-        Access your {vocab.outbound.singular} workspace.
+        Access your {vocab.campaign.singular} workspace.
       </p>
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <label className="block text-sm">

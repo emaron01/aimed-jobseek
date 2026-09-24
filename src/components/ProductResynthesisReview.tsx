@@ -87,9 +87,11 @@ export function ProductResynthesisReview({
     productDraftFromApprovedProfile(draft ?? beforeProfile),
   );
 
-  useEffect(() => {
-    if (draft) setProfile(productDraftFromApprovedProfile(draft));
-  }, [draft]);
+  const [appliedDraft, setAppliedDraft] = useState(draft);
+  if (draft && draft !== appliedDraft) {
+    setAppliedDraft(draft);
+    setProfile(productDraftFromApprovedProfile(draft));
+  }
 
   useEffect(() => {
     if (state?.ok) {

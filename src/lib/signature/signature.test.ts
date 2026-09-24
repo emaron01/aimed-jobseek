@@ -4,7 +4,7 @@ import { TenantError } from "@/lib/tenant/errors";
 import { EMAIL_SIGNATURE_MAX_CHARS } from "@/lib/signature/types";
 
 describe("email signature seams", () => {
-  it("lives on Email connection settings (not Voice)", () => {
+  it("lives on Email signature settings (not Voice)", () => {
     const voice = readFileSync("src/app/(app)/settings/voice/page.tsx", "utf8");
     const emailPage = readFileSync(
       "src/app/(app)/settings/email/page.tsx",
@@ -20,7 +20,7 @@ describe("email signature seams", () => {
     expect(emailPage).toContain("EmailSignatureForm");
     expect(voice).not.toContain("EmailSignatureForm");
     expect(voice).toContain('href="/settings/email"');
-    expect(settings).toMatch(/Email connection[\s\S]*signature appended/);
+    expect(settings).toMatch(/Email signature[\s\S]*Outlook or Gmail/);
     expect(workspace).toContain('href="/settings/email"');
     expect(workspace).not.toContain('href="/settings/voice"');
     expect(form).toContain("saveEmailSignatureAction");

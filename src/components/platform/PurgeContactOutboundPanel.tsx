@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useId, useState } from "react";
+import { useActionState, useId, useState } from "react";
 import { purgeContactOutboundDataAction } from "@/app/actions/platform-orgs";
 import type { PlatformOrgActionResult } from "@/app/actions/platform-orgs";
 import {
@@ -33,13 +33,12 @@ export function PurgeContactOutboundPanel({
   const matches = confirmation === CONTACT_OUTBOUND_PURGE_CONFIRM_PHRASE;
   const summary = contactOutboundPurgeConfirmSummary();
 
-  useEffect(() => {
-    if (!open) setConfirmation("");
-  }, [open]);
-
-  useEffect(() => {
-    if (state?.ok) setOpen(false);
-  }, [state]);
+  if (!open && confirmation) {
+    setConfirmation("");
+  }
+  if (state?.ok && open) {
+    setOpen(false);
+  }
 
   return (
     <div
@@ -48,12 +47,13 @@ export function PurgeContactOutboundPanel({
     >
       <div>
         <h3 className="text-sm font-medium text-slate-900">
-          Delete {vocab.contact.singular} and {vocab.outbound.singular} data
+          Delete {vocab.contact.singular} and {vocab.outreach.singular} data
         </h3>
         <p className="mt-1 text-sm text-slate-600">
           Honour the 30-day cancel retention for{" "}
           <span className="font-medium text-slate-800">{organizationName}</span>
-          . Removes CRM and {vocab.outbound.singular} rows; keeps setup and billing.
+          . Removes {vocab.contact.singular}, {vocab.campaign.singular}, and{" "}
+          {vocab.outreach.singular} rows; keeps setup and billing.
         </p>
       </div>
 
@@ -74,7 +74,7 @@ export function PurgeContactOutboundPanel({
           className="rounded-md border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-50"
           data-testid="platform-purge-contact-outbound-open"
         >
-          Delete {vocab.contact.singular} and {vocab.outbound.singular} data
+          Delete {vocab.contact.singular} and {vocab.outreach.singular} data
         </button>
       ) : (
         <div

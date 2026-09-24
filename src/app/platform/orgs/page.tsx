@@ -60,8 +60,8 @@ export default async function PlatformOrgsPage() {
             purge
           </p>
           <p className="mt-1 text-amber-900">
-            Highlighted below. Open the org detail page to run Delete {vocab.contact.singular} and
-            outbound data. Also listed on{" "}
+            Highlighted below. Open the org detail page to run Delete {vocab.contact.singular} and{" "}
+            {vocab.outreach.singular} data. Also listed on{" "}
             <Link href="/platform" className="font-medium underline">
               Platform home
             </Link>

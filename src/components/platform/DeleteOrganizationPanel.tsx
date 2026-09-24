@@ -2,7 +2,7 @@
 import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
-import { useActionState, useEffect, useId, useState } from "react";
+import { useActionState, useId, useState } from "react";
 import { deleteOrganizationAction } from "@/app/actions/platform-orgs";
 import type { PlatformOrgActionResult } from "@/app/actions/platform-orgs";
 
@@ -29,11 +29,9 @@ export function DeleteOrganizationPanel({
   const inputId = useId();
   const matches = confirmation === CONFIRM_PHRASE;
 
-  useEffect(() => {
-    if (!open) {
-      setConfirmation("");
-    }
-  }, [open]);
+  if (!open && confirmation) {
+    setConfirmation("");
+  }
 
   return (
     <div

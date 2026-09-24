@@ -66,7 +66,7 @@ export default async function SettingsIndexPage() {
             Usage & limits
           </Link>
           <p className="text-slate-600">
-            Effective quotas, metering, and research depth.
+            Effective limits, metering, and research depth.
           </p>
         </li>
         <li>
@@ -74,11 +74,10 @@ export default async function SettingsIndexPage() {
             href="/settings/email"
             className="font-medium text-slate-900 underline-offset-2 hover:underline"
           >
-            Email connection
+            Email signature
           </Link>
           <p className="text-slate-600">
-            Connect your Microsoft 365 mailbox and set the signature appended
-            when you send.
+            Signature appended when you open a draft in Outlook or Gmail.
           </p>
         </li>
         {isAdmin ? (

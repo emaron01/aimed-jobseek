@@ -189,7 +189,8 @@ export function candidateProfileForGeneration(
 ): Omit<CandidateProfile, "compensation"> | null {
   const parsed = candidateProfileSchema.safeParse(raw);
   if (!parsed.success) return null;
-  const { compensation: _omitted, ...rest } = parsed.data;
+  const { compensation, ...rest } = parsed.data;
+  void compensation;
   return rest;
 }
 
@@ -199,7 +200,8 @@ export function omitCompensationFromUnknown(raw: unknown): unknown {
   if (parsed) return parsed;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
   if (!("compensation" in raw)) return raw;
-  const { compensation: _omitted, ...rest } = raw as Record<string, unknown>;
+  const { compensation, ...rest } = raw as Record<string, unknown>;
+  void compensation;
   return rest;
 }
 

@@ -31,17 +31,6 @@ export type PersonaExclusionDetail = {
 };
 
 export type ExclusionDetail = IcpExclusionDetail | PersonaExclusionDetail;
-
-function stringifyBound(value: unknown): string | null {
-  if (value == null || value === "") return null;
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  if (typeof value === "string" && value.trim()) return value.trim();
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10);
-  }
-  return String(value);
-}
-
 function parseNumeric(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim()) {

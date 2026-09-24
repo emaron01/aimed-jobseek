@@ -291,9 +291,10 @@ export async function updateIcp(
   if (!existing) notFound("ICP");
 
   // productId reassignment is not allowed via update payload from clients
-  const { productId: _ignored, ...safeData } = data as Prisma.IcpUncheckedUpdateInput & {
+  const { productId, ...safeData } = data as Prisma.IcpUncheckedUpdateInput & {
     productId?: unknown;
   };
+  void productId;
 
   const updated = await prisma.icp.update({
     where: { id },
@@ -397,9 +398,10 @@ export async function updatePersona(
   });
   if (!existing) notFound("Persona");
 
-  const { productId: _ignored, ...safeData } = data as Prisma.PersonaUncheckedUpdateInput & {
+  const { productId, ...safeData } = data as Prisma.PersonaUncheckedUpdateInput & {
     productId?: unknown;
   };
+  void productId;
 
   return prisma.persona.update({
     where: { id },

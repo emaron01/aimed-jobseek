@@ -247,12 +247,10 @@ function NewIcpForm({
     }
   }, [interpretState, router]);
 
-  useEffect(() => {
-    if (previewState?.ok && previewState.starterDraft) {
-      setStarterDraft(previewState.starterDraft);
-      setMode("draft");
-    }
-  }, [previewState]);
+  if (previewState?.ok && previewState.starterDraft && starterDraft !== previewState.starterDraft) {
+    setStarterDraft(previewState.starterDraft);
+    setMode("draft");
+  }
 
   const autoPreviewStarted = useRef(false);
   useEffect(() => {
@@ -535,9 +533,12 @@ export function IcpDetailsForm({
       ? `icp-fail-${state.message}-${defaults.definition?.slice(0, 24) ?? ""}`
       : `icp-${icp?.id ?? "new"}`;
 
+  if (state?.ok && editing) {
+    setEditing(false);
+  }
+
   useEffect(() => {
     if (!state?.ok) return;
-    setEditing(false);
     router.refresh();
   }, [state, router]);
 

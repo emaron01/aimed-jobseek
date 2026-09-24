@@ -81,14 +81,13 @@ function asPersona(partial: typeof SALES_LEADER_FIXTURE): Persona {
 }
 
 describe("Persona field semantics", () => {
-  it("Desired Outcomes UI means Desired Outcomes From Your Solution", async () => {
+  it("Desired Outcomes UI describes what the Hiring Team role needs from the hire", async () => {
     const src = await import("node:fs").then((fs) =>
       fs.readFileSync("src/components/PersonaForm.tsx", "utf8"),
     );
-    expect(src).toContain("Desired Outcomes From Your ${vocab.solution.Singular}");
-    expect(src).toContain(
-      "Not ${vocab.campaign.aSingular} CTA (meeting, ${vocab.demo.singular}, reply)",
-    );
+    expect(src).toContain("hiringTeamConfig.fields.outcomesLabel");
+    expect(src).toContain("hiringTeamConfig.fields.outcomesHint");
+    expect(src).not.toContain("vocab.solution.Singular");
     expect(src).not.toMatch(/label=\"Desired Outcomes\"/);
   });
 

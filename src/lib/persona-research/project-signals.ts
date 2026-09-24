@@ -582,7 +582,10 @@ function mergeCriteriaRows(rows: MergeRow[]): PersonaCriterionFormRow[] {
     }
   }
 
-  return [...bySemantic.values()].map(({ source: _source, ...rest }) => rest);
+  return [...bySemantic.values()].map(({ source, ...rest }) => {
+    void source;
+    return rest;
+  });
 }
 
 function importanceRank(

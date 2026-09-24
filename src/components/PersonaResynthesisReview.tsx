@@ -189,12 +189,15 @@ export function PersonaResynthesisReview({
     },
   );
 
-  useEffect(() => {
-    if (draft) {
-      setFormState(draftToFormState(draft));
-      setCriteriaJson(JSON.stringify(reviewResult.criteria));
-    }
-  }, [draft, reviewResult.criteria]);
+  const draftSyncKey = draft
+    ? `${draft.name}\0${JSON.stringify(reviewResult.criteria)}`
+    : "";
+  const [appliedDraftKey, setAppliedDraftKey] = useState(draftSyncKey);
+  if (draft && draftSyncKey !== appliedDraftKey) {
+    setAppliedDraftKey(draftSyncKey);
+    setFormState(draftToFormState(draft));
+    setCriteriaJson(JSON.stringify(reviewResult.criteria));
+  }
 
   useEffect(() => {
     if (state?.ok) {

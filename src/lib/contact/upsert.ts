@@ -93,7 +93,6 @@ export async function upsertContactIntoList(
   input: ContactUpsertInput,
 ): Promise<ContactUpsertResult> {
   const normalizedEmail = normalizeContactEmail(input.email);
-  const emailMissing = !normalizedEmail;
 
   if (!normalizedEmail) {
     const contact = await db.contact.create({

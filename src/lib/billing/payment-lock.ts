@@ -136,8 +136,9 @@ export function isPaymentLocked(
  */
 export function isSpendBlocked(
   profile: PaymentLockProfile | null | undefined,
-  now: Date = new Date(),
+  _now: Date = new Date(),
 ): boolean {
+  void _now;
   if (!profile || isCompedOrFree(profile)) return false;
 
   switch (profile.billingStatus) {

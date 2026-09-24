@@ -26,7 +26,7 @@ describe("billing.catalog", () => {
     expect(standard!.entitlementFloors.paid.companyResearchLimit).toBe(100);
     expect(standard!.entitlementFloors.paid.dailyAiGenerationLimit).toBe(500);
     expect(standard!.companyCredits?.blockSize).toBe(100);
-    expect(standard!.tagline).toBe(`For individual ${vocab.salesperson.plural}`);
+    expect(standard!.tagline).toBe(`For individual ${vocab.seeker.plural}`);
     expect(standard!.featureBullets.length).toBeGreaterThan(2);
     expect(PLATFORM_SETTING_BILLING_CATALOG).toBe("billing.catalog");
   });

@@ -4,10 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { requiresStripeCheckout } from "@/lib/billing/billing-state";
-import {
-  ONBOARDING_EULA_PATH,
-  ONBOARDING_SUBSCRIBE_PATH,
-} from "@/lib/billing/paths";
+import { ONBOARDING_SUBSCRIBE_PATH } from "@/lib/billing/paths";
 import {
   clientIpFromHeaders,
   clientUserAgentFromHeaders,

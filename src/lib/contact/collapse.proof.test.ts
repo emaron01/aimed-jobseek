@@ -317,7 +317,6 @@ describe.skipIf(!hasDatabase)(
         organizationId: orgId,
       });
 
-      // eslint-disable-next-line no-console
       console.log(
         "COLLAPSE_PREVIEW_OUTPUT\n",
         JSON.stringify(preview, null, 2),
@@ -517,7 +516,6 @@ describe.skipIf(!hasDatabase)(
         remainingDuplicateGroups: after.duplicateGroupCount,
       };
 
-      // eslint-disable-next-line no-console
       console.log(
         "COLLAPSE_POST_APPLY_STATE\n",
         JSON.stringify(postApplyState, null, 2),

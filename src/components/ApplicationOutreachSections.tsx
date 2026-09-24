@@ -22,7 +22,7 @@ import {
   outreachConfig,
   vocab,
 } from "@/lib/product-config";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, SubmitButton } from "@/components/ui";
+import { SECONDARY_BUTTON_CLASS, SubmitButton } from "@/components/ui";
 
 const initial: ApplicationOutreachActionResult | null = null;
 

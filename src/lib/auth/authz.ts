@@ -1,7 +1,6 @@
 import "server-only";
 
 import type { MembershipRole, PlatformRole, User } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
 import {
   getCurrentUser,
   requireCurrentUser,

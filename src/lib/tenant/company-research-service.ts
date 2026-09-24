@@ -881,7 +881,7 @@ export async function researchCompany(
   if (!company) notFound("Company");
 
   const researchPolicy = await getResearchPolicy(organizationId);
-  let user = await resolveResearchUser();
+  const user = await resolveResearchUser();
 
   if (user && !user.emailVerifiedAt && !isDevTenantBypassEnabled()) {
     return {

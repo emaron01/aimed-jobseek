@@ -4,7 +4,6 @@
  */
 import Module from "node:module";
 import { CRO_PERSONA_DRAFT_V2_FIXTURE } from "../../src/lib/persona-research/fixtures/cro-setup-run-draft-v2";
-import { REVOPS_PERSONA_DRAFT_FIXTURE } from "../../src/lib/persona-research/fixtures/revops-setup-run-draft";
 import type { EmailGenerationContext } from "../../src/lib/email-generation/context";
 import type { EmailCompanyResearch } from "../../src/lib/email-generation/company-research-use";
 
