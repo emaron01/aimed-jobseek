@@ -17,6 +17,8 @@ vi.mock("@/lib/ai", async (importOriginal) => {
 import {
   approveApplicationAsset,
   closingParagraphMakesClaim,
+  coverLetterEvidenceIsThin,
+  coverLetterThinEvidenceCopy,
   generateApplicationAsset,
 } from "@/lib/application-assets/service";
 import { COVER_LETTER_ASSET_PROMPT_VERSION } from "@/lib/application-assets/contract";
@@ -36,7 +38,7 @@ import {
   NORMAL_JOB_MODEL,
   NORMAL_JOB_POSTING,
 } from "@/lib/job-requirement/fixtures";
-import { applicationAssetConfig } from "@/lib/product-config";
+import { applicationAssetConfig, vocab } from "@/lib/product-config";
 import { fixtureAlexChenProfile } from "@/lib/product-research/fixtures/alex-chen-profile";
 import { confirmProfileContactDetails } from "@/lib/product-research/contact-details";
 import { hasTestDatabase } from "@/test/database";
@@ -868,7 +870,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
   });
 
   it("rejects and regenerates a cover letter that pairs an acknowledged gap with unrelated experience", async () => {
-    expect(COVER_LETTER_ASSET_PROMPT_VERSION).toBe("10");
+    expect(COVER_LETTER_ASSET_PROMPT_VERSION).toBe("11");
     const session =
       (await prisma.consultationSession.findUnique({ where: { campaignId } })) ??
       (await prisma.consultationSession.create({
@@ -940,6 +942,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
       const letter = validCoverLetter(payload);
       letter.paragraphs = [
         letter.paragraphs[0]!,
+        letter.paragraphs[1]!,
         {
           id: "cover-gap",
           text: "ROS2 experience is a gap, and I would ramp on it in the first weeks.",
@@ -992,6 +995,164 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
       expect(citesGap && citesContoso).toBe(false);
       expect(paragraph.text).not.toMatch(/ROS2[\s\S]*member-identity API/i);
     }
+  });
+
+  it("rejects a cover letter that omits approved outcome statements or drops the result", async () => {
+    expect(COVER_LETTER_ASSET_PROMPT_VERSION).toBe("11");
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const session =
+      (await prisma.consultationSession.findUnique({ where: { campaignId } })) ??
+      (await prisma.consultationSession.create({
+        data: {
+          organizationId,
+          campaignId,
+          productId,
+          promptVersion: "3",
+          status: "DONE",
+        },
+      }));
+    const turn =
+      (await prisma.consultationTurn.findFirst({
+        where: { sessionId: session.id, targetKey: "required:1" },
+      })) ??
+      (await prisma.consultationTurn.create({
+        data: {
+          organizationId,
+          sessionId: session.id,
+          sequence: 20,
+          speaker: "SEEKER",
+          body: "I led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
+          seekerAuthored: true,
+          targetKey: "required:1",
+        },
+      }));
+    await prisma.consultationStatement.upsert({
+      where: { turnId_kind: { turnId: turn.id, kind: "INTERVIEW_ANSWER" } },
+      create: {
+        organizationId,
+        sessionId: session.id,
+        turnId: turn.id,
+        kind: "INTERVIEW_ANSWER",
+        status: "APPROVED",
+        content:
+          "I led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
+        approvedAt: new Date(),
+        promptVersion: "3",
+        groundingJson: {},
+      },
+      update: {
+        status: "APPROVED",
+        content:
+          "I led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
+        approvedAt: new Date(),
+      },
+    });
+
+    const thinBody = (
+      payload: {
+        salutation: string;
+        signerName: string;
+        sources: Array<{ id: string; text: string; url: string | null }>;
+      },
+    ): CoverLetterAssetContent => {
+      const letter = validCoverLetter(payload);
+      letter.paragraphs[1] = {
+        id: "cover-story",
+        text: "At Northwind Analytics I led the invoice-generation rewrite and owned on-call.",
+        supports: support(
+          "profile:role_1",
+          "Senior Software Engineer. Northwind Analytics. 2021-01. Seattle, WA. Billing and payments systems.",
+        ),
+      };
+      return letter;
+    };
+    const withStatement = (
+      payload: {
+        salutation: string;
+        signerName: string;
+        sources: Array<{ id: string; text: string; url: string | null }>;
+      },
+    ): CoverLetterAssetContent => {
+      const letter = validCoverLetter(payload);
+      const statement = payload.sources.find((source) =>
+        source.id.startsWith("statement:"),
+      );
+      if (!statement) throw new Error("Expected an approved statement source.");
+      letter.paragraphs[1] = {
+        id: "cover-story",
+        text: "I led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
+        supports: support(
+          statement.id,
+          "I led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
+        ),
+      };
+      return letter;
+    };
+
+    let coverLetterCalls = 0;
+    generateStructured.mockImplementation(
+      async (request: { schemaName: string; messages: Array<{ content: string }> }) => {
+        if (request.schemaName === "application_cover_letter") {
+          const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
+            salutation: string;
+            signerName: string;
+            sources: Array<{ id: string; text: string; url: string | null }>;
+          };
+          coverLetterCalls += 1;
+          return {
+            data: coverLetterCalls === 1 ? thinBody(payload) : withStatement(payload),
+          };
+        }
+        if (request.schemaName === "application_asset_claim_validation") {
+          return { data: { violations: [] } };
+        }
+        return { data: validResume() };
+      },
+    );
+
+    const result = await generateApplicationAsset({
+      organizationId,
+      campaignId,
+      userId,
+      type: "COVER_LETTER",
+    });
+    expect(result.ok).toBe(true);
+    expect(coverLetterCalls).toBe(2);
+    const logs = info.mock.calls
+      .map(([value]) => {
+        if (typeof value !== "string") return null;
+        try {
+          return JSON.parse(value) as {
+            event?: string;
+            passed?: boolean;
+            reasons?: string[];
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter((event) => event?.event === "cover_letter_validation");
+    expect(logs[0]?.passed).toBe(false);
+    expect(logs[0]?.reasons?.join(" ")).toMatch(
+      /approved consultation statements|personally did/,
+    );
+    expect(logs.at(-1)?.passed).toBe(true);
+    const saved = await prisma.applicationAsset.findFirst({
+      where: { campaignId, type: "COVER_LETTER" },
+      orderBy: { version: "desc" },
+    });
+    const content = saved?.contentJson as unknown as CoverLetterAssetContent | undefined;
+    expect(
+      content?.paragraphs.some((paragraph) =>
+        paragraph.supports.some((item) => item.sourceId.startsWith("statement:")),
+      ),
+    ).toBe(true);
+    expect(
+      content?.paragraphs.some((paragraph) =>
+        /cut failed billing runs from 8% to under 1%/.test(paragraph.text),
+      ),
+    ).toBe(true);
+    info.mockRestore();
   });
 
   it("increments versions and keeps only one approved version per type", async () => {
@@ -1162,5 +1323,30 @@ describe("application asset seeker-facing labels", () => {
     expect(section).not.toContain("${item.sourceId}");
     expect(section).not.toContain("{claim.id}</span>");
     expect(section).not.toContain("{asset.status}");
+    expect(section).toContain("coverLetterThinNotice");
+    expect(section).toContain("cover-letter-thin-evidence");
+  });
+});
+
+describe("cover letter substance", () => {
+  it("treats a short letter as correct when the seeker has no consulted story", () => {
+    expect(
+      coverLetterEvidenceIsThin({
+        approvedStatementCount: 0,
+        approvedStoryCount: 0,
+        achievementTexts: ["Helped the team with reports"],
+      }),
+    ).toBe(true);
+    expect(
+      coverLetterEvidenceIsThin({
+        approvedStatementCount: 0,
+        approvedStoryCount: 0,
+        achievementTexts: [
+          "Led the rewrite of invoice generation that cut failed billing runs from 8% to under 1%.",
+        ],
+      }),
+    ).toBe(false);
+    expect(coverLetterThinEvidenceCopy()).toContain(vocab.product.singular);
+    expect(coverLetterThinEvidenceCopy()).toContain("Harper");
   });
 });

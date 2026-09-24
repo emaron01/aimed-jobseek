@@ -6,6 +6,8 @@ import {
   criterionFlags,
   FEATURE_FLAGS,
   features,
+  applicationAssetConfig,
+  consultationConfig,
   employerIdentityCopy,
   icpLabels,
   nounForCount,
@@ -53,6 +55,14 @@ describe("vocabulary", () => {
     expect(employerIdentityCopy.checkLabels.sizeOrStage).toBe("Size or stage");
     expect(employerIdentityCopy.status.MATCH).toBe("Match");
     expect(employerIdentityCopy.reasonTemplates.industryCompare).toContain("{posting}");
+    expect(applicationAssetConfig.coverLetter.omittedApprovedStatement).toContain(
+      "approved consultation statements",
+    );
+    expect(applicationAssetConfig.coverLetter.missingStorySubstance).toContain(
+      "personally did",
+    );
+    expect(applicationAssetConfig.coverLetter.thinEvidence).toContain("{consultant}");
+    expect(consultationConfig.displayName).toBe("Harper");
   });
 });
 

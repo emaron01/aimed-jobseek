@@ -109,6 +109,7 @@ export type ApplicationGenerationContext = {
     kind: string;
     content: string;
     turnId: string;
+    targetKey: string | null;
   }>;
   stories: Array<{
     id: string;
@@ -190,6 +191,7 @@ export async function loadApplicationGenerationContext(
           statements: {
             where: { status: "APPROVED" },
             orderBy: { approvedAt: "asc" },
+            include: { turn: { select: { targetKey: true } } },
           },
           turns: {
             where: { speaker: "SEEKER", skipped: false },
@@ -433,6 +435,7 @@ export async function loadApplicationGenerationContext(
         kind: statement.kind,
         content: statement.content,
         turnId: statement.turnId,
+        targetKey: statement.turn?.targetKey ?? null,
       }),
     ),
     stories: stories.map((story) => ({

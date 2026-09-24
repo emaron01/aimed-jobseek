@@ -30,6 +30,23 @@ import type { AssetGenerationResult } from "./outreach-types";
 
 export type { AssetGenerationResult } from "./outreach-types";
 
+export function logCoverLetterValidationAttempt(input: {
+  campaignId: string;
+  attempt: number;
+  reasons: string[];
+  passed: boolean;
+}): void {
+  console.info(
+    JSON.stringify({
+      event: "cover_letter_validation",
+      campaignId: input.campaignId,
+      attempt: input.attempt,
+      passed: input.passed,
+      reasons: input.reasons,
+    }),
+  );
+}
+
 function words(value: string): string[] {
   return value.trim().split(/\s+/).filter(Boolean);
 }
@@ -357,6 +374,147 @@ export function coverLetterMixedTopicErrors(
   return errors;
 }
 
+const STORY_ACTION =
+  /\b(?:I|I've|I'd)\b[\s\S]{0,80}\b(?:led|built|shipped|rewrote|wrote|owned|cut|reduced|increased|designed|managed|reviewed|ran|launched|rewrote)\b|\b(?:led|built|shipped|rewrote|owned|cut)\b/i;
+const STORY_RESULT =
+  /\d|\b(?:cut|reduced|increased|from\b[\s\S]{0,40}\bto\b|used by|under \d|to under)\b/i;
+
+function storyHasActionAndResult(text: string): boolean {
+  return STORY_ACTION.test(text) && STORY_RESULT.test(text);
+}
+
+function scorecardOutcomeTexts(scorecard: unknown): string[] {
+  if (!scorecard || typeof scorecard !== "object") return [];
+  const row = scorecard as {
+    mission?: { text?: string | null } | null;
+    outcomes?: Array<{ text?: string | null } | null>;
+  };
+  const texts: string[] = [];
+  if (row.mission?.text?.trim()) texts.push(row.mission.text.trim());
+  for (const item of row.outcomes ?? []) {
+    if (item?.text?.trim()) texts.push(item.text.trim());
+  }
+  return texts;
+}
+
+function topOutcomeTexts(context: ReadyApplicationGenerationContext): string[] {
+  return [
+    ...scorecardOutcomeTexts(context.requirement.scorecard),
+    ...context.requirement.requiredItems.filter(
+      (item) => !/^\d+\s+years?\b/i.test(item) && !/\blicen[cs]e\b/i.test(item),
+    ),
+  ];
+}
+
+function overlapTokens(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length >= 5),
+  );
+}
+
+function textsOverlap(left: string, right: string): boolean {
+  const a = overlapTokens(left);
+  const b = overlapTokens(right);
+  return [...a].some((token) => b.has(token));
+}
+
+export function relevantApprovedStatementIds(
+  context: ReadyApplicationGenerationContext,
+): string[] {
+  const statements = context.approvedStatements.filter((item) => item.content.trim());
+  if (statements.length === 0) return [];
+  const targeted = statements.filter((item) => {
+    const key = item.targetKey ?? "";
+    return (
+      key.startsWith("outcome:") ||
+      key.startsWith("mission:") ||
+      key.startsWith("required:")
+    );
+  });
+  if (targeted.length > 0) {
+    return targeted.map((item) => `statement:${item.id}`);
+  }
+  const outcomes = topOutcomeTexts(context);
+  return statements
+    .filter((item) => outcomes.some((outcome) => textsOverlap(item.content, outcome)))
+    .map((item) => `statement:${item.id}`);
+}
+
+export function coverLetterEvidenceIsThin(input: {
+  approvedStatementCount: number;
+  approvedStoryCount: number;
+  achievementTexts: string[];
+}): boolean {
+  if (input.approvedStatementCount > 0 || input.approvedStoryCount > 0) {
+    return false;
+  }
+  return !input.achievementTexts.some((text) => storyHasActionAndResult(text));
+}
+
+export function coverLetterThinEvidenceCopy(): string {
+  return applicationAssetConfig.coverLetter.thinEvidence
+    .replace("{product}", vocab.product.singular)
+    .replace("{consultant}", consultationConfig.displayName);
+}
+
+function seekerHasStoryEvidence(context: ReadyApplicationGenerationContext): boolean {
+  if (context.approvedStatements.some((item) => item.content.trim())) return true;
+  if (
+    context.stories.some(
+      (story) => story.action.trim() && story.result.trim(),
+    )
+  ) {
+    return true;
+  }
+  return context.profile.experience.some((role) =>
+    role.achievements.some((item) => storyHasActionAndResult(item.text)),
+  );
+}
+
+function isAcknowledgeOnlyParagraph(
+  paragraph: CoverLetterAssetContent["paragraphs"][number],
+  acknowledgeIds: Set<string>,
+): boolean {
+  const cited = paragraph.supports.map((support) => support.sourceId);
+  return cited.some((id) => acknowledgeIds.has(id)) &&
+    cited.every((id) => acknowledgeIds.has(id) || id === "job:posting");
+}
+
+export function coverLetterSubstanceErrors(
+  content: CoverLetterAssetContent,
+  context: ReadyApplicationGenerationContext,
+): string[] {
+  const errors: string[] = [];
+  const acknowledgeIds = new Set(
+    context.assessments
+      .filter((assessment) => assessment.strategy === "ACKNOWLEDGE")
+      .map((assessment) => `assessment:${assessment.targetKey}`),
+  );
+  const relevantStatements = relevantApprovedStatementIds(context);
+  if (relevantStatements.length > 0) {
+    const cited = new Set(
+      content.paragraphs.flatMap((paragraph) =>
+        paragraph.supports.map((support) => support.sourceId),
+      ),
+    );
+    if (!relevantStatements.some((id) => cited.has(id))) {
+      errors.push(applicationAssetConfig.coverLetter.omittedApprovedStatement);
+    }
+  }
+  if (!seekerHasStoryEvidence(context)) return errors;
+  const bodyStories = content.paragraphs
+    .slice(1, -1)
+    .filter((paragraph) => !isAcknowledgeOnlyParagraph(paragraph, acknowledgeIds));
+  if (!bodyStories.some((paragraph) => storyHasActionAndResult(paragraph.text))) {
+    errors.push(applicationAssetConfig.coverLetter.missingStorySubstance);
+  }
+  return errors;
+}
+
 function coverLetterStructureErrors(
   content: CoverLetterAssetContent,
   context: ReadyApplicationGenerationContext,
@@ -415,6 +573,7 @@ function coverLetterStructureErrors(
     }
   }
   errors.push(...coverLetterMixedTopicErrors(content, context));
+  errors.push(...coverLetterSubstanceErrors(content, context));
   return errors;
 }
 
@@ -457,6 +616,7 @@ export async function validateAssetContent(input: {
       ? validateRepetitionAndMetaLanguage({
           text: texts.join(" "),
           bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
+          ignoreRepeatedNumbers: input.content.type === "COVER_LETTER",
         })
       : []),
   ];
@@ -632,6 +792,14 @@ export async function generateApplicationAsset(input: {
           });
     if (!generated.ok) {
       feedback = [generated.message];
+      if (input.type === "COVER_LETTER") {
+        logCoverLetterValidationAttempt({
+          campaignId: context.campaign.id,
+          attempt: attempt + 1,
+          reasons: feedback,
+          passed: false,
+        });
+      }
       if (
         attempt === applicationAssetConfig.generation.qualityRegenerationAttempts
       ) {
@@ -650,6 +818,14 @@ export async function generateApplicationAsset(input: {
       hiddenRoleIds,
       salutation,
     });
+    if (input.type === "COVER_LETTER") {
+      logCoverLetterValidationAttempt({
+        campaignId: context.campaign.id,
+        attempt: attempt + 1,
+        reasons: violations,
+        passed: violations.length === 0,
+      });
+    }
     if (violations.length === 0) {
       const saved = await saveVersion({
         context,

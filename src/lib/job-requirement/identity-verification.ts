@@ -131,15 +131,15 @@ function extractLocations(text: string): string[] {
   const matches = text.match(
     /\b([A-Z][A-Za-z.]+(?:\s+[A-Z][A-Za-z.]+){0,2}),\s*([A-Z]{2}|[A-Z][a-z]+)\b/g,
   );
-  return (matches ?? []).map((item) => normalized(item));
+  return (matches ?? []).map((item) => item.replace(/\s+/g, " ").trim());
 }
 
 function locationsOverlap(left: string[], right: string[]): boolean {
   if (left.length === 0 || right.length === 0) return false;
   return left.some((a) =>
     right.some((b) => {
-      const aParts = a.split(/[,\s]+/).filter((part) => part.length >= 2);
-      const bParts = b.split(/[,\s]+/).filter((part) => part.length >= 2);
+      const aParts = normalized(a).split(/[,\s]+/).filter((part) => part.length >= 2);
+      const bParts = normalized(b).split(/[,\s]+/).filter((part) => part.length >= 2);
       return aParts.some((part) => bParts.includes(part) && part.length >= 3);
     }),
   );

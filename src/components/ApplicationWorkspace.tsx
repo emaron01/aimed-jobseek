@@ -36,6 +36,10 @@ import type { ApplicationFitOutcome } from "@/lib/application/fit";
 import { readApplicationFitStale } from "@/lib/application/service";
 import type { JobScorecard, ScorecardItem } from "@/lib/job-requirement/types";
 import { prisma } from "@/lib/prisma";
+import {
+  coverLetterEvidenceIsThin,
+  coverLetterThinEvidenceCopy,
+} from "@/lib/application-assets/service";
 import { applicationSummaryConfig, criterionFlags, employerIdentityCopy, hiringTeamConfig, vocab } from "@/lib/product-config";
 import {
   parseIdentityVerification,
@@ -309,7 +313,7 @@ export async function ApplicationWorkspace({
             select: { updatedAt: true, interpretationPromptVersion: true, name: true },
           },
           applicationFit: true,
-          product: { select: { profileJson: true } },
+          product: { select: { id: true, profileJson: true } },
           appliedAt: true,
           applicationProgress: true,
           contacts: {
@@ -356,6 +360,30 @@ export async function ApplicationWorkspace({
   const profile = parseCandidateProfileSafe(
     requirement.campaign.product.profileJson,
   );
+  const [approvedStatementCount, approvedStoryCount] = await Promise.all([
+    prisma.consultationStatement.count({
+      where: {
+        organizationId,
+        session: { campaignId },
+        status: "APPROVED",
+      },
+    }),
+    prisma.profileStory.count({
+      where: {
+        organizationId,
+        productId: requirement.campaign.product.id,
+      },
+    }),
+  ]);
+  const coverLetterEvidenceThin = coverLetterEvidenceIsThin({
+    approvedStatementCount,
+    approvedStoryCount,
+    achievementTexts: profile.ok
+      ? profile.profile.experience.flatMap((role) =>
+          role.achievements.map((item) => item.text),
+        )
+      : [],
+  });
   const shownBucket = fit
     ? displayedFitBucket({
         bucket: fit.bucket,
@@ -573,6 +601,9 @@ export async function ApplicationWorkspace({
     <ApplicationAssetsSection
       campaignId={requirement.campaignId}
       canEdit={canEdit}
+      coverLetterThinNotice={
+        coverLetterEvidenceThin ? coverLetterThinEvidenceCopy() : null
+      }
       profileRoles={
         profile.ok
           ? profile.profile.experience.map((role) => ({

@@ -114,8 +114,9 @@ describe("employer identity verification", () => {
         )
         .replace("{research}", employerIdentityCopy.kinds.highSchoolTeam),
     );
-    expect(byKey.location?.reason).toContain("austin");
-    expect(byKey.location?.reason).toContain("nevada city");
+    expect(byKey.location?.reason).toContain("Austin, TX");
+    expect(byKey.location?.reason).toContain("Nevada City, CA");
+    expect(byKey.location?.reason).not.toContain("austin, tx");
     expect(byKey.sizeOrStage?.status).toBe("NOT_STATED");
     expect(byKey.sizeOrStage?.reason).toBe(employerIdentityCopy.notStatedInPosting);
     expect(byKey.sizeOrStage?.postingEvidence).toBeNull();

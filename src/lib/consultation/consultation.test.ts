@@ -57,6 +57,7 @@ import {
   bannedPhraseHits,
   validateGroundedStatement,
   validateInterviewAnswerQuality,
+  validateRepetitionAndMetaLanguage,
 } from "@/lib/consultation/output-quality";
 import { CONSULTATION_COACH_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content/consultation";
 import {
@@ -824,6 +825,12 @@ describe("consultation evidence and questions", () => {
         expect.stringContaining("repeated the same number"),
       ]),
     );
+    expect(
+      validateRepetitionAndMetaLanguage({
+        text: "ROS2 experience is a gap. I would ramp on ROS2 in the first weeks.",
+        bannedPhrases: [],
+      }),
+    ).toEqual([]);
 
     const polished = await polishAnswerWithQuality({
       answer: "quality retry",

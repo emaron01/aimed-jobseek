@@ -312,12 +312,14 @@ function AssetTypePanel({
   rows,
   profileRoles,
   canEdit,
+  thinNotice,
 }: {
   campaignId: string;
   type: "RESUME" | "COVER_LETTER";
   rows: AssetRow[];
   profileRoles: ProfileRole[];
   canEdit: boolean;
+  thinNotice: string | null;
 }) {
   const [result, action] = useActionState(generateApplicationAssetAction, initial);
   const latestResume =
@@ -326,11 +328,16 @@ function AssetTypePanel({
       : null;
   return (
     <section className="space-y-4 rounded-md border border-slate-200 p-4">
-      <h3 className="font-semibold text-slate-900">
-        {type === "RESUME"
-          ? applicationAssetConfig.labels.resume
-          : applicationAssetConfig.labels.coverLetter}
-      </h3>
+        <h3 className="font-semibold text-slate-900">
+          {type === "RESUME"
+            ? applicationAssetConfig.labels.resume
+            : applicationAssetConfig.labels.coverLetter}
+        </h3>
+        {type === "COVER_LETTER" && thinNotice ? (
+          <p className="text-sm text-slate-600" data-testid="cover-letter-thin-evidence">
+            {thinNotice}
+          </p>
+        ) : null}
       {canEdit ? <form action={action} className="space-y-3">
         <input type="hidden" name="campaignId" value={campaignId} />
         <input type="hidden" name="type" value={type} />
@@ -392,11 +399,13 @@ export function ApplicationAssetsSection({
   assets,
   profileRoles,
   canEdit,
+  coverLetterThinNotice = null,
 }: {
   campaignId: string;
   assets: Array<Omit<AssetRow, "content"> & { content: unknown }>;
   profileRoles: ProfileRole[];
   canEdit: boolean;
+  coverLetterThinNotice?: string | null;
 }) {
   const valid = assets.flatMap((asset) => {
     const parsed = applicationAssetContentSchema.safeParse(asset.content);
@@ -421,6 +430,7 @@ export function ApplicationAssetsSection({
             rows={valid.filter((asset) => asset.type === type)}
             profileRoles={profileRoles}
             canEdit={canEdit}
+            thinNotice={type === "COVER_LETTER" ? coverLetterThinNotice : null}
           />
         ))}
       </div>

@@ -32,6 +32,12 @@ export const applicationAssetConfig = Object.freeze({
     paragraphs: { min: 3, max: 4 },
     mixedTopic:
       "Each paragraph must have one purpose. Do not combine an acknowledged gap with unrelated experience, or two unrelated experiences.",
+    missingStorySubstance:
+      "A body paragraph must include what the seeker personally did and the result, using the strongest story for this role's outcomes.",
+    omittedApprovedStatement:
+      "The letter omitted approved consultation statements that already cover this role's most important outcomes.",
+    thinEvidence:
+      "This letter is short because the {product} does not yet have a consulted story for this role's outcomes. Run a {consultant} round to add what you did and what changed.",
   },
   bannedPhrases: [
     "I'm excited to apply",

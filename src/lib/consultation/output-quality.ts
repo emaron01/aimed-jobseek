@@ -35,7 +35,11 @@ export function bannedPhraseHits(
 }
 
 function numericTokens(text: string): string[] {
-  return text.match(/(?:[$£€]\s*)?\d[\d,.]*(?:\s*%|\s*[kKmMbB])?/g) ?? [];
+  return (
+    text.match(
+      /(?:[$£€]\s*)?(?<![A-Za-z])\d[\d,.]*(?:\s*%|\s*[kKmMbB])?(?![A-Za-z])/g,
+    ) ?? []
+  );
 }
 
 function sentenceParts(text: string): string[] {
@@ -95,6 +99,7 @@ function repetitionTokens(text: string): Set<string> {
 export function validateRepetitionAndMetaLanguage(input: {
   text: string;
   bannedPhrases: readonly string[];
+  ignoreRepeatedNumbers?: boolean;
 }): string[] {
   const errors: string[] = [];
   const text = input.text.trim();
@@ -105,17 +110,19 @@ export function validateRepetitionAndMetaLanguage(input: {
       `The writing described its structure instead of making a point: ${metaHits.join(", ")}.`,
     );
   }
-  const numberCounts = new Map<string, number>();
-  for (const token of numericTokens(text).map(normalized)) {
-    numberCounts.set(token, (numberCounts.get(token) ?? 0) + 1);
-  }
-  const repeatedNumbers = [...numberCounts]
-    .filter(([, count]) => count > 1)
-    .map(([token]) => token);
-  if (repeatedNumbers.length > 0) {
-    errors.push(
-      `The writing repeated the same number without adding information: ${repeatedNumbers.join(", ")}.`,
-    );
+  if (!input.ignoreRepeatedNumbers) {
+    const numberCounts = new Map<string, number>();
+    for (const token of numericTokens(text).map(normalized)) {
+      numberCounts.set(token, (numberCounts.get(token) ?? 0) + 1);
+    }
+    const repeatedNumbers = [...numberCounts]
+      .filter(([, count]) => count > 1)
+      .map(([token]) => token);
+    if (repeatedNumbers.length > 0) {
+      errors.push(
+        `The writing repeated the same number without adding information: ${repeatedNumbers.join(", ")}.`,
+      );
+    }
   }
   const sentences = sentenceParts(text).map((sentence) => ({
     sentence,
