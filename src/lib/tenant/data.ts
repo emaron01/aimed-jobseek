@@ -712,11 +712,13 @@ export async function listContacts(options?: {
   /** When true, include contacts with no list memberships. Default hides them. */
   includeUnlisted?: boolean;
   includeArchivedContacts?: boolean;
+  campaignId?: string;
 }): Promise<ContactWithMemberships[]> {
   const actor = await getWorkActor();
   const organizationId = actor.organizationId;
   const listId = options?.listId?.trim() || undefined;
   const search = options?.search?.trim() || undefined;
+  const campaignId = options?.campaignId?.trim() || undefined;
   const includeUnlisted = options?.includeUnlisted === true;
   const includeArchivedContacts = options?.includeArchivedContacts === true;
 
@@ -730,6 +732,10 @@ export async function listContacts(options?: {
       select: { id: true },
     });
     if (!list) notFound("Contact list");
+  }
+
+  if (campaignId) {
+    await assertCampaignBelongsToOrg(campaignId);
   }
 
   const membershipFilter: Prisma.ContactWhereInput = listId
@@ -774,7 +780,13 @@ export async function listContacts(options?: {
       organizationId,
       ...(actor.canViewAll ? {} : { ownerUserId: actor.userId }),
       ...(includeArchivedContacts ? {} : { archivedAt: null }),
-      AND: [membershipFilter, ...(searchFilter ? [searchFilter] : [])],
+      AND: [
+        membershipFilter,
+        ...(searchFilter ? [searchFilter] : []),
+        ...(campaignId
+          ? [{ campaignContacts: { some: { campaignId } } }]
+          : []),
+      ],
     },
     include: {
       owner: { select: { id: true, name: true, email: true } },

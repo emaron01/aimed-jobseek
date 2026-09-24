@@ -45,6 +45,9 @@ describe("delete action success redirects", () => {
         ...(await vi.importActual("@/lib/auth/authz")),
         requireSetupDeletePermission: vi.fn(async () => undefined),
       }));
+      vi.doMock("@/lib/product-config/feature-access", () => ({
+        assertGatedAction: vi.fn(),
+      }));
 
       const { deleteContactListAction } = await import("@/app/actions");
       const formData = new FormData();

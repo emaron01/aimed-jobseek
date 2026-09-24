@@ -29,6 +29,7 @@ import {
 } from "@/app/actions/email";
 import { getDueContactsForUser } from "@/lib/cadence/dashboard";
 import { vocab } from "@/lib/product-config";
+import { assertGatedAction } from "@/lib/product-config/feature-access";
 
 export type CadenceActionResult = { ok: boolean; message: string };
 
@@ -133,6 +134,7 @@ export async function stopSequenceAction(
   campaignContactId: string,
 ): Promise<CadenceActionResult> {
   try {
+    assertGatedAction("legacyEmailSequence");
     const user = await requireCurrentUser();
     const organization = await requireOrganization();
     const { assertCanManageContactCadence } = await import(
@@ -160,6 +162,7 @@ export async function restoreSequenceAction(
   campaignContactId: string,
 ): Promise<CadenceActionResult> {
   try {
+    assertGatedAction("legacyEmailSequence");
     const user = await requireCurrentUser();
     const organization = await requireOrganization();
     const { assertCanManageContactCadence } = await import(
@@ -185,6 +188,7 @@ export async function bulkGenerateDueForCampaignAction(
   campaignId: string,
 ): Promise<CadenceActionResult & { generated?: number; skipped?: number }> {
   try {
+    assertGatedAction("legacyEmailSequence");
     const user = await requireVerifiedForAiSpend();
     const organization = await requireOrganization();
 

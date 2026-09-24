@@ -11,12 +11,14 @@ import {
 import type { PersonaAiDraft } from "@/lib/persona-research/contract";
 import { getResearchPolicy } from "@/lib/usage/policy";
 import { vocab } from "@/lib/product-config";
+import { requireGatedPage } from "@/lib/product-config/feature-access";
 
 type PageProps = {
   params: Promise<{ productId: string; runId: string }>;
 };
 
 export default async function PersonaSetupRunPage({ params }: PageProps) {
+  requireGatedPage("productLevelHiringTeam");
   const organization = await getCurrentOrganization();
   const { productId, runId } = await params;
 

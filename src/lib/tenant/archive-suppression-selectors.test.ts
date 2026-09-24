@@ -32,7 +32,9 @@ describe("archived and suppressed selector audit", () => {
     expect(data).toMatch(/listContactLists[\s\S]*archivedAt:\s*null/);
     expect(data).toContain("This ${vocab.list.singular} is archived and is read-only");
     expect(listsPage).toContain("ShowArchivedToggle");
-    expect(contactsPage).toContain("listContactLists({ includeArchived })");
+    expect(contactsPage).not.toContain("listContactLists");
+    expect(contactsPage).not.toContain("listId");
+    expect(contactsPage).toContain("campaignId");
     expect(scorePage).toContain("list.archivedAt");
   });
 

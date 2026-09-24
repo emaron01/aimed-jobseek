@@ -19,6 +19,7 @@ import {
 } from "@/lib/tenant/getCurrentOrganization";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
 import { features, vocab } from "@/lib/product-config";
+import { requireGatedPage } from "@/lib/product-config/feature-access";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -26,6 +27,7 @@ type PageProps = {
 };
 
 export default async function ScoreListPage({ params, searchParams }: PageProps) {
+  requireGatedPage("listBulkScoring");
   const organization = await getCurrentOrganization();
   const { id } = await params;
   const campaignId = parseCampaignId((await searchParams).campaign);

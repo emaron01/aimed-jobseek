@@ -5,6 +5,13 @@ export type SmokeExpectation = {
   mustInclude: string | string[];
   /** When true, request without session cookie (public page). */
   public?: boolean;
+  /** Expected HTTP status. Defaults to 200. */
+  status?: number;
+};
+
+const NOT_FOUND: SmokeExpectation = {
+  mustInclude: "This page could not be found",
+  status: 404,
 };
 
 const PUBLIC_PREFIXES = [
@@ -47,9 +54,9 @@ const ROUTE_EXPECTATIONS: Record<string, SmokeExpectation> = {
   "/contacts": { mustInclude: vocab.contact.Plural },
   "/icps": { mustInclude: vocab.icp.Plural },
   "/icps/new": { mustInclude: `New ${vocab.icp.singular}` },
-  "/lists": { mustInclude: vocab.list.Plural },
-  "/personas": { mustInclude: vocab.persona.Plural },
-  "/personas/new": { mustInclude: `New ${vocab.persona.singular}` },
+  "/lists": NOT_FOUND,
+  "/personas": NOT_FOUND,
+  "/personas/new": NOT_FOUND,
   "/products": { mustInclude: vocab.product.Plural },
   "/products/new": { mustInclude: "data-testid=\"assisted-product-intake\"" },
   "/settings": { mustInclude: "Settings" },
@@ -86,6 +93,11 @@ const ROUTE_EXPECTATIONS: Record<string, SmokeExpectation> = {
 function expectationForCampaignChild(pathname: string): SmokeExpectation | null {
   if (!pathname.startsWith("/campaigns/")) return null;
   if (pathname.endsWith("/score")) return null;
+  if (
+    /\/(setup|list|companies|contacts|emails|report)$/.test(pathname)
+  ) {
+    return NOT_FOUND;
+  }
   return { mustInclude: vocab.campaign.Singular };
 }
 
@@ -97,14 +109,8 @@ function expectationForSetupChild(pathname: string): SmokeExpectation | null {
   if (pathname.includes("/rebuild/")) {
     return { mustInclude: "persona-resynthesis-review" };
   }
-  if (pathname.includes("/personas/new")) {
-    return { mustInclude: `Build ${vocab.persona.Singular}` };
-  }
-  if (pathname.includes("/personas/manage/")) {
-    return { mustInclude: vocab.persona.Singular };
-  }
   if (pathname.includes("/personas/")) {
-    return { mustInclude: vocab.persona.Singular };
+    return NOT_FOUND;
   }
   if (pathname.includes("/icps/new")) {
     return { mustInclude: `Add ${vocab.icp.singular}` };
@@ -131,17 +137,14 @@ export function smokeExpectationForPath(pathname: string): SmokeExpectation {
   const setup = expectationForSetupChild(pathname);
   if (setup) return setup;
 
-  if (pathname.startsWith("/lists/") && pathname.endsWith("/score")) {
-    return { mustInclude: "Create Scoring Run" };
-  }
   if (pathname.startsWith("/lists/")) {
-    return { mustInclude: vocab.list.Singular };
+    return NOT_FOUND;
   }
   if (pathname.startsWith("/companies/")) {
     return { mustInclude: "Company briefing" };
   }
   if (pathname.startsWith("/scoring/")) {
-    return { mustInclude: "Score Report" };
+    return NOT_FOUND;
   }
   if (pathname.startsWith("/platform/orgs/") && pathname.endsWith("/view")) {
     return { mustInclude: "data-testid=\"platform-console-nav\"" };

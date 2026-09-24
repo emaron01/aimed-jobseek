@@ -27,6 +27,11 @@ function mockScoringActionDeps(input: {
         ? `/scoring/${runId}?campaign=${campaignId}`
         : `/scoring/${runId}`,
   }));
+  vi.doMock("@/lib/product-config/feature-access", () => ({
+    assertGatedAction: vi.fn(),
+    FEATURE_UNAVAILABLE: "This feature is not available.",
+    FeatureDisabledError: class FeatureDisabledError extends Error {},
+  }));
 }
 
 // Dynamic imports under full-suite contention exceed the default 5s timeout.

@@ -10,8 +10,10 @@ import {
 } from "@/lib/mailbox/microsoft-oauth";
 import { requireOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { assertOrganizationNotPaymentLocked } from "@/lib/billing/payment-lock";
+import { requireGatedPage } from "@/lib/product-config/feature-access";
 
 export async function GET(request: Request) {
+  requireGatedPage("emailConnection");
   try {
     const [user, organization] = await Promise.all([
       requireCurrentUser(),

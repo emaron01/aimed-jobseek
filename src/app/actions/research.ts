@@ -30,6 +30,7 @@ import {
   getWorkActor,
 } from "@/lib/work/ownership";
 import { vocab } from "@/lib/product-config";
+import { assertGatedAction } from "@/lib/product-config/feature-access";
 
 function requiredString(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -107,6 +108,7 @@ export async function researchCompaniesForContactListAction(
   }
 
   try {
+    assertGatedAction("listBulkValidation");
     const actor = await getWorkActor();
     const { prisma } = await import("@/lib/prisma");
     const list = await prisma.contactList.findFirst({
@@ -151,6 +153,7 @@ export async function researchCompaniesForScoringRunAction(
   }
 
   try {
+    assertGatedAction("listBulkValidation");
     const organizationId = await requireOrganizationId();
     const { prisma } = await import("@/lib/prisma");
     const run = await prisma.scoringRun.findFirst({

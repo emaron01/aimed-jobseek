@@ -160,8 +160,9 @@ export async function runSmokeSuite(): Promise<SmokeSuiteReport> {
         const markers = Array.isArray(expectation.mustInclude)
           ? expectation.mustInclude
           : [expectation.mustInclude];
+        const expectedStatus = expectation.status ?? 200;
         const ok =
-          fetched.status === 200 &&
+          fetched.status === expectedStatus &&
           markers.some((marker) => fetched.body.includes(marker));
         results.push({
           path,
@@ -171,7 +172,7 @@ export async function runSmokeSuite(): Promise<SmokeSuiteReport> {
           ok,
           error: ok
             ? undefined
-            : `Expected HTTP 200 with one of ${JSON.stringify(markers)}; got ${fetched.status}`,
+            : `Expected HTTP ${expectedStatus} with one of ${JSON.stringify(markers)}; got ${fetched.status}`,
         });
       } catch (error) {
         results.push({

@@ -14,6 +14,7 @@ import {
 } from "@/lib/work/ownership";
 import { TenantError } from "@/lib/tenant/getCurrentOrganization";
 import { vocab } from "@/lib/product-config";
+import { assertGatedAction } from "@/lib/product-config/feature-access";
 
 function requiredString(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -45,6 +46,7 @@ export async function createScoringRunAction(
   }
 
   try {
+    assertGatedAction("listBulkScoring");
     const { listIcpCriteria } = await import("@/lib/interpretation/icp");
     const {
       criterionMaterialFingerprint,
@@ -124,6 +126,7 @@ export async function scoreContactsAction(
   }
 
   try {
+    assertGatedAction("listBulkScoring");
     const summary = await runScoringForRun(scoringRunId, { forceRescore });
     revalidatePath(`/scoring/${scoringRunId}`);
     return {
@@ -170,6 +173,7 @@ export async function resolveTitleSuggestionAction(
   }
 
   try {
+    assertGatedAction("listBulkScoring");
     const actor = await getWorkActor();
     const organizationId = actor.organizationId;
     const user = await getCurrentUser();
@@ -222,6 +226,7 @@ export async function makePrimaryCriterionMandatoryAndRescoreAction(
   }
 
   try {
+    assertGatedAction("listBulkScoring");
     const actor = await getWorkActor();
     const organizationId = actor.organizationId;
     const { prisma } = await import("@/lib/prisma");

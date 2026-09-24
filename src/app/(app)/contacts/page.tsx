@@ -11,7 +11,7 @@ import {
   isContactEmailUsable,
 } from "@/lib/contact/identity";
 import { loadContactCampaignSummaries } from "@/lib/contact/contacts-campaign-data";
-import { listContactLists, listContacts } from "@/lib/tenant/data";
+import { listCampaigns, listContacts } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 import {
   contactMatchesSuppressionSet,
@@ -24,24 +24,21 @@ import { vocab } from "@/lib/product-config";
 
 type PageProps = {
   searchParams: Promise<{
-    listId?: string;
+    campaignId?: string;
     q?: string;
     archived?: string;
-    unlisted?: string;
   }>;
 };
 
 function contactsQuery(params: {
-  listId?: string;
+  campaignId?: string;
   search?: string;
   includeArchived?: boolean;
-  includeUnlisted?: boolean;
 }): string {
   const q = new URLSearchParams();
-  if (params.listId) q.set("listId", params.listId);
+  if (params.campaignId) q.set("campaignId", params.campaignId);
   if (params.search) q.set("q", params.search);
   if (params.includeArchived) q.set("archived", "1");
-  if (params.includeUnlisted) q.set("unlisted", "1");
   const s = q.toString();
   return s ? `?${s}` : "";
 }
@@ -62,22 +59,20 @@ export default async function ContactsPage({ searchParams }: PageProps) {
     );
   }
 
-  const listId = query.listId?.trim() || undefined;
+  const campaignId = query.campaignId?.trim() || undefined;
   const search = query.q?.trim() || undefined;
   const includeArchived = query.archived === "1";
-  const includeUnlisted = query.unlisted === "1" || !query.listId;
   const membership = await getMembershipForCurrentUser(organization.id);
   const showOwners = canViewAllRepWork(membership.membership.role);
 
-  const [contacts, lists] = await Promise.all([
+  const [contacts, campaigns] = await Promise.all([
     listContacts({
-      listId,
       search,
-      includeUnlisted,
-      // Same toggle that reveals archived lists also reveals cascade-archived contacts.
+      campaignId,
+      includeUnlisted: true,
       includeArchivedContacts: includeArchived,
     }),
-    listContactLists({ includeArchived }),
+    listCampaigns(),
   ]);
   const [suppressedEmails, campaignSummaries] = await Promise.all([
     listActiveNormalizedEmails(
@@ -100,53 +95,36 @@ export default async function ContactsPage({ searchParams }: PageProps) {
         title={vocab.contact.Plural}
         description={`${vocab.contact.Plural} across ${vocab.campaign.plural}. Each row links to its ${vocab.campaign.singular}.`}
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <a
-              href={`/contacts${contactsQuery({
-                listId,
-                search,
-                includeArchived,
-                includeUnlisted: !includeUnlisted,
-              })}`}
-              className="text-sm font-medium text-slate-700 underline-offset-2 hover:underline"
-            >
-              {includeUnlisted ? "Hide unlisted" : "Show unlisted"}
-            </a>
-            <ShowArchivedToggle
-              href={
-                includeArchived
-                  ? `/contacts${contactsQuery({
-                      listId,
-                      search,
-                      includeUnlisted,
-                    })}`
-                  : `/contacts${contactsQuery({
-                      listId,
-                      search,
-                      includeArchived: true,
-                      includeUnlisted,
-                    })}`
-              }
-              includeArchived={includeArchived}
-              label={`${vocab.list.plural} and ${vocab.contact.plural}`}
-            />
-          </div>
+          <ShowArchivedToggle
+            href={
+              includeArchived
+                ? `/contacts${contactsQuery({ campaignId, search })}`
+                : `/contacts${contactsQuery({
+                    campaignId,
+                    search,
+                    includeArchived: true,
+                  })}`
+            }
+            includeArchived={includeArchived}
+            label={vocab.contact.plural}
+          />
         }
       />
 
       <form className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
         <label className="block text-sm">
-          <span className="font-medium text-slate-700">{vocab.list.Singular}</span>
+          <span className="font-medium text-slate-700">
+            {vocab.campaign.Singular}
+          </span>
           <select
-            name="listId"
-            defaultValue={listId ?? ""}
+            name="campaignId"
+            defaultValue={campaignId ?? ""}
             className="mt-1 block min-w-48 rounded-md border border-slate-300 px-3 py-2 text-sm"
           >
-            <option value="">All {vocab.list.plural}</option>
-            {lists.map((list) => (
-              <option key={list.id} value={list.id}>
-                {list.name}
-                {list.archivedAt ? " (archived)" : ""}
+            <option value="">All {vocab.campaign.plural}</option>
+            {campaigns.map((campaign) => (
+              <option key={campaign.id} value={campaign.id}>
+                {campaign.name}
               </option>
             ))}
           </select>
@@ -164,20 +142,15 @@ export default async function ContactsPage({ searchParams }: PageProps) {
         {includeArchived ? (
           <input type="hidden" name="archived" value="1" />
         ) : null}
-        {includeUnlisted ? (
-          <input type="hidden" name="unlisted" value="1" />
-        ) : null}
       </form>
 
       {contacts.length === 0 ? (
         <EmptyState
           title={`No ${vocab.contact.plural} found`}
           description={
-            search || listId
-              ? `Try clearing filters or importing another ${vocab.list.singular}.`
-              : includeUnlisted
-                ? `No ${vocab.contact.plural} in this organization yet.`
-                : `${vocab.contact.Plural} will appear here after you import ${vocab.list.aSingular}. Use Show unlisted for people with no ${vocab.list.singular} membership.`
+            search || campaignId
+              ? `Try clearing filters or adding ${vocab.contact.aSingular} to ${vocab.campaign.aSingular}.`
+              : `No ${vocab.contact.plural} in this organization yet.`
           }
         />
       ) : (
@@ -197,7 +170,6 @@ export default async function ContactsPage({ searchParams }: PageProps) {
                 {showEmployeesColumn ? (
                   <th className="px-4 py-3 font-medium">Employees</th>
                 ) : null}
-                <th className="px-4 py-3 font-medium">{vocab.list.Singular}</th>
                 <th className="px-4 py-3 font-medium">{vocab.campaign.Plural}</th>
                 <th className="px-4 py-3 font-medium">Suppression</th>
               </tr>
@@ -205,13 +177,6 @@ export default async function ContactsPage({ searchParams }: PageProps) {
             <tbody className="divide-y divide-slate-100">
               {contacts.map((contact) => {
                 const usable = isContactEmailUsable(contact);
-                const listNames = contact.memberships
-                  .map((membership) =>
-                    membership.contactList.archivedAt
-                      ? `${membership.contactList.name} (archived)`
-                      : membership.contactList.name,
-                  )
-                  .filter(Boolean);
                 const campaignLines =
                   campaignSummaries.get(contact.id) ?? [];
                 const emailTitle =
@@ -267,9 +232,6 @@ export default async function ContactsPage({ searchParams }: PageProps) {
                         {formatNumber(contact.employeeCount)}
                       </td>
                     ) : null}
-                    <td className="px-4 py-3 text-slate-600">
-                      {listNames.length > 0 ? listNames.join(", ") : "Unlisted"}
-                    </td>
                     <td className="px-4 py-3 text-slate-600">
                       {campaignLines.length > 0 ? (
                         <ul className="space-y-1">

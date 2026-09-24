@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { disconnectMicrosoftMailbox } from "@/lib/mailbox/microsoft-oauth";
 import { requireOrganization } from "@/lib/tenant/getCurrentOrganization";
+import { assertGatedAction } from "@/lib/product-config/feature-access";
 
 export type MailboxConnectionActionResult = {
   ok: boolean;
@@ -17,6 +18,7 @@ export async function disconnectMicrosoftMailboxAction(
   void _previous;
   void _formData;
   try {
+    assertGatedAction("emailConnection");
     const [user, organization] = await Promise.all([
       requireCurrentUser(),
       requireOrganization(),

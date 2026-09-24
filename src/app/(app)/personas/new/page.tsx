@@ -4,12 +4,14 @@ import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/
 import { listProducts } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { vocab } from "@/lib/product-config";
+import { requireGatedPage } from "@/lib/product-config/feature-access";
 
 export default async function NewPersonaPage({
   searchParams,
 }: {
   searchParams: Promise<{ product?: string }>;
 }) {
+  requireGatedPage("productLevelHiringTeam");
   const organization = await getCurrentOrganization();
   const query = await searchParams;
   const requestedProductId = query.product?.trim() || null;

@@ -67,6 +67,8 @@ describe("feature flags", () => {
     expect(features.listBulkValidation).toBe(false);
     expect(features.listBulkScoring).toBe(false);
     expect(features.emailConnection).toBe(false);
+    expect(features.legacyEmailSequence).toBe(false);
+    expect(features.productLevelHiringTeam).toBe(false);
     expect(features.referralProgram).toBe(true);
     expect(features.teamSeats).toBe(false);
     expect(features.teamInvites).toBe(false);
@@ -76,6 +78,8 @@ describe("feature flags", () => {
     expect(features.teamPlanDisplay).toBe(false);
     expect(features.enterprisePlanDisplay).toBe(false);
     expect(FEATURE_FLAGS).toContain("teamSeats");
+    expect(FEATURE_FLAGS).toContain("legacyEmailSequence");
+    expect(FEATURE_FLAGS).toContain("productLevelHiringTeam");
   });
 });
 

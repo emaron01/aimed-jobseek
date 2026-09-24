@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { requireGatedPage } from "@/lib/product-config/feature-access";
 import {
   CAMPAIGN_STAGE_KEYS,
   type CampaignStageKey,
@@ -15,6 +16,18 @@ export default async function LegacyCampaignStagePage({
   params: Promise<{ id: string; stage: string }>;
 }) {
   const { id, stage } = await params;
+  if (stage === "emails" || stage === "send") {
+    requireGatedPage("legacyEmailSequence");
+  }
+  if (
+    stage === "setup" ||
+    stage === "list" ||
+    stage === "companies" ||
+    stage === "contacts" ||
+    stage === "report"
+  ) {
+    requireGatedPage("lists");
+  }
   const redirected = LEGACY_STAGE_REDIRECTS[stage];
   if (redirected) {
     redirect(`/campaigns/${id}?stage=${redirected}`);

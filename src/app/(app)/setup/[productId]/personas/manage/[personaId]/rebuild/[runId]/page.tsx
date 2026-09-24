@@ -16,12 +16,14 @@ import {
 } from "@/lib/tenant/getCurrentOrganization";
 import { getResearchPolicy } from "@/lib/usage/policy";
 import { vocab } from "@/lib/product-config";
+import { requireGatedPage } from "@/lib/product-config/feature-access";
 
 type PageProps = {
   params: Promise<{ productId: string; personaId: string; runId: string }>;
 };
 
 export default async function PersonaResynthesisReviewPage({ params }: PageProps) {
+  requireGatedPage("productLevelHiringTeam");
   const organization = await getCurrentOrganization();
   const { productId, personaId, runId } = await params;
 

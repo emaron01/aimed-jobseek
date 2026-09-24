@@ -10,12 +10,14 @@ import {
   TenantError,
 } from "@/lib/tenant/getCurrentOrganization";
 import { vocab } from "@/lib/product-config";
+import { requireGatedPage } from "@/lib/product-config/feature-access";
 
 type PageProps = {
   params: Promise<{ productId: string; personaId: string }>;
 };
 
 export default async function ManagePersonaPage({ params }: PageProps) {
+  requireGatedPage("productLevelHiringTeam");
   const organization = await getCurrentOrganization();
   const { productId, personaId } = await params;
 

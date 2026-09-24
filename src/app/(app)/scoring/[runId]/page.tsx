@@ -49,6 +49,7 @@ import {
 import { SaveAndReturnToCampaignButton } from "@/components/SaveAndReturnToCampaignButton";
 import { readQualificationBucket } from "@/lib/workflow/qualification";
 import { vocab } from "@/lib/product-config";
+import { requireGatedPage } from "@/lib/product-config/feature-access";
 
 type PageProps = {
   params: Promise<{ runId: string }>;
@@ -77,6 +78,7 @@ export default async function ScoringReportPage({
   params,
   searchParams,
 }: PageProps) {
+  requireGatedPage("listBulkScoring");
   const organization = await getCurrentOrganization();
   const { runId } = await params;
   const query = await searchParams;

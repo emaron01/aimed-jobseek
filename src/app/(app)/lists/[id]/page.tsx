@@ -51,6 +51,7 @@ import { listActiveNormalizedEmails } from "@/lib/suppression/service";
 import { getActiveResearchedCompanyUsage } from "@/lib/usage/quota";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
 import { features, vocab } from "@/lib/product-config";
+import { requireGatedPage } from "@/lib/product-config/feature-access";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -61,6 +62,7 @@ export default async function ListDetailPage({
   params,
   searchParams,
 }: PageProps) {
+  requireGatedPage("lists");
   const organization = await getCurrentOrganization();
   const { id } = await params;
   const query = await searchParams;

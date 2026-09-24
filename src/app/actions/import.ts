@@ -13,6 +13,7 @@ import {
 } from "@/lib/tenant/data";
 import { TenantError } from "@/lib/tenant/getCurrentOrganization";
 import { vocab } from "@/lib/product-config";
+import { assertGatedAction } from "@/lib/product-config/feature-access";
 
 export type DuplicateCheckResult = {
   ok: boolean;
@@ -69,6 +70,7 @@ export async function checkImportDuplicatesAction(
   contacts: PreparedContact[],
 ): Promise<DuplicateCheckResult> {
   try {
+    assertGatedAction("listImport");
     const sanitized = sanitizeContacts(contacts);
     const existing = await findExistingContactsForDuplicateCheck();
     const duplicateIndexes = findDuplicateRows(sanitized, existing);
@@ -104,6 +106,7 @@ export async function importContactsAction(input: {
   duplicateMode: DuplicateMode;
 }): Promise<ImportActionResult> {
   try {
+    assertGatedAction("listImport");
     const name = input.name.trim();
     if (!name) {
       return { ok: false, error: `${vocab.list.Singular} name is required.` };

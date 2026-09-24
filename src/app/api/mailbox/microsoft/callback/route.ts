@@ -9,6 +9,7 @@ import {
   mailboxCallbackErrorParam,
 } from "@/lib/mailbox/microsoft-oauth";
 import { requireOrganization } from "@/lib/tenant/getCurrentOrganization";
+import { requireGatedPage } from "@/lib/product-config/feature-access";
 
 function redirectToEmailSettings(query: Record<string, string>): NextResponse {
   const url = new URL(appAbsoluteUrl("/settings/email"));
@@ -19,6 +20,7 @@ function redirectToEmailSettings(query: Record<string, string>): NextResponse {
 }
 
 export async function GET(request: Request) {
+  requireGatedPage("emailConnection");
   const requestUrl = new URL(request.url);
   const providerError = requestUrl.searchParams.get("error");
   if (providerError) {

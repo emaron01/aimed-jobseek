@@ -13,6 +13,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
 import { countedNoun, nounForCount, vocab } from "@/lib/product-config";
+import { assertGatedAction } from "@/lib/product-config/feature-access";
 
 export type CampaignContactsActionResult = {
   ok: boolean;
@@ -76,6 +77,7 @@ export async function addScoringRunContactsToCampaignAction(
   }
 
   try {
+    assertGatedAction("listBulkScoring");
     const addedCount = await addScoringRunContactsToCampaign({
       campaignId,
       scoringRunId,
@@ -108,6 +110,7 @@ export async function saveScoringRunAndReturnToCampaignAction(
   if (!campaignId || !scoringRunId) {
     throw new TenantError(`${vocab.campaign.Singular} and scoring run are required.`);
   }
+  assertGatedAction("listBulkScoring");
 
   let attachedCount = 0;
   let attachFailed = false;

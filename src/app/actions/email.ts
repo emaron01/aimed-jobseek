@@ -54,6 +54,7 @@ import { resolveEmailGenerationPersona } from "@/lib/email-generation/personaliz
 import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { vocab } from "@/lib/product-config";
+import { assertGatedAction } from "@/lib/product-config/feature-access";
 
 export type GenerateEmailDraftActionResult = {
   ok: boolean;
@@ -165,6 +166,7 @@ export async function generateEmailDraftAction(
   const normalizedGuidance = additionalGuidance?.trim() || null;
 
   try {
+    assertGatedAction("legacyEmailSequence");
     const user = await requireVerifiedForAiSpend();
     const normalizedPersonaId = personaId?.trim() || null;
     if (normalizedPersonaId) {
@@ -249,6 +251,7 @@ export async function lookaheadGenerateEmailDraftAction(
   campaignContactId: string,
 ): Promise<LookaheadGenerateEmailDraftResult> {
   try {
+    assertGatedAction("legacyEmailSequence");
     const user = await requireVerifiedForAiSpend();
     const row = await prisma.campaignContact.findFirst({
       where: { id: campaignContactId },
@@ -386,6 +389,7 @@ export async function commitLookaheadDraftQuotaAction(
   emailDraftId: string,
 ): Promise<{ ok: boolean; committed?: boolean; message?: string }> {
   try {
+    assertGatedAction("legacyEmailSequence");
     const user = await requireVerifiedForAiSpend();
     const result = await commitLookaheadDraftQuota({
       emailDraftId,
@@ -412,6 +416,7 @@ export async function regenerateEmailDraftAction(
   const normalizedGuidance = additionalGuidance?.trim() || null;
 
   try {
+    assertGatedAction("legacyEmailSequence");
     const user = await requireVerifiedForAiSpend();
     const { context, draft: existing } = await loadExistingEmailDraftContext(
       emailDraftId,
@@ -510,6 +515,7 @@ export async function addFollowUpEmailAction(
   emailLength?: string | null,
 ): Promise<GenerateEmailDraftActionResult> {
   try {
+    assertGatedAction("legacyEmailSequence");
     const user = await requireVerifiedForAiSpend();
     const context = await loadEmailGenerationContext(
       campaignContactId,
@@ -556,6 +562,7 @@ export async function markEmailDraftSentAction(
   emailDraftId: string,
 ): Promise<GenerateEmailDraftActionResult> {
   try {
+    assertGatedAction("legacyEmailSequence");
     const user = await requireCurrentUser();
     const marked = await markEmailDraftSent({
       draftId: emailDraftId,
@@ -585,6 +592,7 @@ export async function saveEmailDraftAction(input: {
   emailLength?: string | null;
 }): Promise<GenerateEmailDraftActionResult> {
   try {
+    assertGatedAction("legacyEmailSequence");
     const user = await requireCurrentUser();
     const saved = await updateEmailDraftContent({
       draftId: input.emailDraftId,
@@ -626,6 +634,7 @@ export async function recordEmailClientIntentAction(input: {
     return { ok: false, message: "Invalid email handoff mode." };
   }
   try {
+    assertGatedAction("legacyEmailSequence");
     const user = await requireCurrentUser();
     const recorded = await recordEmailClientIntent({
       draftId: input.emailDraftId,
@@ -655,6 +664,8 @@ export async function sendEmailDraftConnectedAction(input: {
   body: string;
 }): Promise<GenerateEmailDraftActionResult> {
   try {
+    assertGatedAction("legacyEmailSequence");
+    assertGatedAction("emailConnection");
     const user = await requireCurrentUser();
     const sent = await sendEmailDraftWithConnectedMailbox({
       draftId: input.emailDraftId,
@@ -702,6 +713,7 @@ export async function draftReplyAction(
   }
 
   try {
+    assertGatedAction("legacyEmailSequence");
     const user = await requireVerifiedForAiSpend();
     const { context, sourceDraft } = await loadEmailReplyContext(
       emailDraftId,

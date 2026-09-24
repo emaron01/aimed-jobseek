@@ -30,6 +30,7 @@ import { normalizeIcpCriterionTier } from "@/lib/criteria/tier";
 import { createPersona, updatePersona } from "@/lib/tenant/data";
 import { prisma } from "@/lib/prisma";
 import { vocab } from "@/lib/product-config";
+import { assertGatedAction } from "@/lib/product-config/feature-access";
 
 export type CriterionActionResult = {
   ok: boolean;
@@ -177,6 +178,7 @@ export async function saveAndInterpretPersonaAction(
   let productId = "";
 
   try {
+    assertGatedAction("productLevelHiringTeam");
     const parsed = parsePersonaFormData(formData);
     productId = parsed.productId;
     personaId = parsed.id;
@@ -228,15 +230,16 @@ export async function interpretPersonaAction(
   _prev: PersonaActionResult | null,
   formData: FormData,
 ): Promise<PersonaActionResult> {
-  const organizationId = await requireOrganizationId();
-  const user = await getCurrentUser();
   const personaId = String(formData.get("personaId") || "").trim();
-  const productId = String(formData.get("productId") || "").trim();
-  if (!personaId) {
-    return { ok: false, message: `Save the ${vocab.persona.singular} before interpreting.` };
-  }
-
   try {
+    assertGatedAction("productLevelHiringTeam");
+    const organizationId = await requireOrganizationId();
+    const user = await getCurrentUser();
+    const productId = String(formData.get("productId") || "").trim();
+    if (!personaId) {
+      return { ok: false, message: `Save the ${vocab.persona.singular} before interpreting.` };
+    }
+
     await interpretPersonaDefinition({
       organizationId,
       personaId,
@@ -474,6 +477,7 @@ export async function updatePersonaCriterionAction(
   formData: FormData,
 ): Promise<PersonaActionResult> {
   try {
+    assertGatedAction("productLevelHiringTeam");
     const organizationId = await requireOrganizationId();
     const criterionId = String(formData.get("criterionId") || "").trim();
     const personaId = String(formData.get("personaId") || "").trim();
@@ -546,6 +550,7 @@ export async function deletePersonaCriterionAction(
   formData: FormData,
 ): Promise<PersonaActionResult> {
   try {
+    assertGatedAction("productLevelHiringTeam");
     const organizationId = await requireOrganizationId();
     const criterionId = String(formData.get("criterionId") || "").trim();
     const personaId = String(formData.get("personaId") || "").trim();

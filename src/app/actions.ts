@@ -52,6 +52,7 @@ import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { validateCampaignOffer } from "@/lib/campaign/offer-validation";
 import { DELETE_SUCCESS_NOTICE_KEY } from "@/lib/tenant/delete-success-notice";
 import { vocab } from "@/lib/product-config";
+import { assertGatedAction } from "@/lib/product-config/feature-access";
 
 function requiredString(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -274,6 +275,7 @@ export async function upsertPersonaAction(
   formData: FormData,
 ): Promise<PersonaActionResult> {
   try {
+    assertGatedAction("productLevelHiringTeam");
     const { id, productId, fields } = parsePersonaFormData(formData);
 
     let personaId = id;
@@ -301,6 +303,7 @@ export async function deletePersonaAction(
   formData: FormData,
 ): Promise<CrudDeleteResult> {
   try {
+    assertGatedAction("productLevelHiringTeam");
     await requireSetupDeletePermission();
     const id = requiredString(formData, "id");
     const productId = requiredString(formData, "productId");
@@ -397,6 +400,7 @@ export async function archiveContactListAction(
   formData: FormData,
 ): Promise<CrudDeleteResult> {
   try {
+    assertGatedAction("lists");
     const id = requiredString(formData, "id");
     if (!id) throw new TenantError(`${vocab.list.Singular} id is required.`);
     if (requiredString(formData, "confirm") !== "1") {
@@ -421,6 +425,7 @@ export async function unarchiveContactListAction(
   formData: FormData,
 ): Promise<CrudDeleteResult> {
   try {
+    assertGatedAction("lists");
     const id = requiredString(formData, "id");
     if (!id) throw new TenantError(`${vocab.list.Singular} id is required.`);
     const { unarchiveContactList } = await import("@/lib/tenant/list-delete");
@@ -444,6 +449,7 @@ export async function deleteContactListAction(
   let notice: string;
   let destination: string;
   try {
+    assertGatedAction("lists");
     const id = requiredString(formData, "id");
     if (!id) throw new TenantError(`${vocab.list.Singular} id is required.`);
     if (requiredString(formData, "confirm") !== "1") {

@@ -19,6 +19,7 @@ import type { SuggestedBuyerRole } from "@/lib/product-research/contract";
 import { createCorrelationId } from "@/lib/product-research/url";
 import { prisma } from "@/lib/prisma";
 import { vocab } from "@/lib/product-config";
+import { assertGatedAction } from "@/lib/product-config/feature-access";
 
 export type PersonaSetupActionResult = {
   ok: boolean;
@@ -54,6 +55,7 @@ export async function buildPersonaFromBuyerRoleAction(
   formData: FormData,
 ): Promise<PersonaSetupActionResult> {
   try {
+    assertGatedAction("productLevelHiringTeam");
     const user = await requireCurrentUser();
     const organizationId = await requireOrganizationId();
     const productId = String(formData.get("productId") || "").trim();
@@ -112,6 +114,7 @@ export async function retryPersonaSynthesisAction(
   formData: FormData,
 ): Promise<PersonaSetupActionResult> {
   try {
+    assertGatedAction("productLevelHiringTeam");
     const user = await requireCurrentUser();
     const organizationId = await requireOrganizationId();
     const productId = String(formData.get("productId") || "").trim();
@@ -148,6 +151,7 @@ export async function saveApprovedPersonaFromRunAction(
   formData: FormData,
 ): Promise<PersonaSetupActionResult> {
   try {
+    assertGatedAction("productLevelHiringTeam");
     const user = await requireCurrentUser();
     const organizationId = await requireOrganizationId();
     const productId = String(formData.get("productId") || "").trim();
@@ -228,6 +232,7 @@ export async function projectPersonaSignalsFromProfileAction(
   formData: FormData,
 ): Promise<PersonaSetupActionResult> {
   try {
+    assertGatedAction("productLevelHiringTeam");
     await requireCurrentUser();
     const organizationId = await requireOrganizationId();
     const productId = String(formData.get("productId") || "").trim();
@@ -262,6 +267,7 @@ export async function rebuildPersonaFromProductEvidenceAction(
   formData: FormData,
 ): Promise<PersonaSetupActionResult> {
   try {
+    assertGatedAction("productLevelHiringTeam");
     const user = await requireCurrentUser();
     const organizationId = await requireOrganizationId();
     const productId = String(formData.get("productId") || "").trim();
@@ -300,6 +306,7 @@ export async function applyPersonaResynthesisAction(
   formData: FormData,
 ): Promise<PersonaSetupActionResult> {
   try {
+    assertGatedAction("productLevelHiringTeam");
     const user = await requireCurrentUser();
     const organizationId = await requireOrganizationId();
     const productId = String(formData.get("productId") || "").trim();
@@ -364,6 +371,7 @@ export async function getSuggestedBuyerRoleAction(
   productId: string,
   suggestionKey: string,
 ): Promise<SuggestedBuyerRole | null> {
+  assertGatedAction("productLevelHiringTeam");
   const organizationId = await requireOrganizationId();
   const product = await prisma.product.findFirst({
     where: { id: productId, organizationId },

@@ -21,12 +21,14 @@ import { getActiveResearchedCompanyUsage } from "@/lib/usage/quota";
 import { formatDate, formatNumber } from "@/lib/utils";
 import { canViewAllRepWork } from "@/lib/work/ownership";
 import { features, vocab } from "@/lib/product-config";
+import { requireGatedPage } from "@/lib/product-config/feature-access";
 
 export default async function ListsPage({
   searchParams,
 }: {
   searchParams: Promise<{ archived?: string; campaign?: string }>;
 }) {
+  requireGatedPage("lists");
   const organization = await getCurrentOrganization();
   const query = await searchParams;
   const includeArchived = query.archived === "1";

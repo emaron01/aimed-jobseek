@@ -34,6 +34,7 @@ import {
 } from "@/lib/product-research/review";
 import { prisma } from "@/lib/prisma";
 import { vocab } from "@/lib/product-config";
+import { assertGatedAction } from "@/lib/product-config/feature-access";
 
 export type ProductSetupActionResult = {
   ok: boolean;
@@ -533,6 +534,7 @@ export async function saveApprovedPersonaFromSuggestionAction(
   formData: FormData,
 ): Promise<ProductSetupActionResult> {
   try {
+    assertGatedAction("productLevelHiringTeam");
     const user = await requireCurrentUser();
     const organizationId = await requireOrganizationId();
     const productId = String(formData.get("productId") || "").trim();

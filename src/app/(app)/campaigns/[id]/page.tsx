@@ -55,6 +55,7 @@ import {
 } from "@/lib/lists/campaign-query";
 import { prisma } from "@/lib/prisma";
 import { anyListFeatureEnabled, nounForCount, vocab } from "@/lib/product-config";
+import { requireGatedPage } from "@/lib/product-config/feature-access";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -95,6 +96,19 @@ export default async function CampaignDetailPage({
   const user = await requireCurrentUser();
   const { id } = await params;
   const query = await searchParams;
+  const requestedStage = query.stage?.trim();
+  if (requestedStage === "emails" || requestedStage === "send") {
+    requireGatedPage("legacyEmailSequence");
+  }
+  if (
+    requestedStage === "setup" ||
+    requestedStage === "list" ||
+    requestedStage === "companies" ||
+    requestedStage === "contacts" ||
+    requestedStage === "report"
+  ) {
+    requireGatedPage("lists");
+  }
 
   if (!organization) {
     return (

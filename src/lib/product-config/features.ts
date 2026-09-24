@@ -1,6 +1,7 @@
 /**
- * Feature visibility. A disabled flag hides every UI entry point for that
- * feature. Flags never remove or bypass server-side logic. Client-safe.
+ * Feature visibility. A disabled flag hides every UI entry point and
+ * rejects the matching pages (not found) and server actions (forbidden).
+ * Client-safe.
  */
 
 export const FEATURE_FLAGS = [
@@ -28,6 +29,10 @@ export const FEATURE_FLAGS = [
   "referralProgram",
   /** Microsoft 365 connected-mailbox settings and send path. */
   "emailConnection",
+  /** Legacy list-based campaign email sequence workspace. */
+  "legacyEmailSequence",
+  /** Product-level Hiring Team create/edit (roles are identified per application). */
+  "productLevelHiringTeam",
 ] as const;
 
 export type FeatureFlag = (typeof FEATURE_FLAGS)[number];
@@ -45,6 +50,8 @@ export const features: Readonly<Record<FeatureFlag, boolean>> = Object.freeze({
   enterprisePlanDisplay: false,
   referralProgram: true,
   emailConnection: false,
+  legacyEmailSequence: false,
+  productLevelHiringTeam: false,
 });
 
 /** True when any list feature is visible (drives the Lists nav entry). */
