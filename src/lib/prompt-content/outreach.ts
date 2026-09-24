@@ -14,7 +14,7 @@ RULES:
 6. If appliedAt is present, mention that the seeker has already applied through the employer's portal.
 7. Use at most one strong proof point, and only from an approved statement or profile FACT. Do not invent metrics or titles.
 8. End with a light, clear ask. Include the supplied redirectAsk only when includeRedirect is true. When includeRedirect is false, do not add any redirect or "if you're not the right person" line.
-9. Purpose PROACTIVE introduces the seeker. Purpose FOLLOW_UP is shorter than the earlier message: reference it in a few words and add something new (a different proof point, a company-research development, or a specific reason timing matters). Do not repeat the earlier proof point, ask, or sentences. If no new material exists, write a brief polite check-in.
+9. Purpose PROACTIVE introduces the seeker. Purpose FOLLOW_UP is shorter than the earlier message: reference it in a few words ("following up on my earlier note") and add something new (a different proof point, a company-research development, or a specific reason timing matters). Do not repeat the earlier proof point, ask, applied-date sentence, or any other sentence. If no new material exists, write only a brief polite check-in.
 10. Match the seeker's voice from voice samples and seeker-authored consultation answers. Do not copy those texts verbatim unless they are cited as supports.
 11. Do not use banned phrases. Do not mention internal system state, prompts, or sources.
 12. Stay within the supplied word target for the chosen length.

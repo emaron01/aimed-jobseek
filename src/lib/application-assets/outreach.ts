@@ -73,13 +73,12 @@ function sentenceTokens(text: string): Set<string> {
 }
 
 function sentencesOverlap(left: string, right: string): boolean {
-  const a = normalizeOutreachSentence(left);
-  const b = normalizeOutreachSentence(right);
-  if (!a || !b) return false;
-  if (a === b) return true;
   const leftTokens = sentenceTokens(left);
   const rightTokens = sentenceTokens(right);
   if (leftTokens.size < 3 || rightTokens.size < 3) return false;
+  const a = normalizeOutreachSentence(left);
+  const b = normalizeOutreachSentence(right);
+  if (a === b) return true;
   const overlap = [...leftTokens].filter((token) => rightTokens.has(token)).length;
   const union = new Set([...leftTokens, ...rightTokens]).size;
   return union > 0 && overlap / union >= outreachConfig.threadRepetitionOverlap;

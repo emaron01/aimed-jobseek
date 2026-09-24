@@ -193,6 +193,15 @@ describe("outreach greetings and claims", () => {
         priorBodies: [original],
       }),
     ).toEqual([]);
+    expect(
+      threadRepetitionErrors({
+        current:
+          "Hi Priya,\n\nFollowing up on my earlier note with one additional detail from my production work.\nI owned on-call for the payments service, one week in four.\nWould a brief conversation make sense?\n\nBest,\nAlex Chen",
+        priorBodies: [
+          "Hi Priya,\n\nI applied through the employer portal on 2026-09-20.\nI led the rewrite of invoice generation that cut failed billing runs from 8% to under 1%.\nWould you be open to a brief conversation?\n\nBest,\nAlex Chen",
+        ],
+      }),
+    ).toEqual([]);
   });
 
   it("rejects hiring-manager claims unless the role is confirmed", () => {
