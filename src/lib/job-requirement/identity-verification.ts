@@ -309,37 +309,37 @@ function checkWebsite(
       researchEvidence: null,
     };
   }
-  if (
-    postingDomains.length > 0 &&
-    researchDomains.some((domain) => postingDomains.includes(domain))
-  ) {
+  const researchEducation =
+    researchDomains.some((domain) => EDUCATION_HOST.test(domain)) ||
+    EDUCATION_HOST.test(research);
+  const overlap = researchDomains.find((domain) => postingDomains.includes(domain));
+  if (overlap) {
     return {
       key: "website",
       status: "MATCH",
       postingEvidence: postingDomains[0] ?? null,
-      researchEvidence: researchDomains.find((domain) => postingDomains.includes(domain)) ?? null,
+      researchEvidence: overlap,
     };
   }
-  const researchEducation = researchDomains.some((domain) => EDUCATION_HOST.test(domain))
-    || EDUCATION_HOST.test(research);
-  if (postingDomains.length > 0 && researchEducation) {
-    return {
-      key: "website",
-      status: "MISMATCH",
-      postingEvidence: postingDomains[0] ?? null,
-      researchEvidence: snippet(researchDomains[0] ?? research),
-    };
-  }
+  const suppliedDomains = extractDomains(suppliedWebsite ?? "");
   if (
-    postingDomains.length > 0 &&
+    suppliedDomains.length > 0 &&
     researchDomains.length > 0 &&
-    !researchDomains.some((domain) => postingDomains.includes(domain))
+    !researchDomains.some((domain) => suppliedDomains.includes(domain))
   ) {
     return {
       key: "website",
       status: "MISMATCH",
-      postingEvidence: postingDomains[0] ?? null,
+      postingEvidence: suppliedDomains[0] ?? null,
       researchEvidence: researchDomains[0] ?? null,
+    };
+  }
+  if ((postingDomains.length > 0 || suppliedDomains.length > 0) && researchEducation) {
+    return {
+      key: "website",
+      status: "MISMATCH",
+      postingEvidence: postingDomains[0] ?? suppliedDomains[0] ?? null,
+      researchEvidence: snippet(researchDomains[0] ?? research),
     };
   }
   return {
@@ -529,7 +529,7 @@ export function usableEmployerResearch<
     mayUseEmployerResearch({
       confirmation: requirement.identityConfirmation,
       verification,
-      identityAmbiguous: research.identityAmbiguous === true,
+      identityAmbiguous: false,
     })
   ) {
     return research;

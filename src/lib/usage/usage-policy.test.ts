@@ -29,6 +29,7 @@ describe.skipIf(!hasDatabase)(
   it("new organization receives default usage + research policies from DB defaults", async () => {
     if (!ready) return;
     const { createIndividualWorkspace } = await import("@/lib/org/signup");
+    const { organizationNameFromSeeker } = await import("@/lib/product-config");
     const {
       DEFAULT_USAGE_POLICY_VALUES,
       DEFAULT_RESEARCH_POLICY_VALUES,
@@ -43,7 +44,9 @@ describe.skipIf(!hasDatabase)(
       });
 
     expect(membershipRole).toBe("OWNER");
-    expect(organization.name).toContain("Workspace");
+    expect(organization.name).toContain(
+      organizationNameFromSeeker({ firstName: "Erik", lastName: "Test" }),
+    );
     expect(organization.timezone).toBe("America/New_York");
 
     const usage = await prisma.organizationUsagePolicy.findUniqueOrThrow({

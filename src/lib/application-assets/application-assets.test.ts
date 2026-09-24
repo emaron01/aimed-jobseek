@@ -794,6 +794,78 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     ).toBe(0);
   });
 
+  it("generates a cover letter from the posting when employer research is rejected", async () => {
+    await prisma.jobRequirement.update({
+      where: { campaignId },
+      data: { identityConfirmation: "REJECTED" },
+    });
+    generateStructured.mockImplementation(
+      async (request: { schemaName: string; messages: Array<{ content: string }> }) => {
+        if (request.schemaName === "application_cover_letter") {
+          const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
+            salutation: string;
+            signerName: string;
+            sources: Array<{ id: string; text: string; url: string | null }>;
+          };
+          expect(
+            payload.sources.some((source) => source.id.startsWith("research:")),
+          ).toBe(false);
+          const job = payload.sources.find((source) => source.id === "job:posting");
+          if (!job) throw new Error("Expected the job posting source.");
+          return {
+            data: {
+              type: "COVER_LETTER",
+              salutation: payload.salutation,
+              paragraphs: [
+                {
+                  id: "cover-opening",
+                  text: "The Senior Product Engineer role is about warehouse robotics, and my Northwind Analytics billing work is the closest match I have to keeping a high-volume system dependable.",
+                  supports: [
+                    ...support(job.id, "Senior Product Engineer"),
+                    ...support(
+                      "profile:role_1",
+                      "Senior Software Engineer. Northwind Analytics. 2021-01. Seattle, WA. Billing and payments systems.",
+                    ),
+                  ],
+                },
+                {
+                  id: "cover-story",
+                  text: "At Northwind Analytics I led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
+                  supports: support(
+                    "profile:ach_1",
+                    "Led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
+                  ),
+                },
+                {
+                  id: "cover-close",
+                  text: "Can we schedule a conversation about the role?",
+                  supports: [],
+                },
+              ],
+              signoff: "Sincerely,",
+              signerName: payload.signerName,
+            },
+          };
+        }
+        if (request.schemaName === "application_asset_claim_validation") {
+          return { data: { violations: [] } };
+        }
+        return { data: validResume() };
+      },
+    );
+    const result = await generateApplicationAsset({
+      organizationId,
+      campaignId,
+      userId,
+      type: "COVER_LETTER",
+    });
+    expect(result.ok).toBe(true);
+    await prisma.jobRequirement.update({
+      where: { campaignId },
+      data: { identityConfirmation: "PENDING" },
+    });
+  });
+
   it("increments versions and keeps only one approved version per type", async () => {
     installModel({ resumes: [validResume(), validResume()] });
     const first = await generateApplicationAsset({

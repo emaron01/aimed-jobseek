@@ -119,6 +119,27 @@ describe("employer identity verification", () => {
     ).toBe(true);
   });
 
+  it("does not treat a careers or news domain as a material website mismatch", () => {
+    const verification = verifyEmployerIdentity({
+      posting: fixturePosting(),
+      research: {
+        ...MATCHING_COMMERCIAL_RESEARCH,
+        website: null,
+        researchSources: [
+          {
+            url: "https://example.com/acme-robotics",
+            title: "Acme Robotics",
+            supports: ["Warehouse robotics for production facilities"],
+          },
+        ],
+      },
+    });
+    expect(verification.checks.find((check) => check.key === "website")?.status).toBe(
+      "NOT_STATED",
+    );
+    expect(verification.verdict).toBe("MATCHED");
+  });
+
   it("accepts research that matches the commercial posting", () => {
     const verification = verifyEmployerIdentity({
       posting: fixturePosting(),

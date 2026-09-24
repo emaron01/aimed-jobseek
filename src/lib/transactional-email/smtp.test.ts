@@ -370,6 +370,32 @@ describe("console and resend providers still work", () => {
     expect(result.providerMessageId).toMatch(/^console_/);
   });
 
+  it("logs the verification URL from the console provider in local development", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    process.env.TRANSACTIONAL_EMAIL_PROVIDER = "console";
+    const spy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const { ConsoleTransactionalEmailProvider } = await import(
+      "@/lib/transactional-email/providers/console"
+    );
+    const provider = new ConsoleTransactionalEmailProvider();
+    await provider.send({
+      to: "alex@example.test",
+      subject: "Verify email",
+      html: '<p><a href="http://localhost:3000/verify?token=dev-link">Verify</a></p>',
+      text: "Verify your email: http://localhost:3000/verify?token=dev-link",
+    });
+    expect(spy.mock.calls.some((args) => args[0] === "[transactional-email:console] verificationUrl")).toBe(
+      true,
+    );
+    expect(
+      spy.mock.calls.some((args) =>
+        String(args[1] ?? "").includes("http://localhost:3000/verify?token=dev-link"),
+      ),
+    ).toBe(true);
+    spy.mockRestore();
+    vi.unstubAllEnvs();
+  });
+
   it("resend provider posts html+text with configured From", async () => {
     process.env.TRANSACTIONAL_EMAIL_PROVIDER = "resend";
     process.env.TRANSACTIONAL_EMAIL_API_KEY = "re_test_key";

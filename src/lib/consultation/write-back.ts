@@ -36,12 +36,12 @@ export function proposalsFromExtraction(input: {
   const dropped: string[] = [];
   const proposals: ProposalDraft[] = [];
   input.extracted.facts.forEach((fact, index) => {
-    if (!groundedInAnswer(fact.text, input.answer)) {
-      dropped.push(`fact:${index}`);
-      return;
-    }
     if (!isCompleteFactStatement(fact.text)) {
       dropped.push(`fact:${index}:fragment`);
+      return;
+    }
+    if (!groundedInAnswer(fact.text, input.answer)) {
+      dropped.push(`fact:${index}`);
       return;
     }
     proposals.push({
@@ -111,10 +111,10 @@ export function isCompleteFactStatement(text: string): boolean {
   const words = value.split(/\s+/).filter(Boolean);
   if (words.length < 6) return false;
   const hasVerb =
-    /\b(is|are|was|were|has|have|had|used|led|built|cut|wrote|shipped|managed|created|designed|ran|owns|works?|increased|reduced|delivered|rewrote|owned)\b/i.test(
+    /\b(is|are|was|were|be|been|am|has|have|had|used|led|built|cut|wrote|shipped|managed|created|designed|ran|owns|works?|increased|reduced|delivered|rewrote|owned)\b/i.test(
       value,
-    );
-  const startsWithFragment = /^(and|or|but|with|for|to|of|in|on|at|the|a|an)\b/i.test(
+    ) || /\b(?:I|we|they|she|he|the team)\s+[A-Za-z]+ed\b/i.test(value);
+  const startsWithFragment = /^(and|or|but|with|for|to|of|in|on|at)\b/i.test(
     value,
   );
   return hasVerb && !startsWithFragment;

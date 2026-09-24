@@ -508,7 +508,10 @@ describe("consultation evidence and questions", () => {
       answer,
       turnId: "turn_answer_1",
       extracted: {
-        facts: [{ text: answer }, { text: "Invented $9M metric" }],
+        facts: [
+          { text: answer },
+          { text: "The team created a nine million dollar metric last year." },
+        ],
         story: {
           situation: answer,
           task: answer,
@@ -554,6 +557,12 @@ describe("consultation evidence and questions", () => {
     expect(isCompleteFactStatement("5 years")).toBe(false);
     expect(
       isCompleteFactStatement("I used Python for 5 years and cut failed jobs by 40%."),
+    ).toBe(true);
+    expect(
+      isCompleteFactStatement("The team created a nine million dollar metric last year."),
+    ).toBe(true);
+    expect(
+      isCompleteFactStatement("I automated nightly jobs that cut failed billing runs."),
     ).toBe(true);
     const result = proposalsFromExtraction({
       answer,

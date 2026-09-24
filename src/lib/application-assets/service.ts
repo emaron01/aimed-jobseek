@@ -273,11 +273,22 @@ function coverLetterStructureErrors(
   const openingHasCitedResearch = openingSupports.some(
     (item) => item.source?.category === "COMPANY_RESEARCH" && Boolean(item.source.url),
   );
+  const openingHasJobRequirement = openingSupports.some(
+    (item) => item.source?.category === "JOB_REQUIREMENT",
+  );
   const openingHasSeekerFact = openingSupports.some(
     (item) => item.source && isSeekerSource(item.source.category),
   );
-  if (!openingHasCitedResearch) {
+  const hasResearchSources = context.sources.some(
+    (source) => source.category === "COMPANY_RESEARCH" && Boolean(source.url),
+  );
+  if (hasResearchSources && !openingHasCitedResearch) {
     errors.push("The opening needs a cited company-research source.");
+  }
+  if (!hasResearchSources && !openingHasJobRequirement) {
+    errors.push(
+      "The opening needs a cited job-requirement source when company research is not confirmed.",
+    );
   }
   if (!openingHasSeekerFact) {
     errors.push(
@@ -491,19 +502,6 @@ export async function generateApplicationAsset(input: {
     };
   }
   const salutation = coverLetterSalutation(context);
-  if (
-    input.type === "COVER_LETTER" &&
-    !context.sources.some(
-      (source) => source.category === "COMPANY_RESEARCH" && Boolean(source.url),
-    )
-  ) {
-    return {
-      ok: false,
-      message:
-        "The cover letter was not generated because company research with a cited source is not available. Retry after research completes.",
-      violations: ["The opening needs a cited company-research source."],
-    };
-  }
   let feedback: string[] = [];
   for (
     let attempt = 0;
