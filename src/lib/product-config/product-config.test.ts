@@ -6,8 +6,11 @@ import {
   criterionFlags,
   FEATURE_FLAGS,
   features,
+  icpLabels,
   nounForCount,
+  organizationNameFromSeeker,
   referralShareMessage,
+  signupCopy,
   supportMailtoHref,
   vocab,
 } from "@/lib/product-config";
@@ -38,6 +41,13 @@ describe("vocabulary", () => {
     expect(criterionFlagLabels({ isRequired: true, isDisqualifier: true })).toEqual(
       ["Must-have", "Deal-breaker"],
     );
+    expect(icpLabels.scoringCriteria).toBe("What you're looking for");
+    expect(icpLabels.fromCompanyResearch).toBe("Checked against company research");
+    expect(icpLabels.updateFromDescription).toBe("Update from my description");
+    expect(organizationNameFromSeeker({ firstName: "Alex", lastName: "Chen" })).toBe(
+      "Alex Chen's workspace",
+    );
+    expect(signupCopy.emailLabel).toBe("Email");
   });
 });
 

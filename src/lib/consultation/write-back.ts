@@ -40,6 +40,10 @@ export function proposalsFromExtraction(input: {
       dropped.push(`fact:${index}`);
       return;
     }
+    if (!isCompleteFactStatement(fact.text)) {
+      dropped.push(`fact:${index}:fragment`);
+      return;
+    }
     proposals.push({
       kind: "FACT",
       text: fact.text.trim(),
@@ -99,6 +103,21 @@ export function proposalsFromExtraction(input: {
     followUpQuestion,
     missingStarElements: input.extracted.missingStarElements,
   };
+}
+
+export function isCompleteFactStatement(text: string): boolean {
+  const value = text.trim();
+  if (value.length < 24) return false;
+  const words = value.split(/\s+/).filter(Boolean);
+  if (words.length < 6) return false;
+  const hasVerb =
+    /\b(is|are|was|were|has|have|had|used|led|built|cut|wrote|shipped|managed|created|designed|ran|owns|works?|increased|reduced|delivered|rewrote|owned)\b/i.test(
+      value,
+    );
+  const startsWithFragment = /^(and|or|but|with|for|to|of|in|on|at|the|a|an)\b/i.test(
+    value,
+  );
+  return hasVerb && !startsWithFragment;
 }
 
 export function groundedInAnswer(proposalText: string, answer: string): boolean {

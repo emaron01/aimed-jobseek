@@ -220,6 +220,12 @@ enum JobEmployerDisposition {
   UNDISCLOSED
 }
 
+enum IdentityConfirmation {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
 enum QualificationOverrideTarget {
   COMPANY
   CONTACT
@@ -2315,10 +2321,13 @@ model JobRequirement {
   scorecardJson        Json
   /// Named people captured from the posting (FACT). Shape: NamedJobContact[].
   namedContactsJson    Json?
-  employerDisposition  JobEmployerDisposition @default(IDENTIFIED)
-  employerSkipReason   String?
-  suppliedEmployerName String?
-  companyId            String?
+  employerDisposition        JobEmployerDisposition @default(IDENTIFIED)
+  employerSkipReason         String?
+  suppliedEmployerName       String?
+  suppliedEmployerWebsite    String?
+  identityVerificationJson   Json?
+  identityConfirmation       IdentityConfirmation   @default(PENDING)
+  companyId                  String?
   parserPromptVersion  String?
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt

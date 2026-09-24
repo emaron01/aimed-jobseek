@@ -16,6 +16,7 @@ import { parsePersonaListField } from "@/lib/persona/persona-differentiation";
 import { PERSONA_SYNTHESIS_PROMPT_VERSION } from "@/lib/persona-research/contract";
 import { prisma } from "@/lib/prisma";
 import { vocab } from "@/lib/product-config";
+import { usableEmployerResearch } from "@/lib/job-requirement/identity-verification";
 import type { JobScorecard, ScorecardItem } from "@/lib/job-requirement/types";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
@@ -101,11 +102,11 @@ async function loadApplication(organizationId: string, campaignId: string) {
   });
   if (!requirement) return { campaign, requirement: null, job: null, research: null, includeResearch: false };
   const researchRow = requirement.company?.research[0] ?? null;
+  const confirmedResearch = usableEmployerResearch(requirement, researchRow);
   const includeResearch =
     requirement.employerDisposition === "IDENTIFIED" &&
-    researchRow != null &&
-    researchRow.identityAmbiguous !== true &&
-    (researchRow.status === "COMPLETED" || researchRow.status === "PARTIAL");
+    confirmedResearch != null &&
+    (confirmedResearch.status === "COMPLETED" || confirmedResearch.status === "PARTIAL");
   const job: HiringTeamJobEvidence = {
     title: requirement.title,
     companyName: requirement.companyName,

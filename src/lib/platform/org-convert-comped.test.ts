@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
   list: vi.fn(),
   audit: vi.fn(),
   stripeConfigured: true,
+  applyPlanEntitlements: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -38,6 +39,10 @@ vi.mock("@/lib/auth/audit", () => ({
   recordAdminAuditEvent: (...args: unknown[]) => state.audit(...args),
 }));
 
+vi.mock("@/lib/billing/apply-plan-entitlements", () => ({
+  applyPlanEntitlements: (...args: unknown[]) => state.applyPlanEntitlements(...args),
+}));
+
 import { convertOrganizationToComped } from "@/lib/platform/orgs";
 
 describe("convertOrganizationToComped", () => {
@@ -50,6 +55,7 @@ describe("convertOrganizationToComped", () => {
     state.retrieve.mockReset();
     state.list.mockReset();
     state.audit.mockReset();
+    state.applyPlanEntitlements.mockReset();
     state.stripeConfigured = true;
     state.transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
@@ -124,13 +130,18 @@ describe("convertOrganizationToComped", () => {
       expect.objectContaining({
         where: { organizationId: "org_1" },
         data: expect.objectContaining({
-          planCode: "STANDARD",
+          planCode: "COMPED",
           billingStatus: "FREE",
           stripeSubscriptionId: null,
           stripeCustomerId: null,
         }),
       }),
     );
+    expect(state.applyPlanEntitlements).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      planCode: "COMPED",
+      billingStatus: "FREE",
+    });
     expect(state.usageUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({

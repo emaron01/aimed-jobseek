@@ -7,6 +7,7 @@ import { parseCandidateProfileSafe, type CandidateProfile } from "@/lib/product-
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
 import { vocab } from "@/lib/product-config";
+import { usableEmployerResearch } from "@/lib/job-requirement/identity-verification";
 
 export type GenerationSource = {
   id: string;
@@ -242,7 +243,10 @@ export async function loadApplicationGenerationContext(
     select: { id: true, label: true, sampleText: true, createdAt: true },
   });
   const requirement = campaign.jobRequirement;
-  const research = requirement?.company?.research[0] ?? null;
+  const research = usableEmployerResearch(
+    requirement ?? {},
+    requirement?.company?.research[0] ?? null,
+  );
   const sources: GenerationSource[] = [];
   if (parsedProfile.ok) {
     for (const item of profileEvidenceItems(parsedProfile.profile)) {

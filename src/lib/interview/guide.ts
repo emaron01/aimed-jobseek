@@ -20,6 +20,7 @@ import {
   interviewGuideClaims,
   interviewGuideContentSchema,
   interviewGuideCoachingTexts,
+  interviewGuideSections,
   interviewGuideTexts,
   type InterviewClaim,
   type InterviewClarifyingQuestions,
@@ -350,10 +351,10 @@ export function validateInterviewGuideContent(input: {
   if (texts.some(mentionsInternalSystemState)) {
     errors.push("Remove references to internal system state.");
   }
-  for (const text of texts) {
+  for (const section of interviewGuideSections(input.content)) {
     errors.push(
       ...validateRepetitionAndMetaLanguage({
-        text,
+        text: section.text,
         bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
       }),
     );

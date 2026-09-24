@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AssistedProductIntake } from "@/components/AssistedProductSetup";
 import { AddProductMaterialPanel } from "@/components/AddProductMaterialPanel";
+import { ApprovedProductProfile } from "@/components/ApprovedProductProfile";
 import { ProductDraftReview } from "@/components/ProductDraftReview";
 import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
@@ -224,13 +225,26 @@ export default async function ProductResearchPage({ params }: PageProps) {
       ) : null}
 
       {productApproved ? (
-        <section
-          id="product-materials"
-          className="rounded-lg border border-slate-200 bg-white p-5"
-          data-print-hide
-        >
-          <AddProductMaterialPanel productId={product.id} />
-        </section>
+        <>
+          <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-8">
+            <h2 className="text-base font-semibold text-slate-900">
+              Approved {vocab.product.singular}
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              This is the approved {vocab.product.singular}. Add material below to rebuild a draft.
+            </p>
+            <div className="mt-4">
+              <ApprovedProductProfile profileJson={product.profileJson} />
+            </div>
+          </section>
+          <section
+            id="product-materials"
+            className="rounded-lg border border-slate-200 bg-white p-5"
+            data-print-hide
+          >
+            <AddProductMaterialPanel productId={product.id} />
+          </section>
+        </>
       ) : (
         <section
           id="product-materials"

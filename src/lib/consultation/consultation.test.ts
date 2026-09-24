@@ -44,6 +44,7 @@ import {
 import {
   appendConfirmedFact,
   groundedInAnswer,
+  isCompleteFactStatement,
   proposalsFromExtraction,
 } from "@/lib/consultation/write-back";
 import { normalizeParsedJobRequirement } from "@/lib/job-requirement/normalize";
@@ -543,6 +544,38 @@ describe("consultation evidence and questions", () => {
       .find((item) => item.id === "consult_turn_answer_1_fact");
     expect(written?.kind).toBe("FACT");
     expect(written?.provenance).toEqual([{ sourceId: "turn_answer_1" }]);
+  });
+
+  it("rejects fragment facts and does not show them for confirmation", () => {
+    const { targets } = sample();
+    const answer =
+      "I used Python for 5 years and cut failed jobs by 40%. Python. 5 years.";
+    expect(isCompleteFactStatement("Python")).toBe(false);
+    expect(isCompleteFactStatement("5 years")).toBe(false);
+    expect(
+      isCompleteFactStatement("I used Python for 5 years and cut failed jobs by 40%."),
+    ).toBe(true);
+    const result = proposalsFromExtraction({
+      answer,
+      turnId: "turn_fragment",
+      extracted: {
+        facts: [
+          { text: "Python" },
+          { text: "5 years" },
+          { text: "I used Python for 5 years and cut failed jobs by 40%." },
+        ],
+        story: null,
+        demonstratedTargets: [],
+        missingStarElements: [],
+        followUpQuestion: null,
+      },
+      targets,
+    });
+    expect(result.dropped).toEqual(
+      expect.arrayContaining(["fact:0:fragment", "fact:1:fragment"]),
+    );
+    expect(result.proposals).toHaveLength(1);
+    expect(result.proposals[0]?.text).toContain("I used Python");
   });
 
   it("calculates years without double-counting overlap and asks when dates are missing", () => {
@@ -1324,5 +1357,70 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     expect(
       (await prisma.consultationSession.findUnique({ where: { campaignId: other.id } }))?.status,
     ).toBe("IN_PROGRESS");
+  });
+
+  it("opens a focused session after a new gap even when consultation is done", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Gap consult ${suffix}`,
+        productId,
+        icpId,
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(
+      NORMAL_JOB_MODEL,
+      NORMAL_JOB_POSTING,
+    );
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        reportingLine: parsed.reportingLine,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaign.id);
+    await startConsultation({ organizationId, campaignId: campaign.id });
+    const first = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: { turns: { orderBy: { sequence: "asc" } } },
+    });
+    expect(first?.status).toBe("IN_PROGRESS");
+    const firstTurnIds = first?.turns.map((turn) => turn.id) ?? [];
+    await completeConsultation({ organizationId, campaignId: campaign.id });
+    expect(
+      (await prisma.consultationSession.findUnique({ where: { campaignId: campaign.id } }))
+        ?.status,
+    ).toBe("DONE");
+
+    await startConsultation({
+      organizationId,
+      campaignId: campaign.id,
+      focusNote: "Need a concrete story for shipping production services.",
+    });
+    const reopened = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: { turns: { orderBy: { sequence: "asc" } } },
+    });
+    expect(reopened?.status).toBe("IN_PROGRESS");
+    expect(reopened?.turns.map((turn) => turn.id)).toEqual(
+      expect.arrayContaining(firstTurnIds),
+    );
+    expect(reopened!.turns.length).toBeGreaterThan(firstTurnIds.length);
+    expect(
+      reopened?.turns.some(
+        (turn) =>
+          turn.speaker === "CONSULTANT" &&
+          !firstTurnIds.includes(turn.id),
+      ),
+    ).toBe(true);
   });
 });

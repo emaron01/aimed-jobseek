@@ -12,6 +12,7 @@ import {
 } from "@/lib/usage/defaults";
 import { SELF_SERVE_BILLING_DEFAULTS } from "@/lib/billing/billing-state";
 import { isPlatformSuperAdminProvisioningActive } from "@/lib/auth/platform-provision-flag";
+import { organizationNameFromSeeker } from "@/lib/product-config";
 
 export class ProvisionError extends Error {
   constructor(message: string) {
@@ -140,7 +141,7 @@ export async function provisionIndividualWorkspace(input: {
   firstName: string;
   lastName: string;
   timezone?: string;
-  /** Organization / company display name. Falls back to "{firstName}'s Workspace". */
+  /** Organization display name. Falls back to the configured seeker-name format. */
   companyName?: string | null;
   planCode?: string | null;
   seatQuantity?: number | null;
@@ -157,9 +158,10 @@ export async function provisionIndividualWorkspace(input: {
   const displayName = [firstName, lastName].filter(Boolean).join(" ");
   const isVitest = Boolean(process.env.VITEST);
   const trimmedCompany = input.companyName?.trim() || "";
+  const namedFromSeeker = organizationNameFromSeeker({ firstName, lastName });
   const workspaceName = isVitest
-    ? `[TEST] ${trimmedCompany || `${firstName}'s Workspace`}`
-    : trimmedCompany || `${firstName}'s Workspace`;
+    ? `[TEST] ${trimmedCompany || namedFromSeeker}`
+    : trimmedCompany || namedFromSeeker;
   const userDisplayName = isVitest
     ? `[TEST] ${displayName || firstName}`
     : displayName;

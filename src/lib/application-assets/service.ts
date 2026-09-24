@@ -284,7 +284,34 @@ function coverLetterStructureErrors(
       "The opening needs a cited Personal Profile FACT or approved consultation statement.",
     );
   }
+  const closing = content.paragraphs.at(-1);
+  if (closing) {
+    const claim = closingParagraphMakesClaim(closing.text);
+    if (claim && closing.supports.length === 0) {
+      errors.push("The closing paragraph makes a claim and needs a citation.");
+    }
+    for (const paragraph of content.paragraphs.slice(0, -1)) {
+      if (paragraph.supports.length === 0) {
+        errors.push(`Paragraph ${paragraph.id} needs a citation.`);
+      }
+    }
+  }
   return errors;
+}
+
+export function closingParagraphMakesClaim(text: string): boolean {
+  const value = text.trim();
+  if (!value) return false;
+  const hasFactualVerb =
+    /\b(led|built|shipped|cut|increased|reduced|managed|designed|wrote|rewrote|owned|years of|I have \d)\b/i.test(
+      value,
+    );
+  const hasMetric = /\d/.test(value) && !/\b(conversation|call|chat|discuss|schedule)\b/i.test(value);
+  if (hasFactualVerb || hasMetric) return true;
+  const noClaim =
+    /\b(thank you|thanks|look forward|schedule a conversation|welcome a conversation|discuss (the role|this opportunity)|please (let me know|reach out)|i('d| would) (welcome|appreciate))\b/i;
+  if (noClaim.test(value)) return false;
+  return /\bI (led|built|have|shipped)\b/i.test(value);
 }
 
 export async function validateAssetContent(input: {

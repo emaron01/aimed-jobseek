@@ -2,12 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  confirmApplicationEmployerIdentity,
   nameApplicationEmployer,
   overrideApplicationFit,
+  rejectApplicationEmployerIdentity,
   rescoreApplicationFit,
+  retryApplicationResearch,
 } from "@/lib/application/service";
 import { requireCurrentUser } from "@/lib/auth/session";
-import { vocab } from "@/lib/product-config";
+import { employerIdentityCopy, vocab } from "@/lib/product-config";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
 
@@ -33,6 +36,7 @@ export async function nameApplicationEmployerAction(
     await requireCurrentUser();
     const campaignId = String(formData.get("campaignId") ?? "").trim();
     const employerName = String(formData.get("employerName") ?? "").trim();
+    const website = String(formData.get("website") ?? "").trim();
     const companyId = String(formData.get("companyId") ?? "").trim();
     if (!campaignId) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
@@ -41,12 +45,70 @@ export async function nameApplicationEmployerAction(
       organizationId,
       campaignId,
       employerName,
+      website: website || null,
       companyId: companyId || null,
     });
     revalidatePath(`/campaigns/${campaignId}`);
     return { ok: true, message: "Employer saved. Research and fit run when the employer is known." };
   } catch (error) {
     return fail(error, "The employer could not be saved.");
+  }
+}
+
+export async function confirmApplicationEmployerIdentityAction(
+  _prev: ApplicationActionResult | null,
+  formData: FormData,
+): Promise<ApplicationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    await confirmApplicationEmployerIdentity({ organizationId, campaignId });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: employerIdentityCopy.confirmed };
+  } catch (error) {
+    return fail(error, "The employer identity could not be confirmed.");
+  }
+}
+
+export async function rejectApplicationEmployerIdentityAction(
+  _prev: ApplicationActionResult | null,
+  formData: FormData,
+): Promise<ApplicationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    await rejectApplicationEmployerIdentity({ organizationId, campaignId });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: employerIdentityCopy.rejected };
+  } catch (error) {
+    return fail(error, "The employer identity could not be rejected.");
+  }
+}
+
+export async function retryApplicationResearchAction(
+  _prev: ApplicationActionResult | null,
+  formData: FormData,
+): Promise<ApplicationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    await retryApplicationResearch({ organizationId, campaignId });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: "Employer research was retried." };
+  } catch (error) {
+    return fail(error, "Employer research could not be retried.");
   }
 }
 

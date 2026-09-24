@@ -3,6 +3,7 @@
 import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { prepareSignupCompanyAction } from "@/app/actions/pending-signup";
+import { signupCopy } from "@/lib/product-config";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -42,19 +43,11 @@ export function SignupForm({
     const fd = new FormData(e.currentTarget);
     const firstName = String(fd.get("firstName") || "").trim();
     const lastName = String(fd.get("lastName") || "").trim();
-    const companyName = lockedCompany
-      ? defaultCompanyName.trim()
-      : String(fd.get("companyName") || "").trim();
     const email = lockedEmail
       ? defaultEmail.trim()
       : String(fd.get("email") || "").trim();
     const password = String(fd.get("password") || "");
     const confirm = String(fd.get("confirmPassword") || "");
-
-    if (companyName.length < 2) {
-      setError("Company name is required.");
-      return;
-    }
     if (password !== confirm) {
       setError("Passwords do not match.");
       return;
@@ -68,7 +61,7 @@ export function SignupForm({
     try {
       // Self-serve only — invitees must not write a plan / Checkout cookie.
       if (!inviteMode) {
-        const prepared = await prepareSignupCompanyAction({ companyName });
+        const prepared = await prepareSignupCompanyAction({});
         if (!prepared.ok) {
           setError(prepared.message);
           setLoading(false);
@@ -155,24 +148,26 @@ export function SignupForm({
             />
           </label>
         </div>
+        {inviteMode ? (
+          <label className="block text-sm">
+            Workspace
+            <input
+              name="companyName"
+              required={!lockedCompany}
+              minLength={2}
+              maxLength={120}
+              autoComplete="organization"
+              defaultValue={defaultCompanyName}
+              readOnly={lockedCompany}
+              className={cn(
+                "mt-1 w-full rounded-md border border-slate-300 px-3 py-2",
+                lockedCompany ? "bg-slate-50 text-slate-700" : "",
+              )}
+            />
+          </label>
+        ) : null}
         <label className="block text-sm">
-          {inviteMode ? "Workspace" : "Company name"}
-          <input
-            name="companyName"
-            required={!lockedCompany}
-            minLength={2}
-            maxLength={120}
-            autoComplete="organization"
-            defaultValue={defaultCompanyName}
-            readOnly={lockedCompany}
-            className={cn(
-              "mt-1 w-full rounded-md border border-slate-300 px-3 py-2",
-              lockedCompany ? "bg-slate-50 text-slate-700" : "",
-            )}
-          />
-        </label>
-        <label className="block text-sm">
-          Work email
+          {signupCopy.emailLabel}
           <input
             name="email"
             type="email"

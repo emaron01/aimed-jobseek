@@ -36,6 +36,7 @@ import {
   compensationCopy,
   criterionFlags,
   employmentTypeLabel,
+  icpLabels,
   vocab,
 } from "@/lib/product-config";
 import type { StarterTargetEmployerDraft } from "@/lib/icp/save";
@@ -494,7 +495,7 @@ function NewIcpForm({
             >
               {interpretPending
                 ? "Interpreting…"
-                : `Interpret / Reinterpret ${vocab.icp.singular}`}
+                : icpLabels.updateFromDescription}
             </SecondaryButton>
           ) : null}
         </div>
@@ -749,7 +750,7 @@ export function IcpDetailsForm({
               >
                 {interpretPending
                   ? "Interpreting…"
-                  : `Interpret / Reinterpret ${vocab.icp.singular}`}
+                  : icpLabels.updateFromDescription}
               </SecondaryButton>
             </div>
           </form>
@@ -775,7 +776,7 @@ export function IcpDetailsForm({
           <SecondaryButton type="submit" disabled={interpretPending}>
             {interpretPending
               ? "Interpreting…"
-              : `Interpret / Reinterpret ${vocab.icp.singular}`}
+              : icpLabels.updateFromDescription}
           </SecondaryButton>
         </form>
         <ConfirmDeleteForm

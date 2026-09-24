@@ -160,6 +160,7 @@ export async function getHomeWorkflow(
             organizationId,
             userId: options.userId,
             includeArchived: options.includeArchived,
+            includeUpcoming: true,
           })
         : Promise.resolve([] as ApplicationReminderRow[]),
     ]);

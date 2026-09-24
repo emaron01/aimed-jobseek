@@ -470,7 +470,13 @@ async function planAndStoreRound(input: {
       profileItems,
       hiringTeam: input.roles,
       chronologyRequested,
-      coveredTargetKeys: [...new Set([...input.askedKeys, ...input.skippedKeys])],
+      coveredTargetKeys: [
+        ...new Set(
+          [...input.askedKeys, ...input.skippedKeys].filter(
+            (key) => key !== input.focusTargetKey,
+          ),
+        ),
+      ],
       focusTargetKey: input.focusTargetKey ?? null,
       qualityFeedback: feedback,
     });

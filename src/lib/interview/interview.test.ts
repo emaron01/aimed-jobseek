@@ -20,6 +20,7 @@ import {
   detectInterviewNoteGap,
   updateInterviewStage,
 } from "@/lib/interview/stages";
+import { validateRepetitionAndMetaLanguage } from "@/lib/consultation/output-quality";
 import { interviewConfig } from "@/lib/product-config";
 import { redirectLineErrors, thankYouNotesErrors } from "@/lib/application-assets/outreach";
 import { hasTestDatabase } from "@/test/database";
@@ -35,6 +36,26 @@ function claim(id: string, text: string, sourceId?: string): InterviewGuideConte
 }
 
 describe("interview guide rules", () => {
+  it("allows the same metric in different sections and rejects it inside one section", () => {
+    const talkingPoint = "Lead with the 2 production incidents you owned at Northwind.";
+    const exampleAnswer =
+      "I owned 2 production incidents at Northwind and wrote the runbook the on-call team still uses.";
+    const repeatedInside =
+      "Lead with the 2 production incidents. Repeat the 2 production incidents without adding information.";
+    expect(
+      validateRepetitionAndMetaLanguage({ text: talkingPoint, bannedPhrases: [] }),
+    ).toEqual([]);
+    expect(
+      validateRepetitionAndMetaLanguage({ text: exampleAnswer, bannedPhrases: [] }),
+    ).toEqual([]);
+    expect(
+      validateRepetitionAndMetaLanguage({
+        text: repeatedInside,
+        bannedPhrases: [],
+      }).some((error) => error.includes("repeated the same number")),
+    ).toBe(true);
+  });
+
   it("limits clarifying questions to three and allows skip", () => {
     const questions = [
       { id: "q1", text: "Who are you meeting?" },

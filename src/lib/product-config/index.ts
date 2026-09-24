@@ -7,8 +7,12 @@ export {
   countedNoun,
   criterionFlagLabels,
   criterionFlags,
+  employerIdentityCopy,
+  icpLabels,
   nounForCount,
+  organizationNameFromSeeker,
   scoringDimensionLabel,
+  signupCopy,
   vocab,
   vocabExamples,
 } from "./vocabulary";

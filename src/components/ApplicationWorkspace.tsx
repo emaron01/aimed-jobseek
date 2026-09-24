@@ -1,8 +1,11 @@
 import Link from "next/link";
 import {
+  confirmApplicationEmployerIdentityAction,
   nameApplicationEmployerAction,
   overrideApplicationFitAction,
+  rejectApplicationEmployerIdentityAction,
   rescoreApplicationFitAction,
+  retryApplicationResearchAction,
 } from "@/app/actions/application";
 import {
   addApplicationRoleAction,
@@ -33,7 +36,11 @@ import type { ApplicationFitOutcome } from "@/lib/application/fit";
 import { readApplicationFitStale } from "@/lib/application/service";
 import type { JobScorecard, ScorecardItem } from "@/lib/job-requirement/types";
 import { prisma } from "@/lib/prisma";
-import { applicationSummaryConfig, criterionFlags, hiringTeamConfig, vocab } from "@/lib/product-config";
+import { applicationSummaryConfig, criterionFlags, employerIdentityCopy, hiringTeamConfig, vocab } from "@/lib/product-config";
+import {
+  parseIdentityVerification,
+} from "@/lib/job-requirement/identity-verification";
+import { ensureIdentityVerification } from "@/lib/application/service";
 import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
 import { parseStringArray } from "@/lib/research";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
@@ -104,6 +111,167 @@ function ScorecardList({
   );
 }
 
+function IdentityVerificationPanel({
+  campaignId,
+  canEdit,
+  requirement,
+  research,
+}: {
+  campaignId: string;
+  canEdit: boolean;
+  requirement: {
+    campaignId: string;
+    identityConfirmation: "PENDING" | "CONFIRMED" | "REJECTED";
+    identityVerificationJson: unknown;
+    employerSkipReason: string | null;
+  };
+  research: {
+    status: string;
+    identityAmbiguous: boolean;
+    companySummary: string | null;
+    whatTheySell: string | null;
+    businessModel: string | null;
+    hiringSignals: unknown;
+    riskSignals: unknown;
+  } | null;
+}) {
+  const verification = parseIdentityVerification(requirement.identityVerificationJson);
+  const researchFailed =
+    Boolean(requirement.employerSkipReason) &&
+    (!research || research.status === "FAILED" || research.status === "NOT_STARTED");
+  const showRetry =
+    canEdit &&
+    (researchFailed || !research || research.status === "FAILED" || research.status === "NOT_STARTED");
+  const showCandidate =
+    verification &&
+    requirement.identityConfirmation !== "CONFIRMED" &&
+    (verification.verdict === "AMBIGUOUS" || requirement.identityConfirmation === "REJECTED");
+  const confirmedResearch =
+    research &&
+    !research.identityAmbiguous &&
+    (requirement.identityConfirmation === "CONFIRMED" ||
+      verification?.verdict === "MATCHED");
+
+  return (
+    <div className="space-y-3 border-t border-slate-200 pt-4" data-testid="employer-identity">
+      <h2 className="text-base font-semibold text-slate-900">{employerIdentityCopy.title}</h2>
+      {requirement.identityConfirmation === "CONFIRMED" ? (
+        <p className="text-sm text-slate-700">{employerIdentityCopy.confirmed}</p>
+      ) : null}
+      {requirement.identityConfirmation === "REJECTED" ? (
+        <p className="text-sm text-amber-950">{employerIdentityCopy.rejected}</p>
+      ) : null}
+      {showCandidate ? (
+        <div
+          className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3"
+          data-testid="employer-identity-candidate"
+        >
+          <p className="text-sm text-amber-950">{employerIdentityCopy.unmatched}</p>
+          <div className="space-y-1 text-sm text-slate-800">
+            <p className="font-medium">{verification.candidate.name || "Unknown company"}</p>
+            {verification.candidate.summary ? <p>{verification.candidate.summary}</p> : null}
+            {verification.candidate.whatTheyDo ? (
+              <p>What they do: {verification.candidate.whatTheyDo}</p>
+            ) : null}
+            {verification.candidate.location ? <p>Location: {verification.candidate.location}</p> : null}
+            {verification.candidate.sizeOrStage ? (
+              <p>Size or stage: {verification.candidate.sizeOrStage}</p>
+            ) : null}
+            {verification.candidate.website ? <p>Website: {verification.candidate.website}</p> : null}
+          </div>
+          <ul className="space-y-2" data-testid="employer-identity-checks">
+            {verification.checks.map((check) => (
+              <li key={check.key} className="text-sm text-slate-800">
+                <span className="font-medium capitalize">{check.key === "sizeOrStage" ? "Size or stage" : check.key}</span>
+                <span className="ml-2 rounded bg-white px-1.5 py-0.5 text-xs font-medium text-slate-800">
+                  {check.status === "MATCH"
+                    ? "Match"
+                    : check.status === "MISMATCH"
+                      ? "Mismatch"
+                      : "Not stated"}
+                </span>
+                {check.postingEvidence ? (
+                  <span className="mt-1 block text-slate-600">Posting: {check.postingEvidence}</span>
+                ) : null}
+                {check.researchEvidence ? (
+                  <span className="block text-slate-600">Research: {check.researchEvidence}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          {canEdit && requirement.identityConfirmation !== "REJECTED" ? (
+            <div className="flex flex-wrap gap-3">
+              <ApplicationActionForm
+                action={confirmApplicationEmployerIdentityAction}
+                submitLabel={employerIdentityCopy.confirm}
+                testId="confirm-employer-identity"
+              >
+                <input type="hidden" name="campaignId" value={campaignId} />
+              </ApplicationActionForm>
+              <ApplicationActionForm
+                action={rejectApplicationEmployerIdentityAction}
+                submitLabel={employerIdentityCopy.reject}
+                testId="reject-employer-identity"
+              >
+                <input type="hidden" name="campaignId" value={campaignId} />
+              </ApplicationActionForm>
+            </div>
+          ) : null}
+          {canEdit ? (
+            <ApplicationActionForm
+              action={nameApplicationEmployerAction}
+              submitLabel={employerIdentityCopy.rerun}
+              testId="correct-employer-form"
+            >
+              <input type="hidden" name="campaignId" value={requirement.campaignId} />
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">{employerIdentityCopy.supplyName}</span>
+                <input
+                  name="employerName"
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">{employerIdentityCopy.supplyWebsite}</span>
+                <input
+                  name="website"
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                />
+              </label>
+            </ApplicationActionForm>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold text-slate-900">Employer research</h3>
+        {confirmedResearch ? (
+          <div className="space-y-2 text-sm text-slate-800">
+            <p>{research.companySummary || "No summary yet."}</p>
+            <p>{research.whatTheySell ? `Products: ${research.whatTheySell}` : null}</p>
+            <p>{research.businessModel ? `Business model: ${research.businessModel}` : null}</p>
+            <BulletList title="Hiring and growth" items={textList(research.hiringSignals)} />
+            <BulletList title="Employer risk" items={textList(research.riskSignals)} />
+          </div>
+        ) : (
+          <p className="text-sm text-slate-600">
+            Employer research has not been confirmed for this {vocab.campaign.singular}.
+          </p>
+        )}
+        {showRetry ? (
+          <ApplicationActionForm
+            action={retryApplicationResearchAction}
+            submitLabel={employerIdentityCopy.retry}
+            testId="retry-research"
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+          </ApplicationActionForm>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export async function ApplicationWorkspace({
   campaignId,
   organizationId,
@@ -113,6 +281,7 @@ export async function ApplicationWorkspace({
   organizationId: string;
   canEdit: boolean;
 }) {
+  await ensureIdentityVerification({ organizationId, campaignId });
   const requirement = await prisma.jobRequirement.findFirst({
     where: { campaignId, organizationId },
     include: {
@@ -231,7 +400,7 @@ export async function ApplicationWorkspace({
         </p>
       ) : null}
 
-      {canEdit && requirement.employerDisposition !== "IDENTIFIED" ? (
+      {canEdit && requirement.employerDisposition !== "IDENTIFIED" && !parseIdentityVerification(requirement.identityVerificationJson) ? (
         <ApplicationActionForm
           action={nameApplicationEmployerAction}
           submitLabel="Save employer and research"
@@ -245,25 +414,22 @@ export async function ApplicationWorkspace({
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
             />
           </label>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">{employerIdentityCopy.supplyWebsite}</span>
+            <input
+              name="website"
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+          </label>
         </ApplicationActionForm>
       ) : null}
 
-      <div className="space-y-2 border-t border-slate-200 pt-4">
-        <h2 className="text-base font-semibold text-slate-900">Employer research</h2>
-        {research && !research.identityAmbiguous ? (
-          <div className="space-y-2 text-sm text-slate-800">
-            <p>{research.companySummary || "No summary yet."}</p>
-            <p>{research.whatTheySell ? `Products: ${research.whatTheySell}` : null}</p>
-            <p>{research.businessModel ? `Business model: ${research.businessModel}` : null}</p>
-            <BulletList title="Hiring and growth" items={textList(research.hiringSignals)} />
-            <BulletList title="Employer risk" items={textList(research.riskSignals)} />
-          </div>
-        ) : (
-          <p className="text-sm text-slate-600">
-            Employer research has not been run for this {vocab.campaign.singular}.
-          </p>
-        )}
-      </div>
+      <IdentityVerificationPanel
+        campaignId={campaignId}
+        canEdit={canEdit}
+        requirement={requirement}
+        research={research}
+      />
 
       <div className="space-y-3 border-t border-slate-200 pt-4" data-testid="employer-fit">
         <h2 className="text-base font-semibold text-slate-900">Employer fit</h2>

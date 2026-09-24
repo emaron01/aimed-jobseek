@@ -155,6 +155,47 @@ export const criterionFlags = Object.freeze({
     "Assessed from limited public evidence. Never presented as verified.",
 });
 
+/** Seeker-facing Target Employer labels. Stored scoring names are unchanged. */
+export const icpLabels = Object.freeze({
+  scoringCriteria: "What you're looking for",
+  fromCompanyResearch: "Checked against company research",
+  updateFromDescription: "Update from my description",
+});
+
+export const signupCopy = Object.freeze({
+  emailLabel: "Email",
+  organizationNameTemplate: "{name}'s workspace",
+});
+
+export function organizationNameFromSeeker(input: {
+  firstName: string;
+  lastName: string;
+}): string {
+  const name = [input.firstName.trim(), input.lastName.trim()]
+    .filter(Boolean)
+    .join(" ");
+  if (!name) {
+    throw new Error("A first or last name is required to name the workspace.");
+  }
+  return signupCopy.organizationNameTemplate.replace("{name}", name);
+}
+
+export const employerIdentityCopy = Object.freeze({
+  title: "Employer identity",
+  confirm: "This is the company",
+  reject: "This is not the company",
+  retry: "Retry research",
+  supplyName: "Correct company name",
+  supplyWebsite: "Company website",
+  rerun: "Research this company",
+  unmatched:
+    "Research found a company that does not match this posting. Confirm it, reject it, or supply the correct name or website.",
+  confirmed: "You confirmed this employer identity.",
+  rejected: "You rejected this employer identity. Research will not be used.",
+  staleDependents:
+    "Employer identity could not be confirmed against the posting. Fit and anything that used this research are stale.",
+});
+
 export type CriterionFlagKey = keyof typeof criterionFlags;
 
 export function criterionFlagLabels(flags: {

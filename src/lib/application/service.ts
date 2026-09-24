@@ -10,6 +10,15 @@ import {
   decisionAfterResearchIdentity,
   type EmployerMatch,
 } from "@/lib/job-requirement/employer";
+import {
+  identityMismatchReason,
+  identityStaleReason,
+  parseIdentityVerification,
+  postingIdentityInput,
+  researchIdentityInput,
+  verifyEmployerIdentity,
+} from "@/lib/job-requirement/identity-verification";
+import { employerIdentityCopy } from "@/lib/product-config";
 import type { ParsedJobRequirement } from "@/lib/job-requirement/types";
 import { JOB_REQUIREMENT_PROMPT_VERSION } from "@/lib/job-requirement/types";
 import { normalizeEvidenceClass } from "@/lib/criteria/evidence-class";
@@ -182,7 +191,23 @@ async function scoreFit(input: {
     },
     orderBy: { updatedAt: "desc" },
   });
-  if (!research || research.identityAmbiguous) {
+  const requirementForUse = await prisma.jobRequirement.findFirst({
+    where: {
+      campaignId: input.campaignId,
+      organizationId: input.organizationId,
+    },
+    select: { identityConfirmation: true, identityVerificationJson: true },
+  });
+  const verification = parseIdentityVerification(
+    requirementForUse?.identityVerificationJson,
+  );
+  if (
+    !research ||
+    research.identityAmbiguous ||
+    requirementForUse?.identityConfirmation === "REJECTED" ||
+    (requirementForUse?.identityConfirmation !== "CONFIRMED" &&
+      verification?.verdict === "AMBIGUOUS")
+  ) {
     return;
   }
   const requirement = await prisma.jobRequirement.findFirst({
@@ -271,20 +296,49 @@ async function researchAndMaybeScore(input: {
       });
       return;
     }
-    const after = decisionAfterResearchIdentity(research?.identityAmbiguous === true);
+    const requirement = await prisma.jobRequirement.findFirst({
+      where: { campaignId: input.campaignId, organizationId: input.organizationId },
+      include: { company: { select: { name: true, location: true, website: true } } },
+    });
+    if (!requirement) {
+      throw new TenantError(
+        `This ${vocab.campaign.singular} has no job requirement.`,
+      );
+    }
+    const verification = verifyEmployerIdentity({
+      posting: postingIdentityInput(requirement),
+      research: researchIdentityInput({
+        ...research,
+        company: requirement.company,
+      }),
+    });
+    const after = decisionAfterResearchIdentity(
+      research.identityAmbiguous === true || verification.verdict === "AMBIGUOUS",
+    );
     if (!after.scoreFit) {
       await prisma.jobRequirement.update({
         where: { campaignId: input.campaignId },
         data: {
           employerDisposition: "AMBIGUOUS",
-          employerSkipReason: after.reason,
+          employerSkipReason: after.reason ?? identityMismatchReason(),
+          identityVerificationJson: jsonValue(verification),
+          identityConfirmation: "PENDING",
         },
+      });
+      await markIdentityDependentsStale({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
       });
       return;
     }
     await prisma.jobRequirement.update({
       where: { campaignId: input.campaignId },
-      data: { employerDisposition: "IDENTIFIED", employerSkipReason: null },
+      data: {
+        employerDisposition: "IDENTIFIED",
+        employerSkipReason: null,
+        identityVerificationJson: jsonValue(verification),
+        identityConfirmation: "PENDING",
+      },
     });
     await scoreFit(input);
   } finally {
@@ -417,6 +471,7 @@ function jobRequirementData(
     namedContactsJson: jsonValue(parsed.namedContacts),
     employerDisposition: employer.disposition,
     employerSkipReason: employer.reason,
+    identityConfirmation: "PENDING",
     company: employer.companyId
       ? { connect: { id: employer.companyId } }
       : undefined,
@@ -428,6 +483,7 @@ export async function nameApplicationEmployer(input: {
   organizationId: string;
   campaignId: string;
   employerName: string;
+  website?: string | null;
   companyId?: string | null;
 }): Promise<void> {
   const requirement = await prisma.jobRequirement.findFirst({
@@ -456,14 +512,18 @@ export async function nameApplicationEmployer(input: {
     }
     companyId = created.id;
   }
+  const website = input.website?.trim() || null;
   await prisma.jobRequirement.update({
     where: { id: requirement.id },
     data: {
       suppliedEmployerName: name || undefined,
+      suppliedEmployerWebsite: website,
       companyName: name || requirement.companyName,
       companyId,
       employerDisposition: "IDENTIFIED",
       employerSkipReason: null,
+      identityConfirmation: "PENDING",
+      identityVerificationJson: undefined,
     },
   });
   await researchAndMaybeScore({
@@ -531,6 +591,195 @@ export async function overrideApplicationFit(input: {
       overriddenAt: next.overriddenAt,
       overriddenByUserId: input.userId,
     },
+  });
+}
+
+async function markIdentityDependentsStale(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  await prisma.applicationFit.updateMany({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+    },
+    data: {
+      stale: true,
+      staleReason: identityStaleReason(),
+    },
+  });
+}
+
+export async function ensureIdentityVerification(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const requirement = await prisma.jobRequirement.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+    include: {
+      company: {
+        include: { research: { orderBy: { updatedAt: "desc" }, take: 1 } },
+      },
+    },
+  });
+  if (!requirement) return;
+  const research = requirement.company?.research[0] ?? null;
+  if (!research || (research.status !== "COMPLETED" && research.status !== "PARTIAL")) {
+    return;
+  }
+  const stored = parseIdentityVerification(requirement.identityVerificationJson);
+  if (stored && requirement.identityConfirmation !== "PENDING") {
+    return;
+  }
+  const verification = verifyEmployerIdentity({
+    posting: postingIdentityInput(requirement),
+    research: researchIdentityInput({
+      ...research,
+      company: requirement.company,
+    }),
+  });
+  if (verification.verdict === "MATCHED" && stored?.verdict === "MATCHED") {
+    return;
+  }
+  if (verification.verdict === "AMBIGUOUS") {
+    await prisma.jobRequirement.update({
+      where: { id: requirement.id },
+      data: {
+        employerDisposition: "AMBIGUOUS",
+        employerSkipReason: identityMismatchReason(),
+        identityVerificationJson: jsonValue(verification),
+        identityConfirmation:
+          requirement.identityConfirmation === "CONFIRMED"
+            ? requirement.identityConfirmation
+            : "PENDING",
+      },
+    });
+    if (requirement.identityConfirmation !== "CONFIRMED") {
+      await markIdentityDependentsStale({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+      });
+    }
+    return;
+  }
+  if (!stored) {
+    await prisma.jobRequirement.update({
+      where: { id: requirement.id },
+      data: { identityVerificationJson: jsonValue(verification) },
+    });
+  }
+}
+
+export async function confirmApplicationEmployerIdentity(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const requirement = await prisma.jobRequirement.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+    include: { campaign: { select: { icpId: true } } },
+  });
+  if (!requirement) {
+    throw new TenantError(
+      `This ${vocab.campaign.singular} has no job requirement.`,
+    );
+  }
+  if (!parseIdentityVerification(requirement.identityVerificationJson)) {
+    throw new TenantError(employerIdentityCopy.unmatched);
+  }
+  await prisma.jobRequirement.update({
+    where: { id: requirement.id },
+    data: {
+      identityConfirmation: "CONFIRMED",
+      employerDisposition: "IDENTIFIED",
+      employerSkipReason: null,
+    },
+  });
+  if (requirement.companyId) {
+    await scoreFit({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      icpId: requirement.campaign.icpId,
+      companyId: requirement.companyId,
+    });
+  }
+  await syncApplicationHiringTeam({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+  });
+}
+
+export async function rejectApplicationEmployerIdentity(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const requirement = await prisma.jobRequirement.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+  });
+  if (!requirement) {
+    throw new TenantError(
+      `This ${vocab.campaign.singular} has no job requirement.`,
+    );
+  }
+  await prisma.jobRequirement.update({
+    where: { id: requirement.id },
+    data: {
+      identityConfirmation: "REJECTED",
+      employerDisposition: "AMBIGUOUS",
+      employerSkipReason: employerIdentityCopy.rejected,
+    },
+  });
+  await markIdentityDependentsStale({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+  });
+  await syncApplicationHiringTeam({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+  });
+}
+
+export async function retryApplicationResearch(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const requirement = await prisma.jobRequirement.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+    include: { campaign: { select: { icpId: true } } },
+  });
+  if (!requirement) {
+    throw new TenantError(
+      `This ${vocab.campaign.singular} has no job requirement.`,
+    );
+  }
+  let companyId = requirement.companyId;
+  const name = (requirement.suppliedEmployerName || requirement.companyName || "").trim();
+  if (!companyId) {
+    if (!name) {
+      throw new TenantError("Enter the employer's name before retrying research.");
+    }
+    const created = await resolveOrCreateCompany({ name });
+    if (!created) {
+      throw new TenantError("The employer could not be saved, so research did not run.");
+    }
+    companyId = created.id;
+    await prisma.jobRequirement.update({
+      where: { id: requirement.id },
+      data: { companyId, employerDisposition: "IDENTIFIED" },
+    });
+  }
+  await prisma.jobRequirement.update({
+    where: { id: requirement.id },
+    data: {
+      identityConfirmation: "PENDING",
+      identityVerificationJson: undefined,
+      employerSkipReason: null,
+    },
+  });
+  await researchAndMaybeScore({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    icpId: requirement.campaign.icpId,
+    companyId,
   });
 }
 

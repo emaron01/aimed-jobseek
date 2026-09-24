@@ -1,4 +1,4 @@
-import { criterionFlags, vocab } from "@/lib/product-config";
+import { criterionFlags, icpLabels, vocab } from "@/lib/product-config";
 /**
  * ICP criterion evidence class: defaults, heuristics, labels, fingerprints, caps.
  */
@@ -237,7 +237,7 @@ export function evidenceClassAvailabilityLabel(
     case "COMPANY_RESEARCH":
       return {
         class: evidenceClass,
-        label: "From company research",
+        label: icpLabels.fromCompanyResearch,
         tone: "neutral",
       };
     case "TARGETED_SEARCH":

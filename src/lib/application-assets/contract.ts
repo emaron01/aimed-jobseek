@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const RESUME_ASSET_PROMPT_VERSION = "4";
-export const COVER_LETTER_ASSET_PROMPT_VERSION = "7";
+export const COVER_LETTER_ASSET_PROMPT_VERSION = "8";
 export const OUTREACH_EMAIL_PROMPT_VERSION = "5";
 export const OUTREACH_LINKEDIN_NOTE_PROMPT_VERSION = "5";
 export const OUTREACH_LINKEDIN_INMAIL_PROMPT_VERSION = "5";
@@ -49,10 +49,16 @@ export const resumeAssetContentSchema = z.object({
   credentials: z.array(assetClaimSchema),
 });
 
+const coverLetterParagraphSchema = z.object({
+  id: z.string().trim().min(1),
+  text: z.string().trim().min(1),
+  supports: z.array(assetSupportSchema),
+});
+
 export const coverLetterAssetContentSchema = z.object({
   type: z.literal("COVER_LETTER"),
   salutation: z.string().trim().min(1),
-  paragraphs: z.array(assetClaimSchema).min(3).max(4),
+  paragraphs: z.array(coverLetterParagraphSchema).min(3).max(4),
   signoff: z.string().trim().min(1),
   signerName: z.string().trim().min(1),
 });

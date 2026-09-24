@@ -46,6 +46,9 @@ next-env.d.ts
 
 tmp/
 
+# Local unlock / grant tools never belong in the repository
+scripts/ad-hoc/
+
 # Dedicated local Postgres data (never another project / never production)
 .local-postgres/
 .local-postgres-test/

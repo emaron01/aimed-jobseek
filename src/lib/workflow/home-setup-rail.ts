@@ -11,8 +11,8 @@ import {
 import { countedNoun, features, vocab } from "@/lib/product-config";
 
 export const HOME_SETUP_STEP_KEYS = [
-  "voice",
   "products",
+  "voice",
   "icps",
   "email",
 ] as const;
@@ -27,6 +27,7 @@ export type HomeSetupStep = {
   completed: boolean;
   /** Count or connection status for the step (shown next to the label). */
   detail: string;
+  optional?: boolean;
 };
 
 function plural(count: number, singular: string): string {
@@ -117,14 +118,6 @@ export function buildHomeSetupRail(input: {
   const steps: HomeSetupStep[] = [
     {
       number: 1,
-      key: "voice",
-      label: "Voice",
-      href: "/settings/voice",
-      completed: input.voice.ready,
-      detail: voiceDetail,
-    },
-    {
-      number: 2,
       key: "products",
       label: vocab.product.Plural,
       href: "/products",
@@ -134,6 +127,15 @@ export function buildHomeSetupRail(input: {
         readyCount: input.productApprovedCount,
         incomplete: input.productIncomplete,
       }),
+    },
+    {
+      number: 2,
+      key: "voice",
+      label: "Voice",
+      href: "/settings/voice",
+      completed: input.voice.ready,
+      detail: input.voice.ready ? voiceDetail : `${voiceDetail} · Optional`,
+      optional: true,
     },
     {
       number: 3,
@@ -167,8 +169,9 @@ export function resolveHomeSetupFocus(
   steps: HomeSetupStep[],
 ): HomeSetupStepKey {
   return (
+    steps.find((step) => !step.completed && !step.optional)?.key ??
     steps.find((step) => !step.completed)?.key ??
     steps.at(-1)?.key ??
-    "voice"
+    "products"
   );
 }

@@ -16,6 +16,7 @@ vi.mock("@/lib/ai", async (importOriginal) => {
 
 import {
   approveApplicationAsset,
+  closingParagraphMakesClaim,
   generateApplicationAsset,
 } from "@/lib/application-assets/service";
 import {
@@ -652,6 +653,92 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
         ),
       ).toHaveLength(2);
     }
+  });
+
+  it("allows a no-claim closing without a citation and rejects a claim without one", async () => {
+    expect(closingParagraphMakesClaim("Can we schedule a conversation about the role?")).toBe(
+      false,
+    );
+    expect(closingParagraphMakesClaim("Thank you for your time.")).toBe(false);
+    expect(
+      closingParagraphMakesClaim(
+        "I led the rewrite that cut failed billing runs from 8% and would welcome a conversation.",
+      ),
+    ).toBe(true);
+
+    const noClaim = (payload: {
+      salutation: string;
+      signerName: string;
+      sources: Array<{ id: string; text: string; url: string | null }>;
+    }): CoverLetterAssetContent => {
+      const letter = validCoverLetter(payload);
+      letter.paragraphs[2] = {
+        id: "cover-close",
+        text: "Can we schedule a conversation about the role?",
+        supports: [],
+      };
+      return letter;
+    };
+    installModel({
+      coverLetters: [],
+      coverLetter: undefined,
+    });
+    generateStructured.mockImplementation(
+      async (request: { schemaName: string; messages: Array<{ content: string }> }) => {
+        if (request.schemaName === "application_cover_letter") {
+          const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
+            salutation: string;
+            signerName: string;
+            sources: Array<{ id: string; text: string; url: string | null }>;
+          };
+          return { data: noClaim(payload) };
+        }
+        if (request.schemaName === "application_asset_claim_validation") {
+          return { data: { violations: [] } };
+        }
+        return { data: validResume() };
+      },
+    );
+    const allowed = await generateApplicationAsset({
+      organizationId,
+      campaignId,
+      userId,
+      type: "COVER_LETTER",
+    });
+    expect(allowed.ok).toBe(true);
+
+    await prisma.applicationAsset.deleteMany({ where: { campaignId, type: "COVER_LETTER" } });
+    generateStructured.mockImplementation(
+      async (request: { schemaName: string; messages: Array<{ content: string }> }) => {
+        if (request.schemaName === "application_cover_letter") {
+          const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
+            salutation: string;
+            signerName: string;
+            sources: Array<{ id: string; text: string; url: string | null }>;
+          };
+          const letter = validCoverLetter(payload);
+          letter.paragraphs[2] = {
+            id: "cover-close",
+            text: "I led the rewrite that cut failed billing runs from 8% and would welcome a conversation.",
+            supports: [],
+          };
+          return { data: letter };
+        }
+        if (request.schemaName === "application_asset_claim_validation") {
+          return { data: { violations: [] } };
+        }
+        return { data: validResume() };
+      },
+    );
+    const claimed = await generateApplicationAsset({
+      organizationId,
+      campaignId,
+      userId,
+      type: "COVER_LETTER",
+    });
+    expect(claimed.ok).toBe(false);
+    if (claimed.ok) throw new Error("Expected a claimed closing to fail.");
+    expect(claimed.violations.some((item) => item.includes("closing"))).toBe(true);
   });
 
   it("rejects an opening that does not cite both research and a Personal Profile fact", async () => {

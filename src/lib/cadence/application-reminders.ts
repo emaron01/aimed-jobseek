@@ -91,6 +91,14 @@ export function reminderDueAt(anchor: Date, day: number): Date {
   return due;
 }
 
+export function shouldIncludeApplicationReminder(input: {
+  dueAt: Date;
+  now: Date;
+  includeUpcoming: boolean;
+}): boolean {
+  return input.includeUpcoming || input.now >= input.dueAt;
+}
+
 export function isApplicationReminderDue(input: {
   anchor: Date;
   day: number;
@@ -169,9 +177,11 @@ export async function getDueApplicationReminders(input: {
   organizationId: string;
   userId: string;
   includeArchived?: boolean;
+  includeUpcoming?: boolean;
   now?: Date;
 }): Promise<ApplicationReminderRow[]> {
   const now = input.now ?? new Date();
+  const includeUpcoming = input.includeUpcoming === true;
   const policy = await loadApplicationReminderPolicy(input.organizationId);
   const days = reminderDaysFromPolicy(policy);
   if (days.length === 0) return [];
@@ -218,7 +228,7 @@ export async function getDueApplicationReminders(input: {
     if (!anchor) continue;
     for (const day of days) {
       const dueAt = reminderDueAt(anchor, day);
-      if (now < dueAt) continue;
+      if (!shouldIncludeApplicationReminder({ dueAt, now, includeUpcoming })) continue;
       due.push({
         campaignId: campaign.id,
         campaignName: campaign.name,
@@ -236,7 +246,7 @@ export async function getDueApplicationReminders(input: {
         stage.scheduledAt,
         policy.interviewThankYouHours,
       );
-      if (now >= thankYouDue) {
+      if (shouldIncludeApplicationReminder({ dueAt: thankYouDue, now, includeUpcoming })) {
         due.push({
           campaignId: campaign.id,
           campaignName: campaign.name,
@@ -256,7 +266,7 @@ export async function getDueApplicationReminders(input: {
         scheduledAt: stage.scheduledAt,
         businessDays: policy.interviewCheckInBusinessDays,
       });
-      if (now >= checkInDue) {
+      if (shouldIncludeApplicationReminder({ dueAt: checkInDue, now, includeUpcoming })) {
         due.push({
           campaignId: campaign.id,
           campaignName: campaign.name,

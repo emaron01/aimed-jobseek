@@ -21,6 +21,7 @@ import {
   compensationCopy,
   criterionFlagLabels,
   employmentTypeLabel,
+  icpLabels,
   isEmploymentTypeCode,
   vocab,
 } from "@/lib/product-config";
@@ -105,7 +106,7 @@ export function IcpCriteriaBriefing({
 
   if (criteria.length === 0 && !hasInterpretation) {
     return (
-      <ResearchReadSection title="Scoring criteria" empty>
+      <ResearchReadSection title={icpLabels.scoringCriteria} empty>
         {null}
       </ResearchReadSection>
     );
@@ -143,7 +144,7 @@ export function IcpCriteriaBriefing({
       ) : null}
 
       {criteria.length > 0 ? (
-      <ResearchReadSection title="Scoring criteria" empty={false}>
+      <ResearchReadSection title={icpLabels.scoringCriteria} empty={false}>
         <p className="text-sm text-slate-600" data-testid="icp-role-summary">
           {buildIcpRoleSummary({
             primaryCount: primary.length,

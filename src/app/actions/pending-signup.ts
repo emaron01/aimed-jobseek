@@ -51,27 +51,29 @@ export async function setPendingSignupPlanAction(
   redirect("/signup");
 }
 
-export async function prepareSignupCompanyAction(input: {
-  companyName: string;
-}): Promise<PendingSignupActionResult> {
-  const companyName = input.companyName.trim();
-  if (companyName.length < 2) {
+export async function prepareSignupCompanyAction(
+  input: { companyName?: string } = {},
+): Promise<PendingSignupActionResult> {
+  const companyName = input.companyName?.trim() ?? "";
+  if (companyName && companyName.length < 2) {
     return {
       ok: false,
-      message: "Company name must be at least 2 characters.",
+      message: "Workspace name must be at least 2 characters.",
     };
   }
   if (companyName.length > 120) {
-    return { ok: false, message: "Company name is too long." };
+    return { ok: false, message: "Workspace name is too long." };
   }
 
-  const merged = await mergePendingSignupIntent({ companyName });
-  if (!merged?.companyName) {
+  const merged = await mergePendingSignupIntent(
+    companyName ? { companyName } : {},
+  );
+  if (!merged) {
     await writePendingSignupIntent(
       buildPendingSignupIntent({
         planCode: BILLING_PLAN_STANDARD,
         seatQuantity: 1,
-        companyName,
+        ...(companyName ? { companyName } : {}),
       })!,
     );
   }

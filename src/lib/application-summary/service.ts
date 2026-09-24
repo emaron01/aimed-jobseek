@@ -17,6 +17,7 @@ import { consultationConfig, vocab } from "@/lib/product-config";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
+import { usableEmployerResearch } from "@/lib/job-requirement/identity-verification";
 
 export type SummarySource = {
   id: string;
@@ -120,7 +121,10 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
           orderBy: { createdAt: "asc" },
         })
       : [];
-  const research = campaign.jobRequirement.company?.research[0] ?? null;
+  const research = usableEmployerResearch(
+    campaign.jobRequirement,
+    campaign.jobRequirement.company?.research[0] ?? null,
+  );
   const roles = campaign.hiringTeamRoles.map((role) => ({
     id: role.id,
     name: role.name,

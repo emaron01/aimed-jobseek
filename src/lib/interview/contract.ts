@@ -106,28 +106,42 @@ export function interviewGuideCoachingTexts(
   return texts.filter((text) => text.trim());
 }
 
-export function interviewGuideTexts(content: InterviewGuideContent): string[] {
-  const texts: string[] = [content.purpose.text];
+export function interviewGuideSections(
+  content: InterviewGuideContent,
+): Array<{ name: string; text: string }> {
+  const sections: Array<{ name: string; text: string }> = [
+    { name: "purpose", text: content.purpose.text },
+  ];
   for (const interviewer of content.interviewers) {
-    texts.push(
-      interviewer.whoTheyAre.text,
-      interviewer.whatTheyEvaluate.text,
-      ...interviewer.likelyQuestions.flatMap((item) => [
-        item.question.text,
-        item.answerMaterial.text,
-        item.exampleAnswer.text,
-      ]),
-      ...interviewer.questionsToAsk.map((item) => item.text),
+    sections.push(
+      { name: "whoTheyAre", text: interviewer.whoTheyAre.text },
+      { name: "whatTheyEvaluate", text: interviewer.whatTheyEvaluate.text },
     );
+    for (const item of interviewer.likelyQuestions) {
+      sections.push(
+        { name: "question", text: item.question.text },
+        { name: "answerMaterial", text: item.answerMaterial.text },
+        { name: "exampleAnswer", text: item.exampleAnswer.text },
+      );
+    }
+    for (const item of interviewer.questionsToAsk) {
+      sections.push({ name: "questionsToAsk", text: item.text });
+    }
   }
-  texts.push(...content.talkingPoints.map((item) => item.text));
+  for (const point of content.talkingPoints) {
+    sections.push({ name: "talkingPoint", text: point.text });
+  }
   for (const role of content.chronologicalWalkthrough ?? []) {
-    texts.push(
-      ...role.accomplishments.map((item) => item.text),
-      role.reasonForLeaving,
-    );
+    for (const item of role.accomplishments) {
+      sections.push({ name: "walkthrough", text: item.text });
+    }
+    sections.push({ name: "reasonForLeaving", text: role.reasonForLeaving });
   }
-  return texts.filter((text) => text.trim());
+  return sections.filter((section) => section.text.trim());
+}
+
+export function interviewGuideTexts(content: InterviewGuideContent): string[] {
+  return interviewGuideSections(content).map((section) => section.text);
 }
 
 export function interviewGuideClaims(

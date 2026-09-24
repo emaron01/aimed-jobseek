@@ -18,7 +18,9 @@ import {
   COMPED_BILLING_DEFAULTS,
   SELF_SERVE_BILLING_DEFAULTS,
 } from "@/lib/billing/billing-state";
+import { applyPlanEntitlements } from "@/lib/billing/apply-plan-entitlements";
 import {
+  BILLING_PLAN_COMPED,
   BILLING_PLAN_ENTERPRISE,
   BILLING_PLAN_STANDARD,
   getPlanDefinition,
@@ -1073,8 +1075,7 @@ export async function convertOrganizationToComped(input: {
       where: { organizationId: org.id },
       data: {
         ...COMPED_BILLING_DEFAULTS,
-        // Comped is a billing state. Preserve the product plan and its capabilities.
-        planCode: profile.planCode,
+        planCode: BILLING_PLAN_COMPED,
         stripePriceUnitAmountCents: null,
         stripePriceCurrency: null,
         stripePriceInterval: null,
@@ -1092,6 +1093,12 @@ export async function convertOrganizationToComped(input: {
         monthlyEmailSendLimit: input.monthlyEmailSendLimit,
       },
     });
+  });
+
+  await applyPlanEntitlements({
+    organizationId: org.id,
+    planCode: BILLING_PLAN_COMPED,
+    billingStatus: COMPED_BILLING_DEFAULTS.billingStatus,
   });
 
   // Final guard: never leave COMPED applied if the known sub became live again.
