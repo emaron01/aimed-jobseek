@@ -8,6 +8,7 @@ import {
   describeReadSources,
   diffCandidateProfileFields,
   parseCandidateProfileFromFormData,
+  productSourceTypeLabel,
 } from "@/lib/product-research/review";
 import { fixtureAlexChenProfile } from "@/lib/product-research/fixtures/alex-chen-profile";
 import type { CandidateProfile } from "@/lib/product-research/candidate-profile";
@@ -19,6 +20,18 @@ function formFromProfile(profile: CandidateProfile): FormData {
   fd.set("candidateProfileJson", JSON.stringify(profile));
   return fd;
 }
+
+describe("productSourceTypeLabel", () => {
+  it("uses seeker-facing labels instead of stored type names", () => {
+    expect(productSourceTypeLabel("PASTED_TEXT")).toBe("Pasted text");
+    expect(productSourceTypeLabel("UPLOADED_DOCUMENT")).toBe(
+      "Uploaded document",
+    );
+    expect(productSourceTypeLabel("URL")).toBe("Website");
+    expect(productSourceTypeLabel("USER_NOTE")).toBe("Notes");
+    expect(productSourceTypeLabel("UNKNOWN_KIND")).toBe("Source");
+  });
+});
 
 describe("product review source lead-in", () => {
   it("names a website and one uploaded document", () => {
@@ -119,6 +132,8 @@ describe("product review UI contracts", () => {
       body.indexOf("AssistedProductIntake"),
     );
     expect(page).toContain("product-failed-read");
+    expect(page).toContain("Review ${product.name}");
+    expect(page).not.toContain("Research: ${product.name}");
     expect(page).toContain("Upload materials");
     expect(page).toContain("max-w-3xl");
     expect(page).not.toContain("SuggestedBuyerRolesPanel");

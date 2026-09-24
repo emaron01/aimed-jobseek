@@ -415,3 +415,14 @@ describe.skipIf(!hasTestDatabase())("Application Summary", () => {
     expect(css).toContain(".application-summary details > *");
   });
 });
+
+describe("application summary seeker-facing labels", () => {
+  it("does not print assessment enums on the summary page", () => {
+    const page = readFileSync(
+      "src/app/(app)/campaigns/[id]/summary/page.tsx",
+      "utf8",
+    );
+    expect(page).toContain("evidenceStrengthLabels");
+    expect(page).not.toContain("({assessment.strength})");
+  });
+});

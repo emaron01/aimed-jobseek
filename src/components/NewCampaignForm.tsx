@@ -229,7 +229,8 @@ export function NewCampaignForm({
         <legend className="font-medium text-slate-700">{vocab.persona.Plural} in play</legend>
         <p className="mt-1 text-xs text-slate-500">
           Defaults to every {vocab.persona.singular} for this {vocab.product.singular}. {vocab.persona.Singular} is a property of
-          the {vocab.contact.singular}; this only limits which roles the {vocab.campaign.singular} will email.
+          the {vocab.contact.singular}; this only limits which roles this{" "}
+          {vocab.campaign.singular} writes outreach for.
         </p>
         {allProductPersonasSelected ? (
           <input type="hidden" name="allPersonas" value="1" />
@@ -301,7 +302,7 @@ export function NewCampaignForm({
             </span>
             <span className="mt-1 block text-xs text-slate-500">
               Steers materials for this {vocab.campaign.singular}, up to{" "}
-              {EMAIL_GUIDANCE_MAX_CHARS} characters. Stored as application guidance.
+              {EMAIL_GUIDANCE_MAX_CHARS} characters.
             </span>
             <textarea
               name="emailGuidance"
@@ -322,9 +323,11 @@ export function NewCampaignForm({
             ? "Creating…"
             : canSubmit
               ? `Create ${vocab.campaign.singular}`
-              : productId && !productReady
-                ? `Finish ${vocab.product.singular} setup first`
-                : `Select ${vocab.product.singular} and ${vocab.icp.singular}`}
+              : !postingText.trim()
+                ? "Paste a job posting"
+                : productId && !productReady
+                  ? `Finish ${vocab.product.singular} setup first`
+                  : `Select ${vocab.product.singular} and ${vocab.icp.singular}`}
         </SubmitButton>
       </div>
     </form>

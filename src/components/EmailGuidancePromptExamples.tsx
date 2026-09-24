@@ -1,10 +1,10 @@
 const EXAMPLES = [
-  "Focus on the feature that removes the most manual work.",
-  "Emphasize faster decisions as the main outcome.",
-  "Lead with the upcoming deadline.",
-  "Highlight the newest capability.",
-  "Leave out pricing and implementation details.",
-  "Use a more direct tone and ask for a reply instead of a meeting.",
+  "Emphasize the work that matches this role.",
+  "Keep claims to facts already on your Personal Profile.",
+  "Mention the shipping or reliability result that fits this posting.",
+  "Use a professional tone and keep it concise.",
+  "Do not invent titles, employers, or metrics.",
+  "Ask for a brief conversation about the role.",
 ] as const;
 
 export function EmailGuidancePromptExamples() {

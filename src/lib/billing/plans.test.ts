@@ -127,6 +127,22 @@ describe("billing plans catalog", () => {
         monthlyEmailSendLimit: 800,
       }),
     ).toContain("75 companies");
+    expect(
+      billingPlanDescription({
+        planCode: "COMPED",
+        billingStatus: "FREE",
+        activeResearchedCompanyLimit: 50,
+      }),
+    ).not.toMatch(/send through|send up to|sending/i);
+    expect(
+      billingPlanDescription({
+        planCode: "STANDARD",
+        billingStatus: "ACTIVE",
+        activeResearchedCompanyLimit: 75,
+        dailyEmailSendWarningLimit: 40,
+        monthlyEmailSendLimit: 800,
+      }),
+    ).not.toMatch(/send through|send up to|sending/i);
   });
 
   it("portal and checkout return URLs use APP_URL helper", async () => {

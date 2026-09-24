@@ -28,6 +28,7 @@ import {
 import {
   CANDIDATE_PROFILE_FIELD_HINTS,
   describeProductSourceLead,
+  productSourceTypeLabel,
   sourceLabelForId,
   type ProductReviewSource,
 } from "@/lib/product-research/review";
@@ -1035,7 +1036,9 @@ export function ProductDraftReview({
                       ) : null}
                       {source.displayName}
                     </p>
-                    <p className="text-xs text-slate-500">{source.sourceType}</p>
+                    <p className="text-xs text-slate-500">
+                      {productSourceTypeLabel(source.sourceType)}
+                    </p>
                     {source.originalUrl ? (
                       <p className="break-all text-xs text-slate-600">
                         {source.originalUrl}

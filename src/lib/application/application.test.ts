@@ -4,6 +4,7 @@ import {
   applicationFitStaleReason,
   applyFitOverride,
   computeApplicationEmployerFit,
+  formatFitBucketLabel,
   researchRefreshStaleReason,
   targetEmployerStaleReason,
 } from "@/lib/application/fit";
@@ -291,5 +292,20 @@ describe("job-seeker research columns", () => {
     expect(prompt).toContain("hiringSignals");
     expect(prompt).not.toContain("Book a demo");
     expect(criterionFlags.disqualifier).toBe("Deal-breaker");
+  });
+});
+
+describe("employer fit bucket labels", () => {
+  it("shows seeker-facing labels instead of stored bucket names", () => {
+    expect(formatFitBucketLabel("GOOD")).toBe("Good fit");
+    expect(formatFitBucketLabel("NEEDS_REVIEW")).toBe("Needs review");
+    expect(formatFitBucketLabel("POOR_FIT")).toBe("Poor fit");
+    expect(formatFitBucketLabel("EXCLUDED")).toBe("Excluded");
+    const workspace = readFileSync(
+      "src/components/ApplicationWorkspace.tsx",
+      "utf8",
+    );
+    expect(workspace).toContain("formatFitBucketLabel");
+    expect(workspace).not.toContain("<option value=\"GOOD\">GOOD</option>");
   });
 });

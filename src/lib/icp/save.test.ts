@@ -125,6 +125,8 @@ describe("ICP save UI seam", () => {
     expect(formSrc).toContain("fieldErrors");
 
     // Success navigates to the ICP edit view for creates.
+    expect(formSrc).toContain("startTransition");
+    expect(formSrc).toContain("previewAction(fd)");
     expect(formSrc).toContain("router.push(`/setup/${productId}/icps/${state.icpId}`)");
     expect(formSrc).toContain("icpRecordToFormValues");
     expect(actionsSrc).toContain("submittedIcpProfileIsBlank");

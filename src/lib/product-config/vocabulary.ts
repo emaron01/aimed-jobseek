@@ -216,7 +216,7 @@ export type VocabExampleKey = keyof typeof vocabExamples;
 export const compensationCopy = Object.freeze({
   annualEarningsLabel: "Target annual earnings",
   annualEarningsHint:
-    "Total annual compensation, including on-target earnings (OTE) for sales roles.",
+    "Total annual compensation you are targeting.",
   annualMinimumLabel: "Annual minimum",
   annualTargetLabel: "Annual target",
   hourlyRateLabel: "Target hourly rate",

@@ -69,7 +69,7 @@ export function formatResearchAllowanceWarning(remaining: number): string {
 }
 
 export function formatResearchAllowanceExhausted(limit: number): string {
-  return `You've used your company research allowance (${limit} companies). Add capacity in Billing to research new companies. Scoring, email generation, and sending still work for companies you've already researched.`;
+  return `You've used your company research allowance (${limit} companies). Add capacity in Billing to research new companies. Scoring and outreach drafts still work for companies you've already researched.`;
 }
 
 function parseTrialEndsAt(

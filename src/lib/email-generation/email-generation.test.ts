@@ -1244,12 +1244,14 @@ describe("email generation action and UI seams", () => {
     expect(campaignSettings).toContain("EmailGuidancePromptExamples");
     expect(newCampaign).toContain("EmailGuidancePromptExamples");
     expect(scoreReport).toContain("EmailGuidancePromptExamples");
-    expect(promptExamples).toContain("Focus on the feature");
-    expect(promptExamples).toContain("Emphasize faster decisions");
-    expect(promptExamples).toContain("Lead with the upcoming deadline");
-    expect(promptExamples).toContain("Highlight the newest capability");
-    expect(promptExamples).toContain("Leave out pricing");
-    expect(promptExamples).toContain("Use a more direct tone");
+    expect(promptExamples).toContain("Emphasize the work that matches this role");
+    expect(promptExamples).toContain("Keep claims to facts already on your Personal Profile");
+    expect(promptExamples).toContain("Mention the shipping or reliability result");
+    expect(promptExamples).toContain("Use a professional tone and keep it concise");
+    expect(promptExamples).toContain("Do not invent titles, employers, or metrics");
+    expect(promptExamples).toContain("Ask for a brief conversation about the role");
+    expect(promptExamples).not.toContain("Leave out pricing");
+    expect(promptExamples).not.toContain("Focus on the feature");
     expect(form).toContain("cursor-pointer");
     expect(form).toContain("sequence-reply-guidance");
     expect(form).toContain(

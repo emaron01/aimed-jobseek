@@ -98,5 +98,11 @@ describe("Product save UI seam", () => {
     expect(setupSrc).toContain("AssistedProductIntake");
     expect(setupSrc).not.toContain("AddProductForm");
     expect(setupSrc).not.toContain("action={upsertProductAction}");
+    const intakeSrc = readFileSync(
+      "src/components/AssistedProductSetup.tsx",
+      "utf8",
+    );
+    expect(intakeSrc).not.toContain("encType=");
+    expect(intakeSrc).toContain("Try building again");
   });
 });

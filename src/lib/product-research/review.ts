@@ -23,6 +23,21 @@ export type ProductReviewSource = {
   extractedCharCount?: number | null;
 };
 
+export function productSourceTypeLabel(sourceType: string): string {
+  switch (sourceType) {
+    case "PASTED_TEXT":
+      return "Pasted text";
+    case "UPLOADED_DOCUMENT":
+      return "Uploaded document";
+    case "URL":
+      return "Website";
+    case "USER_NOTE":
+      return "Notes";
+    default:
+      return "Source";
+  }
+}
+
 export const CANDIDATE_PROFILE_FIELD_PATHS = [
   "identity.name",
   "identity.headline",

@@ -825,3 +825,51 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     });
   });
 });
+
+describe("application asset seeker-facing labels", () => {
+  it("hides claim ids, source ids, and asset enums from the workspace", async () => {
+    const { readFileSync } = await import("node:fs");
+    const {
+      formatAssetSourceKind,
+      formatAssetStatusLabel,
+      formatClaimEditorLabel,
+      formatClaimSupportLabel,
+    } = await import("@/lib/application-assets/display");
+    const { vocab, consultationConfig } = await import("@/lib/product-config");
+
+    expect(formatAssetStatusLabel("DRAFT")).toBe("Draft");
+    expect(formatAssetStatusLabel("APPROVED")).toBe("Approved");
+    expect(formatAssetSourceKind("profile:identity_name")).toBe(
+      vocab.product.singular,
+    );
+    expect(formatAssetSourceKind("statement:abc")).toBe(
+      consultationConfig.displayName,
+    );
+    expect(formatClaimSupportLabel("profile:identity_name", "Alex Chen")).toBe(
+      `${vocab.product.singular}: “Alex Chen”`,
+    );
+    expect(formatClaimEditorLabel("  Led the invoice rewrite  ")).toBe(
+      "Led the invoice rewrite",
+    );
+    expect(formatClaimSupportLabel("profile:identity_name", "Alex Chen")).not.toMatch(
+      /profile:identity_name/,
+    );
+
+    const action = readFileSync("src/app/actions/application-assets.ts", "utf8");
+    expect(action).not.toMatch(
+      /generateApplicationAsset\([\s\S]*?\);\s*revalidate\(id\)/,
+    );
+    expect(action).toContain("if (!result.ok)");
+
+    const section = readFileSync(
+      "src/components/ApplicationAssetsSection.tsx",
+      "utf8",
+    );
+    expect(section).toContain("formatClaimSupportLabel");
+    expect(section).toContain("formatAssetStatusLabel");
+    expect(section).toContain("formatClaimEditorLabel");
+    expect(section).not.toContain("${item.sourceId}");
+    expect(section).not.toContain("{claim.id}</span>");
+    expect(section).not.toContain("{asset.status}");
+  });
+});

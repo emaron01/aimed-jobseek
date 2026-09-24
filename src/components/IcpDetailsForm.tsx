@@ -1,6 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import { deleteIcpAction, upsertIcpAction } from "@/app/actions";
 import {
@@ -260,7 +267,9 @@ function NewIcpForm({
     autoPreviewStarted.current = true;
     const fd = new FormData();
     fd.set("productId", productId);
-    previewAction(fd);
+    startTransition(() => {
+      previewAction(fd);
+    });
   }, [autoDraftFromProfile, profileApproved, productId, previewAction]);
 
   function fieldHint(key: keyof IcpFormValues): string | undefined {
@@ -276,8 +285,8 @@ function NewIcpForm({
       >
         <StatusBanner result={previewState} testId="icp-starter-preview-status" />
         <p className="text-sm text-slate-700">
-          Draft {vocab.icp.aSingular} from your approved {vocab.product.singular}
-          {"'s"} direction and career goals, or write one from scratch.
+          Draft {vocab.icp.aSingular} from the direction and career goals on
+          your approved {vocab.product.singular}, or write one from scratch.
         </p>
         <div className="flex flex-wrap gap-2">
           <form action={previewAction}>

@@ -9,7 +9,11 @@ import { requireCurrentUser } from "@/lib/auth/session";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
 import { canOpenCampaignDetail } from "@/lib/campaign/visibility";
 import type { JobScorecard } from "@/lib/job-requirement/types";
-import { applicationSummaryConfig, interviewConfig } from "@/lib/product-config";
+import {
+  applicationSummaryConfig,
+  evidenceStrengthLabels,
+  interviewConfig,
+} from "@/lib/product-config";
 import { stageTypeLabel } from "@/lib/interview/stages";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
@@ -259,7 +263,14 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
             return (
               <article key={assessment.id} className="break-inside-avoid border-b border-slate-100 pb-4 last:border-0">
                 <h3 className="font-medium text-slate-900">
-                  {assessment.text} <span className="text-xs text-slate-500">({assessment.strength})</span>
+                  {assessment.text}{" "}
+                  <span className="text-xs text-slate-500">
+                    (
+                    {evidenceStrengthLabels[
+                      assessment.strength as keyof typeof evidenceStrengthLabels
+                    ] ?? assessment.strength}
+                    )
+                  </span>
                 </h3>
                 {assessment.explanation ? <p className="mt-1 text-sm text-slate-700">{assessment.explanation}</p> : null}
                 {stories.map((story) => (

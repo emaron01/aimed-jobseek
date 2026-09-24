@@ -137,6 +137,21 @@ export function displayedFitBucket(fit: {
   return fit.overrideBucket ?? fit.bucket;
 }
 
+export function formatFitBucketLabel(bucket: QualificationBucket): string {
+  switch (bucket) {
+    case "GOOD":
+      return "Good fit";
+    case "NEEDS_REVIEW":
+      return "Needs review";
+    case "POOR_FIT":
+      return "Poor fit";
+    case "EXCLUDED":
+      return "Excluded";
+    default:
+      return "Needs review";
+  }
+}
+
 export function researchRefreshStaleReason(): string {
   return "Company research was refreshed. Rescore employer fit.";
 }

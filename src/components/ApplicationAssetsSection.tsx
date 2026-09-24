@@ -13,6 +13,11 @@ import {
   type AssetClaim,
 } from "@/lib/application-assets/contract";
 import { formatResumeRoleMeta } from "@/lib/application-assets/dates";
+import {
+  formatAssetStatusLabel,
+  formatClaimEditorLabel,
+  formatClaimSupportLabel,
+} from "@/lib/application-assets/display";
 import { applicationAssetConfig } from "@/lib/product-config";
 import { SECONDARY_BUTTON_CLASS, SubmitButton } from "@/components/ui";
 
@@ -58,7 +63,7 @@ function Status({ result }: { result: ApplicationAssetActionResult | null }) {
 
 function ClaimText({ claim }: { claim: AssetClaim }) {
   const support = claim.supports
-    .map((item) => `${item.sourceId}: “${item.quote}”`)
+    .map((item) => formatClaimSupportLabel(item.sourceId, item.quote))
     .join("\n");
   return (
     <span title={support} tabIndex={0} className="cursor-help underline decoration-dotted">
@@ -220,7 +225,9 @@ function AssetEditor({
       <input type="hidden" name="contentJson" value={JSON.stringify(content)} />
       {claims.map((claim) => (
         <label key={claim.id} className="block text-sm">
-          <span className="font-medium text-slate-700">{claim.id}</span>
+          <span className="font-medium text-slate-700">
+            {formatClaimEditorLabel(claim.text)}
+          </span>
           <textarea
             value={claim.text}
             rows={3}
@@ -261,7 +268,7 @@ function AssetHistory({
           className="rounded-md border border-slate-200 p-4"
         >
           <summary className="cursor-pointer text-sm font-medium">
-            Version {asset.version} · {asset.status} ·{" "}
+            Version {asset.version} · {formatAssetStatusLabel(asset.status)} ·{" "}
             {new Date(asset.createdAt).toLocaleString()}
           </summary>
           <div className="mt-4 space-y-4">

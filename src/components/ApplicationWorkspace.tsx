@@ -24,7 +24,11 @@ import {
 } from "@/components/ApplicationOutreachSections";
 import { isOutreachAssetType } from "@/lib/product-config";
 import { HiringTeamDisclosureGroup } from "@/components/HiringTeamDisclosureGroup";
-import { displayedFitBucket, fitSignalLabels } from "@/lib/application/fit";
+import {
+  displayedFitBucket,
+  fitSignalLabels,
+  formatFitBucketLabel,
+} from "@/lib/application/fit";
 import type { ApplicationFitOutcome } from "@/lib/application/fit";
 import { readApplicationFitStale } from "@/lib/application/service";
 import type { JobScorecard, ScorecardItem } from "@/lib/job-requirement/types";
@@ -264,13 +268,13 @@ export async function ApplicationWorkspace({
       <div className="space-y-3 border-t border-slate-200 pt-4" data-testid="employer-fit">
         <h2 className="text-base font-semibold text-slate-900">Employer fit</h2>
         <p className="text-sm text-slate-600">
-          Scored against {icp.name}. A mismatch is a signal. It does not block contacts or email.
+          Scored against {icp.name}. A mismatch is a signal. It does not block contacts or outreach.
         </p>
         {shownBucket ? (
           <p className="text-sm font-medium text-slate-900" data-testid="employer-fit-bucket">
             {fit?.overrideBucket
-              ? `Your result: ${shownBucket} (scored ${fit.bucket})`
-              : `Scored result: ${shownBucket}`}
+              ? `Your result: ${formatFitBucketLabel(shownBucket)} (scored ${formatFitBucketLabel(fit.bucket)})`
+              : `Scored result: ${formatFitBucketLabel(shownBucket)}`}
           </p>
         ) : (
           <p className="text-sm text-slate-600">Fit has not been scored.</p>
@@ -326,10 +330,12 @@ export async function ApplicationWorkspace({
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Your result</span>
               <select name="bucket" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" defaultValue={shownBucket ?? "NEEDS_REVIEW"}>
-                <option value="GOOD">GOOD</option>
-                <option value="NEEDS_REVIEW">NEEDS_REVIEW</option>
-                <option value="POOR_FIT">POOR_FIT</option>
-                <option value="EXCLUDED">EXCLUDED</option>
+                <option value="GOOD">{formatFitBucketLabel("GOOD")}</option>
+                <option value="NEEDS_REVIEW">
+                  {formatFitBucketLabel("NEEDS_REVIEW")}
+                </option>
+                <option value="POOR_FIT">{formatFitBucketLabel("POOR_FIT")}</option>
+                <option value="EXCLUDED">{formatFitBucketLabel("EXCLUDED")}</option>
               </select>
             </label>
             <label className="block text-sm">

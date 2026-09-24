@@ -54,7 +54,7 @@ function VerifyEmailInner() {
       <p className="mt-2 text-sm text-slate-600">
         {invalidOrExpired
           ? "Verification link is invalid or expired. Request a new link below."
-          : "Confirm your email to unlock research, invitations, and billing settings."}
+          : "Confirm your email to finish creating your account."}
       </p>
       {message ? (
         <p className="mt-4 text-sm text-emerald-700" data-testid="verify-email-message">

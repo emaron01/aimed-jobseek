@@ -323,6 +323,13 @@ describe("interview guide rules", () => {
     })?.targetKey).toBe("c1");
   });
 
+  it("keeps a failed guide generate on screen instead of remounting the page", () => {
+    const action = readFileSync("src/app/actions/interview.ts", "utf8");
+    expect(action).toMatch(
+      /if \(result\.status === "FAILED"\) \{[\s\S]*revalidate\(id, stageId\)/,
+    );
+  });
+
   it("prints the guide without navigation or controls", () => {
     const page = readFileSync(
       "src/app/(app)/campaigns/[id]/interviews/[stageId]/page.tsx",

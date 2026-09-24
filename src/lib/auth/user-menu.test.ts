@@ -1,6 +1,7 @@
 /**
  * Authenticated user menu / nav model + logout contract tests.
  */
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   buildSidebarNavItems,
@@ -243,6 +244,15 @@ describe("logoutAction", () => {
     expect(actionSource).toContain("auth.api.signOut");
     expect(actionSource).not.toMatch(/cookies\(\)\.delete/);
     expect(actionSource).not.toMatch(/document\.cookie/);
+  });
+});
+
+describe("sidebar layout", () => {
+  it("stays viewport-tall so it cannot intercept clicks on long pages", () => {
+    const source = readFileSync("src/components/Sidebar.tsx", "utf8");
+    expect(source).toContain("sticky top-0");
+    expect(source).toContain("h-screen");
+    expect(source).toContain("overflow-y-auto");
   });
 });
 

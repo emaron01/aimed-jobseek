@@ -292,13 +292,12 @@ export function defaultBillingCatalogSetting(): BillingCatalogSettingValue {
         tagline: `For individual ${vocab.seeker.plural}`,
         featureBullets: [
           "Research up to 100 companies on Standard",
-          "Up to 50 curated emails per day (1,000 per month)",
+          "Generate tailored outreach drafts for Hiring Team contacts",
           "Handoff to Outlook desktop, Outlook on the web, and Gmail",
-          "Emails send from your mailbox — replies come to you",
           "Add Company Research Credits in blocks of 100",
         ],
         trialNote:
-          "FREE TRIAL: research up to 25 companies during your trial (100 on a paid plan). The 50/day sending limit protects your domain's email reputation and deliverability.",
+          "FREE TRIAL: research up to 25 companies during your trial (100 on a paid plan).",
         sellable: true,
         active: true,
         entitlementFloors: {
@@ -326,12 +325,12 @@ export function defaultBillingCatalogSetting(): BillingCatalogSettingValue {
         featureBullets: [
           "2–10 seats with self-serve seat adds",
           "150 researched companies per user",
-          "Same email limits as Standard, per user",
+          "Generate tailored outreach drafts for Hiring Team contacts",
           `Shared ${vocab.campaign.plural} across the team`,
-          "Emails sent through each user's own mailbox",
+          "Handoff to Outlook desktop, Outlook on the web, and Gmail",
         ],
         trialNote:
-          "FREE TRIAL: each seat gets 150 company research slots and Standard email limits. Add seats anytime up to 10.",
+          "FREE TRIAL: each seat gets 150 company research slots. Add seats anytime up to 10.",
         sellable: true,
         active: true,
         entitlementFloors: {

@@ -78,7 +78,7 @@ export function EmailSignatureForm({
             onChange={(event) => setBody(event.target.value)}
             maxLength={EMAIL_SIGNATURE_MAX_CHARS}
             rows={5}
-            placeholder={"Best,\nAlex Rivera\nhttps://example.com/meet"}
+            placeholder={"Best,\nAlex Rivera\nhttps://www.linkedin.com/in/alex-rivera"}
             className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-slate-400 focus:ring-2"
           />
           <span className="mt-1 block text-xs text-slate-500">
@@ -103,8 +103,8 @@ export function EmailSignatureForm({
           />
           <span className="mt-1 block text-xs text-slate-500">
             {htmlBody.trim().length} / {EMAIL_SIGNATURE_HTML_MAX_CHARS} — logos
-            and styled blocks go here. Used when a connected mailbox send path
-            is enabled.
+            and styled blocks go here. Used when you open a draft in a client
+            that supports HTML.
           </span>
         </label>
         <div>
@@ -120,7 +120,7 @@ export function EmailSignatureForm({
         {htmlBody.trim() ? (
           <div>
             <p className="text-sm font-medium text-slate-700">
-              HTML preview (Connected Send)
+              HTML preview
             </p>
             <div
               data-testid="email-signature-html-preview"

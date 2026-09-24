@@ -16,6 +16,7 @@ import {
   composeOutreachText,
   type ApplicationAssetContent,
 } from "@/lib/application-assets/contract";
+import { formatOutreachTypeLabel } from "@/lib/application-assets/display";
 import { outreachEmailHandoff } from "@/lib/application-assets/handoff";
 import { openEmailClientHref } from "@/lib/email-generation/email-body";
 import {
@@ -368,7 +369,7 @@ export function ApplicationOutreachSection({
               <option value="">None</option>
               {sentAssets.map((asset) => (
                 <option key={asset.id} value={asset.id}>
-                  {asset.type} v{asset.version}
+                  {formatOutreachTypeLabel(asset.type)} v{asset.version}
                 </option>
               ))}
             </select>
@@ -446,7 +447,7 @@ function OutreachMessageCard({
   return (
     <article className="space-y-3 rounded-md border border-slate-200 p-4" data-testid="outreach-message">
       <p className="text-sm font-medium text-slate-900">
-        {asset.type} · v{asset.version}
+        {formatOutreachTypeLabel(asset.type)} · v{asset.version}
         {asset.sentAt ? ` · ${outreachConfig.labels.sentStatus} ${todayInputValue(asset.sentAt)}` : ""}
       </p>
       {composed ? (

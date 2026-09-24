@@ -205,7 +205,7 @@ export default async function SetupProductPage({ params }: PageProps) {
         {/* 1. Product */}
         <Panel
           title={`1. ${vocab.product.Singular}`}
-          description={`Core ${vocab.product.singular} record used by research and scoring.`}
+          description={`Core ${vocab.product.singular} record used by applications and generated documents.`}
         >
           <div data-print-document>
             <div className="flex flex-wrap items-start justify-between gap-3">

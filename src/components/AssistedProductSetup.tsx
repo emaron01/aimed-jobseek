@@ -83,7 +83,7 @@ export function AssistedProductIntake({
         </p>
       </div>
 
-      <form action={action} className="grid gap-4 md:grid-cols-2" encType="multipart/form-data">
+      <form action={action} className="grid gap-4 md:grid-cols-2">
         {productId ? (
           <input type="hidden" name="productId" value={productId} />
         ) : null}
@@ -203,7 +203,7 @@ export function AssistedProductIntake({
             value={latestEvidenceBundleId}
           />
           <SecondaryButton type="submit" disabled={retryPending}>
-            {retryPending ? "Retrying synthesis…" : "Retry Synthesis"}
+            {retryPending ? "Trying again…" : "Try building again"}
           </SecondaryButton>
           <Status result={retry} />
         </form>

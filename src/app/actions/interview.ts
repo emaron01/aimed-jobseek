@@ -194,6 +194,9 @@ export async function generateInterviewGuideAction(
       regenerationInstruction:
         String(formData.get("regenerationInstruction") ?? "").trim() || null,
     });
+    if (result.status === "FAILED") {
+      return { ok: false, message: result.message };
+    }
     revalidate(id, stageId);
     if (result.status === "NEEDS_CLARIFICATION") {
       return {
@@ -201,9 +204,6 @@ export async function generateInterviewGuideAction(
         message: "Answer or skip these questions, then generate the guide.",
         questions: result.questions,
       };
-    }
-    if (result.status === "FAILED") {
-      return { ok: false, message: result.message };
     }
     return { ok: true, message: "Guide generated." };
   } catch (error) {

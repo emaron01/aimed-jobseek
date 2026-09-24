@@ -34,7 +34,7 @@ export function AddProductMaterialPanel({ productId }: { productId: string }) {
         <h3 className="text-lg font-semibold text-slate-900">Add material</h3>
         <p className="mt-1 text-sm text-slate-600">
           Upload a resume or other documents, paste LinkedIn or resume text, or
-          add notes about goals and context. We will re-synthesize a draft for
+          add notes about goals and context. We will rebuild a draft for
           review — your approved {vocab.product.singular} stays in place until you confirm.
         </p>
       </div>
@@ -71,7 +71,7 @@ export function AddProductMaterialPanel({ productId }: { productId: string }) {
           />
         </label>
         <SubmitButton disabled={pending}>
-          {pending ? "Re-synthesizing…" : "Add material & re-synthesize"}
+          {pending ? "Rebuilding…" : "Add material and rebuild"}
         </SubmitButton>
         {state ? (
           <p

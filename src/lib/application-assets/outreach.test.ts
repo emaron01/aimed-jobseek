@@ -79,6 +79,8 @@ describe("sales-only entry points", () => {
     const campaignPage = readFileSync("src/app/(app)/campaigns/[id]/page.tsx", "utf8");
     expect(campaignPage).toContain("anyListFeatureEnabled()");
     expect(campaignPage).toContain('anyListFeatureEnabled() && currentStage === "list"');
+    expect(campaignPage).toMatch(/anyListFeatureEnabled\(\)\s*\?\s*`Stage \$\{/);
+    expect(campaignPage).not.toMatch(/description=\{`Stage \$\{/);
     const workspace = readFileSync(
       "src/components/EmailSequenceWorkspace.tsx",
       "utf8",
@@ -693,6 +695,35 @@ describe("application reminder cadence", () => {
       }),
     ).toBe(false);
     expect(day3.toISOString().startsWith("2026-09-04")).toBe(true);
+  });
+
+  it("shows channel names instead of outreach type enums", async () => {
+    const { formatOutreachTypeLabel } = await import(
+      "@/lib/application-assets/display"
+    );
+    expect(formatOutreachTypeLabel("LINKEDIN_CONNECTION_NOTE")).toBe(
+      "LinkedIn connection note",
+    );
+    expect(formatOutreachTypeLabel("LINKEDIN_INMAIL")).toBe("LinkedIn InMail");
+    expect(formatOutreachTypeLabel("EMAIL")).toBe("Email");
+    const section = readFileSync(
+      "src/components/ApplicationOutreachSections.tsx",
+      "utf8",
+    );
+    expect(section).toContain("formatOutreachTypeLabel");
+    expect(section).not.toContain("{asset.type} · v");
+    expect(section).not.toContain("{asset.type} v");
+  });
+
+  it("keeps a failed outreach generate on screen instead of remounting the page", () => {
+    const action = readFileSync(
+      "src/app/actions/application-outreach.ts",
+      "utf8",
+    );
+    expect(action).not.toMatch(
+      /generateOutreachAsset\([\s\S]*?\);\s*revalidate\(id\)/,
+    );
+    expect(action).toContain("if (!result.ok)");
   });
 
   it("never writes CampaignContact.nextDueAt from the reminder action", () => {

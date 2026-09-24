@@ -144,8 +144,8 @@ export default async function ProductResearchPage({ params }: PageProps) {
     <div className="mx-auto max-w-3xl space-y-8">
       <div data-print-hide>
         <PageHeader
-          title={`Research: ${product.name}`}
-          description={`Research the ${vocab.product.singular} once. Approve it. Then define ${vocab.icp.plural}.`}
+          title={`Review ${product.name}`}
+          description={`Review the ${vocab.product.singular}. Approve it. Then define ${vocab.icp.plural}.`}
           actions={
             <Link
               href={`/setup/${product.id}`}
@@ -182,8 +182,8 @@ export default async function ProductResearchPage({ params }: PageProps) {
           </p>
           {!failedRead ? (
             <p className="mt-2 text-xs text-amber-800/80">
-              Acquired evidence was preserved. Use Retry Synthesis if you only
-              need to re-run the model — no URL re-fetch or web search.
+              Acquired evidence was preserved. Use Try building again if you
+              only need to re-run the model — no URL re-fetch or web search.
             </p>
           ) : null}
         </div>

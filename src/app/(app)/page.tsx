@@ -167,17 +167,17 @@ export default async function DashboardPage({
                 </div>
                 {campaign.emailsToWrite > 0 ? (
                   <span className="rounded-full bg-amber-100 px-2.5 py-1 text-sm font-semibold text-amber-800">
-                    {campaign.emailsToWrite} to write
+                    {campaign.emailsToWrite} outreach to write
                   </span>
                 ) : null}
               </div>
               <dl className="mt-5 grid grid-cols-4 gap-3 text-sm">
                 <div>
-                  <dt className="text-slate-500">Companies</dt>
+                  <dt className="text-slate-500">{vocab.account.Plural}</dt>
                   <dd className="font-semibold">{campaign.companies}</dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">Qualified</dt>
+                  <dt className="text-slate-500">On the roster</dt>
                   <dd className="font-semibold">{campaign.qualified}</dd>
                 </div>
                 <div>
@@ -185,7 +185,7 @@ export default async function DashboardPage({
                   <dd className="font-semibold">{campaign.contacts}</dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">Emails to write</dt>
+                  <dt className="text-slate-500">Outreach to write</dt>
                   <dd className="font-semibold">{campaign.emailsToWrite}</dd>
                 </div>
               </dl>

@@ -476,7 +476,11 @@ export default async function CampaignDetailPage({
       />
       <PageHeader
         title={campaign.name}
-        description={`Stage ${stages.find((stage) => stage.key === currentStage)?.number}: ${stages.find((stage) => stage.key === currentStage)?.label}`}
+        description={
+          anyListFeatureEnabled()
+            ? `Stage ${stages.find((stage) => stage.key === currentStage)?.number}: ${stages.find((stage) => stage.key === currentStage)?.label}`
+            : undefined
+        }
         actions={
           <>
             {canShare && canEditTemplate && !campaignArchived ? (

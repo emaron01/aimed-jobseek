@@ -142,6 +142,9 @@ describe("campaign save UI seam", () => {
     expect(scoreReport).toContain('name="allPersonas"');
     expect(scoreReport).not.toContain("Select persona for this campaign");
     expect(formSrc).toContain('name="emailGuidance"');
+    expect(formSrc).toContain("Paste a job posting");
+    expect(formSrc).toContain("writes outreach for");
+    expect(formSrc).not.toContain("will email");
     expect(scoreReport).toContain('name="emailLength"');
     expect(scoreReport).toContain('name="emailGuidance"');
     expect(settingsForm).toContain("updateCampaignEmailSettingsAction");

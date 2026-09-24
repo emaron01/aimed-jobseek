@@ -119,7 +119,7 @@ function expectationForSetupChild(pathname: string): SmokeExpectation | null {
     return { mustInclude: vocab.icp.singular };
   }
   if (pathname.includes("/research")) {
-    return { mustInclude: "Research:" };
+    return { mustInclude: "Review " };
   }
   if (pathname.endsWith("/edit")) {
     return { mustInclude: "Edit:" };

@@ -70,19 +70,20 @@ export async function generateApplicationAssetAction(
       regenerationInstruction:
         String(formData.get("regenerationInstruction") ?? "").trim() || null,
     });
+    if (!result.ok) {
+      return {
+        ok: false,
+        message: result.message,
+        violations: result.violations,
+      };
+    }
     revalidate(id);
-    return result.ok
-      ? {
-          ok: true,
-          message: `Version ${result.version} generated.`,
-          assetId: result.assetId,
-          version: result.version,
-        }
-      : {
-          ok: false,
-          message: result.message,
-          violations: result.violations,
-        };
+    return {
+      ok: true,
+      message: `Version ${result.version} generated.`,
+      assetId: result.assetId,
+      version: result.version,
+    };
   } catch (error) {
     return errorResult(error);
   }
@@ -138,19 +139,20 @@ export async function saveEditedApplicationAssetAction(
       userId: user.id,
       content,
     });
+    if (!result.ok) {
+      return {
+        ok: false,
+        message: result.message,
+        violations: result.violations,
+      };
+    }
     revalidate(id);
-    return result.ok
-      ? {
-          ok: true,
-          message: `Edited version ${result.version} saved.`,
-          assetId: result.assetId,
-          version: result.version,
-        }
-      : {
-          ok: false,
-          message: result.message,
-          violations: result.violations,
-        };
+    return {
+      ok: true,
+      message: `Edited version ${result.version} saved.`,
+      assetId: result.assetId,
+      version: result.version,
+    };
   } catch (error) {
     return errorResult(error);
   }

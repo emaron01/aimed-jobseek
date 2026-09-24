@@ -28,6 +28,7 @@ describe("email signature seams", () => {
     expect(form).toContain("EMAIL_SIGNATURE_HTML_MAX_CHARS");
     expect(form).toContain('name="htmlBody"');
     expect(form).not.toMatch(/generate|openai|getAiConfig/i);
+    expect(form).not.toMatch(/Connected Send|mailbox send path|example\.com\/meet/i);
   });
 
   it("client handoff and connected send both append signature via appendEmailSignature", async () => {

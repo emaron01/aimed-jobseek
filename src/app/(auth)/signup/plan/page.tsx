@@ -86,8 +86,8 @@ export default async function SignupPlanPage() {
           Choose your plan
         </h1>
         <p className="text-base text-slate-600">
-          Pick Standard or Team first. Next you&apos;ll create your account and
-          verify your email.
+          Choose a plan first. Next you&apos;ll create your account and verify
+          your email.
         </p>
       </div>
 

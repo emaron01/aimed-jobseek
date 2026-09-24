@@ -22,6 +22,8 @@ describe("research allowance view", () => {
     expect(view.warning).toBe(false);
     expect(view.exhausted).toBe(true);
     expect(formatResearchAllowanceExhausted(100)).toMatch(/Billing/);
+    expect(formatResearchAllowanceExhausted(100)).toMatch(/outreach drafts/);
+    expect(formatResearchAllowanceExhausted(100)).not.toMatch(/\bsending\b/);
     expect(formatResearchAllowanceSummary(view)).toMatch(/used/);
   });
 

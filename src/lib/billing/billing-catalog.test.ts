@@ -28,6 +28,10 @@ describe("billing.catalog", () => {
     expect(standard!.companyCredits?.blockSize).toBe(100);
     expect(standard!.tagline).toBe(`For individual ${vocab.seeker.plural}`);
     expect(standard!.featureBullets.length).toBeGreaterThan(2);
+    expect(standard!.featureBullets.join("\n")).not.toMatch(
+      /send from your mailbox|sending limit|deliverability/i,
+    );
+    expect(standard!.trialNote ?? "").not.toMatch(/sending limit|deliverability/i);
     expect(PLATFORM_SETTING_BILLING_CATALOG).toBe("billing.catalog");
   });
 

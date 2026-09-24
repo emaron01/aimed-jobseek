@@ -17,6 +17,9 @@ describe("home setup rail", () => {
       "utf8",
     );
     expect(home).toContain("HomeSetupRail");
+    expect(home).not.toMatch(/Qualified|Emails to write/);
+    expect(home).toContain("Outreach to write");
+    expect(home).toContain("vocab.account.Plural");
     expect(home).toContain("workflow.setupRail");
     expect(rail).toContain('bg-emerald-600 text-white');
     expect(rail).toContain("{step.completed ? \"✓\" : step.number}");

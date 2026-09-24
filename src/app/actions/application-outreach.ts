@@ -209,8 +209,15 @@ export async function generateOutreachAssetAction(
         answer: String(formData.getAll("thankYouAnswer")[index] ?? ""),
       })),
     });
+    if (!result.ok) {
+      return {
+        ok: false,
+        message: result.message,
+        violations: result.violations,
+      };
+    }
     revalidate(id);
-    if (result.ok && "needsClarification" in result) {
+    if ("needsClarification" in result) {
       return {
         ok: true,
         message: interviewConfig.labels.thankYouClarifyHelp,
