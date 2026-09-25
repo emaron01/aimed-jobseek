@@ -320,4 +320,10 @@ export async function finishApplicationAfterResearch(input: {
     icpId: input.icpId,
     companyId: input.companyId,
   });
+  const { enqueueApplicationJob } = await import("@/lib/application-jobs/service");
+  await enqueueApplicationJob({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    type: "HIRING_TEAM_IDENTIFY",
+  });
 }

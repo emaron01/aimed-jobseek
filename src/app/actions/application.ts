@@ -15,6 +15,7 @@ import { requireCurrentUser } from "@/lib/auth/session";
 import { getApplicationResearchStatus } from "@/lib/application/research-status";
 import type { ApplicationResearchStatusView } from "@/lib/application/research-status";
 import { applicationResearchCopy, employerIdentityCopy, vocab } from "@/lib/product-config";
+import { readEmployerCorrectionFields } from "@/lib/application/form-fields";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
 
@@ -38,10 +39,8 @@ export async function nameApplicationEmployerAction(
   try {
     const organizationId = await requireOrganizationId();
     await requireCurrentUser();
-    const campaignId = String(formData.get("campaignId") ?? "").trim();
-    const employerName = String(formData.get("employerName") ?? "").trim();
-    const website = String(formData.get("website") ?? "").trim();
-    const companyId = String(formData.get("companyId") ?? "").trim();
+    const { campaignId, employerName, website, companyId } =
+      readEmployerCorrectionFields(formData);
     if (!campaignId) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }

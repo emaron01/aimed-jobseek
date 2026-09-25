@@ -27,7 +27,7 @@ import { prisma } from "@/lib/prisma";
 import { vocab } from "@/lib/product-config";
 import { normalizeCompanyName } from "@/lib/research";
 import { ingestNamedJobContacts } from "@/lib/application/contacts";
-import { syncApplicationHiringTeam } from "@/lib/hiring-team/build";
+import { queueHiringTeamIdentify } from "@/lib/hiring-team/build";
 import { TenantError } from "@/lib/tenant/errors";
 import { resolveOrCreateCompany } from "@/lib/tenant/company-research-service";
 
@@ -75,10 +75,6 @@ async function queueApplicationResearch(input: {
     companyId: input.companyId,
     forceRefresh: input.forceRefresh,
   });
-  await syncApplicationHiringTeam({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-  });
 }
 
 export async function attachParsedPosting(input: {
@@ -110,7 +106,7 @@ export async function attachParsedPosting(input: {
           companyId: null,
         }),
       });
-      await syncApplicationHiringTeam({
+      await queueHiringTeamIdentify({
         organizationId: input.organizationId,
         campaignId: input.campaignId,
       });
@@ -155,7 +151,7 @@ export async function attachParsedPosting(input: {
     });
     return;
   }
-  await syncApplicationHiringTeam({
+  await queueHiringTeamIdentify({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
   });
@@ -415,7 +411,7 @@ export async function confirmApplicationEmployerIdentity(input: {
       companyId: requirement.companyId,
     });
   }
-  await syncApplicationHiringTeam({
+  await queueHiringTeamIdentify({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
   });
@@ -445,7 +441,7 @@ export async function rejectApplicationEmployerIdentity(input: {
     organizationId: input.organizationId,
     campaignId: input.campaignId,
   });
-  await syncApplicationHiringTeam({
+  await queueHiringTeamIdentify({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
   });
@@ -535,7 +531,13 @@ export async function ensureHiringTeamAfterResearch(input: {
     },
   });
   const research = requirement?.company?.research[0] ?? null;
-  if (!research || (research.status !== "COMPLETED" && research.status !== "PARTIAL")) {
+  const rejectedOrUndisclosed =
+    requirement?.identityConfirmation === "REJECTED" ||
+    requirement?.employerDisposition === "UNDISCLOSED";
+  if (
+    !rejectedOrUndisclosed &&
+    (!research || (research.status !== "COMPLETED" && research.status !== "PARTIAL"))
+  ) {
     return;
   }
   const latestRole = await prisma.persona.findFirst({
@@ -547,10 +549,14 @@ export async function ensureHiringTeamAfterResearch(input: {
     orderBy: { updatedAt: "desc" },
     select: { updatedAt: true },
   });
-  if (latestRole && latestRole.updatedAt >= research.updatedAt) {
+  if (
+    research &&
+    latestRole &&
+    latestRole.updatedAt >= research.updatedAt
+  ) {
     return;
   }
-  await syncApplicationHiringTeam({
+  await queueHiringTeamIdentify({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
   });

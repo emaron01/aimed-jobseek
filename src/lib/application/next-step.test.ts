@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applicationNextStepState } from "@/lib/application/next-step";
+import {
+  applicationNextStepState,
+  rejectedNextStep,
+} from "@/lib/application/next-step";
+import { consultationConfig } from "@/lib/product-config";
 
 const idle = {
   consultationGenerationStatus: null,
@@ -45,5 +49,20 @@ describe("application next-step state", () => {
         appliedAt: "2026-09-25T00:00:00.000Z",
       }).key,
     ).toBe("applied");
+  });
+
+  it("the not-started consultation card starts the coach, not a schedule", () => {
+    expect(
+      rejectedNextStep(
+        `Schedule your initial consultation with ${consultationConfig.displayName}.`,
+        "consultation_not_started",
+      ),
+    ).toBe(true);
+    expect(
+      rejectedNextStep(
+        `Start ${consultationConfig.displayName} in this workspace to review the posting.`,
+        "consultation_not_started",
+      ),
+    ).toBe(false);
   });
 });

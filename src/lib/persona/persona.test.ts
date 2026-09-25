@@ -73,6 +73,8 @@ function asPersona(partial: typeof SALES_LEADER_FIXTURE): Persona {
     personaMessagingJson: null,
     profileJson: null,
     setupStatus: "NOT_STARTED",
+    staleAt: null,
+    staleReason: null,
     approvedPersonaSetupRunId: null,
     archivedAt: null,
     createdAt: new Date(),

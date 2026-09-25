@@ -162,7 +162,6 @@ export async function getApplicationResearchStatus(input: {
     },
     select: {
       companyId: true,
-      employerDisposition: true,
       company: {
         select: {
           research: {
@@ -175,11 +174,8 @@ export async function getApplicationResearchStatus(input: {
     },
   });
 
-  if (!requirement?.companyId || requirement.employerDisposition !== "IDENTIFIED") {
-    return toApplicationResearchStatusView("idle", null);
-  }
-
-  const run = await prisma.researchRun.findFirst({
+  const researchStatus = requirement?.company?.research[0]?.status ?? null;
+  const runPreview = await prisma.researchRun.findFirst({
     where: {
       organizationId: input.organizationId,
       campaignId: input.campaignId,
@@ -194,6 +190,12 @@ export async function getApplicationResearchStatus(input: {
     },
   });
 
+  if (!requirement?.companyId && !researchStatus && !runPreview) {
+    return toApplicationResearchStatusView("idle", null);
+  }
+
+  const run = runPreview;
+
   const now = input.now ?? new Date();
   const queuedStaleMs = getResearchQueuedStaleMs();
   const phase = applicationResearchPhase({
@@ -204,7 +206,7 @@ export async function getApplicationResearchStatus(input: {
           workerHeartbeatAt: run.workerHeartbeatAt?.toISOString() ?? null,
         }
       : null,
-    researchStatus: requirement.company?.research[0]?.status ?? null,
+    researchStatus,
     nowMs: now.getTime(),
     queuedStaleMs,
   });

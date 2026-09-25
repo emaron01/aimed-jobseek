@@ -8,7 +8,8 @@ import {
   applicationNextStepSchema,
 } from "@/lib/application/next-step-contract";
 import { APPLICATION_NEXT_STEP_INSTRUCTIONS } from "@/lib/prompt-content/next-step";
-import { prisma } from "@/lib/prisma";
+import { enqueueApplicationJob } from "@/lib/application-jobs/service";
+import { prisma } from "@/lib/prisma-client";
 import {
   consultationConfig,
   consultationConversationCopy,
@@ -74,28 +75,50 @@ export async function writeApplicationNextStep(input: {
     return { ok: false, message: consultationConversationCopy.nextStepFailed };
   }
   try {
-    const response = await getConsultationAiProvider().generateStructured({
-      ...structuredOutputRequest("applicationNextStep"),
-      messages: [
-        {
-          role: "system",
-          content: `Prompt version: ${NEXT_STEP_PROMPT_VERSION}\n\n${APPLICATION_NEXT_STEP_INSTRUCTIONS}`,
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            consultantName: consultationConfig.displayName,
-            state: input.state,
-            bannedPhrases: consultationConfig.bannedPhrases,
-          }),
-        },
-      ],
-      parseOutput: (raw) => ({
-        data: applicationNextStepSchema.parse(raw),
-        coercedFields: [],
+    let lastText = "";
+    for (
+      let attempt = 0;
+      attempt <= consultationConfig.qualityRegenerationAttempts;
+      attempt += 1
+    ) {
+      const response = await getConsultationAiProvider().generateStructured({
+        ...structuredOutputRequest("applicationNextStep"),
+        messages: [
+          {
+            role: "system",
+            content: `Prompt version: ${NEXT_STEP_PROMPT_VERSION}\n\n${APPLICATION_NEXT_STEP_INSTRUCTIONS}`,
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              consultantName: consultationConfig.displayName,
+              state: input.state,
+              bannedPhrases: consultationConfig.bannedPhrases,
+              rejectedPrevious:
+                attempt > 0
+                  ? "The previous line was generic or said the coach was scheduled. Write a specific action the seeker can take in this workspace now."
+                  : null,
+            }),
+          },
+        ],
+        parseOutput: (raw) => ({
+          data: applicationNextStepSchema.parse(raw),
+          coercedFields: [],
+        }),
+      });
+      lastText = response.data.text;
+      if (!rejectedNextStep(response.data.text, input.state.key)) {
+        return { ok: true, text: response.data.text };
+      }
+    }
+    console.error(
+      JSON.stringify({
+        event: "application_next_step_rejected",
+        stateKey: input.state.key,
+        text: lastText,
       }),
-    });
-    return { ok: true, text: response.data.text };
+    );
+    return { ok: false, message: consultationConversationCopy.nextStepFailed };
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
     const cause =
@@ -158,6 +181,81 @@ export async function ensureApplicationNextStep(input: {
   ) {
     return { text: campaign.nextStepText, stateKey: state.key, failed: false };
   }
+  await enqueueApplicationJob({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    type: "NEXT_STEP",
+  });
+  return {
+    text: campaign.nextStepText,
+    stateKey: state.key,
+    failed: false,
+  };
+}
+
+export function rejectedNextStep(text: string, stateKey: string): boolean {
+  const lower = text.toLowerCase();
+  if (/\bscheduled?\b/.test(lower)) return true;
+  if (stateKey === "consultation_not_started") {
+    const coach = consultationConfig.displayName.toLowerCase();
+    const starts =
+      lower.includes(`start`) ||
+      lower.includes("open") ||
+      lower.includes("begin");
+    if (lower.includes(coach) && starts) return false;
+    return true;
+  }
+  return false;
+}
+
+export async function processApplicationNextStep(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const result = await writeStoredApplicationNextStep(input);
+  if (result.failed) {
+    throw new Error(consultationConversationCopy.nextStepFailed);
+  }
+}
+
+async function writeStoredApplicationNextStep(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<{
+  text: string | null;
+  stateKey: string;
+  failed: boolean;
+}> {
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: {
+      appliedAt: true,
+      consultationSession: {
+        select: { status: true, generationStatus: true },
+      },
+      presentationPlans: { select: { type: true, status: true } },
+      applicationAssets: { select: { type: true } },
+    },
+  });
+  if (!campaign) {
+    return { text: null, stateKey: "missing", failed: false };
+  }
+  const resumePlan = campaign.presentationPlans.find((plan) => plan.type === "RESUME");
+  const coverPlan = campaign.presentationPlans.find(
+    (plan) => plan.type === "COVER_LETTER",
+  );
+  const state = applicationNextStepState({
+    consultationStatus: campaign.consultationSession?.status ?? null,
+    consultationGenerationStatus:
+      campaign.consultationSession?.generationStatus ?? null,
+    resumePlanStatus: resumePlan?.status ?? null,
+    coverPlanStatus: coverPlan?.status ?? null,
+    hasResume: campaign.applicationAssets.some((asset) => asset.type === "RESUME"),
+    hasCoverLetter: campaign.applicationAssets.some(
+      (asset) => asset.type === "COVER_LETTER",
+    ),
+    appliedAt: campaign.appliedAt?.toISOString() ?? null,
+  });
   const written = await writeApplicationNextStep({ state });
   if (!written.ok) {
     await prisma.campaign.update({
@@ -187,9 +285,10 @@ export async function retryApplicationNextStep(input: {
       nextStepStateKey: null,
     },
   });
-  const result = await ensureApplicationNextStep(input);
-  if (result.failed) {
-    throw new Error(consultationConversationCopy.nextStepFailed);
-  }
+  await enqueueApplicationJob({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    type: "NEXT_STEP",
+  });
 }
 

@@ -14,8 +14,9 @@ import {
 import type { PersonaDifferentiationInput } from "@/lib/persona/persona-differentiation";
 import { parsePersonaListField } from "@/lib/persona/persona-differentiation";
 import { PERSONA_SYNTHESIS_PROMPT_VERSION } from "@/lib/persona-research/contract";
+import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { prisma } from "@/lib/prisma-client";
-import { vocab } from "@/lib/product-config";
+import { hiringTeamConfig, vocab } from "@/lib/product-config";
 import { usableEmployerResearch } from "@/lib/job-requirement/identity-verification";
 import type { JobScorecard, ScorecardItem } from "@/lib/job-requirement/types";
 import { parseStringArray } from "@/lib/research";
@@ -217,8 +218,8 @@ async function draftsFor(input: {
   return drafts;
 }
 
-function personaFields(role: IdentifiedHiringRole, draft: RoleDraft) {
-  const narrative = draft.narrative;
+function personaFields(role: IdentifiedHiringRole, draft: RoleDraft | null) {
+  const narrative = draft?.narrative ?? null;
   return {
     name: role.name,
     targetTitles: role.likelyTitles,
@@ -242,9 +243,31 @@ function personaFields(role: IdentifiedHiringRole, draft: RoleDraft) {
       : null,
     suggestionKey: role.roleKey,
     interpretationPromptVersion: PERSONA_SYNTHESIS_PROMPT_VERSION,
-    setupStatus: draft.status,
-    approvalStatus: draft.narrative ? ("NEEDS_REVIEW" as const) : ("NOT_STARTED" as const),
+    setupStatus: draft?.status ?? ("NOT_STARTED" as const),
+    approvalStatus: narrative ? ("NEEDS_REVIEW" as const) : ("NOT_STARTED" as const),
   };
+}
+
+export function isHiringTeamPersonaBuilt(persona: {
+  setupStatus?: string | null;
+  profileJson?: unknown;
+}): boolean {
+  if (
+    persona.setupStatus === "NEEDS_REVIEW" ||
+    persona.setupStatus === "APPROVED"
+  ) {
+    return true;
+  }
+  if (!persona.profileJson || typeof persona.profileJson !== "object") return false;
+  const narrative = (persona.profileJson as { narrative?: unknown }).narrative;
+  return Boolean(narrative && typeof narrative === "object");
+}
+
+export function hiringTeamInvolvement(profileJson: unknown): "DIRECT" | "INDIRECT" {
+  if (!profileJson || typeof profileJson !== "object") return "DIRECT";
+  return (profileJson as { involvement?: unknown }).involvement === "INDIRECT"
+    ? "INDIRECT"
+    : "DIRECT";
 }
 
 export async function syncApplicationHiringTeam(input: {
@@ -259,7 +282,6 @@ export async function syncApplicationHiringTeam(input: {
       campaignId: loaded.campaign.id,
       archivedAt: null,
     },
-    select: { suggestionKey: true, name: true, targetTitles: true },
   });
   const { roles, modelNote, corrections, dropped } = await identifiedRoles({
     job: loaded.job,
@@ -276,55 +298,141 @@ export async function syncApplicationHiringTeam(input: {
     research: loaded.research,
     includeResearch: loaded.includeResearch,
   });
-  const drafts = await draftsFor({
-    roles,
-    job: loaded.job,
-    researchText: evidenceTextFor({
-      job: loaded.job,
-      research: loaded.research,
-      includeResearch: loaded.includeResearch,
-    }),
-    excerpts,
-  });
-  for (let index = 0; index < roles.length; index += 1) {
-    const role = roles[index]!;
-    const draft = drafts[index]!;
-    const existing = await prisma.persona.findFirst({
-      where: {
-        organizationId: input.organizationId,
-        campaignId: loaded.campaign.id,
-        suggestionKey: role.roleKey,
-        archivedAt: null,
-      },
-    });
-    if (existing && seekerEdited(existing.manuallyEditedFields)) continue;
-    const fields = personaFields(role, draft);
+  const seenKeys = new Set<string>();
+  for (const role of roles) {
+    const existing =
+      existingRows.find((row) => row.suggestionKey === role.roleKey) ??
+      existingRows.find((row) => row.name === role.name);
+    const built = existing ? isHiringTeamPersonaBuilt(existing) : false;
+    const existingNarrative =
+      existing?.profileJson &&
+      typeof existing.profileJson === "object" &&
+      (existing.profileJson as { narrative?: HiringTeamNarrative | null }).narrative
+        ? (existing.profileJson as { narrative: HiringTeamNarrative }).narrative
+        : null;
     const profileJson = profilePayload({
       includeResearch: loaded.includeResearch,
       excerpts,
       role,
-      narrative: draft.narrative,
-      modelNote: draft.message ?? modelNote,
+      narrative: built ? existingNarrative : null,
+      modelNote: modelNote,
       corrections,
       dropped,
     });
     if (existing) {
+      seenKeys.add(existing.id);
+      const edited = seekerEdited(existing.manuallyEditedFields);
       await prisma.persona.update({
         where: { id: existing.id },
-        data: { ...fields, profileJson },
-      });
-    } else {
-      await prisma.persona.create({
         data: {
-          organizationId: input.organizationId,
-          productId: loaded.campaign.productId,
-          campaignId: loaded.campaign.id,
-          ...fields,
+          ...(edited
+            ? {}
+            : {
+                name: role.name,
+                targetTitles: role.likelyTitles,
+                department: role.department,
+                whyThisPersonaMatters: role.whyInvolved,
+                suggestionKey: role.roleKey,
+              }),
           profileJson,
+          ...(built
+            ? {
+                staleAt: new Date(),
+                staleReason: hiringTeamConfig.staleReason,
+              }
+            : {
+                setupStatus: "NOT_STARTED",
+                approvalStatus: "NOT_STARTED",
+                definition: null,
+                responsibilities: null,
+                painPoints: null,
+                desiredOutcomes: null,
+                messagingNotes: null,
+              }),
         },
       });
+      continue;
     }
+    const fields = personaFields(role, null);
+    await prisma.persona.create({
+      data: {
+        organizationId: input.organizationId,
+        productId: loaded.campaign.productId,
+        campaignId: loaded.campaign.id,
+        ...fields,
+        profileJson,
+      },
+    });
   }
+  for (const existing of existingRows) {
+    if (seenKeys.has(existing.id)) continue;
+    if (seekerEdited(existing.manuallyEditedFields)) continue;
+    if (existing.personaTemplateId) continue;
+    await prisma.persona.update({
+      where: { id: existing.id },
+      data: { archivedAt: new Date() },
+    });
+  }
+}
+
+export async function queueHiringTeamIdentify(input: {
+  organizationId: string;
+  campaignId: string;
+  initiatedByUserId?: string | null;
+}): Promise<void> {
+  await enqueueApplicationJob({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    type: "HIRING_TEAM_IDENTIFY",
+    initiatedByUserId: input.initiatedByUserId,
+  });
+}
+
+export async function queueHiringTeamBuild(input: {
+  organizationId: string;
+  campaignId: string;
+  personaId: string;
+  initiatedByUserId?: string | null;
+}): Promise<void> {
+  const persona = await requireRole(input);
+  await prisma.persona.update({
+    where: { id: persona.id },
+    data: { setupStatus: "SYNTHESIZING", staleAt: null, staleReason: null },
+  });
+  await enqueueApplicationJob({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    type: "HIRING_TEAM_BUILD",
+    targetId: persona.id,
+    initiatedByUserId: input.initiatedByUserId,
+  });
+}
+
+export async function queueHiringTeamBuildDirect(input: {
+  organizationId: string;
+  campaignId: string;
+  initiatedByUserId?: string | null;
+}): Promise<number> {
+  const roles = await prisma.persona.findMany({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      archivedAt: null,
+    },
+  });
+  let queued = 0;
+  for (const role of roles) {
+    if (hiringTeamInvolvement(role.profileJson) !== "DIRECT") continue;
+    if (isHiringTeamPersonaBuilt(role) && !role.staleAt) continue;
+    await queueHiringTeamBuild({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      personaId: role.id,
+      initiatedByUserId: input.initiatedByUserId,
+    });
+    queued += 1;
+  }
+  return queued;
 }
 
 export async function addApplicationHiringTeamRole(input: {
@@ -355,8 +463,21 @@ export async function addApplicationHiringTeamRole(input: {
       department: input.department,
       whyThisPersonaMatters: input.whyThisRoleMatters,
       additionalContext: input.notes,
-      setupStatus: "NEEDS_REVIEW",
-      approvalStatus: "NEEDS_REVIEW",
+      setupStatus: "NOT_STARTED",
+      approvalStatus: "NOT_STARTED",
+      profileJson: {
+        involvement: "DIRECT",
+        identification: {
+          roleKey: `custom_${Date.now()}`,
+          name,
+          likelyTitles: input.likelyTitles,
+          department: input.department,
+          involvement: "DIRECT",
+          whyInvolved: input.whyThisRoleMatters ?? name,
+          evidence: [],
+        },
+        narrative: null,
+      },
       manuallyEditedFields: ["seeker"],
     },
     select: { id: true },
@@ -498,6 +619,8 @@ export async function rebuildApplicationHiringTeamRole(input: {
       ...fields,
       suggestionKey: persona.suggestionKey ?? role.roleKey,
       manuallyEditedFields: [],
+      staleAt: draft.narrative ? null : persona.staleAt,
+      staleReason: draft.narrative ? null : persona.staleReason,
       profileJson: profilePayload({
         includeResearch: loaded.includeResearch,
         excerpts,
@@ -538,8 +661,21 @@ export async function addTemplateToApplication(input: {
       department: template.department,
       whyThisPersonaMatters: template.whyThisRoleMatters,
       additionalContext: template.notes,
-      setupStatus: "NEEDS_REVIEW",
-      approvalStatus: "NEEDS_REVIEW",
+      setupStatus: "NOT_STARTED",
+      approvalStatus: "NOT_STARTED",
+      profileJson: {
+        involvement: "DIRECT",
+        identification: {
+          roleKey: `template_${template.id}`,
+          name: template.name,
+          likelyTitles: parseStringArray(template.likelyTitles),
+          department: template.department,
+          involvement: "DIRECT",
+          whyInvolved: template.whyThisRoleMatters ?? template.name,
+          evidence: [],
+        },
+        narrative: null,
+      },
       manuallyEditedFields: ["seeker"],
     },
     select: { id: true },

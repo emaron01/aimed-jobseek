@@ -14,7 +14,7 @@ import {
   type GenerationSource,
   type ReadyApplicationGenerationContext,
 } from "@/lib/generation/context";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma-client";
 import {
   applicationAssetConfig,
   consultationConfig,
@@ -811,6 +811,20 @@ export async function generateOutreachAsset(input: {
       };
     }
     contact = membership.contact;
+    if (membership.individualProfileJson) {
+      context = {
+        ...context,
+        sources: [
+          ...context.sources,
+          {
+            id: `contact:${contactId}:individual-profile`,
+            text: JSON.stringify(membership.individualProfileJson),
+            category: "PERSONA",
+            url: null,
+          },
+        ],
+      };
+    }
     roleConfirmed = membership.roleConfirmed;
     confirmedHiringManagerRole =
       membership.chosenPersona?.suggestionKey === "hiring_manager" ||

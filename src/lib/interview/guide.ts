@@ -5,7 +5,7 @@ import {
   mentionsInternalSystemState,
   validateRepetitionAndMetaLanguage,
 } from "@/lib/consultation/output-quality";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma-client";
 import {
   applicationAssetConfig,
   consultationConfig,
@@ -208,6 +208,16 @@ async function loadGuideContext(input: {
   }
   for (const role of stage.campaign.hiringTeamRoles) {
     appendSource(sources, `persona:${role.id}:reason`, role.whyThisPersonaMatters, "PERSONA");
+  }
+  for (const membership of memberships) {
+    if (membership.individualProfileJson) {
+      appendSource(
+        sources,
+        `contact:${membership.contactId}:individual-profile`,
+        JSON.stringify(membership.individualProfileJson),
+        "PERSONA",
+      );
+    }
   }
   for (const statement of stage.campaign.consultationSession?.statements ?? []) {
     appendSource(sources, `statement:${statement.id}`, statement.content, "APPROVED_STATEMENT");

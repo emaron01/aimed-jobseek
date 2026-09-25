@@ -668,8 +668,7 @@ describe.skipIf(!hasTestDatabase())("hiring team per application", () => {
     expect(stored.includeResearch).toBe(false);
     expect(stored.narrative ?? null).toBeNull();
     expect(manager?.definition ?? null).toBeNull();
-    expect(manager?.setupStatus).toBe("PARTIAL");
-    expect(JSON.stringify(manager?.profileJson)).toContain("identification only");
+    expect(manager?.setupStatus).toBe("NOT_STARTED");
     expect(stored.evidence?.[0]?.text).not.toContain("second site");
     const beforeIds = rolesA.map((role) => role.id).sort();
 

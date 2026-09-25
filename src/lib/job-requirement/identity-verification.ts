@@ -530,6 +530,25 @@ function checkWebsite(
   );
 }
 
+function isMaterialMismatch(
+  check: IdentityCheck,
+  checks: IdentityCheck[],
+): boolean {
+  if (check.status !== "MISMATCH") return false;
+  if (check.key === "industry") {
+    const website = checks.find((item) => item.key === "website");
+    if (website?.status === "MATCH") {
+      const research = `${check.researchEvidence ?? ""} ${check.reason}`;
+      return (
+        STUDENT_ORG.test(research) ||
+        research.includes(employerIdentityCopy.kinds.studentTeam) ||
+        research.includes(employerIdentityCopy.kinds.highSchoolTeam)
+      );
+    }
+  }
+  return true;
+}
+
 export function verifyEmployerIdentity(input: {
   posting: PostingIdentityInput;
   research: ResearchIdentityInput;
@@ -567,7 +586,9 @@ export function verifyEmployerIdentity(input: {
       input.posting.suppliedEmployerWebsite,
     ),
   ];
-  const mismatched = checks.some((check) => check.status === "MISMATCH");
+  const mismatched = checks.some((check) =>
+    isMaterialMismatch(check, checks),
+  );
   const verdict: IdentityVerdict =
     input.research.identityAmbiguous || mismatched ? "AMBIGUOUS" : "MATCHED";
   return {

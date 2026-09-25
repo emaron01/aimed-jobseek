@@ -346,9 +346,8 @@ describe("interview guide rules", () => {
 
   it("keeps a failed guide generate on screen instead of remounting the page", () => {
     const action = readFileSync("src/app/actions/interview.ts", "utf8");
-    expect(action).toMatch(
-      /if \(result\.status === "FAILED"\) \{[\s\S]*revalidate\(id, stageId\)/,
-    );
+    expect(action).toContain("enqueueApplicationJob");
+    expect(action).toContain("revalidate(id, stageId)");
   });
 
   it("prints the guide without navigation or controls", () => {

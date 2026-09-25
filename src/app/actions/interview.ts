@@ -1,11 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { startConsultation } from "@/lib/consultation/service";
 import { requireCurrentUser } from "@/lib/auth/authz";
-import {
-  requestInterviewGuide,
-} from "@/lib/interview/guide";
 import { refreshConsultationOffer } from "@/lib/interview/guide";
 import {
   addInterviewStageInterviewer,
@@ -184,28 +182,23 @@ export async function generateInterviewGuideAction(
       id: String(raw),
       answer: String(formData.getAll("answer")[index] ?? ""),
     }));
-    const result = await requestInterviewGuide({
+    await enqueueApplicationJob({
       organizationId,
       campaignId: id,
-      userId: user.id,
-      stageId,
-      skipQuestions: skip,
-      answers: answers.filter((row) => row.answer.trim()),
-      regenerationInstruction:
-        String(formData.get("regenerationInstruction") ?? "").trim() || null,
+      type: "INTERVIEW_GUIDE",
+      targetId: stageId,
+      initiatedByUserId: user.id,
+      payload: {
+        userId: user.id,
+        stageId,
+        skipQuestions: skip,
+        answers: answers.filter((row) => row.answer.trim()),
+        regenerationInstruction:
+          String(formData.get("regenerationInstruction") ?? "").trim() || null,
+      },
     });
-    if (result.status === "FAILED") {
-      return { ok: false, message: result.message };
-    }
     revalidate(id, stageId);
-    if (result.status === "NEEDS_CLARIFICATION") {
-      return {
-        ok: true,
-        message: "Answer or skip these questions, then generate the guide.",
-        questions: result.questions,
-      };
-    }
-    return { ok: true, message: "Guide generated." };
+    return { ok: true, message: "Interview guide generation was queued." };
   } catch (error) {
     return errorResult(error);
   }

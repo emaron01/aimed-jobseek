@@ -500,6 +500,8 @@ describe("resolveTitleSuggestion", () => {
       personaMessagingJson: null,
       profileJson: null,
       setupStatus: "APPROVED",
+      staleAt: null,
+      staleReason: null,
       approvedPersonaSetupRunId: null,
       archivedAt: null,
       createdAt: new Date(),

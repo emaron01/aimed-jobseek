@@ -3,6 +3,17 @@
  */
 import { prisma } from "@/lib/prisma-client";
 
+function isMissingApplicationJobTable(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? String(error.code) : "";
+  const message = "message" in error ? String(error.message) : "";
+  return (
+    code === "P2021" ||
+    code === "42P01" ||
+    /relation "ApplicationJob" does not exist/i.test(message)
+  );
+}
+
 function isMissingResearchRunTable(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const code = "code" in error ? String(error.code) : "";
@@ -33,9 +44,10 @@ export async function waitForResearchRunSchema(options?: {
   while (Date.now() - started < maxWaitMs) {
     try {
       await prisma.$queryRaw`SELECT "id" FROM "ResearchRun" LIMIT 0`;
+      await prisma.$queryRaw`SELECT "id" FROM "ApplicationJob" LIMIT 0`;
       return;
     } catch (error) {
-      if (!isMissingResearchRunTable(error)) {
+      if (!isMissingResearchRunTable(error) && !isMissingApplicationJobTable(error)) {
         throw error;
       }
       const waitedSec = Math.round((Date.now() - started) / 1000);

@@ -5,7 +5,7 @@ import type {
   InterviewStageType,
 } from "@prisma/client";
 import { addApplicationContact } from "@/lib/application/contacts";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma-client";
 import {
   interviewConfig,
   isApplicationProgress,

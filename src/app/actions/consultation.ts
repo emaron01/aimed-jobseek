@@ -2,25 +2,22 @@
 
 import { revalidatePath } from "next/cache";
 import {
-  answerConsultationQuestion,
   approveConsultationStatement,
   completeConsultation,
   confirmConsultationProposal,
   dismissConsultationProposal,
   pauseConsultation,
   regenerateConsultationStatement,
-  replyConsultation,
-  retryConsultationGeneration,
   resumeConsultation,
   reviseConsultationResult,
   skipConsultation,
   skipConsultationQuestion,
-  startConsultation,
   confirmConsultationResult,
   flagConsultationInaccuracy,
 } from "@/lib/consultation/service";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { consultationConversationCopy, vocab } from "@/lib/product-config";
+import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
 
@@ -52,9 +49,14 @@ export async function startConsultationAction(
     if (!campaignId) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }
-    await startConsultation({ organizationId, campaignId });
+    await enqueueApplicationJob({
+      organizationId,
+      campaignId,
+      type: "CONSULTATION",
+      payload: { operation: "start" },
+    });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: consultationConversationCopy.start };
+    return { ok: true, message: `${consultationConversationCopy.start} was queued.` };
   } catch (error) {
     return fail(error, "The consultation could not be started.");
   }
@@ -71,9 +73,14 @@ export async function retryConsultationAction(
     if (!campaignId) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }
-    await retryConsultationGeneration({ organizationId, campaignId });
+    await enqueueApplicationJob({
+      organizationId,
+      campaignId,
+      type: "CONSULTATION",
+      payload: { operation: "retry" },
+    });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: consultationConversationCopy.retry };
+    return { ok: true, message: `${consultationConversationCopy.retry} was queued.` };
   } catch (error) {
     return fail(error, "The consultation could not be retried.");
   }
@@ -171,14 +178,14 @@ export async function answerConsultationAction(
     if (!campaignId || !targetKey) {
       return { ok: false, message: "That question was not found." };
     }
-    await answerConsultationQuestion({
+    await enqueueApplicationJob({
       organizationId,
       campaignId,
-      targetKey,
-      answer,
+      type: "CONSULTATION",
+      payload: { operation: "answer", targetKey, answer },
     });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: "Answer saved." };
+    return { ok: true, message: "Answer queued." };
   } catch (error) {
     return fail(error, "The answer could not be saved.");
   }
@@ -307,9 +314,14 @@ export async function replyConsultationAction(
     if (!answer) {
       return { ok: false, message: consultationConversationCopy.threadReply };
     }
-    await replyConsultation({ organizationId, campaignId, answer });
+    await enqueueApplicationJob({
+      organizationId,
+      campaignId,
+      type: "CONSULTATION",
+      payload: { operation: "reply", answer },
+    });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: consultationConversationCopy.threadReply };
+    return { ok: true, message: `${consultationConversationCopy.threadReply} was queued.` };
   } catch (error) {
     return fail(error, "The reply could not be sent.");
   }

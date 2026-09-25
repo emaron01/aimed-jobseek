@@ -17,6 +17,7 @@ export { JOB_REQUIREMENT_SYSTEM_INSTRUCTIONS } from "./job-requirement";
 export { COMPANY_RESEARCH_SYSTEM_INSTRUCTIONS } from "./company-research";
 export { PERSONA_SYNTHESIS_SYSTEM_INSTRUCTIONS } from "./persona-synthesis";
 export { HIRING_TEAM_IDENTIFICATION_SYSTEM_INSTRUCTIONS } from "./hiring-team-identification";
+export { CONTACT_INDIVIDUAL_PROFILE_INSTRUCTIONS } from "./contact-individual-profile";
 export { APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS } from "./application-summary";
 export {
   INTERVIEW_CLARIFY_SYSTEM_INSTRUCTIONS,

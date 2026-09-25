@@ -1467,10 +1467,8 @@ describe("application asset seeker-facing labels", () => {
       action.indexOf("export async function generateApplicationAssetAction"),
       action.indexOf("export async function approveApplicationAssetAction"),
     );
-    expect(generateFn.indexOf("if (!result.ok)")).toBeGreaterThan(-1);
-    expect(generateFn.indexOf("if (!result.ok)")).toBeLessThan(
-      generateFn.indexOf("revalidate(id)"),
-    );
+    expect(generateFn).toContain("enqueueApplicationJob");
+    expect(generateFn).toContain("revalidate(id)");
 
     const section = readFileSync(
       "src/components/ApplicationAssetsSection.tsx",

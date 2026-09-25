@@ -11,6 +11,10 @@
 import { isResearchAiConfigured } from "@/lib/ai/config";
 import { waitForResearchRunSchema } from "@/lib/research/schema-readiness";
 import {
+  abandonStaleApplicationJobs,
+  claimNextApplicationJob,
+} from "@/lib/application-jobs/service";
+import {
   abandonStaleResearchRuns,
   claimNextResearchRun,
   processResearchRun,
@@ -42,6 +46,25 @@ async function main(): Promise<void> {
 
   while (!researchWorkerShutdown.requested) {
     await abandonStaleResearchRuns();
+    await abandonStaleApplicationJobs();
+
+    const jobId = await claimNextApplicationJob();
+    if (jobId) {
+      const { processApplicationJob } = await import(
+        "@/lib/application-jobs/process"
+      );
+      console.log(`[research-worker] processing application job ${jobId}`);
+      inFlight = processApplicationJob(jobId)
+        .then(() => {
+          console.log(`[research-worker] finished application job ${jobId}`);
+        })
+        .catch((error) => {
+          console.error(`[research-worker] application job ${jobId} failed`, error);
+        });
+      await inFlight;
+      inFlight = null;
+      continue;
+    }
 
     const runId = await claimNextResearchRun();
     if (!runId) {

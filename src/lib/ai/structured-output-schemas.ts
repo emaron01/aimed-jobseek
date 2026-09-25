@@ -37,6 +37,7 @@ import {
   resumePresentationPlanSchema,
 } from "@/lib/application-assets/plan-contract";
 import { applicationNextStepSchema } from "@/lib/application/next-step-contract";
+import { individualProfileSchema } from "@/lib/contact-profile/contract";
 import {
   interviewClarifyingQuestionsSchema,
   interviewGuideContentSchema,
@@ -186,6 +187,11 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
     schemaName: "application_next_step",
     schema: applicationNextStepSchema,
     usageOperations: ["CONSULTATION"],
+  },
+  contactIndividualProfile: {
+    schemaName: "contact_individual_profile",
+    schema: individualProfileSchema,
+    usageOperations: ["PERSONA_SYNTHESIS"],
   },
   resumeAsset: {
     schemaName: "application_resume",

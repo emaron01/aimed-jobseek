@@ -8,7 +8,7 @@ import {
   loadApplicationGenerationContext,
   type ReadyApplicationGenerationContext,
 } from "@/lib/generation/context";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma-client";
 import { applicationAssetConfig, consultationConfig, vocab } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 import {

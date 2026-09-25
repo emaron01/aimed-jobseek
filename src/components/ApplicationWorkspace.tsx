@@ -15,11 +15,17 @@ import {
   addApplicationRoleAction,
   addTemplateRoleAction,
   approveApplicationRoleAction,
+  buildAllDirectRolesAction,
+  buildApplicationRoleAction,
   rebuildApplicationRoleAction,
   removeApplicationRoleAction,
   saveRoleAsTemplateAction,
   updateApplicationRoleAction,
 } from "@/app/actions/hiring-team";
+import {
+  parseIndividualProfile,
+  parseLinkedInExtracted,
+} from "@/lib/contact-profile/service";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { InterviewStagesSection } from "@/components/InterviewStagesSection";
 import { ConsultationSection } from "@/components/ConsultationSection";
@@ -678,17 +684,7 @@ export async function ApplicationWorkspace({
       campaignId={requirement.campaignId}
       canEdit={canEdit}
       roles={requirement.campaign.hiringTeamRoles}
-      contacts={requirement.campaign.contacts.map((row) => ({
-        contactId: row.contact.id,
-        firstName: row.contact.firstName,
-        lastName: row.contact.lastName,
-        title: row.contact.title,
-        email: row.contact.email,
-        linkedinUrl: row.contact.linkedinUrl,
-        personaId: row.chosenPersonaId,
-        personaName: row.chosenPersona?.name ?? null,
-        roleConfirmed: row.roleConfirmed,
-      }))}
+      contacts={requirement.campaign.contacts.map(toContactRow)}
     />
     <ApplicationAssetsSection
       campaignId={requirement.campaignId}
@@ -736,17 +732,7 @@ export async function ApplicationWorkspace({
         )?.id ?? null
       }
       roles={requirement.campaign.hiringTeamRoles}
-      contacts={requirement.campaign.contacts.map((row) => ({
-        contactId: row.contact.id,
-        firstName: row.contact.firstName,
-        lastName: row.contact.lastName,
-        title: row.contact.title,
-        email: row.contact.email,
-        linkedinUrl: row.contact.linkedinUrl,
-        personaId: row.chosenPersonaId,
-        personaName: row.chosenPersona?.name ?? null,
-        roleConfirmed: row.roleConfirmed,
-      }))}
+      contacts={requirement.campaign.contacts.map(toContactRow)}
       assets={requirement.campaign.applicationAssets
         .filter((asset): asset is typeof asset & {
           type: "EMAIL" | "LINKEDIN_CONNECTION_NOTE" | "LINKEDIN_INMAIL";
@@ -845,12 +831,57 @@ function readNarrative(value: unknown): {
   };
 }
 
-function hiringTeamStatusLabel(setupStatus: string, approvalStatus: string): string {
-  if (approvalStatus === "APPROVED") return "Approved";
-  if (setupStatus === "FAILED") return "Synthesis failed";
-  if (setupStatus === "PARTIAL") return "Identification only";
-  if (setupStatus === "NEEDS_REVIEW") return "Needs review";
-  return "Identification only";
+function toContactRow(row: {
+  chosenPersonaId: string | null;
+  roleConfirmed: boolean;
+  linkedInProfileText: string | null;
+  linkedInExtractedJson: unknown;
+  individualProfileJson: unknown;
+  individualProfileStatus: string | null;
+  individualProfileError: string | null;
+  contact: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    title: string | null;
+    email: string | null;
+    linkedinUrl: string | null;
+  };
+  chosenPersona: { name: string } | null;
+}) {
+  const extracted = parseLinkedInExtracted(row.linkedInExtractedJson);
+  const individual = parseIndividualProfile(row.individualProfileJson);
+  return {
+    contactId: row.contact.id,
+    firstName: row.contact.firstName,
+    lastName: row.contact.lastName,
+    title: row.contact.title,
+    email: row.contact.email,
+    linkedinUrl: row.contact.linkedinUrl,
+    personaId: row.chosenPersonaId,
+    personaName: row.chosenPersona?.name ?? null,
+    roleConfirmed: row.roleConfirmed,
+    linkedInProfileText: row.linkedInProfileText,
+    extractedTitle: extracted?.currentTitle?.text ?? null,
+    individualStatus: row.individualProfileStatus,
+    individualError: row.individualProfileError,
+    commonGround: individual?.commonGround ?? [],
+    caresAbout: individual?.caresAbout ?? [],
+  };
+}
+
+function hiringTeamStatusLabel(
+  setupStatus: string,
+  approvalStatus: string,
+  staleAt: Date | null,
+): string {
+  if (staleAt) return hiringTeamConfig.status.stale;
+  if (approvalStatus === "APPROVED") return hiringTeamConfig.status.approved;
+  if (setupStatus === "FAILED") return hiringTeamConfig.status.failed;
+  if (setupStatus === "SYNTHESIZING") return hiringTeamConfig.status.building;
+  if (setupStatus === "NEEDS_REVIEW") return hiringTeamConfig.status.built;
+  if (setupStatus === "PARTIAL") return hiringTeamConfig.status.built;
+  return hiringTeamConfig.status.identified;
 }
 
 function KindMark({ kind }: { kind: string }) {
@@ -906,7 +937,7 @@ async function HiringTeamSection({
         <div className="flex flex-wrap items-center gap-2">
           <h4 className="text-sm font-semibold text-slate-900">{role.name}</h4>
           <span className="text-xs text-slate-500">
-            {hiringTeamStatusLabel(role.setupStatus, role.approvalStatus)}
+            {hiringTeamStatusLabel(role.setupStatus, role.approvalStatus, role.staleAt)}
           </span>
         </div>
         <p className="text-sm text-slate-700">
@@ -1004,21 +1035,27 @@ async function HiringTeamSection({
             </ApplicationActionForm>
             <div className="flex flex-wrap gap-3">
               <ApplicationActionForm
-                action={approveApplicationRoleAction}
-                submitLabel="Approve"
-                testId={`approve-role-${role.id}`}
+                action={
+                  role.setupStatus === "FAILED" || role.staleAt
+                    ? rebuildApplicationRoleAction
+                    : buildApplicationRoleAction
+                }
+                submitLabel={
+                  role.setupStatus === "FAILED"
+                    ? hiringTeamConfig.actions.retry
+                    : role.staleAt
+                      ? hiringTeamConfig.actions.rebuild
+                      : hiringTeamConfig.actions.build
+                }
+                testId={`build-role-${role.id}`}
               >
                 <input type="hidden" name="campaignId" value={campaignId} />
                 <input type="hidden" name="personaId" value={role.id} />
               </ApplicationActionForm>
               <ApplicationActionForm
-                action={rebuildApplicationRoleAction}
-                submitLabel={
-                  role.setupStatus === "PARTIAL" || role.setupStatus === "FAILED"
-                    ? "Retry synthesis"
-                    : "Rebuild"
-                }
-                testId={`rebuild-role-${role.id}`}
+                action={approveApplicationRoleAction}
+                submitLabel="Approve"
+                testId={`approve-role-${role.id}`}
               >
                 <input type="hidden" name="campaignId" value={campaignId} />
                 <input type="hidden" name="personaId" value={role.id} />
@@ -1080,6 +1117,15 @@ async function HiringTeamSection({
           </HiringTeamDisclosureGroup>
         </div>
       )}
+      {canEdit ? (
+        <ApplicationActionForm
+          action={buildAllDirectRolesAction}
+          submitLabel={hiringTeamConfig.actions.buildAllDirect}
+          testId="build-all-direct-roles"
+        >
+          <input type="hidden" name="campaignId" value={campaignId} />
+        </ApplicationActionForm>
+      ) : null}
       {canEdit ? (
         <ApplicationActionForm action={addApplicationRoleAction} submitLabel={`Add ${vocab.persona.singular}`} testId="add-hiring-team-role">
           <input type="hidden" name="campaignId" value={campaignId} />

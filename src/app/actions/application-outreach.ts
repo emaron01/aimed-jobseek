@@ -1,18 +1,23 @@
 "use server";
 
-import type { ApplicationAssetType, EmailLength } from "@prisma/client";
+import type { EmailLength } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { requireCurrentUser } from "@/lib/auth/authz";
+import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import {
-  generateOutreachAsset,
   markApplicationApplied,
   markOutreachSent,
 } from "@/lib/application-assets/outreach";
 import {
+  isHiringTeamPersonaBuilt,
+  queueHiringTeamBuild,
+} from "@/lib/hiring-team/build";
+import { hiringTeamConfig, isOutreachAssetType } from "@/lib/product-config";
+import { prisma } from "@/lib/prisma";
+import {
   addApplicationContact,
   updateApplicationContactRole,
 } from "@/lib/application/contacts";
-import { interviewConfig, isOutreachAssetType } from "@/lib/product-config";
 import { setApplicationProgress } from "@/lib/interview/stages";
 import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
@@ -188,48 +193,50 @@ export async function generateOutreachAssetAction(
     const lengthRaw = String(formData.get("emailLength") ?? "MEDIUM");
     const emailLength: EmailLength =
       lengthRaw === "SHORT" || lengthRaw === "LONG" ? lengthRaw : "MEDIUM";
-    const result = await generateOutreachAsset({
+    const personaId = String(formData.get("personaId") ?? "").trim();
+    if (personaId) {
+      const persona = await prisma.persona.findFirst({
+        where: { id: personaId, organizationId, campaignId: id, archivedAt: null },
+      });
+      if (persona && !isHiringTeamPersonaBuilt(persona)) {
+        await queueHiringTeamBuild({
+          organizationId,
+          campaignId: id,
+          personaId,
+          initiatedByUserId: user.id,
+        });
+        revalidate(id);
+        return { ok: false, message: hiringTeamConfig.needsBuildFirst };
+      }
+    }
+    await enqueueApplicationJob({
       organizationId,
       campaignId: id,
-      userId: user.id,
-      type: type as ApplicationAssetType,
-      personaId: String(formData.get("personaId") ?? ""),
-      contactId: String(formData.get("contactId") ?? "").trim() || null,
-      purpose,
-      followUpToAssetId:
-        String(formData.get("followUpToAssetId") ?? "").trim() || null,
-      interviewStageId:
-        String(formData.get("interviewStageId") ?? "").trim() || null,
-      emailLength,
-      regenerationInstruction:
-        String(formData.get("regenerationInstruction") ?? "").trim() || null,
-      skipThankYouQuestions: String(formData.get("skipThankYouQuestions") ?? "") === "1",
-      thankYouAnswers: formData.getAll("thankYouAnswerId").map((raw, index) => ({
-        id: String(raw),
-        answer: String(formData.getAll("thankYouAnswer")[index] ?? ""),
-      })),
+      type: "OUTREACH",
+      targetId: personaId || undefined,
+      initiatedByUserId: user.id,
+      payload: {
+        userId: user.id,
+        assetType: type,
+        personaId,
+        contactId: String(formData.get("contactId") ?? "").trim() || undefined,
+        purpose,
+        followUpToAssetId:
+          String(formData.get("followUpToAssetId") ?? "").trim() || null,
+        interviewStageId:
+          String(formData.get("interviewStageId") ?? "").trim() || null,
+        emailLength,
+        regenerationInstruction:
+          String(formData.get("regenerationInstruction") ?? "").trim() || null,
+        skipThankYouQuestions: String(formData.get("skipThankYouQuestions") ?? "") === "1",
+        thankYouAnswers: formData.getAll("thankYouAnswerId").map((raw, index) => ({
+          id: String(raw),
+          answer: String(formData.getAll("thankYouAnswer")[index] ?? ""),
+        })),
+      },
     });
-    if (!result.ok) {
-      return {
-        ok: false,
-        message: result.message,
-        violations: result.violations,
-      };
-    }
     revalidate(id);
-    if ("needsClarification" in result) {
-      return {
-        ok: true,
-        message: interviewConfig.labels.thankYouClarifyHelp,
-        questions: result.questions,
-      };
-    }
-    return {
-      ok: true,
-      message: `Version ${result.version} generated.`,
-      assetId: result.assetId,
-      version: result.version,
-    };
+    return { ok: true, message: "Outreach generation was queued." };
   } catch (error) {
     return errorResult(error);
   }

@@ -36,6 +36,14 @@ export const outreachConfig = Object.freeze({
     noContact: "No named contact",
     roleConfirmed: "Role confirmed",
     roleUnconfirmed: "Matched from title. Save a role to confirm it.",
+    pasteLinkedIn: "Paste LinkedIn profile text",
+    pasteLinkedInHelp:
+      "Paste the text of this person's LinkedIn profile. Nothing is fetched or scraped.",
+    saveLinkedIn: "Save pasted profile",
+    buildIndividual: "Build individual profile",
+    rebuildIndividual: "Rebuild individual profile",
+    commonGround: "Common ground",
+    individualProfile: "Individual profile",
     remindersTitle: "Follow-up reminders",
     remindersHelp:
       "Alerts only. Nothing is sent or blocked. Blank means no reminder for that slot.",

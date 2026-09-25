@@ -724,10 +724,8 @@ describe("application reminder cadence", () => {
       action.indexOf("export async function generateOutreachAssetAction"),
       action.indexOf("export async function markOutreachSentAction"),
     );
-    expect(generateFn.indexOf("if (!result.ok)")).toBeGreaterThan(-1);
-    expect(generateFn.indexOf("if (!result.ok)")).toBeLessThan(
-      generateFn.indexOf("revalidate(id)"),
-    );
+    expect(generateFn).toContain("enqueueApplicationJob");
+    expect(generateFn).toContain("revalidate(id)");
   });
 
   it("never writes CampaignContact.nextDueAt from the reminder action", () => {

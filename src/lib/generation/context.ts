@@ -1,8 +1,5 @@
-import "server-only";
-
-import { resolveActiveOrganization } from "@/lib/auth/session";
 import { profileEvidenceItems } from "@/lib/consultation/assess";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma-client";
 import { parseCandidateProfileSafe, type CandidateProfile } from "@/lib/product-research/candidate-profile";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
@@ -150,15 +147,8 @@ export async function loadApplicationGenerationContext(
   userId: string,
   options?: { personaId?: string | null; allowProductPersona?: boolean },
 ): Promise<ApplicationGenerationContext> {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) throw new TenantError("User not found.");
-  const membership = await resolveActiveOrganization(user);
-  if (!membership) {
-    throw new TenantError("No active organization membership was found.");
-  }
-  const organizationId = membership.organization.id;
   const campaign = await prisma.campaign.findFirst({
-    where: { id: campaignId, organizationId },
+    where: { id: campaignId, ownerUserId: userId },
     include: {
       product: {
         include: {
@@ -205,6 +195,7 @@ export async function loadApplicationGenerationContext(
   if (!campaign) {
     throw new TenantError(`${vocab.campaign.Singular} was not found.`);
   }
+  const organizationId = campaign.organizationId;
   if (campaign.ownerUserId !== userId) {
     throw new TenantError(
       `This ${vocab.campaign.singular} is read-only because it belongs to another user.`,
@@ -345,12 +336,18 @@ export async function loadApplicationGenerationContext(
     }
   }
   if (persona) {
+    const built =
+      persona.setupStatus === "NEEDS_REVIEW" ||
+      persona.setupStatus === "APPROVED" ||
+      (persona.profileJson &&
+        typeof persona.profileJson === "object" &&
+        Boolean((persona.profileJson as { narrative?: unknown }).narrative));
     addSource(sources, {
       id: `persona:${persona.id}`,
       text: [
         persona.name,
         persona.whyThisPersonaMatters,
-        JSON.stringify(persona.profileJson ?? {}),
+        built ? JSON.stringify(persona.profileJson ?? {}) : null,
       ]
         .filter(Boolean)
         .join(". "),

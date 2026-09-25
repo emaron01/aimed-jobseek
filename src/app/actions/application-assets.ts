@@ -2,13 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { requireCurrentUser } from "@/lib/auth/authz";
+import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import {
   acceptPresentationPlan,
-  writePresentationPlan,
 } from "@/lib/application-assets/plan-service";
 import {
   approveApplicationAsset,
-  generateApplicationAsset,
   saveEditedApplicationAsset,
 } from "@/lib/application-assets/service";
 import { applicationAssetConfig } from "@/lib/product-config";
@@ -60,18 +59,18 @@ export async function writePresentationPlanAction(
     const organizationId = await requireOrganizationId();
     await requireCurrentUser();
     const id = campaignId(formData);
-    const result = await writePresentationPlan({
+    const type = assetType(formData);
+    await enqueueApplicationJob({
       organizationId,
       campaignId: id,
-      type: assetType(formData),
-      adjustmentNote:
-        String(formData.get("adjustmentNote") ?? "").trim() || null,
+      type,
+      payload: {
+        operation: "plan",
+        adjustmentNote: String(formData.get("adjustmentNote") ?? "").trim() || null,
+      },
     });
-    if (!result.ok) {
-      return { ok: false, message: result.message };
-    }
     revalidate(id);
-    return { ok: true, message: applicationAssetConfig.labels.writePlan };
+    return { ok: true, message: `${applicationAssetConfig.labels.writePlan} was queued.` };
   } catch (error) {
     return errorResult(error);
   }
@@ -107,31 +106,26 @@ export async function generateApplicationAssetAction(
       requireOrganizationId(),
     ]);
     const id = campaignId(formData);
-    const result = await generateApplicationAsset({
+    const type = assetType(formData);
+    await enqueueApplicationJob({
       organizationId,
       campaignId: id,
-      userId: user.id,
-      type: assetType(formData),
-      hiddenRoleIds: formData
-        .getAll("hiddenRoleId")
-        .map((value) => String(value).trim())
-        .filter(Boolean),
-      regenerationInstruction:
-        String(formData.get("regenerationInstruction") ?? "").trim() || null,
+      type,
+      initiatedByUserId: user.id,
+      payload: {
+        userId: user.id,
+        hiddenRoleIds: formData
+          .getAll("hiddenRoleId")
+          .map((value) => String(value).trim())
+          .filter(Boolean),
+        regenerationInstruction:
+          String(formData.get("regenerationInstruction") ?? "").trim() || null,
+      },
     });
-    if (!result.ok) {
-      return {
-        ok: false,
-        message: result.message,
-        violations: result.violations,
-      };
-    }
     revalidate(id);
     return {
       ok: true,
-      message: `Version ${result.version} generated.`,
-      assetId: result.assetId,
-      version: result.version,
+      message: "Generation was queued.",
     };
   } catch (error) {
     return errorResult(error);

@@ -10,6 +10,11 @@ import {
   updateApplicationContactRoleAction,
   type ApplicationOutreachActionResult,
 } from "@/app/actions/application-outreach";
+import {
+  buildIndividualProfileAction,
+  saveLinkedInPasteAction,
+} from "@/app/actions/contact-profile";
+import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { interviewConfig } from "@/lib/product-config";
 import {
   applicationAssetContentSchema,
@@ -39,6 +44,12 @@ type ContactRow = {
   personaId: string | null;
   personaName: string | null;
   roleConfirmed: boolean;
+  linkedInProfileText: string | null;
+  extractedTitle: string | null;
+  individualStatus: string | null;
+  individualError: string | null;
+  commonGround: Array<{ text: string; seekerSource: string; contactSource: string }>;
+  caresAbout: Array<{ text: string }>;
 };
 
 type OutreachRow = {
@@ -230,6 +241,75 @@ export function ApplicationContactsSection({
                   ? outreachConfig.labels.roleConfirmed
                   : outreachConfig.labels.roleUnconfirmed}
               </p>
+              {contact.extractedTitle ? (
+                <p className="mt-1 text-xs text-slate-600">
+                  Title from paste: {contact.extractedTitle}
+                </p>
+              ) : null}
+              {canEdit ? (
+                <ApplicationActionForm
+                  action={saveLinkedInPasteAction}
+                  submitLabel={outreachConfig.labels.saveLinkedIn}
+                  testId={`linkedin-paste-${contact.contactId}`}
+                >
+                  <input type="hidden" name="campaignId" value={campaignId} />
+                  <input type="hidden" name="contactId" value={contact.contactId} />
+                  {contact.personaId ? (
+                    <input type="hidden" name="personaId" value={contact.personaId} />
+                  ) : null}
+                  <label className="block text-sm">
+                    <span className="font-medium text-slate-700">
+                      {outreachConfig.labels.pasteLinkedIn}
+                    </span>
+                    <textarea
+                      name="linkedInProfileText"
+                      rows={5}
+                      defaultValue={contact.linkedInProfileText ?? ""}
+                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    />
+                  </label>
+                  <p className="text-xs text-slate-500">
+                    {outreachConfig.labels.pasteLinkedInHelp}
+                  </p>
+                </ApplicationActionForm>
+              ) : null}
+              {contact.individualStatus ? (
+                <p className="mt-2 text-xs text-slate-600">
+                  {outreachConfig.labels.individualProfile}: {contact.individualStatus}
+                  {contact.individualError ? ` — ${contact.individualError}` : ""}
+                </p>
+              ) : null}
+              {contact.individualStatus === "FAILED" && canEdit ? (
+                <ApplicationActionForm
+                  action={buildIndividualProfileAction}
+                  submitLabel={outreachConfig.labels.rebuildIndividual}
+                  testId={`retry-individual-${contact.contactId}`}
+                >
+                  <input type="hidden" name="campaignId" value={campaignId} />
+                  <input type="hidden" name="contactId" value={contact.contactId} />
+                </ApplicationActionForm>
+              ) : null}
+              {contact.commonGround.length > 0 ? (
+                <div className="mt-2">
+                  <p className="text-xs font-medium text-slate-700">
+                    {outreachConfig.labels.commonGround}
+                  </p>
+                  <ul className="mt-1 list-disc pl-5 text-xs text-slate-600">
+                    {contact.commonGround.map((item) => (
+                      <li key={item.text}>
+                        {item.text} ({item.seekerSource}; {item.contactSource})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {contact.caresAbout.length > 0 ? (
+                <ul className="mt-2 list-disc pl-5 text-xs text-slate-600">
+                  {contact.caresAbout.map((item) => (
+                    <li key={item.text}>{item.text}</li>
+                  ))}
+                </ul>
+              ) : null}
             </li>
           ))}
         </ul>

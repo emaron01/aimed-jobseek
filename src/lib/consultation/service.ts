@@ -15,6 +15,7 @@ import {
   type EvidenceTarget,
 } from "@/lib/consultation/assess";
 import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
+import { isHiringTeamPersonaBuilt } from "@/lib/hiring-team/build";
 import {
   matchConsultationFocus,
   planQuestionRound,
@@ -31,7 +32,7 @@ import {
   appendConfirmedFact,
   proposalsFromExtraction,
 } from "@/lib/consultation/write-back";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma-client";
 import { consultationConfig, vocab } from "@/lib/product-config";
 import {
   emptyCandidateProfile,
@@ -126,15 +127,29 @@ async function hiringTeam(
       targetTitles: true,
       whyThisPersonaMatters: true,
       profileJson: true,
+      setupStatus: true,
     },
   });
-  return roles.map((role) => ({
-    id: role.id,
-    name: role.name,
-    likelyTitles: parseStringArray(role.targetTitles),
-    whyThisRoleMatters: role.whyThisPersonaMatters,
-    personaContext: role.profileJson,
-  }));
+  return roles.map((role) => {
+    const built = isHiringTeamPersonaBuilt(role);
+    const profile =
+      role.profileJson && typeof role.profileJson === "object"
+        ? (role.profileJson as Record<string, unknown>)
+        : {};
+    return {
+      id: role.id,
+      name: role.name,
+      likelyTitles: parseStringArray(role.targetTitles),
+      whyThisRoleMatters: role.whyThisPersonaMatters,
+      personaContext: built
+        ? role.profileJson
+        : {
+            involvement: profile.involvement ?? "DIRECT",
+            identification: profile.identification ?? null,
+            built: false,
+          },
+    };
+  });
 }
 
 async function saveAssessments(

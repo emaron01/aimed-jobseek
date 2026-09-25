@@ -12,7 +12,7 @@ import {
   validateGroundedStatement,
 } from "@/lib/consultation/output-quality";
 import { profileEvidenceItems } from "@/lib/consultation/assess";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma-client";
 import { consultationConfig, vocab } from "@/lib/product-config";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { parseStringArray } from "@/lib/research";

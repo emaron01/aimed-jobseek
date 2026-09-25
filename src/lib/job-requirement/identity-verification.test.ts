@@ -183,6 +183,46 @@ describe("employer identity verification", () => {
     expect(verification.verdict).toBe("MATCHED");
   });
 
+  it("is MATCHED when website matches, location matches, and size is not stated", () => {
+    const verification = verifyEmployerIdentity({
+      posting: {
+        rawText:
+          "Channel Partnerships Leader in Wilmington, Delaware. Website https://www.cscglobal.com",
+        title: "Channel Partnerships Leader",
+        companyName: "CSC",
+        location: "Wilmington, Delaware",
+        suppliedEmployerWebsite: "https://www.cscglobal.com",
+      },
+      research: {
+        companyName: "CSC",
+        companySummary: "CSC provides corporate solutions worldwide.",
+        whatTheySell: "Corporate solutions.",
+        businessModel: "B2B services.",
+        companySizeContext: null,
+        location: "Wilmington, Delaware",
+        website: "https://www.cscglobal.com",
+        identityAmbiguous: false,
+        researchSources: [
+          {
+            url: "https://www.cscglobal.com",
+            title: "CSC",
+            supports: ["Corporate solutions"],
+          },
+        ],
+      },
+    });
+    expect(verification.checks.find((check) => check.key === "website")?.status).toBe(
+      "MATCH",
+    );
+    expect(verification.checks.find((check) => check.key === "location")?.status).toBe(
+      "MATCH",
+    );
+    expect(
+      verification.checks.find((check) => check.key === "sizeOrStage")?.status,
+    ).toBe("NOT_STATED");
+    expect(verification.verdict).toBe("MATCHED");
+  });
+
   it("accepts research that matches the commercial posting", () => {
     const verification = verifyEmployerIdentity({
       posting: fixturePosting(),

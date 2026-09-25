@@ -535,6 +535,26 @@ enum PersonaSetupStatus {
   FAILED
 }
 
+enum ApplicationJobType {
+  HIRING_TEAM_IDENTIFY
+  HIRING_TEAM_BUILD
+  CONTACT_PROFILE
+  CONSULTATION
+  RESUME
+  COVER_LETTER
+  OUTREACH
+  INTERVIEW_GUIDE
+  APPLICATION_SUMMARY
+  NEXT_STEP
+}
+
+enum ApplicationJobStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
 model Organization {
   id                String                  @id @default(cuid())
   name              String
@@ -621,6 +641,7 @@ model Organization {
   jobRequirements               JobRequirement[]
   applicationFits               ApplicationFit[]
   presentationPlans             ApplicationPresentationPlan[]
+  applicationJobs               ApplicationJob[]
 
   @@index([status])
   @@index([accountType])
@@ -724,6 +745,7 @@ model User {
   digestSendTimeLocal            String                        @default("08:00")
   dailyDigestSends               DailyDigestSend[]
   researchRunsInitiated          ResearchRun[]                 @relation("ResearchRunInitiatedBy")
+  applicationJobsInitiated       ApplicationJob[]              @relation("ApplicationJobInitiatedBy")
   platformSettingsUpdated        PlatformSetting[]             @relation("PlatformSettingUpdatedBy")
   eulaVersionsCreated            EulaVersion[]                 @relation("EulaVersionCreatedBy")
   eulaAcceptances                UserEulaAcceptance[]
@@ -1439,6 +1461,9 @@ model Persona {
   /// Extended approved persona profile from staged Persona synthesis.
   profileJson                 Json?
   setupStatus                 PersonaSetupStatus    @default(NOT_STARTED)
+  /// Set when identification or research changed after this role was built.
+  staleAt                     DateTime?
+  staleReason                 String?
   approvedPersonaSetupRunId   String?
   /// Soft-archive: hidden from setup UI; preserves ScoringRun FK history.
   archivedAt                  DateTime?
@@ -2057,6 +2082,38 @@ model ResearchRun {
   @@index([initiatedByUserId])
 }
 
+/// Application-scoped generation work processed by the research worker.
+model ApplicationJob {
+  id                String               @id @default(cuid())
+  organizationId    String
+  campaignId        String
+  type              ApplicationJobType
+  status            ApplicationJobStatus @default(PENDING)
+  /// Persona, contact, asset type, or interview stage this job targets.
+  targetId          String?
+  error             String?
+  attempt           Int                  @default(0)
+  maxAttempts       Int                  @default(3)
+  payload           Json?
+  initiatedByUserId String?
+  workerHeartbeatAt DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  initiatedBy  User?        @relation("ApplicationJobInitiatedBy", fields: [initiatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([campaignId])
+  @@index([organizationId, campaignId, type, status])
+  @@index([campaignId, type, targetId, status])
+  @@index([status, workerHeartbeatAt])
+  @@index([initiatedByUserId])
+}
+
 model ScoringRun {
   id               String           @id @default(cuid())
   organizationId   String
@@ -2296,6 +2353,7 @@ model Campaign {
   interviewStages     InterviewStage[]
   researchRuns        ResearchRun[]
   presentationPlans   ApplicationPresentationPlan[]
+  applicationJobs     ApplicationJob[]
   /// Harper-written next step for the current application state.
   nextStepText        String?
   nextStepStateKey    String?
@@ -2821,6 +2879,12 @@ model CampaignContact {
   chosenPersonaId         String?
   /// True when the role came from the posting or the seeker confirmed it.
   roleConfirmed           Boolean               @default(false)
+  /// Pasted LinkedIn profile text. Never fetched or scraped.
+  linkedInProfileText     String?
+  linkedInExtractedJson   Json?
+  individualProfileJson   Json?
+  individualProfileStatus ApplicationJobStatus?
+  individualProfileError  String?
   createdAt               DateTime              @default(now())
   updatedAt               DateTime              @updatedAt
 

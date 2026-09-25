@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { generateApplicationSummary } from "@/lib/application-summary/service";
+import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
@@ -20,13 +20,15 @@ export async function generateApplicationSummaryAction(
   try {
     const organizationId = await requireOrganizationId();
     const user = await requireCurrentUser();
-    await generateApplicationSummary({
+    await enqueueApplicationJob({
       organizationId,
       campaignId,
-      userId: user.id,
+      type: "APPLICATION_SUMMARY",
+      initiatedByUserId: user.id,
+      payload: { userId: user.id },
     });
     revalidatePath(`/campaigns/${campaignId}/summary`);
-    return { ok: true, message: "Application Summary generation finished." };
+    return { ok: true, message: "Application Summary generation was queued." };
   } catch (error) {
     if (error instanceof TenantError) {
       return { ok: false, message: error.message };

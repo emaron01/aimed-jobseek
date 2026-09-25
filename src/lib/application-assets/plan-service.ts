@@ -6,7 +6,7 @@ import {
   presentationPlanSchema,
   type PresentationPlan,
 } from "@/lib/application-assets/plan-contract";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma-client";
 import { applicationAssetConfig, vocab } from "@/lib/product-config";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { TenantError } from "@/lib/tenant/errors";

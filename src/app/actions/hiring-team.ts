@@ -5,11 +5,14 @@ import {
   addApplicationHiringTeamRole,
   addTemplateToApplication,
   approveApplicationHiringTeamRole,
-  rebuildApplicationHiringTeamRole,
+  queueHiringTeamBuild,
+  queueHiringTeamBuildDirect,
   removeApplicationHiringTeamRole,
   savePersonaAsTemplate,
   updateApplicationHiringTeamRole,
 } from "@/lib/hiring-team/build";
+import { retryApplicationJob } from "@/lib/application-jobs/service";
+import { hiringTeamConfig } from "@/lib/product-config";
 import {
   createPersonaTemplate,
   deletePersonaTemplate,
@@ -178,9 +181,9 @@ export async function rebuildApplicationRoleAction(
     if (!campaignId || !personaId) {
       return { ok: false, message: `${vocab.persona.Singular} was not found.` };
     }
-    await rebuildApplicationHiringTeamRole({ organizationId, campaignId, personaId });
+    await queueHiringTeamBuild({ organizationId, campaignId, personaId });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: `${vocab.persona.Singular} rebuilt from the job.` };
+    return { ok: true, message: hiringTeamConfig.queuedBuild };
   } catch (error) {
     return fail(error, `The ${vocab.persona.singular} could not be rebuilt.`);
   }
@@ -223,6 +226,65 @@ export async function removeApplicationRoleAction(
     return { ok: true, message: `${vocab.persona.Singular} removed.` };
   } catch (error) {
     return fail(error, `The ${vocab.persona.singular} could not be removed.`);
+  }
+}
+
+export async function buildApplicationRoleAction(
+  _prev: HiringTeamActionResult | null,
+  formData: FormData,
+): Promise<HiringTeamActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    const personaId = String(formData.get("personaId") ?? "").trim();
+    if (!campaignId || !personaId) {
+      return { ok: false, message: `${vocab.persona.Singular} was not found.` };
+    }
+    await queueHiringTeamBuild({ organizationId, campaignId, personaId });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: hiringTeamConfig.queuedBuild };
+  } catch (error) {
+    return fail(error, `The ${vocab.persona.singular} could not be queued.`);
+  }
+}
+
+export async function buildAllDirectRolesAction(
+  _prev: HiringTeamActionResult | null,
+  formData: FormData,
+): Promise<HiringTeamActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    await queueHiringTeamBuildDirect({ organizationId, campaignId });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: hiringTeamConfig.queuedBuildAllDirect };
+  } catch (error) {
+    return fail(error, "Direct role builds could not be queued.");
+  }
+}
+
+export async function retryApplicationJobAction(
+  _prev: HiringTeamActionResult | null,
+  formData: FormData,
+): Promise<HiringTeamActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    const jobId = String(formData.get("jobId") ?? "").trim();
+    if (!campaignId || !jobId) {
+      return { ok: false, message: "That job was not found." };
+    }
+    await retryApplicationJob({ organizationId, campaignId, jobId });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: hiringTeamConfig.actions.retry };
+  } catch (error) {
+    return fail(error, "The job could not be retried.");
   }
 }
 
