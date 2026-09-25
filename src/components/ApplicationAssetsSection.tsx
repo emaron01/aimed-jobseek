@@ -20,8 +20,11 @@ import {
   formatAssetStatusLabel,
   formatClaimEditorLabel,
   formatClaimSupportLabel,
+  hasVisibleText,
+  sanitizeAssetContent,
+  visibleItems,
 } from "@/lib/application-assets/display";
-import { applicationAssetConfig, vocab } from "@/lib/product-config";
+import { applicationAssetConfig, consultationConfig, vocab } from "@/lib/product-config";
 import { AppActionLink, SubmitButton } from "@/components/ui";
 
 type AssetRow = {
@@ -54,24 +57,53 @@ const initial: ApplicationAssetActionResult | null = null;
 function Status({
   result,
   errorsOnly = false,
+  campaignId,
+  profileHref,
 }: {
   result: ApplicationAssetActionResult | null;
   errorsOnly?: boolean;
+  campaignId?: string;
+  profileHref?: string | null;
 }) {
   if (!result) return null;
   if (errorsOnly && result.ok) return null;
+  const violations = visibleItems(result.violations ?? [], (item) => item);
+  const messageLines = result.message
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => hasVisibleText(line) && !violations.includes(line));
   return (
     <div
       role="status"
       className={result.ok ? "text-sm text-emerald-700" : "text-sm text-red-700"}
+      data-testid="asset-verification-status"
     >
-      <p>{result.message}</p>
-      {result.violations?.length ? (
+      {messageLines.map((line) => (
+        <p key={line}>{line}</p>
+      ))}
+      {violations.length ? (
         <ul className="mt-1 list-disc pl-5">
-          {result.violations.map((violation) => (
+          {violations.map((violation) => (
             <li key={violation}>{violation}</li>
           ))}
         </ul>
+      ) : null}
+      {!result.ok ? (
+        <p className="mt-2 text-sm text-slate-700">
+          {applicationAssetConfig.labels.violationFix
+            .replace("{consultant}", consultationConfig.displayName)
+            .replace("{product}", vocab.product.singular)}{" "}
+          {campaignId ? (
+            <AppActionLink href={`/campaigns/${campaignId}#consultation`} variant="chip">
+              {consultationConfig.displayName}
+            </AppActionLink>
+          ) : null}{" "}
+          {profileHref ? (
+            <AppActionLink href={profileHref} variant="chip">
+              {vocab.product.Singular}
+            </AppActionLink>
+          ) : null}
+        </p>
       ) : null}
     </div>
   );
@@ -96,14 +128,21 @@ function AssetPreview({
   earlierExperienceHeading: string | null;
 }) {
   if (content.type === "COVER_LETTER") {
+    const paragraphs = visibleItems(content.paragraphs, (claim) => claim.text);
     return (
       <article className="space-y-4 text-sm leading-6 text-slate-800">
-        <p>{content.salutation}</p>
-        {content.paragraphs.map((claim) => (
-          <p key={claim.id}>
-            <ClaimText claim={claim} />
+        {hasVisibleText(content.salutation) ? <p>{content.salutation}</p> : null}
+        {paragraphs.length ? (
+          paragraphs.map((claim) => (
+            <p key={claim.id}>
+              <ClaimText claim={claim} />
+            </p>
+          ))
+        ) : (
+          <p className="text-sm text-slate-600">
+            {applicationAssetConfig.labels.emptySection}
           </p>
-        ))}
+        )}
         <p>
           {content.signoff}
           <br />
@@ -131,13 +170,24 @@ function AssetPreview({
         </p>
       </header>
       <AssetSection title={applicationAssetConfig.resumeHeadings.summary}>
-        {content.summary.map((claim) => (
-          <p key={claim.id}>
-            <ClaimText claim={claim} />
+        {visibleItems(content.summary, (claim) => claim.text).length ? (
+          visibleItems(content.summary, (claim) => claim.text).map((claim) => (
+            <p key={claim.id}>
+              <ClaimText claim={claim} />
+            </p>
+          ))
+        ) : (
+          <p className="text-sm text-slate-600">
+            {applicationAssetConfig.labels.emptySection}
           </p>
-        ))}
+        )}
       </AssetSection>
       <AssetSection title={applicationAssetConfig.resumeHeadings.experience}>
+        {featured.length === 0 ? (
+          <p className="text-sm text-slate-600">
+            {applicationAssetConfig.labels.emptySection}
+          </p>
+        ) : null}
         {featured.map((role) => (
           <div key={role.roleId} className="space-y-1">
             <p className="font-medium">
@@ -146,13 +196,19 @@ function AssetPreview({
             <p className="text-xs text-slate-600">
               {formatResumeRoleMeta(role)}
             </p>
-            <ul className="list-disc pl-5">
-              {role.bullets.map((claim) => (
-                <li key={claim.id}>
-                  <ClaimText claim={claim} />
-                </li>
-              ))}
-            </ul>
+            {visibleItems(role.bullets, (claim) => claim.text).length ? (
+              <ul className="list-disc pl-5">
+                {visibleItems(role.bullets, (claim) => claim.text).map((claim) => (
+                  <li key={claim.id}>
+                    <ClaimText claim={claim} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-600">
+                {applicationAssetConfig.labels.emptySection}
+              </p>
+            )}
           </div>
         ))}
         {condensed.length > 0 ? (
@@ -173,13 +229,15 @@ function AssetPreview({
         [applicationAssetConfig.resumeHeadings.education, content.education],
         [applicationAssetConfig.resumeHeadings.credentials, content.credentials],
       ].map(([title, claims]) =>
-        (claims as AssetClaim[]).length ? (
+        visibleItems(claims as AssetClaim[], (claim) => claim.text).length ? (
           <AssetSection key={title as string} title={title as string}>
-            {(claims as AssetClaim[]).map((claim) => (
-              <p key={claim.id}>
-                <ClaimText claim={claim} />
-              </p>
-            ))}
+            {visibleItems(claims as AssetClaim[], (claim) => claim.text).map(
+              (claim) => (
+                <p key={claim.id}>
+                  <ClaimText claim={claim} />
+                </p>
+              ),
+            )}
           </AssetSection>
         ) : null,
       )}
@@ -242,15 +300,19 @@ function AssetEditor({
   const [content, setContent] = useState(asset.content);
   const [result, action] = useActionState(saveEditedApplicationAssetAction, initial);
   const claims = useMemo(() => {
-    if (content.type === "COVER_LETTER") return content.paragraphs;
-    if (content.type !== "RESUME") return [];
-    return [
-      ...content.summary,
-      ...content.experience.flatMap((role) => role.bullets),
-      ...content.skills,
-      ...content.education,
-      ...content.credentials,
-    ];
+    const raw =
+      content.type === "COVER_LETTER"
+        ? content.paragraphs
+        : content.type === "RESUME"
+          ? [
+              ...content.summary,
+              ...content.experience.flatMap((role) => role.bullets),
+              ...content.skills,
+              ...content.education,
+              ...content.credentials,
+            ]
+          : [];
+    return visibleItems(raw, (claim) => claim.text);
   }, [content]);
   return (
     <form action={action} className="mt-4 space-y-3 border-t border-slate-200 pt-4">
@@ -275,7 +337,7 @@ function AssetEditor({
         </label>
       ))}
       <SubmitButton>{applicationAssetConfig.labels.saveNewVersion}</SubmitButton>
-      <Status result={result} />
+      <Status result={result} campaignId={campaignId} />
     </form>
   );
 }
@@ -285,11 +347,13 @@ function AssetHistory({
   rows,
   canEdit,
   earlierExperienceHeading,
+  profileHref,
 }: {
   campaignId: string;
   rows: AssetRow[];
   canEdit: boolean;
   earlierExperienceHeading: string | null;
+  profileHref: string | null;
 }) {
   const [approveResult, approveAction] = useActionState(
     approveApplicationAssetAction,
@@ -337,7 +401,7 @@ function AssetHistory({
           </div>
         </details>
       ))}
-      <Status result={approveResult} />
+      <Status result={approveResult} campaignId={campaignId} profileHref={profileHref} />
     </div>
   );
 }
@@ -363,7 +427,10 @@ function PlanPanel({
             <>
               <p className="text-sm text-slate-800">{plan.plan.summaryAngle}</p>
               <ul className="list-disc space-y-1 pl-5 text-sm text-slate-800">
-                {plan.plan.recommendations.map((item) => (
+                {visibleItems(
+                  plan.plan.recommendations,
+                  (item) => `${item.text} ${item.reason}`,
+                ).map((item) => (
                   <li key={`${item.text}-${item.reason}`}>
                     {item.text} {item.reason}
                   </li>
@@ -375,7 +442,10 @@ function PlanPanel({
               <p className="text-sm text-slate-800">{plan.plan.angle}</p>
               <p className="text-sm text-slate-800">{plan.plan.gapHandling}</p>
               <ul className="list-disc space-y-1 pl-5 text-sm text-slate-800">
-                {plan.plan.recommendations.map((item) => (
+                {visibleItems(
+                  plan.plan.recommendations,
+                  (item) => `${item.text} ${item.reason}`,
+                ).map((item) => (
                   <li key={`${item.text}-${item.reason}`}>
                     {item.text} {item.reason}
                   </li>
@@ -534,7 +604,12 @@ function AssetTypePanel({
             ? applicationAssetConfig.labels.regenerate
             : applicationAssetConfig.labels.generate}
         </SubmitButton>
-        <Status result={result} errorsOnly />
+        <Status
+          result={result}
+          errorsOnly
+          campaignId={campaignId}
+          profileHref={profileHref}
+        />
       </form> : null}
       {rows.length ? (
         <AssetHistory
@@ -542,6 +617,7 @@ function AssetTypePanel({
           rows={rows}
           canEdit={canEdit}
           earlierExperienceHeading={earlierExperienceHeading}
+          profileHref={profileHref}
         />
       ) : (
         <p className="text-sm text-slate-600">
@@ -577,7 +653,27 @@ export function ApplicationAssetsSection({
 }) {
   const valid = assets.flatMap((asset) => {
     const parsed = applicationAssetContentSchema.safeParse(asset.content);
-    return parsed.success ? [{ ...asset, content: parsed.data }] : [];
+    if (parsed.success) {
+      return [{ ...asset, content: sanitizeAssetContent(parsed.data) }];
+    }
+    if (
+      asset.content &&
+      typeof asset.content === "object" &&
+      "type" in asset.content &&
+      ((asset.content as ApplicationAssetContent).type === "RESUME" ||
+        (asset.content as ApplicationAssetContent).type === "COVER_LETTER")
+    ) {
+      try {
+        const sanitized = sanitizeAssetContent(
+          asset.content as ApplicationAssetContent,
+        );
+        const retry = applicationAssetContentSchema.safeParse(sanitized);
+        return retry.success ? [{ ...asset, content: retry.data }] : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
   });
   return (
     <details

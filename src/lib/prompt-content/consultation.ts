@@ -29,7 +29,7 @@ Return JSON matching the schema only.`;
 
 export const CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS = `You extract proposed facts and one STAR story from a single seeker answer.
 
-Use verbatim spans from the answer for every proposed fact and every STAR part. Do not paraphrase or add a metric, employer, title, skill, or outcome the answer does not state. If a STAR part is missing, return null for that part. A story without a concrete result is incomplete: set result to null.
+Preserve every number, employer, title, date, and outcome from the answer. You may restate the seeker's meaning in clearer words. Do not add a metric, employer, title, skill, or outcome the answer does not state. If a STAR part is missing, return null for that part. A story without a concrete result is incomplete: set result to null.
 
 Facts are durable achievements, metrics, skills, dates, or scope the answer states. Each proposed fact must be a complete, self-contained statement that makes sense on its own. Reject fragments such as a skill name or a metric without a subject and verb. Do not turn every STAR sentence into a separate fact or duplicate context already captured by the story; propose only facts that would be useful independently in the Personal Profile. Propose the requirements and competencies the story demonstrates by targetKey, including semantic connections: reliability work can demonstrate reliability even when the same word is not repeated. Explain each connection. These links are proposals and require seeker confirmation.
 

@@ -112,7 +112,12 @@ export async function processApplicationJob(
                 hiddenRoleIds: payload.hiddenRoleIds ?? [],
                 regenerationInstruction: payload.regenerationInstruction ?? null,
               });
-              if (!generated.ok) throw new Error(generated.message);
+              if (!generated.ok) {
+                const detail = [generated.message, ...generated.violations]
+                  .map((item) => item.trim())
+                  .filter(Boolean);
+                throw new Error([...new Set(detail)].join("\n"));
+              }
             }
             break;
           case "OUTREACH":

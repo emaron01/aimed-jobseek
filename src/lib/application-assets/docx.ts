@@ -12,6 +12,7 @@ import type {
   ResumeAssetContent,
 } from "./contract";
 import { formatResumeRoleMeta } from "./dates";
+import { hasVisibleText } from "@/lib/grounding/fact-tokens";
 
 const style = applicationAssetConfig.docx;
 
@@ -95,7 +96,9 @@ function resumeChildren(content: ResumeAssetContent): Paragraph[] {
   }
   children.push(
     heading(applicationAssetConfig.resumeHeadings.summary),
-    ...content.summary.map((claim) => bodyParagraph(claim.text)),
+    ...content.summary
+      .filter((claim) => hasVisibleText(claim.text))
+      .map((claim) => bodyParagraph(claim.text)),
     heading(applicationAssetConfig.resumeHeadings.experience),
   );
   const featured = content.experience.filter(
@@ -111,9 +114,9 @@ function resumeChildren(content: ResumeAssetContent): Paragraph[] {
         { bold: true, after: 0 },
       ),
       bodyParagraph(formatResumeRoleMeta(role)),
-      ...role.bullets.map((claim) =>
-        bodyParagraph(claim.text, { bullet: true }),
-      ),
+      ...role.bullets
+        .filter((claim) => hasVisibleText(claim.text))
+        .map((claim) => bodyParagraph(claim.text, { bullet: true })),
     );
   }
   if (condensed.length > 0) {
@@ -153,11 +156,13 @@ function coverLetterChildren(
 ): Paragraph[] {
   return [
     bodyParagraph(content.salutation),
-    ...content.paragraphs.map((claim) =>
-      bodyParagraph(claim.text, {
-        after: style.paragraphAfterTwips * 2,
-      }),
-    ),
+    ...content.paragraphs
+      .filter((claim) => hasVisibleText(claim.text))
+      .map((claim) =>
+        bodyParagraph(claim.text, {
+          after: style.paragraphAfterTwips * 2,
+        }),
+      ),
     bodyParagraph(content.signoff, { after: 0 }),
     bodyParagraph(content.signerName),
   ];

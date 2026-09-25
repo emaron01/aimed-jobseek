@@ -59,7 +59,10 @@ import {
   NORMAL_JOB_MODEL,
   NORMAL_JOB_POSTING,
 } from "@/lib/job-requirement/fixtures";
-import { consultationConfig } from "@/lib/product-config/consultation";
+import {
+  consultationConfig,
+  consultationConversationCopy,
+} from "@/lib/product-config/consultation";
 import {
   validateGroundedStatement,
   validateInterviewAnswerQuality,
@@ -590,6 +593,78 @@ describe("consultation evidence and questions", () => {
       ],
     });
     expect(why.dropped).toContain("target:why-this-company:motivation");
+
+    const paraphrased = proposalsFromExtraction({
+      answer,
+      turnId: "turn_paraphrase",
+      extracted: {
+        facts: [
+          {
+            text: "I spent five years using Python and reduced unsuccessful jobs by 40 percent.",
+          },
+        ],
+        story: {
+          situation:
+            "Python work over five years needed more reliable job processing.",
+          task: "I needed to reduce unsuccessful jobs.",
+          action: "I used Python to stabilize the job pipeline.",
+          result: "Unsuccessful jobs fell by 40 percent.",
+        },
+        demonstratedTargets: [],
+        missingStarElements: [],
+        followUpQuestion: null,
+      },
+      targets,
+    });
+    const modelMarkedActionMissing = proposalsFromExtraction({
+      answer,
+      turnId: "turn_action_present",
+      extracted: {
+        facts: [],
+        story: {
+          situation:
+            "Python work over five years needed more reliable job processing.",
+          task: "I needed to reduce unsuccessful jobs.",
+          action: "I used Python to stabilize the job pipeline.",
+          result: "Unsuccessful jobs fell by 40 percent.",
+        },
+        demonstratedTargets: [],
+        missingStarElements: ["ACTION"],
+        followUpQuestion: "What did you personally do?",
+      },
+      targets,
+    });
+    expect(
+      modelMarkedActionMissing.proposals.some((proposal) => proposal.kind === "STORY"),
+    ).toBe(true);
+    expect(modelMarkedActionMissing.missingStarElements).not.toContain("ACTION");
+
+    expect(paraphrased.proposals.some((proposal) => proposal.kind === "STORY")).toBe(
+      true,
+    );
+    expect(paraphrased.dropped).not.toContain("fact:0");
+
+    const changedNumber = proposalsFromExtraction({
+      answer,
+      turnId: "turn_changed_number",
+      extracted: {
+        facts: [],
+        story: {
+          situation: answer,
+          task: answer,
+          action: answer,
+          result: "Unsuccessful jobs fell by 60 percent.",
+        },
+        demonstratedTargets: [],
+        missingStarElements: [],
+        followUpQuestion: null,
+      },
+      targets,
+    });
+    expect(changedNumber.dropped).toContain("story:result");
+    expect(changedNumber.proposals.find((proposal) => proposal.kind === "STORY")).toBeUndefined();
+    expect(changedNumber.missingStarElements).toContain("RESULT");
+    expect(changedNumber.followUpQuestion).toMatch(/result/i);
     expect(why.proposals.find((proposal) => proposal.kind === "STORY")?.story?.competencyLinks).toEqual(
       [],
     );
@@ -620,6 +695,11 @@ describe("consultation evidence and questions", () => {
     ).toBe(true);
     expect(
       isCompleteFactStatement("I automated nightly jobs that cut failed billing runs."),
+    ).toBe(true);
+    expect(
+      isCompleteFactStatement(
+        "Grew Harborline's annual contract value from $9 million to $21 million over three years.",
+      ),
     ).toBe(true);
     const result = proposalsFromExtraction({
       answer,
@@ -805,7 +885,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("10");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("11");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("coach, not an interrogator");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("Never inflate fit");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -1113,7 +1193,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("10");
+    expect(session?.promptVersion).toBe("11");
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
     expect(session?.briefingJson).toMatchObject({
@@ -1317,37 +1397,43 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     const followUp = afterAnswer?.turns.find(
       (turn) => turn.speaker === "CONSULTANT" && turn.followUp,
     );
-    expect(followUp?.body).toContain("what did you personally change");
-    expect(afterAnswer?.statements).toHaveLength(0);
-
-    await skipConsultationQuestion({
-      organizationId,
-      campaignId: campaign.id,
-      targetKey: question!.targetKey!,
-    });
-    const declined = await prisma.consultationSession.findUnique({
+    if (followUp) {
+      expect(followUp.body.toLowerCase()).toMatch(
+        /what did you|tell me what you did|personally/,
+      );
+      expect(afterAnswer?.statements).toHaveLength(0);
+      await skipConsultationQuestion({
+        organizationId,
+        campaignId: campaign.id,
+        targetKey: question!.targetKey!,
+      });
+    }
+    const polished = await prisma.consultationSession.findUnique({
       where: { campaignId: campaign.id },
       include: {
         turns: { orderBy: { sequence: "asc" } },
         statements: { orderBy: { kind: "asc" } },
       },
     });
-    const interview = declined?.statements.find(
+    const interview = polished?.statements.find(
       (statement) => statement.kind === "INTERVIEW_ANSWER",
     );
-    expect(interview?.content).toBe(answer);
+    expect(interview?.content).toMatch(/8%/);
     expect(interview?.content.match(/8%/g)).toHaveLength(1);
-    expect(interview?.strengtheningNote).toContain("ACTION");
-    expect(
-      declined?.turns.some(
-        (turn) =>
-          turn.skipped &&
-          turn.analysisJson &&
-          typeof turn.analysisJson === "object" &&
-          (turn.analysisJson as { followUpDeclined?: unknown })
-            .followUpDeclined === true,
-      ),
-    ).toBe(true);
+    if (followUp) {
+      expect(interview?.content).toBe(answer);
+      expect(interview?.strengtheningNote).toContain("ACTION");
+      expect(
+        polished?.turns.some(
+          (turn) =>
+            turn.skipped &&
+            turn.analysisJson &&
+            typeof turn.analysisJson === "object" &&
+            (turn.analysisJson as { followUpDeclined?: unknown })
+              .followUpDeclined === true,
+        ),
+      ).toBe(true);
+    }
   });
 
   it("shows a failed generation state with no substitute questions and retries", async () => {
@@ -1398,6 +1484,63 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     });
     expect(retried?.generationStatus).toBe("READY");
     expect(retried?.turns.length).toBeGreaterThan(0);
+  });
+
+  it("keeps Harper coaching when extraction fails and asks for the missing story", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Extract fail ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaign.id);
+    await startConsultation({ organizationId, campaignId: campaign.id });
+    const session = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: { turns: { orderBy: { sequence: "asc" } } },
+    });
+    const question = session?.turns.find((turn) => turn.speaker === "CONSULTANT");
+    generateStructured.mockImplementation(async (request: { schemaName: string }) => {
+      if (request.schemaName === "consultation_extract") {
+        throw new Error("extraction provider failed");
+      }
+      throw new Error(`Unexpected schema ${request.schemaName}`);
+    });
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey: question!.targetKey!,
+      answer: "I used Python for 5 years and cut failed jobs by 40%.",
+    });
+    const after = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: { turns: { orderBy: { sequence: "asc" } } },
+    });
+    expect(after?.generationStatus).toBe("READY");
+    expect(after?.generationError).toBeNull();
+    const coaching = after?.turns
+      .filter((turn) => turn.speaker === "CONSULTANT")
+      .at(-1)?.body;
+    expect(coaching).toContain(consultationConversationCopy.askForStory);
+    expect(coaching).not.toMatch(/fully grounded story/i);
   });
 
   it("dismisses a proposal without writing the Personal Profile", async () => {

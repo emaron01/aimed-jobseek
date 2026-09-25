@@ -14,6 +14,7 @@ import {
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
 import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-status";
+import { mergeExistingHiringTeamRoles } from "@/lib/hiring-team/merge-existing";
 import { getApplicationResearchStatus } from "@/lib/application/research-status";
 import type { ApplicationResearchStatusView } from "@/lib/application/research-status";
 import {
@@ -334,6 +335,7 @@ export async function ApplicationWorkspace({
 }) {
   await ensureIdentityVerification({ organizationId, campaignId });
   await ensureHiringTeamAfterResearch({ organizationId, campaignId });
+  await mergeExistingHiringTeamRoles({ organizationId, campaignId });
   const requirement = await prisma.jobRequirement.findFirst({
     where: { campaignId, organizationId },
     include: {
@@ -485,7 +487,11 @@ export async function ApplicationWorkspace({
       <h2 id="application-next-step" className="text-base font-semibold text-slate-900">
         {consultationConversationCopy.nextStepTitle}
       </h2>
-      <ApplicationWorkspaceLive campaignId={campaignId} initialJobs={live.jobs} />
+      <ApplicationWorkspaceLive
+        campaignId={campaignId}
+        initialJobs={live.jobs}
+        profileHref={`/products/${requirement.campaign.product.id}`}
+      />
       <WorkspaceProgress jobs={live.jobs} type="NEXT_STEP" />
       {nextStep.failed ? (
         <div className="space-y-2">
@@ -697,8 +703,18 @@ export async function ApplicationWorkspace({
       jobs={live.jobs}
     />
     <div id="assets">
-    <WorkspaceProgress jobs={live.jobs} type="RESUME" />
-    <WorkspaceProgress jobs={live.jobs} type="COVER_LETTER" />
+    <WorkspaceProgress
+      jobs={live.jobs}
+      type="RESUME"
+      campaignId={campaignId}
+      profileHref={`/products/${requirement.campaign.product.id}`}
+    />
+    <WorkspaceProgress
+      jobs={live.jobs}
+      type="COVER_LETTER"
+      campaignId={campaignId}
+      profileHref={`/products/${requirement.campaign.product.id}`}
+    />
     <ApplicationAssetsSection
       campaignId={requirement.campaignId}
       canEdit={canEdit}
@@ -1303,12 +1319,13 @@ function AnnotatedBlock({
   title: string;
   items: Array<{ text: string; kind: string }>;
 }) {
-  if (items.length === 0) return null;
+  const visible = items.filter((item) => item.text.replace(/\s+/g, " ").trim());
+  if (visible.length === 0) return null;
   return (
     <div>
       <h4 className="text-sm font-medium text-slate-900">{title}</h4>
       <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-800">
-        {items.map((item) => (
+        {visible.map((item) => (
           <li key={item.text}>
             {item.text}
             <KindMark kind={item.kind} />
@@ -1329,12 +1346,13 @@ function Field({ label, value }: { label: string; value: string | null }) {
 }
 
 function BulletList({ title, items }: { title: string; items: string[] }) {
-  if (items.length === 0) return null;
+  const visible = items.filter((item) => item.replace(/\s+/g, " ").trim());
+  if (visible.length === 0) return null;
   return (
     <div>
       <h3 className="text-sm font-medium text-slate-900">{title}</h3>
       <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-800">
-        {items.map((item) => (
+        {visible.map((item) => (
           <li key={item}>{item}</li>
         ))}
       </ul>

@@ -12,17 +12,70 @@ import {
 } from "@/lib/product-config";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
 import { AppPendingIndicator } from "@/components/AppButton";
+import { AppActionLink } from "@/components/ui";
+import { hasVisibleText } from "@/lib/grounding/fact-tokens";
+import { applicationAssetConfig, consultationConfig, vocab } from "@/lib/product-config";
 
 const POLL_MS = 3_000;
+
+function JobErrorDetail({
+  error,
+  campaignId,
+  profileHref,
+}: {
+  error: string | null;
+  campaignId: string;
+  profileHref?: string | null;
+}) {
+  const lines = (error ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => hasVisibleText(line));
+  const message = lines[0] || workspaceJobCopy.failed;
+  const violations = lines.slice(1);
+  const showFix =
+    /claim|source|verif/i.test(error ?? "") || violations.length > 0;
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-amber-950">{message}</p>
+      {violations.length ? (
+        <ul className="list-disc pl-5 text-sm text-amber-950">
+          {violations.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      ) : null}
+      {showFix ? (
+        <p className="text-sm text-slate-700">
+          {applicationAssetConfig.labels.violationFix
+            .replace("{consultant}", consultationConfig.displayName)
+            .replace("{product}", vocab.product.singular)}{" "}
+          <AppActionLink href={`/campaigns/${campaignId}#consultation`} variant="chip">
+            {consultationConfig.displayName}
+          </AppActionLink>{" "}
+          {profileHref ? (
+            <AppActionLink href={profileHref} variant="chip">
+              {vocab.product.Singular}
+            </AppActionLink>
+          ) : null}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 export function WorkspaceProgress({
   jobs,
   type,
   stayAndWatch,
+  campaignId,
+  profileHref,
 }: {
   jobs: WorkspaceJobStatusView[];
   type: WorkspaceJobStatusView["type"];
   stayAndWatch?: boolean;
+  campaignId?: string;
+  profileHref?: string | null;
 }) {
   const latest = jobs.find((job) => job.type === type);
   const live =
@@ -48,9 +101,17 @@ export function WorkspaceProgress({
         className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3"
         data-testid={`workspace-failed-${type}`}
       >
-        <p className="text-sm text-amber-950">
-          {failed.error?.trim() || workspaceJobCopy.failed}
-        </p>
+        {campaignId ? (
+          <JobErrorDetail
+            error={failed.error}
+            campaignId={campaignId}
+            profileHref={profileHref}
+          />
+        ) : (
+          <p className="text-sm text-amber-950">
+            {failed.error?.trim() || workspaceJobCopy.failed}
+          </p>
+        )}
       </div>
     );
   }
@@ -61,9 +122,11 @@ export function WorkspaceProgress({
 export function ApplicationWorkspaceLive({
   campaignId,
   initialJobs,
+  profileHref,
 }: {
   campaignId: string;
   initialJobs: WorkspaceJobStatusView[];
+  profileHref?: string | null;
 }) {
   const router = useRouter();
   const [jobs, setJobs] = useState(initialJobs);
@@ -132,9 +195,11 @@ export function ApplicationWorkspaceLive({
           key={job.id}
           className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3"
         >
-          <p className="text-sm text-amber-950">
-            {job.error?.trim() || workspaceJobCopy.failed}
-          </p>
+          <JobErrorDetail
+            error={job.error}
+            campaignId={campaignId}
+            profileHref={profileHref}
+          />
           <ApplicationActionForm
             action={retryApplicationJobAction}
             submitLabel={workspaceJobCopy.retry}

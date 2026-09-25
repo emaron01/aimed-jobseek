@@ -67,6 +67,17 @@ export const consultationConversationCopy = Object.freeze({
   changePrompt: "What should change?",
   generationFailed: `${consultationConfig.displayName} could not finish this coaching. Retry.`,
   generationQualityFailed: `${consultationConfig.displayName} could not keep one part of this coaching after checks. The rest is below. Retry the missing part.`,
+  askForStory:
+    "Tell me what happened, what you did, and what the result was.",
+  keepCoaching:
+    "I can work with what you shared. A bit more detail will make the story stronger.",
+  missingStarAsk: {
+    SITUATION: "Tell me what the situation was.",
+    TASK: "Tell me what you were asked to do.",
+    ACTION: "Tell me what you did.",
+    RESULT: "Tell me what the result was.",
+    METRIC: "Tell me the number or outcome.",
+  },
   modelUnavailable: `${consultationConfig.displayName} could not reach the consultation model. Retry when it is available.`,
   retry: `Retry ${consultationConfig.displayName}`,
   start: `Start with ${consultationConfig.displayName}`,

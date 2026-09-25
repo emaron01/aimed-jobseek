@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-export const RESUME_ASSET_PROMPT_VERSION = "7";
-export const COVER_LETTER_ASSET_PROMPT_VERSION = "13";
+export const RESUME_ASSET_PROMPT_VERSION = "8";
+export const COVER_LETTER_ASSET_PROMPT_VERSION = "14";
 export const OUTREACH_EMAIL_PROMPT_VERSION = "5";
 export const OUTREACH_LINKEDIN_NOTE_PROMPT_VERSION = "5";
 export const OUTREACH_LINKEDIN_INMAIL_PROMPT_VERSION = "5";
-export const ASSET_CLAIM_VALIDATION_PROMPT_VERSION = "4";
+export const ASSET_CLAIM_VALIDATION_PROMPT_VERSION = "5";
 
 export const assetSupportSchema = z.object({
   sourceId: z.string().trim().min(1),

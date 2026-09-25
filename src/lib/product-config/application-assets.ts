@@ -24,6 +24,11 @@ export const applicationAssetConfig = Object.freeze({
     planFailed: `${consultationConfig.displayName} could not write this plan. Retry.`,
     planModelUnavailable: `${consultationConfig.displayName} could not reach the consultation model for this plan. Retry when it is available.`,
     emptyHistory: "No versions generated yet.",
+    emptySection: "Nothing here yet.",
+    verificationFailed:
+      "This version was not saved because some claims did not match their sources.",
+    violationFix:
+      "Confirm this fact with {consultant} or edit the {product}.",
     saveNewVersion: "Save as new version",
     seekerEditedGuidance: "Seeker-edited version",
     partialRemoved:

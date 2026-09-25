@@ -40,6 +40,7 @@ import {
 import { nextConsultationStatus } from "@/lib/consultation/state";
 import {
   appendConfirmedFact,
+  followUpForMissingStar,
   proposalsFromExtraction,
 } from "@/lib/consultation/write-back";
 import { prisma } from "@/lib/prisma-client";
@@ -1110,37 +1111,56 @@ async function processAnswerGeneration(input: {
     targets: input.targets,
   });
   if (!extracted.ok) {
-    await prisma.consultationTurn.update({
-      where: { id: input.turnId },
-      data: {
-        analysisJson: { status: "FAILED", message: extracted.message },
-      },
-    });
-    await failGeneration(input.sessionId, extracted.message);
-    return { ok: false };
+    const ask = consultationConversationCopy.askForStory;
+    console.error(
+      JSON.stringify({
+        event: "consultation_extraction_dropped",
+        turnId: input.turnId,
+        text: input.answerContext,
+        reason: extracted.message,
+      }),
+    );
+    await prisma.$transaction([
+      prisma.consultationTurn.update({
+        where: { id: input.turnId },
+        data: {
+          analysisJson: {
+            status: "READY",
+            answerContext: input.answerContext,
+            story: null,
+            dropped: [
+              { text: input.answerContext, reason: extracted.message },
+            ],
+            missingStarElements: ["SITUATION", "TASK", "ACTION", "RESULT"],
+            demonstratedTargets: [],
+          },
+        },
+      }),
+      prisma.consultationSession.update({
+        where: { id: input.sessionId },
+        data: { generationStatus: "READY", generationError: null },
+      }),
+    ]);
+    return {
+      ok: true,
+      followUpQuestion: ask,
+      coaching: ask,
+      missingStarElements: ["SITUATION", "TASK", "ACTION", "RESULT"],
+    };
   }
   const verified = proposalsFromExtraction({
     answer: input.answerContext,
     turnId: input.turnId,
     extracted: extracted.data,
     targets: input.targets,
+    profile: input.profile,
   });
   const storyProposal = verified.proposals.find(
     (proposal) => proposal.kind === "STORY" && proposal.story,
   );
   let polished: Awaited<ReturnType<typeof polishAnswerWithQuality>> | null =
     null;
-  if (!verified.followUpQuestion && verified.missingStarElements.length === 0) {
-    if (!storyProposal?.story) {
-      const message =
-        "Consultation answer analysis did not return a fully grounded story. Retry consultation.";
-      await prisma.consultationTurn.update({
-        where: { id: input.turnId },
-        data: { analysisJson: { status: "FAILED", message } },
-      });
-      await failGeneration(input.sessionId, message);
-      return { ok: false };
-    }
+  if (storyProposal?.story && verified.missingStarElements.length === 0) {
     polished = await polishAnswerWithQuality({
       answer: input.answerContext,
       story: {
@@ -1158,16 +1178,29 @@ async function processAnswerGeneration(input: {
       strengtheningNeeds: [],
     });
     if (!polished.ok) {
-      await prisma.consultationTurn.update({
-        where: { id: input.turnId },
-        data: {
-          analysisJson: { status: "FAILED", message: polished.message },
-        },
-      });
-      await failGeneration(input.sessionId, polished.message);
-      return { ok: false };
+      console.error(
+        JSON.stringify({
+          event: "consultation_polish_dropped",
+          turnId: input.turnId,
+          text: storyProposal.story.result,
+          reason: polished.message,
+        }),
+      );
+      polished = null;
     }
   }
+  const followUpQuestion =
+    verified.followUpQuestion ??
+    (verified.missingStarElements.length > 0
+      ? followUpForMissingStar(verified.missingStarElements)
+      : storyProposal?.story
+        ? null
+        : consultationConversationCopy.askForStory);
+  const coaching =
+    extracted.data.coaching?.trim() ||
+    (followUpQuestion
+      ? consultationConversationCopy.keepCoaching
+      : null);
   const operations: Prisma.PrismaPromise<unknown>[] = [
     prisma.consultationProposal.deleteMany({
       where: { turnId: input.turnId, status: "PENDING" },
@@ -1178,8 +1211,8 @@ async function processAnswerGeneration(input: {
         analysisJson: {
           status: "READY",
           answerContext: input.answerContext,
-          story: extracted.data.story,
-          dropped: verified.dropped,
+          story: storyProposal?.story ?? verified.partialStory ?? extracted.data.story,
+          dropped: verified.droppedDetails,
           missingStarElements: verified.missingStarElements,
           demonstratedTargets: extracted.data.demonstratedTargets,
         },
@@ -1267,8 +1300,8 @@ async function processAnswerGeneration(input: {
   await prisma.$transaction(operations);
   return {
     ok: true,
-    followUpQuestion: verified.followUpQuestion,
-    coaching: extracted.data.coaching?.trim() || null,
+    followUpQuestion,
+    coaching,
     missingStarElements: verified.missingStarElements,
   };
 }

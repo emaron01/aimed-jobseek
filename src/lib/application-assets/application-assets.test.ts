@@ -179,6 +179,20 @@ describe("application asset date display", () => {
     expect(documentXml).not.toContain("2021-01");
     expect(documentXml).not.toContain("2017-06");
   });
+
+  it("does not write empty resume bullets into the DOCX", async () => {
+    const resume = validResume();
+    resume.experience[0]!.bullets.push({
+      id: "empty-bullet",
+      text: "   ",
+      supports: support("profile:ach_1", "rewrite"),
+    });
+    const buffer = await renderApplicationAssetDocx(resume);
+    const zip = await JSZip.loadAsync(buffer);
+    const documentXml = await zip.file("word/document.xml")!.async("string");
+    expect(documentXml).toContain("invoice generation");
+    expect(documentXml.match(/<w:ilvl w:val="0"\/>/g)?.length).toBe(2);
+  });
 });
 
 describe("application asset DOCX", () => {
@@ -573,6 +587,60 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     const xml = await zip.file("word/document.xml")!.async("string");
     expect(xml).toContain("Contoso Health");
     expect(xml).toContain("Software Engineer");
+  });
+
+  it("accepts a paraphrased profile fact and rejects a changed number", async () => {
+    const paraphrased = validResume();
+    paraphrased.experience[0]!.bullets[0] = {
+      id: "bullet-1",
+      text: "As Senior Software Engineer at Northwind Analytics, I rewrote invoice generation and reduced failed billing runs from 8 percent to under 1 percent.",
+      supports: support(
+        "profile:ach_1",
+        "Led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
+      ),
+    };
+    installModel({ resumes: [paraphrased] });
+    const passed = await generateApplicationAsset({
+      organizationId,
+      campaignId,
+      userId,
+      type: "RESUME",
+    });
+    expect(passed.ok).toBe(true);
+    const saved = await prisma.applicationAsset.findFirst({
+      where: { campaignId, type: "RESUME" },
+      orderBy: { version: "desc" },
+    });
+    const content = saved?.contentJson as ResumeAssetContent;
+    expect(content.experience[0]?.bullets[0]?.text).toContain("8 percent");
+
+    await prisma.applicationAsset.deleteMany({ where: { campaignId, type: "RESUME" } });
+    const changed = validResume();
+    changed.experience[0]!.bullets[0] = {
+      id: "bullet-1",
+      text: "As Senior Software Engineer at Northwind Analytics, I rewrote invoice generation and reduced failed billing runs from 18 percent to under 1 percent.",
+      supports: support(
+        "profile:ach_1",
+        "Led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
+      ),
+    };
+    installModel({ resumes: [changed] });
+    const stripped = await generateApplicationAsset({
+      organizationId,
+      campaignId,
+      userId,
+      type: "RESUME",
+    });
+    expect(stripped.ok).toBe(true);
+    const kept = await prisma.applicationAsset.findFirst({
+      where: { campaignId, type: "RESUME" },
+      orderBy: { version: "desc" },
+    });
+    const keptContent = kept?.contentJson as ResumeAssetContent;
+    expect(
+      keptContent.experience[0]?.bullets.some((item) => item.text.includes("18")),
+    ).toBe(false);
+    expect(kept?.guidance).toBe(applicationAssetConfig.labels.partialRemoved);
   });
 
   it("fails closed and never saves a resume with an unknown claim source", async () => {
@@ -1016,7 +1084,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
   });
 
   it("rejects and regenerates a cover letter that pairs an acknowledged gap with unrelated experience", async () => {
-    expect(COVER_LETTER_ASSET_PROMPT_VERSION).toBe("13");
+    expect(COVER_LETTER_ASSET_PROMPT_VERSION).toBe("14");
     const session =
       (await prisma.consultationSession.findUnique({ where: { campaignId } })) ??
       (await prisma.consultationSession.create({
@@ -1144,7 +1212,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
   });
 
   it("rejects a cover letter that omits approved outcome statements or drops the result", async () => {
-    expect(COVER_LETTER_ASSET_PROMPT_VERSION).toBe("13");
+    expect(COVER_LETTER_ASSET_PROMPT_VERSION).toBe("14");
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     const session =
       (await prisma.consultationSession.findUnique({ where: { campaignId } })) ??

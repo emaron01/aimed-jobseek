@@ -56,6 +56,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { anyListFeatureEnabled, nounForCount, vocab } from "@/lib/product-config";
 import { requireGatedPage } from "@/lib/product-config/feature-access";
+import { mergeExistingHiringTeamRoles } from "@/lib/hiring-team/merge-existing";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -131,6 +132,10 @@ export default async function CampaignDetailPage({
   let voiceSamples: Awaited<ReturnType<typeof listVoiceSamplesForUser>>;
   let emailSignature: Awaited<ReturnType<typeof getActiveEmailSignatureBody>>;
   try {
+    await mergeExistingHiringTeamRoles({
+      organizationId: organization.id,
+      campaignId: id,
+    });
     [
       campaign,
       availableContacts,

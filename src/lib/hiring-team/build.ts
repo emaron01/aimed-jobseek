@@ -15,6 +15,7 @@ import type { PersonaDifferentiationInput } from "@/lib/persona/persona-differen
 import { parsePersonaListField } from "@/lib/persona/persona-differentiation";
 import { PERSONA_SYNTHESIS_PROMPT_VERSION } from "@/lib/persona-research/contract";
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
+import { mergeExistingHiringTeamRoles } from "@/lib/hiring-team/merge-existing";
 import { prisma } from "@/lib/prisma-client";
 import { hiringTeamConfig, vocab } from "@/lib/product-config";
 import { usableEmployerResearch } from "@/lib/job-requirement/identity-verification";
@@ -276,6 +277,10 @@ export async function syncApplicationHiringTeam(input: {
 }): Promise<void> {
   const loaded = await loadApplication(input.organizationId, input.campaignId);
   if (!loaded.job) return;
+  await mergeExistingHiringTeamRoles({
+    organizationId: input.organizationId,
+    campaignId: loaded.campaign.id,
+  });
   const existingRows = await prisma.persona.findMany({
     where: {
       organizationId: input.organizationId,

@@ -40,7 +40,18 @@ import {
   condensedRoleIdsFromPlan,
 } from "./plan-service";
 import type { AssetGenerationResult } from "./outreach-types";
+import { formatAssetSourceKind } from "./display";
 import { applyProfileContactHeader } from "./header";
+import {
+  deterministicClaimViolations,
+  formatAssetVerificationMessage,
+  formatClaimViolation,
+  logRejectedClaim,
+  sanitizeAssetContent,
+  stripClaimsById,
+  claimIdSetFromDetails,
+  claimIdsFromViolations,
+} from "./claim-grounding";
 
 export type { AssetGenerationResult } from "./outreach-types";
 
@@ -215,11 +226,6 @@ function supportErrors(
         errors.push(`Claim ${claim.id} cites an unknown source.`);
         continue;
       }
-      if (
-        !source.text.toLowerCase().includes(support.quote.trim().toLowerCase())
-      ) {
-        errors.push(`Claim ${claim.id} cites words that are absent from its source.`);
-      }
       if (content.type === "RESUME" && !isSeekerSource(source.category)) {
         errors.push(
           `Claim ${claim.id} must cite a Personal Profile FACT or an approved consultation statement.`,
@@ -239,33 +245,9 @@ function supportErrors(
 function stripUngroundedClaims(
   content: ApplicationAssetContent,
   violations: string[],
+  claimIds: Set<string> = claimIdsFromViolations(violations),
 ): ApplicationAssetContent {
-  const drop = new Set(
-    violations.flatMap((message) => {
-      const match = message.match(/^Claim (\S+)/);
-      return match?.[1] ? [match[1]] : [];
-    }),
-  );
-  if (drop.size === 0) return content;
-  const keep = (claim: AssetClaim) => !drop.has(claim.id);
-  if (content.type === "COVER_LETTER") {
-    return {
-      ...content,
-      paragraphs: content.paragraphs.filter(keep),
-    };
-  }
-  if (content.type !== "RESUME") return content;
-  return {
-    ...content,
-    summary: content.summary.filter(keep),
-    skills: content.skills.filter(keep),
-    education: content.education.filter(keep),
-    credentials: content.credentials.filter(keep),
-    experience: content.experience.map((role) => ({
-      ...role,
-      bullets: role.bullets.filter(keep),
-    })),
-  };
+  return stripClaimsById(sanitizeAssetContent(content), claimIds);
 }
 
 function resumeStructureErrors(
@@ -466,7 +448,7 @@ function topOutcomeTexts(context: ReadyApplicationGenerationContext): string[] {
 
 function overlapTokens(text: string): Set<string> {
   return new Set(
-    text
+    (typeof text === "string" ? text : "")
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, " ")
       .split(/\s+/)
@@ -718,20 +700,38 @@ export async function validateAssetContent(input: {
       ),
     );
   }
-  if (errors.length > 0) return [...new Set(errors)];
+  const deterministic = deterministicClaimViolations({
+    claims,
+    context: input.context,
+  });
+  for (const detail of deterministic) {
+    logRejectedClaim(detail);
+    errors.push(formatClaimViolation(detail));
+  }
   const modelValidation = await validateAssetClaimsWithModel({
     claims,
     sources: input.context.sources,
   });
-  if (!modelValidation.ok) return [modelValidation.message];
-  return [
-    ...new Set(
-      modelValidation.data.violations.map(
-        (violation) =>
-          `Claim ${violation.claimId} is unsupported: ${violation.reason}`,
-      ),
-    ),
-  ];
+  if (!modelValidation.ok) {
+    return [...new Set([...errors, modelValidation.message])];
+  }
+  const claimById = new Map(claims.map((claim) => [claim.id, claim]));
+  const sourceById = new Map(input.context.sources.map((source) => [source.id, source]));
+  for (const violation of modelValidation.data.violations) {
+    const claim = claimById.get(violation.claimId);
+    const sourceId = claim?.supports[0]?.sourceId ?? null;
+    const source = sourceId ? sourceById.get(sourceId) : null;
+    const detail = {
+      claimId: violation.claimId,
+      claimText: claim?.text.trim() ?? "",
+      sourceId,
+      sourceLabel: source ? formatAssetSourceKind(source.id) : "the cited source",
+      reason: violation.reason,
+    };
+    logRejectedClaim(detail);
+    errors.push(formatClaimViolation(detail));
+  }
+  return [...new Set(errors)];
 }
 
 function coverLetterSalutation(context: ReadyApplicationGenerationContext): string {
@@ -903,11 +903,13 @@ export async function generateApplicationAsset(input: {
       }
       continue;
     }
-    const content = applyProfileContactHeader(
-      replaceEmDashesDeep(
-        normalizeAssetSupportSourceIds(generated.data, context),
+    const content = sanitizeAssetContent(
+      applyProfileContactHeader(
+        replaceEmDashesDeep(
+          normalizeAssetSupportSourceIds(generated.data, context),
+        ),
+        context.profile,
       ),
-      context.profile,
     );
     const violations = await validateAssetContent({
       content,
@@ -948,8 +950,14 @@ export async function generateApplicationAsset(input: {
       });
       return { ok: true, assetId: saved.id, version: saved.version };
     }
-    if (attempt === applicationAssetConfig.generation.qualityRegenerationAttempts) {
-      const stripped = stripUngroundedClaims(content, violations);
+    const claimIds = new Set([
+      ...claimIdsFromViolations(violations),
+      ...claimIdSetFromDetails(
+        deterministicClaimViolations({ claims: assetClaims(content), context }),
+      ),
+    ]);
+    if (claimIds.size > 0) {
+      const stripped = stripUngroundedClaims(content, violations, claimIds);
       const remaining = await validateAssetContent({
         content: stripped,
         context,
@@ -972,8 +980,7 @@ export async function generateApplicationAsset(input: {
   }
   return {
     ok: false,
-    message:
-      "The asset was not saved because its claims did not pass verification. Retry after reviewing the violations.",
+    message: formatAssetVerificationMessage(feedback),
     violations: feedback,
   };
 }
@@ -1033,6 +1040,17 @@ export async function saveEditedApplicationAsset(input: {
       violations: parsed.error.issues.map((issue) => issue.message),
     };
   }
+  const sanitizedParse = applicationAssetContentSchema.safeParse(
+    sanitizeAssetContent(parsed.data),
+  );
+  if (!sanitizedParse.success) {
+    return {
+      ok: false,
+      message: "The edited asset has an invalid structure.",
+      violations: sanitizedParse.error.issues.map((issue) => issue.message),
+    };
+  }
+  const content = sanitizedParse.data;
   const existing = await prisma.applicationAsset.findFirst({
     where: {
       id: input.assetId,
@@ -1055,17 +1073,17 @@ export async function saveEditedApplicationAsset(input: {
   }
   const readyContext = context as ReadyApplicationGenerationContext;
   const hiddenRoleIds =
-    parsed.data.type === "RESUME"
-      ? parsed.data.experience.filter((role) => role.hidden).map((role) => role.roleId)
+    content.type === "RESUME"
+      ? content.experience.filter((role) => role.hidden).map((role) => role.roleId)
       : [];
   const condensedRoleIds =
-    parsed.data.type === "RESUME"
-      ? parsed.data.experience
+    content.type === "RESUME"
+      ? content.experience
           .filter((role) => role.condensed)
           .map((role) => role.roleId)
       : [];
   const violations = await validateAssetContent({
-    content: parsed.data,
+    content,
     context: readyContext,
     hiddenRoleIds,
     condensedRoleIds,
@@ -1074,7 +1092,7 @@ export async function saveEditedApplicationAsset(input: {
   if (violations.length > 0) {
     return {
       ok: false,
-      message: "The edit was not saved because a claim could not be verified.",
+      message: formatAssetVerificationMessage(violations),
       violations,
     };
   }
@@ -1082,7 +1100,7 @@ export async function saveEditedApplicationAsset(input: {
     context: readyContext,
     type: existing.type,
     personaId: existing.personaId,
-    content: parsed.data,
+    content,
     guidance: applicationAssetConfig.labels.seekerEditedGuidance,
   });
   return { ok: true, assetId: saved.id, version: saved.version };

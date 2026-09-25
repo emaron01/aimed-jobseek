@@ -53,6 +53,7 @@ import {
   syncApplicationHiringTeam,
   updateApplicationHiringTeamRole,
 } from "@/lib/hiring-team/build";
+import { mergeExistingHiringTeamRoles } from "@/lib/hiring-team/merge-existing";
 import { isUneditedDefaultTemplate } from "@/lib/hiring-team/templates";
 import { findNearDuplicatePersonaPairs } from "@/lib/persona/persona-differentiation";
 import {
@@ -796,6 +797,135 @@ describe.skipIf(!hasTestDatabase())("hiring team per application", () => {
     });
     expect(savedTemplate?.templateKey).toBeNull();
     expect(savedTemplate?.name).toBe("Staff Engineer interviewer");
+  });
+
+  it("merges existing duplicate roles and keeps personas, edits, contacts, and outreach", async () => {
+    const campaign = await application(`Existing dupes ${suffix}`);
+    await requirement(campaign.id, { disposition: "UNDISCLOSED" });
+    const built = await prisma.persona.create({
+      data: {
+        organizationId,
+        productId,
+        campaignId: campaign.id,
+        name: "Customer Success Leader",
+        suggestionKey: "customer_success_leader",
+        targetTitles: ["VP Customer Success"],
+        whyThisPersonaMatters: "Owns expansion after the sale.",
+        setupStatus: "APPROVED",
+        approvalStatus: "APPROVED",
+        profileJson: { narrative: { overview: "Built customer-success persona." } },
+        manuallyEditedFields: ["name"],
+      },
+    });
+    const duplicate = await prisma.persona.create({
+      data: {
+        organizationId,
+        productId,
+        campaignId: campaign.id,
+        name: "Customer Success Leader",
+        suggestionKey: "customer_success_leader_2",
+        targetTitles: ["Head of Customer Success"],
+        whyThisPersonaMatters: "Partners on post-sale expansion.",
+      },
+    });
+    const sponsor = await prisma.persona.create({
+      data: {
+        organizationId,
+        productId,
+        campaignId: campaign.id,
+        name: "Executive Sponsor",
+        suggestionKey: "executive_sponsor",
+        targetTitles: ["CRO"],
+        whyThisPersonaMatters: "Sponsors the hire at the executive level.",
+      },
+    });
+    await prisma.persona.create({
+      data: {
+        organizationId,
+        productId,
+        campaignId: campaign.id,
+        name: "Executive Sales Sponsor",
+        suggestionKey: "executive_sales_sponsor",
+        targetTitles: ["CRO", "Revenue Operations Manager"],
+        whyThisPersonaMatters: "Executive sponsor for the sales hire.",
+      },
+    });
+    const contact = await prisma.contact.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        firstName: "Pat",
+        lastName: "Lee",
+        company: "Acme",
+      },
+    });
+    await prisma.campaignContact.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        contactId: contact.id,
+        chosenPersonaId: duplicate.id,
+      },
+    });
+    await prisma.applicationAsset.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        type: "EMAIL",
+        personaId: duplicate.id,
+        groupKey: "EMAIL",
+        version: 1,
+        contentJson: { type: "EMAIL", subject: "Hello", greeting: "Hi", paragraphs: [], signoff: "Thanks", signerName: "Alex" },
+        claimTraceJson: [],
+        promptVersion: "1",
+        status: "DRAFT",
+      },
+    });
+    await prisma.campaignPersona.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        personaId: duplicate.id,
+      },
+    });
+    const result = await mergeExistingHiringTeamRoles({
+      organizationId,
+      campaignId: campaign.id,
+    });
+    expect(result.merged).toBeGreaterThan(0);
+    const remaining = await prisma.persona.findMany({
+      where: { campaignId: campaign.id, archivedAt: null },
+    });
+    expect(remaining.filter((row) => /customer success/i.test(row.name))).toHaveLength(1);
+    expect(remaining.filter((row) => /executive/i.test(row.name))).toHaveLength(1);
+    const survivor = remaining.find((row) => /customer success/i.test(row.name));
+    expect(survivor?.id).toBe(built.id);
+    expect(survivor?.setupStatus).toBe("APPROVED");
+    expect(survivor?.manuallyEditedFields).toEqual(["name"]);
+    expect(
+      await prisma.campaignContact.count({
+        where: { campaignId: campaign.id, chosenPersonaId: built.id },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.applicationAsset.count({
+        where: { campaignId: campaign.id, personaId: built.id },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.campaignPersona.count({
+        where: { campaignId: campaign.id, personaId: built.id },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.persona.findFirst({
+        where: { id: duplicate.id, archivedAt: { not: null } },
+      }),
+    ).not.toBeNull();
+    expect(
+      remaining.some((row) => row.id === sponsor.id) ||
+        remaining.some((row) => /executive/i.test(row.name)),
+    ).toBe(true);
   });
 
   it("rejects recruiter-job talking points and regenerates from the seeker's perspective", () => {
