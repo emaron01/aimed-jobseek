@@ -591,22 +591,19 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
       userId,
       type: "RESUME",
     });
-    expect(result.ok).toBe(false);
-    expect(
-      await prisma.applicationAsset.count({ where: { campaignId } }),
-    ).toBe(0);
+    expect(result.ok).toBe(true);
+    const saved = await prisma.applicationAsset.findFirst({
+      where: { campaignId, type: "RESUME" },
+    });
+    const content = saved?.contentJson as ResumeAssetContent | undefined;
+    expect(content?.summary.some((item) => item.id === "fabricated")).toBe(false);
+    expect(saved?.guidance).toBe(applicationAssetConfig.labels.partialRemoved);
   });
 
-  it("regenerates banned language and preserves exact roles and seeker hide choices", async () => {
-    const banned = validResume();
-    banned.summary[0] = {
-      ...banned.summary[0]!,
-      text: "Spearheaded TypeScript work.",
-      supports: support("profile:skill_1", "TypeScript"),
-    };
+  it("preserves exact roles and seeker hide choices", async () => {
     const hidden = validResume();
     hidden.experience[1]!.hidden = true;
-    installModel({ resumes: [banned, hidden] });
+    installModel({ resumes: [hidden] });
     const result = await generateApplicationAsset({
       organizationId,
       campaignId,
@@ -651,7 +648,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
       generateStructured.mock.calls.filter(
         ([request]) => request.schemaName === "application_resume",
       ),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
   });
 
   it("does not save a resume claim that traces only to the job posting", async () => {
@@ -670,14 +667,13 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
       userId,
       type: "RESUME",
     });
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error("Expected fail-closed generation.");
-    expect(result.violations.some((item) => item.includes("skill-job"))).toBe(
-      true,
-    );
-    expect(
-      await prisma.applicationAsset.count({ where: { campaignId } }),
-    ).toBe(0);
+    expect(result.ok).toBe(true);
+    const saved = await prisma.applicationAsset.findFirst({
+      where: { campaignId, type: "RESUME" },
+    });
+    const content = saved?.contentJson as ResumeAssetContent | undefined;
+    expect(content?.skills.some((item) => item.id === "skill-job")).toBe(false);
+    expect(saved?.guidance).toBe(applicationAssetConfig.labels.partialRemoved);
   });
 
   it("uses the Hiring Manager roster name and cited research in the cover-letter opening", async () => {
@@ -762,59 +758,50 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     ).toHaveLength(2);
   });
 
-  it("regenerates when a configured cover-letter banned phrase appears", async () => {
-    for (const phrase of applicationAssetConfig.bannedPhrases) {
-      generateStructured.mockReset();
-      await prisma.applicationAsset.deleteMany({ where: { campaignId } });
-      const banned: CoverLetterAssetContent = {
-        type: "COVER_LETTER",
-        salutation: "Dear Morgan Lee,",
-        paragraphs: [
-          {
-            id: "cover-opening",
-            text: `${phrase} for a team that builds warehouse robotics systems, and my Northwind Analytics billing work is the closest match I have to keeping a high-volume system dependable.`,
-            supports: [
-              ...support(
-                "research:placeholder:source:0",
-                "Acme builds warehouse robotics systems.",
-              ),
-              ...support(
-                "profile:role_1",
-                "Senior Software Engineer. Northwind Analytics. 2021-01. Seattle, WA. Billing and payments systems.",
-              ),
-            ],
-          },
-          {
-            id: "cover-story",
-            text: "At Northwind Analytics I led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
-            supports: support(
-              "profile:ach_1",
-              "Led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
-            ),
-          },
-          {
-            id: "cover-close",
-            text: "Can we schedule a conversation about the role?",
-            supports: support("profile:id_name", "Alex Chen"),
-          },
-        ],
-        signoff: "Sincerely,",
-        signerName: "Alex Chen",
-      };
-      installModel({ coverLetters: [banned] });
-      const result = await generateApplicationAsset({
-        organizationId,
-        campaignId,
-        userId,
-        type: "COVER_LETTER",
-      });
-      expect(result.ok).toBe(true);
-      expect(
-        generateStructured.mock.calls.filter(
-          ([request]) => request.schemaName === "application_cover_letter",
-        ),
-      ).toHaveLength(2);
-    }
+  it("allows job-posting language in a cover letter without regenerating", async () => {
+    installModel();
+    generateStructured.mockImplementation(
+      async (request: { schemaName: string; messages: Array<{ content: string }> }) => {
+        if (request.schemaName === "application_resume") {
+          return { data: validResume() };
+        }
+        if (request.schemaName === "application_cover_letter") {
+          const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
+            salutation: string;
+            signerName: string;
+            sources: Array<{ id: string; text: string; url: string | null }>;
+          };
+          const letter = validCoverLetter(payload);
+          letter.paragraphs[0] = {
+            ...letter.paragraphs[0]!,
+            text: "This fast-paced, results-driven role in a dynamic environment at Acme builds warehouse robotics systems, and my Northwind Analytics billing work is the closest match I have to a proven track record keeping a high-volume system dependable.",
+          };
+          return { data: letter };
+        }
+        if (request.schemaName === "application_asset_claim_validation") {
+          return { data: { violations: [] } };
+        }
+        throw new Error(`Unexpected schema ${request.schemaName}`);
+      },
+    );
+    const result = await generateApplicationAsset({
+      organizationId,
+      campaignId,
+      userId,
+      type: "COVER_LETTER",
+    });
+    expect(result.ok).toBe(true);
+    expect(
+      generateStructured.mock.calls.filter(
+        ([request]) => request.schemaName === "application_cover_letter",
+      ),
+    ).toHaveLength(1);
+    const saved = await prisma.applicationAsset.findFirst({
+      where: { campaignId, type: "COVER_LETTER" },
+    });
+    const content = saved?.contentJson as unknown as CoverLetterAssetContent;
+    expect(content.paragraphs[0]?.text).toContain("fast-paced");
+    expect(content.paragraphs[0]?.text).toContain("proven track record");
   });
 
   it("allows a no-claim closing without a citation and rejects a claim without one", async () => {
@@ -1029,7 +1016,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
   });
 
   it("rejects and regenerates a cover letter that pairs an acknowledged gap with unrelated experience", async () => {
-    expect(COVER_LETTER_ASSET_PROMPT_VERSION).toBe("12");
+    expect(COVER_LETTER_ASSET_PROMPT_VERSION).toBe("13");
     const session =
       (await prisma.consultationSession.findUnique({ where: { campaignId } })) ??
       (await prisma.consultationSession.create({
@@ -1157,7 +1144,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
   });
 
   it("rejects a cover letter that omits approved outcome statements or drops the result", async () => {
-    expect(COVER_LETTER_ASSET_PROMPT_VERSION).toBe("12");
+    expect(COVER_LETTER_ASSET_PROMPT_VERSION).toBe("13");
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     const session =
       (await prisma.consultationSession.findUnique({ where: { campaignId } })) ??

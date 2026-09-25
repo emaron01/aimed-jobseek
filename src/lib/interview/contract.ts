@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const INTERVIEW_GUIDE_PROMPT_VERSION = "4";
+export const INTERVIEW_GUIDE_PROMPT_VERSION = "5";
 export const INTERVIEW_CLARIFY_PROMPT_VERSION = "1";
 export const INTERVIEW_THANK_YOU_CLARIFY_PROMPT_VERSION = "1";
 

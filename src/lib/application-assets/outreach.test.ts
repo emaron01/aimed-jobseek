@@ -164,7 +164,11 @@ describe("outreach greetings and claims", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("rejects an em dash in a subject", async () => {
+  it("does not reject an em dash; cleanup is silent", async () => {
+    const { replaceEmDashes } = await import("@/lib/generation/quality");
+    expect(replaceEmDashes("Senior Product Engineer — production reliability")).toBe(
+      "Senior Product Engineer, production reliability",
+    );
     const { validateOutreachContent } = await import(
       "@/lib/application-assets/outreach"
     );
@@ -194,7 +198,7 @@ describe("outreach greetings and claims", () => {
       includeRedirect: false,
     });
     expect(errors.some((error) => error.includes("—") || error.toLowerCase().includes("banned"))).toBe(
-      true,
+      false,
     );
   });
 

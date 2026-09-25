@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { applicationAssetConfig } from "@/lib/product-config/application-assets";
 
-export const PRESENTATION_PLAN_PROMPT_VERSION = "2";
+export const PRESENTATION_PLAN_PROMPT_VERSION = "3";
 
 const recommendationSchema = z.object({
   text: z.string().trim().min(1),

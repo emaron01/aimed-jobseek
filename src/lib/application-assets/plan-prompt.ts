@@ -46,10 +46,6 @@ export function buildPresentationPlanMessages(input: {
         earlierExperienceYears:
           applicationAssetConfig.presentation.earlierExperienceYears,
         adjustmentNote: input.adjustmentNote,
-        bannedPhrases: [
-          ...consultationConfig.bannedPhrases,
-          ...applicationAssetConfig.bannedPhrases,
-        ],
         qualityFeedback: input.qualityFeedback,
       }),
     },

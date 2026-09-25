@@ -5,7 +5,6 @@ import {
   INTERVIEW_THANK_YOU_CLARIFY_SYSTEM_INSTRUCTIONS,
 } from "@/lib/prompt-content";
 import {
-  applicationAssetConfig,
   consultationConfig,
   interviewConfig,
 } from "@/lib/product-config";
@@ -69,10 +68,6 @@ export function buildInterviewClarifyingMessages(input: {
         consultantName: consultationConfig.displayName,
         missingInformation: input.missing,
         maxQuestions: interviewConfig.clarifyingQuestionLimit,
-        bannedPhrases: [
-          ...consultationConfig.bannedPhrases,
-          ...applicationAssetConfig.bannedPhrases,
-        ],
         qualityFeedback: input.qualityFeedback,
         responseShape: {
           questions: [{ id: "string", text: "one-sentence question" }],
@@ -124,10 +119,6 @@ export function buildInterviewGuideMessages(
           .map((source) => source.id),
         approvedStatementIds: input.approvedStatements.map((row) => row.id),
         approvedStoryIds: input.approvedStories.map((row) => row.id),
-        bannedPhrases: [
-          ...consultationConfig.bannedPhrases,
-          ...applicationAssetConfig.bannedPhrases,
-        ],
         qualityFeedback: input.qualityFeedback,
         responseShape: {
           purpose: "claim",
@@ -186,10 +177,6 @@ export function buildInterviewThankYouClarifyingMessages(input: {
         consultantName: consultationConfig.displayName,
         notes: input.notes,
         maxQuestions: interviewConfig.thankYouClarifyingQuestionLimit,
-        bannedPhrases: [
-          ...consultationConfig.bannedPhrases,
-          ...applicationAssetConfig.bannedPhrases,
-        ],
         qualityFeedback: input.qualityFeedback,
         responseShape: {
           questions: [{ id: "string", text: "one-sentence question" }],

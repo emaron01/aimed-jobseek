@@ -11,6 +11,10 @@ import { APPLICATION_NEXT_STEP_INSTRUCTIONS } from "@/lib/prompt-content/next-st
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { prisma } from "@/lib/prisma-client";
 import {
+  logQualityRejection,
+  qualityIssue,
+} from "@/lib/generation/quality";
+import {
   consultationConfig,
   consultationConversationCopy,
 } from "@/lib/product-config";
@@ -72,7 +76,7 @@ export async function writeApplicationNextStep(input: {
         cause: "CONSULTATION_AI_not_configured",
       }),
     );
-    return { ok: false, message: consultationConversationCopy.nextStepFailed };
+    return { ok: false, message: consultationConversationCopy.nextStepModelUnavailable };
   }
   try {
     let lastText = "";
@@ -93,7 +97,6 @@ export async function writeApplicationNextStep(input: {
             content: JSON.stringify({
               consultantName: consultationConfig.displayName,
               state: input.state,
-              bannedPhrases: consultationConfig.bannedPhrases,
               rejectedPrevious:
                 attempt > 0
                   ? "The previous line was generic or said the coach was scheduled. Write a specific action the seeker can take in this workspace now."
@@ -110,6 +113,19 @@ export async function writeApplicationNextStep(input: {
       if (!rejectedNextStep(response.data.text, input.state.key)) {
         return { ok: true, text: response.data.text };
       }
+      logQualityRejection({
+        generator: "application.next_step",
+        attempt,
+        issues: [
+          qualityIssue({
+            check: "next_step",
+            field: "text",
+            text: response.data.text,
+            message:
+              "The next-step line was generic or said the coach was scheduled.",
+          }),
+        ],
+      });
     }
     console.error(
       JSON.stringify({

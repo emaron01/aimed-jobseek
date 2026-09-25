@@ -12,7 +12,7 @@ import {
 } from "@/lib/application-assets/plan-contract";
 import { AiValidationError } from "@/lib/ai/errors";
 import { buildPresentationPlanMessages } from "@/lib/application-assets/plan-prompt";
-import { consultationConfig } from "@/lib/product-config";
+import { applicationAssetConfig } from "@/lib/product-config";
 
 export async function writePresentationPlanWithModel(input: {
   type: "RESUME" | "COVER_LETTER";
@@ -39,7 +39,7 @@ export async function writePresentationPlanWithModel(input: {
     );
     return {
       ok: false,
-      message: `${consultationConfig.displayName} could not write this plan because Consultation AI is not configured.`,
+      message: applicationAssetConfig.labels.planModelUnavailable,
     };
   }
   try {
@@ -92,7 +92,7 @@ export async function writePresentationPlanWithModel(input: {
     );
     return {
       ok: false,
-      message: `${consultationConfig.displayName} could not write this plan. Retry.`,
+      message: applicationAssetConfig.labels.planFailed,
     };
   }
 }

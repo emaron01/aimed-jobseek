@@ -60,11 +60,11 @@ import {
 } from "@/lib/job-requirement/fixtures";
 import { consultationConfig } from "@/lib/product-config/consultation";
 import {
-  bannedPhraseHits,
   validateGroundedStatement,
   validateInterviewAnswerQuality,
   validateRepetitionAndMetaLanguage,
 } from "@/lib/consultation/output-quality";
+import { qualityMessages } from "@/lib/generation/quality";
 import { CONSULTATION_COACH_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content/consultation";
 import {
   parseCandidateProfile,
@@ -745,7 +745,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("7");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("8");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("coach, not an interrogator");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("Never inflate fit");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -816,10 +816,9 @@ describe("consultation evidence and questions", () => {
         ],
       },
       sources: [{ id: "answer", text: "I improved the service." }],
-      bannedPhrases: consultationConfig.bannedPhrases,
       requireSentenceClaims: true,
     });
-    expect(errors).toEqual(
+    expect(qualityMessages(errors)).toEqual(
       expect.arrayContaining([
         expect.stringContaining("not connected"),
         expect.stringContaining('$9M'),
@@ -868,7 +867,10 @@ describe("consultation evidence and questions", () => {
     expect(question?.requirementInterpretation).toContain("Prioritize");
     expect(question?.whoCaresNote).toContain("VP of Sales");
     expect(
-      bannedPhraseHits([question!.text], consultationConfig.bannedPhrases),
+      validateRepetitionAndMetaLanguage({
+        text: "This is a fast-paced, results-driven role in a dynamic environment with a proven track record.",
+        field: "briefing.overall",
+      }),
     ).toEqual([]);
   });
 
@@ -877,9 +879,9 @@ describe("consultation evidence and questions", () => {
       text:
         "I cut failed runs from 8% to 1%. The starting point was 8%.",
       maxWords: consultationConfig.interviewAnswerMaxWords,
-      bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
+      metaLanguagePhrases: consultationConfig.interviewAnswerMetaLanguage,
     });
-    expect(directErrors).toEqual(
+    expect(qualityMessages(directErrors)).toEqual(
       expect.arrayContaining([
         expect.stringContaining("described its structure"),
         expect.stringContaining("repeated the same number"),
@@ -888,7 +890,7 @@ describe("consultation evidence and questions", () => {
     expect(
       validateRepetitionAndMetaLanguage({
         text: "ROS2 experience is a gap. I would ramp on ROS2 in the first weeks.",
-        bannedPhrases: [],
+        field: "briefing.importantGaps.0",
       }),
     ).toEqual([]);
 
@@ -947,7 +949,7 @@ describe("consultation evidence and questions", () => {
         validateInterviewAnswerQuality({
           text: polished.data.interviewAnswer.text,
           maxWords: consultationConfig.interviewAnswerMaxWords,
-          bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
+          metaLanguagePhrases: consultationConfig.interviewAnswerMetaLanguage,
         }),
       ).toEqual([]);
     }
@@ -1049,7 +1051,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("7");
+    expect(session?.promptVersion).toBe("8");
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
     expect(session?.briefingJson).toMatchObject({
@@ -1123,7 +1125,10 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     );
     expect(
       statements.flatMap((statement) =>
-        bannedPhraseHits([statement.content], consultationConfig.bannedPhrases),
+        validateRepetitionAndMetaLanguage({
+          text: statement.content,
+          field: statement.kind,
+        }),
       ),
     ).toEqual([]);
     await approveConsultationStatement({

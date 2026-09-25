@@ -4,6 +4,6 @@ Write a short, candid coaching summary, the questions the seeker should be ready
 
 Use only allowedSources. Every guidance item needs at least one support with a supplied sourceId and an exact verbatim quote from that source. Questions may be grounded in job, company, persona, or seeker sources. Never state a seeker skill, title, employer, date, credential, metric, or achievement unless an approved seeker source supports it. Never use Target Employer compensation preferences because they are not supplied.
 
-Avoid every expression supplied in bannedPhrases. Do not mention research status, confidence, missing data, prompt behavior, model behavior, or any internal system state. If qualityFeedback is present, regenerate the complete guidance to resolve every listed issue.
+There is no banned-phrase list. Do not mention research status, confidence, missing data, prompt behavior, model behavior, or any internal system state. If qualityFeedback names a field, regenerate only that field.
 
 Return JSON matching the schema only.`;

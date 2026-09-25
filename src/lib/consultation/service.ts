@@ -398,6 +398,22 @@ async function extractAnswerWithQuality(input: {
       attempt,
       issues,
     });
+    if (attempt === consultationConfig.qualityRegenerationAttempts) {
+      const failing = new Set(issues.map((issue) => issue.field));
+      return {
+        ok: true as const,
+        data: {
+          ...extracted.data,
+          demonstratedTargets: extracted.data.demonstratedTargets.filter(
+            (_, index) =>
+              !failing.has(`demonstratedTargets.${index}.explanation`),
+          ),
+          followUpQuestion: failing.has("followUpQuestion")
+            ? null
+            : extracted.data.followUpQuestion,
+        },
+      };
+    }
     feedback = qualityMessages(issues);
   }
   return {
@@ -429,57 +445,82 @@ export async function polishAnswerWithQuality(input: {
       qualityFeedback: feedback,
     });
     if (!polished.ok) return polished;
-    const interviewErrors = validateGroundedStatement({
+    const interviewIssues = validateGroundedStatement({
       statement: polished.data.interviewAnswer,
       sources: input.sources,
-      bannedPhrases: consultationConfig.bannedPhrases,
+      field: "interviewAnswer",
       requireSentenceClaims: true,
     });
-    interviewErrors.push(
+    interviewIssues.push(
       ...validateInterviewAnswerQuality({
         text: polished.data.interviewAnswer.text,
+        field: "interviewAnswer",
         maxWords: consultationConfig.interviewAnswerMaxWords,
-        bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
+        metaLanguagePhrases: consultationConfig.interviewAnswerMetaLanguage,
       }),
     );
     const note = polished.data.strengtheningNote?.trim() || null;
     if (input.declinedFollowUp) {
       if (!note) {
-        interviewErrors.push(
-          "The declined follow-up needs a concise strengthening note.",
+        interviewIssues.push(
+          qualityIssue({
+            check: "strengthening_note",
+            field: "strengtheningNote",
+            text: "",
+            message: "The declined follow-up needs a concise strengthening note.",
+          }),
         );
       } else {
         const namedNeed = input.strengtheningNeeds.some((need) =>
           note.toLowerCase().includes(need.toLowerCase()),
         );
         if (!namedNeed) {
-          interviewErrors.push(
-            "The strengthening note must name the STAR part that needs detail.",
+          interviewIssues.push(
+            qualityIssue({
+              check: "strengthening_note",
+              field: "strengtheningNote",
+              text: note,
+              message:
+                "The strengthening note must name the STAR part that needs detail.",
+            }),
           );
         }
-        const noteBanned = bannedPhraseHits(
-          [note],
-          consultationConfig.bannedPhrases,
-        );
-        if (noteBanned.length > 0 || INTERNAL_SYSTEM_STATE.test(note)) {
-          interviewErrors.push(
-            "The strengthening note used prohibited or internal language.",
+        if (mentionsInternalSystemState(note)) {
+          interviewIssues.push(
+            qualityIssue({
+              check: "internal_state",
+              field: "strengtheningNote",
+              text: note,
+              message: "The strengthening note referenced internal system state.",
+            }),
           );
         }
       }
     } else if (note) {
-      interviewErrors.push(
-        "A complete answer must not include a strengthening note.",
+      interviewIssues.push(
+        qualityIssue({
+          check: "strengthening_note",
+          field: "strengtheningNote",
+          text: note,
+          message: "A complete answer must not include a strengthening note.",
+        }),
       );
     }
-    const bulletErrors = validateGroundedStatement({
+    const bulletIssues = validateGroundedStatement({
       statement: polished.data.resumeBullet,
       sources: input.sources,
-      bannedPhrases: consultationConfig.bannedPhrases,
+      field: "resumeBullet",
       requireSentenceClaims: false,
     });
     if (/[\r\n]/.test(polished.data.resumeBullet.text)) {
-      bulletErrors.push("The resume bullet must be one line.");
+      bulletIssues.push(
+        qualityIssue({
+          check: "structure",
+          field: "resumeBullet",
+          text: polished.data.resumeBullet.text,
+          message: "The resume bullet must be one line.",
+        }),
+      );
     }
     const bulletClaim = polished.data.resumeBullet.claims[0];
     if (
@@ -487,18 +528,59 @@ export async function polishAnswerWithQuality(input: {
       !bulletClaim ||
       bulletClaim.text.trim() !== polished.data.resumeBullet.text.trim()
     ) {
-      bulletErrors.push(
-        "The resume bullet must be returned as one fully grounded claim.",
+      bulletIssues.push(
+        qualityIssue({
+          check: "grounding",
+          field: "resumeBullet",
+          text: polished.data.resumeBullet.text,
+          message:
+            "The resume bullet must be returned as one fully grounded claim.",
+        }),
       );
     }
-    const errors = [...new Set([...interviewErrors, ...bulletErrors])];
-    if (errors.length === 0) return polished;
-    feedback = errors;
+    const issues = [...interviewIssues, ...bulletIssues];
+    if (issues.length === 0) return polished;
+    logQualityRejection({
+      generator: "consultation.polish",
+      attempt,
+      issues,
+    });
+    const failingFields = new Set(issues.map((issue) => issue.field));
+    feedback = qualityMessages(
+      issues.filter((issue) => failingFields.has(issue.field)),
+    );
+    if (attempt === consultationConfig.qualityRegenerationAttempts) {
+      const answerIssues = interviewIssues.filter(
+        (issue) => issue.field === "interviewAnswer",
+      );
+      const noteIssues = interviewIssues.filter(
+        (issue) => issue.field === "strengtheningNote",
+      );
+      const keepInterview = answerIssues.length === 0;
+      const keepBullet = bulletIssues.length === 0;
+      if (keepInterview || keepBullet) {
+        return {
+          ok: true as const,
+          data: {
+            ...polished.data,
+            interviewAnswer: keepInterview
+              ? polished.data.interviewAnswer
+              : { text: "", claims: [] },
+            resumeBullet: keepBullet
+              ? polished.data.resumeBullet
+              : { text: "", claims: [] },
+            strengtheningNote:
+              keepInterview && noteIssues.length === 0
+                ? polished.data.strengtheningNote
+                : null,
+          },
+        };
+      }
+    }
   }
   return {
     ok: false as const,
-    message:
-      "Consultation statements did not pass grounding checks. Retry consultation.",
+    message: consultationConversationCopy.generationQualityFailed,
   };
 }
 
@@ -567,6 +649,7 @@ async function planAndStoreRound(input: {
     title: input.requirement.title,
   });
   let feedback: string[] = [];
+  let partialError: string | null = null;
   let accepted:
     | {
         plan: Extract<
@@ -601,30 +684,45 @@ async function planAndStoreRound(input: {
       await failGeneration(input.sessionId, plan.message);
       throw new Error(plan.message);
     }
-    const allNarrative = [
-      plan.data.commentary,
-      plan.data.briefing.overall,
-      ...plan.data.briefing.strongestAngles,
-      ...plan.data.briefing.importantGaps,
-      ...plan.data.briefing.storyPlan,
-      plan.data.closingNote ?? "",
-      ...plan.data.assessments.flatMap((item) => [item.explanation, item.strategy]),
-      ...plan.data.questions.flatMap((item) => [
-        item.text,
-        item.requirementInterpretation ?? "",
-        item.whoCaresNote,
-      ]),
+    const issues: QualityIssue[] = [];
+    const narrativeFields: Array<[string, string]> = [
+      ["commentary", plan.data.commentary],
+      ["briefing.overall", plan.data.briefing.overall],
+      ...plan.data.briefing.strongestAngles.map(
+        (text, index): [string, string] => [`briefing.strongestAngles.${index}`, text],
+      ),
+      ...plan.data.briefing.importantGaps.map(
+        (text, index): [string, string] => [`briefing.importantGaps.${index}`, text],
+      ),
+      ...plan.data.briefing.storyPlan.map(
+        (text, index): [string, string] => [`briefing.storyPlan.${index}`, text],
+      ),
+      ["closingNote", plan.data.closingNote ?? ""],
+      ...plan.data.assessments.flatMap(
+        (item, index): Array<[string, string]> => [
+          [`assessments.${index}.explanation`, item.explanation],
+          [`assessments.${index}.strategy`, item.strategy],
+        ],
+      ),
+      ...plan.data.questions.flatMap(
+        (item, index): Array<[string, string]> => [
+          [`questions.${index}.text`, item.text],
+          [`questions.${index}.requirementInterpretation`, item.requirementInterpretation ?? ""],
+          [`questions.${index}.whoCaresNote`, item.whoCaresNote],
+        ],
+      ),
     ];
-    const errors: string[] = [];
-    if (allNarrative.some((text) => INTERNAL_SYSTEM_STATE.test(text))) {
-      errors.push("Remove references to internal system state.");
-    }
-    const banned = bannedPhraseHits(
-      allNarrative,
-      consultationConfig.bannedPhrases,
-    );
-    if (banned.length > 0) {
-      errors.push(`Remove banned language: ${banned.join(", ")}.`);
+    for (const [field, text] of narrativeFields) {
+      if (text && mentionsInternalSystemState(text)) {
+        issues.push(
+          qualityIssue({
+            check: "internal_state",
+            field,
+            text,
+            message: "Remove references to internal system state.",
+          }),
+        );
+      }
     }
     let assessments: EvidenceAssessment[] = [];
     let questions: ReturnType<typeof planQuestionRound> = [];
@@ -637,7 +735,10 @@ async function planAndStoreRound(input: {
       });
       questions = planQuestionRound({
         assessments,
-        modelQuestions: plan.data.questions,
+        modelQuestions: plan.data.questions.filter(
+          (item, index) =>
+            !issues.some((issue) => issue.field.startsWith(`questions.${index}.`)),
+        ),
         hiringTeam: input.roles,
         askedKeys: input.askedKeys,
         skippedKeys: input.skippedKeys,
@@ -646,21 +747,73 @@ async function planAndStoreRound(input: {
         focusTargetKey: input.focusTargetKey ?? null,
       });
     } catch (error) {
-      errors.push(
-        error instanceof Error
-          ? error.message
-          : "Consultation output validation failed.",
+      issues.push(
+        qualityIssue({
+          check: "assessment_verification",
+          field: "assessments",
+          text: error instanceof Error ? error.message : "Consultation output validation failed.",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Consultation output validation failed.",
+        }),
       );
     }
-    if (errors.length === 0) {
+    if (issues.length === 0) {
       accepted = { plan, assessments, questions };
       break;
     }
-    feedback = errors;
+    logQualityRejection({
+      generator: "consultation.plan",
+      attempt,
+      issues,
+    });
+    feedback = qualityMessages(issues);
+    if (attempt === consultationConfig.qualityRegenerationAttempts) {
+      const failing = new Set(issues.map((issue) => issue.field));
+      const briefing = {
+        ...plan.data.briefing,
+        overall: failing.has("briefing.overall") ? "" : plan.data.briefing.overall,
+        strongestAngles: plan.data.briefing.strongestAngles.filter(
+          (_, index) => !failing.has(`briefing.strongestAngles.${index}`),
+        ),
+        importantGaps: plan.data.briefing.importantGaps.filter(
+          (_, index) => !failing.has(`briefing.importantGaps.${index}`),
+        ),
+        storyPlan: plan.data.briefing.storyPlan.filter(
+          (_, index) => !failing.has(`briefing.storyPlan.${index}`),
+        ),
+      };
+      const hasBriefing = Boolean(
+        briefing.overall.trim() ||
+          briefing.strongestAngles.length ||
+          briefing.importantGaps.length ||
+          briefing.storyPlan.length,
+      );
+      if (hasBriefing || questions.length > 0) {
+        accepted = {
+          plan: {
+            ...plan,
+            data: {
+              ...plan.data,
+              briefing,
+              commentary: failing.has("commentary") ? "" : plan.data.commentary,
+            },
+          },
+          assessments: issues.some(
+            (issue) => issue.check === "assessment_verification",
+          )
+            ? []
+            : assessments,
+          questions,
+        };
+        partialError = consultationConversationCopy.generationQualityFailed;
+        break;
+      }
+    }
   }
   if (!accepted) {
-    const message =
-      "Consultation output did not pass quality checks. Retry consultation.";
+    const message = consultationConversationCopy.generationQualityFailed;
     await failGeneration(input.sessionId, message);
     throw new Error(message);
   }
@@ -687,7 +840,7 @@ async function planAndStoreRound(input: {
       coachNote: plan.data.commentary.trim() || null,
       briefingJson: plan.data.briefing as Prisma.InputJsonValue,
       generationStatus: "READY",
-      generationError: null,
+      generationError: partialError,
     },
   });
   if (questions.length === 0 && plan.data.closingNote?.trim()) {
@@ -993,7 +1146,18 @@ async function processAnswerGeneration(input: {
         kind: "RESUME_BULLET" as const,
         value: polished.data.resumeBullet,
       },
-    ];
+    ].filter((statement) => statement.value.text.trim());
+    if (statements.length < 2) {
+      operations.push(
+        prisma.consultationSession.update({
+          where: { id: input.sessionId },
+          data: {
+            generationStatus: "READY",
+            generationError: consultationConversationCopy.generationQualityFailed,
+          },
+        }),
+      );
+    }
     operations.push(
       ...statements.map((statement) =>
         prisma.consultationStatement.upsert({
@@ -1488,7 +1652,7 @@ async function declineConsultationFollowUp(input: {
       value: polished.data.resumeBullet,
       strengtheningNote: null,
     },
-  ];
+  ].filter((statement) => statement.value.text.trim());
   await prisma.$transaction([
     prisma.consultationTurn.create({
       data: {
@@ -1756,13 +1920,6 @@ export async function approveConsultationStatement(input: {
 }): Promise<void> {
   const content = input.content.trim();
   if (!content) throw new TenantError("A polished statement cannot be empty.");
-  const banned = bannedPhraseHits(
-    [content],
-    consultationConfig.bannedPhrases,
-  );
-  if (banned.length > 0) {
-    throw new TenantError("Remove the flagged wording before approval.");
-  }
   const statement = await prisma.consultationStatement.findFirst({
     where: { id: input.statementId, organizationId: input.organizationId },
     include: { turn: true, session: true },
@@ -1771,8 +1928,9 @@ export async function approveConsultationStatement(input: {
   if (statement.kind === "INTERVIEW_ANSWER") {
     const qualityErrors = validateInterviewAnswerQuality({
       text: content,
+      field: "interviewAnswer",
       maxWords: consultationConfig.interviewAnswerMaxWords,
-      bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
+      metaLanguagePhrases: consultationConfig.interviewAnswerMetaLanguage,
     });
     if (qualityErrors.length > 0) {
       throw new TenantError(
@@ -1807,7 +1965,7 @@ export async function approveConsultationStatement(input: {
   const errors = validateGroundedStatement({
     statement: grounding.data,
     sources,
-    bannedPhrases: consultationConfig.bannedPhrases,
+    field: statement.kind === "INTERVIEW_ANSWER" ? "interviewAnswer" : "resumeBullet",
     requireSentenceClaims: statement.kind === "INTERVIEW_ANSWER",
   });
   if (
@@ -1815,9 +1973,21 @@ export async function approveConsultationStatement(input: {
     (grounding.data.claims.length !== 1 ||
       grounding.data.claims[0]?.text.trim() !== content)
   ) {
-    errors.push("The resume bullet was not fully grounded.");
+    errors.push(
+      qualityIssue({
+        check: "grounding",
+        field: "resumeBullet",
+        text: content,
+        message: "The resume bullet was not fully grounded.",
+      }),
+    );
   }
   if (errors.length > 0) {
+    logQualityRejection({
+      generator: "consultation.approve",
+      attempt: 0,
+      issues: errors,
+    });
     throw new TenantError(
       "The statement contains content that is not supported by the answer or Personal Profile.",
     );

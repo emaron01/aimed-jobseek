@@ -19,13 +19,13 @@ import {
   buildConsultationPolishMessages,
   buildConsultationStatementGroundingMessages,
 } from "@/lib/consultation/prompt";
+import { consultationConversationCopy } from "@/lib/product-config";
 
 export type ConsultationPlanAiResult =
   | { ok: true; data: ConsultationPlanResult }
   | { ok: false; message: string };
 
-const UNCONFIGURED =
-  "Consultation AI is not configured. Configure it, then retry consultation.";
+const UNCONFIGURED = consultationConversationCopy.modelUnavailable;
 
 export async function planConsultationWithModel(input: {
   targets: Array<{ key: string; kind: string; text: string }>;

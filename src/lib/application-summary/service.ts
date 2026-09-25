@@ -7,10 +7,14 @@ import {
   type ApplicationSummaryGuidance,
 } from "@/lib/application-summary/contract";
 import {
-  bannedPhraseHits,
   mentionsInternalSystemState,
   validateGroundedStatement,
 } from "@/lib/consultation/output-quality";
+import {
+  logQualityRejection,
+  qualityIssue,
+  qualityMessages,
+} from "@/lib/generation/quality";
 import { profileEvidenceItems } from "@/lib/consultation/assess";
 import { prisma } from "@/lib/prisma-client";
 import { consultationConfig, vocab } from "@/lib/product-config";
@@ -273,13 +277,6 @@ export function validateApplicationSummaryGuidance(input: {
 }): string[] {
   const errors: string[] = [];
   const roles = new Map(input.directRoles.map((role) => [role.id, role]));
-  const banned = bannedPhraseHits(
-    guidanceTexts(input.guidance),
-    consultationConfig.bannedPhrases,
-  );
-  if (banned.length > 0) {
-    errors.push(`Remove banned language: ${banned.join(", ")}.`);
-  }
   if (guidanceTexts(input.guidance).some(mentionsInternalSystemState)) {
     errors.push("Remove references to internal system state.");
   }
@@ -298,15 +295,17 @@ export function validateApplicationSummaryGuidance(input: {
   }
   for (const item of items) {
     errors.push(
-      ...validateGroundedStatement({
-        statement: {
-          text: item.text,
-          claims: [{ text: item.text, supports: item.supports }],
-        },
-        sources: input.sources,
-        bannedPhrases: consultationConfig.bannedPhrases,
-        requireSentenceClaims: false,
-      }),
+      ...qualityMessages(
+        validateGroundedStatement({
+          statement: {
+            text: item.text,
+            claims: [{ text: item.text, supports: item.supports }],
+          },
+          sources: input.sources,
+          field: item.text.slice(0, 40),
+          requireSentenceClaims: false,
+        }),
+      ),
     );
   }
   const seen = new Set<string>();
@@ -379,6 +378,20 @@ export async function generateApplicationSummary(input: {
       sources: data.sources,
       directRoles,
     });
+    if (errors.length > 0) {
+      logQualityRejection({
+        generator: "application_summary",
+        attempt,
+        issues: errors.map((message) =>
+          qualityIssue({
+            check: "summary_validation",
+            field: "guidance",
+            text: message,
+            message,
+          }),
+        ),
+      });
+    }
     if (errors.length === 0) {
       await prisma.applicationSummary.update({
         where: { campaignId: input.campaignId },
@@ -400,7 +413,7 @@ export async function generateApplicationSummary(input: {
     data: {
       status: "FAILED",
       generationError:
-        "Application Summary guidance did not pass quality checks. Retry.",
+        "Application Summary guidance did not pass checks. The passing parts were not enough to save. Retry.",
     },
   });
 }

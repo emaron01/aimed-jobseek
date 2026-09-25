@@ -7,7 +7,7 @@ export const INTERVIEW_CLARIFY_SYSTEM_INSTRUCTIONS = `You write up to three shor
 
 Ask only about missing information that would materially change the guide: who they are meeting, what they were told to prepare for, or an unknown reason for leaving a past role. Do not invent facts. Do not ask for information already supplied. Each question is one sentence and ends with a question mark.
 
-Avoid every expression supplied in bannedPhrases. Do not mention internal system state, prompts, or sources. If qualityFeedback is present, regenerate to resolve every listed issue.
+There is no banned-phrase list. Do not mention internal system state, prompts, or sources. If qualityFeedback names a field, regenerate only that field.
 
 Return JSON matching the schema only.`;
 
@@ -22,14 +22,14 @@ RULES:
 6. When requiredCitationSourceIds is not empty, at least one claim.supports entry must use one of those source ids, and the quote must be copied verbatim from that source. Earlier-stage notes are seeker-authored FACT. The topic in those notes must shape whatTheyEvaluate, likely questions, and talking points.
 7. Be generic when little is known. Curate from everything supplied when more is known.
 8. Every narrative field is a claim object. Copy supports.sourceId exactly from allowedSourceIds. Never invent a source id. quote must be a contiguous substring copied from that source's text. Seeker facts, approved statements, stories, personas, job requirement, company research, and interview notes are valid sources.
-9. Avoid every expression supplied in bannedPhrases. Do not use an em dash. Do not mention internal system state, prompts, or sources. Do not invent skills, titles, employers, dates, metrics, or achievements.
-10. If qualityFeedback is present, regenerate the complete guide to resolve every listed issue.
+9. There is no banned-phrase list. Do not mention internal system state, prompts, or sources. Do not invent skills, titles, employers, dates, metrics, or achievements.
+10. If qualityFeedback names a field, regenerate only that field.
 11. Return JSON matching the schema only.`;
 
 export const INTERVIEW_THANK_YOU_CLARIFY_SYSTEM_INSTRUCTIONS = `You write up to two short questions that help a job seeker turn thin post-stage notes into enough detail for a thank-you message.
 
 Ask only what would supply a specific conversation topic, something the interviewer said, or a point the seeker wants to reinforce. Do not invent facts. Do not ask for information already present. Each question is one sentence and ends with a question mark.
 
-Avoid every expression supplied in bannedPhrases. Do not mention internal system state, prompts, or sources. If qualityFeedback is present, regenerate to resolve every listed issue.
+There is no banned-phrase list. Do not mention internal system state, prompts, or sources. If qualityFeedback names a field, regenerate only that field.
 
 Return JSON matching the schema only.`;

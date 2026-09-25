@@ -1,15 +1,24 @@
 import { Prisma, type ApplicationAssetType } from "@prisma/client";
 import {
-  bannedPhraseHits,
   mentionsInternalSystemState,
   validateRepetitionAndMetaLanguage,
 } from "@/lib/consultation/output-quality";
+import {
+  logQualityRejection,
+  qualityIssue,
+  qualityMessages,
+  replaceEmDashesDeep,
+} from "@/lib/generation/quality";
 import {
   loadApplicationGenerationContext,
   type ReadyApplicationGenerationContext,
 } from "@/lib/generation/context";
 import { prisma } from "@/lib/prisma-client";
-import { applicationAssetConfig, consultationConfig, vocab } from "@/lib/product-config";
+import {
+  applicationAssetConfig,
+  consultationConfig,
+  vocab,
+} from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 import {
   generateCoverLetterWithModel,
@@ -224,6 +233,38 @@ function supportErrors(
     }
   }
   return errors;
+}
+
+function stripUngroundedClaims(
+  content: ApplicationAssetContent,
+  violations: string[],
+): ApplicationAssetContent {
+  const drop = new Set(
+    violations.flatMap((message) => {
+      const match = message.match(/^Claim (\S+)/);
+      return match?.[1] ? [match[1]] : [];
+    }),
+  );
+  if (drop.size === 0) return content;
+  const keep = (claim: AssetClaim) => !drop.has(claim.id);
+  if (content.type === "COVER_LETTER") {
+    return {
+      ...content,
+      paragraphs: content.paragraphs.filter(keep),
+    };
+  }
+  if (content.type !== "RESUME") return content;
+  return {
+    ...content,
+    summary: content.summary.filter(keep),
+    skills: content.skills.filter(keep),
+    education: content.education.filter(keep),
+    credentials: content.credentials.filter(keep),
+    experience: content.experience.map((role) => ({
+      ...role,
+      bullets: role.bullets.filter(keep),
+    })),
+  };
 }
 
 function resumeStructureErrors(
@@ -617,29 +658,38 @@ export async function validateAssetContent(input: {
 }): Promise<string[]> {
   const claims = assetClaims(input.content);
   const texts = claims.map((claim) => claim.text);
-  const errors = [
-    ...supportErrors(input.content, input.context),
-    ...bannedPhraseHits(texts, [
-      ...consultationConfig.bannedPhrases,
-      ...applicationAssetConfig.bannedPhrases,
-    ]).map((phrase) => `Remove configured banned language: ${phrase}.`),
-    ...texts.flatMap((text) =>
+  const issues = [
+    ...texts.flatMap((text, index) =>
       validateRepetitionAndMetaLanguage({
         text,
-        bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
+        field: claims[index]?.id ?? `claim.${index}`,
       }),
     ),
     ...(input.content.type !== "RESUME"
       ? validateRepetitionAndMetaLanguage({
           text: texts.join(" "),
-          bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
+          field: "body",
           ignoreRepeatedNumbers: input.content.type === "COVER_LETTER",
         })
       : []),
   ];
-  if (texts.some(mentionsInternalSystemState)) {
-    errors.push("Remove references to internal system state.");
-  }
+  const errors = [
+    ...supportErrors(input.content, input.context),
+    ...qualityMessages(issues),
+  ];
+  texts.forEach((text, index) => {
+    if (mentionsInternalSystemState(text)) {
+      issues.push(
+        qualityIssue({
+          check: "internal_state",
+          field: claims[index]?.id ?? `claim.${index}`,
+          text,
+          message: "Remove references to internal system state.",
+        }),
+      );
+      errors.push("Remove references to internal system state.");
+    }
+  });
   if (input.context.profile.experience.some((role) => !role.endDate)) {
     for (const phrase of applicationAssetConfig.unsupportedTemporalPhrasesWithoutExplicitDates) {
       if (texts.some((text) => text.toLowerCase().includes(phrase))) {
@@ -852,7 +902,9 @@ export async function generateApplicationAsset(input: {
       }
       continue;
     }
-    const content = normalizeAssetSupportSourceIds(generated.data, context);
+    const content = replaceEmDashesDeep(
+      normalizeAssetSupportSourceIds(generated.data, context),
+    );
     const violations = await validateAssetContent({
       content,
       context,
@@ -868,6 +920,20 @@ export async function generateApplicationAsset(input: {
         passed: violations.length === 0,
       });
     }
+    if (violations.length > 0) {
+      logQualityRejection({
+        generator: `asset.${input.type}`,
+        attempt,
+        issues: violations.map((message) =>
+          qualityIssue({
+            check: "asset_validation",
+            field: "content",
+            text: message,
+            message,
+          }),
+        ),
+      });
+    }
     if (violations.length === 0) {
       const saved = await saveVersion({
         context,
@@ -877,6 +943,26 @@ export async function generateApplicationAsset(input: {
         guidance: input.regenerationInstruction?.trim() || null,
       });
       return { ok: true, assetId: saved.id, version: saved.version };
+    }
+    if (attempt === applicationAssetConfig.generation.qualityRegenerationAttempts) {
+      const stripped = stripUngroundedClaims(content, violations);
+      const remaining = await validateAssetContent({
+        content: stripped,
+        context,
+        hiddenRoleIds,
+        condensedRoleIds,
+        salutation,
+      });
+      if (remaining.length === 0) {
+        const saved = await saveVersion({
+          context,
+          type: input.type,
+          personaId,
+          content: stripped,
+          guidance: applicationAssetConfig.labels.partialRemoved,
+        });
+        return { ok: true, assetId: saved.id, version: saved.version };
+      }
     }
     feedback = violations;
   }

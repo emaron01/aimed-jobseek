@@ -5,10 +5,15 @@ import {
   type EmailLength,
 } from "@prisma/client";
 import {
-  bannedPhraseHits,
   mentionsInternalSystemState,
   validateRepetitionAndMetaLanguage,
 } from "@/lib/consultation/output-quality";
+import {
+  logQualityRejection,
+  qualityIssue,
+  qualityMessages,
+  replaceEmDashesDeep,
+} from "@/lib/generation/quality";
 import {
   loadApplicationGenerationContext,
   type GenerationSource,
@@ -497,15 +502,13 @@ export async function validateOutreachContent(input: {
       confirmedHiringManagerRole: input.confirmedHiringManagerRole,
       channel,
     }),
-    ...bannedPhraseHits(qualityTexts, [
-      ...consultationConfig.bannedPhrases,
-      ...applicationAssetConfig.bannedPhrases,
-    ]).map((phrase) => `Remove configured banned language: ${phrase}.`),
-    ...qualityTexts.flatMap((text) =>
-      validateRepetitionAndMetaLanguage({
-        text,
-        bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
-      }),
+    ...qualityMessages(
+      qualityTexts.flatMap((text, index) =>
+        validateRepetitionAndMetaLanguage({
+          text,
+          field: `outreach.${index}`,
+        }),
+      ),
     ),
     ...redirectLineErrors({
       text: composed.body,
@@ -901,7 +904,7 @@ export async function generateOutreachAsset(input: {
         if (questions.length === 0) {
           return {
             ok: false,
-            message: "Thank-you questions did not pass quality checks. Retry.",
+            message: "Thank-you questions could not be written. Retry.",
             violations: [],
           };
         }
@@ -1064,7 +1067,7 @@ export async function generateOutreachAsset(input: {
       }
       continue;
     }
-    const content = generated.data;
+    const content = replaceEmDashesDeep(generated.data);
     const violations = await validateOutreachContent({
       content,
       context,
@@ -1077,6 +1080,21 @@ export async function generateOutreachAsset(input: {
       stageNotes: interviewStageNotes,
       mentionApplied,
     });
+    if (violations.length > 0) {
+      const composed = composeOutreachText(content);
+      logQualityRejection({
+        generator: `outreach.${input.type}`,
+        attempt,
+        issues: violations.map((message) =>
+          qualityIssue({
+            check: "outreach_validation",
+            field: "content",
+            text: composed.body,
+            message,
+          }),
+        ),
+      });
+    }
     if (violations.length === 0) {
       const saved = await saveOutreachVersion({
         context,

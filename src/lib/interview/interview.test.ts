@@ -43,16 +43,16 @@ describe("interview guide rules", () => {
     const repeatedInside =
       "Lead with the 2 production incidents. Repeat the 2 production incidents without adding information.";
     expect(
-      validateRepetitionAndMetaLanguage({ text: talkingPoint, bannedPhrases: [] }),
+      validateRepetitionAndMetaLanguage({ text: talkingPoint, field: "talkingPoints" }),
     ).toEqual([]);
     expect(
-      validateRepetitionAndMetaLanguage({ text: exampleAnswer, bannedPhrases: [] }),
+      validateRepetitionAndMetaLanguage({ text: exampleAnswer, field: "exampleAnswer" }),
     ).toEqual([]);
     expect(
       validateRepetitionAndMetaLanguage({
         text: repeatedInside,
-        bannedPhrases: [],
-      }).some((error) => error.includes("repeated the same number")),
+        field: "talkingPoints",
+      }).some((issue) => issue.message.includes("repeated the same number")),
     ).toBe(true);
   });
 

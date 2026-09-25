@@ -14,7 +14,6 @@ import {
 import {
   applicationAssetConfig,
   connectionNoteBodyBudget,
-  consultationConfig,
   outreachConfig,
 } from "@/lib/product-config";
 import {
@@ -114,10 +113,7 @@ export function buildResumeAssetMessages(input: {
         applicationGuidance: input.context.campaign.applicationGuidance,
         regenerationInstruction: input.regenerationInstruction,
         qualityFeedback: input.qualityFeedback,
-        bannedPhrases: [
-          ...consultationConfig.bannedPhrases,
-          ...applicationAssetConfig.bannedPhrases,
-        ],
+        seekerVoiceInstruction: applicationAssetConfig.seekerVoiceInstruction,
         targetLength: resumeTargetLength(input.context),
         headerFacts: [
           contact.name,
@@ -188,10 +184,7 @@ export function buildCoverLetterAssetMessages(input: {
         applicationGuidance: input.context.campaign.applicationGuidance,
         regenerationInstruction: input.regenerationInstruction,
         qualityFeedback: input.qualityFeedback,
-        bannedPhrases: [
-          ...consultationConfig.bannedPhrases,
-          ...applicationAssetConfig.bannedPhrases,
-        ],
+        seekerVoiceInstruction: applicationAssetConfig.seekerVoiceInstruction,
         salutation: input.salutation,
         signerName: input.context.profile.identity.name?.text ?? "",
         responseShape: {
@@ -301,10 +294,7 @@ export function buildOutreachAssetMessages(
           inMailSubject: outreachConfig.linkedinLimits.inMailSubjectChars,
           inMailBody: outreachConfig.linkedinLimits.inMailBodyChars,
         },
-        bannedPhrases: [
-          ...consultationConfig.bannedPhrases,
-          ...applicationAssetConfig.bannedPhrases,
-        ],
+        seekerVoiceInstruction: applicationAssetConfig.seekerVoiceInstruction,
         regenerationInstruction: input.regenerationInstruction,
         qualityFeedback: input.qualityFeedback,
         responseShape,

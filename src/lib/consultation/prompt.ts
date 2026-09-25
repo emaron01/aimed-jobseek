@@ -44,7 +44,6 @@ ${CONSULTATION_COACH_SYSTEM_INSTRUCTIONS}`;
     chronologyRequested: input.chronologyRequested,
     coveredTargetKeys: input.coveredTargetKeys,
     focusTargetKey: input.focusTargetKey ?? null,
-    bannedPhrases: consultationConfig.bannedPhrases,
     qualityFeedback: input.qualityFeedback ?? [],
   });
   return [
@@ -68,7 +67,6 @@ ${CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS}`;
     question: input.question,
     target: input.target,
     availableTargets: input.targets,
-    bannedPhrases: consultationConfig.bannedPhrases,
     interviewAnswerMaxWords: consultationConfig.interviewAnswerMaxWords,
     qualityFeedback: input.qualityFeedback ?? [],
   });
@@ -105,9 +103,8 @@ ${CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS}`,
         answer: input.answer,
         story: input.story,
         allowedSources: input.sources,
-        bannedPhrases: consultationConfig.bannedPhrases,
-        interviewAnswerBannedPhrases:
-          consultationConfig.interviewAnswerBannedPhrases,
+        interviewAnswerMetaLanguage:
+          consultationConfig.interviewAnswerMetaLanguage,
         interviewAnswerMaxWords:
           consultationConfig.interviewAnswerMaxWords,
         declinedFollowUp: input.declinedFollowUp,

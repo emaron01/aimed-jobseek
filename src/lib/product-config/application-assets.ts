@@ -21,10 +21,13 @@ export const applicationAssetConfig = Object.freeze({
     adjustPlanPrompt: "What should change?",
     adjustManually: "Adjust manually",
     acceptPlanFirst: `Accept ${consultationConfig.displayName}'s plan before generating this version.`,
-    planFailed: `${consultationConfig.displayName} could not write this plan. Retry when the consultation model is available.`,
+    planFailed: `${consultationConfig.displayName} could not write this plan. Retry.`,
+    planModelUnavailable: `${consultationConfig.displayName} could not reach the consultation model for this plan. Retry when it is available.`,
     emptyHistory: "No versions generated yet.",
     saveNewVersion: "Save as new version",
     seekerEditedGuidance: "Seeker-edited version",
+    partialRemoved:
+      "One part of this version could not be verified and was removed. Retry that part if you want it rewritten.",
   },
   seekerSourceCategories: [
     "PROFILE_FACT",

@@ -115,6 +115,11 @@ export async function ConsultationSection({
     ? consultationBriefingSchema.safeParse(session.briefingJson)
     : null;
   const failed = session?.generationStatus === "FAILED";
+  const qualityNote =
+    session?.generationStatus === "GENERATING"
+      ? null
+      : session?.generationError?.trim() ||
+        (failed ? consultationConversationCopy.generationFailed : null);
   const draftStatements = (session?.statements ?? []).filter(
     (statement) => statement.status === "DRAFT",
   );
@@ -255,14 +260,12 @@ export async function ConsultationSection({
         <p className="text-sm text-slate-600">Evidence has not been assessed yet.</p>
       )}
 
-      {failed ? (
+      {qualityNote ? (
         <div
           className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3"
           data-testid="consultation-failed"
         >
-          <p className="text-sm text-amber-950">
-            {consultationConversationCopy.generationFailed}
-          </p>
+          <p className="text-sm text-amber-950">{qualityNote}</p>
           {canEdit ? (
             <ApplicationActionForm
               action={retryConsultationAction}

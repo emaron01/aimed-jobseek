@@ -1,10 +1,14 @@
 import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import {
-  bannedPhraseHits,
   mentionsInternalSystemState,
   validateRepetitionAndMetaLanguage,
 } from "@/lib/consultation/output-quality";
+import {
+  logQualityRejection,
+  qualityIssue,
+  qualityMessages,
+} from "@/lib/generation/quality";
 import { prisma } from "@/lib/prisma-client";
 import {
   applicationAssetConfig,
@@ -351,22 +355,17 @@ export function validateInterviewGuideContent(input: {
       }
     }
   }
-  const banned = bannedPhraseHits(texts, [
-    ...consultationConfig.bannedPhrases,
-    ...applicationAssetConfig.bannedPhrases,
-  ]);
-  if (banned.length > 0) {
-    errors.push(`Remove configured banned language: ${banned.join(", ")}.`);
-  }
   if (texts.some(mentionsInternalSystemState)) {
     errors.push("Remove references to internal system state.");
   }
   for (const section of interviewGuideSections(input.content)) {
     errors.push(
-      ...validateRepetitionAndMetaLanguage({
-        text: section.text,
-        bannedPhrases: consultationConfig.interviewAnswerBannedPhrases,
-      }),
+      ...qualityMessages(
+        validateRepetitionAndMetaLanguage({
+          text: section.text,
+          field: section.name,
+        }),
+      ),
     );
   }
   const sourceById = new Map(input.sources.map((source) => [source.id, source]));
@@ -513,7 +512,7 @@ export async function requestInterviewGuide(input: {
     if (questions.length === 0) {
       return {
         status: "FAILED",
-        message: "Clarifying questions did not pass quality checks. Retry.",
+        message: "Clarifying questions could not be written. Retry.",
       };
     }
     await prisma.interviewStageGuide.upsert({
@@ -607,6 +606,20 @@ export async function requestInterviewGuide(input: {
         ) ?? [],
       approvedStoryIds: context.stories.map((story) => story.id),
     });
+    if (errors.length > 0) {
+      logQualityRejection({
+        generator: "interview_guide",
+        attempt,
+        issues: errors.map((message) =>
+          qualityIssue({
+            check: "guide_validation",
+            field: "content",
+            text: message,
+            message,
+          }),
+        ),
+      });
+    }
     if (errors.length === 0) {
       await prisma.interviewStageGuide.update({
         where: { stageId: input.stageId },
@@ -636,12 +649,12 @@ export async function requestInterviewGuide(input: {
     data: {
       status: "FAILED",
       generationError:
-        "The interview guide did not pass quality checks. Retry.",
+        "The interview guide did not pass checks. Retry the missing part.",
     },
   });
   return {
     status: "FAILED",
-    message: "The interview guide did not pass quality checks. Retry.",
+    message: "The interview guide did not pass checks. Retry the missing part.",
   };
 }
 
