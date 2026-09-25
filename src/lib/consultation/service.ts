@@ -25,11 +25,17 @@ import {
   seniorityWarrantsChronology,
 } from "@/lib/consultation/questions";
 import {
-  bannedPhraseHits,
+  mentionsInternalSystemState,
   validateGroundedStatement,
   validateInterviewAnswerQuality,
   type GroundingSource,
 } from "@/lib/consultation/output-quality";
+import {
+  logQualityRejection,
+  qualityIssue,
+  qualityMessages,
+  type QualityIssue,
+} from "@/lib/generation/quality";
 import { nextConsultationStatus } from "@/lib/consultation/state";
 import {
   appendConfirmedFact,
@@ -322,17 +328,37 @@ async function addTurn(input: {
   });
 }
 
-const INTERNAL_SYSTEM_STATE =
-  /\b(?:research (?:status|is|isn't|has|hasn't|not|pending|incomplete|unavailable)|confidence(?: score)?|ambiguit(?:y|ies)|ambiguous|missing (?:data|information|context)|internal (?:state|system)|prompt|model (?:output|behavior|generation)|not configured)\b/i;
-
-function extractionReferencesInternalState(extracted: {
+function extractionQualityIssues(extracted: {
   demonstratedTargets: Array<{ explanation: string }>;
   followUpQuestion: string | null;
-}): boolean {
-  return [
-    ...extracted.demonstratedTargets.map((item) => item.explanation),
-    extracted.followUpQuestion ?? "",
-  ].some((text) => INTERNAL_SYSTEM_STATE.test(text));
+}): QualityIssue[] {
+  const issues: QualityIssue[] = [];
+  extracted.demonstratedTargets.forEach((item, index) => {
+    if (mentionsInternalSystemState(item.explanation)) {
+      issues.push(
+        qualityIssue({
+          check: "internal_state",
+          field: `demonstratedTargets.${index}.explanation`,
+          text: item.explanation,
+          message: "Remove references to internal system state.",
+        }),
+      );
+    }
+  });
+  if (
+    extracted.followUpQuestion &&
+    mentionsInternalSystemState(extracted.followUpQuestion)
+  ) {
+    issues.push(
+      qualityIssue({
+        check: "internal_state",
+        field: "followUpQuestion",
+        text: extracted.followUpQuestion,
+        message: "Remove references to internal system state.",
+      }),
+    );
+  }
+  return issues;
 }
 
 function polishingSources(input: {
@@ -365,28 +391,18 @@ async function extractAnswerWithQuality(input: {
       qualityFeedback: feedback,
     });
     if (!extracted.ok) return extracted;
-    const narrative = [
-      ...extracted.data.demonstratedTargets.map((item) => item.explanation),
-      extracted.data.followUpQuestion ?? "",
-    ];
-    const errors: string[] = [];
-    if (extractionReferencesInternalState(extracted.data)) {
-      errors.push("Remove references to internal system state.");
-    }
-    const banned = bannedPhraseHits(
-      narrative,
-      consultationConfig.bannedPhrases,
-    );
-    if (banned.length > 0) {
-      errors.push(`Remove banned language: ${banned.join(", ")}.`);
-    }
-    if (errors.length === 0) return extracted;
-    feedback = errors;
+    const issues = extractionQualityIssues(extracted.data);
+    if (issues.length === 0) return extracted;
+    logQualityRejection({
+      generator: "consultation.extract",
+      attempt,
+      issues,
+    });
+    feedback = qualityMessages(issues);
   }
   return {
     ok: false as const,
-    message:
-      "Consultation answer analysis did not pass quality checks. Retry consultation.",
+    message: consultationConversationCopy.generationQualityFailed,
   };
 }
 
