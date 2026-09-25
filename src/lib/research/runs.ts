@@ -8,6 +8,7 @@ export type { ResearchRunView } from "@/lib/research/run-types";
 export {
   isResearchRunPaused,
   isResearchRunStalled,
+  isResearchRunQueuedUnstarted,
   RESEARCH_RUN_STALE_MS,
 } from "@/lib/research/run-types";
 export {
@@ -18,6 +19,7 @@ export {
   canRetryResearchRun,
   claimNextResearchRun,
   createResearchRun,
+  enqueueApplicationResearch,
   getActiveResearchRunForContactList,
   getLatestResearchRunForContactList,
   getResearchRunForOrganization,

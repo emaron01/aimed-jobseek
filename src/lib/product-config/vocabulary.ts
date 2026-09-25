@@ -180,6 +180,26 @@ export function organizationNameFromSeeker(input: {
   return signupCopy.organizationNameTemplate.replace("{name}", name);
 }
 
+export const applicationResearchCopy = Object.freeze({
+  title: "Employer research",
+  queued: "Queued",
+  researching: "Researching",
+  done: "Done",
+  failed: "Failed",
+  notStarted: "Research has not started",
+  notStartedDetail:
+    "A background worker has not picked up this research yet. Retry after the worker is running, or contact support if this continues.",
+  queuedDetail: "Research is waiting for a background worker.",
+  researchingDetail: "Research is in progress.",
+  doneDetail: "Research finished.",
+  failedDetail: "Research failed. You can retry.",
+  idle: "Not requested",
+  idleDetail: "Research has not been requested for this employer.",
+  saveEmployer: "Save employer and research",
+  savedQueued: "Employer saved. Research will run in the background.",
+  retriedQueued: "Research was queued again.",
+});
+
 export const employerIdentityCopy = Object.freeze({
   title: "Employer identity",
   confirm: "This is the company",

@@ -1,5 +1,6 @@
 /**
- * Render Background Worker entrypoint for durable ResearchRun batches.
+ * Render Background Worker entrypoint for durable ResearchRun batches
+ * (list research and application employer research).
  *
  * Migration ownership: web service runs `npm run render:pre-deploy` before deploy.
  * This process never runs prisma migrate — it waits for the ResearchRun table.

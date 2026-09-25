@@ -2,17 +2,19 @@ import type { Prisma, QualificationBucket } from "@prisma/client";
 import {
   applicationFitStaleReason,
   applyFitOverride,
-  computeApplicationEmployerFit,
   displayedFitBucket,
 } from "@/lib/application/fit";
 import {
+  markIdentityDependentsStale,
+  scoreFit,
+} from "@/lib/application/research-finish";
+import { enqueueApplicationResearch } from "@/lib/research/runs-service";
+import {
   decideEmployerResearch,
-  decisionAfterResearchIdentity,
   type EmployerMatch,
 } from "@/lib/job-requirement/employer";
 import {
   identityMismatchReason,
-  identityStaleReason,
   parseIdentityVerification,
   postingIdentityInput,
   researchIdentityInput,
@@ -21,24 +23,13 @@ import {
 import { employerIdentityCopy } from "@/lib/product-config";
 import type { ParsedJobRequirement } from "@/lib/job-requirement/types";
 import { JOB_REQUIREMENT_PROMPT_VERSION } from "@/lib/job-requirement/types";
-import { normalizeEvidenceClass } from "@/lib/criteria/evidence-class";
-import type { CompanyResearchActuals } from "@/lib/criteria/research-cascade";
-import type { CriterionSnapshot } from "@/lib/criteria/types";
-import {
-  emptyEmployerCompensationProfile,
-  parseEmploymentTypeCodes,
-  type EmployerCompensationProfile,
-} from "@/lib/application/compensation-fit";
 import { prisma } from "@/lib/prisma";
 import { vocab } from "@/lib/product-config";
-import { normalizeCompanyName, parseStringArray } from "@/lib/research";
+import { normalizeCompanyName } from "@/lib/research";
 import { ingestNamedJobContacts } from "@/lib/application/contacts";
 import { syncApplicationHiringTeam } from "@/lib/hiring-team/build";
 import { TenantError } from "@/lib/tenant/errors";
-import {
-  researchCompany,
-  resolveOrCreateCompany,
-} from "@/lib/tenant/company-research-service";
+import { resolveOrCreateCompany } from "@/lib/tenant/company-research-service";
 
 const BUCKETS = ["GOOD", "NEEDS_REVIEW", "POOR_FIT", "EXCLUDED"] as const;
 
@@ -51,110 +42,6 @@ function asBucket(value: string): QualificationBucket {
 
 function jsonValue(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
-}
-
-function researchActuals(row: {
-  companySummary: string | null;
-  whatTheySell: string | null;
-  businessModel: string | null;
-  companySizeContext: string | null;
-  relevantTechnologies: Prisma.JsonValue | null;
-  buyingSignals: Prisma.JsonValue | null;
-  hiringSignals: Prisma.JsonValue | null;
-  riskSignals: Prisma.JsonValue | null;
-  primaryMarkets: Prisma.JsonValue | null;
-} | null): CompanyResearchActuals | null {
-  if (!row) return null;
-  return {
-    companySummary: row.companySummary,
-    whatTheySell: row.whatTheySell,
-    businessModel: row.businessModel,
-    companySizeContext: row.companySizeContext,
-    relevantTechnologies: parseStringArray(row.relevantTechnologies),
-    buyingSignals: parseStringArray(row.buyingSignals),
-    hiringSignals: parseStringArray(row.hiringSignals),
-    riskSignals: parseStringArray(row.riskSignals),
-    primaryMarkets: parseStringArray(row.primaryMarkets),
-  };
-}
-
-function decimalToNumber(value: unknown): number | null {
-  if (value == null || value === "") return null;
-  const number = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-
-function employerCompensationFromIcp(icp: {
-  targetAnnualEarningsMin: unknown;
-  targetAnnualEarningsTarget: unknown;
-  targetHourlyRateMin: unknown;
-  targetHourlyRateTarget: unknown;
-  compensationCurrency: string | null;
-  employmentTypes: unknown;
-  annualEarningsMinimumRequired: boolean;
-  hourlyRateMinimumRequired: boolean;
-  employmentTypeRequired: boolean;
-}): EmployerCompensationProfile {
-  return {
-    targetAnnualEarningsMin: decimalToNumber(icp.targetAnnualEarningsMin),
-    targetAnnualEarningsTarget: decimalToNumber(icp.targetAnnualEarningsTarget),
-    targetHourlyRateMin: decimalToNumber(icp.targetHourlyRateMin),
-    targetHourlyRateTarget: decimalToNumber(icp.targetHourlyRateTarget),
-    compensationCurrency: icp.compensationCurrency,
-    employmentTypes: parseEmploymentTypeCodes(icp.employmentTypes),
-    annualEarningsMinimumRequired: icp.annualEarningsMinimumRequired,
-    hourlyRateMinimumRequired: icp.hourlyRateMinimumRequired,
-    employmentTypeRequired: icp.employmentTypeRequired,
-  };
-}
-
-async function loadCriteria(
-  organizationId: string,
-  icpId: string,
-): Promise<{
-  criteria: CriterionSnapshot[];
-  version: string | null;
-  updatedAt: Date;
-  targets: string[];
-  compensation: EmployerCompensationProfile;
-}> {
-  const icp = await prisma.icp.findFirst({
-    where: { id: icpId, organizationId },
-    include: { criteria: { orderBy: { sortOrder: "asc" } } },
-  });
-  if (!icp) {
-    throw new TenantError(
-      `${vocab.icp.Singular} was not found for this ${vocab.campaign.singular}.`,
-    );
-  }
-  const criteria: CriterionSnapshot[] = icp.criteria.map((row) => ({
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    criterionType: row.criterionType,
-    dataType: row.dataType,
-    operator: row.operator,
-    targetValue: row.targetValue,
-    minValue: row.minValue,
-    maxValue: row.maxValue,
-    importance: row.importance,
-    isRequired: row.isRequired,
-    isDisqualifier: row.isDisqualifier,
-    researchGuidance: row.researchGuidance,
-    evidenceClass: normalizeEvidenceClass(row.evidenceClass),
-    tier: row.tier,
-    isMandatory: row.isMandatory,
-    sortOrder: row.sortOrder,
-  }));
-  return {
-    criteria,
-    version: icp.interpretationPromptVersion,
-    updatedAt: icp.updatedAt,
-    targets: criteria
-      .map((criterion) => criterion.researchGuidance?.trim() ?? "")
-      .filter(Boolean),
-    compensation: employerCompensationFromIcp(icp),
-  };
 }
 
 async function companyMatches(
@@ -176,177 +63,22 @@ async function companyMatches(
   }));
 }
 
-async function scoreFit(input: {
+async function queueApplicationResearch(input: {
   organizationId: string;
   campaignId: string;
-  icpId: string;
   companyId: string;
+  forceRefresh?: boolean;
 }): Promise<void> {
-  const profile = await loadCriteria(input.organizationId, input.icpId);
-  const research = await prisma.companyResearch.findFirst({
-    where: {
-      organizationId: input.organizationId,
-      companyId: input.companyId,
-      status: { in: ["COMPLETED", "PARTIAL"] },
-    },
-    orderBy: { updatedAt: "desc" },
+  await enqueueApplicationResearch({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    companyId: input.companyId,
+    forceRefresh: input.forceRefresh,
   });
-  const requirementForUse = await prisma.jobRequirement.findFirst({
-    where: {
-      campaignId: input.campaignId,
-      organizationId: input.organizationId,
-    },
-    select: { identityConfirmation: true, identityVerificationJson: true },
+  await syncApplicationHiringTeam({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
   });
-  const verification = parseIdentityVerification(
-    requirementForUse?.identityVerificationJson,
-  );
-  if (
-    !research ||
-    research.identityAmbiguous ||
-    requirementForUse?.identityConfirmation === "REJECTED" ||
-    (requirementForUse?.identityConfirmation !== "CONFIRMED" &&
-      verification?.verdict === "AMBIGUOUS")
-  ) {
-    return;
-  }
-  const requirement = await prisma.jobRequirement.findFirst({
-    where: {
-      campaignId: input.campaignId,
-      organizationId: input.organizationId,
-    },
-    select: { compensationRange: true, employmentType: true },
-  });
-  const computed = computeApplicationEmployerFit({
-    criteria: profile.criteria,
-    company: {
-      industry: null,
-      employeeCount: null,
-      revenue: null,
-      location: null,
-    },
-    research: researchActuals(research),
-    interpretationPromptVersion: profile.version,
-    compensation: {
-      profile: profile.compensation ?? emptyEmployerCompensationProfile(),
-      compensationRange: requirement?.compensationRange ?? null,
-      employmentType: requirement?.employmentType ?? null,
-    },
-  });
-  const now = new Date();
-  const data = {
-    bucket: computed.bucket,
-    outcomesJson: jsonValue(computed.outcomes),
-    computedAt: now,
-    companyResearchId: research.id,
-    companyResearchUpdatedAt: research.updatedAt,
-    icpUpdatedAt: profile.updatedAt,
-    interpretationPromptVersion: profile.version,
-    stale: false,
-    staleReason: null,
-  };
-  await prisma.applicationFit.upsert({
-    where: { campaignId: input.campaignId },
-    create: {
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      icpId: input.icpId,
-      ...data,
-    },
-    update: data,
-  });
-}
-
-function researchFailureReason(result: {
-  skipped?: boolean;
-  reason?: string;
-  researchFailed?: boolean;
-}): string | null {
-  if (result.researchFailed) {
-    return result.reason?.trim() || "Employer research failed, so fit was not scored.";
-  }
-  if (result.skipped && result.reason === "fresh") return null;
-  if (result.skipped && result.reason === "provider_unconfigured") {
-    return "Employer research is not configured, so fit was not scored.";
-  }
-  if (result.skipped && result.reason) return result.reason;
-  return null;
-}
-
-async function researchAndMaybeScore(input: {
-  organizationId: string;
-  campaignId: string;
-  icpId: string;
-  companyId: string;
-}): Promise<void> {
-  try {
-    const profile = await loadCriteria(input.organizationId, input.icpId);
-    const result = await researchCompany(input.companyId, {
-      evidenceTargets: profile.targets,
-    });
-    const failure = researchFailureReason(result);
-    const research = result.research;
-    if (failure || !research || (research.status !== "COMPLETED" && research.status !== "PARTIAL")) {
-      await prisma.jobRequirement.update({
-        where: { campaignId: input.campaignId },
-        data: {
-          employerSkipReason:
-            failure ?? "Employer research did not finish, so fit was not scored.",
-        },
-      });
-      return;
-    }
-    const requirement = await prisma.jobRequirement.findFirst({
-      where: { campaignId: input.campaignId, organizationId: input.organizationId },
-      include: { company: { select: { name: true, location: true, website: true } } },
-    });
-    if (!requirement) {
-      throw new TenantError(
-        `This ${vocab.campaign.singular} has no job requirement.`,
-      );
-    }
-    const verification = verifyEmployerIdentity({
-      posting: postingIdentityInput(requirement),
-      research: researchIdentityInput({
-        ...research,
-        company: requirement.company,
-      }),
-    });
-    const after = decisionAfterResearchIdentity(
-      research.identityAmbiguous === true || verification.verdict === "AMBIGUOUS",
-    );
-    if (!after.scoreFit) {
-      await prisma.jobRequirement.update({
-        where: { campaignId: input.campaignId },
-        data: {
-          employerDisposition: "AMBIGUOUS",
-          employerSkipReason: after.reason ?? identityMismatchReason(),
-          identityVerificationJson: jsonValue(verification),
-          identityConfirmation: "PENDING",
-        },
-      });
-      await markIdentityDependentsStale({
-        organizationId: input.organizationId,
-        campaignId: input.campaignId,
-      });
-      return;
-    }
-    await prisma.jobRequirement.update({
-      where: { campaignId: input.campaignId },
-      data: {
-        employerDisposition: "IDENTIFIED",
-        employerSkipReason: null,
-        identityVerificationJson: jsonValue(verification),
-        identityConfirmation: "PENDING",
-      },
-    });
-    await scoreFit(input);
-  } finally {
-    await syncApplicationHiringTeam({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-    });
-  }
 }
 
 export async function attachParsedPosting(input: {
@@ -410,10 +142,9 @@ export async function attachParsedPosting(input: {
   });
 
   if (decision.disposition === "IDENTIFIED" && decision.runResearch && companyId) {
-    await researchAndMaybeScore({
+    await queueApplicationResearch({
       organizationId: input.organizationId,
       campaignId: input.campaignId,
-      icpId: input.icpId,
       companyId,
     });
     await ingestNamedJobContacts({
@@ -488,7 +219,6 @@ export async function nameApplicationEmployer(input: {
 }): Promise<void> {
   const requirement = await prisma.jobRequirement.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
-    include: { campaign: { select: { icpId: true } } },
   });
   if (!requirement) {
     throw new TenantError(
@@ -526,10 +256,9 @@ export async function nameApplicationEmployer(input: {
       identityVerificationJson: undefined,
     },
   });
-  await researchAndMaybeScore({
+  await queueApplicationResearch({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
-    icpId: requirement.campaign.icpId,
     companyId,
   });
 }
@@ -590,22 +319,6 @@ export async function overrideApplicationFit(input: {
       overrideReason: next.overrideReason,
       overriddenAt: next.overriddenAt,
       overriddenByUserId: input.userId,
-    },
-  });
-}
-
-async function markIdentityDependentsStale(input: {
-  organizationId: string;
-  campaignId: string;
-}): Promise<void> {
-  await prisma.applicationFit.updateMany({
-    where: {
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-    },
-    data: {
-      stale: true,
-      staleReason: identityStaleReason(),
     },
   });
 }
@@ -744,7 +457,6 @@ export async function retryApplicationResearch(input: {
 }): Promise<void> {
   const requirement = await prisma.jobRequirement.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
-    include: { campaign: { select: { icpId: true } } },
   });
   if (!requirement) {
     throw new TenantError(
@@ -775,11 +487,11 @@ export async function retryApplicationResearch(input: {
       employerSkipReason: null,
     },
   });
-  await researchAndMaybeScore({
+  await queueApplicationResearch({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
-    icpId: requirement.campaign.icpId,
     companyId,
+    forceRefresh: true,
   });
 }
 
@@ -808,6 +520,40 @@ export function readApplicationFitStale(input: {
   }
   if (derived) return { stale: true, reason: derived };
   return { stale: false, reason: null };
+}
+
+export async function ensureHiringTeamAfterResearch(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const requirement = await prisma.jobRequirement.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+    include: {
+      company: {
+        include: { research: { orderBy: { updatedAt: "desc" }, take: 1 } },
+      },
+    },
+  });
+  const research = requirement?.company?.research[0] ?? null;
+  if (!research || (research.status !== "COMPLETED" && research.status !== "PARTIAL")) {
+    return;
+  }
+  const latestRole = await prisma.persona.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      archivedAt: null,
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { updatedAt: true },
+  });
+  if (latestRole && latestRole.updatedAt >= research.updatedAt) {
+    return;
+  }
+  await syncApplicationHiringTeam({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+  });
 }
 
 export { displayedFitBucket };

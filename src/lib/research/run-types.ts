@@ -13,9 +13,16 @@ export type ResearchRunStatus =
 /** No worker heartbeat for this long → UI treats the run as stalled (not live). */
 export const RESEARCH_RUN_STALE_MS = 15 * 60 * 1000;
 
+/** PENDING with no claim for this long → research has not started (no worker). */
+export const RESEARCH_RUN_QUEUED_STALE_MS_DEFAULT = 2 * 60 * 1000;
+
+/** Stored on ResearchRun.lastError when a PENDING run is reported as not started. */
+export const RESEARCH_RUN_QUEUED_UNSTARTED_MARKER = "queued_unstarted";
+
 export type ResearchRunView = {
   id: string;
-  contactListId: string;
+  contactListId: string | null;
+  campaignId: string | null;
   scoringRunId: string | null;
   status: ResearchRunStatus;
   forceRefresh: boolean;
@@ -34,6 +41,7 @@ export type ResearchRunView = {
   startedAt: string | null;
   completedAt: string | null;
   pausedAt: string | null;
+  createdAt: string;
 };
 
 export function isResearchRunPaused(
@@ -54,6 +62,16 @@ export function isResearchRunStalled(
   const last = run.workerHeartbeatAt ?? run.startedAt;
   if (!last) return false;
   return nowMs - new Date(last).getTime() > RESEARCH_RUN_STALE_MS;
+}
+
+export function isResearchRunQueuedUnstarted(
+  run: Pick<ResearchRunView, "status" | "createdAt" | "workerHeartbeatAt">,
+  nowMs: number = Date.now(),
+  queuedStaleMs: number = RESEARCH_RUN_QUEUED_STALE_MS_DEFAULT,
+): boolean {
+  if (run.status !== "PENDING") return false;
+  if (run.workerHeartbeatAt != null) return false;
+  return nowMs - new Date(run.createdAt).getTime() > queuedStaleMs;
 }
 
 export function isTerminalResearchRunStatus(status: ResearchRunStatus): boolean {

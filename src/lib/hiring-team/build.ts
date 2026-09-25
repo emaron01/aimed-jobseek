@@ -14,7 +14,7 @@ import {
 import type { PersonaDifferentiationInput } from "@/lib/persona/persona-differentiation";
 import { parsePersonaListField } from "@/lib/persona/persona-differentiation";
 import { PERSONA_SYNTHESIS_PROMPT_VERSION } from "@/lib/persona-research/contract";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma-client";
 import { vocab } from "@/lib/product-config";
 import { usableEmployerResearch } from "@/lib/job-requirement/identity-verification";
 import type { JobScorecard, ScorecardItem } from "@/lib/job-requirement/types";

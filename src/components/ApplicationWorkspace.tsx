@@ -7,6 +7,9 @@ import {
   rescoreApplicationFitAction,
   retryApplicationResearchAction,
 } from "@/app/actions/application";
+import { ApplicationResearchStatus } from "@/components/ApplicationResearchStatus";
+import { getApplicationResearchStatus } from "@/lib/application/research-status";
+import type { ApplicationResearchStatusView } from "@/lib/application/research-status";
 import {
   addApplicationRoleAction,
   addTemplateRoleAction,
@@ -40,11 +43,11 @@ import {
   coverLetterEvidenceIsThin,
   coverLetterThinEvidenceCopy,
 } from "@/lib/application-assets/service";
-import { applicationSummaryConfig, criterionFlags, employerIdentityCopy, hiringTeamConfig, vocab } from "@/lib/product-config";
+import { applicationResearchCopy, applicationSummaryConfig, criterionFlags, employerIdentityCopy, hiringTeamConfig, vocab } from "@/lib/product-config";
 import {
   parseIdentityVerification,
 } from "@/lib/job-requirement/identity-verification";
-import { ensureIdentityVerification } from "@/lib/application/service";
+import { ensureHiringTeamAfterResearch, ensureIdentityVerification } from "@/lib/application/service";
 import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
 import { parseStringArray } from "@/lib/research";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
@@ -120,6 +123,7 @@ function IdentityVerificationPanel({
   canEdit,
   requirement,
   research,
+  researchStatus,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -138,6 +142,7 @@ function IdentityVerificationPanel({
     hiringSignals: unknown;
     riskSignals: unknown;
   } | null;
+  researchStatus: ApplicationResearchStatusView;
 }) {
   const verification = parseIdentityVerification(requirement.identityVerificationJson);
   const researchFailed =
@@ -145,6 +150,9 @@ function IdentityVerificationPanel({
     (!research || research.status === "FAILED" || research.status === "NOT_STARTED");
   const showRetry =
     canEdit &&
+    !researchStatus.canRetry &&
+    researchStatus.phase !== "queued" &&
+    researchStatus.phase !== "researching" &&
     (researchFailed || !research || research.status === "FAILED" || research.status === "NOT_STARTED");
   const showCandidate =
     verification &&
@@ -265,7 +273,11 @@ function IdentityVerificationPanel({
       ) : null}
 
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-slate-900">Employer research</h3>
+        <ApplicationResearchStatus
+          campaignId={campaignId}
+          canEdit={canEdit}
+          initialStatus={researchStatus}
+        />
         {confirmedResearch ? (
           <div className="space-y-2 text-sm text-slate-800">
             <p>{research.companySummary || "No summary yet."}</p>
@@ -303,6 +315,7 @@ export async function ApplicationWorkspace({
   canEdit: boolean;
 }) {
   await ensureIdentityVerification({ organizationId, campaignId });
+  await ensureHiringTeamAfterResearch({ organizationId, campaignId });
   const requirement = await prisma.jobRequirement.findFirst({
     where: { campaignId, organizationId },
     include: {
@@ -339,6 +352,10 @@ export async function ApplicationWorkspace({
   });
   if (!requirement) return null;
 
+  const researchStatus = await getApplicationResearchStatus({
+    organizationId,
+    campaignId,
+  });
   const scorecard = readScorecard(requirement.scorecardJson);
   const research = requirement.company?.research[0] ?? null;
   const fit = requirement.campaign.applicationFit;
@@ -448,7 +465,7 @@ export async function ApplicationWorkspace({
       {canEdit && requirement.employerDisposition !== "IDENTIFIED" && !parseIdentityVerification(requirement.identityVerificationJson) ? (
         <ApplicationActionForm
           action={nameApplicationEmployerAction}
-          submitLabel="Save employer and research"
+          submitLabel={applicationResearchCopy.saveEmployer}
           testId="confirm-employer-form"
         >
           <input type="hidden" name="campaignId" value={requirement.campaignId} />
@@ -474,6 +491,7 @@ export async function ApplicationWorkspace({
         canEdit={canEdit}
         requirement={requirement}
         research={research}
+        researchStatus={researchStatus}
       />
 
       <div className="space-y-3 border-t border-slate-200 pt-4" data-testid="employer-fit">

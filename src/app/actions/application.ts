@@ -10,7 +10,9 @@ import {
   retryApplicationResearch,
 } from "@/lib/application/service";
 import { requireCurrentUser } from "@/lib/auth/session";
-import { employerIdentityCopy, vocab } from "@/lib/product-config";
+import { getApplicationResearchStatus } from "@/lib/application/research-status";
+import type { ApplicationResearchStatusView } from "@/lib/application/research-status";
+import { applicationResearchCopy, employerIdentityCopy, vocab } from "@/lib/product-config";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
 
@@ -49,7 +51,7 @@ export async function nameApplicationEmployerAction(
       companyId: companyId || null,
     });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: "Employer saved. Research and fit run when the employer is known." };
+    return { ok: true, message: applicationResearchCopy.savedQueued };
   } catch (error) {
     return fail(error, "The employer could not be saved.");
   }
@@ -106,9 +108,32 @@ export async function retryApplicationResearchAction(
     }
     await retryApplicationResearch({ organizationId, campaignId });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: "Employer research was retried." };
+    return { ok: true, message: applicationResearchCopy.retriedQueued };
   } catch (error) {
     return fail(error, "Employer research could not be retried.");
+  }
+}
+
+export async function getApplicationResearchStatusAction(
+  campaignId: string,
+): Promise<ApplicationResearchStatusView | null> {
+  const trimmed = campaignId.trim();
+  if (!trimmed) return null;
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    return await getApplicationResearchStatus({
+      organizationId,
+      campaignId: trimmed,
+    });
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "application_research_status_failed",
+        message: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+    throw error;
   }
 }
 

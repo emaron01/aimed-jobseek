@@ -2005,7 +2005,10 @@ model ContactResearch {
 model ResearchRun {
   id                       String            @id @default(cuid())
   organizationId           String
-  contactListId            String
+  /// List-scoped batch. Null when this run is application employer research.
+  contactListId            String?
+  /// Application-scoped single-company research. Null for list batches.
+  campaignId               String?
   scoringRunId             String?
   status                   ResearchRunStatus @default(PENDING)
   forceRefresh             Boolean           @default(false)
@@ -2036,7 +2039,8 @@ model ResearchRun {
   updatedAt                DateTime          @updatedAt
 
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  contactList  ContactList   @relation(fields: [contactListId], references: [id], onDelete: Cascade)
+  contactList  ContactList?  @relation(fields: [contactListId], references: [id], onDelete: Cascade)
+  campaign     Campaign?     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   scoringRun   ScoringRun?   @relation(fields: [scoringRunId], references: [id], onDelete: SetNull)
   initiatedBy  User?         @relation("ResearchRunInitiatedBy", fields: [initiatedByUserId], references: [id], onDelete: SetNull)
   retryOf      ResearchRun?  @relation("ResearchRunRetry", fields: [retryOfRunId], references: [id], onDelete: SetNull)
@@ -2044,7 +2048,9 @@ model ResearchRun {
 
   @@index([organizationId])
   @@index([contactListId])
+  @@index([campaignId])
   @@index([organizationId, contactListId, status])
+  @@index([organizationId, campaignId, status])
   @@index([status, workerHeartbeatAt])
   @@index([scoringRunId])
   @@index([initiatedByUserId])
@@ -2287,6 +2293,7 @@ model Campaign {
   applicationSummary  ApplicationSummary?
   applicationAssets   ApplicationAsset[]
   interviewStages     InterviewStage[]
+  researchRuns        ResearchRun[]
 
   @@index([organizationId])
   @@index([organizationId, createdAt])

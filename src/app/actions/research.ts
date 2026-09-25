@@ -203,10 +203,15 @@ export async function getResearchRunStatusAction(
   const { prisma } = await import("@/lib/prisma");
   const run = await prisma.researchRun.findFirst({
     where: { id: runId, organizationId },
-    select: { contactList: { select: { ownerUserId: true } } },
+    select: {
+      contactList: { select: { ownerUserId: true } },
+      campaign: { select: { ownerUserId: true } },
+    },
   });
   if (!run) return null;
-  assertCanViewOwnedWork(actor, run.contactList.ownerUserId, "Research run");
+  const ownerUserId = run.contactList?.ownerUserId ?? run.campaign?.ownerUserId;
+  if (!ownerUserId) return null;
+  assertCanViewOwnedWork(actor, ownerUserId, "Research run");
   return getResearchRunForOrganization(runId, organizationId);
 }
 
@@ -232,6 +237,12 @@ export async function retryFailedResearchRunAction(
     const organizationId = await requireOrganizationId();
     const user = await requireCurrentUser();
     const prior = await requireResearchRunInOrganization(runId, organizationId);
+    if (!prior.contactListId) {
+      return {
+        ok: false,
+        message: "Retry this research from the application.",
+      };
+    }
     const { prisma } = await import("@/lib/prisma");
     const list = await prisma.contactList.findFirstOrThrow({
       where: { id: prior.contactListId, organizationId },

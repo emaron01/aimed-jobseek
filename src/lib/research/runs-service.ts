@@ -15,13 +15,17 @@ import { runWithTenantContext } from "@/lib/tenant/request-context";
 import { TenantError } from "@/lib/tenant/errors";
 import { getResearchWorkerConcurrency } from "@/lib/research/config";
 import { isProviderLevelFailure } from "@/lib/research/failure-classification";
-import type { ResearchRunView } from "@/lib/research/run-types";
+import {
+  isResearchRunQueuedUnstarted,
+  type ResearchRunView,
+} from "@/lib/research/run-types";
 import { vocab } from "@/lib/product-config";
 
 export type { ResearchRunView } from "@/lib/research/run-types";
 export {
   isResearchRunPaused,
   isResearchRunStalled,
+  isResearchRunQueuedUnstarted,
   RESEARCH_RUN_STALE_MS,
 } from "@/lib/research/run-types";
 
@@ -50,6 +54,7 @@ function toResearchRunView(run: ResearchRun): ResearchRunView {
   return {
     id: run.id,
     contactListId: run.contactListId,
+    campaignId: run.campaignId,
     scoringRunId: run.scoringRunId,
     status: run.status,
     forceRefresh: run.forceRefresh,
@@ -68,6 +73,7 @@ function toResearchRunView(run: ResearchRun): ResearchRunView {
     completedAt: run.completedAt?.toISOString() ?? null,
     pausedAt: run.pausedAt?.toISOString() ?? null,
     workerHeartbeatAt: run.workerHeartbeatAt?.toISOString() ?? null,
+    createdAt: run.createdAt.toISOString(),
   };
 }
 
@@ -119,6 +125,95 @@ async function findActiveRunForList(
     },
     orderBy: { createdAt: "desc" },
   });
+}
+
+async function findActiveRunForCampaign(
+  campaignId: string,
+  organizationId: string,
+): Promise<ResearchRun | null> {
+  return prisma.researchRun.findFirst({
+    where: {
+      organizationId,
+      campaignId,
+      status: { in: ["PENDING", "IN_PROGRESS"] },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function enqueueApplicationResearch(input: {
+  organizationId: string;
+  campaignId: string;
+  companyId: string;
+  forceRefresh?: boolean;
+  initiatedByUserId?: string | null;
+}): Promise<ResearchRunView> {
+  const existing = await findActiveRunForCampaign(
+    input.campaignId,
+    input.organizationId,
+  );
+  if (existing) {
+    if (isHeartbeatStale(existing) || isQueuedUnstartedRun(existing)) {
+      await failStaleResearchRun(
+        existing.id,
+        new Date(),
+        "Replaced by a new research request.",
+      );
+    } else {
+      return toResearchRunView(existing);
+    }
+  }
+
+  const company = await prisma.company.findFirst({
+    where: { id: input.companyId, organizationId: input.organizationId },
+    select: { id: true, name: true },
+  });
+  if (!company) {
+    throw new TenantError("That employer was not found.");
+  }
+
+  try {
+    const run = await prisma.researchRun.create({
+      data: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        contactListId: null,
+        initiatedByUserId: input.initiatedByUserId ?? null,
+        forceRefresh: Boolean(input.forceRefresh),
+        totalCompanies: 1,
+        status: "PENDING",
+        currentCompanyId: company.id,
+        currentCompanyName: company.name,
+      },
+    });
+    return toResearchRunView(run);
+  } catch (error) {
+    if (
+      error instanceof PrismaNamespace.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const active = await findActiveRunForCampaign(
+        input.campaignId,
+        input.organizationId,
+      );
+      if (active) return toResearchRunView(active);
+    }
+    throw error;
+  }
+}
+
+function isQueuedUnstartedRun(
+  run: Pick<ResearchRun, "status" | "createdAt" | "workerHeartbeatAt">,
+  now = new Date(),
+): boolean {
+  return isResearchRunQueuedUnstarted(
+    {
+      status: run.status,
+      createdAt: run.createdAt.toISOString(),
+      workerHeartbeatAt: run.workerHeartbeatAt?.toISOString() ?? null,
+    },
+    now.getTime(),
+  );
 }
 
 function buildTargetItems(
@@ -434,7 +529,8 @@ export async function claimNextResearchRun(now = new Date()): Promise<string | n
 
   if (claimed.count === 0) return null;
   console.log(
-    `[research-worker] claimed run ${candidate.id} (list ${candidate.contactListId}, ` +
+    `[research-worker] claimed run ${candidate.id} (` +
+      `${candidate.campaignId ? `application ${candidate.campaignId}` : `list ${candidate.contactListId}`}, ` +
       `status was ${candidate.status})`,
   );
   return candidate.id;
@@ -489,6 +585,122 @@ function isResearchCompanyFailure(
   );
 }
 
+async function failApplicationResearchRun(
+  runId: string,
+  lastError: string,
+): Promise<void> {
+  await prisma.researchRun.update({
+    where: { id: runId },
+    data: {
+      status: "FAILED",
+      lastError,
+      failedCount: 1,
+      completedAt: new Date(),
+      currentCompanyId: null,
+      currentCompanyName: null,
+      workerHeartbeatAt: new Date(),
+      pausedAt: null,
+    },
+  });
+}
+
+async function processApplicationResearchRun(run: ResearchRun): Promise<void> {
+  if (!run.campaignId || !run.currentCompanyId) {
+    await failApplicationResearchRun(
+      run.id,
+      "Application research run is missing campaign or company.",
+    );
+    return;
+  }
+
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: run.campaignId, organizationId: run.organizationId },
+    select: { icpId: true },
+  });
+  if (!campaign) {
+    await failApplicationResearchRun(
+      run.id,
+      `This ${vocab.campaign.singular} was not found.`,
+    );
+    return;
+  }
+
+  console.log(
+    `[research-run ${run.id}] processing application ${run.campaignId} ` +
+      `(org ${run.organizationId}, company ${run.currentCompanyId}, ` +
+      `forceRefresh=${run.forceRefresh})`,
+  );
+
+  try {
+    await runWithTenantContext(
+      {
+        organizationId: run.organizationId,
+        userId: run.initiatedByUserId,
+      },
+      async () => {
+        await prisma.researchRun.update({
+          where: { id: run.id },
+          data: { workerHeartbeatAt: new Date() },
+        });
+
+        const result = await researchCompany(run.currentCompanyId!, {
+          force: run.forceRefresh,
+        });
+
+        const { finishApplicationAfterResearch } = await import(
+          "@/lib/application/research-finish"
+        );
+        await finishApplicationAfterResearch({
+          organizationId: run.organizationId,
+          campaignId: run.campaignId!,
+          icpId: campaign.icpId,
+          companyId: run.currentCompanyId!,
+          result,
+        });
+
+        const failed = isResearchCompanyFailure(result);
+        const skippedFresh = Boolean(result.skipped && result.reason === "fresh");
+        const lastError = failed
+          ? result.failure?.userMessage ??
+            result.reason ??
+            "Employer research failed."
+          : null;
+
+        await prisma.researchRun.update({
+          where: { id: run.id },
+          data: {
+            status: failed ? "FAILED" : "COMPLETED",
+            completedCount: failed ? 0 : 1,
+            failedCount: failed ? 1 : 0,
+            skippedFreshCount: skippedFresh ? 1 : 0,
+            lastError,
+            completedAt: new Date(),
+            currentCompanyId: null,
+            currentCompanyName: null,
+            workerHeartbeatAt: new Date(),
+            pausedAt: null,
+            processedCompanyIds: [run.currentCompanyId!],
+          },
+        });
+
+        console.log(
+          `[research-run ${run.id}] application research ` +
+            `${failed ? "FAILED" : "COMPLETED"}` +
+            (lastError ? ` lastError=${lastError}` : ""),
+        );
+      },
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message.slice(0, 500)
+        : "Research worker crashed.";
+    console.error(`[research-run ${run.id}] application research crashed`, message);
+    await failApplicationResearchRun(run.id, message);
+    throw error;
+  }
+}
+
 export async function processResearchRun(runId: string): Promise<void> {
   const run = await prisma.researchRun.findUnique({ where: { id: runId } });
   if (!run) {
@@ -502,8 +714,33 @@ export async function processResearchRun(runId: string): Promise<void> {
     return;
   }
 
+  if (run.campaignId) {
+    await processApplicationResearchRun(run);
+    return;
+  }
+
+  const contactListId = run.contactListId;
+  if (!contactListId) {
+    console.error(
+      `[research-run ${runId}] skipped: run has neither campaignId nor contactListId`,
+    );
+    await prisma.researchRun.update({
+      where: { id: runId },
+      data: {
+        status: "FAILED",
+        lastError: "Research run is missing a list or application scope.",
+        completedAt: new Date(),
+        currentCompanyId: null,
+        currentCompanyName: null,
+        workerHeartbeatAt: new Date(),
+        pausedAt: null,
+      },
+    });
+    return;
+  }
+
   console.log(
-    `[research-run ${runId}] processing list ${run.contactListId} ` +
+    `[research-run ${runId}] processing list ${contactListId} ` +
       `(org ${run.organizationId}, totalCompanies ${run.totalCompanies}, ` +
       `forceRefresh=${run.forceRefresh})`,
   );
@@ -519,7 +756,7 @@ export async function processResearchRun(runId: string): Promise<void> {
         userId: run.initiatedByUserId,
       },
       async () => {
-      const plan = await getCompaniesNeedingResearchForContactList(run.contactListId);
+      const plan = await getCompaniesNeedingResearchForContactList(contactListId);
       const targets = buildTargetItems(plan, {
         forceRefresh: run.forceRefresh,
         failuresOnly: run.failuresOnly,

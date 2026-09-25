@@ -4,6 +4,7 @@
  */
 export {
   compensationCopy,
+  applicationResearchCopy,
   countedNoun,
   criterionFlagLabels,
   criterionFlags,

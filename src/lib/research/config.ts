@@ -1,3 +1,5 @@
+import { RESEARCH_RUN_QUEUED_STALE_MS_DEFAULT } from "@/lib/research/run-types";
+
 /**
  * Research AI prompt versioning (application constant — not env).
  * v3: job-seeker employer research. Hiring signals are separate from buyingSignals.
@@ -44,4 +46,27 @@ export function getResearchWorkerConcurrency(): number {
     );
   }
   return Math.min(parsed, RESEARCH_CONCURRENCY_MAX);
+}
+
+const RESEARCH_QUEUED_STALE_MS_MIN = 15_000;
+const RESEARCH_QUEUED_STALE_MS_MAX = 60 * 60 * 1000;
+
+/**
+ * How long a PENDING run may sit unclaimed before the application shows
+ * that research has not started. Override with RESEARCH_QUEUED_STALE_MS.
+ */
+export function getResearchQueuedStaleMs(): number {
+  const raw = process.env.RESEARCH_QUEUED_STALE_MS?.trim();
+  if (!raw) return RESEARCH_RUN_QUEUED_STALE_MS_DEFAULT;
+  const parsed = Number.parseInt(raw, 10);
+  if (
+    !Number.isFinite(parsed) ||
+    parsed < RESEARCH_QUEUED_STALE_MS_MIN ||
+    parsed > RESEARCH_QUEUED_STALE_MS_MAX
+  ) {
+    throw new Error(
+      `Invalid RESEARCH_QUEUED_STALE_MS "${raw}". Use an integer from ${RESEARCH_QUEUED_STALE_MS_MIN} to ${RESEARCH_QUEUED_STALE_MS_MAX}.`,
+    );
+  }
+  return parsed;
 }

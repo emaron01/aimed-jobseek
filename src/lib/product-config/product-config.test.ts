@@ -8,6 +8,7 @@ import {
   features,
   applicationAssetConfig,
   consultationConfig,
+  applicationResearchCopy,
   employerIdentityCopy,
   icpLabels,
   nounForCount,
@@ -51,6 +52,11 @@ describe("vocabulary", () => {
       "Alex Chen's workspace",
     );
     expect(signupCopy.emailLabel).toBe("Email");
+    expect(applicationResearchCopy.queued).toBe("Queued");
+    expect(applicationResearchCopy.researching).toBe("Researching");
+    expect(applicationResearchCopy.done).toBe("Done");
+    expect(applicationResearchCopy.failed).toBe("Failed");
+    expect(applicationResearchCopy.notStarted).toBe("Research has not started");
     expect(employerIdentityCopy.notStatedInPosting).toBe("Not stated in the posting");
     expect(employerIdentityCopy.checkLabels.sizeOrStage).toBe("Size or stage");
     expect(employerIdentityCopy.status.MATCH).toBe("Match");
