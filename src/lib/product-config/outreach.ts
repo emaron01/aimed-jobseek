@@ -5,16 +5,17 @@
  * documents 200-character subjects and 1,900-character bodies. Article a546814
  * mentions a 2,000-character body; this product uses the stricter 1,900 limit.
  */
+import { applicationWorkspaceCopy } from "./vocabulary";
 
 export const outreachConfig = Object.freeze({
   labels: {
     sectionTitle: "Outreach",
     sectionHelp:
       "Generate a message for a Hiring Team role. A named contact is optional. Open email in your own client, or copy LinkedIn text. Nothing is sent from this product.",
-    contactsTitle: "Contacts",
+    contactsTitle: applicationWorkspaceCopy.contactsTitle,
     contactsHelp:
       "Add one person at a time. The product matches a Hiring Team role from their title. You can change it.",
-    appliedTitle: "Applied",
+    appliedTitle: applicationWorkspaceCopy.appliedTitle,
     appliedHelp: "Mark the date you submitted this application through the employer portal.",
     appliedStatus: "Applied",
     notAppliedStatus: "Not marked applied",

@@ -52,7 +52,7 @@ import {
 } from "@/lib/application-assets/service";
 import { presentationPlanSchema } from "@/lib/application-assets/plan-contract";
 import { ensureApplicationNextStep } from "@/lib/application/next-step";
-import { applicationResearchCopy, applicationSummaryConfig, consultationConversationCopy, criterionFlags, employerIdentityCopy, hiringTeamConfig, vocab } from "@/lib/product-config";
+import { applicationResearchCopy, applicationSummaryConfig, applicationWorkspaceCopy, consultationConversationCopy, criterionFlags, employerIdentityCopy, hiringTeamConfig, vocab } from "@/lib/product-config";
 import {
   parseIdentityVerification,
 } from "@/lib/job-requirement/identity-verification";
@@ -474,13 +474,15 @@ export async function ApplicationWorkspace({
     </section>
     <details className="space-y-4 rounded-lg border border-slate-200 bg-white p-5" data-testid="application-workspace">
       <summary className="cursor-pointer text-base font-semibold text-slate-900">
-        Job requirement
+        {applicationWorkspaceCopy.jobRequirementTitle}
       </summary>
       <div className="mt-4 space-y-4">
     <section className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">Job requirement</h2>
+          <h2 className="text-base font-semibold text-slate-900">
+            {applicationWorkspaceCopy.jobRequirementTitle}
+          </h2>
           <p className="mt-1 text-sm text-slate-600">
             Parsed from the pasted posting. Empty fields were not in the posting.
           </p>
@@ -669,7 +671,7 @@ export async function ApplicationWorkspace({
       data-testid="application-applied-wrap"
     >
       <summary className="cursor-pointer text-base font-semibold text-slate-900">
-        Applied
+        {applicationWorkspaceCopy.appliedTitle}
       </summary>
       <div className="mt-4">
     <ApplicationAppliedSection
@@ -680,12 +682,22 @@ export async function ApplicationWorkspace({
     />
       </div>
     </details>
+    <details
+      className="rounded-lg border border-slate-200 bg-white p-5"
+      data-testid="application-contacts-wrap"
+    >
+      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+        {applicationWorkspaceCopy.contactsTitle}
+      </summary>
+      <div className="mt-4">
     <ApplicationContactsSection
       campaignId={requirement.campaignId}
       canEdit={canEdit}
       roles={requirement.campaign.hiringTeamRoles}
       contacts={requirement.campaign.contacts.map(toContactRow)}
     />
+      </div>
+    </details>
     <ApplicationAssetsSection
       campaignId={requirement.campaignId}
       canEdit={canEdit}
@@ -1085,7 +1097,7 @@ async function HiringTeamSection({
   return (
     <details className="space-y-4 rounded-lg border border-slate-200 bg-white p-5" data-testid="hiring-team">
       <summary className="cursor-pointer text-base font-semibold text-slate-900">
-        {vocab.persona.nav}
+        {hiringTeamConfig.workspaceTitle}
       </summary>
       <div className="mt-4 space-y-4">
       <div>

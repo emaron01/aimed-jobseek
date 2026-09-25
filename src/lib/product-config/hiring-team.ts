@@ -1,10 +1,11 @@
 /** Hiring Team identification limits. Role names and titles come from the model. */
-import { vocab } from "./vocabulary";
+import { applicationWorkspaceCopy, vocab } from "./vocabulary";
 
 export const hiringTeamConfig = {
   maxIdentifiedRoles: 8,
   maxBuildAttempts: 3,
   staleReason: `This ${vocab.persona.singular} is stale because the job or employer research changed. Rebuild when you want an updated draft.`,
+  workspaceTitle: applicationWorkspaceCopy.hiringTeamTitle,
   sections: {
     direct: "Direct",
     indirect: "Indirect",

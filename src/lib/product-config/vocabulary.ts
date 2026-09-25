@@ -200,6 +200,14 @@ export const applicationResearchCopy = Object.freeze({
   retriedQueued: "Research was queued again.",
 });
 
+export const applicationWorkspaceCopy = Object.freeze({
+  nextStepTitle: "Let's Walk Through The Application Process",
+  jobRequirementTitle: "Review and Edit The Job Requirements",
+  hiringTeamTitle: "Review/ Edit The Assumed Hiring Personas",
+  appliedTitle: "Update Application Date and Status",
+  contactsTitle: "Add/ Review Interview Contacts",
+});
+
 export const employerIdentityCopy = Object.freeze({
   title: "Employer identity",
   confirm: "This is the company",

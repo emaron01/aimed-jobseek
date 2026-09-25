@@ -5,6 +5,7 @@
 export {
   compensationCopy,
   applicationResearchCopy,
+  applicationWorkspaceCopy,
   countedNoun,
   criterionFlagLabels,
   criterionFlags,

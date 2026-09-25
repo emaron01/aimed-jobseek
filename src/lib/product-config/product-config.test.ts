@@ -9,7 +9,11 @@ import {
   applicationAssetConfig,
   consultationConfig,
   applicationResearchCopy,
+  applicationWorkspaceCopy,
+  consultationConversationCopy,
   employerIdentityCopy,
+  hiringTeamConfig,
+  outreachConfig,
   icpLabels,
   nounForCount,
   organizationNameFromSeeker,
@@ -69,6 +73,24 @@ describe("vocabulary", () => {
     );
     expect(applicationAssetConfig.coverLetter.thinEvidence).toContain("{consultant}");
     expect(consultationConfig.displayName).toBe("Harper");
+    expect(applicationWorkspaceCopy.nextStepTitle).toBe(
+      "Let's Walk Through The Application Process",
+    );
+    expect(consultationConversationCopy.nextStepTitle).toBe(
+      applicationWorkspaceCopy.nextStepTitle,
+    );
+    expect(applicationWorkspaceCopy.jobRequirementTitle).toBe(
+      "Review and Edit The Job Requirements",
+    );
+    expect(hiringTeamConfig.workspaceTitle).toBe(
+      "Review/ Edit The Assumed Hiring Personas",
+    );
+    expect(outreachConfig.labels.appliedTitle).toBe(
+      "Update Application Date and Status",
+    );
+    expect(outreachConfig.labels.contactsTitle).toBe(
+      "Add/ Review Interview Contacts",
+    );
   });
 });
 
