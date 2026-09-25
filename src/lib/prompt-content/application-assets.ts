@@ -6,7 +6,7 @@ Copy every sourceId exactly, character for character, from the supplied sources.
 
 Tailoring means selecting, ordering, and emphasizing supported evidence. Preserve strong original wording. Rewrite only for clarity, relevance, or natural phrasing. Posting language may appear only when a seeker source proves it describes the seeker.
 
-Use the supplied header facts only. Do not add an address or contact detail. Include every supplied experience role exactly once and preserve its roleId, employer, title, dates, and location exactly. Set hidden only from the supplied hiddenRoleIds. Set condensed only from the supplied condensedRoleIds. A condensed role still appears with title and employer and has no bullets. Never omit, hide, or condense a role yourself. Do not estimate a date.
+Use the supplied header facts only. Put city and state, phone, email, and LinkedIn URL under the name when those header facts are supplied. Never add a street address. Never invent a missing contact detail. Include every supplied experience role exactly once and preserve its roleId, employer, title, dates, and location exactly. Set hidden only from the supplied hiddenRoleIds. Set condensed only from the supplied condensedRoleIds. A condensed role still appears with title and employer and has no bullets. Never omit, hide, or condense a role yourself. Do not estimate a date.
 
 Write a concise job-specific summary. Use approved resume bullets when they are strong and relevant. Keep bullets direct and factual. Skills, education, and credentials must be supported seeker facts.
 

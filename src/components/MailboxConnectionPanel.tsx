@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import { useActionState } from "react";
@@ -80,13 +80,13 @@ export function MailboxConnectionPanel({
         ) : null}
         {connection ? (
           <form action={action}>
-            <button
+            <AppButton
               type="submit"
               disabled={pending}
               className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 disabled:cursor-not-allowed disabled:text-slate-400"
             >
               {pending ? "Disconnecting…" : "Disconnect"}
-            </button>
+            </AppButton>
           </form>
         ) : null}
       </div>

@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -71,7 +71,7 @@ export function ConvertTrialNowButton({
           )}
         </p>
         <div className="flex flex-wrap gap-2">
-          <button
+          <AppButton
             type="button"
             disabled={pending}
             className={className ?? PRIMARY_BUTTON_CLASS}
@@ -105,15 +105,15 @@ export function ConvertTrialNowButton({
             }}
           >
             {pending ? "Converting…" : "Charge card and convert"}
-          </button>
-          <button
+          </AppButton>
+          <AppButton
             type="button"
             disabled={pending}
             className={SECONDARY_BUTTON_CLASS}
             onClick={() => setConfirming(false)}
           >
             Cancel
-          </button>
+          </AppButton>
         </div>
         {error ? <p className="text-sm text-red-700">{error}</p> : null}
       </div>
@@ -122,7 +122,7 @@ export function ConvertTrialNowButton({
 
   return (
     <div className="space-y-1">
-      <button
+      <AppButton
         type="button"
         disabled={pending}
         data-testid="convert-trial-now"
@@ -133,7 +133,7 @@ export function ConvertTrialNowButton({
         }}
       >
         Convert to {planLabel} now
-      </button>
+      </AppButton>
       <p className="text-xs text-slate-600">
         {capacityIncreasesOnConvert
           ? `Charges your card today and starts the ${planLabel} billing cycle immediately${

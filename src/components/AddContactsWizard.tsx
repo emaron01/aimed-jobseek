@@ -23,7 +23,7 @@ import {
   type ParsedTable,
   type ValidatedRow,
 } from "@/lib/import";
-import { PRIMARY_BUTTON_CLASS, PrimaryButton, SecondaryButton } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, PrimaryButton, SecondaryButton, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { vocab, vocabExamples } from "@/lib/product-config";
 
@@ -646,14 +646,14 @@ function ChoiceCard({
   onClick: () => void;
 }) {
   return (
-    <button
+    <AppButton
       type="button"
       onClick={onClick}
       className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-5 text-left transition hover:border-slate-400 hover:bg-white"
     >
       <p className="text-base font-semibold text-slate-900">{title}</p>
       <p className="mt-1 text-sm text-slate-600">{description}</p>
-    </button>
+    </AppButton>
   );
 }
 

@@ -5,7 +5,7 @@ import {
   ReferralShareFields,
   useReferralShare,
 } from "@/components/billing/ReferralShareFields";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { features } from "@/lib/product-config";
 import { cn } from "@/lib/utils";
 
@@ -32,14 +32,14 @@ export function ReferralProgramPanel() {
           </p>
         </div>
         {!open ? (
-          <button
+          <AppButton
             type="button"
             onClick={() => setOpen(true)}
             className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
             data-testid="billing-referral-open"
           >
             Show my referral code
-          </button>
+          </AppButton>
         ) : null}
       </div>
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { StartFreeTrialButton } from "@/components/billing/StartFreeTrialButton";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import type { CatalogPlanEntry } from "@/lib/billing/billing-catalog";
 import { cn } from "@/lib/utils";
 import { features, supportMailtoHref, vocab } from "@/lib/product-config";
@@ -146,7 +146,7 @@ function PlanCard({
   priceLabel: string | null;
 }) {
   return (
-    <button
+    <AppButton
       type="button"
       onClick={onSelect}
       className={`rounded-lg border px-4 py-3 text-left transition ${
@@ -160,6 +160,6 @@ function PlanCard({
       {priceLabel ? (
         <p className="mt-2 text-sm font-medium text-slate-800">{priceLabel}</p>
       ) : null}
-    </button>
+    </AppButton>
   );
 }

@@ -11,7 +11,15 @@ import { buildApplicationSummaryGuidanceMessages } from "@/lib/application-summa
 
 export async function generateApplicationSummaryGuidance(input: {
   sources: Array<{ id: string; text: string; category: string }>;
-  directRoles: Array<{ id: string; name: string }>;
+  people: Array<{
+    sectionKey: string;
+    roleId: string;
+    contactId: string | null;
+    heading: string;
+    roleName: string;
+    titles: string[];
+    sectionKind: string;
+  }>;
   qualityFeedback?: string[];
 }): Promise<
   | { ok: true; data: ApplicationSummaryGuidance }
@@ -21,7 +29,7 @@ export async function generateApplicationSummaryGuidance(input: {
     return {
       ok: false,
       message:
-        "Application Summary AI is not configured. Configure it, then retry.",
+        "Interview Cheat Sheet AI is not configured. Configure it, then retry.",
     };
   }
   try {
@@ -43,7 +51,7 @@ export async function generateApplicationSummaryGuidance(input: {
     );
     return {
       ok: false,
-      message: "Application Summary guidance could not be generated. Retry.",
+      message: "Interview Cheat Sheet guidance could not be generated. Retry.",
     };
   }
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { AppButton } from "@/components/AppButton";
 import { useRef, type ReactNode } from "react";
 import { hiringTeamConfig } from "@/lib/product-config";
 
@@ -28,22 +29,22 @@ export function HiringTeamDisclosureGroup({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
         <div className="flex gap-2 print:hidden">
-          <button
+          <AppButton
             type="button"
             className="text-xs font-medium text-slate-700 underline"
             onClick={() => setAll(true)}
             data-testid={`expand-all-${groupKey}`}
           >
             {hiringTeamConfig.controls.expandAll}
-          </button>
-          <button
+          </AppButton>
+          <AppButton
             type="button"
             className="text-xs font-medium text-slate-700 underline"
             onClick={() => setAll(false)}
             data-testid={`collapse-all-${groupKey}`}
           >
             {hiringTeamConfig.controls.collapseAll}
-          </button>
+          </AppButton>
         </div>
       </div>
       <div ref={groupRef} className="space-y-3">

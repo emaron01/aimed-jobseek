@@ -232,7 +232,13 @@ describe.skipIf(!hasTestDatabase())("Application Summary", () => {
     }) => {
       const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
         allowedSources: Array<{ id: string; text: string; category: string }>;
-        directHiringTeamRoles: Array<{ id: string; name: string }>;
+        people: Array<{
+          sectionKey: string;
+          roleId: string;
+          contactId: string | null;
+          heading: string;
+          sectionKind: "RECRUITER" | "HIRING_MANAGER" | "EXECUTIVE" | "CROSS_FUNCTIONAL";
+        }>;
       };
       capturedSources = payload.allowedSources;
       const source = payload.allowedSources[0]!;
@@ -246,12 +252,64 @@ describe.skipIf(!hasTestDatabase())("Application Summary", () => {
       };
       return {
         data: {
-          coachingSummary: [item],
-          questionsToPrepare: [question],
-          questionsForDirectRoles: payload.directHiringTeamRoles.map((role) => ({
-            roleId: role.id,
-            roleName: role.name,
-            questions: [question],
+          overview: {
+            thirtySecondFit: item,
+            careerRecap: item,
+            gapsToPrepare: [item, item],
+          },
+          stories: [
+            {
+              storyId: "story-1",
+              headline: "Operating cadence",
+              situation: source.text,
+              answers: [{ requirement: source.text, question: question.text }],
+              variations: [
+                { angle: "Forecast discipline", text: `${source.text} forecast`, supports: item.supports },
+                { angle: "Manager coaching", text: `${source.text} coaching`, supports: item.supports },
+              ],
+            },
+          ],
+          people: payload.people.map((person) => ({
+            sectionKey: person.sectionKey,
+            roleId: person.roleId,
+            contactId: person.contactId,
+            heading: person.heading,
+            sectionKind: person.sectionKind,
+            caresAbout: [item],
+            bestMaterial: [item],
+            likelyQuestions: [question],
+            questionsToAsk: [question],
+            storyIds: ["story-1"],
+            recruiter:
+              person.sectionKind === "RECRUITER"
+                ? {
+                    sixtySecondSummary: item,
+                    whyThisCompany: item,
+                    whyThisRole: item,
+                    logistics: item,
+                    compensationReadiness: item,
+                    flagAnswers: [item],
+                  }
+                : null,
+            hiringManager:
+              person.sectionKind === "HIRING_MANAGER"
+                ? {
+                    scorecardOutcomes: [
+                      { outcome: source.text, storyId: "story-1", note: source.text },
+                    ],
+                    firstNinetyDays: item,
+                    drillDowns: [question],
+                    gaps: [item],
+                  }
+                : null,
+            executive:
+              person.sectionKind === "EXECUTIVE"
+                ? { strategy: item, judgment: item, businessImpact: item }
+                : null,
+            crossFunctional:
+              person.sectionKind === "CROSS_FUNCTIONAL"
+                ? { howWorkedAcross: item, dayToDay: item }
+                : null,
           })),
         },
       };
@@ -359,34 +417,6 @@ describe.skipIf(!hasTestDatabase())("Application Summary", () => {
     expect(failed.guidance).toBeNull();
     expect(failed.summary?.generationError).toContain("could not be generated");
 
-    generateStructured.mockImplementation(async (request: {
-      messages: Array<{ content: string }>;
-    }) => {
-      const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
-        allowedSources: Array<{ id: string; text: string; category: string }>;
-        directHiringTeamRoles: Array<{ id: string; name: string }>;
-      };
-      const source = payload.allowedSources[0]!;
-      const item = {
-        text: source.text,
-        supports: [{ sourceId: source.id, quote: source.text }],
-      };
-      const question = {
-        text: `What should I be ready to discuss about ${source.text}?`,
-        supports: [{ sourceId: source.id, quote: source.text }],
-      };
-      return {
-        data: {
-          coachingSummary: [item],
-          questionsToPrepare: [question],
-          questionsForDirectRoles: payload.directHiringTeamRoles.map((role) => ({
-            roleId: role.id,
-            roleName: role.name,
-            questions: [question],
-          })),
-        },
-      };
-    });
     await generateApplicationSummary({ organizationId, campaignId, userId });
     expect(
       (await getApplicationSummaryView({ organizationId, campaignId })).summary
@@ -417,12 +447,13 @@ describe.skipIf(!hasTestDatabase())("Application Summary", () => {
 });
 
 describe("application summary seeker-facing labels", () => {
-  it("does not print assessment enums on the summary page", () => {
+  it("does not print assessment enums on the cheat sheet page", () => {
     const page = readFileSync(
       "src/app/(app)/campaigns/[id]/summary/page.tsx",
       "utf8",
     );
-    expect(page).toContain("evidenceStrengthLabels");
+    expect(page).toContain("applicationSummaryConfig.title");
     expect(page).not.toContain("({assessment.strength})");
+    expect(page).not.toContain("evidenceStrengthLabels");
   });
 });

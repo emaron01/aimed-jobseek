@@ -96,6 +96,14 @@ export const applicationAssetConfig = Object.freeze({
     validationTemperature: 0,
   },
   contactDetailsSourceLabel: "Confirmed profile contact details",
+  missingContact: {
+    heading: "Resume header is missing contact details",
+    cityState: "city and state",
+    phone: "phone",
+    email: "email",
+    linkedinUrl: "LinkedIn URL",
+    addInProfile: "Add it in the Personal Profile. Never invent a contact detail.",
+  },
   docx: {
     font: "Arial",
     bodySizeHalfPoints: 20,

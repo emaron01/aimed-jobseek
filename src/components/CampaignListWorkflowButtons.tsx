@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import {
   campaignListScoreButtonLabel,
@@ -46,7 +46,7 @@ export function CampaignListWorkflowButtons({
   return (
     <>
       {allowResearch ? (
-      <button
+      <AppButton
         type="button"
         onClick={scrollToResearch}
         data-testid="campaign-list-research-button"
@@ -77,7 +77,7 @@ export function CampaignListWorkflowButtons({
         ) : (
           "Research Companies"
         )}
-      </button>
+      </AppButton>
       ) : null}
       {allowScore ? (
       researchComplete ? (

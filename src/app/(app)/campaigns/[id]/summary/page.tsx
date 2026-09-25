@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { generateApplicationSummaryAction } from "@/app/actions/application-summary";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
+import { AppActionLink } from "@/components/AppButton";
 import { PrintApplicationSummaryButton } from "@/components/PrintApplicationSummaryButton";
-import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import { PageHeader, TenantMissing } from "@/components/ui";
 import { getApplicationSummaryView } from "@/lib/application-summary/service";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
@@ -11,7 +11,6 @@ import { canOpenCampaignDetail } from "@/lib/campaign/visibility";
 import type { JobScorecard } from "@/lib/job-requirement/types";
 import {
   applicationSummaryConfig,
-  evidenceStrengthLabels,
   interviewConfig,
 } from "@/lib/product-config";
 import { stageTypeLabel } from "@/lib/interview/stages";
@@ -71,15 +70,24 @@ function TextList({ items }: { items: readonly string[] }) {
 }
 
 function SummarySection({
+  id,
   title,
   children,
 }: {
+  id: string;
   title: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="application-summary-section break-inside-avoid rounded-lg border border-slate-200 bg-white p-6">
-      <h2 className="text-xl font-semibold text-slate-950">{title}</h2>
+    <section
+      id={id}
+      data-print-id={id}
+      className="application-summary-section break-inside-avoid rounded-lg border border-slate-200 bg-white p-6"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h2 className="text-xl font-semibold text-slate-950">{title}</h2>
+        <PrintApplicationSummaryButton sectionId={id} />
+      </div>
       <div className="mt-4 space-y-4">{children}</div>
     </section>
   );
@@ -113,32 +121,11 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
 
   const canGenerate = view.campaign.ownerUserId === user.id;
   const requirementScorecard = scorecard(view.requirement.scorecardJson);
-  const strengths = view.assessments.filter(
-    (item) => item.strength === "STRONG" || item.strength === "PARTIAL",
-  );
-  const gaps = view.assessments.filter((item) => item.strength === "NONE");
-  const directRoles = view.roles.filter((role) => role.involvement === "DIRECT");
-  const indirectRoles = view.roles.filter((role) => role.involvement === "INDIRECT");
   const approvedStories = view.stories.filter(
     (story) =>
       (story.interviewAnswer && story.interviewAnswerApprovedAt) ||
       (story.resumeBullet && story.resumeBulletApprovedAt),
   );
-  const storyByTarget = new Map<string, (typeof approvedStories)[number][]>();
-  for (const story of approvedStories) {
-    for (const ref of competencyRefs(story.competencyLinks)) {
-      for (const key of new Set([ref.id, ref.text])) {
-        storyByTarget.set(key, [...(storyByTarget.get(key) ?? []), story]);
-      }
-    }
-  }
-  const storyGroups = new Map<string, (typeof approvedStories)[number][]>();
-  for (const story of approvedStories) {
-    const labels = competencyRefs(story.competencyLinks).map((ref) => ref.text);
-    for (const label of labels.length > 0 ? labels : ["Other"]) {
-      storyGroups.set(label, [...(storyGroups.get(label) ?? []), story]);
-    }
-  }
   const summaryStatus = view.summary?.status ?? null;
   const actionLabel =
     summaryStatus === "FAILED"
@@ -146,18 +133,25 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
       : summaryStatus === "READY"
         ? applicationSummaryConfig.actions.regenerate
         : applicationSummaryConfig.actions.generate;
+  const guidance = view.guidance;
 
   return (
     <main className="application-summary mx-auto max-w-5xl space-y-6">
+      <style>{`
+        @media print {
+          body[data-print-section] .application-summary-section { display: none !important; }
+          body[data-print-section] .application-summary-section[data-print-active="true"] { display: block !important; }
+        }
+      `}</style>
       <PageHeader
         title={applicationSummaryConfig.title}
         description={`${view.campaign.name} · ${applicationSummaryConfig.description}`}
         actions={
           <div className="flex flex-wrap gap-2 print:hidden">
             {summaryStatus === "READY" ? <PrintApplicationSummaryButton /> : null}
-            <Link href={`/campaigns/${id}`} className={SECONDARY_BUTTON_CLASS}>
+            <AppActionLink href={`/campaigns/${id}`}>
               Back to application
-            </Link>
+            </AppActionLink>
           </div>
         }
       />
@@ -171,7 +165,7 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
         ) : null}
         {summaryStatus === "FAILED" ? (
           <p role="alert" className="mt-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            {view.summary?.generationError ?? "Summary synthesis failed. Retry."}
+            {view.summary?.generationError ?? "Cheat sheet synthesis failed. Retry."}
           </p>
         ) : null}
         {canGenerate ? (
@@ -187,7 +181,258 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
         ) : null}
       </div>
 
-      <SummarySection title={applicationSummaryConfig.sections.company}>
+      <SummarySection id="overview" title={applicationSummaryConfig.sections.overview}>
+        {summaryStatus !== "READY" || !guidance ? (
+          <p className="text-sm text-slate-600">
+            {summaryStatus === "FAILED"
+              ? "Guidance generation failed. Use Retry above."
+              : `Generate the ${applicationSummaryConfig.title} to create the 30-second fit, career recap, and gaps.`}
+          </p>
+        ) : (
+          <>
+            <div>
+              <h3 className="font-medium text-slate-900">
+                {applicationSummaryConfig.sections.thirtySecondFit}
+              </h3>
+              <p className="mt-1 text-sm text-slate-800">{guidance.overview.thirtySecondFit.text}</p>
+            </div>
+            <div>
+              <h3 className="font-medium text-slate-900">
+                {applicationSummaryConfig.sections.careerRecap}
+              </h3>
+              <p className="mt-1 text-sm text-slate-800">{guidance.overview.careerRecap.text}</p>
+            </div>
+            <div>
+              <h3 className="font-medium text-slate-900">
+                {applicationSummaryConfig.sections.gapsToPrepare}
+              </h3>
+              <TextList items={guidance.overview.gapsToPrepare.map((item) => item.text)} />
+            </div>
+          </>
+        )}
+      </SummarySection>
+
+      {(guidance?.people ?? view.people).map((person) => {
+        const section = guidance?.people.find((item) => item.sectionKey === ("sectionKey" in person ? person.sectionKey : ""));
+        const heading = section?.heading ?? ("heading" in person ? person.heading : "");
+        const sectionKey = section?.sectionKey ?? ("sectionKey" in person ? person.sectionKey : heading);
+        return (
+          <SummarySection key={sectionKey} id={sectionKey} title={heading}>
+            {!section ? (
+              <p className="text-sm text-slate-600">
+                Generate the {applicationSummaryConfig.title} for this person.
+              </p>
+            ) : (
+              <>
+                <div>
+                  <h3 className="font-medium text-slate-900">
+                    {applicationSummaryConfig.sections.caresAbout}
+                  </h3>
+                  <TextList items={section.caresAbout.map((item) => item.text)} />
+                </div>
+                <div>
+                  <h3 className="font-medium text-slate-900">
+                    {applicationSummaryConfig.sections.bestMaterial}
+                  </h3>
+                  <TextList items={section.bestMaterial.map((item) => item.text)} />
+                </div>
+                {section.recruiter ? (
+                  <>
+                    <div>
+                      <h3 className="font-medium text-slate-900">
+                        {applicationSummaryConfig.sections.recruiterSummary}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-800">
+                        {section.recruiter.sixtySecondSummary.text}
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-slate-900">
+                        {applicationSummaryConfig.sections.whyThisCompany}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-800">
+                        {section.recruiter.whyThisCompany.text}
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-slate-900">
+                        {applicationSummaryConfig.sections.whyThisRole}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-800">{section.recruiter.whyThisRole.text}</p>
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-slate-900">
+                        {applicationSummaryConfig.sections.logistics}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-800">{section.recruiter.logistics.text}</p>
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-slate-900">
+                        {applicationSummaryConfig.sections.compensation}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-800">
+                        {section.recruiter.compensationReadiness.text}
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-slate-900">
+                        {applicationSummaryConfig.sections.flagAnswers}
+                      </h3>
+                      <TextList items={section.recruiter.flagAnswers.map((item) => item.text)} />
+                    </div>
+                  </>
+                ) : null}
+                {section.hiringManager ? (
+                  <>
+                    <div>
+                      <h3 className="font-medium text-slate-900">
+                        {applicationSummaryConfig.sections.scorecard}
+                      </h3>
+                      <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-slate-800">
+                        {section.hiringManager.scorecardOutcomes.map((item) => (
+                          <li key={item.outcome}>
+                            {item.outcome}
+                            {item.storyId ? ` · story ${item.storyId}` : ""}
+                            {item.note ? ` — ${item.note}` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-slate-900">
+                        {applicationSummaryConfig.sections.firstNinetyDays}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-800">
+                        {section.hiringManager.firstNinetyDays.text}
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-slate-900">
+                        {applicationSummaryConfig.sections.drillDowns}
+                      </h3>
+                      <TextList
+                        items={section.hiringManager.drillDowns.map((item) => item.text)}
+                      />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-slate-900">
+                        {applicationSummaryConfig.sections.gapsToPrepare}
+                      </h3>
+                      <TextList items={section.hiringManager.gaps.map((item) => item.text)} />
+                    </div>
+                  </>
+                ) : null}
+                {section.executive ? (
+                  <>
+                    <div>
+                      <h3 className="font-medium text-slate-900">
+                        {applicationSummaryConfig.sections.strategy}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-800">{section.executive.strategy.text}</p>
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-slate-900">
+                        {applicationSummaryConfig.sections.judgment}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-800">{section.executive.judgment.text}</p>
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-slate-900">
+                        {applicationSummaryConfig.sections.businessImpact}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-800">
+                        {section.executive.businessImpact.text}
+                      </p>
+                    </div>
+                  </>
+                ) : null}
+                {section.crossFunctional ? (
+                  <>
+                    <div>
+                      <h3 className="font-medium text-slate-900">
+                        {applicationSummaryConfig.sections.howWorkedAcross}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-800">
+                        {section.crossFunctional.howWorkedAcross.text}
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-slate-900">
+                        {applicationSummaryConfig.sections.dayToDay}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-800">
+                        {section.crossFunctional.dayToDay.text}
+                      </p>
+                    </div>
+                  </>
+                ) : null}
+                <div>
+                  <h3 className="font-medium text-slate-900">
+                    {applicationSummaryConfig.sections.likelyQuestions}
+                  </h3>
+                  <TextList items={section.likelyQuestions.map((item) => item.text)} />
+                </div>
+                <div>
+                  <h3 className="font-medium text-slate-900">
+                    {applicationSummaryConfig.sections.questionsToAsk}
+                  </h3>
+                  <TextList items={section.questionsToAsk.map((item) => item.text)} />
+                </div>
+              </>
+            )}
+          </SummarySection>
+        );
+      })}
+
+      <SummarySection id="stories" title={applicationSummaryConfig.sections.stories}>
+        {guidance && guidance.stories.length > 0 ? (
+          guidance.stories.map((story) => (
+            <article key={story.storyId} className="break-inside-avoid rounded-md bg-slate-50 p-4">
+              <h3 className="font-medium text-slate-900">{story.headline}</h3>
+              <p className="mt-2 text-sm text-slate-800">{story.situation}</p>
+              <p className="mt-3 text-sm font-medium text-slate-900">
+                {applicationSummaryConfig.sections.thisStoryAnswers}
+              </p>
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-800">
+                {story.answers.map((item) => (
+                  <li key={`${item.requirement}:${item.question}`}>
+                    {item.requirement}: {item.question}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-3 space-y-2">
+                {story.variations.map((variation) => (
+                  <p key={variation.angle} className="text-sm text-slate-800">
+                    <span className="font-medium">{variation.angle}: </span>
+                    {variation.text}
+                  </p>
+                ))}
+              </div>
+            </article>
+          ))
+        ) : approvedStories.length === 0 ? (
+          <p className="text-sm text-slate-500">No approved STAR statements yet.</p>
+        ) : (
+          approvedStories.map((story) => (
+            <article key={story.id} className="break-inside-avoid rounded-md bg-slate-50 p-4 text-sm text-slate-800">
+              {story.interviewAnswerApprovedAt && story.interviewAnswer ? (
+                <p>{story.interviewAnswer}</p>
+              ) : null}
+              {story.resumeBulletApprovedAt && story.resumeBullet ? (
+                <p className="mt-2 font-medium">{story.resumeBullet}</p>
+              ) : null}
+              <p className="mt-2 text-xs text-slate-500">
+                {applicationSummaryConfig.sections.thisStoryAnswers}{" "}
+                {competencyRefs(story.competencyLinks)
+                  .map((ref) => ref.text)
+                  .join("; ") || "Not linked yet."}
+              </p>
+            </article>
+          ))
+        )}
+      </SummarySection>
+
+      <SummarySection id="company" title={applicationSummaryConfig.sections.company}>
         <div>
           <h3 className="font-medium text-slate-900">What they do</h3>
           <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
@@ -198,32 +443,10 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
           <h3 className="font-medium text-slate-900">Customers</h3>
           <TextList items={lines(view.research?.customerTypes)} />
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <h3 className="font-medium text-slate-900">Stage, size, and recent news</h3>
-            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
-              {[view.research?.companySizeContext, view.research?.companySummary]
-                .filter(Boolean)
-                .join("\n\n") || "Not available."}
-            </p>
-            {view.research?.companySummary ? (
-              <p className="mt-2 text-xs text-slate-500">
-                Culture references: {applicationSummaryConfig.cultureEvidenceLabel}.
-              </p>
-            ) : null}
-          </div>
-          <div>
-            <h3 className="font-medium text-slate-900">Hiring and growth signals</h3>
-            <TextList items={lines(view.research?.hiringSignals)} />
-          </div>
-        </div>
-        <div>
-          <h3 className="font-medium text-slate-900">Employer risk signals</h3>
-          <TextList items={lines(view.research?.riskSignals)} />
-        </div>
+        <TextList items={lines(view.research?.hiringSignals)} />
       </SummarySection>
 
-      <SummarySection title={applicationSummaryConfig.sections.position}>
+      <SummarySection id="position" title={applicationSummaryConfig.sections.position}>
         <dl className="grid gap-4 sm:grid-cols-2">
           {[
             ["Title", view.requirement.title],
@@ -248,175 +471,33 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
           <h3 className="font-medium text-slate-900">Key outcomes</h3>
           <TextList items={requirementScorecard.outcomes.map((item) => item.text)} />
         </div>
-        <div>
-          <h3 className="font-medium text-slate-900">Competencies</h3>
-          <TextList items={requirementScorecard.competencies.map((item) => item.text)} />
-        </div>
       </SummarySection>
 
-      <SummarySection title={applicationSummaryConfig.sections.strengths}>
-        {strengths.length === 0 ? (
-          <p className="text-sm text-slate-500">No assessed strengths yet.</p>
-        ) : (
-          strengths.map((assessment) => {
-            const stories = storyByTarget.get(assessment.targetKey) ?? [];
-            return (
-              <article key={assessment.id} className="break-inside-avoid border-b border-slate-100 pb-4 last:border-0">
-                <h3 className="font-medium text-slate-900">
-                  {assessment.text}{" "}
-                  <span className="text-xs text-slate-500">
-                    (
-                    {evidenceStrengthLabels[
-                      assessment.strength as keyof typeof evidenceStrengthLabels
-                    ] ?? assessment.strength}
-                    )
-                  </span>
-                </h3>
-                {assessment.explanation ? <p className="mt-1 text-sm text-slate-700">{assessment.explanation}</p> : null}
-                {stories.map((story) => (
-                  <div key={story.id} className="mt-2 rounded-md bg-slate-50 p-3 text-sm text-slate-800">
-                    {story.interviewAnswerApprovedAt ? story.interviewAnswer : story.resumeBullet}
-                  </div>
-                ))}
-              </article>
-            );
-          })
-        )}
-      </SummarySection>
-
-      <SummarySection title={applicationSummaryConfig.sections.gaps}>
-        {gaps.length === 0 ? (
-          <p className="text-sm text-slate-500">No remaining assessed gaps.</p>
-        ) : (
-          gaps.map((assessment) => (
-            <article key={assessment.id} className="break-inside-avoid">
-              <h3 className="font-medium text-slate-900">{assessment.text}</h3>
-              <p className="mt-1 text-sm text-slate-700">{assessment.strategyText}</p>
-            </article>
-          ))
-        )}
-      </SummarySection>
-
-      <SummarySection title={applicationSummaryConfig.sections.hiringTeam}>
-        <div>
-          <h3 className="font-semibold text-slate-900">Direct</h3>
-          <div className="mt-3 space-y-4">
-            {directRoles.map((role) => (
-              <article key={role.id} className="break-inside-avoid">
-                <h4 className="font-medium text-slate-900">{role.name}</h4>
-                <p className="text-xs text-slate-500">{role.likelyTitles.join(", ")}</p>
-                <p className="mt-2 text-sm font-medium text-slate-800">Top talking points</p>
-                <TextList items={role.talkingPoints} />
-                <p className="mt-2 text-sm font-medium text-slate-800">Likely concerns</p>
-                <TextList items={role.concerns} />
-              </article>
-            ))}
-          </div>
-        </div>
-        <div>
-          <h3 className="font-semibold text-slate-900">Indirect</h3>
-          <ul className="mt-2 space-y-2 text-sm text-slate-800">
-            {indirectRoles.map((role) => (
-              <li key={role.id}>
-                <span className="font-medium">{role.name}:</span>{" "}
-                {role.impact ?? role.reason}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </SummarySection>
-
-      <SummarySection title={applicationSummaryConfig.sections.interviewStages}>
+      <SummarySection id="stages" title={applicationSummaryConfig.sections.interviewStages}>
         {view.stages.length === 0 ? (
           <p className="text-sm text-slate-500">No interview stages yet.</p>
         ) : (
           <>
-            <div>
-              <h3 className="font-medium text-slate-900">
-                {applicationSummaryConfig.sections.completedStages}
-              </h3>
-              <ul className="mt-2 space-y-3 text-sm text-slate-800">
-                {view.stages
-                  .filter((stage) => stage.outcome)
-                  .map((stage) => (
-                    <li key={stage.id}>
-                      <span className="font-medium">{stageTypeLabel(stage.type)}</span>
-                      {stage.notesAfter ? `: ${stage.notesAfter}` : ""}
-                    </li>
-                  ))}
-              </ul>
-            </div>
+            <ul className="space-y-3 text-sm text-slate-800">
+              {view.stages.map((stage) => (
+                <li key={stage.id}>
+                  <span className="font-medium">{stageTypeLabel(stage.type)}</span>
+                  {stage.notesAfter ? `: ${stage.notesAfter}` : ""}
+                </li>
+              ))}
+            </ul>
             {(() => {
               const next = view.stages.find((stage) => !stage.outcome);
               return next ? (
-                <div>
-                  <h3 className="font-medium text-slate-900">
-                    {applicationSummaryConfig.sections.nextStage}
-                  </h3>
-                  <p className="mt-2 text-sm text-slate-800">
-                    {stageTypeLabel(next.type)}
-                  </p>
-                  <Link
-                    href={`/campaigns/${id}/interviews/${next.id}`}
-                    className="mt-2 inline-block text-sm font-medium text-slate-700 underline print:hidden"
-                  >
-                    {interviewConfig.labels.openGuide}
-                  </Link>
-                </div>
+                <AppActionLink
+                  href={`/campaigns/${id}/interviews/${next.id}`}
+                  className="print:hidden"
+                >
+                  {interviewConfig.labels.openGuide}
+                </AppActionLink>
               ) : null;
             })()}
           </>
-        )}
-      </SummarySection>
-
-      <SummarySection title={applicationSummaryConfig.sections.guidance}>
-        {summaryStatus !== "READY" || !view.guidance ? (
-          <p className="text-sm text-slate-600">
-            {summaryStatus === "FAILED"
-              ? "Guidance generation failed. Use Retry summary above."
-              : "Generate the summary to create Harper's guidance."}
-          </p>
-        ) : (
-          <>
-            <div>
-              <h3 className="font-medium text-slate-900">Coaching summary</h3>
-              <TextList items={view.guidance.coachingSummary.map((item) => item.text)} />
-            </div>
-            <div>
-              <h3 className="font-medium text-slate-900">Questions to prepare for</h3>
-              <TextList items={view.guidance.questionsToPrepare.map((item) => item.text)} />
-            </div>
-            {view.guidance.questionsForDirectRoles.map((role) => (
-              <div key={role.roleId} className="break-inside-avoid">
-                <h3 className="font-medium text-slate-900">Questions to ask {role.roleName}</h3>
-                <TextList items={role.questions.map((item) => item.text)} />
-              </div>
-            ))}
-          </>
-        )}
-      </SummarySection>
-
-      <SummarySection title={applicationSummaryConfig.sections.stories}>
-        {storyGroups.size === 0 ? (
-          <p className="text-sm text-slate-500">No approved STAR statements yet.</p>
-        ) : (
-          [...storyGroups].map(([competency, stories]) => (
-            <div key={competency}>
-              <h3 className="font-medium text-slate-900">{competency}</h3>
-              <div className="mt-2 space-y-3">
-                {stories.map((story) => (
-                  <article key={`${competency}:${story.id}`} className="break-inside-avoid rounded-md bg-slate-50 p-4 text-sm text-slate-800">
-                    {story.interviewAnswerApprovedAt && story.interviewAnswer ? (
-                      <p>{story.interviewAnswer}</p>
-                    ) : null}
-                    {story.resumeBulletApprovedAt && story.resumeBullet ? (
-                      <p className="mt-2 font-medium">{story.resumeBullet}</p>
-                    ) : null}
-                  </article>
-                ))}
-              </div>
-            </div>
-          ))
         )}
       </SummarySection>
     </main>

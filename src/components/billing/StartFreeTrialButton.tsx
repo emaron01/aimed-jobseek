@@ -1,5 +1,6 @@
 "use client";
 
+import { AppButton } from "@/components/AppButton";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BILLING_PLAN_STANDARD } from "@/lib/billing/plans";
@@ -44,7 +45,7 @@ export function StartFreeTrialButton({
 
   return (
     <div className="space-y-2" data-testid="onboarding-subscribe-cta">
-      <button
+      <AppButton
         type="button"
         disabled={pending}
         className="w-full rounded-md bg-green-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-60"
@@ -80,7 +81,7 @@ export function StartFreeTrialButton({
         }}
       >
         {pending ? "Redirecting…" : label}
-      </button>
+      </AppButton>
       <p className="text-center text-base font-bold text-slate-900">
         {trialOff
           ? "You\u2019ll be charged when Checkout completes."

@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -323,7 +323,7 @@ export function EmailDraftsStage({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <button
+        <AppButton
           type="button"
           onClick={() => setView("write")}
           className={
@@ -331,8 +331,8 @@ export function EmailDraftsStage({
           }
         >
           Write
-        </button>
-        <button
+        </AppButton>
+        <AppButton
           type="button"
           data-testid="compare-drafts-toggle"
           onClick={() => setView("compare")}
@@ -341,7 +341,7 @@ export function EmailDraftsStage({
           }
         >
           Compare drafts
-        </button>
+        </AppButton>
         <label className="ml-auto flex items-center gap-2 text-sm text-slate-700">
           <span className="font-medium">Show</span>
           <select
@@ -408,7 +408,7 @@ export function EmailDraftsStage({
                   });
                   return (
                     <li key={row.campaignContactId}>
-                      <button
+                      <AppButton
                         type="button"
                         onClick={() => void handleSelectContact(row.campaignContactId)}
                         className={`w-full rounded-md px-2 py-2 text-left text-sm ${
@@ -438,7 +438,7 @@ export function EmailDraftsStage({
                         >
                           {listLine}
                         </span>
-                      </button>
+                      </AppButton>
                     </li>
                   );
                 })}
@@ -570,13 +570,13 @@ function CampaignDraftCompare({
                 })}
               </p>
             </div>
-            <button
+            <AppButton
               type="button"
               onClick={() => onOpenInWrite(contact.campaignContactId)}
               className={cn(SECONDARY_BUTTON_CLASS, "px-2.5", "!px-2.5", "!py-1.5", "!text-xs")}
             >
               Open in Write
-            </button>
+            </AppButton>
           </div>
           {draft ? (
             <>

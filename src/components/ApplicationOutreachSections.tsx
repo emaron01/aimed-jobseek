@@ -28,7 +28,7 @@ import {
   outreachConfig,
   vocab,
 } from "@/lib/product-config";
-import { SECONDARY_BUTTON_CLASS, SubmitButton } from "@/components/ui";
+import { SECONDARY_BUTTON_CLASS, SubmitButton, AppButton } from "@/components/ui";
 
 const initial: ApplicationOutreachActionResult | null = null;
 
@@ -540,27 +540,27 @@ function OutreachMessageCard({
       )}
       {canEdit && composed && asset.type === "EMAIL" && handoff ? (
         <div className="flex flex-wrap gap-2" data-testid="email-handoff">
-          <button
+          <AppButton
             type="button"
             className={SECONDARY_BUTTON_CLASS}
             onClick={() => handoff.outlookWeb.href && openEmailClientHref(handoff.outlookWeb.href)}
           >
             {outreachConfig.labels.openOutlookWeb}
-          </button>
-          <button
+          </AppButton>
+          <AppButton
             type="button"
             className={SECONDARY_BUTTON_CLASS}
             onClick={() => openEmailClientHref(handoff.outlookDesktop.href)}
           >
             {outreachConfig.labels.openOutlookDesktop}
-          </button>
-          <button
+          </AppButton>
+          <AppButton
             type="button"
             className={SECONDARY_BUTTON_CLASS}
             onClick={() => handoff.gmailWeb.href && openEmailClientHref(handoff.gmailWeb.href)}
           >
             {outreachConfig.labels.openGmail}
-          </button>
+          </AppButton>
           {approvedResumeId ? (
             <a
               href={`/api/application-assets/${approvedResumeId}/docx`}
@@ -575,13 +575,13 @@ function OutreachMessageCard({
       {canEdit && composed && asset.type !== "EMAIL" ? (
         <div className="flex flex-wrap gap-2" data-testid="linkedin-handoff">
           {composed.subject ? (
-            <button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => copy("subject", composed.subject ?? "")}>
+            <AppButton type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => copy("subject", composed.subject ?? "")}>
               {outreachConfig.labels.copySubject}
-            </button>
+            </AppButton>
           ) : null}
-          <button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => copy("body", composed.body)}>
+          <AppButton type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => copy("body", composed.body)}>
             {outreachConfig.labels.copyBody}
-          </button>
+          </AppButton>
           {contact?.linkedinUrl ? (
             <a href={contact.linkedinUrl} target="_blank" rel="noreferrer" className={SECONDARY_BUTTON_CLASS}>
               {outreachConfig.labels.openLinkedIn}

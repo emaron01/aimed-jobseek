@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const RESUME_ASSET_PROMPT_VERSION = "6";
+export const RESUME_ASSET_PROMPT_VERSION = "7";
 export const COVER_LETTER_ASSET_PROMPT_VERSION = "13";
 export const OUTREACH_EMAIL_PROMPT_VERSION = "5";
 export const OUTREACH_LINKEDIN_NOTE_PROMPT_VERSION = "5";

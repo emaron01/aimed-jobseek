@@ -14,6 +14,10 @@ import {
   syncApplicationHiringTeam,
 } from "@/lib/hiring-team/build";
 import { requestInterviewGuide } from "@/lib/interview/guide";
+import {
+  personPrepFocus,
+  recordPersonPrepOpening,
+} from "@/lib/interview/person-prep";
 import { prisma } from "@/lib/prisma-client";
 import { runWithTenantContext } from "@/lib/tenant/request-context";
 import {
@@ -84,6 +88,7 @@ export async function processApplicationJob(
               operation: payload.operation,
               answer: payload.answer,
               targetKey: payload.targetKey,
+              contactId: payload.contactId ?? job.targetId,
             });
             break;
           case "RESUME":
@@ -208,6 +213,7 @@ async function processConsultationJob(input: {
   operation?: string;
   answer?: string;
   targetKey?: string;
+  contactId?: string | null;
 }): Promise<void> {
   if (input.operation === "retry") {
     await retryConsultationGeneration(input);
@@ -217,6 +223,40 @@ async function processConsultationJob(input: {
     await continueConsultationPlanning({
       organizationId: input.organizationId,
       campaignId: input.campaignId,
+    });
+    return;
+  }
+  if (input.operation === "person_prep") {
+    if (!input.contactId) {
+      throw new Error("Interviewer prep needs a person.");
+    }
+    const focus = await personPrepFocus({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      contactId: input.contactId,
+    });
+    await startConsultation({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      focusTargetKey: focus.focusTargetKey,
+      focusNote: focus.focusNote,
+    });
+    const session = await prisma.consultationSession.findUnique({
+      where: { campaignId: input.campaignId },
+      select: { id: true },
+    });
+    const opening = session
+      ? await prisma.consultationTurn.findFirst({
+          where: { sessionId: session.id, speaker: "CONSULTANT" },
+          orderBy: { sequence: "desc" },
+          select: { body: true },
+        })
+      : null;
+    await recordPersonPrepOpening({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      contactId: input.contactId,
+      openingText: opening?.body ?? null,
     });
     return;
   }

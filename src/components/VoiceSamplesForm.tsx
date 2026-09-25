@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import { useActionState, useEffect } from "react";
@@ -27,13 +27,13 @@ function DeleteSampleForm({ sample }: { sample: VoiceSampleView }) {
   return (
     <form action={formAction} className="mt-2">
       <input type="hidden" name="voiceSampleId" value={sample.id} />
-      <button
+      <AppButton
         type="submit"
         disabled={pending}
         className="text-xs font-medium text-red-800 underline disabled:opacity-60"
       >
         {pending ? "Removing…" : "Delete"}
-      </button>
+      </AppButton>
       {state && !state.ok ? (
         <p role="status" className="mt-1 text-xs text-red-600">
           {state.message}
@@ -115,13 +115,13 @@ export function VoiceSamplesForm({
             className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-slate-400 focus:ring-2"
           />
         </label>
-        <button
+        <AppButton
           type="submit"
           disabled={pending}
           className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
         >
           {pending ? "Saving…" : "Save sample"}
-        </button>
+        </AppButton>
       </form>
 
       {samples.length > 0 ? (

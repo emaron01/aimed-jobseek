@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { StartFreeTrialButton } from "@/components/billing/StartFreeTrialButton";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import {
   BILLING_PLAN_ENTERPRISE,
   BILLING_PLAN_STANDARD,
@@ -114,7 +114,7 @@ export function OnboardingPlanSelector({
                 : []),
             ] as const
           ).map((plan) => (
-            <button
+            <AppButton
               key={plan.code}
               type="button"
               onClick={() => setPlanCode(plan.code)}
@@ -134,7 +134,7 @@ export function OnboardingPlanSelector({
               >
                 {plan.blurb}
               </p>
-            </button>
+            </AppButton>
           ))}
         </div>
       )}

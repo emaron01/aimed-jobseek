@@ -10,7 +10,7 @@ import {
 import { AutosizeTextarea } from "@/components/AutosizeTextarea";
 import { ExportPdfButton } from "@/components/ExportPdfButton";
 import { PersonaBriefingDocument } from "@/components/PersonaBriefingDocument";
-import { SECONDARY_BUTTON_CLASS, SecondaryButton, SubmitButton } from "@/components/ui";
+import { SECONDARY_BUTTON_CLASS, SecondaryButton, SubmitButton, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { PersonaAiDraft } from "@/lib/persona-research/contract";
 import {
@@ -78,7 +78,7 @@ function BoxResearchGuidance({ notes }: { notes: string[] }) {
 
   return (
     <div className="mt-1.5">
-      <button
+      <AppButton
         type="button"
         className="text-xs font-medium text-slate-600 underline"
         onClick={() => setOpen((v) => !v)}
@@ -86,7 +86,7 @@ function BoxResearchGuidance({ notes }: { notes: string[] }) {
         {open
           ? "Hide research notes"
           : `Research notes (${notes.length})`}
-      </button>
+      </AppButton>
       {open ? (
         <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-slate-500">
           {notes.map((note) => (
@@ -196,22 +196,22 @@ function PersonaCriteriaEditor({
                 <p className="text-xs font-medium text-amber-950">{row.name}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {NEEDS_REVIEW_CLASSIFY_TARGETS.map((target) => (
-                    <button
+                    <AppButton
                       key={target.role}
                       type="button"
                       className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-950 hover:bg-amber-100"
                       onClick={() => classifyNeedsReview(row.name, target.box)}
                     >
                       {target.label}
-                    </button>
+                    </AppButton>
                   ))}
-                  <button
+                  <AppButton
                     type="button"
                     className={cn(SECONDARY_BUTTON_CLASS, "py-1", "!px-2", "!py-1", "!text-[11px]")}
                     onClick={() => dismissNeedsReview(row.name)}
                   >
                     Dismiss
-                  </button>
+                  </AppButton>
                 </div>
               </li>
             ))}

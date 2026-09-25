@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import { useState, useTransition } from "react";
@@ -26,7 +26,7 @@ export function BuyCompanyCreditsButton({
 
   return (
     <div className="space-y-2" data-testid="buy-company-credits">
-      <button
+      <AppButton
         type="button"
         disabled={pending}
         className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
@@ -58,7 +58,7 @@ export function BuyCompanyCreditsButton({
         }}
       >
         {pending ? "Redirecting…" : "Buy company credits"}
-      </button>
+      </AppButton>
       <p className="text-xs text-slate-500">
         Each block adds 100 companies for 12 months. On Checkout you can raise
         the quantity (e.g. 3 blocks = 300 companies) before paying.

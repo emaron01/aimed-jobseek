@@ -54,6 +54,8 @@ import {
   parseCandidateProfileSafe,
 } from "@/lib/product-research/candidate-profile";
 import { persistExtractedExperienceDates } from "@/lib/product-research/restore-role-dates";
+import { persistExtractedContactDetails } from "@/lib/product-research/restore-contact-details";
+import { contactIdFromPersonPrepTarget } from "@/lib/interview/person-prep";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
 
@@ -114,10 +116,15 @@ async function requireApplication(organizationId: string, campaignId: string) {
       `The ${vocab.product.singular} could not be read, so consultation did not start.`,
     );
   }
-  const profile = await persistExtractedExperienceDates({
+  const withDates = await persistExtractedExperienceDates({
     organizationId,
     productId: product.id,
     profile: parsed.profile,
+  });
+  const profile = await persistExtractedContactDetails({
+    organizationId,
+    productId: product.id,
+    profile: withDates,
   });
   return { campaign, requirement, product, profile };
 }
@@ -985,7 +992,17 @@ function resolveConsultationTargets(input: {
     targets,
   });
   const note = input.focusNote?.trim() ?? "";
-  if (!focusTargetKey && note) {
+  const personPrepKey = input.focusTargetKey?.trim() ?? "";
+  if (personPrepKey.startsWith("person-prep:")) {
+    focusTargetKey = personPrepKey;
+    if (!targets.some((target) => target.key === focusTargetKey)) {
+      targets.unshift({
+        key: focusTargetKey,
+        kind: "COMPETENCY",
+        text: note || "Interview prep for this person",
+      });
+    }
+  } else if (!focusTargetKey && note) {
     focusTargetKey = "interview-note-focus";
     targets.unshift({
       key: focusTargetKey,
@@ -2312,6 +2329,17 @@ export async function confirmConsultationProposal(input: {
     where: { id: proposal.id },
     data: { status: "CONFIRMED", text },
   });
+  const prepContactId = contactIdFromPersonPrepTarget(proposal.turn.targetKey);
+  if (prepContactId) {
+    const { appendPersonPrepAnswer } = await import("@/lib/interview/person-prep");
+    await appendPersonPrepAnswer({
+      organizationId: input.organizationId,
+      campaignId: proposal.session.campaignId,
+      contactId: prepContactId,
+      text,
+      turnId: proposal.turnId,
+    });
+  }
   const assessments = await prisma.consultationAssessment.findMany({
     where: { sessionId: proposal.sessionId },
   });

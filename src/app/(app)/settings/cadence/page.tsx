@@ -1,4 +1,4 @@
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { ActionFeedbackForm } from "@/components/ActionFeedbackForm";
@@ -104,12 +104,12 @@ export default async function CadenceSettingsPage() {
               Blank means no repeating reminder.
             </span>
           </label>
-          <button
+          <AppButton
             type="submit"
             className={cn(PRIMARY_BUTTON_CLASS, "sm:col-span-2", "w-fit", "!px-3")}
           >
             Save reminder settings
-          </button>
+          </AppButton>
         </ActionFeedbackForm>
       </section>
       <p className="text-sm text-slate-500">

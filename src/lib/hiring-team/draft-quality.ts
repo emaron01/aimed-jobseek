@@ -132,10 +132,32 @@ export function fieldsFromPersonaDraft(draft: PersonaAiDraft): HiringTeamDraftFi
   };
 }
 
+const RECRUITER_CRAFT =
+  /\b(target maps?|source(?:d|ing)? candidates|build(?:ing)? a slate|write (?:a |the )?job descriptions?|run the (?:req|search|requisition)|screen(?:ing)? (?:candidates|applicants)|requisitions?|pipeline of candidates|boolean search)\b/i;
+const PERSONA_JOB_IMPERATIVE =
+  /\b(describe how you would|walk (?:me|them) through how you would|explain how you would)\b/i;
+const RECRUITER_ROLE =
+  /\b(talent acquisition|recruiter|sourcer|staffing|people partner|ta partner)\b/i;
+
+/** Talking points are what the seeker says to this person, not how to do this person's job. */
+export function talkingPointWrittenFromPersonaJob(
+  text: string,
+  roleName = "",
+  titles: string[] = [],
+): boolean {
+  const value = text.trim();
+  if (!value) return false;
+  if (RECRUITER_CRAFT.test(value)) return true;
+  const persona = [roleName, ...titles].join(" ");
+  return RECRUITER_ROLE.test(persona) && PERSONA_JOB_IMPERATIVE.test(value);
+}
+
 export function assessHiringTeamDraft(input: {
   fields: HiringTeamDraftFields;
   jobLines: string[];
   involvement: Involvement;
+  roleName?: string;
+  likelyTitles?: string[];
 }): { ok: true } | { ok: false; reasons: string[] } {
   const reasons: string[] = [];
   const requireText = (label: string, text: string) => {
@@ -165,6 +187,19 @@ export function assessHiringTeamDraft(input: {
   requireList("Needs", input.fields.needs, 2);
   requireList("Concerns", input.fields.concerns, 1);
   requireList("Talking points", input.fields.talkingPoints, 1);
+  input.fields.talkingPoints.forEach((point, index) => {
+    if (
+      talkingPointWrittenFromPersonaJob(
+        point,
+        input.roleName ?? "",
+        input.likelyTitles ?? [],
+      )
+    ) {
+      reasons.push(
+        `Talking points item ${index + 1} is written from this person's own job instead of what the seeker should say to them.`,
+      );
+    }
+  });
   requireList("How to communicate", input.fields.communication, 1);
   if (input.involvement === "DIRECT") {
     requireText("Interview stage", input.fields.interviewStage ?? "");

@@ -250,6 +250,13 @@ export async function addInterviewStageInterviewer(input: {
       contactId: added.contactId,
     },
   });
+  const { offerPersonPrep } = await import("@/lib/interview/person-prep");
+  await offerPersonPrep({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    contactId: added.contactId,
+    personaId: input.personaId,
+  });
   return added;
 }
 

@@ -16,8 +16,8 @@ Cover these fields:
 - Pressures in organizationalPressures.
 - Impact in impact.
 - Needs in needsFromHire: first-month outcomes, not the requirements copied across.
-- Concerns in candidateConcerns.
-- Talking points in talkingPoints.
+- Concerns in candidateConcerns: what THIS PERSON worries about regarding the seeker as a candidate for the posted role. Never write concerns as if the seeker were applying for this person's job.
+- Talking points in talkingPoints: specific things THE SEEKER says to this person about the seeker's candidacy for the posted role. Never write talking points from this person's own job. A Talent Acquisition Partner talking point is how the seeker presents fit, logistics, and motivation, not how the seeker would source, screen, or build a target map.
 - How to communicate in communicationApproach.
 - If involvement is DIRECT, interviewStage is one of: recruiter screen; hiring manager chronological walk-through; panel competency interview; executive. For the Hiring Manager, use hiring manager chronological walk-through unless the job requirement or company research states a different stage. Also say what they evaluate. If involvement is INDIRECT, interviewStage is null.
 

@@ -100,13 +100,16 @@ describe("button class boundary", () => {
     ).toEqual([]);
   });
 
-  it("defines shared button classes in ui.tsx", () => {
+  it("defines shared button classes in AppButton and re-exports them from ui", () => {
     const ui = readFileSync(join(ROOT, "components/ui.tsx"), "utf8");
-    expect(ui).toContain("export const PRIMARY_BUTTON_CLASS");
-    expect(ui).toContain("export const SECONDARY_BUTTON_CLASS");
-    expect(ui).toContain("export const SECONDARY_CHIP_CLASS");
-    expect(ui).toMatch(/PRIMARY_BUTTON_CLASS[\s\S]*bg-slate-900/);
-    expect(ui).toMatch(/SECONDARY_BUTTON_CLASS[\s\S]*border-slate-300/);
-    expect(ui).toMatch(/SECONDARY_CHIP_CLASS[\s\S]*border-slate-300/);
+    const buttons = readFileSync(join(ROOT, "components/AppButton.tsx"), "utf8");
+    expect(ui).toContain("PRIMARY_BUTTON_CLASS");
+    expect(ui).toContain("SECONDARY_BUTTON_CLASS");
+    expect(ui).toContain("SECONDARY_CHIP_CLASS");
+    expect(buttons).toContain("export const PRIMARY_BUTTON_CLASS");
+    expect(buttons).toContain("bg-slate-900");
+    expect(buttons).toContain("border-slate-300");
+    expect(buttons).toContain("export const SECONDARY_BUTTON_CLASS");
+    expect(buttons).toContain("export const SECONDARY_CHIP_CLASS");
   });
 });

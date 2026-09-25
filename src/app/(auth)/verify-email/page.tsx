@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import Link from "next/link";
@@ -81,14 +81,14 @@ function VerifyEmailInner() {
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
           />
         </label>
-        <button
+        <AppButton
           type="submit"
           disabled={pending}
           data-testid="resend-verification"
           className={cn(PRIMARY_BUTTON_CLASS, "w-full", "!px-3")}
         >
           {pending ? "Sending…" : "Send a new verification email"}
-        </button>
+        </AppButton>
       </form>
       <p className="mt-4 text-sm">
         <Link href="/login" className="underline">

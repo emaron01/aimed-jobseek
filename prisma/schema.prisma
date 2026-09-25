@@ -2887,6 +2887,11 @@ model CampaignContact {
   individualProfileJson   Json?
   individualProfileStatus ApplicationJobStatus?
   individualProfileError  String?
+  /// Harper per-person interview prep. Null until a person is linked to a role or stage.
+  personPrepStatus        String?
+  personPrepOpening       String?
+  personPrepAnswersJson   Json?
+  personPrepOfferedAt     DateTime?
   createdAt               DateTime              @default(now())
   updatedAt               DateTime              @updatedAt
 

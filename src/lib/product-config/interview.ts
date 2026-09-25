@@ -36,6 +36,10 @@ export const interviewConfig = Object.freeze({
     recordNotesFirst: "Record notes after the interview before generating this message.",
     consultationOffer: "A new gap from these notes can be covered in a short consultation.",
     startConsultation: "Start a short consultation",
+    personPrepOffer: "Prep for this interviewer",
+    personPrepStart: "Start interviewer prep",
+    personPrepFallbackOpening:
+      "We will cover what this person will likely probe, which of your stories fit, and one or two questions that strengthen weak spots.",
     progressTitle: "Application status",
     staleGuide: "This guide is stale because interview information changed.",
     clarifyingHelp: "Answer or skip. These questions change how the guide is written.",

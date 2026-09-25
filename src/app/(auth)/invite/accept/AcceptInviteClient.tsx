@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import {
@@ -56,13 +56,13 @@ export function AcceptInviteClient({
         </p>
         <form action={logoutForInviteAction} className="flex flex-wrap gap-2">
           <input type="hidden" name="next" value={returnTo} />
-          <button
+          <AppButton
             type="submit"
             className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
             data-testid="invite-accept-switch-account"
           >
             Sign out and continue
-          </button>
+          </AppButton>
         </form>
         <p className="text-sm text-slate-600">
           After sign-out, choose{" "}
@@ -87,14 +87,14 @@ export function AcceptInviteClient({
       </p>
       <form action={formAction}>
         <input type="hidden" name="token" value={token} />
-        <button
+        <AppButton
           type="submit"
           disabled={pending}
           className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
           data-testid="invite-accept-submit"
         >
           {pending ? "Joining…" : "Accept invitation"}
-        </button>
+        </AppButton>
       </form>
       {state && !state.ok ? (
         <p className="text-sm text-red-600" role="alert">
@@ -103,9 +103,9 @@ export function AcceptInviteClient({
       ) : null}
       <form action={logoutForInviteAction}>
         <input type="hidden" name="next" value={returnTo} />
-        <button type="submit" className={cn(SECONDARY_BUTTON_CLASS, "!px-3", "text-xs")}>
+        <AppButton type="submit" className={cn(SECONDARY_BUTTON_CLASS, "!px-3", "text-xs")}>
           Use a different account
-        </button>
+        </AppButton>
       </form>
       <p
         className="hidden"

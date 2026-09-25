@@ -1,5 +1,5 @@
 "use client";
-import { SECONDARY_CHIP_CLASS } from "@/components/ui";
+import { SECONDARY_CHIP_CLASS, AppButton } from "@/components/ui";
 
 import { useState, type ReactNode } from "react";
 import {
@@ -63,7 +63,7 @@ export function ResearchSourceChip({
 
   return (
     <span className="research-source-chip relative ml-1 inline-block align-middle">
-      <button
+      <AppButton
         type="button"
         data-print-hide
         className={SECONDARY_CHIP_CLASS}
@@ -72,7 +72,7 @@ export function ResearchSourceChip({
       >
         {label}
         {sources.length > 1 ? ` +${sources.length - 1}` : ""}
-      </button>
+      </AppButton>
       <span
         className={`research-source-chip-print hidden rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600 print:inline ${
           open ? "" : ""

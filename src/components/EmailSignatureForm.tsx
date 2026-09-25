@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import { useActionState, useEffect, useState } from "react";
@@ -130,13 +130,13 @@ export function EmailSignatureForm({
             />
           </div>
         ) : null}
-        <button
+        <AppButton
           type="submit"
           disabled={pending}
           className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
         >
           {pending ? "Saving…" : "Save signature"}
-        </button>
+        </AppButton>
       </form>
     </section>
   );

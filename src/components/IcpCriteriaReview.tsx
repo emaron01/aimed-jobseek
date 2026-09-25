@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import { useActionState, useEffect, useState } from "react";
@@ -87,39 +87,39 @@ function DecisionForm({
           <input type="hidden" name="icpId" value={icpId} />
           <input type="hidden" name="criterionId" value={criterion.id} />
           <input type="hidden" name="decision" value="KEEP_ASYMMETRIC" />
-          <button
+          <AppButton
             type="submit"
             disabled={pending}
             className={cn(PRIMARY_BUTTON_CLASS, "!px-2.5", "!py-1.5", "!text-xs")}
           >
             Keep — confirm when found, never penalize when not found
-          </button>
+          </AppButton>
         </form>
         <form action={action}>
           <input type="hidden" name="productId" value={productId} />
           <input type="hidden" name="icpId" value={icpId} />
           <input type="hidden" name="criterionId" value={criterion.id} />
           <input type="hidden" name="decision" value="MAKE_SUPPORTING" />
-          <button
+          <AppButton
             type="submit"
             disabled={pending}
             className={cn(SECONDARY_BUTTON_CLASS, "px-2.5", "!px-2.5", "!py-1.5", "!text-xs")}
           >
             Make supporting
-          </button>
+          </AppButton>
         </form>
         <form action={action}>
           <input type="hidden" name="productId" value={productId} />
           <input type="hidden" name="icpId" value={icpId} />
           <input type="hidden" name="criterionId" value={criterion.id} />
           <input type="hidden" name="decision" value="REMOVE" />
-          <button
+          <AppButton
             type="submit"
             disabled={pending}
             className="rounded-md border border-red-300 bg-white px-2.5 py-1.5 text-xs font-medium text-red-800 disabled:opacity-60"
           >
             Remove this criterion
-          </button>
+          </AppButton>
         </form>
       </div>
       {state && !state.ok ? (
@@ -191,13 +191,13 @@ function TierAndMandatoryForm({
           Mandatory
         </label>
       ) : null}
-      <button
+      <AppButton
         type="submit"
         disabled={pending}
         className="text-xs font-medium text-slate-900 underline disabled:opacity-60"
       >
         {pending ? "Saving…" : "Update"}
-      </button>
+      </AppButton>
       {state && !state.ok ? (
         <p className="w-full text-xs text-red-600">{state.message}</p>
       ) : null}

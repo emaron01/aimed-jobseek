@@ -170,6 +170,8 @@ export async function synthesizeHiringTeamRole(input: {
       fields,
       jobLines: input.jobLines,
       involvement: input.involvement,
+      roleName: input.roleName,
+      likelyTitles: input.likelyTitles,
     });
     if (assessment.ok) {
       return {

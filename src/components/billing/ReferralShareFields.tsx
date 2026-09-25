@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { AutosizeTextarea } from "@/components/AutosizeTextarea";
-import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { referralShareMessage } from "@/lib/billing/referral-share-message";
 import { cn } from "@/lib/utils";
 
@@ -122,14 +122,14 @@ export function ReferralShareFields({
             >
               {code}
             </code>
-            <button
+            <AppButton
               type="button"
               className={cn(SECONDARY_BUTTON_CLASS, "!px-3")}
               data-testid={`${testIdPrefix}-copy-code`}
               onClick={() => onCopy("code", code)}
             >
               {copiedKind === "code" ? "Copied" : "Copy code"}
-            </button>
+            </AppButton>
           </div>
 
           <div className="space-y-2">
@@ -146,14 +146,14 @@ export function ReferralShareFields({
               data-testid={`${testIdPrefix}-message`}
               className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 placeholder:text-slate-400 focus:ring-2"
             />
-            <button
+            <AppButton
               type="button"
               className={cn(SECONDARY_BUTTON_CLASS, "!px-3")}
               data-testid={`${testIdPrefix}-copy-message`}
               onClick={() => onCopy("message", message)}
             >
               {copiedKind === "message" ? "Copied" : "Copy message"}
-            </button>
+            </AppButton>
           </div>
 
           <p

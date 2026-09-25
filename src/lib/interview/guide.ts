@@ -222,6 +222,28 @@ async function loadGuideContext(input: {
         "PERSONA",
       );
     }
+    if (membership.personPrepOpening) {
+      appendSource(
+        sources,
+        `person-prep:${membership.contactId}:opening`,
+        membership.personPrepOpening,
+        "PERSON_PREP",
+      );
+    }
+    if (Array.isArray(membership.personPrepAnswersJson)) {
+      membership.personPrepAnswersJson.forEach((item, index) => {
+        if (!item || typeof item !== "object") return;
+        const text = (item as { text?: unknown }).text;
+        if (typeof text === "string" && text.trim()) {
+          appendSource(
+            sources,
+            `person-prep:${membership.contactId}:answer:${index}`,
+            text,
+            "PERSON_PREP",
+          );
+        }
+      });
+    }
   }
   for (const statement of stage.campaign.consultationSession?.statements ?? []) {
     appendSource(sources, `statement:${statement.id}`, statement.content, "APPROVED_STATEMENT");

@@ -6,8 +6,11 @@ import {
   skipConsultationAction,
   startConsultationAction,
 } from "@/app/actions/consultation";
+import { AppPendingIndicator } from "@/components/AppButton";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { WorkspaceProgress } from "@/components/ApplicationWorkspaceLive";
+import { listPersonPreps } from "@/lib/interview/person-prep";
+import { interviewConfig } from "@/lib/product-config";
 import { ConsultationStanding } from "@/components/ConsultationStanding";
 import { ConsultationThread } from "@/components/ConsultationThread";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
@@ -151,6 +154,7 @@ export async function ConsultationSection({
     ? parseCandidateProfileSafe(campaign.product.profileJson)
     : { ok: true as const, profile: emptyCandidateProfile() };
   const profileItems = parsed.ok ? profileEvidenceItems(parsed.profile) : [];
+  const personPreps = await listPersonPreps({ organizationId, campaignId });
   const briefing = session
     ? consultationBriefingSchema.safeParse(session.briefingJson)
     : null;
@@ -184,12 +188,40 @@ export async function ConsultationSection({
           (job.status === "PENDING" || job.status === "IN_PROGRESS"),
       ) || session?.generationStatus === "GENERATING" ? (
         <p className="text-sm text-slate-600" data-testid="harper-typing">
-          {workspaceJobCopy.typing}
+          <AppPendingIndicator label={workspaceJobCopy.typing} />
         </p>
       ) : null}
       <p className="text-sm text-slate-600">
         {consultationConfig.displayName} compares this job with the {vocab.product.singular} and draws out the stories behind the gaps. Nothing is added to the {vocab.product.singular} until you confirm it.
       </p>
+      {personPreps.length > 0 ? (
+        <div className="space-y-3" data-testid="person-prep-offers">
+          {personPreps.map((prep) => (
+            <article
+              key={prep.contactId}
+              className="rounded-md border border-slate-200 bg-slate-50 p-4"
+            >
+              <h4 className="text-sm font-semibold text-slate-900">
+                {interviewConfig.labels.personPrepOffer}: {prep.name || prep.roleName}
+              </h4>
+              {prep.openingText ? (
+                <p className="mt-2 text-sm text-slate-800">{prep.openingText}</p>
+              ) : (
+                <p className="mt-2 text-sm text-slate-600">
+                  <AppPendingIndicator label={workspaceJobCopy.typing} />
+                </p>
+              )}
+              {prep.confirmedAnswers.length > 0 ? (
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-800">
+                  {prep.confirmedAnswers.map((answer) => (
+                    <li key={answer.turnId}>{answer.text}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      ) : null}
 
       {briefing?.success ? (
         <div

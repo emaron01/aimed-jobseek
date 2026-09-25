@@ -1,6 +1,6 @@
 "use client";
 
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { prepareSignupCompanyAction } from "@/app/actions/pending-signup";
 import { signupCopy } from "@/lib/product-config";
@@ -208,7 +208,7 @@ export function SignupForm({
             {error}
           </p>
         ) : null}
-        <button
+        <AppButton
           type="submit"
           disabled={loading || (requirePlan && !planSummary)}
           className={cn(PRIMARY_BUTTON_CLASS, "w-full", "!px-3")}
@@ -218,7 +218,7 @@ export function SignupForm({
             : inviteMode
               ? "Create password and join"
               : "Create account"}
-        </button>
+        </AppButton>
       </form>
       <p className="mt-4 text-sm text-slate-600">
         Already have an account?{" "}

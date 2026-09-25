@@ -1,8 +1,9 @@
 import { z } from "zod";
 
-export const CONSULTATION_PROMPT_VERSION = "9";
+export const CONSULTATION_PROMPT_VERSION = "10";
 
 export const WHY_THIS_COMPANY_TARGET_KEY = "why-this-company";
+export const PERSON_PREP_TARGET_PREFIX = "person-prep:";
 
 const strengthSchema = z.enum(["STRONG", "PARTIAL", "NONE"]);
 const strategyModeSchema = z.enum([

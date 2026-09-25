@@ -8,7 +8,7 @@ import {
   retryProductSynthesisAction,
   type ProductSetupActionResult,
 } from "@/app/actions/product-setup";
-import { Field, SECONDARY_BUTTON_CLASS, SecondaryButton, SubmitButton } from "@/components/ui";
+import { Field, SECONDARY_BUTTON_CLASS, SecondaryButton, SubmitButton, AppButton } from "@/components/ui";
 import { vocab } from "@/lib/product-config";
 
 const initial: ProductSetupActionResult | null = null;
@@ -181,14 +181,14 @@ export function AssistedProductIntake({
             {pending ? "Researching…" : `Research & Build ${vocab.product.Singular}`}
           </SubmitButton>
           {!productId ? (
-            <button
+            <AppButton
               type="submit"
               formAction={saveAction}
               disabled={pending || savePending}
               className={SECONDARY_BUTTON_CLASS}
             >
               {savePending ? "Saving…" : `Save ${vocab.product.Singular} only`}
-            </button>
+            </AppButton>
           ) : null}
         </div>
       </form>

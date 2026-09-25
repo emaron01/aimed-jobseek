@@ -6,7 +6,7 @@ import {
   setPendingSignupPlanAction,
   type PendingSignupActionResult,
 } from "@/app/actions/pending-signup";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import {
   BILLING_PLAN_ENTERPRISE,
   BILLING_PLAN_STANDARD,
@@ -81,7 +81,7 @@ export function SignupPlanSelector({
               : []),
           ] as const
         ).map((plan) => (
-          <button
+          <AppButton
             key={plan.code}
             type="button"
             onClick={() => setPlanCode(plan.code)}
@@ -101,7 +101,7 @@ export function SignupPlanSelector({
             >
               {plan.blurb}
             </p>
-          </button>
+          </AppButton>
         ))}
       </div>
 
@@ -193,13 +193,13 @@ export function SignupPlanSelector({
                 planCode === BILLING_PLAN_TEAM ? String(seatQuantity) : "1"
               }
             />
-            <button
+            <AppButton
               type="submit"
               disabled={pending}
               className={cn(PRIMARY_BUTTON_CLASS, "w-full !px-4 !py-3")}
             >
               {pending ? "Continuing…" : "Continue to create account"}
-            </button>
+            </AppButton>
             {state && !state.ok ? (
               <p className="text-sm text-red-600" role="alert">
                 {state.message}

@@ -560,6 +560,39 @@ describe("consultation evidence and questions", () => {
     );
     const story = result.proposals.find((proposal) => proposal.kind === "STORY");
     expect(story?.story?.competencyLinks[0]?.text).toBe("Leads incident response");
+    const why = proposalsFromExtraction({
+      answer,
+      turnId: "turn_why",
+      extracted: {
+        facts: [],
+        story: {
+          situation: answer,
+          task: answer,
+          action: answer,
+          result: answer,
+        },
+        demonstratedTargets: [
+          {
+            targetKey: "why-this-company",
+            explanation: "The go-to-market story shows motivation.",
+          },
+        ],
+        missingStarElements: [],
+        followUpQuestion: null,
+      },
+      targets: [
+        ...targets,
+        {
+          key: "why-this-company",
+          kind: "MISSION",
+          text: "Why the seeker wants to work at this company",
+        },
+      ],
+    });
+    expect(why.dropped).toContain("target:why-this-company:motivation");
+    expect(why.proposals.find((proposal) => proposal.kind === "STORY")?.story?.competencyLinks).toEqual(
+      [],
+    );
 
     const confirmed = appendConfirmedFact(profile, {
       id: "consult_turn_answer_1_fact",
@@ -772,7 +805,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("9");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("10");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("coach, not an interrogator");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("Never inflate fit");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -1080,7 +1113,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("9");
+    expect(session?.promptVersion).toBe("10");
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
     expect(session?.briefingJson).toMatchObject({

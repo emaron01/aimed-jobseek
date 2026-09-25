@@ -1,5 +1,6 @@
 "use client";
 
+import { AppButton } from "@/components/AppButton";
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -34,7 +35,7 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
 
   return (
     <div className="relative" ref={rootRef}>
-      <button
+      <AppButton
         type="button"
         className="flex items-center gap-3 rounded-md px-1 py-1 text-left hover:bg-slate-50"
         aria-haspopup="menu"
@@ -61,7 +62,7 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
         >
           {model.avatarInitial}
         </div>
-      </button>
+      </AppButton>
 
       {open ? (
         <div
@@ -121,14 +122,14 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
                       name="organizationId"
                       value={ws.organizationId}
                     />
-                    <button
+                    <AppButton
                       type="submit"
                       role="menuitem"
                       data-testid={`workspace-option-${ws.organizationId}`}
                       className="w-full truncate px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                     >
                       {ws.name}
-                    </button>
+                    </AppButton>
                   </form>
                 ),
               )}
@@ -158,14 +159,14 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
 
           <div className="border-t border-slate-100 p-1">
             <form action={logoutAction}>
-              <button
+              <AppButton
                 type="submit"
                 role="menuitem"
                 data-testid="user-menu-log_out"
                 className="w-full rounded-sm px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
               >
                 Log Out
-              </button>
+              </AppButton>
             </form>
           </div>
         </div>

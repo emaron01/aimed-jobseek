@@ -1,5 +1,5 @@
 "use client";
-import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -32,14 +32,14 @@ export function UnarchiveForm({
     <div>
       <form action={formAction}>
         <input type="hidden" name={idFieldName} value={id} />
-        <button
+        <AppButton
           type="submit"
           disabled={pending}
           className={SECONDARY_BUTTON_CLASS}
           data-testid="unarchive-submit"
         >
           {pending ? "Restoring…" : label}
-        </button>
+        </AppButton>
       </form>
       {state && !state.ok ? (
         <p className="mt-2 text-sm text-red-600" role="alert">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent, type ReactNode } from "react";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { AppButton } from "@/components/AppButton";
 
 type ActionResult = { ok: boolean; message: string };
 
@@ -27,19 +27,6 @@ export async function runApplicationFormAction(
           : FALLBACK_ERROR,
     };
   }
-}
-
-function PendingSpinner({ label }: { label: string }) {
-  return (
-    <span className="inline-flex items-center gap-2">
-      <span
-        className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
-        aria-hidden
-        data-testid="action-pending-spinner"
-      />
-      {label}
-    </span>
-  );
 }
 
 export function ApplicationActionForm({
@@ -84,14 +71,9 @@ export function ApplicationActionForm({
           {state.message}
         </p>
       ) : null}
-      <button
-        type="submit"
-        disabled={pending}
-        className={PRIMARY_BUTTON_CLASS}
-        aria-busy={pending}
-      >
-        {pending ? <PendingSpinner label={pendingLabel} /> : submitLabel}
-      </button>
+      <AppButton type="submit" pending={pending} pendingLabel={pendingLabel}>
+        {submitLabel}
+      </AppButton>
     </form>
   );
 }

@@ -463,6 +463,8 @@ describeDb("interview stages persistence", () => {
       where: { campaignId, contactId: added.contactId },
     });
     expect(membership?.roleConfirmed).toBe(true);
+    expect(membership?.personPrepOfferedAt).not.toBeNull();
+    expect(membership?.personPrepStatus).toBe("OFFERED");
     await updateInterviewStage({
       organizationId,
       campaignId,

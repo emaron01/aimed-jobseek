@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import Link from "next/link";
@@ -76,13 +76,13 @@ function LoginForm() {
             {error}
           </p>
         ) : null}
-        <button
+        <AppButton
           type="submit"
           disabled={loading}
           className={cn(PRIMARY_BUTTON_CLASS, "w-full", "!px-3")}
         >
           {loading ? "Signing in…" : "Sign in"}
-        </button>
+        </AppButton>
       </form>
       <p className="mt-4 text-sm text-slate-600">
         <Link href="/forgot-password" className="underline">

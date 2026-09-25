@@ -21,8 +21,8 @@ import {
   formatClaimEditorLabel,
   formatClaimSupportLabel,
 } from "@/lib/application-assets/display";
-import { applicationAssetConfig } from "@/lib/product-config";
-import { SECONDARY_BUTTON_CLASS, SubmitButton } from "@/components/ui";
+import { applicationAssetConfig, vocab } from "@/lib/product-config";
+import { AppActionLink, SubmitButton } from "@/components/ui";
 
 type AssetRow = {
   id: string;
@@ -318,12 +318,9 @@ function AssetHistory({
               </p>
             ) : null}
             <div className="flex flex-wrap gap-2">
-              <a
-                className={SECONDARY_BUTTON_CLASS}
-                href={`/api/application-assets/${asset.id}/docx`}
-              >
+              <AppActionLink href={`/api/application-assets/${asset.id}/docx`}>
                 {applicationAssetConfig.labels.downloadDocx}
-              </a>
+              </AppActionLink>
               {canEdit && asset.status !== "APPROVED" ? (
                 <form action={approveAction}>
                   <input type="hidden" name="campaignId" value={campaignId} />
@@ -436,6 +433,8 @@ function AssetTypePanel({
   planError,
   canEdit,
   thinNotice,
+  missingContacts,
+  profileHref,
 }: {
   campaignId: string;
   type: "RESUME" | "COVER_LETTER";
@@ -445,6 +444,8 @@ function AssetTypePanel({
   planError: string | null;
   canEdit: boolean;
   thinNotice: string | null;
+  missingContacts: string[];
+  profileHref: string | null;
 }) {
   const [result, action] = useActionState(generateApplicationAssetAction, initial);
   const latestResume =
@@ -461,6 +462,17 @@ function AssetTypePanel({
             ? applicationAssetConfig.labels.resume
             : applicationAssetConfig.labels.coverLetter}
         </h3>
+        {type === "RESUME" && missingContacts.length > 0 ? (
+          <p className="text-sm text-amber-900" data-testid="resume-missing-contact">
+            {applicationAssetConfig.missingContact.heading}: {missingContacts.join(", ")}.{" "}
+            {profileHref ? (
+              <AppActionLink href={profileHref} variant="chip">
+                {vocab.product.Singular}
+              </AppActionLink>
+            ) : null}{" "}
+            {applicationAssetConfig.missingContact.addInProfile}
+          </p>
+        ) : null}
         {type === "COVER_LETTER" && thinNotice ? (
           <p className="text-sm text-slate-600" data-testid="cover-letter-thin-evidence">
             {thinNotice}
@@ -548,6 +560,8 @@ export function ApplicationAssetsSection({
   invalidPlanTypes = [],
   canEdit,
   coverLetterThinNotice = null,
+  missingResumeContacts = [],
+  profileHref = null,
   defaultOpen = false,
 }: {
   campaignId: string;
@@ -557,6 +571,8 @@ export function ApplicationAssetsSection({
   invalidPlanTypes?: Array<"RESUME" | "COVER_LETTER">;
   canEdit: boolean;
   coverLetterThinNotice?: string | null;
+  missingResumeContacts?: string[];
+  profileHref?: string | null;
   defaultOpen?: boolean;
 }) {
   const valid = assets.flatMap((asset) => {
@@ -592,6 +608,8 @@ export function ApplicationAssetsSection({
             }
             canEdit={canEdit}
             thinNotice={type === "COVER_LETTER" ? coverLetterThinNotice : null}
+            missingContacts={type === "RESUME" ? missingResumeContacts : []}
+            profileHref={profileHref}
           />
         ))}
       </div>

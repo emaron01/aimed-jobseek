@@ -1,4 +1,4 @@
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { requireCurrentUser } from "@/lib/auth/authz";
@@ -105,12 +105,12 @@ export default async function AccountSettingsPage() {
                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
               />
             </label>
-            <button
+            <AppButton
               type="submit"
               className={cn(PRIMARY_BUTTON_CLASS, "sm:col-span-2", "w-fit", "!px-3")}
             >
               Save digest preferences
-            </button>
+            </AppButton>
           </ActionFeedbackForm>
         </section>
       ) : null}
@@ -121,13 +121,13 @@ export default async function AccountSettingsPage() {
       </section>
 
       <form action={logoutAction}>
-        <button
+        <AppButton
           type="submit"
           data-testid="account-log_out"
           className="rounded-md border border-slate-300 px-3 py-2 text-sm"
         >
           Log Out
-        </button>
+        </AppButton>
       </form>
     </div>
   );

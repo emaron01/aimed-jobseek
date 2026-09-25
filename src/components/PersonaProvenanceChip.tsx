@@ -1,5 +1,5 @@
 "use client";
-import { SECONDARY_CHIP_CLASS } from "@/components/ui";
+import { SECONDARY_CHIP_CLASS, AppButton } from "@/components/ui";
 
 import { useState } from "react";
 import { SourceMarkers } from "@/components/research-document";
@@ -45,7 +45,7 @@ export function PersonaProvenanceChip({
 
   return (
     <span className="persona-provenance-chip research-source-chip relative ml-1 inline-block align-middle">
-      <button
+      <AppButton
         type="button"
         data-print-hide
         className={SECONDARY_CHIP_CLASS}
@@ -53,7 +53,7 @@ export function PersonaProvenanceChip({
         onClick={() => setOpen((value) => !value)}
       >
         {label}
-      </button>
+      </AppButton>
       <span className="research-source-chip-print hidden rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600 print:inline">
         {label}
       </span>

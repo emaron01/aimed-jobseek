@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import Link from "next/link";
@@ -89,7 +89,7 @@ export function DueContactsPanel({
                   ) : null}
                 </p>
               </div>
-              <button
+              <AppButton
                 type="button"
                 disabled={pending}
                 onClick={() =>
@@ -100,7 +100,7 @@ export function DueContactsPanel({
                 className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
               >
                 Generate all due
-              </button>
+              </AppButton>
             </div>
 
             <ul className="mt-4 divide-y divide-slate-100">
@@ -138,7 +138,7 @@ export function DueContactsPanel({
                         Review draft
                       </Link>
                     ) : (
-                      <button
+                      <AppButton
                         type="button"
                         disabled={pending}
                         onClick={() =>
@@ -157,7 +157,7 @@ export function DueContactsPanel({
                         className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-60"
                       >
                         Generate
-                      </button>
+                      </AppButton>
                     )}
                   </div>
                 </li>

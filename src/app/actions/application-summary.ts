@@ -42,7 +42,7 @@ export async function generateApplicationSummaryAction(
     );
     return {
       ok: false,
-      message: "Application Summary could not be generated. Retry.",
+      message: "Interview Cheat Sheet could not be generated. Retry.",
     };
   }
 }

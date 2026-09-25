@@ -1,4 +1,4 @@
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import {
@@ -114,12 +114,12 @@ export default async function OrganizationSettingsPage() {
             defaultValue={organization.name}
             className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
-          <button
+          <AppButton
             type="submit"
             className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
           >
             Save
-          </button>
+          </AppButton>
         </ActionFeedbackForm>
       </section>
 
@@ -140,12 +140,12 @@ export default async function OrganizationSettingsPage() {
             placeholder="America/New_York"
             className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
-          <button
+          <AppButton
             type="submit"
             className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
           >
             Save
-          </button>
+          </AppButton>
         </ActionFeedbackForm>
         <p className="text-sm">
           <Link href="/settings/cadence" className="font-medium underline">
@@ -231,22 +231,22 @@ export default async function OrganizationSettingsPage() {
                       <option value="ADMIN">ADMIN</option>
                       <option value="MEMBER">MEMBER</option>
                     </select>
-                    <button
+                    <AppButton
                       type="submit"
                       className="rounded-md border border-slate-300 px-2 py-1 text-xs"
                     >
                       Save role
-                    </button>
+                    </AppButton>
                   </ActionFeedbackForm>
                   ) : null}
                   <ActionFeedbackForm action={removeMemberAction}>
                     <input type="hidden" name="targetUserId" value={m.userId} />
-                    <button
+                    <AppButton
                       type="submit"
                       className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-800"
                     >
                       Remove
-                    </button>
+                    </AppButton>
                   </ActionFeedbackForm>
                 </div>
               ) : null}
@@ -364,12 +364,12 @@ export default async function OrganizationSettingsPage() {
                 <option value="MEMBER">MEMBER</option>
                 <option value="ADMIN">ADMIN</option>
               </select>
-              <button
+              <AppButton
                 type="submit"
                 className={cn(PRIMARY_BUTTON_CLASS, "sm:col-span-3", "w-fit", "!px-3")}
               >
                 Create invitation
-              </button>
+              </AppButton>
             </ActionFeedbackForm>
             {invitations.length > 0 ? (
               <ul className="space-y-2 text-sm text-slate-600">
@@ -384,12 +384,12 @@ export default async function OrganizationSettingsPage() {
                     </span>
                     <ActionFeedbackForm action={revokeInvitationAction}>
                       <input type="hidden" name="invitationId" value={inv.id} />
-                      <button
+                      <AppButton
                         type="submit"
                         className="rounded-md border border-slate-300 px-2 py-1 text-xs"
                       >
                         Revoke
-                      </button>
+                      </AppButton>
                     </ActionFeedbackForm>
                   </li>
                 ))}

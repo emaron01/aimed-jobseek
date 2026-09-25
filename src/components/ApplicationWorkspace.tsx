@@ -67,6 +67,8 @@ import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
 import { parseStringArray } from "@/lib/research";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { persistExtractedExperienceDates } from "@/lib/product-research/restore-role-dates";
+import { persistExtractedContactDetails } from "@/lib/product-research/restore-contact-details";
+import { missingResumeContactLabels } from "@/lib/application-assets/header";
 
 function textList(value: unknown): string[] {
   return parseStringArray(value);
@@ -397,10 +399,14 @@ export async function ApplicationWorkspace({
   if (profile.ok && canEdit) {
     profile = {
       ok: true,
-      profile: await persistExtractedExperienceDates({
+      profile: await persistExtractedContactDetails({
         organizationId,
         productId: requirement.campaign.product.id,
-        profile: profile.profile,
+        profile: await persistExtractedExperienceDates({
+          organizationId,
+          productId: requirement.campaign.product.id,
+          profile: profile.profile,
+        }),
       }),
     };
   }
@@ -702,6 +708,10 @@ export async function ApplicationWorkspace({
       coverLetterThinNotice={
         coverLetterEvidenceThin ? coverLetterThinEvidenceCopy() : null
       }
+      missingResumeContacts={
+        profile.ok ? missingResumeContactLabels(profile.profile) : []
+      }
+      profileHref={`/products/${requirement.campaign.product.id}`}
       profileRoles={
         profile.ok
           ? profile.profile.experience.map((role) => ({

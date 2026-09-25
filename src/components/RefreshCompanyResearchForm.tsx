@@ -1,5 +1,5 @@
 "use client";
-import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 
 import { ActionFeedbackForm } from "@/components/ActionFeedbackForm";
 import { refreshCompanyResearchAction } from "@/app/actions/research";
@@ -19,12 +19,12 @@ export function RefreshCompanyResearchForm({
       {contactListId ? (
         <input type="hidden" name="contactListId" value={contactListId} />
       ) : null}
-      <button
+      <AppButton
         type="submit"
         className={SECONDARY_BUTTON_CLASS}
       >
         {label}
-      </button>
+      </AppButton>
     </ActionFeedbackForm>
   );
 }

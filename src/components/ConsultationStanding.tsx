@@ -1,5 +1,6 @@
 "use client";
 
+import { AppButton } from "@/components/AppButton";
 import { useMemo, useState } from "react";
 import { consultationConversationCopy, evidenceStrengthLabels } from "@/lib/product-config";
 
@@ -81,7 +82,7 @@ export function ConsultationStanding({
       </div>
       {expandable.length > 0 ? (
         <div className="flex flex-wrap gap-2">
-          <button
+          <AppButton
             type="button"
             className="text-sm font-medium text-slate-700 underline"
             onClick={() => setAll(!allOpen)}
@@ -89,7 +90,7 @@ export function ConsultationStanding({
             {allOpen
               ? consultationConversationCopy.collapseAllEvidence
               : consultationConversationCopy.expandAllEvidence}
-          </button>
+          </AppButton>
         </div>
       ) : null}
       <ul className="space-y-3">
@@ -111,7 +112,7 @@ export function ConsultationStanding({
               ) : null}
               {item.facts.length > 0 ? (
                 <div>
-                  <button
+                  <AppButton
                     type="button"
                     className="text-sm font-medium text-slate-700 underline"
                     onClick={() => toggle(item.id)}
@@ -120,7 +121,7 @@ export function ConsultationStanding({
                     {open
                       ? consultationConversationCopy.collapseEvidence
                       : consultationConversationCopy.expandEvidence}
-                  </button>
+                  </AppButton>
                   {open ? (
                     <ul className="mt-2 space-y-1">
                       {item.facts.map((fact) => (

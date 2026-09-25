@@ -40,6 +40,7 @@ import {
   condensedRoleIdsFromPlan,
 } from "./plan-service";
 import type { AssetGenerationResult } from "./outreach-types";
+import { applyProfileContactHeader } from "./header";
 
 export type { AssetGenerationResult } from "./outreach-types";
 
@@ -902,8 +903,11 @@ export async function generateApplicationAsset(input: {
       }
       continue;
     }
-    const content = replaceEmDashesDeep(
-      normalizeAssetSupportSourceIds(generated.data, context),
+    const content = applyProfileContactHeader(
+      replaceEmDashesDeep(
+        normalizeAssetSupportSourceIds(generated.data, context),
+      ),
+      context.profile,
     );
     const violations = await validateAssetContent({
       content,

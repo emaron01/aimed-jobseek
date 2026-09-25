@@ -19,6 +19,7 @@ import { synthesizeHiringTeamRole } from "@/lib/hiring-team/ai";
 import {
   applyHiringManagerInterviewStage,
   assessHiringTeamDraft,
+  talkingPointWrittenFromPersonaJob,
   fieldRestatesJobRequirement,
   HIRING_MANAGER_WALKTHROUGH,
   jobRequirementLines,
@@ -31,6 +32,8 @@ import {
   applyHiringTeamIdentificationGuardrails,
   evidenceTextFor,
   hiringManagerTitles,
+  rolesDescribeSamePerson,
+  titlesCoherentToRole,
 } from "@/lib/hiring-team/identify";
 import {
   FINANCIAL_CONTROLLER_IDENTIFICATION_FIXTURE,
@@ -509,7 +512,7 @@ describe("hiring team evidence and selectors", () => {
   });
 
   it("synthesizes Hiring Team roles as inference and bumps the prompt version", () => {
-    expect(PERSONA_SYNTHESIS_PROMPT_VERSION).toBe("12");
+    expect(PERSONA_SYNTHESIS_PROMPT_VERSION).toBe("13");
     expect(HIRING_TEAM_IDENTIFICATION_PROMPT_VERSION).toBe("2");
     const prompt = readFileSync("src/lib/prompt-content/persona-synthesis.ts", "utf8");
     expect(prompt).toContain("FACT");
@@ -793,5 +796,133 @@ describe.skipIf(!hasTestDatabase())("hiring team per application", () => {
     });
     expect(savedTemplate?.templateKey).toBeNull();
     expect(savedTemplate?.name).toBe("Staff Engineer interviewer");
+  });
+
+  it("rejects recruiter-job talking points and regenerates from the seeker's perspective", () => {
+    expect(
+      talkingPointWrittenFromPersonaJob(
+        "Describe how you would build a target map for senior sales leaders.",
+        "Talent Acquisition Partner",
+        ["Recruiter"],
+      ),
+    ).toBe(true);
+    expect(
+      talkingPointWrittenFromPersonaJob(
+        "Walk them through why this company, this role, and your timeline in the first minute.",
+        "Talent Acquisition Partner",
+        ["Recruiter"],
+      ),
+    ).toBe(false);
+    const rejected = assessHiringTeamDraft({
+      involvement: "DIRECT",
+      jobLines: jobRequirementLines(fixtureJob()),
+      roleName: "Talent Acquisition Partner",
+      likelyTitles: ["Recruiter"],
+      fields: {
+        ...substantiveDirectorDraft(),
+        talkingPoints: [
+          "Describe how you would build a target map for senior sales leaders.",
+        ],
+      },
+    });
+    expect(rejected.ok).toBe(false);
+    if (!rejected.ok) {
+      expect(rejected.reasons.join(" ")).toMatch(/seeker should say/i);
+    }
+  });
+
+  it("merges duplicate Hiring Team roles by meaning and keeps titles coherent", () => {
+    expect(
+      rolesDescribeSamePerson(
+        {
+          roleKey: "customer_success_leader",
+          name: "Customer Success Leader",
+          likelyTitles: ["VP Customer Success"],
+          whyInvolved: "Owns expansion after the sale.",
+        },
+        {
+          roleKey: "customer_success_leader_2",
+          name: "Customer Success Leader",
+          likelyTitles: ["Head of Customer Success"],
+          whyInvolved: "Partners on post-sale expansion.",
+        },
+      ),
+    ).toBe(true);
+    expect(
+      rolesDescribeSamePerson(
+        {
+          roleKey: "executive_sponsor",
+          name: "Executive Sponsor",
+          likelyTitles: ["CRO"],
+          whyInvolved: "Sponsors the hire at the executive level.",
+        },
+        {
+          roleKey: "executive_sales_sponsor",
+          name: "Executive Sales Sponsor",
+          likelyTitles: ["CRO", "Revenue Operations Manager"],
+          whyInvolved: "Executive sponsor for the sales hire.",
+        },
+      ),
+    ).toBe(true);
+    expect(
+      titlesCoherentToRole("Executive Sales Sponsor", [
+        "CRO",
+        "Revenue Operations Manager",
+      ]),
+    ).toEqual(["CRO"]);
+    const merged = applyHiringTeamIdentificationGuardrails({
+      roles: [
+        {
+          name: "Customer Success Leader",
+          likelyTitles: ["VP Customer Success"],
+          department: "Customer Success",
+          involvement: "INDIRECT",
+          whyInvolved: "The hire will partner with customer success on expansion after the sale.",
+          evidence: [
+            { claim: "partner with customer success on expansion after the sale", kind: "FACT" },
+          ],
+        },
+        {
+          name: "Customer Success Leader",
+          likelyTitles: ["Head of Customer Success"],
+          department: "Customer Success",
+          involvement: "INDIRECT",
+          whyInvolved: "Customer success will feel this hire through expansion after the sale.",
+          evidence: [
+            { claim: "customer success will feel this hire through expansion after the sale", kind: "FACT" },
+          ],
+        },
+        {
+          name: "Executive Sponsor",
+          likelyTitles: ["CRO"],
+          department: "Sales",
+          involvement: "DIRECT",
+          whyInvolved: "An executive sponsor will press on the revenue plan for this hire.",
+          evidence: [
+            { claim: "executive sponsor will press on the revenue plan for this hire", kind: "FACT" },
+          ],
+        },
+        {
+          name: "Executive Sales Sponsor",
+          likelyTitles: ["CRO", "Revenue Operations Manager"],
+          department: "Revenue Operations",
+          involvement: "DIRECT",
+          whyInvolved: "The executive sales sponsor owns the revenue plan for this hire.",
+          evidence: [
+            { claim: "executive sales sponsor owns the revenue plan for this hire", kind: "FACT" },
+          ],
+        },
+      ],
+      job: fixtureJob(),
+      evidenceText:
+        "The hire will partner with customer success on expansion after the sale. An executive sponsor will press on the revenue plan for this hire. The executive sales sponsor owns the revenue plan for this hire. Customer success will feel this hire through expansion after the sale.",
+    });
+    const names = merged.roles.map((role) => role.name);
+    expect(names.filter((name) => /customer success/i.test(name))).toHaveLength(1);
+    expect(names.filter((name) => /executive/i.test(name))).toHaveLength(1);
+    const sponsor = merged.roles.find((role) => /executive/i.test(role.name));
+    expect(sponsor?.likelyTitles.some((title) => /revenue operations/i.test(title))).toBe(
+      false,
+    );
   });
 });

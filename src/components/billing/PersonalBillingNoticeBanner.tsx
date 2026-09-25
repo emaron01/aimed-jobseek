@@ -7,7 +7,7 @@ import {
   openOwnedOrgBillingPortalAction,
   type WorkspaceActionResult,
 } from "@/app/actions/workspace";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 export type PersonalBillingNoticeOrg = {
@@ -77,25 +77,25 @@ function PersonalBillingNoticeRow({ org }: { org: PersonalBillingNoticeOrg }) {
       <div className="flex flex-wrap items-center gap-2">
         <form action={openOwnedOrgBillingPortalAction}>
           <input type="hidden" name="organizationId" value={org.organizationId} />
-          <button type="submit" className={cn(PRIMARY_BUTTON_CLASS, "!px-3 !py-1.5 !text-sm")}>
+          <AppButton type="submit" className={cn(PRIMARY_BUTTON_CLASS, "!px-3 !py-1.5 !text-sm")}>
             Manage / cancel in Stripe
-          </button>
+          </AppButton>
         </form>
-        <button
+        <AppButton
           type="button"
           className={cn(SECONDARY_BUTTON_CLASS, "!px-3 !py-1.5 !text-sm")}
           onClick={() => setConfirmOpen((v) => !v)}
         >
           {confirmOpen ? "Hide cancel form" : "Cancel Standard here"}
-        </button>
+        </AppButton>
         <form action={dismissPersonalBillingNoticeAction}>
           <input type="hidden" name="organizationId" value={org.organizationId} />
-          <button
+          <AppButton
             type="submit"
             className="text-sm font-medium text-sky-900 underline underline-offset-2"
           >
             Keep for now
-          </button>
+          </AppButton>
         </form>
       </div>
 
@@ -116,7 +116,7 @@ function PersonalBillingNoticeRow({ org }: { org: PersonalBillingNoticeOrg }) {
             className="w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
             data-testid="personal-billing-cancel-confirm"
           />
-          <button
+          <AppButton
             type="submit"
             disabled={cancelPending || confirmText !== "CANCEL"}
             className={cn(
@@ -125,7 +125,7 @@ function PersonalBillingNoticeRow({ org }: { org: PersonalBillingNoticeOrg }) {
             )}
           >
             {cancelPending ? "Canceling…" : "Cancel subscription"}
-          </button>
+          </AppButton>
           {cancelState && !cancelState.ok ? (
             <p className="text-sm text-red-700">{cancelState.message}</p>
           ) : null}

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { HomeSetupRail } from "@/components/HomeSetupRail";
-import { PageHeader, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import { PageHeader, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, TenantMissing, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ShowArchivedToggle } from "@/components/ShowArchivedToggle";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
@@ -106,14 +106,14 @@ export default async function DashboardPage({
             New {vocab.campaign.singular}
           </Link>
         ) : (
-          <button
+          <AppButton
             type="button"
             disabled
             title={`Finish ${vocab.product.singular} setup first`}
             className="cursor-not-allowed rounded-md bg-slate-300 px-3 py-2 text-sm font-medium text-slate-500"
           >
             New {vocab.campaign.singular}
-          </button>
+          </AppButton>
         )}
       </div>
       {!workflow.setupComplete ? (

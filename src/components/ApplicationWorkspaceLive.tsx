@@ -11,20 +11,9 @@ import {
   workspaceWaitKind,
 } from "@/lib/product-config";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
+import { AppPendingIndicator } from "@/components/AppButton";
 
 const POLL_MS = 3_000;
-
-function Spinner({ label }: { label: string }) {
-  return (
-    <div className="flex items-start gap-2 text-sm text-slate-700" role="status">
-      <span
-        className="mt-0.5 inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-800"
-        aria-hidden
-      />
-      <span>{label}</span>
-    </div>
-  );
-}
 
 export function WorkspaceProgress({
   jobs,
@@ -44,7 +33,9 @@ export function WorkspaceProgress({
   if (live) {
     return (
       <div className="space-y-1" data-testid={`workspace-progress-${type}`}>
-        <Spinner label={live.progressText} />
+        <div className="text-sm text-slate-700" role="status">
+          <AppPendingIndicator label={live.progressText} />
+        </div>
         {live.waitKind === "longer" ? (
           <p className="text-sm text-slate-600">{workspaceJobCopy.keepWorking}</p>
         ) : null}

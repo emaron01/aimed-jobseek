@@ -5,7 +5,15 @@ import { consultationConfig } from "@/lib/product-config";
 
 export function buildApplicationSummaryGuidanceMessages(input: {
   sources: Array<{ id: string; text: string; category: string }>;
-  directRoles: Array<{ id: string; name: string }>;
+  people: Array<{
+    sectionKey: string;
+    roleId: string;
+    contactId: string | null;
+    heading: string;
+    roleName: string;
+    titles: string[];
+    sectionKind: string;
+  }>;
   qualityFeedback?: string[];
 }): AiMessage[] {
   return [
@@ -20,7 +28,7 @@ ${APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS}`,
       content: JSON.stringify({
         consultantName: consultationConfig.displayName,
         allowedSources: input.sources,
-        directHiringTeamRoles: input.directRoles,
+        people: input.people,
         qualityFeedback: input.qualityFeedback ?? [],
       }),
     },

@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -767,7 +767,7 @@ export function EmailSequenceWorkspace({
               const isCurrent = draft.id === latest?.id;
               const activity = sequenceActivity(draft);
               return (
-                <button
+                <AppButton
                   key={draft.id}
                   type="button"
                   onClick={() => {
@@ -812,11 +812,11 @@ export function EmailSequenceWorkspace({
                       : "Open"}
                     {isCurrent ? " · current" : ""}
                   </span>
-                </button>
+                </AppButton>
               );
             })}
           </div>
-          <button
+          <AppButton
             type="button"
             disabled={!canAdd || aiBusy}
             title={canAdd ? "Generate the next email." : addDisabledReason}
@@ -832,7 +832,7 @@ export function EmailSequenceWorkspace({
             className={cn(SECONDARY_BUTTON_CLASS, "mt-3", "disabled:border-slate-200", "disabled:bg-slate-50", "disabled:text-slate-400", "!px-3")}
           >
             + Add email to {vocab.sequence.singular}
-          </button>
+          </AppButton>
           {!canAdd ? (
             <p className="mt-1 text-xs text-slate-500">{addDisabledReason}</p>
           ) : null}
@@ -1000,7 +1000,7 @@ export function EmailSequenceWorkspace({
         </div>
 
         {!selected ? (
-          <button
+          <AppButton
             type="button"
             disabled={aiBusy || !selectedPersonaId}
             onClick={() =>
@@ -1020,17 +1020,17 @@ export function EmailSequenceWorkspace({
               : needsPersonaConfirmation
                 ? `Confirm ${vocab.persona.singular} & generate Email 1`
                 : "Generate Email 1"}
-          </button>
+          </AppButton>
         ) : (
           <>
             {selected.id !== latest?.id ? (
-              <button
+              <AppButton
                 type="button"
                 onClick={() => setSelectedId(latest?.id ?? null)}
                 className="text-sm font-medium text-slate-700 underline"
               >
                 Return to current draft
-              </button>
+              </AppButton>
             ) : null}
 
             <article
@@ -1152,7 +1152,7 @@ export function EmailSequenceWorkspace({
                     </label>
                     <EmailGuidancePromptExamples />
                   </div>
-                  <button
+                  <AppButton
                     type="button"
                     disabled={aiBusy || !selectedPersonaId}
                     onClick={() =>
@@ -1168,7 +1168,7 @@ export function EmailSequenceWorkspace({
                     className={cn(SECONDARY_BUTTON_CLASS, "!px-3")}
                   >
                     {aiBusy ? "Regenerating…" : "Regenerate"}
-                  </button>
+                  </AppButton>
                 </div>
                 {persistFailure ? (
                   <div
@@ -1181,32 +1181,32 @@ export function EmailSequenceWorkspace({
                         : "Draft could not be saved"}
                     </p>
                     <p>{persistFailure.message}</p>
-                    <button
+                    <AppButton
                       type="button"
                       disabled={saving}
                       onClick={retryFailedPersist}
                       className="rounded-md border border-amber-400 bg-white px-3 py-1.5 text-sm font-medium text-amber-950"
                     >
                       {saving ? "Saving…" : "Retry save"}
-                    </button>
+                    </AppButton>
                   </div>
                 ) : null}
                 <div className="flex flex-wrap items-center gap-2">
-                  <button
+                  <AppButton
                     type="button"
                     disabled={saving || sendBusy !== null}
                     onClick={saveDraft}
                     className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium"
                   >
                     {saving ? "Saving…" : "Save draft"}
-                  </button>
+                  </AppButton>
                   {saving ? (
                     <span className="text-xs text-slate-500">Saving…</span>
                   ) : dirty ? (
                     <span className="text-xs text-slate-500">Unsaved edits</span>
                   ) : null}
                   {EMAIL_CLIENT_OPTIONS.map((option) => (
-                    <button
+                    <AppButton
                       key={option.client}
                       type="button"
                       disabled={handoffLocked || !contactEmail}
@@ -1219,10 +1219,10 @@ export function EmailSequenceWorkspace({
                       className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:text-slate-400"
                     >
                       Open in {option.label}
-                    </button>
+                    </AppButton>
                   ))}
                   {features.emailConnection ? (
-                  <button
+                  <AppButton
                     type="button"
                     disabled={
                       handoffLocked ||
@@ -1239,9 +1239,9 @@ export function EmailSequenceWorkspace({
                     {sendBusy === "connected"
                       ? "Sending…"
                       : "Send with Microsoft 365"}
-                  </button>
+                  </AppButton>
                   ) : null}
-                  <button
+                  <AppButton
                     type="button"
                     disabled={handoffLocked}
                     onClick={markSent}
@@ -1250,7 +1250,7 @@ export function EmailSequenceWorkspace({
                     {sendBusy === "mark"
                       ? "Marking…"
                       : "I sent this — mark as sent"}
-                  </button>
+                  </AppButton>
                 </div>
                 {features.emailConnection && mailboxConnection?.status !== "CONNECTED" ? (
                   <a
@@ -1289,7 +1289,7 @@ export function EmailSequenceWorkspace({
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {EMAIL_CLIENT_OPTIONS.map((option) => (
-                    <button
+                    <AppButton
                       key={option.client}
                       type="button"
                       disabled={!contactEmail}
@@ -1302,9 +1302,9 @@ export function EmailSequenceWorkspace({
                       className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:text-slate-400"
                     >
                       Open in {option.label}
-                    </button>
+                    </AppButton>
                   ))}
-                  <button
+                  <AppButton
                     type="button"
                     disabled={!canDraftReply || aiBusy}
                     title={
@@ -1316,8 +1316,8 @@ export function EmailSequenceWorkspace({
                     className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:text-slate-400"
                   >
                     Draft reply
-                  </button>
-                  <button
+                  </AppButton>
+                  <AppButton
                     type="button"
                     disabled={!canAdd || aiBusy}
                     title={
@@ -1341,9 +1341,9 @@ export function EmailSequenceWorkspace({
                     )}
                   >
                     + Add email to {vocab.sequence.singular}
-                  </button>
+                  </AppButton>
                   {!sequenceStopped ? (
-                    <button
+                    <AppButton
                       type="button"
                       disabled={aiBusy}
                       onClick={() =>
@@ -1356,10 +1356,10 @@ export function EmailSequenceWorkspace({
                       className="rounded-md border border-rose-200 px-3 py-2 text-sm font-medium text-rose-800"
                     >
                       Stop {vocab.sequence.singular}
-                    </button>
+                    </AppButton>
                   ) : sequenceStoppedReason === "MANUAL_STOP" ||
                     sequenceStoppedReason === "MAX_SEQUENCE" ? (
-                    <button
+                    <AppButton
                       type="button"
                       disabled={aiBusy}
                       onClick={() =>
@@ -1373,7 +1373,7 @@ export function EmailSequenceWorkspace({
                       className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium"
                     >
                       Restore {vocab.sequence.singular}
-                    </button>
+                    </AppButton>
                   ) : null}
                 </div>
               </div>
@@ -1397,7 +1397,7 @@ export function EmailSequenceWorkspace({
                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                   />
                 </label>
-                <button
+                <AppButton
                   type="button"
                   disabled={aiBusy || !replyText.trim()}
                   onClick={() =>
@@ -1406,7 +1406,7 @@ export function EmailSequenceWorkspace({
                   className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
                 >
                   {aiBusy ? "Classifying…" : "They replied"}
-                </button>
+                </AppButton>
               </div>
             ) : null}
 
@@ -1441,30 +1441,30 @@ export function EmailSequenceWorkspace({
               email the same person twice.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <button
+              <AppButton
                 type="button"
                 disabled={sendBusy !== null}
                 onClick={() => answerSendConfirm("yes")}
                 className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
               >
                 Yes
-              </button>
-              <button
+              </AppButton>
+              <AppButton
                 type="button"
                 disabled={sendBusy !== null}
                 onClick={() => answerSendConfirm("no")}
                 className={cn(SECONDARY_BUTTON_CLASS, "!px-3")}
               >
                 No
-              </button>
-              <button
+              </AppButton>
+              <AppButton
                 type="button"
                 disabled={sendBusy !== null}
                 onClick={() => answerSendConfirm("not_yet")}
                 className={cn(SECONDARY_BUTTON_CLASS, "!px-3")}
               >
                 Not yet
-              </button>
+              </AppButton>
             </div>
           </div>
         </div>

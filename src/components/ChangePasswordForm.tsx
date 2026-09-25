@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import { useActionState, useEffect, useRef } from "react";
@@ -62,13 +62,13 @@ export function ChangePasswordForm() {
           className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
         />
       </label>
-      <button
+      <AppButton
         type="submit"
         disabled={pending}
         className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
       >
         {pending ? "Updating…" : "Update password"}
-      </button>
+      </AppButton>
     </form>
   );
 }

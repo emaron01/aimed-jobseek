@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 type SeatPreview = {
@@ -92,7 +92,7 @@ export function SeatManagementPanel({
     <div className="space-y-3" data-testid="billing-seat-management">
       <p className="text-sm text-slate-700">{seatLabel}</p>
       <div className="flex flex-wrap gap-2">
-        <button
+        <AppButton
           type="button"
           disabled={!canAdd || pending}
           title={!canAdd ? (addDisabledReason ?? undefined) : undefined}
@@ -102,8 +102,8 @@ export function SeatManagementPanel({
           {pending && preview?.direction !== "remove"
             ? "Loading…"
             : "Add a seat"}
-        </button>
-        <button
+        </AppButton>
+        <AppButton
           type="button"
           disabled={!canRemove || pending}
           title={!canRemove ? (removeDisabledReason ?? undefined) : undefined}
@@ -111,7 +111,7 @@ export function SeatManagementPanel({
           className={cn(SECONDARY_BUTTON_CLASS, "!px-3")}
         >
           Remove a seat
-        </button>
+        </AppButton>
       </div>
       {!canAdd && addDisabledReason ? (
         <p className="text-xs text-slate-500">{addDisabledReason}</p>
@@ -132,22 +132,22 @@ export function SeatManagementPanel({
             ))}
           </ul>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button
+            <AppButton
               type="button"
               disabled={pending}
               onClick={() => void confirmChange()}
               className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
             >
               {pending ? "Updating…" : "Confirm seat change"}
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               type="button"
               disabled={pending}
               onClick={() => setPreview(null)}
               className={cn(SECONDARY_BUTTON_CLASS, "!px-3")}
             >
               Cancel
-            </button>
+            </AppButton>
           </div>
         </div>
       ) : null}

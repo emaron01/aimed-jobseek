@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import Link from "next/link";
@@ -242,7 +242,7 @@ export function QualificationBuckets({
                   {EXCLUSION_REVIEW_COPY.groupReason(group.criterionName)}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <button
+                  <AppButton
                     type="button"
                     disabled={pending || !canActOnRows(group.rows)}
                     onClick={() =>
@@ -253,15 +253,15 @@ export function QualificationBuckets({
                     className={cn(SECONDARY_BUTTON_CLASS, "py-1", "!px-2", "!py-1", "!text-xs")}
                   >
                     {EXCLUSION_REVIEW_COPY.keepExcluded}
-                  </button>
-                  <button
+                  </AppButton>
+                  <AppButton
                     type="button"
                     disabled={pending || !canActOnRows(group.rows)}
                     onClick={() => restoreMany(group.rows, "GOOD")}
                     className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-900"
                   >
                     {EXCLUSION_REVIEW_COPY.addAllBack}
-                  </button>
+                  </AppButton>
                 </div>
               </div>
               <ul className="divide-y divide-slate-200 rounded-md border border-slate-200 bg-white">
@@ -279,7 +279,7 @@ export function QualificationBuckets({
                     </div>
                     {row.canOverride ? (
                       <div className="flex flex-wrap gap-1">
-                        <button
+                        <AppButton
                           type="button"
                           disabled={pending || !canActOnRow(row)}
                           onClick={() =>
@@ -288,15 +288,15 @@ export function QualificationBuckets({
                           className={cn(SECONDARY_BUTTON_CLASS, "py-1", "!px-2", "!py-1", "!text-xs")}
                         >
                           {EXCLUSION_REVIEW_COPY.keepExcluded}
-                        </button>
-                        <button
+                        </AppButton>
+                        <AppButton
                           type="button"
                           disabled={pending || !canActOnRow(row)}
                           onClick={() => restore(row, "GOOD")}
                           className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-900"
                         >
                           {EXCLUSION_REVIEW_COPY.addBack}
-                        </button>
+                        </AppButton>
                       </div>
                     ) : null}
                   </li>
@@ -341,7 +341,7 @@ export function QualificationBuckets({
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {row.bucket === "EXCLUDED" && row.canOverride ? (
-                    <button
+                    <AppButton
                       type="button"
                       disabled={pending || !canActOnRow(row)}
                       onClick={() => restore(row, "GOOD")}
@@ -349,13 +349,13 @@ export function QualificationBuckets({
                       data-testid={`restore-${row.targetType}-${row.id}`}
                     >
                       {EXCLUSION_REVIEW_COPY.addBack}
-                    </button>
+                    </AppButton>
                   ) : null}
                   {row.bucket !== "EXCLUDED" && row.canOverride
                     ? QUALIFICATION_BUCKETS.filter(
                         (bucket) => bucket !== row.bucket,
                       ).map((bucket) => (
-                        <button
+                        <AppButton
                           key={bucket}
                           type="button"
                           disabled={pending || !canActOnRow(row)}
@@ -363,7 +363,7 @@ export function QualificationBuckets({
                           className={cn(SECONDARY_BUTTON_CLASS, "py-1", "!px-2", "!py-1", "!text-xs")}
                         >
                           Move to {QUALIFICATION_BUCKET_LABELS[bucket]}
-                        </button>
+                        </AppButton>
                       ))
                     : null}
                 </div>

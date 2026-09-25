@@ -23,7 +23,7 @@ import { projectPersonaSignalsFromProfileAction, rebuildPersonaFromProductEviden
 import { ConfirmDeleteForm } from "@/components/ConfirmDeleteForm";
 import { ExportPdfButton } from "@/components/ExportPdfButton";
 import { PersonaBriefingDocument } from "@/components/PersonaBriefingDocument";
-import { Field, SECONDARY_BUTTON_CLASS, SecondaryButton, SubmitButton } from "@/components/ui";
+import { Field, SECONDARY_BUTTON_CLASS, SecondaryButton, SubmitButton, AppButton } from "@/components/ui";
 import { formatCriterionDisplay } from "@/lib/criteria/types";
 import type { PersonaActionResult } from "@/lib/persona/save";
 import {
@@ -270,7 +270,7 @@ function NeedsReviewCriterionRow({
             <input type="hidden" name="productId" value={productId} />
             <input type="hidden" name="name" value={criterion.name} />
             {NEEDS_REVIEW_CLASSIFY_TARGETS.map((target) => (
-              <button
+              <AppButton
                 key={target.role}
                 type="submit"
                 name="role"
@@ -278,19 +278,19 @@ function NeedsReviewCriterionRow({
                 className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-950 hover:bg-amber-100"
               >
                 {target.label}
-              </button>
+              </AppButton>
             ))}
           </CriterionActionForm>
           <CriterionActionForm action={deletePersonaCriterionAction}>
             <input type="hidden" name="criterionId" value={criterion.id} />
             <input type="hidden" name="personaId" value={personaId} />
             <input type="hidden" name="productId" value={productId} />
-            <button
+            <AppButton
               type="submit"
               className={cn(SECONDARY_BUTTON_CLASS, "py-1", "!px-2", "!py-1", "!text-[11px]")}
             >
               Dismiss
-            </button>
+            </AppButton>
           </CriterionActionForm>
         </div>
       ) : null}
@@ -454,7 +454,7 @@ function NewPersonaForm({
           <SubmitButton disabled={pending}>
             {savePending ? "Saving…" : `Add ${vocab.persona.singular}`}
           </SubmitButton>
-          <button
+          <AppButton
             type="submit"
             formAction={interpretAction}
             disabled={pending}
@@ -463,7 +463,7 @@ function NewPersonaForm({
             {interpretPending
               ? "Regenerating criteria…"
               : "Regenerate criteria"}
-          </button>
+          </AppButton>
         </div>
       </form>
       <StatusBanner result={status} />
@@ -705,7 +705,7 @@ export function PersonaForm({
               <SubmitButton disabled={pending}>
                 {savePending ? "Saving…" : `Save ${vocab.persona.singular}`}
               </SubmitButton>
-              <button
+              <AppButton
                 type="submit"
                 formAction={interpretAction}
                 disabled={pending}
@@ -714,7 +714,7 @@ export function PersonaForm({
                 {interpretPending
                   ? "Regenerating criteria…"
                   : "Regenerate criteria"}
-              </button>
+              </AppButton>
             </div>
           </form>
           <StatusBanner result={status} />
@@ -732,7 +732,7 @@ export function PersonaForm({
             <form action={interpretAction} className="inline">
               <input type="hidden" name="productId" value={productId} />
               <PersonaHiddenFields persona={persona} />
-              <button
+              <AppButton
                 type="submit"
                 disabled={interpretPending}
                 className={SECONDARY_BUTTON_CLASS}
@@ -740,13 +740,13 @@ export function PersonaForm({
                 {interpretPending
                   ? "Regenerating criteria…"
                   : "Regenerate criteria"}
-              </button>
+              </AppButton>
             </form>
             {persona.approvalStatus === "APPROVED" ? (
               <form action={rebuildAction} className="inline">
                 <input type="hidden" name="productId" value={productId} />
                 <input type="hidden" name="personaId" value={persona.id} />
-                <button
+                <AppButton
                   type="submit"
                   disabled={rebuildPending}
                   className={SECONDARY_BUTTON_CLASS}
@@ -754,7 +754,7 @@ export function PersonaForm({
                   {rebuildPending
                     ? "Rebuilding…"
                     : `Rebuild from ${vocab.product.singular} evidence`}
-                </button>
+                </AppButton>
               </form>
             ) : null}
           </div>

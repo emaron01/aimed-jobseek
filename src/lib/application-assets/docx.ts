@@ -63,28 +63,35 @@ function resumeChildren(content: ResumeAssetContent): Paragraph[] {
     }),
   ];
   if (content.header.contactDetails.length > 0) {
-    children.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: content.header.contactDetails.flatMap((claim, index) => [
-          ...(index > 0
-            ? [
-                new TextRun({
-                  text: " | ",
-                  font: style.font,
-                  size: style.bodySizeHalfPoints,
-                }),
-              ]
-            : []),
-          new TextRun({
-            text: claim.text,
-            font: style.font,
-            size: style.bodySizeHalfPoints,
-          }),
-        ]),
-        spacing: { after: style.paragraphAfterTwips },
-      }),
-    );
+    const details = content.header.contactDetails;
+    const lines =
+      details.length <= 2
+        ? [details]
+        : [details.slice(0, 2), details.slice(2)];
+    for (const line of lines) {
+      children.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: line.flatMap((claim, index) => [
+            ...(index > 0
+              ? [
+                  new TextRun({
+                    text: " | ",
+                    font: style.font,
+                    size: style.bodySizeHalfPoints,
+                  }),
+                ]
+              : []),
+            new TextRun({
+              text: claim.text,
+              font: style.font,
+              size: style.bodySizeHalfPoints,
+            }),
+          ]),
+          spacing: { after: style.paragraphAfterTwips },
+        }),
+      );
+    }
   }
   children.push(
     heading(applicationAssetConfig.resumeHeadings.summary),

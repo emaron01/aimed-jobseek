@@ -17,6 +17,11 @@ import {
 } from "@/lib/generation/quality";
 import { profileEvidenceItems } from "@/lib/consultation/assess";
 import { prisma } from "@/lib/prisma-client";
+import {
+  buildCheatSheetPeople,
+  cheatSheetSectionKind,
+} from "@/lib/application-summary/people";
+import { listPersonPreps } from "@/lib/interview/person-prep";
 import { consultationConfig, vocab } from "@/lib/product-config";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { parseStringArray } from "@/lib/research";
@@ -104,6 +109,14 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
         },
       },
       applicationSummary: true,
+      contacts: {
+        include: {
+          contact: {
+            select: { id: true, firstName: true, lastName: true, title: true },
+          },
+        },
+        orderBy: { createdAt: "asc" },
+      },
       interviewStages: {
         include: { guide: { select: { id: true, status: true, updatedAt: true } } },
         orderBy: { sortOrder: "asc" },
@@ -133,10 +146,33 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
     id: role.id,
     name: role.name,
     likelyTitles: parseStringArray(role.targetTitles),
+    suggestionKey: role.suggestionKey,
     reason: role.whyThisPersonaMatters,
     updatedAt: role.updatedAt,
     ...personaNarrative(role.profileJson),
   }));
+  const people = buildCheatSheetPeople({
+    roles: roles.map((role) => ({
+      id: role.id,
+      name: role.name,
+      titles: role.likelyTitles,
+      involvement: role.involvement,
+      suggestionKey: role.suggestionKey,
+    })),
+    contacts: campaign.contacts
+      .filter((row) => row.chosenPersonaId)
+      .map((row) => ({
+        contactId: row.contactId,
+        personaId: row.chosenPersonaId,
+        firstName: row.contact.firstName,
+        lastName: row.contact.lastName,
+        title: row.contact.title,
+      })),
+  }).map((person) => ({
+    ...person,
+    sectionKind: cheatSheetSectionKind(person),
+  }));
+  const personPreps = await listPersonPreps({ organizationId, campaignId });
   const sourceFingerprint = {
     requirement: [
       campaign.jobRequirement.id,
@@ -169,6 +205,13 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
       stage.outcome,
       stage.guide?.updatedAt.toISOString() ?? null,
     ]),
+    personPreps: personPreps.map((prep) => [
+      prep.contactId,
+      prep.status,
+      prep.openingText,
+      prep.confirmedAnswers.map((item) => item.text),
+    ]),
+    whyThisCompany: campaign.whyThisCompany,
   };
   const sourceHash = createHash("sha256")
     .update(JSON.stringify(sourceFingerprint))
@@ -248,11 +291,34 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
       "APPROVED_STORY",
     );
   }
+  appendSource(
+    sources,
+    "seeker:why-this-company",
+    campaign.whyThisCompany,
+    "SEEKER",
+  );
+  for (const prep of personPreps) {
+    appendSource(
+      sources,
+      `person-prep:${prep.contactId}:opening`,
+      prep.openingText,
+      "PERSON_PREP",
+    );
+    prep.confirmedAnswers.forEach((answer, index) =>
+      appendSource(
+        sources,
+        `person-prep:${prep.contactId}:answer:${index}`,
+        answer.text,
+        "PERSON_PREP",
+      ),
+    );
+  }
   return {
     campaign,
     requirement,
     research,
     roles,
+    people,
     stories,
     stages: campaign.interviewStages,
     sources,
@@ -260,40 +326,121 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
   };
 }
 
-function guidanceTexts(guidance: ApplicationSummaryGuidance): string[] {
+function guidanceItemTexts(guidance: ApplicationSummaryGuidance): string[] {
+  const personItems = guidance.people.flatMap((person) => [
+    ...person.caresAbout,
+    ...person.bestMaterial,
+    ...person.likelyQuestions,
+    ...person.questionsToAsk,
+    person.recruiter?.sixtySecondSummary,
+    person.recruiter?.whyThisCompany,
+    person.recruiter?.whyThisRole,
+    person.recruiter?.logistics,
+    person.recruiter?.compensationReadiness,
+    ...(person.recruiter?.flagAnswers ?? []),
+    person.hiringManager?.firstNinetyDays,
+    ...(person.hiringManager?.drillDowns ?? []),
+    ...(person.hiringManager?.gaps ?? []),
+    person.executive?.strategy,
+    person.executive?.judgment,
+    person.executive?.businessImpact,
+    person.crossFunctional?.howWorkedAcross,
+    person.crossFunctional?.dayToDay,
+  ]);
   return [
-    ...guidance.coachingSummary.map((item) => item.text),
-    ...guidance.questionsToPrepare.map((item) => item.text),
-    ...guidance.questionsForDirectRoles.flatMap((role) =>
-      role.questions.map((item) => item.text),
-    ),
+    guidance.overview.thirtySecondFit.text,
+    guidance.overview.careerRecap.text,
+    ...guidance.overview.gapsToPrepare.map((item) => item.text),
+    ...personItems.filter(Boolean).map((item) => item!.text),
+    ...guidance.stories.flatMap((story) => [
+      story.situation,
+      ...story.variations.map((item) => item.text),
+    ]),
   ];
+}
+
+function guidanceSupportItems(guidance: ApplicationSummaryGuidance) {
+  return [
+    guidance.overview.thirtySecondFit,
+    guidance.overview.careerRecap,
+    ...guidance.overview.gapsToPrepare,
+    ...guidance.people.flatMap((person) => [
+      ...person.caresAbout,
+      ...person.bestMaterial,
+      ...person.likelyQuestions,
+      ...person.questionsToAsk,
+      ...(person.recruiter
+        ? [
+            person.recruiter.sixtySecondSummary,
+            person.recruiter.whyThisCompany,
+            person.recruiter.whyThisRole,
+            person.recruiter.logistics,
+            person.recruiter.compensationReadiness,
+            ...person.recruiter.flagAnswers,
+          ]
+        : []),
+      ...(person.hiringManager
+        ? [
+            person.hiringManager.firstNinetyDays,
+            ...person.hiringManager.drillDowns,
+            ...person.hiringManager.gaps,
+          ]
+        : []),
+      ...(person.executive
+        ? [
+            person.executive.strategy,
+            person.executive.judgment,
+            person.executive.businessImpact,
+          ]
+        : []),
+      ...(person.crossFunctional
+        ? [person.crossFunctional.howWorkedAcross, person.crossFunctional.dayToDay]
+        : []),
+    ]),
+    ...guidance.stories.flatMap((story) => story.variations),
+  ];
+}
+
+export function storyTextsRepeatVerbatim(guidance: ApplicationSummaryGuidance): boolean {
+  const bodies = guidance.stories.flatMap((story) => [
+    story.situation.trim(),
+    ...story.variations.map((item) => item.text.trim()),
+  ]);
+  const seen = new Set<string>();
+  for (const body of bodies) {
+    if (!body) continue;
+    if (seen.has(body)) return true;
+    seen.add(body);
+  }
+  return false;
 }
 
 export function validateApplicationSummaryGuidance(input: {
   guidance: ApplicationSummaryGuidance;
   sources: SummarySource[];
-  directRoles: Array<{ id: string; name: string }>;
+  people: Array<{ sectionKey: string; heading: string; sectionKind: string }>;
 }): string[] {
   const errors: string[] = [];
-  const roles = new Map(input.directRoles.map((role) => [role.id, role]));
-  if (guidanceTexts(input.guidance).some(mentionsInternalSystemState)) {
+  if (guidanceItemTexts(input.guidance).some(mentionsInternalSystemState)) {
     errors.push("Remove references to internal system state.");
   }
-  const items = [
-    ...input.guidance.coachingSummary,
-    ...input.guidance.questionsToPrepare,
-    ...input.guidance.questionsForDirectRoles.flatMap((role) => role.questions),
-  ];
-  for (const item of [
-    ...input.guidance.questionsToPrepare,
-    ...input.guidance.questionsForDirectRoles.flatMap((role) => role.questions),
-  ]) {
-    if (!item.text.trim().endsWith("?")) {
-      errors.push("Every guidance question must be written as a question.");
+  if (storyTextsRepeatVerbatim(input.guidance)) {
+    errors.push("Each story may appear once. Do not repeat the same story text verbatim.");
+  }
+  const storyIds = new Set(input.guidance.stories.map((story) => story.storyId));
+  for (const person of input.guidance.people) {
+    for (const storyId of person.storyIds) {
+      if (!storyIds.has(storyId)) {
+        errors.push("A person section referenced a story that is not in the story bank.");
+      }
+    }
+    for (const item of [...person.likelyQuestions, ...person.questionsToAsk]) {
+      if (!item.text.trim().endsWith("?")) {
+        errors.push("Every guidance question must be written as a question.");
+      }
     }
   }
-  for (const item of items) {
+  for (const item of guidanceSupportItems(input.guidance)) {
     errors.push(
       ...qualityMessages(
         validateGroundedStatement({
@@ -308,20 +455,22 @@ export function validateApplicationSummaryGuidance(input: {
       ),
     );
   }
+  const expected = new Map(input.people.map((person) => [person.sectionKey, person]));
   const seen = new Set<string>();
-  for (const roleGuidance of input.guidance.questionsForDirectRoles) {
-    const role = roles.get(roleGuidance.roleId);
+  for (const person of input.guidance.people) {
+    const expectedPerson = expected.get(person.sectionKey);
     if (
-      !role ||
-      role.name !== roleGuidance.roleName ||
-      seen.has(roleGuidance.roleId)
+      !expectedPerson ||
+      expectedPerson.heading !== person.heading ||
+      expectedPerson.sectionKind !== person.sectionKind ||
+      seen.has(person.sectionKey)
     ) {
-      errors.push("Guidance referenced an invalid or duplicate Direct role.");
+      errors.push("Guidance referenced an invalid or duplicate person section.");
     }
-    seen.add(roleGuidance.roleId);
+    seen.add(person.sectionKey);
   }
-  if (seen.size !== input.directRoles.length) {
-    errors.push("Guidance did not include every Direct Hiring Team role.");
+  if (seen.size !== input.people.length) {
+    errors.push("Guidance did not include every Hiring Team person section.");
   }
   return [...new Set(errors)];
 }
@@ -352,9 +501,15 @@ export async function generateApplicationSummary(input: {
       promptVersion: APPLICATION_SUMMARY_PROMPT_VERSION,
     },
   });
-  const directRoles = data.roles
-    .filter((role) => role.involvement === "DIRECT")
-    .map((role) => ({ id: role.id, name: role.name }));
+  const people = data.people.map((person) => ({
+    sectionKey: person.sectionKey,
+    roleId: person.roleId,
+    contactId: person.contactId,
+    heading: person.heading,
+    roleName: person.roleName,
+    titles: person.titles,
+    sectionKind: person.sectionKind,
+  }));
   let feedback: string[] = [];
   for (
     let attempt = 0;
@@ -363,7 +518,7 @@ export async function generateApplicationSummary(input: {
   ) {
     const generated = await generateApplicationSummaryGuidance({
       sources: data.sources,
-      directRoles,
+      people,
       qualityFeedback: feedback,
     });
     if (!generated.ok) {
@@ -376,7 +531,7 @@ export async function generateApplicationSummary(input: {
     const errors = validateApplicationSummaryGuidance({
       guidance: generated.data,
       sources: data.sources,
-      directRoles,
+      people,
     });
     if (errors.length > 0) {
       logQualityRejection({
@@ -413,7 +568,7 @@ export async function generateApplicationSummary(input: {
     data: {
       status: "FAILED",
       generationError:
-        "Application Summary guidance did not pass checks. The passing parts were not enough to save. Retry.",
+        "Interview Cheat Sheet guidance did not pass checks. The passing parts were not enough to save. Retry.",
     },
   });
 }
@@ -438,6 +593,7 @@ export async function getApplicationSummaryView(input: {
     requirement: data.requirement,
     research: data.research,
     roles: data.roles,
+    people: data.people,
     assessments: data.campaign.consultationSession?.assessments ?? [],
     stories: data.stories,
     stages: data.stages,

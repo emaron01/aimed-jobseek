@@ -1,5 +1,8 @@
 import type { EvidenceTarget } from "@/lib/consultation/assess";
-import type { ConsultationExtractResult } from "@/lib/consultation/contract";
+import {
+  WHY_THIS_COMPANY_TARGET_KEY,
+  type ConsultationExtractResult,
+} from "@/lib/consultation/contract";
 import { validModelQuestion } from "@/lib/consultation/questions";
 import {
   parseCandidateProfile,
@@ -56,6 +59,14 @@ export function proposalsFromExtraction(input: {
     const target = targetByKey.get(link.targetKey);
     if (!target) {
       dropped.push(`target:${link.targetKey}`);
+      return [];
+    }
+    if (target.key === WHY_THIS_COMPANY_TARGET_KEY) {
+      dropped.push(`target:${link.targetKey}:motivation`);
+      return [];
+    }
+    if (!link.explanation.trim()) {
+      dropped.push(`target:${link.targetKey}:no-explanation`);
       return [];
     }
     return [{

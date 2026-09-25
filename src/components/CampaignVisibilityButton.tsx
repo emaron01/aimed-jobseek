@@ -6,7 +6,7 @@ import {
   setCampaignVisibilityAction,
   type CampaignSharingActionResult,
 } from "@/app/actions/campaign-sharing";
-import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { vocab } from "@/lib/product-config";
 
 const initial: CampaignSharingActionResult | null = null;
@@ -42,7 +42,7 @@ export function CampaignVisibilityButton({
         name="visibility"
         value={sharing ? "SHARED" : "PERSONAL"}
       />
-      <button
+      <AppButton
         type="submit"
         disabled={pending}
         className={SECONDARY_BUTTON_CLASS}
@@ -58,7 +58,7 @@ export function CampaignVisibilityButton({
           : sharing
             ? "Share with team"
             : "Make personal"}
-      </button>
+      </AppButton>
       {state && !state.ok ? (
         <span role="alert" className="ml-2 self-center text-sm text-red-600">
           {state.message}

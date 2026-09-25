@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { BILLING_PLAN_STANDARD } from "@/lib/billing/plans";
 import { vocab } from "@/lib/product-config";
 import { cn } from "@/lib/utils";
@@ -41,7 +41,7 @@ export function StartStandardCheckoutButton({
 
   return (
     <div className="space-y-2" data-testid="billing-stripe-hook">
-      <button
+      <AppButton
         type="button"
         disabled={pending}
         className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
@@ -78,7 +78,7 @@ export function StartStandardCheckoutButton({
         }}
       >
         {pending ? "Redirecting…" : buttonLabel}
-      </button>
+      </AppButton>
       <p className="text-xs text-slate-500">
         {trialPeriodDays == null
           ? "Card required. Billing starts when Checkout completes (no free trial). You can enter a promotion code on the Stripe Checkout page. Card details stay in Stripe."

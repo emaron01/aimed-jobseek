@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -53,7 +53,7 @@ export function ProductContinuePicker({
           ))}
         </select>
       </label>
-      <button
+      <AppButton
         type="button"
         disabled={!productId}
         onClick={() => {
@@ -63,7 +63,7 @@ export function ProductContinuePicker({
         className={PRIMARY_BUTTON_CLASS}
       >
         {continueLabel}
-      </button>
+      </AppButton>
     </div>
   );
 }

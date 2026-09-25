@@ -127,6 +127,64 @@ function jaccard(left: Set<string>, right: Set<string>): number {
   return shared / new Set([...left, ...right]).size;
 }
 
+type RoleFamily = {
+  key: string;
+  match: RegExp;
+  titleKeep: RegExp;
+};
+
+const ROLE_FAMILIES: RoleFamily[] = [
+  {
+    key: "customer_success",
+    match: /\b(customer success|client success|cs leader|\bcsm\b)\b/i,
+    titleKeep:
+      /\b(customer success|client success|\bcsm\b|cs director|vp customer|head of customer)\b/i,
+  },
+  {
+    key: "executive_sponsor",
+    match: /\bexecutive(?: sales)? sponsor\b/i,
+    titleKeep:
+      /\b(chief|cro|ceo|president|svp|evp|gm|general manager|sponsor)\b/i,
+  },
+  {
+    key: "talent_acquisition",
+    match: /\b(talent acquisition|recruiter|sourcer|ta partner|staffing)\b/i,
+    titleKeep: /\b(recruiter|talent|sourcer|staffing|people partner)\b/i,
+  },
+  {
+    key: "revenue_operations",
+    match:
+      /\b(revenue operations|revops|sales operations|sales ops|revenue ops)\b/i,
+    titleKeep:
+      /\b(revenue operations|revops|sales operations|sales ops|revenue ops)\b/i,
+  },
+];
+
+export function roleFunctionFamily(
+  role: Pick<IdentifiedHiringRole, "name" | "likelyTitles">,
+): RoleFamily | null {
+  const haystack = [role.name, ...role.likelyTitles].join(" ");
+  return ROLE_FAMILIES.find((family) => family.match.test(role.name) || family.match.test(haystack)) ?? null;
+}
+
+export function titlesCoherentToRole(
+  roleName: string,
+  titles: string[],
+): string[] {
+  const family = roleFunctionFamily({ name: roleName, likelyTitles: titles });
+  if (!family) return titles.map((title) => title.trim()).filter(Boolean);
+  const others = ROLE_FAMILIES.filter((item) => item.key !== family.key);
+  return titles
+    .map((title) => title.trim())
+    .filter(Boolean)
+    .filter((title) => {
+      const belongsElsewhere = others.some(
+        (item) => item.match.test(title) && !family.titleKeep.test(title),
+      );
+      return !belongsElsewhere;
+    });
+}
+
 export function rolesDescribeSamePerson(
   left: Pick<IdentifiedHiringRole, "name" | "likelyTitles" | "whyInvolved" | "roleKey">,
   right: Pick<IdentifiedHiringRole, "name" | "likelyTitles" | "whyInvolved" | "roleKey">,
@@ -135,6 +193,21 @@ export function rolesDescribeSamePerson(
     return left.roleKey === right.roleKey;
   }
   if (left.name.trim().toLowerCase() === right.name.trim().toLowerCase()) return true;
+  const leftFamily = roleFunctionFamily(left);
+  const rightFamily = roleFunctionFamily(right);
+  if (leftFamily && rightFamily && leftFamily.key === rightFamily.key) return true;
+  const leftName = left.name.trim().toLowerCase();
+  const rightName = right.name.trim().toLowerCase();
+  const [shorterName, longerName] =
+    leftName.length <= rightName.length
+      ? [leftName, rightName]
+      : [rightName, leftName];
+  if (
+    shorterName.split(/\s+/).filter(Boolean).length >= 2 &&
+    longerName.includes(shorterName)
+  ) {
+    return true;
+  }
   const leftTitles = new Set(left.likelyTitles.map((title) => title.trim().toLowerCase()));
   const rightTitles = new Set(right.likelyTitles.map((title) => title.trim().toLowerCase()));
   for (const title of leftTitles) {
@@ -175,7 +248,10 @@ function toIdentifiedRole(
           likelyTitles: role.likelyTitles,
           reportingLine,
         })
-      : role.likelyTitles.map((title) => title.trim()).filter(Boolean);
+      : titlesCoherentToRole(
+          name,
+          role.likelyTitles.map((title) => title.trim()).filter(Boolean),
+        );
   return {
     roleKey,
     name,
@@ -200,9 +276,12 @@ function mergePair(
       titles.push(title);
     }
   }
+  const name =
+    extra.name.trim().length > kept.name.trim().length ? extra.name : kept.name;
   return {
     ...kept,
-    likelyTitles: titles,
+    name,
+    likelyTitles: titlesCoherentToRole(name, titles),
     department: kept.department ?? extra.department,
     whyInvolved: kept.whyInvolved.length >= extra.whyInvolved.length
       ? kept.whyInvolved
@@ -323,6 +402,24 @@ export function applyHiringTeamIdentificationGuardrails(input: {
     }
     accepted.splice(0, accepted.length, manager, ...others);
   }
+
+  const merged: IdentifiedHiringRole[] = [];
+  for (const role of accepted) {
+    const duplicate = merged.findIndex((item) => rolesDescribeSamePerson(item, role));
+    if (duplicate >= 0) {
+      merged[duplicate] = mergePair(merged[duplicate]!, role);
+      corrections.push({
+        roleKey: merged[duplicate]!.roleKey,
+        reason: `Merged with ${role.name}.`,
+      });
+      continue;
+    }
+    merged.push({
+      ...role,
+      likelyTitles: titlesCoherentToRole(role.name, role.likelyTitles),
+    });
+  }
+  accepted.splice(0, accepted.length, ...merged);
 
   const limited = accepted.slice(0, hiringTeamConfig.maxIdentifiedRoles);
   for (const extra of accepted.slice(hiringTeamConfig.maxIdentifiedRoles)) {

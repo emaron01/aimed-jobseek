@@ -20,8 +20,7 @@ import {
   PrimaryButton,
   SecondaryButton,
   SECONDARY_BUTTON_CLASS,
-  SubmitButton,
-} from "@/components/ui";
+  SubmitButton, AppButton } from "@/components/ui";
 import { contactDisplayName, cn } from "@/lib/utils";
 import { hasUsableCompanyResearchFields } from "@/lib/research/freshness";
 import { SuppressContactForm } from "@/components/SuppressContactForm";
@@ -687,7 +686,7 @@ export function ScoreReportClient({
                       </span>
                       {canRestore ? (
                         <div className="mt-2 flex flex-wrap gap-1">
-                          <button
+                          <AppButton
                             type="button"
                             disabled={overridePending}
                             onClick={() => restoreContact(row.contactId, "GOOD")}
@@ -695,7 +694,7 @@ export function ScoreReportClient({
                             data-testid={`restore-contact-${row.contactId}`}
                           >
                             {EXCLUSION_REVIEW_COPY.addBack}
-                          </button>
+                          </AppButton>
                         </div>
                       ) : null}
                     </td>
@@ -703,7 +702,7 @@ export function ScoreReportClient({
                       {isExcluded && exclusionDetails.length > 0 ? (
                         <ExclusionDetailList details={exclusionDetails} compact />
                       ) : (
-                        <button
+                        <AppButton
                           type="button"
                           className={cn(
                             SECONDARY_BUTTON_CLASS,
@@ -719,7 +718,7 @@ export function ScoreReportClient({
                           <span className="mt-0.5 block text-xs font-medium text-slate-500">
                             {open ? "Hide details" : "Show details"}
                           </span>
-                        </button>
+                        </AppButton>
                       )}
                       {personaMatch?.matchedPersonaId ? (
                         <p className="mt-1 text-xs text-slate-500">
@@ -728,13 +727,13 @@ export function ScoreReportClient({
                       ) : null}
                     </td>
                     <td className="px-3 py-2">
-                      <button
+                      <AppButton
                         type="button"
                         className="text-sm font-medium text-slate-900 underline"
                         onClick={() => setExpandedId(open ? null : row.id)}
                       >
                         {open ? "Hide" : "View"}
-                      </button>
+                      </AppButton>
                     </td>
                   </tr>
                   {open ? (

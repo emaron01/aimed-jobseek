@@ -5,7 +5,7 @@ import {
   ReferralShareFields,
   useReferralShare,
 } from "@/components/billing/ReferralShareFields";
-import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { features } from "@/lib/product-config";
 import { cn } from "@/lib/utils";
 
@@ -33,14 +33,14 @@ export function ReferAFriendButton() {
 
   return (
     <>
-      <button
+      <AppButton
         type="button"
         className={cn(SECONDARY_BUTTON_CLASS, "!px-3", "!py-1.5")}
         data-testid="refer-a-friend-open"
         onClick={() => setOpen(true)}
       >
         Refer a friend
-      </button>
+      </AppButton>
 
       {open ? (
         <div
@@ -67,7 +67,7 @@ export function ReferAFriendButton() {
                   successful referral, up to 50%.
                 </p>
               </div>
-              <button
+              <AppButton
                 ref={closeRef}
                 type="button"
                 className={cn(SECONDARY_BUTTON_CLASS, "!px-3", "!py-1.5")}
@@ -75,7 +75,7 @@ export function ReferAFriendButton() {
                 onClick={() => setOpen(false)}
               >
                 Close
-              </button>
+              </AppButton>
             </div>
             <div className="mt-4">
               <ReferralShareFields

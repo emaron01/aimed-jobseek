@@ -11,8 +11,7 @@ import {
 import { listIndexHref, scoringRunDisplayName } from "@/lib/lists/campaign-query";
 import {
   PRIMARY_BUTTON_CLASS,
-  SECONDARY_BUTTON_CLASS,
-} from "@/components/ui";
+  SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { vocab } from "@/lib/product-config";
 
 const initial: CampaignContactsActionResult | null = null;
@@ -79,14 +78,14 @@ export function CampaignContactsManager({
         >
           Select an Existing {vocab.list.Singular} To Be Researched and Scored
         </Link>
-        <button
+        <AppButton
           type="submit"
           form="campaign-scored-run-form"
           disabled={!hasScoredRuns || runPending}
           className={SECONDARY_BUTTON_CLASS}
         >
           {runPending ? "Adding…" : "Add from Scored Run"}
-        </button>
+        </AppButton>
       </div>
 
       {hasScoredRuns ? (
@@ -166,12 +165,12 @@ export function CampaignContactsManager({
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
             />
           </label>
-          <button
+          <AppButton
             type="submit"
             className={`${SECONDARY_BUTTON_CLASS}`}
           >
             Search
-          </button>
+          </AppButton>
           {search ? (
             <Link
               href={`/campaigns/${campaignId}`}
@@ -228,13 +227,13 @@ export function CampaignContactsManager({
                   </label>
                 ))}
               </div>
-              <button
+              <AppButton
                 type="submit"
                 disabled={contactPending}
                 className={PRIMARY_BUTTON_CLASS}
               >
                 {contactPending ? "Adding…" : `Add selected ${vocab.contact.plural}`}
-              </button>
+              </AppButton>
             </>
           ) : (
             <p className="text-sm text-slate-600">

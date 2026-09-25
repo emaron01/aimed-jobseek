@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import Link from "next/link";
@@ -87,13 +87,13 @@ export default function ForgotPasswordPage() {
             {error}
           </p>
         ) : null}
-        <button
+        <AppButton
           type="submit"
           disabled={loading}
           className={cn(PRIMARY_BUTTON_CLASS, "w-full", "!px-3")}
         >
           {loading ? "Sending…" : "Send reset link"}
-        </button>
+        </AppButton>
       </form>
       <p className="mt-4 text-sm">
         <Link href="/login" className="underline">

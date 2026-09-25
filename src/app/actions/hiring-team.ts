@@ -332,6 +332,13 @@ export async function addHiringTeamPersonAction(
       campaignId,
       contactId: added.contactId,
     });
+    const { offerPersonPrep } = await import("@/lib/interview/person-prep");
+    await offerPersonPrep({
+      organizationId,
+      campaignId,
+      contactId: added.contactId,
+      personaId,
+    });
     revalidatePath(`/campaigns/${campaignId}`);
     return {
       ok: true,

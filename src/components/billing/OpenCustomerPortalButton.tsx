@@ -1,5 +1,5 @@
 "use client";
-import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import { useState, useTransition } from "react";
@@ -14,7 +14,7 @@ export function OpenCustomerPortalButton() {
 
   return (
     <div className="space-y-2" data-testid="billing-portal-hook">
-      <button
+      <AppButton
         type="button"
         disabled={pending}
         className={cn(SECONDARY_BUTTON_CLASS, "!px-3")}
@@ -42,7 +42,7 @@ export function OpenCustomerPortalButton() {
         }}
       >
         {pending ? "Opening…" : "Manage billing"}
-      </button>
+      </AppButton>
       <p className="text-xs text-slate-500">
         Update your card, cancel, or view invoices in Stripe. You return here
         when finished.

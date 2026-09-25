@@ -1,5 +1,5 @@
 "use client";
-import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 
 import { useActionState, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -81,13 +81,13 @@ export function ConfirmDeleteForm({
   return (
     <div data-testid="confirm-delete">
       {!open ? (
-        <button
+        <AppButton
           type="button"
           onClick={() => setOpen(true)}
           className={SECONDARY_BUTTON_CLASS}
         >
           {triggerLabel}
-        </button>
+        </AppButton>
       ) : (
         <div
           className={
@@ -107,7 +107,7 @@ export function ConfirmDeleteForm({
               <input key={name} type="hidden" name={name} value={value} />
             ))}
             <input type="hidden" name="confirm" value="1" />
-            <button
+            <AppButton
               type="submit"
               disabled={pending}
               className={
@@ -120,15 +120,15 @@ export function ConfirmDeleteForm({
               {pending
                 ? (pendingLabel ?? "Deleting…")
                 : confirmButtonLabel}
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               type="button"
               onClick={() => setOpen(false)}
               disabled={pending}
               className={SECONDARY_BUTTON_CLASS}
             >
               Cancel
-            </button>
+            </AppButton>
           </form>
         </div>
       )}

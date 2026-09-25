@@ -5,7 +5,7 @@ import {
   acceptEulaAction,
   type AcceptEulaActionResult,
 } from "@/app/actions/eula";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 
 export function AcceptEulaForm({ versionNumber }: { versionNumber: number }) {
   const [agreed, setAgreed] = useState(false);
@@ -37,14 +37,14 @@ export function AcceptEulaForm({ versionNumber }: { versionNumber: number }) {
           {state.message}
         </p>
       ) : null}
-      <button
+      <AppButton
         type="submit"
         disabled={!agreed || pending}
         className={`${PRIMARY_BUTTON_CLASS} w-full`}
         data-testid="eula-continue"
       >
         {pending ? "Saving…" : "Continue"}
-      </button>
+      </AppButton>
     </form>
   );
 }

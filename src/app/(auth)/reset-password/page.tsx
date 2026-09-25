@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import Link from "next/link";
@@ -78,13 +78,13 @@ function ResetPasswordInner() {
           />
         </label>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <button
+        <AppButton
           type="submit"
           disabled={loading}
           className={cn(PRIMARY_BUTTON_CLASS, "w-full", "!px-3")}
         >
           {loading ? "Updating…" : "Update password"}
-        </button>
+        </AppButton>
       </form>
       <p className="mt-4 text-sm">
         <Link href="/login" className="underline">
