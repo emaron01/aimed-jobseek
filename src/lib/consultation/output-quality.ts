@@ -1,3 +1,8 @@
+import {
+  qualityIssue,
+  type QualityIssue,
+} from "@/lib/generation/quality";
+
 export type GroundingSource = {
   id: string;
   text: string;
@@ -24,14 +29,12 @@ export function mentionsInternalSystemState(text: string): boolean {
   return INTERNAL_SYSTEM_STATE.test(text);
 }
 
-export function bannedPhraseHits(
+export function phraseHits(
   texts: readonly string[],
-  bannedPhrases: readonly string[],
+  phrases: readonly string[],
 ): string[] {
   const haystack = normalized(texts.join("\n"));
-  return bannedPhrases.filter((phrase) =>
-    haystack.includes(normalized(phrase)),
-  );
+  return phrases.filter((phrase) => haystack.includes(normalized(phrase)));
 }
 
 function numericTokens(text: string): string[] {
@@ -72,9 +75,7 @@ function groundingTokens(text: string): Set<string> {
     normalized(text)
       .replace(/[^a-z0-9\s]/g, " ")
       .split(/\s+/)
-      .filter(
-        (token) => token.length >= 4 && !GROUNDING_STOPWORDS.has(token),
-      ),
+      .filter((token) => token.length >= 4 && !GROUNDING_STOPWORDS.has(token)),
   );
 }
 
@@ -90,25 +91,31 @@ function repetitionTokens(text: string): Set<string> {
       .replace(/[^a-z0-9\s]/g, " ")
       .split(/\s+/)
       .map(stem)
-      .filter(
-        (token) => token.length >= 4 && !GROUNDING_STOPWORDS.has(token),
-      ),
+      .filter((token) => token.length >= 4 && !GROUNDING_STOPWORDS.has(token)),
   );
 }
 
 export function validateRepetitionAndMetaLanguage(input: {
   text: string;
-  bannedPhrases: readonly string[];
+  field: string;
+  metaLanguagePhrases?: readonly string[];
   ignoreRepeatedNumbers?: boolean;
-}): string[] {
-  const errors: string[] = [];
+}): QualityIssue[] {
+  const issues: QualityIssue[] = [];
   const text = input.text.trim();
-  if (!text) return errors;
-  const metaHits = bannedPhraseHits([text], input.bannedPhrases);
-  if (metaHits.length > 0) {
-    errors.push(
-      `The writing described its structure instead of making a point: ${metaHits.join(", ")}.`,
-    );
+  if (!text) return issues;
+  if (input.metaLanguagePhrases?.length) {
+    const metaHits = phraseHits([text], input.metaLanguagePhrases);
+    if (metaHits.length > 0) {
+      issues.push(
+        qualityIssue({
+          check: "meta_language",
+          field: input.field,
+          text,
+          message: `The writing described its structure instead of making a point: ${metaHits.join(", ")}.`,
+        }),
+      );
+    }
   }
   if (!input.ignoreRepeatedNumbers) {
     const numberCounts = new Map<string, number>();
@@ -119,8 +126,13 @@ export function validateRepetitionAndMetaLanguage(input: {
       .filter(([, count]) => count > 1)
       .map(([token]) => token);
     if (repeatedNumbers.length > 0) {
-      errors.push(
-        `The writing repeated the same number without adding information: ${repeatedNumbers.join(", ")}.`,
+      issues.push(
+        qualityIssue({
+          check: "repetition",
+          field: input.field,
+          text,
+          message: `The writing repeated the same number without adding information: ${repeatedNumbers.join(", ")}.`,
+        }),
       );
     }
   }
@@ -136,66 +148,122 @@ export function validateRepetitionAndMetaLanguage(input: {
       const overlap = [...a.tokens].filter((token) => b.tokens.has(token)).length;
       const union = new Set([...a.tokens, ...b.tokens]).size;
       if (union > 0 && overlap / union >= 0.6) {
-        errors.push(
-          `The writing restated the same fact in multiple sentences: "${a.sentence}" / "${b.sentence}".`,
+        issues.push(
+          qualityIssue({
+            check: "repetition",
+            field: input.field,
+            text: `${a.sentence} / ${b.sentence}`,
+            message: `The writing restated the same fact in multiple sentences: "${a.sentence}" / "${b.sentence}".`,
+          }),
         );
       }
     }
   }
-  return [...new Set(errors)];
+  return issues;
 }
 
 export function validateInterviewAnswerQuality(input: {
   text: string;
+  field?: string;
   maxWords: number;
-  bannedPhrases: readonly string[];
-}): string[] {
-  const errors: string[] = [];
+  metaLanguagePhrases?: readonly string[];
+}): QualityIssue[] {
+  const field = input.field ?? "interviewAnswer";
+  const issues: QualityIssue[] = [];
   const text = input.text.trim();
   const wordCount = text.split(/\s+/).filter(Boolean).length;
   if (wordCount > input.maxWords) {
-    errors.push(`The interview answer exceeded ${input.maxWords} words.`);
+    issues.push(
+      qualityIssue({
+        check: "length",
+        field,
+        text,
+        message: `The interview answer exceeded ${input.maxWords} words.`,
+      }),
+    );
   }
   if (!/\b(?:I|I'm|I've|I'd|I'll|my|mine|we|we're|we've|our|ours)\b/i.test(text)) {
-    errors.push("The interview answer was not written as natural first-person speech.");
+    issues.push(
+      qualityIssue({
+        check: "first_person",
+        field,
+        text,
+        message: "The interview answer was not written as natural first-person speech.",
+      }),
+    );
   }
-  errors.push(
+  issues.push(
     ...validateRepetitionAndMetaLanguage({
       text,
-      bannedPhrases: input.bannedPhrases,
+      field,
+      metaLanguagePhrases: input.metaLanguagePhrases,
     }),
   );
-  return [...new Set(errors)];
+  return issues;
 }
 
 export function validateGroundedStatement(input: {
   statement: GroundedStatement;
   sources: GroundingSource[];
-  bannedPhrases: readonly string[];
+  field?: string;
   requireSentenceClaims: boolean;
-}): string[] {
-  const errors: string[] = [];
+}): QualityIssue[] {
+  const field = input.field ?? "statement";
+  const issues: QualityIssue[] = [];
   const text = input.statement.text.trim();
-  if (!text) return ["The statement was empty."];
-  const banned = bannedPhraseHits([text], input.bannedPhrases);
-  if (banned.length > 0) {
-    errors.push(`The statement used banned language: ${banned.join(", ")}.`);
+  if (!text) {
+    return [
+      qualityIssue({
+        check: "empty",
+        field,
+        text: "",
+        message: "The statement was empty.",
+      }),
+    ];
   }
   if (mentionsInternalSystemState(text)) {
-    errors.push("The statement referenced internal system state.");
+    issues.push(
+      qualityIssue({
+        check: "internal_state",
+        field,
+        text,
+        message: "The statement referenced internal system state.",
+      }),
+    );
   }
   const byId = new Map(input.sources.map((source) => [source.id, source.text]));
   const claims = input.statement.claims;
   if (claims.length === 0) {
-    errors.push("The statement did not provide claim-level grounding.");
+    issues.push(
+      qualityIssue({
+        check: "grounding",
+        field,
+        text,
+        message: "The statement did not provide claim-level grounding.",
+      }),
+    );
   }
   for (const claim of claims) {
     const claimText = claim.text.trim();
     if (!claimText || !normalized(text).includes(normalized(claimText))) {
-      errors.push("A grounded claim was not present in the statement.");
+      issues.push(
+        qualityIssue({
+          check: "grounding",
+          field,
+          text: claimText,
+          message: "A grounded claim was not present in the statement.",
+        }),
+      );
     }
     if (claim.supports.length === 0) {
-      errors.push(`The claim "${claimText}" had no supporting source.`);
+      issues.push(
+        qualityIssue({
+          check: "grounding",
+          field,
+          text: claimText,
+          message: `The claim "${claimText}" had no supporting source.`,
+        }),
+      );
     }
     let hasContentConnection = false;
     const claimTokens = groundingTokens(claimText);
@@ -206,7 +274,14 @@ export function validateGroundedStatement(input: {
         !support.quote.trim() ||
         !normalized(source).includes(normalized(support.quote))
       ) {
-        errors.push(`The claim "${claimText}" cited unsupported source text.`);
+        issues.push(
+          qualityIssue({
+            check: "grounding",
+            field,
+            text: claimText,
+            message: `The claim "${claimText}" cited unsupported source text.`,
+          }),
+        );
       } else {
         const quoteTokens = groundingTokens(support.quote);
         hasContentConnection ||= [...claimTokens].some((token) =>
@@ -215,24 +290,45 @@ export function validateGroundedStatement(input: {
       }
     }
     if (claimTokens.size > 0 && !hasContentConnection) {
-      errors.push(`The claim "${claimText}" was not connected to its cited text.`);
+      issues.push(
+        qualityIssue({
+          check: "grounding",
+          field,
+          text: claimText,
+          message: `The claim "${claimText}" was not connected to its cited text.`,
+        }),
+      );
     }
   }
   if (input.requireSentenceClaims) {
     const claimTexts = new Set(claims.map((claim) => normalized(claim.text)));
     for (const sentence of sentenceParts(text)) {
       if (!claimTexts.has(normalized(sentence))) {
-        errors.push(`The sentence "${sentence}" lacked claim-level grounding.`);
+        issues.push(
+          qualityIssue({
+            check: "grounding",
+            field,
+            text: sentence,
+            message: `The sentence "${sentence}" lacked claim-level grounding.`,
+          }),
+        );
       }
     }
   }
   const sourceCorpus = input.sources.map((source) => source.text).join("\n");
   for (const token of numericTokens(text)) {
     if (!normalized(sourceCorpus).includes(normalized(token))) {
-      errors.push(`The number "${token}" was absent from the source material.`);
+      issues.push(
+        qualityIssue({
+          check: "grounding",
+          field,
+          text: token,
+          message: `The number "${token}" was absent from the source material.`,
+        }),
+      );
     }
   }
-  return [...new Set(errors)];
+  return issues;
 }
 
 export function questionRestatesTarget(question: string, target: string): boolean {

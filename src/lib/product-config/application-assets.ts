@@ -50,17 +50,8 @@ export const applicationAssetConfig = Object.freeze({
     thinEvidence:
       "This letter is short because the {product} does not yet have a consulted story for this role's outcomes. Run a {consultant} round to add what you did and what changed.",
   },
-  bannedPhrases: [
-    "I'm excited to apply",
-    "I am excited to apply",
-    "I am writing to",
-    "I'm writing to",
-    "draws me to",
-    "I would welcome the opportunity",
-    "I believe I would be a great fit",
-    "Thank you for your consideration",
-    "perfect fit",
-  ],
+  seekerVoiceInstruction:
+    "Write the way the seeker writes, in plain professional language. Use the seeker's voice samples and their own words from consultation answers whenever those are supplied. Avoid phrasing that reads as AI-generated.",
   dateDisplay: {
     currentRoleLabel: "Present",
     rangeSeparator: "\u2013",

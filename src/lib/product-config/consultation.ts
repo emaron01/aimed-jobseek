@@ -9,20 +9,7 @@ export const consultationConfig = Object.freeze({
   maxFollowUpsPerTarget: 2,
   qualityRegenerationAttempts: 2,
   interviewAnswerMaxWords: 220,
-  bannedPhrases: Object.freeze([
-    "spearheaded",
-    "leveraged",
-    "synergies",
-    "passionate about",
-    "dynamic environment",
-    "fast-paced",
-    "results-driven",
-    "proven track record",
-    "thrilled",
-    "delve",
-    "—",
-  ]),
-  interviewAnswerBannedPhrases: Object.freeze([
+  interviewAnswerMetaLanguage: Object.freeze([
     "the task in this example was",
     "the starting point was",
     "the comparison point was",
@@ -73,7 +60,9 @@ export const consultationConversationCopy = Object.freeze({
   changeSomething: "Change something",
   notAccurate: "Not accurate",
   changePrompt: "What should change?",
-  generationFailed: `${consultationConfig.displayName} could not write this coaching. Retry when the consultation model is available.`,
+  generationFailed: `${consultationConfig.displayName} could not finish this coaching. Retry.`,
+  generationQualityFailed: `${consultationConfig.displayName} could not keep one part of this coaching after checks. The rest is below. Retry the missing part.`,
+  modelUnavailable: `${consultationConfig.displayName} could not reach the consultation model. Retry when it is available.`,
   retry: `Retry ${consultationConfig.displayName}`,
   start: `Start with ${consultationConfig.displayName}`,
   planComplete: "The plan for this conversation is complete.",
@@ -83,6 +72,7 @@ export const consultationConversationCopy = Object.freeze({
   whyThisCompanyQuestion:
     "Why do you want to work at this company? Say what specifically draws you to it for this role.",
   nextStepTitle: applicationWorkspaceCopy.nextStepTitle,
-  nextStepFailed: `${consultationConfig.displayName} could not write the next step. Retry when the consultation model is available.`,
+  nextStepFailed: `${consultationConfig.displayName} could not write the next step. Retry.`,
+  nextStepModelUnavailable: `${consultationConfig.displayName} could not reach the consultation model for the next step. Retry when it is available.`,
   nextStepRetry: "Retry next step",
 });
