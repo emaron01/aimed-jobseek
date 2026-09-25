@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 import { clearAiProviderCache, createAiProvider } from "@/lib/ai/provider";
 import {
+  assertConsultationAiConfigured,
   getEmailAiConfig,
   getEmailFactsAiConfig,
   getResearchAiConfig,
@@ -217,6 +219,14 @@ describe("role-specific AI configuration", () => {
     expect(id).not.toContain("secret");
     expect(id).not.toContain("abc");
     expect(id).toContain("example.test");
+  });
+
+  it("fails loudly when CONSULTATION_AI configuration is missing", () => {
+    clearAllAiEnv();
+    expect(() => assertConsultationAiConfigured()).toThrow(/CONSULTATION_AI_API_KEY|Consultation AI is not configured/);
+    const instrumentation = readFileSync("src/instrumentation.ts", "utf8");
+    expect(instrumentation).toContain("assertConsultationAiConfigured");
+    expect(instrumentation).toContain("assertAssetAiConfigured");
   });
 
   it("redacts research and scoring API keys from log text", () => {

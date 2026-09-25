@@ -9,14 +9,18 @@ import {
   dismissConsultationProposal,
   pauseConsultation,
   regenerateConsultationStatement,
+  replyConsultation,
   retryConsultationGeneration,
   resumeConsultation,
+  reviseConsultationResult,
   skipConsultation,
   skipConsultationQuestion,
   startConsultation,
+  confirmConsultationResult,
+  flagConsultationInaccuracy,
 } from "@/lib/consultation/service";
 import { requireCurrentUser } from "@/lib/auth/session";
-import { vocab } from "@/lib/product-config";
+import { consultationConversationCopy, vocab } from "@/lib/product-config";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
 
@@ -50,7 +54,7 @@ export async function startConsultationAction(
     }
     await startConsultation({ organizationId, campaignId });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: "Consultation started." };
+    return { ok: true, message: consultationConversationCopy.start };
   } catch (error) {
     return fail(error, "The consultation could not be started.");
   }
@@ -69,7 +73,7 @@ export async function retryConsultationAction(
     }
     await retryConsultationGeneration({ organizationId, campaignId });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: "Consultation generation retried." };
+    return { ok: true, message: consultationConversationCopy.retry };
   } catch (error) {
     return fail(error, "The consultation could not be retried.");
   }
@@ -285,5 +289,89 @@ export async function regenerateConsultationStatementAction(
     return { ok: true, message: "Polished statement regenerated." };
   } catch (error) {
     return fail(error, "The polished statement could not be regenerated.");
+  }
+}
+
+export async function replyConsultationAction(
+  _prev: ConsultationActionResult | null,
+  formData: FormData,
+): Promise<ConsultationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = campaignIdFrom(formData);
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    const answer = String(formData.get("answer") ?? "").trim();
+    if (!answer) {
+      return { ok: false, message: consultationConversationCopy.threadReply };
+    }
+    await replyConsultation({ organizationId, campaignId, answer });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: consultationConversationCopy.threadReply };
+  } catch (error) {
+    return fail(error, "The reply could not be sent.");
+  }
+}
+
+export async function useConsultationResultAction(
+  _prev: ConsultationActionResult | null,
+  formData: FormData,
+): Promise<ConsultationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = campaignIdFrom(formData);
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    await confirmConsultationResult({ organizationId, campaignId });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: consultationConversationCopy.useThis };
+  } catch (error) {
+    return fail(error, "The result could not be used.");
+  }
+}
+
+export async function reviseConsultationResultAction(
+  _prev: ConsultationActionResult | null,
+  formData: FormData,
+): Promise<ConsultationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = campaignIdFrom(formData);
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    const instruction = String(formData.get("instruction") ?? "").trim();
+    if (!instruction) {
+      return { ok: false, message: consultationConversationCopy.changePrompt };
+    }
+    await reviseConsultationResult({ organizationId, campaignId, instruction });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: consultationConversationCopy.changeSomething };
+  } catch (error) {
+    return fail(error, "The result could not be revised.");
+  }
+}
+
+export async function flagConsultationInaccuracyAction(
+  _prev: ConsultationActionResult | null,
+  formData: FormData,
+): Promise<ConsultationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = campaignIdFrom(formData);
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    await flagConsultationInaccuracy({ organizationId, campaignId });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: consultationConversationCopy.notAccurate };
+  } catch (error) {
+    return fail(error, "The inaccuracy could not be recorded.");
   }
 }

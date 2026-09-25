@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONSULTATION_PROMPT_VERSION = "5";
+export const CONSULTATION_PROMPT_VERSION = "6";
 
 const strengthSchema = z.enum(["STRONG", "PARTIAL", "NONE"]);
 const strategyModeSchema = z.enum([
@@ -9,8 +9,17 @@ const strategyModeSchema = z.enum([
   "ACKNOWLEDGE",
 ]);
 
+export const consultationBriefingSchema = z.object({
+  overall: z.string(),
+  strongestAngles: z.array(z.string()).min(2).max(3),
+  importantGaps: z.array(z.string()).min(2).max(3),
+  storyPlan: z.array(z.string()).min(1).max(5),
+});
+
 export const consultationPlanSchema = z.object({
   commentary: z.string(),
+  briefing: consultationBriefingSchema,
+  closingNote: z.string().nullable(),
   assessments: z.array(
     z.object({
       targetKey: z.string(),
@@ -56,6 +65,7 @@ export const consultationExtractSchema = z.object({
   missingStarElements: z.array(
     z.enum(["SITUATION", "TASK", "ACTION", "RESULT", "METRIC"]),
   ),
+  coaching: z.string().nullable().optional(),
   followUpQuestion: z.string().nullable(),
 });
 

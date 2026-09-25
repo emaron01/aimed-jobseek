@@ -91,7 +91,13 @@ function resumeChildren(content: ResumeAssetContent): Paragraph[] {
     ...content.summary.map((claim) => bodyParagraph(claim.text)),
     heading(applicationAssetConfig.resumeHeadings.experience),
   );
-  for (const role of content.experience.filter((item) => !item.hidden)) {
+  const featured = content.experience.filter(
+    (item) => !item.hidden && !item.condensed,
+  );
+  const condensed = content.experience.filter(
+    (item) => !item.hidden && item.condensed,
+  );
+  for (const role of featured) {
     children.push(
       bodyParagraph(
         [role.title, role.employer].filter(Boolean).join(", "),
@@ -102,6 +108,17 @@ function resumeChildren(content: ResumeAssetContent): Paragraph[] {
         bodyParagraph(claim.text, { bullet: true }),
       ),
     );
+  }
+  if (condensed.length > 0) {
+    for (const role of condensed) {
+      children.push(
+        bodyParagraph(
+          [role.title, role.employer].filter(Boolean).join(", "),
+          { bold: true, after: 0 },
+        ),
+        bodyParagraph(formatResumeRoleMeta(role)),
+      );
+    }
   }
   if (content.skills.length > 0) {
     children.push(

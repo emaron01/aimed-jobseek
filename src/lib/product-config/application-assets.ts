@@ -1,3 +1,5 @@
+import { consultationConfig } from "./consultation";
+
 export const applicationAssetConfig = Object.freeze({
   labels: {
     resume: "Resume",
@@ -11,6 +13,13 @@ export const applicationAssetConfig = Object.freeze({
     changeInstruction: "What should change?",
     sourceSupport: "Source",
     hideRolesLegend: "Roles to hide",
+    acceptPlan: "Accept this plan",
+    writePlan: `Ask ${consultationConfig.displayName} for a plan`,
+    adjustPlan: `Adjust with ${consultationConfig.displayName}`,
+    adjustPlanPrompt: "What should change?",
+    adjustManually: "Adjust manually",
+    acceptPlanFirst: `Accept ${consultationConfig.displayName}'s plan before generating this version.`,
+    planFailed: `${consultationConfig.displayName} could not write this plan. Retry when the consultation model is available.`,
     emptyHistory: "No versions generated yet.",
     saveNewVersion: "Save as new version",
     seekerEditedGuidance: "Seeker-edited version",
@@ -81,6 +90,9 @@ export const applicationAssetConfig = Object.freeze({
     "current role",
     "currently",
   ],
+  presentation: {
+    earlierExperienceYears: 10,
+  },
   generation: {
     qualityRegenerationAttempts: 4,
     writingTemperatureDefault: 0.5,

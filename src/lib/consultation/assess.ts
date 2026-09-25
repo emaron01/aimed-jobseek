@@ -169,6 +169,41 @@ export function profileFactEvidence(profile: CandidateProfile): ProfileFactRef[]
   return profileEvidenceItems(profile).filter((item) => item.kind === "FACT");
 }
 
+export function requirementMeaning(text: string): string {
+  return contentTokens(text).join(" ");
+}
+
+export function sameRequirementMeaning(left: string, right: string): boolean {
+  const leftTokens = new Set(contentTokens(left));
+  const rightTokens = new Set(contentTokens(right));
+  if (leftTokens.size === 0 || rightTokens.size === 0) {
+    return requirementMeaning(left) === requirementMeaning(right) &&
+      requirementMeaning(left).length > 0;
+  }
+  let intersection = 0;
+  for (const token of leftTokens) {
+    if (rightTokens.has(token)) intersection += 1;
+  }
+  const union = leftTokens.size + rightTokens.size - intersection;
+  if (union > 0 && intersection / union >= 0.55) return true;
+  const [smaller, larger] =
+    leftTokens.size <= rightTokens.size
+      ? [leftTokens, rightTokens]
+      : [rightTokens, leftTokens];
+  if (smaller.size < 2) return false;
+  for (const token of smaller) {
+    if (!larger.has(token)) return false;
+  }
+  return true;
+}
+
+function pushUniqueTarget(targets: EvidenceTarget[], next: EvidenceTarget): void {
+  if (targets.some((existing) => sameRequirementMeaning(existing.text, next.text))) {
+    return;
+  }
+  targets.push(next);
+}
+
 export function evidenceTargets(input: {
   scorecard: JobScorecard;
   requiredItems: string[];
@@ -177,17 +212,25 @@ export function evidenceTargets(input: {
   const targets: EvidenceTarget[] = [];
   input.requiredItems.forEach((text, index) => {
     if (text.trim()) {
-      targets.push({ key: `required:${index}`, kind: "REQUIRED", text: text.trim() });
+      pushUniqueTarget(targets, {
+        key: `required:${index}`,
+        kind: "REQUIRED",
+        text: text.trim(),
+      });
     }
   });
   input.scorecard.outcomes.forEach((item) => {
     if (item.text.trim()) {
-      targets.push({ key: `outcome:${item.id}`, kind: "OUTCOME", text: item.text.trim() });
+      pushUniqueTarget(targets, {
+        key: `outcome:${item.id}`,
+        kind: "OUTCOME",
+        text: item.text.trim(),
+      });
     }
   });
   input.scorecard.competencies.forEach((item) => {
     if (item.text.trim()) {
-      targets.push({
+      pushUniqueTarget(targets, {
         key: `competency:${item.id}`,
         kind: "COMPETENCY",
         text: item.text.trim(),
@@ -195,7 +238,7 @@ export function evidenceTargets(input: {
     }
   });
   if (input.scorecard.mission?.text.trim()) {
-    targets.push({
+    pushUniqueTarget(targets, {
       key: `mission:${input.scorecard.mission.id}`,
       kind: "MISSION",
       text: input.scorecard.mission.text.trim(),
@@ -203,7 +246,11 @@ export function evidenceTargets(input: {
   }
   input.preferredItems.forEach((text, index) => {
     if (text.trim()) {
-      targets.push({ key: `preferred:${index}`, kind: "PREFERRED", text: text.trim() });
+      pushUniqueTarget(targets, {
+        key: `preferred:${index}`,
+        kind: "PREFERRED",
+        text: text.trim(),
+      });
     }
   });
   return targets;

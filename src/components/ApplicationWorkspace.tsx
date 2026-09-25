@@ -5,6 +5,7 @@ import {
   overrideApplicationFitAction,
   rejectApplicationEmployerIdentityAction,
   rescoreApplicationFitAction,
+  retryApplicationNextStepAction,
   retryApplicationResearchAction,
 } from "@/app/actions/application";
 import { ApplicationResearchStatus } from "@/components/ApplicationResearchStatus";
@@ -43,7 +44,9 @@ import {
   coverLetterEvidenceIsThin,
   coverLetterThinEvidenceCopy,
 } from "@/lib/application-assets/service";
-import { applicationResearchCopy, applicationSummaryConfig, criterionFlags, employerIdentityCopy, hiringTeamConfig, vocab } from "@/lib/product-config";
+import { presentationPlanSchema } from "@/lib/application-assets/plan-contract";
+import { ensureApplicationNextStep } from "@/lib/application/next-step";
+import { applicationResearchCopy, applicationSummaryConfig, consultationConversationCopy, criterionFlags, employerIdentityCopy, hiringTeamConfig, vocab } from "@/lib/product-config";
 import {
   parseIdentityVerification,
 } from "@/lib/job-requirement/identity-verification";
@@ -346,6 +349,7 @@ export async function ApplicationWorkspace({
           applicationAssets: {
             orderBy: [{ type: "asc" }, { version: "desc" }],
           },
+          presentationPlans: true,
         },
       },
     },
@@ -401,6 +405,32 @@ export async function ApplicationWorkspace({
         )
       : [],
   });
+  const nextStep = await ensureApplicationNextStep({
+    organizationId,
+    campaignId,
+  });
+  const presentationPlans = requirement.campaign.presentationPlans.flatMap(
+    (row) => {
+      const parsed = presentationPlanSchema.safeParse(row.planJson);
+      if (!parsed.success) return [];
+      return [
+        {
+          type: row.type as "RESUME" | "COVER_LETTER",
+          status: row.status as "DRAFT" | "ACCEPTED",
+          plan: parsed.data,
+        },
+      ];
+    },
+  );
+  const assetsOpen =
+    nextStep.stateKey === "resume_plan_ready" ||
+    nextStep.stateKey === "cover_plan_ready" ||
+    nextStep.stateKey === "resume_ready" ||
+    nextStep.stateKey === "cover_ready";
+  const consultationOpen =
+    nextStep.stateKey === "consultation_not_started" ||
+    nextStep.stateKey === "consultation_in_progress" ||
+    nextStep.stateKey === "consultation_failed";
   const shownBucket = fit
     ? displayedFitBucket({
         bucket: fit.bucket,
@@ -410,7 +440,38 @@ export async function ApplicationWorkspace({
 
   return (
     <>
-    <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-5" data-testid="application-workspace">
+    <section
+      className="space-y-3 rounded-lg border border-slate-200 bg-white p-5"
+      data-testid="application-next-step"
+    >
+      <h2 className="text-base font-semibold text-slate-900">
+        {consultationConversationCopy.nextStepTitle}
+      </h2>
+      {nextStep.failed ? (
+        <div className="space-y-2">
+          <p className="text-sm text-amber-950">
+            {consultationConversationCopy.nextStepFailed}
+          </p>
+          {canEdit ? (
+            <ApplicationActionForm
+              action={retryApplicationNextStepAction}
+              submitLabel={consultationConversationCopy.nextStepRetry}
+              testId="retry-next-step"
+            >
+              <input type="hidden" name="campaignId" value={campaignId} />
+            </ApplicationActionForm>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-sm text-slate-800">{nextStep.text}</p>
+      )}
+    </section>
+    <details className="space-y-4 rounded-lg border border-slate-200 bg-white p-5" data-testid="application-workspace">
+      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+        Job requirement
+      </summary>
+      <div className="mt-4 space-y-4">
+    <section className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-slate-900">Job requirement</h2>
@@ -584,6 +645,8 @@ export async function ApplicationWorkspace({
         ) : null}
       </div>
     </section>
+      </div>
+    </details>
     <HiringTeamSection
       campaignId={requirement.campaignId}
       organizationId={organizationId}
@@ -593,13 +656,24 @@ export async function ApplicationWorkspace({
       campaignId={requirement.campaignId}
       organizationId={organizationId}
       canEdit={canEdit}
+      defaultOpen={consultationOpen}
     />
+    <details
+      className="rounded-lg border border-slate-200 bg-white p-5"
+      data-testid="application-applied-wrap"
+    >
+      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+        Applied
+      </summary>
+      <div className="mt-4">
     <ApplicationAppliedSection
       campaignId={requirement.campaignId}
       canEdit={canEdit}
       appliedAt={requirement.campaign.appliedAt?.toISOString() ?? null}
       applicationProgress={requirement.campaign.applicationProgress}
     />
+      </div>
+    </details>
     <ApplicationContactsSection
       campaignId={requirement.campaignId}
       canEdit={canEdit}
@@ -619,6 +693,8 @@ export async function ApplicationWorkspace({
     <ApplicationAssetsSection
       campaignId={requirement.campaignId}
       canEdit={canEdit}
+      defaultOpen={assetsOpen}
+      plans={presentationPlans}
       coverLetterThinNotice={
         coverLetterEvidenceThin ? coverLetterThinEvidenceCopy() : null
       }
@@ -970,9 +1046,12 @@ async function HiringTeamSection({
     </details>
   );
   return (
-    <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-5" data-testid="hiring-team">
+    <details className="space-y-4 rounded-lg border border-slate-200 bg-white p-5" data-testid="hiring-team">
+      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+        {vocab.persona.nav}
+      </summary>
+      <div className="mt-4 space-y-4">
       <div>
-        <h2 className="text-base font-semibold text-slate-900">{vocab.persona.nav}</h2>
         <p className="mt-1 text-sm text-slate-600">
           Roles for this {vocab.campaign.singular} are identified from the job and employer research. Review each draft before you rely on it. Saved templates are added only when you choose one.
         </p>
@@ -1044,7 +1123,8 @@ async function HiringTeamSection({
           </label>
         </ApplicationActionForm>
       ) : null}
-    </section>
+      </div>
+    </details>
   );
 }
 

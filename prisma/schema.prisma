@@ -620,6 +620,7 @@ model Organization {
   supportTickets                SupportTicket[]
   jobRequirements               JobRequirement[]
   applicationFits               ApplicationFit[]
+  presentationPlans             ApplicationPresentationPlan[]
 
   @@index([status])
   @@index([accountType])
@@ -2294,6 +2295,10 @@ model Campaign {
   applicationAssets   ApplicationAsset[]
   interviewStages     InterviewStage[]
   researchRuns        ResearchRun[]
+  presentationPlans   ApplicationPresentationPlan[]
+  /// Harper-written next step for the current application state.
+  nextStepText        String?
+  nextStepStateKey    String?
 
   @@index([organizationId])
   @@index([organizationId, createdAt])
@@ -2438,6 +2443,16 @@ enum ApplicationAssetType {
   LINKEDIN_INMAIL
 }
 
+enum ApplicationPresentationPlanType {
+  RESUME
+  COVER_LETTER
+}
+
+enum ApplicationPresentationPlanStatus {
+  DRAFT
+  ACCEPTED
+}
+
 enum ApplicationOutreachPurpose {
   PROACTIVE
   FOLLOW_UP
@@ -2462,6 +2477,8 @@ model ConsultationSession {
   promptVersion    String
   /// Model-written coaching commentary. Generation errors are stored separately.
   coachNote        String?
+  /// Model-written opening briefing: overall, angles, gaps, and story plan.
+  briefingJson     Json?
   createdAt        DateTime                     @default(now())
   updatedAt        DateTime                     @updatedAt
 
@@ -2494,6 +2511,8 @@ model ConsultationTurn {
   analysisJson        Json?
   /// Model-written requirement interpretation and persona-grounded who-cares note.
   questionContextJson Json?
+  /// REPLY | CHANGE | NOT_ACCURATE | CLOSING. Null for legacy turns.
+  intent              String?
   createdAt           DateTime            @default(now())
 
   organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -2674,6 +2693,28 @@ model ApplicationAsset {
   @@index([interviewStageId])
   @@index([status])
   @@index([sentAt])
+}
+
+/// Harper-written resume or cover-letter recommendation. Generation waits for accept.
+model ApplicationPresentationPlan {
+  id               String                            @id @default(cuid())
+  organizationId   String
+  campaignId       String
+  type             ApplicationPresentationPlanType
+  status           ApplicationPresentationPlanStatus @default(DRAFT)
+  planJson         Json
+  adjustmentNote   String?
+  promptVersion    String
+  acceptedAt       DateTime?
+  createdAt        DateTime                          @default(now())
+  updatedAt        DateTime                          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, type])
+  @@index([organizationId])
+  @@index([campaignId])
 }
 
 model InterviewStage {

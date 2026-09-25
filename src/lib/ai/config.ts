@@ -449,6 +449,16 @@ export function isConsultationAiConfigured(): boolean {
   }
 }
 
+/** Production boot: fail loudly when Consultation AI env is missing. */
+export function assertConsultationAiConfigured(): void {
+  getConsultationAiConfig();
+}
+
+/** Production boot: fail loudly when Application asset AI env is missing. */
+export function assertAssetAiConfigured(): void {
+  getAssetAiConfig();
+}
+
 /** Fail closed for resume and cover-letter generation. */
 export function getAssetAiConfig(): AiConfig {
   const config = getAiConfigForRole("asset");

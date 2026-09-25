@@ -40,7 +40,13 @@ import {
   skipConsultation,
   skipConsultationQuestion,
   startConsultation,
+  confirmConsultationResult,
 } from "@/lib/consultation/service";
+import {
+  looksLikeInternalId,
+  profileItemDisplayLabel,
+  resolveEvidenceLabels,
+} from "@/lib/consultation/evidence-display";
 import {
   appendConfirmedFact,
   groundedInAnswer,
@@ -105,6 +111,22 @@ function installConsultationModelFixture() {
         data: {
           commentary:
             "Your production ownership is relevant here; the main questions are duration, robotics transfer, and measurable outcomes.",
+          briefing: {
+            overall:
+              "You have transferable production ownership, and the gaps that matter are duration proof, robotics transfer, and measured outcomes.",
+            strongestAngles: [
+              "Production ownership at Northwind",
+              "Incident response already on the profile",
+            ],
+            importantGaps: [
+              "Robotics domain experience",
+              "Measured outcomes for the posted requirements",
+            ],
+            storyPlan: [
+              "Start with the Python duration and a measured production result.",
+            ],
+          },
+          closingNote: null,
           assessments: targets.map((target) => {
             const incident = /incident response/i.test(target.text);
             const mission = target.kind === "MISSION";
@@ -723,7 +745,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("5");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("6");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("coach, not an interrogator");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("Never inflate fit");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -733,6 +755,44 @@ describe("consultation evidence and questions", () => {
     const workspace = readFileSync("src/components/ConsultationSection.tsx", "utf8");
     expect(workspace).toContain("consultationConfig.displayName");
     expect(workspace).not.toContain("Avery");
+    expect(workspace).not.toContain("Save answer");
+    expect(workspace).toContain("consultationConversationCopy.generationFailed");
+    expect(workspace).toContain("consultationConversationCopy.useThis");
+    expect(workspace).not.toContain("supportingFactIds).join");
+  });
+
+  it("merges posting requirements and scorecard items that mean the same thing", () => {
+    const targets = evidenceTargets({
+      requiredItems: ["5 years of enterprise sales leadership"],
+      preferredItems: [],
+      scorecard: {
+        mission: null,
+        outcomes: [
+          {
+            id: "outcome_sales",
+            text: "Enterprise sales leadership for five years",
+            inferred: false,
+          },
+        ],
+        competencies: [],
+      },
+    });
+    expect(targets).toHaveLength(1);
+    expect(targets[0]?.kind).toBe("REQUIRED");
+    expect(targets[0]?.text).toBe("5 years of enterprise sales leadership");
+  });
+
+  it("shows evidence in plain language and never treats internal ids as labels", () => {
+    expect(looksLikeInternalId("direction_function_1")).toBe(true);
+    expect(looksLikeInternalId("role_5")).toBe(true);
+    const items = profileEvidenceItems(fixtureAlexChenProfile());
+    const role = items.find((item) => item.id === "role_1");
+    expect(role).toBeTruthy();
+    expect(profileItemDisplayLabel(role!)).toMatch(/ at /);
+    expect(profileItemDisplayLabel(role!)).not.toBe("role_1");
+    expect(resolveEvidenceLabels(["role_1"], items)[0]?.label).not.toMatch(
+      /role_1/,
+    );
   });
 
   it("contains no deterministic consultation narrative generators", () => {
@@ -988,9 +1048,14 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("5");
+    expect(session?.promptVersion).toBe("6");
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
+    expect(session?.briefingJson).toMatchObject({
+      strongestAngles: expect.any(Array),
+      importantGaps: expect.any(Array),
+      storyPlan: expect.any(Array),
+    });
     const incident = session?.assessments.find((item) => item.text === "Leads incident response");
     expect(incident?.strength).toBe("STRONG");
     expect(incident?.supportingFactIds).toEqual(expect.arrayContaining(["skill_4"]));
@@ -1107,6 +1172,16 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       expect(bank?.seekerAuthored).toBe(true);
       expect(JSON.stringify(bank?.competencyLinks).toLowerCase()).toContain("python");
     }
+    await confirmConsultationResult({ organizationId, campaignId });
+    const afterUse = await prisma.consultationStatement.findMany({
+      where: { sessionId: session!.id, status: "DRAFT" },
+    });
+    expect(afterUse).toHaveLength(0);
+    const laterQuestions = await prisma.consultationTurn.findMany({
+      where: { sessionId: session!.id, speaker: "CONSULTANT" },
+      orderBy: { sequence: "asc" },
+    });
+    expect(laterQuestions.length).toBeGreaterThan(1);
   });
 
   it("asks about a thin Action and polishes honestly when the follow-up is declined", async () => {

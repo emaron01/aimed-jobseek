@@ -97,6 +97,7 @@ function resumeTargetLength(context: ReadyApplicationGenerationContext) {
 export function buildResumeAssetMessages(input: {
   context: ReadyApplicationGenerationContext;
   hiddenRoleIds: string[];
+  condensedRoleIds: string[];
   regenerationInstruction: string | null;
   qualityFeedback: string[];
 }): AiMessage[] {
@@ -133,6 +134,7 @@ export function buildResumeAssetMessages(input: {
           })),
         experience: input.context.profile.experience,
         hiddenRoleIds: input.hiddenRoleIds,
+        condensedRoleIds: input.condensedRoleIds,
         seekerSources: seekerSources(input.context),
         responseShape: {
           type: "RESUME",
@@ -150,6 +152,7 @@ export function buildResumeAssetMessages(input: {
               endDate: "exact supplied date|null",
               location: "exact supplied location|null",
               hidden: "boolean from hiddenRoleIds only",
+              condensed: "boolean from condensedRoleIds only",
               bullets: ["claim"],
             },
           ],

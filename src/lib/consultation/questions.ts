@@ -1,5 +1,5 @@
 import type { EvidenceAssessment } from "@/lib/consultation/assess";
-import { openGaps } from "@/lib/consultation/assess";
+import { openGaps, requirementMeaning } from "@/lib/consultation/assess";
 import { questionRestatesTarget } from "@/lib/consultation/output-quality";
 import { consultationConfig } from "@/lib/product-config/consultation";
 
@@ -31,10 +31,7 @@ export function validModelQuestion(text: string): boolean {
 }
 
 function targetMeaning(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+  return requirementMeaning(text);
 }
 
 export function matchConsultationFocus(input: {
@@ -114,12 +111,9 @@ export function planQuestionRound(input: {
     const remaining = gaps.filter((gap) => gap.key !== focus.key);
     gaps.splice(0, gaps.length, focus, ...remaining);
   }
-  const room = input.includeChronology && !input.chronologyAsked
-    ? consultationConfig.roundSize - 1
-    : consultationConfig.roundSize;
   const selected: EvidenceAssessment[] = [];
   const selectedMeanings = new Set<string>();
-  const selectionLimit = Math.max(room, 0);
+  const selectionLimit = consultationConfig.roundSize;
   for (const gap of gaps) {
     if (selected.length >= selectionLimit) break;
     const meaning = targetMeaning(gap.text);
@@ -183,7 +177,11 @@ export function planQuestionRound(input: {
       whoCaresNote: modelQuestion.whoCaresNote.trim(),
     };
   });
-  if (input.includeChronology && !input.chronologyAsked) {
+  if (
+    input.includeChronology &&
+    !input.chronologyAsked &&
+    questions.length === 0
+  ) {
     const modelQuestion = byKey.get("chronology");
     const role = modelQuestion
       ? rolesById.get(modelQuestion.hiringTeamRoleId)

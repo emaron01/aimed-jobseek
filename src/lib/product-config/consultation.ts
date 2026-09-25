@@ -4,7 +4,7 @@
  */
 export const consultationConfig = Object.freeze({
   displayName: "Harper",
-  roundSize: 3,
+  roundSize: 1,
   maxFollowUpsPerTarget: 2,
   qualityRegenerationAttempts: 2,
   interviewAnswerMaxWords: 220,
@@ -63,4 +63,20 @@ export const consultationStatementLabels = Object.freeze({
   RESUME_BULLET: "Resume bullet",
   DRAFT: "Draft",
   APPROVED: "Approved",
+});
+
+export const consultationConversationCopy = Object.freeze({
+  whereYouStand: "Where you stand",
+  threadReply: "Reply",
+  useThis: "Use this",
+  changeSomething: "Change something",
+  notAccurate: "Not accurate",
+  changePrompt: "What should change?",
+  generationFailed: `${consultationConfig.displayName} could not write this coaching. Retry when the consultation model is available.`,
+  retry: `Retry ${consultationConfig.displayName}`,
+  start: `Start with ${consultationConfig.displayName}`,
+  planComplete: "The plan for this conversation is complete.",
+  nextStepTitle: "Next step",
+  nextStepFailed: `${consultationConfig.displayName} could not write the next step. Retry when the consultation model is available.`,
+  nextStepRetry: "Retry next step",
 });

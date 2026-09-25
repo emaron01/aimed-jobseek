@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { retryApplicationNextStep } from "@/lib/application/next-step";
 import {
   confirmApplicationEmployerIdentity,
   nameApplicationEmployer,
@@ -9,6 +10,7 @@ import {
   rescoreApplicationFit,
   retryApplicationResearch,
 } from "@/lib/application/service";
+import { consultationConversationCopy } from "@/lib/product-config";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { getApplicationResearchStatus } from "@/lib/application/research-status";
 import type { ApplicationResearchStatusView } from "@/lib/application/research-status";
@@ -180,5 +182,24 @@ export async function overrideApplicationFitAction(
     return { ok: true, message: "Employer-fit override saved." };
   } catch (error) {
     return fail(error, "The employer-fit override could not be saved.");
+  }
+}
+
+export async function retryApplicationNextStepAction(
+  _prev: ApplicationActionResult | null,
+  formData: FormData,
+): Promise<ApplicationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    await retryApplicationNextStep({ organizationId, campaignId });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: consultationConversationCopy.nextStepRetry };
+  } catch (error) {
+    return fail(error, consultationConversationCopy.nextStepFailed);
   }
 }

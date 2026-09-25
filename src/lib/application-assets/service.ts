@@ -26,6 +26,10 @@ import {
   type CoverLetterAssetContent,
   type ResumeAssetContent,
 } from "./contract";
+import {
+  acceptedPresentationPlan,
+  condensedRoleIdsFromPlan,
+} from "./plan-service";
 import type { AssetGenerationResult } from "./outreach-types";
 
 export type { AssetGenerationResult } from "./outreach-types";
@@ -226,6 +230,7 @@ function resumeStructureErrors(
   content: ResumeAssetContent,
   context: ReadyApplicationGenerationContext,
   hiddenRoleIds: string[],
+  condensedRoleIds: string[],
 ): string[] {
   const errors: string[] = [];
   const expected = context.profile.experience;
@@ -252,6 +257,17 @@ function resumeStructureErrors(
     }
     if (role.hidden !== hiddenRoleIds.includes(profileRole.id)) {
       errors.push(`Role ${profileRole.id} did not preserve the seeker's hide choice.`);
+    }
+    const shouldCondense =
+      condensedRoleIds.includes(profileRole.id) && !role.hidden;
+    if (Boolean(role.condensed) !== shouldCondense) {
+      errors.push(`Role ${profileRole.id} did not preserve the accepted plan's condensation.`);
+    }
+    if (role.condensed && role.bullets.length > 0) {
+      errors.push(`Condensed role ${profileRole.id} must keep title and employer only.`);
+    }
+    if (role.condensed && role.hidden) {
+      errors.push(`Role ${profileRole.id} cannot be hidden and condensed.`);
     }
   }
   const allowedContactIds = new Set(
@@ -596,6 +612,7 @@ export async function validateAssetContent(input: {
   content: ApplicationAssetContent;
   context: ReadyApplicationGenerationContext;
   hiddenRoleIds?: string[];
+  condensedRoleIds?: string[];
   salutation?: string;
 }): Promise<string[]> {
   const claims = assetClaims(input.content);
@@ -638,6 +655,7 @@ export async function validateAssetContent(input: {
         input.content,
         input.context,
         input.hiddenRoleIds ?? [],
+        input.condensedRoleIds ?? [],
       ),
     );
   } else if (input.content.type === "COVER_LETTER") {
@@ -735,6 +753,18 @@ export async function generateApplicationAsset(input: {
       violations: [],
     };
   }
+  const acceptedPlan = await acceptedPresentationPlan({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    type: input.type,
+  });
+  if (!acceptedPlan) {
+    return {
+      ok: false,
+      message: applicationAssetConfig.labels.acceptPlanFirst,
+      violations: [],
+    };
+  }
   if (!base.requirement || !base.profile) {
     return {
       ok: false,
@@ -762,11 +792,21 @@ export async function generateApplicationAsset(input: {
     ...new Set((input.hiddenRoleIds ?? []).map((id) => id.trim()).filter(Boolean)),
   ];
   const allowedRoleIds = new Set(context.profile.experience.map((role) => role.id));
+  const condensedRoleIds = condensedRoleIdsFromPlan(acceptedPlan).filter(
+    (id) => !hiddenRoleIds.includes(id),
+  );
   if (hiddenRoleIds.some((id) => !allowedRoleIds.has(id))) {
     return {
       ok: false,
       message: "A hidden role does not belong to the Personal Profile.",
       violations: ["Unknown hidden role."],
+    };
+  }
+  if (condensedRoleIds.some((id) => !allowedRoleIds.has(id))) {
+    return {
+      ok: false,
+      message: "A condensed role does not belong to the Personal Profile.",
+      violations: ["Unknown condensed role."],
     };
   }
   const salutation = coverLetterSalutation(context);
@@ -781,6 +821,7 @@ export async function generateApplicationAsset(input: {
         ? await generateResumeWithModel({
             context,
             hiddenRoleIds,
+            condensedRoleIds,
             regenerationInstruction: input.regenerationInstruction ?? null,
             qualityFeedback: feedback,
           })
@@ -816,6 +857,7 @@ export async function generateApplicationAsset(input: {
       content,
       context,
       hiddenRoleIds,
+      condensedRoleIds,
       salutation,
     });
     if (input.type === "COVER_LETTER") {
@@ -926,10 +968,17 @@ export async function saveEditedApplicationAsset(input: {
     parsed.data.type === "RESUME"
       ? parsed.data.experience.filter((role) => role.hidden).map((role) => role.roleId)
       : [];
+  const condensedRoleIds =
+    parsed.data.type === "RESUME"
+      ? parsed.data.experience
+          .filter((role) => role.condensed)
+          .map((role) => role.roleId)
+      : [];
   const violations = await validateAssetContent({
     content: parsed.data,
     context: readyContext,
     hiddenRoleIds,
+    condensedRoleIds,
     salutation: coverLetterSalutation(readyContext),
   });
   if (violations.length > 0) {

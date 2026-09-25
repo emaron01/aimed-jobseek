@@ -80,6 +80,7 @@ function validResume(): ResumeAssetContent {
         endDate: null,
         location: "Seattle, WA",
         hidden: false,
+        condensed: false,
         bullets: [
           {
             id: "bullet-1",
@@ -99,6 +100,7 @@ function validResume(): ResumeAssetContent {
         endDate: "2020-12",
         location: "Remote",
         hidden: false,
+        condensed: false,
         bullets: [
           {
             id: "bullet-2",
@@ -162,6 +164,7 @@ describe("application asset date display", () => {
       endDate: "2016",
       location: null,
       hidden: false,
+      condensed: false,
       bullets: [],
     });
     const buffer = await renderApplicationAssetDocx(resume);
@@ -330,6 +333,83 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     generateStructured.mockReset();
     isAssetAiConfigured.mockReturnValue(true);
     await prisma.applicationAsset.deleteMany({ where: { campaignId } });
+    for (const type of ["RESUME", "COVER_LETTER"] as const) {
+      await prisma.applicationPresentationPlan.upsert({
+        where: { campaignId_type: { campaignId, type } },
+        create: {
+          organizationId,
+          campaignId,
+          type,
+          status: "ACCEPTED",
+          acceptedAt: new Date(),
+          promptVersion: "1",
+          planJson:
+            type === "RESUME"
+              ? {
+                  type: "RESUME",
+                  leadingRoleIds: ["role_1"],
+                  featuredStories: ["Invoice reliability at Northwind"],
+                  summaryAngle: "Lead with production reliability ownership.",
+                  earlierExperienceHeading: "Earlier experience",
+                  condensedRoleIds: [],
+                  recommendations: [
+                    {
+                      text: "Lead with Northwind",
+                      reason: "It is the most relevant production role.",
+                      roleId: "role_1",
+                    },
+                  ],
+                }
+              : {
+                  type: "COVER_LETTER",
+                  angle: "Reliability ownership for this role",
+                  storiesToUse: ["Invoice rewrite"],
+                  gapHandling: "Name the robotics gap and how you close it.",
+                  recommendations: [
+                    {
+                      text: "Open with reliability",
+                      reason: "That is the strongest overlap.",
+                      roleId: null,
+                    },
+                  ],
+                },
+        },
+        update: {
+          status: "ACCEPTED",
+          acceptedAt: new Date(),
+          planJson:
+            type === "RESUME"
+              ? {
+                  type: "RESUME",
+                  leadingRoleIds: ["role_1"],
+                  featuredStories: ["Invoice reliability at Northwind"],
+                  summaryAngle: "Lead with production reliability ownership.",
+                  earlierExperienceHeading: "Earlier experience",
+                  condensedRoleIds: [],
+                  recommendations: [
+                    {
+                      text: "Lead with Northwind",
+                      reason: "It is the most relevant production role.",
+                      roleId: "role_1",
+                    },
+                  ],
+                }
+              : {
+                  type: "COVER_LETTER",
+                  angle: "Reliability ownership for this role",
+                  storiesToUse: ["Invoice rewrite"],
+                  gapHandling: "Name the robotics gap and how you close it.",
+                  recommendations: [
+                    {
+                      text: "Open with reliability",
+                      reason: "That is the strongest overlap.",
+                      roleId: null,
+                    },
+                  ],
+                },
+        },
+      });
+    }
   });
 
   function validCoverLetter(
@@ -415,6 +495,85 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
       },
     );
   }
+
+  it("does not generate a resume until the seeker accepts a plan", async () => {
+    await prisma.applicationPresentationPlan.deleteMany({
+      where: { campaignId, type: "RESUME" },
+    });
+    installModel({ resumes: [validResume()] });
+    const result = await generateApplicationAsset({
+      organizationId,
+      campaignId,
+      userId,
+      type: "RESUME",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toBe(applicationAssetConfig.labels.acceptPlanFirst);
+    }
+    expect(
+      await prisma.applicationAsset.count({ where: { campaignId, type: "RESUME" } }),
+    ).toBe(0);
+  });
+
+  it("keeps condensed roles visible by title and employer after an accepted plan", async () => {
+    await prisma.applicationPresentationPlan.update({
+      where: { campaignId_type: { campaignId, type: "RESUME" } },
+      data: {
+        planJson: {
+          type: "RESUME",
+          leadingRoleIds: ["role_1"],
+          featuredStories: ["Invoice reliability at Northwind"],
+          summaryAngle: "Lead with production reliability ownership.",
+          earlierExperienceHeading: "Earlier experience",
+          condensedRoleIds: ["role_2"],
+          recommendations: [
+            {
+              text: "Condense Contoso",
+              reason: "It is older than the configured threshold.",
+              roleId: "role_2",
+            },
+          ],
+        },
+      },
+    });
+    const condensed = validResume();
+    condensed.experience[1] = {
+      ...condensed.experience[1]!,
+      condensed: true,
+      bullets: [],
+    };
+    installModel({ resumes: [condensed] });
+    const result = await generateApplicationAsset({
+      organizationId,
+      campaignId,
+      userId,
+      type: "RESUME",
+    });
+    expect(result.ok).toBe(true);
+    const saved = await prisma.applicationAsset.findFirst({
+      where: { campaignId, type: "RESUME" },
+    });
+    expect(saved?.contentJson).toMatchObject({
+      experience: [
+        { roleId: "role_1", hidden: false, condensed: false },
+        {
+          roleId: "role_2",
+          employer: "Contoso Health",
+          title: "Software Engineer",
+          hidden: false,
+          condensed: true,
+        },
+      ],
+    });
+    const docx = await renderApplicationAssetDocx(
+      saved!.contentJson as ResumeAssetContent,
+    );
+    const zip = await JSZip.loadAsync(docx);
+    const xml = await zip.file("word/document.xml")!.async("string");
+    expect(xml).toContain("Contoso Health");
+    expect(xml).toContain("Software Engineer");
+  });
 
   it("fails closed and never saves a resume with an unknown claim source", async () => {
     const invalid = validResume();

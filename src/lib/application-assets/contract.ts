@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const RESUME_ASSET_PROMPT_VERSION = "4";
+export const RESUME_ASSET_PROMPT_VERSION = "5";
 export const COVER_LETTER_ASSET_PROMPT_VERSION = "11";
 export const OUTREACH_EMAIL_PROMPT_VERSION = "5";
 export const OUTREACH_LINKEDIN_NOTE_PROMPT_VERSION = "5";
@@ -33,6 +33,7 @@ export const resumeExperienceSchema = z.object({
   endDate: z.string().nullable(),
   location: z.string().nullable(),
   hidden: z.boolean(),
+  condensed: z.boolean().default(false),
   bullets: z.array(assetClaimSchema),
 });
 

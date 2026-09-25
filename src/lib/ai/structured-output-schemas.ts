@@ -33,6 +33,11 @@ import {
   resumeAssetContentSchema,
 } from "@/lib/application-assets/contract";
 import {
+  coverLetterPresentationPlanSchema,
+  resumePresentationPlanSchema,
+} from "@/lib/application-assets/plan-contract";
+import { applicationNextStepSchema } from "@/lib/application/next-step-contract";
+import {
   interviewClarifyingQuestionsSchema,
   interviewGuideContentSchema,
   interviewThankYouClarifyingQuestionsSchema,
@@ -165,6 +170,21 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   applicationSummaryGuidance: {
     schemaName: "application_summary_guidance",
     schema: applicationSummaryGuidanceSchema,
+    usageOperations: ["CONSULTATION"],
+  },
+  resumePresentationPlan: {
+    schemaName: "resume_presentation_plan",
+    schema: resumePresentationPlanSchema,
+    usageOperations: ["CONSULTATION"],
+  },
+  coverLetterPresentationPlan: {
+    schemaName: "cover_letter_presentation_plan",
+    schema: coverLetterPresentationPlanSchema,
+    usageOperations: ["CONSULTATION"],
+  },
+  applicationNextStep: {
+    schemaName: "application_next_step",
+    schema: applicationNextStepSchema,
     usageOperations: ["CONSULTATION"],
   },
   resumeAsset: {

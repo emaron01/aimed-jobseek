@@ -53,6 +53,13 @@ export async function planConsultationWithModel(input: {
   qualityFeedback?: string[];
 }): Promise<ConsultationPlanAiResult> {
   if (!isConsultationAiConfigured()) {
+    console.error(
+      JSON.stringify({
+        event: "consultation_coach_failed",
+        cause: "CONSULTATION_AI_not_configured",
+        message: UNCONFIGURED,
+      }),
+    );
     return { ok: false, message: UNCONFIGURED };
   }
   try {
@@ -67,8 +74,12 @@ export async function planConsultationWithModel(input: {
     return { ok: true, data: response.data };
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
+    const cause =
+      error instanceof Error && error.cause instanceof Error
+        ? error.cause.message
+        : message;
     console.error(
-      JSON.stringify({ event: "consultation_coach_failed", message }),
+      JSON.stringify({ event: "consultation_coach_failed", message, cause }),
     );
     return {
       ok: false,

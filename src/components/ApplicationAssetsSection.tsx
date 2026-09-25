@@ -2,9 +2,11 @@
 
 import { useActionState, useMemo, useState } from "react";
 import {
+  acceptPresentationPlanAction,
   approveApplicationAssetAction,
   generateApplicationAssetAction,
   saveEditedApplicationAssetAction,
+  writePresentationPlanAction,
   type ApplicationAssetActionResult,
 } from "@/app/actions/application-assets";
 import {
@@ -12,6 +14,7 @@ import {
   type ApplicationAssetContent,
   type AssetClaim,
 } from "@/lib/application-assets/contract";
+import type { PresentationPlan } from "@/lib/application-assets/plan-contract";
 import { formatResumeRoleMeta } from "@/lib/application-assets/dates";
 import {
   formatAssetStatusLabel,
@@ -38,6 +41,12 @@ type ProfileRole = {
   title: string | null;
   startDate: string | null;
   endDate: string | null;
+};
+
+type PlanRow = {
+  type: "RESUME" | "COVER_LETTER";
+  status: "DRAFT" | "ACCEPTED";
+  plan: PresentationPlan;
 };
 
 const initial: ApplicationAssetActionResult | null = null;
@@ -72,7 +81,13 @@ function ClaimText({ claim }: { claim: AssetClaim }) {
   );
 }
 
-function AssetPreview({ content }: { content: ApplicationAssetContent }) {
+function AssetPreview({
+  content,
+  earlierExperienceHeading,
+}: {
+  content: ApplicationAssetContent;
+  earlierExperienceHeading: string | null;
+}) {
   if (content.type === "COVER_LETTER") {
     return (
       <article className="space-y-4 text-sm leading-6 text-slate-800">
@@ -91,6 +106,8 @@ function AssetPreview({ content }: { content: ApplicationAssetContent }) {
     );
   }
   if (content.type !== "RESUME") return null;
+  const featured = content.experience.filter((role) => !role.hidden && !role.condensed);
+  const condensed = content.experience.filter((role) => !role.hidden && role.condensed);
   return (
     <article className="space-y-4 text-sm text-slate-800">
       <header className="text-center">
@@ -114,25 +131,35 @@ function AssetPreview({ content }: { content: ApplicationAssetContent }) {
         ))}
       </AssetSection>
       <AssetSection title={applicationAssetConfig.resumeHeadings.experience}>
-        {content.experience
-          .filter((role) => !role.hidden)
-          .map((role) => (
-            <div key={role.roleId} className="space-y-1">
-              <p className="font-medium">
+        {featured.map((role) => (
+          <div key={role.roleId} className="space-y-1">
+            <p className="font-medium">
+              {role.title}, {role.employer}
+            </p>
+            <p className="text-xs text-slate-600">
+              {formatResumeRoleMeta(role)}
+            </p>
+            <ul className="list-disc pl-5">
+              {role.bullets.map((claim) => (
+                <li key={claim.id}>
+                  <ClaimText claim={claim} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        {condensed.length > 0 ? (
+          <div className="space-y-1" data-testid="condensed-roles">
+            {earlierExperienceHeading ? (
+              <p className="font-medium">{earlierExperienceHeading}</p>
+            ) : null}
+            {condensed.map((role) => (
+              <p key={role.roleId} className="font-medium">
                 {role.title}, {role.employer}
               </p>
-              <p className="text-xs text-slate-600">
-                {formatResumeRoleMeta(role)}
-              </p>
-              <ul className="list-disc pl-5">
-                {role.bullets.map((claim) => (
-                  <li key={claim.id}>
-                    <ClaimText claim={claim} />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+            ))}
+          </div>
+        ) : null}
       </AssetSection>
       {[
         [applicationAssetConfig.resumeHeadings.skills, content.skills],
@@ -250,10 +277,12 @@ function AssetHistory({
   campaignId,
   rows,
   canEdit,
+  earlierExperienceHeading,
 }: {
   campaignId: string;
   rows: AssetRow[];
   canEdit: boolean;
+  earlierExperienceHeading: string | null;
 }) {
   const [approveResult, approveAction] = useActionState(
     approveApplicationAssetAction,
@@ -272,7 +301,10 @@ function AssetHistory({
             {new Date(asset.createdAt).toLocaleString()}
           </summary>
           <div className="mt-4 space-y-4">
-            <AssetPreview content={asset.content} />
+            <AssetPreview
+              content={asset.content}
+              earlierExperienceHeading={earlierExperienceHeading}
+            />
             {asset.guidance ? (
               <p className="text-xs text-slate-500">
                 {applicationAssetConfig.labels.changeInstruction} {asset.guidance}
@@ -306,11 +338,94 @@ function AssetHistory({
   );
 }
 
+function PlanPanel({
+  campaignId,
+  type,
+  plan,
+  canEdit,
+}: {
+  campaignId: string;
+  type: "RESUME" | "COVER_LETTER";
+  plan: PlanRow | null;
+  canEdit: boolean;
+}) {
+  const [writeResult, writeAction] = useActionState(writePresentationPlanAction, initial);
+  const [acceptResult, acceptAction] = useActionState(acceptPresentationPlanAction, initial);
+  return (
+    <div className="space-y-3" data-testid={`${type.toLowerCase()}-plan`}>
+      {plan ? (
+        <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+          {plan.plan.type === "RESUME" ? (
+            <>
+              <p className="text-sm text-slate-800">{plan.plan.summaryAngle}</p>
+              <ul className="list-disc space-y-1 pl-5 text-sm text-slate-800">
+                {plan.plan.recommendations.map((item) => (
+                  <li key={`${item.text}-${item.reason}`}>
+                    {item.text} {item.reason}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-slate-800">{plan.plan.angle}</p>
+              <p className="text-sm text-slate-800">{plan.plan.gapHandling}</p>
+              <ul className="list-disc space-y-1 pl-5 text-sm text-slate-800">
+                {plan.plan.recommendations.map((item) => (
+                  <li key={`${item.text}-${item.reason}`}>
+                    {item.text} {item.reason}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      ) : null}
+      {canEdit && !plan ? (
+        <form action={writeAction} className="space-y-2">
+          <input type="hidden" name="campaignId" value={campaignId} />
+          <input type="hidden" name="type" value={type} />
+          <SubmitButton>{applicationAssetConfig.labels.writePlan}</SubmitButton>
+          <Status result={writeResult} />
+        </form>
+      ) : null}
+      {canEdit && plan?.status === "DRAFT" ? (
+        <div className="space-y-3">
+          <form action={acceptAction}>
+            <input type="hidden" name="campaignId" value={campaignId} />
+            <input type="hidden" name="type" value={type} />
+            <SubmitButton>{applicationAssetConfig.labels.acceptPlan}</SubmitButton>
+          </form>
+          <form action={writeAction} className="space-y-2">
+            <input type="hidden" name="campaignId" value={campaignId} />
+            <input type="hidden" name="type" value={type} />
+            <label className="block text-sm">
+              <span className="font-medium text-slate-700">
+                {applicationAssetConfig.labels.adjustPlanPrompt}
+              </span>
+              <textarea
+                name="adjustmentNote"
+                required
+                rows={2}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              />
+            </label>
+            <SubmitButton>{applicationAssetConfig.labels.adjustPlan}</SubmitButton>
+          </form>
+          <Status result={acceptResult} />
+          <Status result={writeResult} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function AssetTypePanel({
   campaignId,
   type,
   rows,
   profileRoles,
+  plan,
   canEdit,
   thinNotice,
 }: {
@@ -318,6 +433,7 @@ function AssetTypePanel({
   type: "RESUME" | "COVER_LETTER";
   rows: AssetRow[];
   profileRoles: ProfileRole[];
+  plan: PlanRow | null;
   canEdit: boolean;
   thinNotice: string | null;
 }) {
@@ -326,6 +442,9 @@ function AssetTypePanel({
     type === "RESUME" && rows[0]?.content.type === "RESUME"
       ? rows[0].content
       : null;
+  const accepted = plan?.status === "ACCEPTED";
+  const earlierExperienceHeading =
+    plan?.plan.type === "RESUME" ? plan.plan.earlierExperienceHeading : null;
   return (
     <section className="space-y-4 rounded-md border border-slate-200 p-4">
         <h3 className="font-semibold text-slate-900">
@@ -338,44 +457,52 @@ function AssetTypePanel({
             {thinNotice}
           </p>
         ) : null}
-      {canEdit ? <form action={action} className="space-y-3">
+      <PlanPanel campaignId={campaignId} type={type} plan={plan} canEdit={canEdit} />
+      {canEdit && accepted ? <form action={action} className="space-y-3">
         <input type="hidden" name="campaignId" value={campaignId} />
         <input type="hidden" name="type" value={type} />
         {type === "RESUME" ? (
-          <fieldset>
-            <legend className="text-sm font-medium">
-              {applicationAssetConfig.labels.hideRolesLegend}
-            </legend>
-            <div className="mt-2 space-y-1">
-              {profileRoles.map((role) => (
-                <label key={role.id} className="block text-sm">
-                  <input
-                    type="checkbox"
-                    name="hiddenRoleId"
-                    value={role.id}
-                    defaultChecked={Boolean(
-                      latestResume?.experience.find(
-                        (item) => item.roleId === role.id,
-                      )?.hidden,
-                    )}
-                    className="mr-2"
-                  />
-                  {[role.title, role.employer].filter(Boolean).join(" at ")}
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          <details>
+            <summary className="cursor-pointer text-sm font-medium">
+              {applicationAssetConfig.labels.adjustManually}
+            </summary>
+            <fieldset className="mt-2">
+              <legend className="text-sm font-medium">
+                {applicationAssetConfig.labels.hideRolesLegend}
+              </legend>
+              <div className="mt-2 space-y-1">
+                {profileRoles.map((role) => (
+                  <label key={role.id} className="block text-sm">
+                    <input
+                      type="checkbox"
+                      name="hiddenRoleId"
+                      value={role.id}
+                      defaultChecked={Boolean(
+                        latestResume?.experience.find(
+                          (item) => item.roleId === role.id,
+                        )?.hidden,
+                      )}
+                      className="mr-2"
+                    />
+                    {[role.title, role.employer].filter(Boolean).join(" at ")}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </details>
         ) : null}
-        <label className="block text-sm">
-          <span className="font-medium text-slate-700">
-            {applicationAssetConfig.labels.changeInstruction}
-          </span>
-          <textarea
-            name="regenerationInstruction"
-            rows={2}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-          />
-        </label>
+        {rows.length ? (
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">
+              {applicationAssetConfig.labels.changeInstruction}
+            </span>
+            <textarea
+              name="regenerationInstruction"
+              rows={2}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            />
+          </label>
+        ) : null}
         <SubmitButton>
           {rows.length
             ? applicationAssetConfig.labels.regenerate
@@ -384,7 +511,12 @@ function AssetTypePanel({
         <Status result={result} />
       </form> : null}
       {rows.length ? (
-        <AssetHistory campaignId={campaignId} rows={rows} canEdit={canEdit} />
+        <AssetHistory
+          campaignId={campaignId}
+          rows={rows}
+          canEdit={canEdit}
+          earlierExperienceHeading={earlierExperienceHeading}
+        />
       ) : (
         <p className="text-sm text-slate-600">
           {applicationAssetConfig.labels.emptyHistory}
@@ -398,29 +530,36 @@ export function ApplicationAssetsSection({
   campaignId,
   assets,
   profileRoles,
+  plans,
   canEdit,
   coverLetterThinNotice = null,
+  defaultOpen = false,
 }: {
   campaignId: string;
   assets: Array<Omit<AssetRow, "content"> & { content: unknown }>;
   profileRoles: ProfileRole[];
+  plans: PlanRow[];
   canEdit: boolean;
   coverLetterThinNotice?: string | null;
+  defaultOpen?: boolean;
 }) {
   const valid = assets.flatMap((asset) => {
     const parsed = applicationAssetContentSchema.safeParse(asset.content);
     return parsed.success ? [{ ...asset, content: parsed.data }] : [];
   });
   return (
-    <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
-      <div>
-        <h2 className="text-base font-semibold text-slate-900">
-          {applicationAssetConfig.labels.sectionTitle}
-        </h2>
-        <p className="mt-1 text-sm text-slate-600">
-          {applicationAssetConfig.labels.sectionHelp}
-        </p>
-      </div>
+    <details
+      open={defaultOpen}
+      className="space-y-4 rounded-lg border border-slate-200 bg-white p-5"
+      data-testid="application-assets"
+    >
+      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+        {applicationAssetConfig.labels.sectionTitle}
+      </summary>
+      <div className="mt-4 space-y-4">
+      <p className="text-sm text-slate-600">
+        {applicationAssetConfig.labels.sectionHelp}
+      </p>
       <div className="grid gap-5 xl:grid-cols-2">
         {(["RESUME", "COVER_LETTER"] as const).map((type) => (
           <AssetTypePanel
@@ -429,11 +568,13 @@ export function ApplicationAssetsSection({
             type={type}
             rows={valid.filter((asset) => asset.type === type)}
             profileRoles={profileRoles}
+            plan={plans.find((item) => item.type === type) ?? null}
             canEdit={canEdit}
             thinNotice={type === "COVER_LETTER" ? coverLetterThinNotice : null}
           />
         ))}
       </div>
-    </section>
+      </div>
+    </details>
   );
 }

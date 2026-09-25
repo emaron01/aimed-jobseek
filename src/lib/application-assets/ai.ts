@@ -56,6 +56,7 @@ function failure(operation: string, error: unknown, message: string) {
 export function generateResumeWithModel(input: {
   context: ReadyApplicationGenerationContext;
   hiddenRoleIds: string[];
+  condensedRoleIds: string[];
   regenerationInstruction: string | null;
   qualityFeedback: string[];
 }): Promise<Result<ResumeAssetContent>> {

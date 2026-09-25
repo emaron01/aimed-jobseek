@@ -236,6 +236,7 @@ async function addTurn(input: {
     hiringTeamRoleId: string;
     whoCaresNote: string;
   };
+  intent?: string | null;
 }) {
   const sequence = await nextSequence(input.sessionId);
   return prisma.consultationTurn.create({
@@ -251,6 +252,7 @@ async function addTurn(input: {
       seekerAuthored: input.seekerAuthored ?? false,
       questionContextJson:
         (input.questionContext as Prisma.InputJsonValue | undefined) ?? undefined,
+      intent: input.intent ?? null,
     },
   });
 }
@@ -420,6 +422,13 @@ export async function polishAnswerWithQuality(input: {
 }
 
 async function failGeneration(sessionId: string, message: string): Promise<void> {
+  console.error(
+    JSON.stringify({
+      event: "consultation_generation_failed",
+      sessionId,
+      message,
+    }),
+  );
   await prisma.consultationSession.update({
     where: { id: sessionId },
     data: {
@@ -439,6 +448,7 @@ async function planAndStoreRound(input: {
   targets: EvidenceTarget[];
   roles: Awaited<ReturnType<typeof hiringTeam>>;
   focusTargetKey?: string | null;
+  focusGuidance?: string[];
 }): Promise<ReturnType<typeof planQuestionRound>> {
   await prisma.consultationSession.update({
     where: { id: input.sessionId },
@@ -478,7 +488,7 @@ async function planAndStoreRound(input: {
         ),
       ],
       focusTargetKey: input.focusTargetKey ?? null,
-      qualityFeedback: feedback,
+      qualityFeedback: [...(input.focusGuidance ?? []), ...feedback],
     });
     if (!plan.ok) {
       await failGeneration(input.sessionId, plan.message);
@@ -486,6 +496,11 @@ async function planAndStoreRound(input: {
     }
     const allNarrative = [
       plan.data.commentary,
+      plan.data.briefing.overall,
+      ...plan.data.briefing.strongestAngles,
+      ...plan.data.briefing.importantGaps,
+      ...plan.data.briefing.storyPlan,
+      plan.data.closingNote ?? "",
       ...plan.data.assessments.flatMap((item) => [item.explanation, item.strategy]),
       ...plan.data.questions.flatMap((item) => [
         item.text,
@@ -564,10 +579,21 @@ async function planAndStoreRound(input: {
     where: { id: input.sessionId },
     data: {
       coachNote: plan.data.commentary.trim() || null,
+      briefingJson: plan.data.briefing as Prisma.InputJsonValue,
       generationStatus: "READY",
       generationError: null,
     },
   });
+  if (questions.length === 0 && plan.data.closingNote?.trim()) {
+    await addTurn({
+      organizationId: input.organizationId,
+      sessionId: input.sessionId,
+      speaker: "CONSULTANT",
+      body: plan.data.closingNote.trim(),
+      targetKey: null,
+      intent: "CLOSING",
+    });
+  }
   return questions;
 }
 
@@ -745,6 +771,7 @@ async function processAnswerGeneration(input: {
   | {
       ok: true;
       followUpQuestion: string | null;
+      coaching: string | null;
       missingStarElements: string[];
     }
   | { ok: false }
@@ -903,6 +930,7 @@ async function processAnswerGeneration(input: {
   return {
     ok: true,
     followUpQuestion: verified.followUpQuestion,
+    coaching: extracted.data.coaching?.trim() || null,
     missingStarElements: verified.missingStarElements,
   };
 }
@@ -974,11 +1002,14 @@ export async function retryConsultationGeneration(input: {
           turn.followUp,
       ).length;
       if (followUpCount < consultationConfig.maxFollowUpsPerTarget) {
+        const coaching = processed.coaching?.trim();
         await addTurn({
           organizationId: input.organizationId,
           sessionId: session.id,
           speaker: "CONSULTANT",
-          body: processed.followUpQuestion,
+          body: coaching
+            ? `${coaching}\n\n${processed.followUpQuestion}`
+            : processed.followUpQuestion,
           targetKey: failedAnswer.targetKey,
           followUp: true,
         });
@@ -1108,6 +1139,10 @@ async function continueAfterAnsweredRound(input: {
     return unanswered(refreshed, turn.targetKey) != null;
   });
   if (open) return;
+  const pendingConfirmation = await prisma.consultationStatement.count({
+    where: { sessionId: input.sessionId, status: "DRAFT" },
+  });
+  if (pendingConfirmation > 0) return;
   const { requirement, profile } = await requireApplication(
     input.organizationId,
     input.campaignId,
@@ -1143,6 +1178,7 @@ export async function answerConsultationQuestion(input: {
   campaignId: string;
   targetKey: string;
   answer: string;
+  intent?: string | null;
 }): Promise<void> {
   const answer = input.answer.trim();
   if (!answer) throw new TenantError("Write an answer, or skip the question.");
@@ -1162,6 +1198,7 @@ export async function answerConsultationQuestion(input: {
     body: answer,
     targetKey: input.targetKey,
     seekerAuthored: true,
+    intent: input.intent ?? "REPLY",
   });
   const { requirement, profile } = await requireApplication(
     input.organizationId,
@@ -1204,16 +1241,27 @@ export async function answerConsultationQuestion(input: {
     input.targetKey !== "chronology" &&
     followUpCount < consultationConfig.maxFollowUpsPerTarget
   ) {
+    const coaching = processed.coaching?.trim();
     await addTurn({
       organizationId: input.organizationId,
       sessionId: session.id,
       speaker: "CONSULTANT",
-      body: processed.followUpQuestion,
+      body: coaching
+        ? `${coaching}\n\n${processed.followUpQuestion}`
+        : processed.followUpQuestion,
       targetKey: input.targetKey,
       followUp: true,
     });
     return;
   }
+  const pendingStatements = await prisma.consultationStatement.count({
+    where: {
+      sessionId: session.id,
+      turnId: seekerTurn.id,
+      status: "DRAFT",
+    },
+  });
+  if (pendingStatements > 0) return;
   await continueAfterAnsweredRound({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
@@ -1811,6 +1859,228 @@ export async function confirmConsultationProposal(input: {
       data: { status: "DONE" },
     });
   }
+}
+
+export async function confirmConsultationResult(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const session = await prisma.consultationSession.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+  });
+  if (!session) throw new TenantError("The consultation has not started.");
+  const drafts = await prisma.consultationStatement.findMany({
+    where: { sessionId: session.id, status: "DRAFT" },
+    orderBy: { createdAt: "asc" },
+  });
+  if (drafts.length === 0) {
+    throw new TenantError("There is no polished result to use yet.");
+  }
+  const turnId = drafts[0]!.turnId;
+  const proposals = await prisma.consultationProposal.findMany({
+    where: { sessionId: session.id, turnId, status: "PENDING" },
+  });
+  for (const proposal of proposals) {
+    const story =
+      proposal.storyJson && typeof proposal.storyJson === "object"
+        ? (proposal.storyJson as {
+            situation?: unknown;
+            task?: unknown;
+            action?: unknown;
+            result?: unknown;
+          })
+        : null;
+    await confirmConsultationProposal({
+      organizationId: input.organizationId,
+      proposalId: proposal.id,
+      text: proposal.text,
+      situation: typeof story?.situation === "string" ? story.situation : null,
+      task: typeof story?.task === "string" ? story.task : null,
+      action: typeof story?.action === "string" ? story.action : null,
+      result: typeof story?.result === "string" ? story.result : null,
+    });
+  }
+  for (const statement of drafts) {
+    await approveConsultationStatement({
+      organizationId: input.organizationId,
+      statementId: statement.id,
+      content: statement.content,
+    });
+  }
+  await continueAfterAnsweredRound({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    sessionId: session.id,
+  });
+}
+
+export async function reviseConsultationResult(input: {
+  organizationId: string;
+  campaignId: string;
+  instruction: string;
+}): Promise<void> {
+  const instruction = input.instruction.trim();
+  if (!instruction) throw new TenantError("Write what should change.");
+  const session = await prisma.consultationSession.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+  });
+  if (!session) throw new TenantError("The consultation has not started.");
+  const draft = await prisma.consultationStatement.findFirst({
+    where: { sessionId: session.id, status: "DRAFT" },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!draft) {
+    throw new TenantError("There is no polished result to change yet.");
+  }
+  const turn = await prisma.consultationTurn.findUnique({
+    where: { id: draft.turnId },
+  });
+  if (!turn?.targetKey) {
+    throw new TenantError("There is no polished result to change yet.");
+  }
+  const seekerTurn = await addTurn({
+    organizationId: input.organizationId,
+    sessionId: session.id,
+    speaker: "SEEKER",
+    body: instruction,
+    targetKey: turn.targetKey,
+    seekerAuthored: true,
+    intent: "CHANGE",
+  });
+  const { requirement, profile } = await requireApplication(
+    input.organizationId,
+    input.campaignId,
+  );
+  const targets = targetsFromRequirement(requirement);
+  const question = await prisma.consultationTurn.findFirst({
+    where: {
+      sessionId: session.id,
+      speaker: "CONSULTANT",
+      targetKey: turn.targetKey,
+    },
+    orderBy: { sequence: "asc" },
+  });
+  if (!question) {
+    throw new TenantError("The question for this story was not found.");
+  }
+  const prior = await prisma.consultationTurn.findMany({
+    where: {
+      sessionId: session.id,
+      speaker: "SEEKER",
+      targetKey: turn.targetKey,
+      skipped: false,
+    },
+    orderBy: { sequence: "asc" },
+  });
+  await processAnswerGeneration({
+    organizationId: input.organizationId,
+    sessionId: session.id,
+    turnId: seekerTurn.id,
+    answerContext: prior.map((item) => item.body).filter(Boolean).join("\n"),
+    question: question.body,
+    target: targets.find((item) => item.key === turn.targetKey) ?? null,
+    targets,
+    profile,
+  });
+}
+
+export async function flagConsultationInaccuracy(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const session = await prisma.consultationSession.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+  });
+  if (!session) throw new TenantError("The consultation has not started.");
+  const draft = await prisma.consultationStatement.findFirst({
+    where: { sessionId: session.id, status: "DRAFT" },
+    include: { turn: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!draft?.turn.targetKey) {
+    throw new TenantError("There is no polished result to correct yet.");
+  }
+  await addTurn({
+    organizationId: input.organizationId,
+    sessionId: session.id,
+    speaker: "SEEKER",
+    body: "Not accurate.",
+    targetKey: draft.turn.targetKey,
+    seekerAuthored: true,
+    intent: "NOT_ACCURATE",
+  });
+  const turns = await loadSessionTurns(session.id);
+  const { askedKeys, skippedKeys } = askedAndSkipped(turns);
+  askedKeys.delete(draft.turn.targetKey);
+  const { requirement, profile } = await requireApplication(
+    input.organizationId,
+    input.campaignId,
+  );
+  const roles = await hiringTeam(input.organizationId, input.campaignId);
+  const next = await planAndStoreRound({
+    organizationId: input.organizationId,
+    sessionId: session.id,
+    askedKeys,
+    skippedKeys,
+    profile,
+    requirement,
+    targets: targetsFromRequirement(requirement),
+    roles,
+    focusTargetKey: draft.turn.targetKey,
+    focusGuidance: [
+      "The seeker said the last polished result was not accurate. Ask what is wrong before rewriting.",
+    ],
+  });
+  if (next.length === 0) {
+    await failGeneration(
+      session.id,
+      "Consultation could not ask what was inaccurate. Retry consultation.",
+    );
+  }
+}
+
+export async function replyConsultation(input: {
+  organizationId: string;
+  campaignId: string;
+  answer: string;
+}): Promise<void> {
+  const answer = input.answer.trim();
+  if (!answer) throw new TenantError("Write a reply.");
+  const session = await prisma.consultationSession.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+  });
+  if (!session || session.status !== "IN_PROGRESS") {
+    throw new TenantError("The consultation is not waiting for a reply.");
+  }
+  const turns = await loadSessionTurns(session.id);
+  const open = turns.find(
+    (turn) =>
+      turn.speaker === "CONSULTANT" &&
+      turn.targetKey &&
+      unanswered(turns, turn.targetKey) != null,
+  );
+  if (open?.targetKey) {
+    await answerConsultationQuestion({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      targetKey: open.targetKey,
+      answer,
+      intent: "REPLY",
+    });
+    return;
+  }
+  const drafts = await prisma.consultationStatement.count({
+    where: { sessionId: session.id, status: "DRAFT" },
+  });
+  if (drafts > 0) {
+    await reviseConsultationResult({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      instruction: answer,
+    });
+    return;
+  }
+  throw new TenantError("There is no open question to answer.");
 }
 
 export async function dismissConsultationProposal(input: {

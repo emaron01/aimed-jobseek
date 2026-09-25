@@ -1,13 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { ApplicationAssetType } from "@prisma/client";
 import { requireCurrentUser } from "@/lib/auth/authz";
+import {
+  acceptPresentationPlan,
+  writePresentationPlan,
+} from "@/lib/application-assets/plan-service";
 import {
   approveApplicationAsset,
   generateApplicationAsset,
   saveEditedApplicationAsset,
 } from "@/lib/application-assets/service";
+import { applicationAssetConfig } from "@/lib/product-config";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
 
@@ -25,7 +29,7 @@ function campaignId(formData: FormData): string {
   return value;
 }
 
-function assetType(formData: FormData): ApplicationAssetType {
+function assetType(formData: FormData): "RESUME" | "COVER_LETTER" {
   const value = String(formData.get("type") ?? "");
   if (value !== "RESUME" && value !== "COVER_LETTER") {
     throw new TenantError("Application asset type is invalid.");
@@ -46,6 +50,51 @@ function errorResult(error: unknown): ApplicationAssetActionResult {
         ? error.message
         : "The application asset action could not be completed. Retry.",
   };
+}
+
+export async function writePresentationPlanAction(
+  _previous: ApplicationAssetActionResult | null,
+  formData: FormData,
+): Promise<ApplicationAssetActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const id = campaignId(formData);
+    const result = await writePresentationPlan({
+      organizationId,
+      campaignId: id,
+      type: assetType(formData),
+      adjustmentNote:
+        String(formData.get("adjustmentNote") ?? "").trim() || null,
+    });
+    if (!result.ok) {
+      return { ok: false, message: result.message };
+    }
+    revalidate(id);
+    return { ok: true, message: applicationAssetConfig.labels.writePlan };
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
+export async function acceptPresentationPlanAction(
+  _previous: ApplicationAssetActionResult | null,
+  formData: FormData,
+): Promise<ApplicationAssetActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const id = campaignId(formData);
+    await acceptPresentationPlan({
+      organizationId,
+      campaignId: id,
+      type: assetType(formData),
+    });
+    revalidate(id);
+    return { ok: true, message: applicationAssetConfig.labels.acceptPlan };
+  } catch (error) {
+    return errorResult(error);
+  }
 }
 
 export async function generateApplicationAssetAction(
