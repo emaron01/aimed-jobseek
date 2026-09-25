@@ -62,12 +62,14 @@ describe("application job worker logging", () => {
 describe("seeker-facing progress copy", () => {
   it("never uses queued wording", () => {
     expect(workspaceProgressText("CONSULTATION")).toMatch(/reading/i);
+    expect(workspaceProgressText("CONSULTATION", null, "continue")).toMatch(/next question/i);
+    expect(workspaceProgressText("CONSULTATION", null, "process_reply")).toMatch(/thinking/i);
     expect(workspaceProgressText("RESUME", null, "plan")).toMatch(/plan/i);
     expect(workspaceProgressText("RESUME")).toMatch(/Writing the Resume/i);
     expect(hiringTeamConfig.queuedBuild).not.toMatch(/queued/i);
     expect(consultationConversationCopy.starting).not.toMatch(/queued/i);
     expect(applicationResearchCopy.queued).not.toMatch(/queued/i);
-    expect(workspaceJobCopy.typing).toMatch(/typing/i);
+    expect(workspaceJobCopy.typing).toMatch(/thinking/i);
     const actions = [
       readFileSync("src/app/actions/consultation.ts", "utf8"),
       readFileSync("src/app/actions/application-assets.ts", "utf8"),
@@ -114,7 +116,7 @@ describe("workspace order and Harper start", () => {
 
 describe("why this company", () => {
   it("asks the why-this-company target once before other gaps", () => {
-    const questions = planQuestionRound({
+    const planned = planQuestionRound({
       assessments: [
         {
           key: WHY_THIS_COMPANY_TARGET_KEY,
@@ -158,9 +160,9 @@ describe("why this company", () => {
       includeChronology: false,
       chronologyAsked: false,
     });
-    expect(questions).toHaveLength(1);
-    expect(questions[0]?.targetKey).toBe(WHY_THIS_COMPANY_TARGET_KEY);
-    expect(questions[0]?.text).toBe(
+    expect(planned.questions).toHaveLength(1);
+    expect(planned.questions[0]?.targetKey).toBe(WHY_THIS_COMPANY_TARGET_KEY);
+    expect(planned.questions[0]?.text).toBe(
       consultationConversationCopy.whyThisCompanyQuestion,
     );
   });

@@ -18,6 +18,8 @@ import { prisma } from "@/lib/prisma-client";
 import { runWithTenantContext } from "@/lib/tenant/request-context";
 import {
   answerConsultationQuestion,
+  continueConsultationPlanning,
+  processConsultationReply,
   replyConsultation,
   retryConsultationGeneration,
   startConsultation,
@@ -209,6 +211,22 @@ async function processConsultationJob(input: {
 }): Promise<void> {
   if (input.operation === "retry") {
     await retryConsultationGeneration(input);
+    return;
+  }
+  if (input.operation === "continue") {
+    await continueConsultationPlanning({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+    });
+    return;
+  }
+  if (input.operation === "process_reply") {
+    await processConsultationReply({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      targetKey: input.targetKey,
+      answer: input.answer,
+    });
     return;
   }
   if (input.operation === "reply") {

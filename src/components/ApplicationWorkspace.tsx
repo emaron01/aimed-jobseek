@@ -66,6 +66,7 @@ import { ensureHiringTeamAfterResearch, ensureIdentityVerification } from "@/lib
 import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
 import { parseStringArray } from "@/lib/research";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
+import { persistExtractedExperienceDates } from "@/lib/product-research/restore-role-dates";
 
 function textList(value: unknown): string[] {
   return parseStringArray(value);
@@ -390,9 +391,19 @@ export async function ApplicationWorkspace({
       })
     : null;
   const outcomes = fit ? readOutcomes(fit.outcomesJson) : [];
-  const profile = parseCandidateProfileSafe(
+  let profile = parseCandidateProfileSafe(
     requirement.campaign.product.profileJson,
   );
+  if (profile.ok && canEdit) {
+    profile = {
+      ok: true,
+      profile: await persistExtractedExperienceDates({
+        organizationId,
+        productId: requirement.campaign.product.id,
+        profile: profile.profile,
+      }),
+    };
+  }
   const [approvedStatementCount, approvedStoryCount] = await Promise.all([
     prisma.consultationStatement.count({
       where: {

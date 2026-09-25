@@ -83,7 +83,8 @@ export async function planConsultationWithModel(input: {
     );
     return {
       ok: false,
-      message: "Consultation planning could not be generated. Retry consultation.",
+      message:
+        "Consultation planning did not return a usable plan. Retry consultation.",
     };
   }
 }

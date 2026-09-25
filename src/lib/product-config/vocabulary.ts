@@ -213,7 +213,7 @@ export const applicationWorkspaceCopy = Object.freeze({
     "This usually takes a minute or two. You can keep working; it will appear here when it's ready.",
   readyNotice: "Ready",
   readyLink: "View it",
-  typing: "{consultant} is typing…",
+  typing: "{consultant} is thinking…",
 });
 
 export const employerIdentityCopy = Object.freeze({

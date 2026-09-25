@@ -13,6 +13,16 @@ export type PlannedQuestion = {
   whoCaresNote: string;
 };
 
+export type DroppedQuestion = {
+  targetKey: string;
+  reason: string;
+};
+
+export type QuestionRoundPlan = {
+  questions: PlannedQuestion[];
+  dropped: DroppedQuestion[];
+};
+
 const SENIOR_ROLE =
   /\b(senior|staff|principal|director|lead|manager|head|vp|vice|executive|chief)\b/i;
 
@@ -68,6 +78,134 @@ export function matchConsultationFocus(input: {
   return best?.key ?? null;
 }
 
+function asksForDates(text: string): boolean {
+  return /\b(?:date|dates|when|from|started|ended|month|year)\b/i.test(text);
+}
+
+function asksForEstimate(text: string): boolean {
+  return /\b(?:approximate(?:ly)?|roughly|estimate[ds]?)\b/i.test(text);
+}
+
+function canCalculateExperience(gap: EvidenceAssessment): boolean {
+  const calculation = gap.experienceCalculation;
+  return Boolean(
+    calculation &&
+      calculation.missingDateRoleIds.length === 0 &&
+      calculation.periods.length > 0,
+  );
+}
+
+function isDateOnlyQuestion(text: string): boolean {
+  if (!asksForDates(text)) return false;
+  return !/\b(?:used|use|which roles|where you|what did you|how did you)\b/i.test(
+    text,
+  );
+}
+
+function questionForGap(input: {
+  gap: EvidenceAssessment;
+  modelQuestion:
+    | {
+        targetKey: string;
+        text: string;
+        requirementInterpretation: string | null;
+        hiringTeamRoleId: string;
+        whoCaresNote: string;
+      }
+    | undefined;
+  hiringTeam: Array<{ id: string; name: string }>;
+  rolesById: Map<string, { id: string; name: string }>;
+}): { question: PlannedQuestion } | { dropped: DroppedQuestion } {
+  const { gap, modelQuestion } = input;
+  if (!modelQuestion && gap.key === WHY_THIS_COMPANY_TARGET_KEY) {
+    const role = input.hiringTeam[0];
+    if (!role) {
+      return {
+        dropped: {
+          targetKey: gap.key,
+          reason:
+            "No hiring-team role was available to ask why this company matters, so that question was left for a later round.",
+        },
+      };
+    }
+    return {
+      question: {
+        targetKey: gap.key,
+        followUp: false,
+        text: consultationConversationCopy.whyThisCompanyQuestion,
+        requirementInterpretation: null,
+        hiringTeamRoleId: role.id,
+        whoCaresNote: `${role.name} will hear why this company matters to the seeker.`,
+      },
+    };
+  }
+  if (!modelQuestion) {
+    return {
+      dropped: {
+        targetKey: gap.key,
+        reason:
+          "A usable question was not written for this requirement, so it was left for a later round.",
+      },
+    };
+  }
+  const text = modelQuestion.text.trim();
+  const role = input.rolesById.get(modelQuestion.hiringTeamRoleId);
+  if (
+    !role ||
+    !modelQuestion.whoCaresNote.trim() ||
+    !modelQuestion.whoCaresNote.toLowerCase().includes(role.name.toLowerCase())
+  ) {
+    return {
+      dropped: {
+        targetKey: gap.key,
+        reason:
+          "The question was not grounded in a hiring-team role, so it was left out of this round.",
+      },
+    };
+  }
+  if (
+    modelQuestion.requirementInterpretation &&
+    questionRestatesTarget(text, gap.text)
+  ) {
+    return {
+      dropped: {
+        targetKey: gap.key,
+        reason:
+          "The question repeated the job wording instead of asking for a concrete story, so it was left out of this round.",
+      },
+    };
+  }
+  if (canCalculateExperience(gap) && isDateOnlyQuestion(text)) {
+    return {
+      dropped: {
+        targetKey: gap.key,
+        reason:
+          "Role dates already support a conservative years calculation, so a date-only question was not asked.",
+      },
+    };
+  }
+  if (asksForEstimate(text)) {
+    return {
+      dropped: {
+        targetKey: gap.key,
+        reason:
+          "The question asked for an estimated duration instead of using the dates already in the profile, so it was left out of this round.",
+      },
+    };
+  }
+  return {
+    question: {
+      targetKey: gap.key,
+      followUp: false,
+      text,
+      requirementInterpretation:
+        modelQuestion.requirementInterpretation?.trim() || null,
+      hiringTeamRoleId: role.id,
+      whoCaresNote: modelQuestion.whoCaresNote.trim(),
+    },
+  };
+}
+
 export function planQuestionRound(input: {
   assessments: EvidenceAssessment[];
   modelQuestions: Array<{
@@ -83,7 +221,7 @@ export function planQuestionRound(input: {
   includeChronology: boolean;
   chronologyAsked: boolean;
   focusTargetKey?: string | null;
-}): PlannedQuestion[] {
+}): QuestionRoundPlan {
   const askedKeys = new Set(input.askedKeys);
   if (input.focusTargetKey) askedKeys.delete(input.focusTargetKey);
   const coveredMeanings = new Set(
@@ -103,14 +241,18 @@ export function planQuestionRound(input: {
   );
   const focus = input.focusTargetKey
     ? input.assessments.find(
-        (assessment) => assessment.key === input.focusTargetKey,
+        (assessment) =>
+          assessment.key === input.focusTargetKey &&
+          assessment.strength !== "STRONG",
       )
     : undefined;
-  if (focus && !gaps.some((gap) => gap.key === focus.key)) {
-    gaps.unshift(focus);
-  } else if (focus) {
-    const remaining = gaps.filter((gap) => gap.key !== focus.key);
-    gaps.splice(0, gaps.length, focus, ...remaining);
+  if (focus) {
+    if (!gaps.some((gap) => gap.key === focus.key)) {
+      gaps.unshift(focus);
+    } else {
+      const remaining = gaps.filter((gap) => gap.key !== focus.key);
+      gaps.splice(0, gaps.length, focus, ...remaining);
+    }
   } else {
     const why = gaps.find((gap) => gap.key === WHY_THIS_COMPANY_TARGET_KEY);
     if (why) {
@@ -135,72 +277,19 @@ export function planQuestionRound(input: {
   );
   const rolesById = new Map(input.hiringTeam.map((role) => [role.id, role]));
   const questions: PlannedQuestion[] = [];
+  const dropped: DroppedQuestion[] = [];
   for (const gap of selected) {
-    const modelQuestion = byKey.get(gap.key);
-    if (!modelQuestion && gap.key === WHY_THIS_COMPANY_TARGET_KEY) {
-      const role = input.hiringTeam[0];
-      if (!role) {
-        throw new Error(
-          `Consultation AI did not write a valid question for ${gap.key}.`,
-        );
-      }
-      questions.push({
-        targetKey: gap.key,
-        followUp: false,
-        text: consultationConversationCopy.whyThisCompanyQuestion,
-        requirementInterpretation: null,
-        hiringTeamRoleId: role.id,
-        whoCaresNote: `${role.name} will hear why this company matters to the seeker.`,
-      });
+    const result = questionForGap({
+      gap,
+      modelQuestion: byKey.get(gap.key),
+      hiringTeam: input.hiringTeam,
+      rolesById,
+    });
+    if ("dropped" in result) {
+      dropped.push(result.dropped);
       continue;
     }
-    if (!modelQuestion) {
-      throw new Error(`Consultation AI did not write a valid question for ${gap.key}.`);
-    }
-    const text = modelQuestion.text.trim();
-    const role = rolesById.get(modelQuestion.hiringTeamRoleId);
-    if (
-      !role ||
-      !modelQuestion.whoCaresNote.trim() ||
-      !modelQuestion.whoCaresNote.toLowerCase().includes(role.name.toLowerCase())
-    ) {
-      throw new Error(
-        `Consultation AI did not ground the who-cares note for ${gap.key} in a Hiring Team role.`,
-      );
-    }
-    if (
-      modelQuestion.requirementInterpretation &&
-      questionRestatesTarget(text, gap.text)
-    ) {
-      throw new Error(
-        `Consultation AI repeated a vague requirement instead of translating ${gap.key}.`,
-      );
-    }
-    if (
-      gap.experienceCalculation?.missingDateRoleIds.length &&
-      !/\b(?:date|dates|when|from|started|ended|month|year)\b/i.test(text)
-    ) {
-      throw new Error(
-        `Consultation AI did not ask for the missing role dates for ${gap.key}.`,
-      );
-    }
-    if (
-      gap.experienceCalculation &&
-      /\b(?:approximate(?:ly)?|roughly|estimate[ds]?)\b/i.test(text)
-    ) {
-      throw new Error(
-        `Consultation AI asked for an estimated duration instead of exact dates for ${gap.key}.`,
-      );
-    }
-    questions.push({
-      targetKey: gap.key,
-      followUp: false,
-      text,
-      requirementInterpretation:
-        modelQuestion.requirementInterpretation?.trim() || null,
-      hiringTeamRoleId: role.id,
-      whoCaresNote: modelQuestion.whoCaresNote.trim(),
-    });
+    questions.push(result.question);
   }
   if (
     input.includeChronology &&
@@ -216,17 +305,25 @@ export function planQuestionRound(input: {
       !role ||
       !modelQuestion.whoCaresNote.toLowerCase().includes(role.name.toLowerCase())
     ) {
-      throw new Error("Consultation AI did not write a valid chronology question.");
+      dropped.push({
+        targetKey: "chronology",
+        reason:
+          "A usable chronology question was not written, so it was left out of this round.",
+      });
+    } else {
+      questions.push({
+        targetKey: "chronology",
+        followUp: false,
+        text: modelQuestion.text.trim(),
+        requirementInterpretation:
+          modelQuestion.requirementInterpretation?.trim() || null,
+        hiringTeamRoleId: role.id,
+        whoCaresNote: modelQuestion.whoCaresNote.trim(),
+      });
     }
-    questions.push({
-      targetKey: "chronology",
-      followUp: false,
-      text: modelQuestion.text.trim(),
-      requirementInterpretation:
-        modelQuestion.requirementInterpretation?.trim() || null,
-      hiringTeamRoleId: role.id,
-      whoCaresNote: modelQuestion.whoCaresNote.trim(),
-    });
   }
-  return questions.slice(0, consultationConfig.roundSize);
+  return {
+    questions: questions.slice(0, consultationConfig.roundSize),
+    dropped,
+  };
 }

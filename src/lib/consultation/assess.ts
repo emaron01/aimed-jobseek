@@ -1,5 +1,10 @@
 import type { CandidateProfile, ProfileFactItem } from "@/lib/product-research/candidate-profile";
 import type { JobScorecard } from "@/lib/job-requirement/types";
+import {
+  experienceDateToMaximumMonthIndex,
+  experienceDateToMonthIndex,
+  parseExperienceDate,
+} from "@/lib/product-research/role-dates";
 
 export const EVIDENCE_STRENGTHS = ["STRONG", "PARTIAL", "NONE"] as const;
 export type EvidenceStrengthName = (typeof EVIDENCE_STRENGTHS)[number];
@@ -40,9 +45,16 @@ export type ExperienceCalculation = {
   requiredYears: number;
   totalMonths: number;
   totalYears: number;
+  maximumMonths: number;
+  maximumYears: number;
   roleIds: string[];
   missingDateRoleIds: string[];
-  periods: Array<{ roleId: string; startDate: string; endDate: string }>;
+  periods: Array<{
+    roleId: string;
+    startDate: string;
+    endDate: string;
+    precision: "month" | "year" | "mixed";
+  }>;
 };
 
 export type EvidenceAssessment = {
@@ -256,13 +268,10 @@ export function evidenceTargets(input: {
   return targets;
 }
 
-function parseMonth(value: string): number | null {
-  const match = value.trim().match(/^(\d{4})-(\d{2})$/);
-  if (!match) return null;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  if (!Number.isInteger(year) || month < 1 || month > 12) return null;
-  return year * 12 + month - 1;
+function formatMonthIndex(index: number): string {
+  const year = Math.floor(index / 12);
+  const month = (index % 12) + 1;
+  return `${year}-${String(month).padStart(2, "0")}`;
 }
 
 export function yearsRequirement(text: string): number | null {
@@ -270,6 +279,26 @@ export function yearsRequirement(text: string): number | null {
   if (!match) return null;
   const value = Number(match[1]);
   return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function mergeMonthRanges(
+  ranges: Array<{ start: number; end: number }>,
+): Array<{ start: number; end: number }> {
+  const sorted = [...ranges].sort((a, b) => a.start - b.start);
+  const merged: Array<{ start: number; end: number }> = [];
+  for (const range of sorted) {
+    const prior = merged.at(-1);
+    if (!prior || range.start > prior.end + 1) {
+      merged.push({ ...range });
+    } else {
+      prior.end = Math.max(prior.end, range.end);
+    }
+  }
+  return merged;
+}
+
+function summedMonths(ranges: Array<{ start: number; end: number }>): number {
+  return ranges.reduce((sum, range) => sum + (range.end - range.start + 1), 0);
 }
 
 export function calculateExperienceYears(input: {
@@ -286,43 +315,68 @@ export function calculateExperienceYears(input: {
         Boolean(item && item.itemType === "EXPERIENCE" && item.kind === "FACT"),
     );
   const missingDateRoleIds: string[] = [];
-  const periods: Array<{ roleId: string; startDate: string; endDate: string }> = [];
-  const monthRanges: Array<{ start: number; end: number }> = [];
-  const current = input.asOf.getUTCFullYear() * 12 + input.asOf.getUTCMonth();
+  const periods: ExperienceCalculation["periods"] = [];
+  const conservativeRanges: Array<{ start: number; end: number }> = [];
+  const maximumRanges: Array<{ start: number; end: number }> = [];
+  const asOfLabel = formatMonthIndex(
+    input.asOf.getUTCFullYear() * 12 + input.asOf.getUTCMonth(),
+  );
   for (const role of roles) {
-    const start = role.startDate ? parseMonth(role.startDate) : null;
-    const end = role.endDate ? parseMonth(role.endDate) : current;
-    if (start == null || end == null || end < start) {
+    const startParsed = role.startDate ? parseExperienceDate(role.startDate) : null;
+    const endParsed = role.endDate
+      ? parseExperienceDate(role.endDate)
+      : {
+          year: input.asOf.getUTCFullYear(),
+          month: input.asOf.getUTCMonth() + 1,
+          precision: "month" as const,
+          raw: asOfLabel,
+          present: true,
+        };
+    const conservativeStart = startParsed
+      ? experienceDateToMonthIndex(startParsed, "start", input.asOf)
+      : null;
+    const conservativeEnd = endParsed
+      ? experienceDateToMonthIndex(endParsed, "end", input.asOf)
+      : null;
+    const maximumStart = startParsed
+      ? experienceDateToMaximumMonthIndex(startParsed, "start", input.asOf)
+      : null;
+    const maximumEnd = endParsed
+      ? experienceDateToMaximumMonthIndex(endParsed, "end", input.asOf)
+      : null;
+    if (
+      conservativeStart == null ||
+      conservativeEnd == null ||
+      maximumStart == null ||
+      maximumEnd == null
+    ) {
       missingDateRoleIds.push(role.id);
       continue;
     }
-    monthRanges.push({ start, end });
+    if (conservativeEnd >= conservativeStart) {
+      conservativeRanges.push({ start: conservativeStart, end: conservativeEnd });
+    }
+    if (maximumEnd >= maximumStart) {
+      maximumRanges.push({ start: maximumStart, end: maximumEnd });
+    }
+    const startPrecision = startParsed?.precision ?? "month";
+    const endPrecision = endParsed?.present ? "month" : endParsed?.precision ?? "month";
     periods.push({
       roleId: role.id,
-      startDate: role.startDate!,
-      endDate:
-        role.endDate ??
-        `${input.asOf.getUTCFullYear()}-${String(input.asOf.getUTCMonth() + 1).padStart(2, "0")}`,
+      startDate: role.startDate ?? startParsed?.raw ?? asOfLabel,
+      endDate: role.endDate ?? endParsed?.raw ?? asOfLabel,
+      precision:
+        startPrecision === "year" || endPrecision === "year" ? "year" : "month",
     });
   }
-  monthRanges.sort((a, b) => a.start - b.start);
-  const merged: Array<{ start: number; end: number }> = [];
-  for (const range of monthRanges) {
-    const prior = merged.at(-1);
-    if (!prior || range.start > prior.end + 1) {
-      merged.push({ ...range });
-    } else {
-      prior.end = Math.max(prior.end, range.end);
-    }
-  }
-  const totalMonths = merged.reduce(
-    (sum, range) => sum + (range.end - range.start + 1),
-    0,
-  );
+  const totalMonths = summedMonths(mergeMonthRanges(conservativeRanges));
+  const maximumMonths = summedMonths(mergeMonthRanges(maximumRanges));
   return {
     requiredYears: input.requiredYears,
     totalMonths,
     totalYears: Number((totalMonths / 12).toFixed(1)),
+    maximumMonths,
+    maximumYears: Number((maximumMonths / 12).toFixed(1)),
     roleIds: roles.map((role) => role.id),
     missingDateRoleIds,
     periods,

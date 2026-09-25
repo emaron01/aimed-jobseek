@@ -184,7 +184,13 @@ export async function synthesizeProductSetup(input: {
     stage = "validation";
     const aiResult = response.data;
     const allowedSourceIds = new Set(input.excerpts.map((e) => e.sourceId));
-    const result = transformProductAiResponse(aiResult, { allowedSourceIds });
+    const result = transformProductAiResponse(aiResult, {
+      allowedSourceIds,
+      sourceTexts: input.excerpts.map((excerpt) => ({
+        sourceId: excerpt.sourceId,
+        text: excerpt.text,
+      })),
+    });
 
     stage = "persist";
     await prisma.productSetupRun.update({

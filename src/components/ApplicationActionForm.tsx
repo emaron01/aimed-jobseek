@@ -29,10 +29,25 @@ export async function runApplicationFormAction(
   }
 }
 
+function PendingSpinner({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span
+        className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+        aria-hidden
+        data-testid="action-pending-spinner"
+      />
+      {label}
+    </span>
+  );
+}
+
 export function ApplicationActionForm({
   action,
   submitLabel,
+  pendingLabel = "Saving…",
   testId,
+  onSubmitStart,
   children,
 }: {
   action: (
@@ -40,7 +55,9 @@ export function ApplicationActionForm({
     formData: FormData,
   ) => Promise<ActionResult>;
   submitLabel: string;
+  pendingLabel?: string;
   testId: string;
+  onSubmitStart?: (formData: FormData) => void;
   children: ReactNode;
 }) {
   const [state, setState] = useState<ActionResult | null>(null);
@@ -48,13 +65,11 @@ export function ApplicationActionForm({
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    onSubmitStart?.(formData);
     setPending(true);
     try {
-      const result = await runApplicationFormAction(
-        action,
-        state,
-        event.currentTarget,
-      );
+      const result = await runApplicationFormAction(action, state, formData);
       setState(result);
     } finally {
       setPending(false);
@@ -73,8 +88,9 @@ export function ApplicationActionForm({
         type="submit"
         disabled={pending}
         className={PRIMARY_BUTTON_CLASS}
+        aria-busy={pending}
       >
-        {pending ? "Saving…" : submitLabel}
+        {pending ? <PendingSpinner label={pendingLabel} /> : submitLabel}
       </button>
     </form>
   );

@@ -72,6 +72,16 @@ export function workspaceProgressText(
 ): string {
   switch (type) {
     case "CONSULTATION":
+      if (operation === "continue") {
+        return `${consultationConfig.displayName} is planning the next question…`;
+      }
+      if (
+        operation === "reply" ||
+        operation === "process_reply" ||
+        operation === "answer"
+      ) {
+        return `${consultationConfig.displayName} is thinking…`;
+      }
       return `${consultationConfig.displayName} is reading your ${vocab.product.singular} and the job…`;
     case "HIRING_TEAM_IDENTIFY":
       return `Identifying the ${vocab.persona.nav}…`;

@@ -23,6 +23,7 @@ import {
   matchConsultationFocus,
   planQuestionRound,
   seniorityWarrantsChronology,
+  type QuestionRoundPlan,
 } from "@/lib/consultation/questions";
 import {
   mentionsInternalSystemState,
@@ -52,6 +53,7 @@ import {
   parseCandidateProfile,
   parseCandidateProfileSafe,
 } from "@/lib/product-research/candidate-profile";
+import { persistExtractedExperienceDates } from "@/lib/product-research/restore-role-dates";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
 
@@ -112,7 +114,12 @@ async function requireApplication(organizationId: string, campaignId: string) {
       `The ${vocab.product.singular} could not be read, so consultation did not start.`,
     );
   }
-  return { campaign, requirement, product, profile: parsed.profile };
+  const profile = await persistExtractedExperienceDates({
+    organizationId,
+    productId: product.id,
+    profile: parsed.profile,
+  });
+  return { campaign, requirement, product, profile };
 }
 
 function whyThisCompanyTarget(): EvidenceTarget {
@@ -638,7 +645,7 @@ async function planAndStoreRound(input: {
   roles: Awaited<ReturnType<typeof hiringTeam>>;
   focusTargetKey?: string | null;
   focusGuidance?: string[];
-}): Promise<ReturnType<typeof planQuestionRound>> {
+}): Promise<QuestionRoundPlan["questions"]> {
   await prisma.consultationSession.update({
     where: { id: input.sessionId },
     data: { generationStatus: "GENERATING", generationError: null },
@@ -657,7 +664,7 @@ async function planAndStoreRound(input: {
           { ok: true }
         >;
         assessments: EvidenceAssessment[];
-        questions: ReturnType<typeof planQuestionRound>;
+        questions: QuestionRoundPlan["questions"];
       }
     | null = null;
   for (
@@ -725,7 +732,8 @@ async function planAndStoreRound(input: {
       }
     }
     let assessments: EvidenceAssessment[] = [];
-    let questions: ReturnType<typeof planQuestionRound> = [];
+    let questions: QuestionRoundPlan["questions"] = [];
+    let droppedQuestions: QuestionRoundPlan["dropped"] = [];
     try {
       assessments = verifyModelAssessments({
         targets: input.targets,
@@ -733,7 +741,7 @@ async function planAndStoreRound(input: {
         assessments: plan.data.assessments,
         asOf: new Date(),
       });
-      questions = planQuestionRound({
+      const planned = planQuestionRound({
         assessments,
         modelQuestions: plan.data.questions.filter(
           (item, index) =>
@@ -746,22 +754,55 @@ async function planAndStoreRound(input: {
         chronologyAsked: input.askedKeys.has("chronology"),
         focusTargetKey: input.focusTargetKey ?? null,
       });
+      questions = planned.questions;
+      droppedQuestions = planned.dropped;
     } catch (error) {
       issues.push(
         qualityIssue({
           check: "assessment_verification",
           field: "assessments",
-          text: error instanceof Error ? error.message : "Consultation output validation failed.",
+          text:
+            error instanceof Error
+              ? error.message
+              : "Consultation could not verify one of the requirement assessments.",
           message:
             error instanceof Error
               ? error.message
-              : "Consultation output validation failed.",
+              : "Consultation could not verify one of the requirement assessments.",
         }),
       );
     }
-    if (issues.length === 0) {
+    const questionIssues = droppedQuestions.map((drop) =>
+      qualityIssue({
+        check: "question_item",
+        field: `questions.${drop.targetKey}`,
+        text: drop.reason,
+        message: drop.reason,
+      }),
+    );
+    if (issues.length === 0 && (questionIssues.length === 0 || attempt === consultationConfig.qualityRegenerationAttempts)) {
+      for (const drop of droppedQuestions) {
+        console.info(
+          JSON.stringify({
+            event: "consultation_question_dropped",
+            sessionId: input.sessionId,
+            targetKey: drop.targetKey,
+            reason: drop.reason,
+            attempt,
+          }),
+        );
+      }
       accepted = { plan, assessments, questions };
       break;
+    }
+    if (issues.length === 0 && questionIssues.length > 0) {
+      logQualityRejection({
+        generator: "consultation.plan",
+        attempt,
+        issues: questionIssues,
+      });
+      feedback = qualityMessages(questionIssues);
+      continue;
     }
     logQualityRejection({
       generator: "consultation.plan",
@@ -858,14 +899,27 @@ async function planAndStoreRound(input: {
 
 async function finishIfPlanningIsComplete(
   sessionId: string,
-  questions: ReturnType<typeof planQuestionRound>,
+  questions: QuestionRoundPlan["questions"],
 ): Promise<void> {
   if (questions.length > 0) return;
-  const session = await prisma.consultationSession.findUnique({
-    where: { id: sessionId },
-    select: { generationStatus: true },
-  });
-  if (session?.generationStatus === "READY") {
+  const [session, stored, skipped] = await Promise.all([
+    prisma.consultationSession.findUnique({
+      where: { id: sessionId },
+      select: { generationStatus: true },
+    }),
+    prisma.consultationAssessment.findMany({
+      where: { sessionId },
+    }),
+    prisma.consultationTurn.findMany({
+      where: { sessionId, speaker: "SEEKER", skipped: true },
+      select: { targetKey: true },
+    }),
+  ]);
+  const covered = gapsAreCovered(
+    stored.map(storedAssessment),
+    new Set(skipped.map((turn) => turn.targetKey).filter((key): key is string => Boolean(key))),
+  );
+  if (covered && session?.generationStatus === "READY") {
     await prisma.consultationSession.update({
       where: { id: sessionId },
       data: { status: "DONE" },
@@ -1447,13 +1501,19 @@ async function continueAfterAnsweredRound(input: {
   await finishIfPlanningIsComplete(input.sessionId, next);
 }
 
-export async function answerConsultationQuestion(input: {
+function analysisIsComplete(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const status = (value as { status?: unknown }).status;
+  return status !== "FAILED" && status !== "PENDING";
+}
+
+export async function recordConsultationReply(input: {
   organizationId: string;
   campaignId: string;
-  targetKey: string;
+  targetKey?: string | null;
   answer: string;
   intent?: string | null;
-}): Promise<void> {
+}): Promise<{ sessionId: string; targetKey: string; turnId: string }> {
   const answer = input.answer.trim();
   if (!answer) throw new TenantError("Write an answer, or skip the question.");
   const session = await prisma.consultationSession.findFirst({
@@ -1463,40 +1523,151 @@ export async function answerConsultationQuestion(input: {
     throw new TenantError("The consultation is not waiting for an answer.");
   }
   const turns = await loadSessionTurns(session.id);
-  const question = unanswered(turns, input.targetKey);
+  const targetKey =
+    input.targetKey?.trim() ||
+    turns.find(
+      (turn) =>
+        turn.speaker === "CONSULTANT" &&
+        turn.targetKey &&
+        unanswered(turns, turn.targetKey) != null,
+    )?.targetKey;
+  if (!targetKey) throw new TenantError("That question is not open.");
+  const question = unanswered(turns, targetKey);
   if (!question) throw new TenantError("That question is not open.");
+  const existing = [...turns]
+    .reverse()
+    .find(
+      (turn) =>
+        turn.speaker === "SEEKER" &&
+        turn.targetKey === targetKey &&
+        turn.body === answer &&
+        !analysisIsComplete(turn.analysisJson),
+    );
+  if (existing) {
+    await prisma.consultationSession.update({
+      where: { id: session.id },
+      data: { generationStatus: "GENERATING", generationError: null },
+    });
+    return { sessionId: session.id, targetKey, turnId: existing.id };
+  }
   const seekerTurn = await addTurn({
     organizationId: input.organizationId,
     sessionId: session.id,
     speaker: "SEEKER",
     body: answer,
-    targetKey: input.targetKey,
+    targetKey,
     seekerAuthored: true,
     intent: input.intent ?? "REPLY",
   });
+  await prisma.consultationSession.update({
+    where: { id: session.id },
+    data: { generationStatus: "GENERATING", generationError: null },
+  });
+  return { sessionId: session.id, targetKey, turnId: seekerTurn.id };
+}
+
+export async function answerConsultationQuestion(input: {
+  organizationId: string;
+  campaignId: string;
+  targetKey: string;
+  answer: string;
+  intent?: string | null;
+}): Promise<void> {
+  const recorded = await recordConsultationReply(input);
+  await processConsultationReply({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    sessionId: recorded.sessionId,
+    turnId: recorded.turnId,
+    targetKey: recorded.targetKey,
+    answer: input.answer,
+    intent: input.intent,
+  });
+}
+
+export async function processConsultationReply(input: {
+  organizationId: string;
+  campaignId: string;
+  sessionId?: string;
+  turnId?: string;
+  targetKey?: string;
+  answer?: string;
+  intent?: string | null;
+}): Promise<void> {
+  const answer = input.answer?.trim() ?? "";
+  const session = await prisma.consultationSession.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      ...(input.sessionId
+        ? { id: input.sessionId }
+        : { campaignId: input.campaignId }),
+    },
+  });
+  if (!session || session.status !== "IN_PROGRESS") {
+    throw new TenantError("The consultation is not waiting for an answer.");
+  }
+  const turns = await loadSessionTurns(session.id);
+  let seekerTurn = input.turnId
+    ? turns.find((turn) => turn.id === input.turnId)
+    : [...turns].reverse().find(
+        (turn) =>
+          turn.speaker === "SEEKER" &&
+          !turn.skipped &&
+          (!input.targetKey || turn.targetKey === input.targetKey) &&
+          !analysisIsComplete(turn.analysisJson),
+      );
+  let targetKey = seekerTurn?.targetKey ?? input.targetKey ?? "";
+  if (!seekerTurn) {
+    if (!answer) throw new TenantError("Write an answer, or skip the question.");
+    const recorded = await recordConsultationReply({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      targetKey: targetKey || null,
+      answer,
+      intent: input.intent,
+    });
+    targetKey = recorded.targetKey;
+    seekerTurn = { id: recorded.turnId } as (typeof turns)[number];
+  }
+  if (!targetKey) throw new TenantError("That question is not open.");
+  const question = [...turns]
+    .reverse()
+    .find(
+      (turn) =>
+        turn.speaker === "CONSULTANT" &&
+        turn.targetKey === targetKey &&
+        turn.sequence < (turns.find((item) => item.id === seekerTurn!.id)?.sequence ?? Number.MAX_SAFE_INTEGER),
+    ) ?? unanswered(turns, targetKey);
+  if (!question) throw new TenantError("That question is not open.");
+  const seekerTurnId = seekerTurn.id;
   const { requirement, profile } = await requireApplication(
     input.organizationId,
     input.campaignId,
   );
   const targets = targetsFromRequirement(requirement);
-  const target = targets.find((item) => item.key === input.targetKey);
+  const target = targets.find((item) => item.key === targetKey);
+  const recordedAnswer =
+    ("body" in seekerTurn && typeof seekerTurn.body === "string"
+      ? seekerTurn.body
+      : answer) || answer;
   const answerContext = [
     ...turns
       .filter(
         (turn) =>
           turn.speaker === "SEEKER" &&
-          turn.targetKey === input.targetKey &&
-          !turn.skipped,
+          turn.targetKey === targetKey &&
+          !turn.skipped &&
+          turn.id !== seekerTurnId,
       )
       .map((turn) => turn.body),
-    answer,
+    recordedAnswer,
   ]
     .filter(Boolean)
     .join("\n");
   const processed = await processAnswerGeneration({
     organizationId: input.organizationId,
     sessionId: session.id,
-    turnId: seekerTurn.id,
+    turnId: seekerTurnId,
     answerContext,
     question: question.body,
     target: target ?? null,
@@ -1506,22 +1677,22 @@ export async function answerConsultationQuestion(input: {
   if (!processed.ok) {
     throw new Error("Consultation could not write coaching for that reply.");
   }
-  if (input.targetKey === WHY_THIS_COMPANY_TARGET_KEY) {
+  if (targetKey === WHY_THIS_COMPANY_TARGET_KEY) {
     await persistWhyThisCompany({
       organizationId: input.organizationId,
       campaignId: input.campaignId,
-      answer,
+      answer: recordedAnswer,
     });
   }
   const followUpCount = turns.filter(
     (turn) =>
       turn.speaker === "CONSULTANT" &&
-      turn.targetKey === input.targetKey &&
+      turn.targetKey === targetKey &&
       turn.followUp,
   ).length;
   if (
     processed.followUpQuestion &&
-    input.targetKey !== "chronology" &&
+    targetKey !== "chronology" &&
     followUpCount < consultationConfig.maxFollowUpsPerTarget
   ) {
     const coaching = processed.coaching?.trim();
@@ -1532,7 +1703,7 @@ export async function answerConsultationQuestion(input: {
       body: coaching
         ? `${coaching}\n\n${processed.followUpQuestion}`
         : processed.followUpQuestion,
-      targetKey: input.targetKey,
+      targetKey,
       followUp: true,
     });
     return;
@@ -1540,7 +1711,7 @@ export async function answerConsultationQuestion(input: {
   const pendingStatements = await prisma.consultationStatement.count({
     where: {
       sessionId: session.id,
-      turnId: seekerTurn.id,
+      turnId: seekerTurnId,
       status: "DRAFT",
     },
   });
@@ -1953,44 +2124,49 @@ export async function approveConsultationStatement(input: {
     turnId: statement.turnId,
     profile,
   });
-  const grounding = await groundStatementWithModel({
-    statement: content,
-    kind: statement.kind,
-    sources,
-  });
-  if (!grounding.ok) throw new TenantError(grounding.message);
-  if (grounding.data.text.trim() !== content) {
-    throw new TenantError("Statement verification altered the supplied wording.");
-  }
-  const errors = validateGroundedStatement({
-    statement: grounding.data,
-    sources,
-    field: statement.kind === "INTERVIEW_ANSWER" ? "interviewAnswer" : "resumeBullet",
-    requireSentenceClaims: statement.kind === "INTERVIEW_ANSWER",
-  });
-  if (
-    statement.kind === "RESUME_BULLET" &&
-    (grounding.data.claims.length !== 1 ||
-      grounding.data.claims[0]?.text.trim() !== content)
-  ) {
-    errors.push(
-      qualityIssue({
-        check: "grounding",
-        field: "resumeBullet",
-        text: content,
-        message: "The resume bullet was not fully grounded.",
-      }),
-    );
-  }
-  if (errors.length > 0) {
-    logQualityRejection({
-      generator: "consultation.approve",
-      attempt: 0,
-      issues: errors,
+  const contentUnchanged = statement.content.trim() === content;
+  let groundingJson: Prisma.InputJsonValue = statement.groundingJson as Prisma.InputJsonValue;
+  if (!contentUnchanged || !statement.groundingJson) {
+    const grounding = await groundStatementWithModel({
+      statement: content,
+      kind: statement.kind,
+      sources,
     });
-    throw new TenantError(
-      "The statement contains content that is not supported by the answer or Personal Profile.",
-    );
+    if (!grounding.ok) throw new TenantError(grounding.message);
+    if (grounding.data.text.trim() !== content) {
+      throw new TenantError("Statement verification altered the supplied wording.");
+    }
+    const errors = validateGroundedStatement({
+      statement: grounding.data,
+      sources,
+      field: statement.kind === "INTERVIEW_ANSWER" ? "interviewAnswer" : "resumeBullet",
+      requireSentenceClaims: statement.kind === "INTERVIEW_ANSWER",
+    });
+    if (
+      statement.kind === "RESUME_BULLET" &&
+      (grounding.data.claims.length !== 1 ||
+        grounding.data.claims[0]?.text.trim() !== content)
+    ) {
+      errors.push(
+        qualityIssue({
+          check: "grounding",
+          field: "resumeBullet",
+          text: content,
+          message: "The resume bullet was not fully grounded.",
+        }),
+      );
+    }
+    if (errors.length > 0) {
+      logQualityRejection({
+        generator: "consultation.approve",
+        attempt: 0,
+        issues: errors,
+      });
+      throw new TenantError(
+        "The statement contains content that is not supported by the answer or Personal Profile.",
+      );
+    }
+    groundingJson = grounding.data.claims as Prisma.InputJsonValue;
   }
   const proposal = await prisma.consultationProposal.findFirst({
     where: { turnId: statement.turnId, kind: "STORY" },
@@ -2020,7 +2196,7 @@ export async function approveConsultationStatement(input: {
       data: {
         status: "APPROVED",
         content,
-        groundingJson: grounding.data.claims,
+        groundingJson,
         approvedAt: now,
       },
     }),
@@ -2201,6 +2377,16 @@ export async function confirmConsultationResult(input: {
       content: statement.content,
     });
   }
+}
+
+export async function continueConsultationPlanning(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const session = await prisma.consultationSession.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+  });
+  if (!session) throw new TenantError("The consultation has not started.");
   await continueAfterAnsweredRound({
     organizationId: input.organizationId,
     campaignId: input.campaignId,

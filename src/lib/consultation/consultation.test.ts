@@ -41,6 +41,7 @@ import {
   skipConsultationQuestion,
   startConsultation,
   confirmConsultationResult,
+  continueConsultationPlanning,
 } from "@/lib/consultation/service";
 import {
   looksLikeInternalId,
@@ -478,8 +479,8 @@ describe("consultation evidence and questions", () => {
       }),
       chronologyAsked: false,
     });
-    expect(round).toHaveLength(consultationConfig.roundSize);
-    expect(round[0]?.targetKey.startsWith("required:")).toBe(true);
+    expect(round.questions).toHaveLength(consultationConfig.roundSize);
+    expect(round.questions[0]?.targetKey.startsWith("required:")).toBe(true);
 
     const incident = assessments.find((item) =>
       /incident/i.test(item.text),
@@ -495,14 +496,14 @@ describe("consultation evidence and questions", () => {
       chronologyAsked: false,
       focusTargetKey: incident!.key,
     });
-    expect(focused[0]?.targetKey).toBe(incident!.key);
+    expect(focused.questions[0]?.targetKey).toBe(incident!.key);
     expect(
       matchConsultationFocus({
         focusNote: "The hiring manager will focus on incident leadership.",
         targets: assessments.map((item) => ({ key: item.key, text: item.text })),
       }),
     ).toBe(incident!.key);
-    const covered = round[0]!.targetKey;
+    const covered = round.questions[0]!.targetKey;
     const coveredText = assessments.find((item) => item.key === covered)!.text;
     const next = planQuestionRound({
       assessments,
@@ -513,9 +514,9 @@ describe("consultation evidence and questions", () => {
       includeChronology: false,
       chronologyAsked: false,
     });
-    expect(next.some((question) => question.targetKey === covered)).toBe(false);
+    expect(next.questions.some((question) => question.targetKey === covered)).toBe(false);
     expect(
-      next.some(
+      next.questions.some(
         (question) =>
           assessments.find((item) => item.key === question.targetKey)?.text ===
           coveredText,
@@ -642,8 +643,20 @@ describe("consultation evidence and questions", () => {
         { id: "a", kind: "FACT", text: "Role A", itemType: "EXPERIENCE", startDate: "2020", endDate: "2024" },
       ],
     });
-    expect(yearOnly.totalMonths).toBe(0);
-    expect(yearOnly.missingDateRoleIds).toEqual(["a"]);
+    expect(yearOnly.totalMonths).toBe(38);
+    expect(yearOnly.maximumMonths).toBe(60);
+    expect(yearOnly.missingDateRoleIds).toEqual([]);
+    const twoThousand = calculateExperienceYears({
+      requiredYears: 3,
+      roleIds: ["a"],
+      asOf: new Date("2026-09-25T00:00:00.000Z"),
+      profileItems: [
+        { id: "a", kind: "FACT", text: "Role A", itemType: "EXPERIENCE", startDate: "2002", endDate: "2006" },
+      ],
+    });
+    expect(twoThousand.totalMonths).toBe(38);
+    expect(twoThousand.totalYears).toBe(3.2);
+    expect(twoThousand.maximumYears).toBe(5);
 
     const target = { key: "required:python", kind: "REQUIRED" as const, text: "5 years of Python" };
     const [assessment] = verifyModelAssessments({
@@ -664,23 +677,22 @@ describe("consultation evidence and questions", () => {
       asOf: new Date("2026-09-23T00:00:00.000Z"),
     });
     expect(assessment?.experienceCalculation?.totalMonths).toBe(0);
-    expect(() =>
-      planQuestionRound({
-        assessments: [assessment!],
-        modelQuestions: [{
-          targetKey: target.key,
-          text: "Tell me more about how you used Python in that backend engineering role.",
-          requirementInterpretation: null,
-          hiringTeamRoleId: "hm",
-          whoCaresNote: "The Hiring Manager needs to understand your Python experience.",
-        }],
-        hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
-        askedKeys: new Set(),
-        skippedKeys: new Set(),
-        includeChronology: false,
-        chronologyAsked: false,
-      }),
-    ).toThrow(/missing role dates/);
+    const withoutDates = planQuestionRound({
+      assessments: [assessment!],
+      modelQuestions: [{
+        targetKey: target.key,
+        text: "Tell me more about how you used Python in that backend engineering role.",
+        requirementInterpretation: null,
+        hiringTeamRoleId: "hm",
+        whoCaresNote: "The Hiring Manager needs to understand your Python experience.",
+      }],
+      hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
+      askedKeys: new Set(),
+      skippedKeys: new Set(),
+      includeChronology: false,
+      chronologyAsked: false,
+    });
+    expect(withoutDates.questions[0]?.text).toContain("Python");
     expect(
       planQuestionRound({
         assessments: [assessment!],
@@ -696,8 +708,23 @@ describe("consultation evidence and questions", () => {
         skippedKeys: new Set(),
         includeChronology: false,
         chronologyAsked: false,
-      })[0]?.text,
+      }).questions[0]?.text,
     ).toContain("month and year");
+    const missingQuestion = planQuestionRound({
+      assessments: [{
+        ...assessment!,
+        key: "required:0",
+        text: "10+ years of progressive leadership",
+      }],
+      modelQuestions: [],
+      hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
+      askedKeys: new Set(),
+      skippedKeys: new Set(),
+      includeChronology: false,
+      chronologyAsked: false,
+    });
+    expect(missingQuestion.questions).toEqual([]);
+    expect(missingQuestion.dropped[0]?.reason).toMatch(/later round/i);
   });
 
   it("uses a model-written follow-up for the missing Result and metric", async () => {
@@ -745,7 +772,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("8");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("9");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("coach, not an interrogator");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("Never inflate fit");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -753,11 +780,13 @@ describe("consultation evidence and questions", () => {
     );
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("focusTargetKey");
     const workspace = readFileSync("src/components/ConsultationSection.tsx", "utf8");
+    const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
     expect(workspace).toContain("consultationConfig.displayName");
     expect(workspace).not.toContain("Avery");
     expect(workspace).not.toContain("Save answer");
     expect(workspace).toContain("consultationConversationCopy.generationFailed");
-    expect(workspace).toContain("consultationConversationCopy.useThis");
+    expect(thread).toContain("consultationConversationCopy.useThis");
+    expect(thread).toContain("consultationConversationCopy.thinking");
     expect(workspace).not.toContain("supportingFactIds).join");
   });
 
@@ -862,7 +891,7 @@ describe("consultation evidence and questions", () => {
       skippedKeys: new Set(),
       includeChronology: false,
       chronologyAsked: false,
-    });
+    }).questions;
     expect(question?.text).not.toContain(assessment.text);
     expect(question?.requirementInterpretation).toContain("Prioritize");
     expect(question?.whoCaresNote).toContain("VP of Sales");
@@ -1051,7 +1080,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("8");
+    expect(session?.promptVersion).toBe("9");
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
     expect(session?.briefingJson).toMatchObject({
@@ -1178,16 +1207,25 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       expect(bank?.seekerAuthored).toBe(true);
       expect(JSON.stringify(bank?.competencyLinks).toLowerCase()).toContain("python");
     }
+    const beforeContinue = await prisma.consultationTurn.count({
+      where: { sessionId: session!.id, speaker: "CONSULTANT" },
+    });
     await confirmConsultationResult({ organizationId, campaignId });
     const afterUse = await prisma.consultationStatement.findMany({
       where: { sessionId: session!.id, status: "DRAFT" },
     });
     expect(afterUse).toHaveLength(0);
+    expect(
+      await prisma.consultationTurn.count({
+        where: { sessionId: session!.id, speaker: "CONSULTANT" },
+      }),
+    ).toBe(beforeContinue);
+    await continueConsultationPlanning({ organizationId, campaignId });
     const laterQuestions = await prisma.consultationTurn.findMany({
       where: { sessionId: session!.id, speaker: "CONSULTANT" },
       orderBy: { sequence: "asc" },
     });
-    expect(laterQuestions.length).toBeGreaterThan(1);
+    expect(laterQuestions.length).toBeGreaterThan(beforeContinue);
   });
 
   it("asks about a thin Action and polishes honestly when the follow-up is declined", async () => {
@@ -1308,7 +1346,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     generateStructured.mockRejectedValueOnce(new Error("provider timeout"));
     await expect(
       startConsultation({ organizationId, campaignId: campaign.id }),
-    ).rejects.toThrow(/could not be generated|timeout/i);
+    ).rejects.toThrow(/usable plan|timeout/i);
     const failed = await prisma.consultationSession.findUnique({
       where: { campaignId: campaign.id },
       include: { turns: true },

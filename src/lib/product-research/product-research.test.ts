@@ -107,7 +107,7 @@ describe("Product synthesis contract", () => {
     });
     expect(parsed.candidateProfile.identity.name?.text).toBe("Alex Chen");
     expect(parsed).not.toHaveProperty("suggestedBuyerRoles");
-    expect(PRODUCT_SYNTHESIS_PROMPT_VERSION).toBe("8");
+    expect(PRODUCT_SYNTHESIS_PROMPT_VERSION).toBe("9");
   });
 
   it("prompt forbids suggestedBuyerRoles and person web search", () => {

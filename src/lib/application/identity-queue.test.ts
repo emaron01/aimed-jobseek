@@ -59,6 +59,7 @@ describe("employer correction form fields", () => {
     expect(workspace).toContain('name="website"');
     expect(form).toContain("new FormData(form as HTMLFormElement)");
     expect(form).toContain("event.preventDefault()");
+    expect(form).toContain("action-pending-spinner");
     expect(form).not.toContain("useActionState");
     expect(action).toContain("readEmployerCorrectionFields");
   });

@@ -55,8 +55,13 @@ export const consultationStatementLabels = Object.freeze({
 
 export const consultationConversationCopy = Object.freeze({
   whereYouStand: "Where you stand",
+  expandEvidence: "Expand evidence",
+  collapseEvidence: "Collapse evidence",
+  expandAllEvidence: "Expand all",
+  collapseAllEvidence: "Collapse all",
   threadReply: "Reply",
   useThis: "Use this",
+  confirmed: "Saved. The next question is on the way.",
   changeSomething: "Change something",
   notAccurate: "Not accurate",
   changePrompt: "What should change?",
@@ -67,7 +72,8 @@ export const consultationConversationCopy = Object.freeze({
   start: `Start with ${consultationConfig.displayName}`,
   planComplete: "The plan for this conversation is complete.",
   starting: `${consultationConfig.displayName} is reading your ${vocab.product.singular} and the job…`,
-  typing: `${consultationConfig.displayName} is typing…`,
+  typing: `${consultationConfig.displayName} is thinking…`,
+  thinking: `${consultationConfig.displayName} is thinking…`,
   whyThisCompanyTarget: "Why the seeker wants to work at this company",
   whyThisCompanyQuestion:
     "Why do you want to work at this company? Say what specifically draws you to it for this role.",

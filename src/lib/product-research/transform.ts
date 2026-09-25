@@ -14,6 +14,7 @@ import type {
   ProductAiResponse,
   ProductSynthesisResult,
 } from "@/lib/product-research/contract";
+import { fillMissingRoleDates } from "@/lib/product-research/role-dates";
 
 function filterProvenance(
   refs: ProvenanceRef[],
@@ -114,13 +115,20 @@ function filterCandidateProfile(
 
 export function transformProductAiResponse(
   ai: ProductAiResponse,
-  options?: { allowedSourceIds?: Set<string> },
+  options?: {
+    allowedSourceIds?: Set<string>;
+    sourceTexts?: Array<{ sourceId: string; text: string }>;
+  },
 ): ProductSynthesisResult {
   const filtered = filterCandidateProfile(
     ai.candidateProfile,
     options?.allowedSourceIds,
   );
+  const withDates = fillMissingRoleDates(
+    filtered,
+    options?.sourceTexts ?? [],
+  ).profile;
   return {
-    candidateProfile: parseCandidateProfile(filtered),
+    candidateProfile: parseCandidateProfile(withDates),
   };
 }

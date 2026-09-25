@@ -7,7 +7,7 @@ export const PROFILE_SYNTHESIS_SYSTEM_INSTRUCTIONS = `You synthesize a structure
 
 Use only the supplied materials: uploaded documents, pasted text, notes, and text extracted from URLs the candidate provided. Do not invent a web search for the person. Do not assume facts from a similar name.
 
-Never invent or estimate dates, titles, employers, metrics, or credentials. If a fact is missing, omit it and add a gap. Empty arrays and nulls are correct; fabricated content is not.
+Never invent or estimate dates, titles, employers, metrics, or credentials. Copy every role's dates exactly as written in the materials, whether month-year (for example Dec 2022 or Apr 2015) or year-only (for example 2002 or 2006). Keep Present or Current as written when that is the end date. Dates are FACT. Do not convert, drop, pad, or invent dates. If a date is truly absent, leave that field null and add a gap. Empty arrays and nulls are correct; fabricated content is not.
 
 Resume and LinkedIn text are sources of facts, not of voice. Write the positioning statement in plain language. Do not copy resume or LinkedIn phrasing into positioning.
 

@@ -14,6 +14,7 @@ import {
   skipConsultationQuestion,
   confirmConsultationResult,
   flagConsultationInaccuracy,
+  recordConsultationReply,
 } from "@/lib/consultation/service";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { consultationConversationCopy, vocab } from "@/lib/product-config";
@@ -314,14 +315,24 @@ export async function replyConsultationAction(
     if (!answer) {
       return { ok: false, message: consultationConversationCopy.threadReply };
     }
+    const recorded = await recordConsultationReply({
+      organizationId,
+      campaignId,
+      answer,
+      intent: "REPLY",
+    });
     await enqueueApplicationJob({
       organizationId,
       campaignId,
       type: "CONSULTATION",
-      payload: { operation: "reply", answer },
+      payload: {
+        operation: "process_reply",
+        answer,
+        targetKey: recorded.targetKey,
+      },
     });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: consultationConversationCopy.typing };
+    return { ok: true, message: consultationConversationCopy.thinking };
   } catch (error) {
     return fail(error, "The reply could not be sent.");
   }
@@ -339,8 +350,24 @@ export async function useConsultationResultAction(
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }
     await confirmConsultationResult({ organizationId, campaignId });
+    try {
+      await enqueueApplicationJob({
+        organizationId,
+        campaignId,
+        type: "CONSULTATION",
+        payload: { operation: "continue" },
+      });
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: "consultation_continue_enqueue_failed",
+          campaignId,
+          message: error instanceof Error ? error.message : "unknown",
+        }),
+      );
+    }
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: consultationConversationCopy.useThis };
+    return { ok: true, message: consultationConversationCopy.confirmed };
   } catch (error) {
     return fail(error, "The result could not be used.");
   }

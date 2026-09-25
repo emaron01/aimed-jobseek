@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONSULTATION_PROMPT_VERSION = "8";
+export const CONSULTATION_PROMPT_VERSION = "9";
 
 export const WHY_THIS_COMPANY_TARGET_KEY = "why-this-company";
 

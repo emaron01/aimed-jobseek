@@ -34,7 +34,7 @@ describe("Product synthesis v6 — candidate profile only", () => {
     });
     expect(ai).not.toHaveProperty("suggestedBuyerRoles");
     expect(ai).not.toHaveProperty("personas");
-    expect(PRODUCT_SYNTHESIS_PROMPT_VERSION).toBe("8");
+    expect(PRODUCT_SYNTHESIS_PROMPT_VERSION).toBe("9");
 
     const result = transformProductAiResponse(ai);
     expect(result).not.toHaveProperty("suggestedBuyerRoles");
