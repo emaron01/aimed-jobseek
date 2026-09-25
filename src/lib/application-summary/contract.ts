@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const APPLICATION_SUMMARY_PROMPT_VERSION = "4";
+export const APPLICATION_SUMMARY_PROMPT_VERSION = "5";
 
 export const CHEAT_SHEET_SECTION_KINDS = [
   "RECRUITER",

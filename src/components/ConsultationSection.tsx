@@ -369,6 +369,7 @@ export async function ConsultationSection({
             status: statement.status,
             content: statement.content,
             strengtheningNote: statement.strengtheningNote,
+            claimFlagsJson: statement.claimFlagsJson,
           }))}
           latestDraftTurnId={latestDraftTurnId}
         />

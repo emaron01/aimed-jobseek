@@ -22,6 +22,6 @@ Stories:
 
 Use only allowedSources. Every guidance item needs at least one support with a supplied sourceId and an exact verbatim quote from that source. When personPrep sources exist for a contact, use them in that person's section. Never state a seeker skill, title, employer, date, credential, metric, or achievement unless an approved seeker source supports it. Never use Target Employer compensation preferences because they are not supplied.
 
-There is no banned-phrase list. Do not mention research status, confidence, missing data, prompt behavior, model behavior, or any other internal system state. If qualityFeedback names a field, regenerate only that field.
+There is no banned-phrase list. Do not invent a number, employer, title, date, credential, or outcome the seeker did not state. Paraphrase is allowed when the facts stay the same. Do not mention research status, confidence, missing data, prompt behavior, model behavior, or any other internal system state. If qualityFeedback names a field, regenerate only that field.
 
 Return JSON matching the schema only.`;

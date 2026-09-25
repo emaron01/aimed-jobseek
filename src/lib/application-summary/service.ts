@@ -11,8 +11,6 @@ import {
   validateGroundedStatement,
 } from "@/lib/consultation/output-quality";
 import {
-  logQualityRejection,
-  qualityIssue,
   qualityMessages,
 } from "@/lib/generation/quality";
 import { profileEvidenceItems } from "@/lib/consultation/assess";
@@ -22,10 +20,17 @@ import {
   cheatSheetSectionKind,
 } from "@/lib/application-summary/people";
 import { listPersonPreps } from "@/lib/interview/person-prep";
-import { consultationConfig, vocab } from "@/lib/product-config";
+import { vocab } from "@/lib/product-config";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
+import {
+  claimFlagsFromJson,
+  flagInventedClaims,
+  openClaimFlags,
+  resolveClaimFlag,
+  seekerSourceTexts,
+} from "@/lib/grounding/claim-flags";
 import { usableEmployerResearch } from "@/lib/job-requirement/identity-verification";
 
 export type SummarySource = {
@@ -510,67 +515,71 @@ export async function generateApplicationSummary(input: {
     titles: person.titles,
     sectionKind: person.sectionKind,
   }));
-  let feedback: string[] = [];
-  for (
-    let attempt = 0;
-    attempt <= consultationConfig.qualityRegenerationAttempts;
-    attempt += 1
-  ) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     const generated = await generateApplicationSummaryGuidance({
       sources: data.sources,
       people,
-      qualityFeedback: feedback,
+      qualityFeedback: [],
     });
     if (!generated.ok) {
-      await prisma.applicationSummary.update({
-        where: { campaignId: input.campaignId },
-        data: { status: "FAILED", generationError: generated.message },
-      });
-      return;
+      if (attempt === 1) {
+        await prisma.applicationSummary.update({
+          where: { campaignId: input.campaignId },
+          data: { status: "FAILED", generationError: generated.message },
+        });
+        return;
+      }
+      continue;
     }
-    const errors = validateApplicationSummaryGuidance({
-      guidance: generated.data,
+    const seeker = seekerSourceTexts({
       sources: data.sources,
-      people,
     });
-    if (errors.length > 0) {
-      logQualityRejection({
-        generator: "application_summary",
-        attempt,
-        issues: errors.map((message) =>
-          qualityIssue({
-            check: "summary_validation",
-            field: "guidance",
-            text: message,
-            message,
-          }),
-        ),
-      });
-    }
-    if (errors.length === 0) {
-      await prisma.applicationSummary.update({
-        where: { campaignId: input.campaignId },
-        data: {
-          status: "READY",
-          guidanceJson: generated.data,
-          sourceHash: data.sourceHash,
-          generationError: null,
-          generatedAt: new Date(),
-          promptVersion: APPLICATION_SUMMARY_PROMPT_VERSION,
-        },
-      });
-      return;
-    }
-    feedback = errors;
+    const claimFlags = flagInventedClaims({
+      claims: flattenGuidanceTexts(generated.data),
+      sourceTexts: seeker.texts,
+      names: seeker.names,
+    });
+    await prisma.applicationSummary.update({
+      where: { campaignId: input.campaignId },
+      data: {
+        status: "READY",
+        guidanceJson: generated.data,
+        claimFlagsJson: claimFlags as object,
+        sourceHash: data.sourceHash,
+        generationError: null,
+        generatedAt: new Date(),
+        promptVersion: APPLICATION_SUMMARY_PROMPT_VERSION,
+      },
+    });
+    return;
   }
   await prisma.applicationSummary.update({
     where: { campaignId: input.campaignId },
     data: {
       status: "FAILED",
-      generationError:
-        "Interview Cheat Sheet guidance did not pass checks. The passing parts were not enough to save. Retry.",
+      generationError: "The model did not return usable Interview Cheat Sheet guidance.",
     },
   });
+}
+
+function flattenGuidanceTexts(
+  value: unknown,
+  path = "guidance",
+): Array<{ id: string; text: string }> {
+  if (typeof value === "string" && value.trim()) {
+    return [{ id: path, text: value }];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) =>
+      flattenGuidanceTexts(item, `${path}.${index}`),
+    );
+  }
+  if (value && typeof value === "object") {
+    return Object.entries(value).flatMap(([key, item]) =>
+      flattenGuidanceTexts(item, path ? `${path}.${key}` : key),
+    );
+  }
+  return [];
 }
 
 export async function getApplicationSummaryView(input: {
@@ -598,9 +607,62 @@ export async function getApplicationSummaryView(input: {
     stories: data.stories,
     stages: data.stages,
     summary: data.campaign.applicationSummary,
+    claimFlags: openClaimFlags(
+      claimFlagsFromJson(data.campaign.applicationSummary?.claimFlagsJson),
+    ),
     guidance: guidance?.success ? guidance.data : null,
     stale:
       data.campaign.applicationSummary?.status === "READY" &&
       data.campaign.applicationSummary.sourceHash !== data.sourceHash,
   };
+}
+
+function blankGuidancePath(value: unknown, path: string): unknown {
+  const parts = path.replace(/^guidance\.?/, "").split(".").filter(Boolean);
+  if (parts.length === 0) return value;
+  const clone = structuredClone(value);
+  let cursor: unknown = clone;
+  for (const [index, part] of parts.entries()) {
+    if (!cursor || typeof cursor !== "object") return clone;
+    const key = /^\d+$/.test(part) ? Number(part) : part;
+    if (index === parts.length - 1) {
+      if (Array.isArray(cursor) && typeof key === "number") {
+        cursor[key] = "";
+      } else if (!Array.isArray(cursor)) {
+        (cursor as Record<string, unknown>)[String(key)] = "";
+      }
+      return clone;
+    }
+    cursor = Array.isArray(cursor)
+      ? cursor[Number(key)]
+      : (cursor as Record<string, unknown>)[String(key)];
+  }
+  return clone;
+}
+
+export async function resolveApplicationSummaryFlag(input: {
+  organizationId: string;
+  campaignId: string;
+  claimId: string;
+  action: "KEPT" | "REMOVED";
+}): Promise<void> {
+  const summary = await prisma.applicationSummary.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+  });
+  if (!summary) throw new TenantError("Interview Cheat Sheet was not found.");
+  const nextFlags = resolveClaimFlag(
+    claimFlagsFromJson(summary.claimFlagsJson),
+    input.claimId,
+    input.action,
+  );
+  await prisma.applicationSummary.update({
+    where: { campaignId: input.campaignId },
+    data: {
+      claimFlagsJson: nextFlags as object,
+      guidanceJson:
+        input.action === "REMOVED"
+          ? (blankGuidancePath(summary.guidanceJson, input.claimId) as object)
+          : undefined,
+    },
+  });
 }

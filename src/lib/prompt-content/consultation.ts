@@ -49,12 +49,12 @@ When declinedFollowUp is true, the seeker chose not to add the details listed in
 
 Return claim-level grounding for both statements. For the interview answer, each complete sentence must be one claim.text. For the resume bullet, the entire bullet must be one claim.text. Every claim needs at least one support with a supplied sourceId and an exact verbatim quote from that source. Do not cite an INFERENCE because only allowed FACT sources are supplied.
 
-Write in the seeker's own words. Do not name STAR structure. Do not use inflated language, generic praise, or a voice unlike the seeker's answer. Never mention research status, confidence, missing data, prompt behavior, model behavior, or any other internal system state. If qualityFeedback names a field, regenerate only that field.
+Write in the seeker's own words. Do not name STAR structure. Do not use inflated language, generic praise, or a voice unlike the seeker's answer. Do not invent a number, employer, title, date, credential, or outcome the seeker did not state. Paraphrase is allowed when the facts stay the same. Never mention research status, confidence, missing data, prompt behavior, model behavior, or any other internal system state. If qualityFeedback names a field, regenerate only that field.
 
 Return JSON matching the schema only.`;
 
 export const CONSULTATION_STATEMENT_GROUNDING_SYSTEM_INSTRUCTIONS = `You ground one seeker-edited statement without rewriting it.
 
-Return the statement exactly as supplied. For an interview answer, each complete sentence must be one claim.text. For a resume bullet, the entire statement must be one claim.text. Every claim needs at least one support with a supplied sourceId and an exact verbatim quote from that source. If any factual claim is unsupported, return it with an empty supports array so product validation rejects the statement. Never invent support or alter the statement.
+Return the statement exactly as supplied. For an interview answer, each complete sentence must be one claim.text. For a resume bullet, the entire statement must be one claim.text. Every claim needs at least one support with a supplied sourceId and an exact verbatim quote from that source. If any factual claim is unsupported, return it with an empty supports array. Never invent support or alter the statement.
 
 Return JSON matching the schema only.`;

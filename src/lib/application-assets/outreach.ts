@@ -9,8 +9,6 @@ import {
   validateRepetitionAndMetaLanguage,
 } from "@/lib/consultation/output-quality";
 import {
-  logQualityRejection,
-  qualityIssue,
   qualityMessages,
   replaceEmDashesDeep,
 } from "@/lib/generation/quality";
@@ -20,6 +18,11 @@ import {
   type ReadyApplicationGenerationContext,
 } from "@/lib/generation/context";
 import { prisma } from "@/lib/prisma-client";
+import {
+  flagInventedClaims,
+  seekerSourceTexts,
+  type ClaimFlagRecord,
+} from "@/lib/grounding/claim-flags";
 import {
   applicationAssetConfig,
   consultationConfig,
@@ -603,6 +606,7 @@ async function saveOutreachVersion(input: {
   emailLength: EmailLength | null;
   content: ApplicationAssetContent;
   guidance: string | null;
+  claimFlags?: ClaimFlagRecord;
 }): Promise<{ id: string; version: number }> {
   const groupKey = outreachGroupKey({
     type: input.type as "EMAIL" | "LINKEDIN_CONNECTION_NOTE" | "LINKEDIN_INMAIL",
@@ -638,6 +642,10 @@ async function saveOutreachVersion(input: {
           claimTraceJson: claimTrace(
             input.content,
           ) as unknown as Prisma.InputJsonValue,
+          claimFlagsJson: (input.claimFlags ?? {
+            flags: [],
+            seekerEditedIds: [],
+          }) as unknown as Prisma.InputJsonValue,
           guidance: input.guidance,
           promptVersion: outreachPromptVersion(input.type),
           status: "DRAFT",
@@ -1033,10 +1041,7 @@ export async function generateOutreachAsset(input: {
   const emailLength =
     input.type === "EMAIL" ? input.emailLength ?? "MEDIUM" : null;
   let feedback: string[] = [];
-  const attempts =
-    applicationAssetConfig.generation.qualityRegenerationAttempts +
-    outreachConfig.generation.limitRegenerationAttempts;
-  for (let attempt = 0; attempt <= attempts; attempt += 1) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     const generated = await generateOutreachWithModel({
       context,
       type: input.type,
@@ -1050,7 +1055,7 @@ export async function generateOutreachAsset(input: {
       interviewStageNotes,
       mentionApplied,
       regenerationInstruction: input.regenerationInstruction ?? null,
-      qualityFeedback: feedback,
+      qualityFeedback: [],
     });
     if (!generated.ok) {
       console.error(
@@ -1062,70 +1067,53 @@ export async function generateOutreachAsset(input: {
         }),
       );
       feedback = [generated.message];
-      if (attempt === attempts) {
+      if (attempt === 1) {
         return { ok: false, message: generated.message, violations: feedback };
       }
       continue;
     }
     const content = replaceEmDashesDeep(generated.data);
-    const violations = await validateOutreachContent({
-      content,
-      context,
-      greeting,
-      signerName,
-      confirmedHiringManagerRole,
-      purpose: input.purpose,
-      includeRedirect,
-      priorMessages,
-      stageNotes: interviewStageNotes,
-      mentionApplied,
+    const seeker = seekerSourceTexts({
+      sources: context.sources,
+      profile: context.profile,
+      notes: [context.campaign.applicationGuidance],
+      requirement: context.requirement,
     });
-    if (violations.length > 0) {
-      const composed = composeOutreachText(content);
-      logQualityRejection({
-        generator: `outreach.${input.type}`,
-        attempt,
-        issues: violations.map((message) =>
-          qualityIssue({
-            check: "outreach_validation",
-            field: "content",
-            text: composed.body,
-            message,
-          }),
-        ),
-      });
-    }
-    if (violations.length === 0) {
-      const saved = await saveOutreachVersion({
-        context,
-        type: input.type,
-        personaId,
-        contactId,
-        purpose: input.purpose,
-        followUpToAssetId,
-        interviewStageId,
-        emailLength,
-        content,
-        guidance: input.regenerationInstruction?.trim() || null,
-      });
-      return { ok: true, assetId: saved.id, version: saved.version };
-    }
-    console.error(
-      JSON.stringify({
-        event: "outreach_validation_failed",
-        purpose: input.purpose,
-        attempt: attempt + 1,
-        errors: violations,
-      }),
-    );
-    feedback = violations;
+    const claimFlags = flagInventedClaims({
+      claims: assetClaims(content).map((claim) => ({
+        id: claim.id,
+        text: claim.text,
+      })),
+      sourceTexts: seeker.texts,
+      names: seeker.names,
+    });
+    const saved = await saveOutreachVersion({
+      context,
+      type: input.type,
+      personaId,
+      contactId,
+      purpose: input.purpose,
+      followUpToAssetId,
+      interviewStageId,
+      emailLength,
+      content,
+      guidance: input.regenerationInstruction?.trim() || null,
+      claimFlags,
+    });
+    return { ok: true, assetId: saved.id, version: saved.version };
   }
   return {
     ok: false,
-    message:
-      "The message was not saved because it did not pass verification. Retry after reviewing the violations.",
+    message: lastOutreachMessage(feedback),
     violations: feedback,
   };
+}
+
+function lastOutreachMessage(feedback: string[]): string {
+  return (
+    feedback[0] ??
+    "The model did not return a usable message."
+  );
 }
 
 export async function markOutreachSent(input: {

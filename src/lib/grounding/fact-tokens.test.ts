@@ -57,8 +57,28 @@ describe("fact token grounding", () => {
     const source = "I used Python for 5 years and cut failed jobs by 40%.";
     const invented = "The team created a nine million dollar metric last year.";
     expect(factsSupportedBySources(invented, [source], known).ok).toBe(false);
-    expect(extractFactNumbers(invented)).toContain("9");
+    expect(extractFactNumbers(invented)).toContain("9000000");
     expect(extractFactNumbers(source)).toEqual(expect.arrayContaining(["5", "40"]));
+  });
+
+  it("treats written and abbreviated money as the same number", () => {
+    expect(extractFactNumbers("$9M to $21M")).toEqual(
+      expect.arrayContaining(["9000000", "21000000"]),
+    );
+    expect(
+      extractFactNumbers(
+        "from nine million to twenty-one million in annual contract value",
+      ),
+    ).toEqual(expect.arrayContaining(["9000000", "21000000"]));
+    expect(
+      factsSupportedBySources(
+        "Took Harborline Software's West Coast enterprise book from nine million to twenty-one million in annual contract value.",
+        [
+          "Grew the West Coast enterprise book from $9M to $21M in annual contract value over three years. Harborline Software.",
+        ],
+        { employers: ["Harborline Software"], titles: [] },
+      ).ok,
+    ).toBe(true);
   });
 
   it("normalizes month-year dates and hides empty text", () => {

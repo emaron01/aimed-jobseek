@@ -410,7 +410,9 @@ describe.skipIf(!hasTestDatabase())("Application Summary", () => {
   });
 
   it("stores failure with no substitute guidance and supports retry", async () => {
-    generateStructured.mockRejectedValueOnce(new Error("provider timeout"));
+    generateStructured
+      .mockRejectedValueOnce(new Error("provider timeout"))
+      .mockRejectedValueOnce(new Error("provider timeout"));
     await generateApplicationSummary({ organizationId, campaignId, userId });
     const failed = await getApplicationSummaryView({ organizationId, campaignId });
     expect(failed.summary?.status).toBe("FAILED");

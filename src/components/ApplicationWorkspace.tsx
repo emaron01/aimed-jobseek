@@ -752,6 +752,7 @@ export async function ApplicationWorkspace({
           version: asset.version,
           status: asset.status,
           content: asset.contentJson,
+          claimFlagsJson: asset.claimFlagsJson,
           guidance: asset.guidance,
           promptVersion: asset.promptVersion,
           createdAt: asset.createdAt.toISOString(),
@@ -802,6 +803,7 @@ export async function ApplicationWorkspace({
           sentAt: asset.sentAt?.toISOString() ?? null,
           emailLength: asset.emailLength,
           content: asset.contentJson,
+          claimFlagsJson: asset.claimFlagsJson,
         }))}
     />
     </div>

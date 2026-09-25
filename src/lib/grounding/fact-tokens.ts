@@ -75,17 +75,110 @@ export function normalizeFactNumber(value: string): string {
   return asText(value).replace(/[$,%]/g, "").replace(/,/g, "").replace(/\.0+$/, "");
 }
 
+const NUMBER_SCALES: Record<string, number> = {
+  hundred: 100,
+  thousand: 1_000,
+  k: 1_000,
+  million: 1_000_000,
+  m: 1_000_000,
+  billion: 1_000_000_000,
+  b: 1_000_000_000,
+};
+
+const TENS_WORDS: Record<string, number> = {
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
+};
+
+function canonicalizeNumber(value: number): string | null {
+  if (!Number.isFinite(value)) return null;
+  return normalizeFactNumber(String(value));
+}
+
+function readWordNumber(tokens: string[], start: number): { value: number; next: number } | null {
+  let index = start;
+  let total = 0;
+  let current = 0;
+  let consumed = false;
+  while (index < tokens.length) {
+    const token = tokens[index]!;
+    if (token in TENS_WORDS) {
+      current += TENS_WORDS[token]!;
+      consumed = true;
+      index += 1;
+      continue;
+    }
+    if (token in NUMBER_WORDS && !(token in NUMBER_SCALES)) {
+      current += Number(NUMBER_WORDS[token]);
+      consumed = true;
+      index += 1;
+      continue;
+    }
+    if (token in NUMBER_SCALES) {
+      const scale = NUMBER_SCALES[token]!;
+      if (!consumed && current === 0) return null;
+      current = (current || 1) * scale;
+      if (scale >= 1000) {
+        total += current;
+        current = 0;
+      }
+      consumed = true;
+      index += 1;
+      continue;
+    }
+    if (token === "percent") {
+      index += 1;
+      break;
+    }
+    break;
+  }
+  if (!consumed) return null;
+  return { value: total + current, next: index };
+}
+
+function extractWordNumbers(text: string): string[] {
+  const tokens = asText(text)
+    .toLowerCase()
+    .replace(/[^a-z0-9%\s-]/g, " ")
+    .split(/[\s-]+/)
+    .filter(Boolean);
+  const found: string[] = [];
+  let index = 0;
+  while (index < tokens.length) {
+    const parsed = readWordNumber(tokens, index);
+    if (parsed) {
+      const canonical = canonicalizeNumber(parsed.value);
+      if (canonical) found.push(canonical);
+      index = parsed.next;
+    } else {
+      index += 1;
+    }
+  }
+  return found;
+}
+
 export function extractFactNumbers(text: string): string[] {
   const found = new Set<string>();
-  for (const match of asText(text).match(/\$?\d[\d,]*(?:\.\d+)?%?/g) ?? []) {
-    const normalized = normalizeFactNumber(match);
-    if (normalized) found.add(normalized);
+  const value = asText(text);
+  for (const match of value.matchAll(
+    /\$?(\d[\d,]*(?:\.\d+)?)(?:\s*(million|billion|thousand|percent|[kmb]))?%?/gi,
+  )) {
+    const amount = Number(match[1]!.replace(/,/g, ""));
+    const scaleToken = match[2]?.toLowerCase();
+    const scale =
+      scaleToken && scaleToken !== "percent"
+        ? (NUMBER_SCALES[scaleToken] ?? 1)
+        : 1;
+    const canonical = canonicalizeNumber(amount * scale);
+    if (canonical) found.add(canonical);
   }
-  const lower = asText(text).toLowerCase();
-  for (const [word, value] of Object.entries(NUMBER_WORDS)) {
-    const pattern = new RegExp(`\\b${word}\\b`, "i");
-    if (pattern.test(lower)) found.add(value);
-  }
+  for (const item of extractWordNumbers(value)) found.add(item);
   return [...found];
 }
 

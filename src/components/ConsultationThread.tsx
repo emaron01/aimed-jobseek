@@ -1,12 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import {
   flagConsultationInaccuracyAction,
   replyConsultationAction,
   reviseConsultationResultAction,
+  saveEditedConsultationStatementAction,
   useConsultationResultAction,
 } from "@/app/actions/consultation";
+import { ClaimFlagBanner } from "@/components/ClaimFlagBanner";
+import {
+  claimFlagsFromJson,
+  openClaimFlags,
+  type ClaimFlag,
+} from "@/lib/grounding/claim-flags";
+import { applicationAssetConfig } from "@/lib/product-config";
+import { SubmitButton } from "@/components/ui";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import {
   consultationConfig,
@@ -30,6 +39,7 @@ export type ThreadStatement = {
   status: string;
   content: string;
   strengtheningNote: string | null;
+  claimFlagsJson?: unknown;
 };
 
 export function ConsultationThread({
@@ -52,6 +62,10 @@ export function ConsultationThread({
   latestDraftTurnId: string | null;
 }) {
   const [pendingReply, setPendingReply] = useState<string | null>(null);
+  const [, saveStatementAction] = useActionState(
+    saveEditedConsultationStatementAction,
+    null,
+  );
   const statementsByTurn = new Map<string, ThreadStatement[]>();
   for (const statement of statements) {
     const existing = statementsByTurn.get(statement.turnId) ?? [];
@@ -118,7 +132,44 @@ export function ConsultationThread({
                     {statement.strengtheningNote}
                   </p>
                 ) : null}
-                <p className={`text-sm text-slate-800 ${wrapClass}`}>{statement.content}</p>
+                <p
+                  id={`claim-edit-${statement.id}`}
+                  className={`text-sm text-slate-800 ${wrapClass}`}
+                >
+                  {statement.content}
+                </p>
+                {openClaimFlags(claimFlagsFromJson(statement.claimFlagsJson)).map(
+                  (flag: ClaimFlag) => (
+                    <div key={flag.id} className="space-y-2">
+                      <ClaimFlagBanner
+                        campaignId={campaignId}
+                        statementId={statement.id}
+                        flag={flag}
+                        editHref={`#claim-edit-form-${statement.id}`}
+                      />
+                      {canEdit ? (
+                        <form
+                          id={`claim-edit-form-${statement.id}`}
+                          action={saveStatementAction}
+                          className="space-y-2"
+                        >
+                          <input type="hidden" name="campaignId" value={campaignId} />
+                          <input type="hidden" name="statementId" value={statement.id} />
+                          <textarea
+                            name="content"
+                            required
+                            rows={3}
+                            defaultValue={statement.content}
+                            className={fieldClass}
+                          />
+                          <SubmitButton>
+                            {applicationAssetConfig.labels.saveNewVersion}
+                          </SubmitButton>
+                        </form>
+                      ) : null}
+                    </div>
+                  ),
+                )}
               </div>
             ))}
             {showConfirm ? (

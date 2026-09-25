@@ -9,6 +9,12 @@ import {
   writePresentationPlanAction,
   type ApplicationAssetActionResult,
 } from "@/app/actions/application-assets";
+import { ClaimFlagBanner } from "@/components/ClaimFlagBanner";
+import {
+  claimFlagsFromJson,
+  openClaimFlags,
+  type ClaimFlag,
+} from "@/lib/grounding/claim-flags";
 import {
   applicationAssetContentSchema,
   type ApplicationAssetContent,
@@ -33,6 +39,7 @@ type AssetRow = {
   version: number;
   status: "DRAFT" | "APPROVED";
   content: ApplicationAssetContent;
+  claimFlags: ClaimFlag[];
   guidance: string | null;
   promptVersion: string;
   createdAt: string;
@@ -109,23 +116,67 @@ function Status({
   );
 }
 
-function ClaimText({ claim }: { claim: AssetClaim }) {
+function ClaimFlagActions({
+  campaignId,
+  assetId,
+  flag,
+}: {
+  campaignId: string;
+  assetId: string;
+  flag: ClaimFlag;
+}) {
+  return (
+    <ClaimFlagBanner
+      campaignId={campaignId}
+      assetId={assetId}
+      flag={flag}
+      editHref={`#claim-edit-${flag.claimId}`}
+    />
+  );
+}
+
+function ClaimText({
+  claim,
+  flag,
+  campaignId,
+  assetId,
+}: {
+  claim: AssetClaim;
+  flag?: ClaimFlag;
+  campaignId?: string;
+  assetId?: string;
+}) {
   const support = claim.supports
     .map((item) => formatClaimSupportLabel(item.sourceId, item.quote))
     .join("\n");
   return (
-    <span title={support} tabIndex={0} className="cursor-help underline decoration-dotted">
-      {claim.text}
+    <span>
+      <span title={support} tabIndex={0} className="cursor-help underline decoration-dotted">
+        {claim.text}
+      </span>
+      {flag && campaignId && assetId ? (
+        <ClaimFlagActions campaignId={campaignId} assetId={assetId} flag={flag} />
+      ) : null}
     </span>
   );
+}
+
+function flagFor(flags: ClaimFlag[], claimId: string): ClaimFlag | undefined {
+  return flags.find((flag) => flag.claimId === claimId);
 }
 
 function AssetPreview({
   content,
   earlierExperienceHeading,
+  flags = [],
+  campaignId,
+  assetId,
 }: {
   content: ApplicationAssetContent;
   earlierExperienceHeading: string | null;
+  flags?: ClaimFlag[];
+  campaignId?: string;
+  assetId?: string;
 }) {
   if (content.type === "COVER_LETTER") {
     const paragraphs = visibleItems(content.paragraphs, (claim) => claim.text);
@@ -135,7 +186,12 @@ function AssetPreview({
         {paragraphs.length ? (
           paragraphs.map((claim) => (
             <p key={claim.id}>
-              <ClaimText claim={claim} />
+              <ClaimText
+                claim={claim}
+                flag={flagFor(flags, claim.id)}
+                campaignId={campaignId}
+                assetId={assetId}
+              />
             </p>
           ))
         ) : (
@@ -158,13 +214,23 @@ function AssetPreview({
     <article className="space-y-4 text-sm text-slate-800">
       <header className="text-center">
         <h4 className="text-xl font-semibold">
-          <ClaimText claim={content.header.name} />
+          <ClaimText
+            claim={content.header.name}
+            flag={flagFor(flags, content.header.name.id)}
+            campaignId={campaignId}
+            assetId={assetId}
+          />
         </h4>
         <p className="mt-1">
           {content.header.contactDetails.map((claim, index) => (
             <span key={claim.id}>
               {index > 0 ? " | " : ""}
-              <ClaimText claim={claim} />
+              <ClaimText
+                claim={claim}
+                flag={flagFor(flags, claim.id)}
+                campaignId={campaignId}
+                assetId={assetId}
+              />
             </span>
           ))}
         </p>
@@ -173,7 +239,12 @@ function AssetPreview({
         {visibleItems(content.summary, (claim) => claim.text).length ? (
           visibleItems(content.summary, (claim) => claim.text).map((claim) => (
             <p key={claim.id}>
-              <ClaimText claim={claim} />
+              <ClaimText
+                claim={claim}
+                flag={flagFor(flags, claim.id)}
+                campaignId={campaignId}
+                assetId={assetId}
+              />
             </p>
           ))
         ) : (
@@ -200,7 +271,12 @@ function AssetPreview({
               <ul className="list-disc pl-5">
                 {visibleItems(role.bullets, (claim) => claim.text).map((claim) => (
                   <li key={claim.id}>
-                    <ClaimText claim={claim} />
+                    <ClaimText
+                claim={claim}
+                flag={flagFor(flags, claim.id)}
+                campaignId={campaignId}
+                assetId={assetId}
+              />
                   </li>
                 ))}
               </ul>
@@ -234,7 +310,12 @@ function AssetPreview({
             {visibleItems(claims as AssetClaim[], (claim) => claim.text).map(
               (claim) => (
                 <p key={claim.id}>
-                  <ClaimText claim={claim} />
+                  <ClaimText
+                claim={claim}
+                flag={flagFor(flags, claim.id)}
+                campaignId={campaignId}
+                assetId={assetId}
+              />
                 </p>
               ),
             )}
@@ -325,6 +406,7 @@ function AssetEditor({
             {formatClaimEditorLabel(claim.text)}
           </span>
           <textarea
+            id={`claim-edit-${claim.id}`}
             value={claim.text}
             rows={3}
             onChange={(event) =>
@@ -334,6 +416,13 @@ function AssetEditor({
             }
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
           />
+          {flagFor(asset.claimFlags, claim.id) ? (
+            <ClaimFlagActions
+              campaignId={campaignId}
+              assetId={asset.id}
+              flag={flagFor(asset.claimFlags, claim.id)!}
+            />
+          ) : null}
         </label>
       ))}
       <SubmitButton>{applicationAssetConfig.labels.saveNewVersion}</SubmitButton>
@@ -375,6 +464,9 @@ function AssetHistory({
             <AssetPreview
               content={asset.content}
               earlierExperienceHeading={earlierExperienceHeading}
+              flags={asset.claimFlags}
+              campaignId={campaignId}
+              assetId={asset.id}
             />
             {asset.guidance ? (
               <p className="text-xs text-slate-500">
@@ -641,7 +733,12 @@ export function ApplicationAssetsSection({
   defaultOpen = false,
 }: {
   campaignId: string;
-  assets: Array<Omit<AssetRow, "content"> & { content: unknown }>;
+  assets: Array<
+    Omit<AssetRow, "content" | "claimFlags"> & {
+      content: unknown;
+      claimFlagsJson?: unknown;
+    }
+  >;
   profileRoles: ProfileRole[];
   plans: PlanRow[];
   invalidPlanTypes?: Array<"RESUME" | "COVER_LETTER">;
@@ -654,7 +751,13 @@ export function ApplicationAssetsSection({
   const valid = assets.flatMap((asset) => {
     const parsed = applicationAssetContentSchema.safeParse(asset.content);
     if (parsed.success) {
-      return [{ ...asset, content: sanitizeAssetContent(parsed.data) }];
+      return [
+        {
+          ...asset,
+          content: sanitizeAssetContent(parsed.data),
+          claimFlags: openClaimFlags(claimFlagsFromJson(asset.claimFlagsJson)),
+        },
+      ];
     }
     if (
       asset.content &&
@@ -668,7 +771,17 @@ export function ApplicationAssetsSection({
           asset.content as ApplicationAssetContent,
         );
         const retry = applicationAssetContentSchema.safeParse(sanitized);
-        return retry.success ? [{ ...asset, content: retry.data }] : [];
+        return retry.success
+          ? [
+              {
+                ...asset,
+                content: retry.data,
+                claimFlags: openClaimFlags(
+                  claimFlagsFromJson(asset.claimFlagsJson),
+                ),
+              },
+            ]
+          : [];
       } catch {
         return [];
       }

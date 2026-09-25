@@ -15,7 +15,7 @@ const support = [{ sourceId: "story:1", quote: "I rebuilt the forecast cadence."
 describe("Interview Cheat Sheet", () => {
   it("renames the surface through the vocabulary module", () => {
     expect(applicationSummaryConfig.title).toBe("Interview Cheat Sheet");
-    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("4");
+    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("5");
   });
 
   it("builds one section per Direct role or linked contact and tailors by type", () => {

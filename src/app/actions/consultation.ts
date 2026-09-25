@@ -8,6 +8,8 @@ import {
   dismissConsultationProposal,
   pauseConsultation,
   regenerateConsultationStatement,
+  resolveConsultationStatementFlag,
+  saveEditedConsultationStatement,
   resumeConsultation,
   reviseConsultationResult,
   skipConsultation,
@@ -17,7 +19,11 @@ import {
   recordConsultationReply,
 } from "@/lib/consultation/service";
 import { requireCurrentUser } from "@/lib/auth/session";
-import { consultationConversationCopy, vocab } from "@/lib/product-config";
+import {
+  applicationAssetConfig,
+  consultationConversationCopy,
+  vocab,
+} from "@/lib/product-config";
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
@@ -297,6 +303,66 @@ export async function regenerateConsultationStatementAction(
     return { ok: true, message: "Polished statement regenerated." };
   } catch (error) {
     return fail(error, "The polished statement could not be regenerated.");
+  }
+}
+
+export async function resolveConsultationStatementFlagAction(
+  _prev: ConsultationActionResult | null,
+  formData: FormData,
+): Promise<ConsultationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = campaignIdFrom(formData);
+    const statementId = String(formData.get("statementId") ?? "").trim();
+    const claimId = String(formData.get("claimId") ?? "").trim();
+    const action = String(formData.get("flagAction") ?? "").trim();
+    if (!statementId) {
+      return { ok: false, message: "That polished statement was not found." };
+    }
+    if (action !== "KEPT" && action !== "REMOVED") {
+      return { ok: false, message: "That flag action is not available." };
+    }
+    await resolveConsultationStatementFlag({
+      organizationId,
+      statementId,
+      claimId,
+      action,
+    });
+    if (campaignId) revalidatePath(`/campaigns/${campaignId}`);
+    return {
+      ok: true,
+      message:
+        action === "KEPT"
+          ? applicationAssetConfig.labels.claimFlag.keep
+          : applicationAssetConfig.labels.claimFlag.remove,
+    };
+  } catch (error) {
+    return fail(error, "The claim flag could not be updated.");
+  }
+}
+
+export async function saveEditedConsultationStatementAction(
+  _prev: ConsultationActionResult | null,
+  formData: FormData,
+): Promise<ConsultationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = campaignIdFrom(formData);
+    const statementId = String(formData.get("statementId") ?? "").trim();
+    if (!statementId) {
+      return { ok: false, message: "That polished statement was not found." };
+    }
+    await saveEditedConsultationStatement({
+      organizationId,
+      statementId,
+      content: String(formData.get("content") ?? ""),
+    });
+    if (campaignId) revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: applicationAssetConfig.labels.saveNewVersion };
+  } catch (error) {
+    return fail(error, "The polished statement could not be saved.");
   }
 }
 

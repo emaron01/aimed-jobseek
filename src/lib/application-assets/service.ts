@@ -4,7 +4,6 @@ import {
   validateRepetitionAndMetaLanguage,
 } from "@/lib/consultation/output-quality";
 import {
-  logQualityRejection,
   qualityIssue,
   qualityMessages,
   replaceEmDashesDeep,
@@ -26,6 +25,14 @@ import {
   validateAssetClaimsWithModel,
 } from "./ai";
 import {
+  claimFlagsFromJson,
+  flagInventedClaims,
+  markClaimSeekerEdited,
+  resolveClaimFlag,
+  seekerSourceTexts,
+  type ClaimFlagRecord,
+} from "@/lib/grounding/claim-flags";
+import {
   COVER_LETTER_ASSET_PROMPT_VERSION,
   RESUME_ASSET_PROMPT_VERSION,
   applicationAssetContentSchema,
@@ -44,13 +51,10 @@ import { formatAssetSourceKind } from "./display";
 import { applyProfileContactHeader } from "./header";
 import {
   deterministicClaimViolations,
-  formatAssetVerificationMessage,
   formatClaimViolation,
   logRejectedClaim,
   sanitizeAssetContent,
   stripClaimsById,
-  claimIdSetFromDetails,
-  claimIdsFromViolations,
 } from "./claim-grounding";
 
 export type { AssetGenerationResult } from "./outreach-types";
@@ -240,14 +244,6 @@ function supportErrors(
     }
   }
   return errors;
-}
-
-function stripUngroundedClaims(
-  content: ApplicationAssetContent,
-  violations: string[],
-  claimIds: Set<string> = claimIdsFromViolations(violations),
-): ApplicationAssetContent {
-  return stripClaimsById(sanitizeAssetContent(content), claimIds);
 }
 
 function resumeStructureErrors(
@@ -734,6 +730,43 @@ export async function validateAssetContent(input: {
   return [...new Set(errors)];
 }
 
+function flaggableAssetClaims(content: ApplicationAssetContent): Array<{
+  id: string;
+  text: string;
+  section?: string;
+}> {
+  const credentialIds =
+    content.type === "RESUME"
+      ? new Set(content.credentials.map((claim) => claim.id))
+      : new Set<string>();
+  return assetClaims(content).map((claim) => ({
+    id: claim.id,
+    text: claim.text,
+    section: credentialIds.has(claim.id) ? "credentials" : undefined,
+  }));
+}
+
+function flagsForAssetContent(
+  content: ApplicationAssetContent,
+  context: ReadyApplicationGenerationContext,
+  previous?: ClaimFlagRecord,
+  seekerEditedIds?: Iterable<string>,
+): ClaimFlagRecord {
+  const seeker = seekerSourceTexts({
+    sources: context.sources,
+    profile: context.profile,
+    notes: [context.campaign.applicationGuidance],
+    requirement: context.requirement,
+  });
+  return flagInventedClaims({
+    claims: flaggableAssetClaims(content),
+    sourceTexts: seeker.texts,
+    names: seeker.names,
+    seekerEditedIds,
+    previous,
+  });
+}
+
 function coverLetterSalutation(context: ReadyApplicationGenerationContext): string {
   return context.hiringManagerContactName
     ? `Dear ${context.hiringManagerContactName},`
@@ -746,6 +779,7 @@ async function saveVersion(input: {
   personaId: string | null;
   content: ApplicationAssetContent;
   guidance: string | null;
+  claimFlags: ClaimFlagRecord;
 }): Promise<{ id: string; version: number }> {
   return prisma.$transaction(
     async (tx) => {
@@ -770,6 +804,7 @@ async function saveVersion(input: {
             input.content,
             input.context,
           ) as unknown as Prisma.InputJsonValue,
+          claimFlagsJson: input.claimFlags as unknown as Prisma.InputJsonValue,
           guidance: input.guidance,
           promptVersion: promptVersion(input.type),
           status: "DRAFT",
@@ -861,12 +896,8 @@ export async function generateApplicationAsset(input: {
     };
   }
   const salutation = coverLetterSalutation(context);
-  let feedback: string[] = [];
-  for (
-    let attempt = 0;
-    attempt <= applicationAssetConfig.generation.qualityRegenerationAttempts;
-    attempt += 1
-  ) {
+  let lastMessage = "The model did not return a usable asset.";
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     const generated =
       input.type === "RESUME"
         ? await generateResumeWithModel({
@@ -874,32 +905,23 @@ export async function generateApplicationAsset(input: {
             hiddenRoleIds,
             condensedRoleIds,
             regenerationInstruction: input.regenerationInstruction ?? null,
-            qualityFeedback: feedback,
+            qualityFeedback: [],
           })
         : await generateCoverLetterWithModel({
             context,
             salutation,
             regenerationInstruction: input.regenerationInstruction ?? null,
-            qualityFeedback: feedback,
+            qualityFeedback: [],
           });
     if (!generated.ok) {
-      feedback = [generated.message];
+      lastMessage = generated.message;
       if (input.type === "COVER_LETTER") {
         logCoverLetterValidationAttempt({
           campaignId: context.campaign.id,
           attempt: attempt + 1,
-          reasons: feedback,
+          reasons: [generated.message],
           passed: false,
         });
-      }
-      if (
-        attempt === applicationAssetConfig.generation.qualityRegenerationAttempts
-      ) {
-        return {
-          ok: false,
-          message: generated.message,
-          violations: feedback,
-        };
       }
       continue;
     }
@@ -911,78 +933,26 @@ export async function generateApplicationAsset(input: {
         context.profile,
       ),
     );
-    const violations = await validateAssetContent({
-      content,
-      context,
-      hiddenRoleIds,
-      condensedRoleIds,
-      salutation,
-    });
+    const claimFlags = flagsForAssetContent(content, context);
     if (input.type === "COVER_LETTER") {
       logCoverLetterValidationAttempt({
         campaignId: context.campaign.id,
         attempt: attempt + 1,
-        reasons: violations,
-        passed: violations.length === 0,
+        reasons: claimFlags.flags.map((flag) => flag.message),
+        passed: true,
       });
     }
-    if (violations.length > 0) {
-      logQualityRejection({
-        generator: `asset.${input.type}`,
-        attempt,
-        issues: violations.map((message) =>
-          qualityIssue({
-            check: "asset_validation",
-            field: "content",
-            text: message,
-            message,
-          }),
-        ),
-      });
-    }
-    if (violations.length === 0) {
-      const saved = await saveVersion({
-        context,
-        type: input.type,
-        personaId,
-        content,
-        guidance: input.regenerationInstruction?.trim() || null,
-      });
-      return { ok: true, assetId: saved.id, version: saved.version };
-    }
-    const claimIds = new Set([
-      ...claimIdsFromViolations(violations),
-      ...claimIdSetFromDetails(
-        deterministicClaimViolations({ claims: assetClaims(content), context }),
-      ),
-    ]);
-    if (claimIds.size > 0) {
-      const stripped = stripUngroundedClaims(content, violations, claimIds);
-      const remaining = await validateAssetContent({
-        content: stripped,
-        context,
-        hiddenRoleIds,
-        condensedRoleIds,
-        salutation,
-      });
-      if (remaining.length === 0) {
-        const saved = await saveVersion({
-          context,
-          type: input.type,
-          personaId,
-          content: stripped,
-          guidance: applicationAssetConfig.labels.partialRemoved,
-        });
-        return { ok: true, assetId: saved.id, version: saved.version };
-      }
-    }
-    feedback = violations;
+    const saved = await saveVersion({
+      context,
+      type: input.type,
+      personaId,
+      content,
+      guidance: input.regenerationInstruction?.trim() || null,
+      claimFlags,
+    });
+    return { ok: true, assetId: saved.id, version: saved.version };
   }
-  return {
-    ok: false,
-    message: formatAssetVerificationMessage(feedback),
-    violations: feedback,
-  };
+  return { ok: false, message: lastMessage, violations: [lastMessage] };
 }
 
 export async function approveApplicationAsset(input: {
@@ -1072,36 +1042,36 @@ export async function saveEditedApplicationAsset(input: {
     };
   }
   const readyContext = context as ReadyApplicationGenerationContext;
-  const hiddenRoleIds =
-    content.type === "RESUME"
-      ? content.experience.filter((role) => role.hidden).map((role) => role.roleId)
-      : [];
-  const condensedRoleIds =
-    content.type === "RESUME"
-      ? content.experience
-          .filter((role) => role.condensed)
-          .map((role) => role.roleId)
-      : [];
-  const violations = await validateAssetContent({
-    content,
-    context: readyContext,
-    hiddenRoleIds,
-    condensedRoleIds,
-    salutation: coverLetterSalutation(readyContext),
-  });
-  if (violations.length > 0) {
-    return {
-      ok: false,
-      message: formatAssetVerificationMessage(violations),
-      violations,
-    };
-  }
+  const previousContent = applicationAssetContentSchema.safeParse(
+    existing.contentJson,
+  );
+  const previousTexts = new Map(
+    previousContent.success
+      ? assetClaims(previousContent.data).map((claim) => [claim.id, claim.text])
+      : [],
+  );
+  const editedIds = assetClaims(content)
+    .filter((claim) => previousTexts.get(claim.id) !== claim.text)
+    .map((claim) => claim.id);
+  const claimFlags = markClaimSeekerEdited(
+    flagsForAssetContent(
+      content,
+      readyContext,
+      claimFlagsFromJson(existing.claimFlagsJson),
+      [
+        ...claimFlagsFromJson(existing.claimFlagsJson).seekerEditedIds,
+        ...editedIds,
+      ],
+    ),
+    editedIds,
+  );
   const saved = await saveVersion({
     context: readyContext,
     type: existing.type,
     personaId: existing.personaId,
     content,
     guidance: applicationAssetConfig.labels.seekerEditedGuidance,
+    claimFlags,
   });
   return { ok: true, assetId: saved.id, version: saved.version };
 }
@@ -1117,6 +1087,69 @@ export async function listApplicationAssets(input: {
     },
     orderBy: [{ type: "asc" }, { version: "desc" }],
   });
+}
+
+export async function resolveApplicationAssetFlag(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  assetId: string;
+  claimId: string;
+  action: "KEPT" | "REMOVED";
+}): Promise<AssetGenerationResult> {
+  const existing = await prisma.applicationAsset.findFirst({
+    where: {
+      id: input.assetId,
+      campaignId: input.campaignId,
+      organizationId: input.organizationId,
+    },
+  });
+  if (!existing) throw new TenantError("Application asset was not found.");
+  const parsed = applicationAssetContentSchema.safeParse(existing.contentJson);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: "The asset has an invalid structure.",
+      violations: parsed.error.issues.map((issue) => issue.message),
+    };
+  }
+  const claimId = input.claimId.trim();
+  if (!claimId) {
+    return { ok: false, message: "That line was not found.", violations: [] };
+  }
+  let content = parsed.data;
+  if (input.action === "REMOVED") {
+    content = sanitizeAssetContent(stripClaimsById(content, new Set([claimId])));
+  }
+  const claimFlags = resolveClaimFlag(
+    claimFlagsFromJson(existing.claimFlagsJson),
+    claimId,
+    input.action,
+  );
+  const context = await loadApplicationGenerationContext(
+    input.campaignId,
+    input.userId,
+    { personaId: existing.personaId },
+  );
+  if (!context.profile || !context.requirement) {
+    return {
+      ok: false,
+      message: `This ${vocab.campaign.singular} needs an approved ${vocab.product.singular} and job requirement.`,
+      violations: [],
+    };
+  }
+  await prisma.applicationAsset.update({
+    where: { id: existing.id },
+    data: {
+      contentJson: content as unknown as Prisma.InputJsonValue,
+      claimFlagsJson: claimFlags as unknown as Prisma.InputJsonValue,
+      claimTraceJson: claimTrace(
+        content,
+        context as ReadyApplicationGenerationContext,
+      ) as unknown as Prisma.InputJsonValue,
+    },
+  });
+  return { ok: true, assetId: existing.id, version: existing.version };
 }
 
 export function assetWordCount(content: ApplicationAssetContent): number {

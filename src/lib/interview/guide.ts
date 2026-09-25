@@ -5,19 +5,20 @@ import {
   validateRepetitionAndMetaLanguage,
 } from "@/lib/consultation/output-quality";
 import {
-  logQualityRejection,
-  qualityIssue,
   qualityMessages,
 } from "@/lib/generation/quality";
 import { prisma } from "@/lib/prisma-client";
 import {
-  applicationAssetConfig,
   consultationConfig,
   interviewConfig,
 } from "@/lib/product-config";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
+import {
+  flagInventedClaims,
+  seekerSourceTexts,
+} from "@/lib/grounding/claim-flags";
 import { generateInterviewClarifyingQuestions, generateInterviewGuideWithModel } from "./ai";
 import {
   INTERVIEW_GUIDE_PROMPT_VERSION,
@@ -592,8 +593,7 @@ export async function requestInterviewGuide(input: {
     },
   });
 
-  const maxAttempts = applicationAssetConfig.generation.qualityRegenerationAttempts;
-  for (let attempt = 0; attempt <= maxAttempts; attempt += 1) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     const generated = await generateInterviewGuideWithModel({
       ...promptInput,
       qualityFeedback: feedback,
@@ -601,82 +601,56 @@ export async function requestInterviewGuide(input: {
     if (!generated.ok) {
       console.error(
         JSON.stringify({
-          event: "interview_guide_validation_failed",
+          event: "interview_guide_parse_failed",
           attempt: attempt + 1,
-          maxAttempts: maxAttempts + 1,
           errors: [generated.message],
         }),
       );
-      await prisma.interviewStageGuide.update({
-        where: { stageId: input.stageId },
-        data: { status: "FAILED", generationError: generated.message },
-      });
-      return { status: "FAILED", message: generated.message };
+      if (attempt === 1) {
+        await prisma.interviewStageGuide.update({
+          where: { stageId: input.stageId },
+          data: { status: "FAILED", generationError: generated.message },
+        });
+        return { status: "FAILED", message: generated.message };
+      }
+      continue;
     }
-    const errors = validateInterviewGuideContent({
-      content: generated.data,
+    const seeker = seekerSourceTexts({
       sources: context.sources,
-      stageType: context.stage.type,
-      interviewerIds: context.stage.interviewers.map((row) => row.contactId),
-      experience: context.experience,
-      priorNoteSourceIds: context.priorStages
-        .filter((row) => row.notesAfter?.trim())
-        .map((row) => `interview:${row.id}:notesAfter`),
-      approvedStatementIds:
-        context.stage.campaign.consultationSession?.statements.map(
-          (statement) => statement.id,
-        ) ?? [],
-      approvedStoryIds: context.stories.map((story) => story.id),
+      profile: { experience: context.experience },
     });
-    if (errors.length > 0) {
-      logQualityRejection({
-        generator: "interview_guide",
-        attempt,
-        issues: errors.map((message) =>
-          qualityIssue({
-            check: "guide_validation",
-            field: "content",
-            text: message,
-            message,
-          }),
-        ),
-      });
-    }
-    if (errors.length === 0) {
-      await prisma.interviewStageGuide.update({
-        where: { stageId: input.stageId },
-        data: {
-          status: "READY",
-          contentJson: generated.data as unknown as Prisma.InputJsonValue,
-          sourceHash: context.sourceHash,
-          generationError: null,
-          generatedAt: new Date(),
-          promptVersion: INTERVIEW_GUIDE_PROMPT_VERSION,
-        },
-      });
-      return { status: "READY", stale: false };
-    }
-    console.error(
-      JSON.stringify({
-        event: "interview_guide_validation_failed",
-        attempt: attempt + 1,
-        maxAttempts: maxAttempts + 1,
-        errors,
-      }),
-    );
-    feedback = errors;
+    const claimFlags = flagInventedClaims({
+      claims: interviewGuideClaims(generated.data).map((claim, index) => ({
+        id: claim.id ?? `guide_${index}`,
+        text: claim.text,
+      })),
+      sourceTexts: seeker.texts,
+      names: seeker.names,
+    });
+    await prisma.interviewStageGuide.update({
+      where: { stageId: input.stageId },
+      data: {
+        status: "READY",
+        contentJson: generated.data as unknown as Prisma.InputJsonValue,
+        claimFlagsJson: claimFlags as unknown as Prisma.InputJsonValue,
+        sourceHash: context.sourceHash,
+        generationError: null,
+        generatedAt: new Date(),
+        promptVersion: INTERVIEW_GUIDE_PROMPT_VERSION,
+      },
+    });
+    return { status: "READY", stale: false };
   }
   await prisma.interviewStageGuide.update({
     where: { stageId: input.stageId },
     data: {
       status: "FAILED",
-      generationError:
-        "The interview guide did not pass checks. Retry the missing part.",
+      generationError: "The model did not return a usable interview guide.",
     },
   });
   return {
     status: "FAILED",
-    message: "The interview guide did not pass checks. Retry the missing part.",
+    message: "The model did not return a usable interview guide.",
   };
 }
 

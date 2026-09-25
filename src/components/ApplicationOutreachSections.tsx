@@ -28,6 +28,11 @@ import {
   outreachConfig,
   vocab,
 } from "@/lib/product-config";
+import { ClaimFlagBanner } from "@/components/ClaimFlagBanner";
+import {
+  claimFlagsFromJson,
+  openClaimFlags,
+} from "@/lib/grounding/claim-flags";
 import { SECONDARY_BUTTON_CLASS, SubmitButton, AppButton } from "@/components/ui";
 
 const initial: ApplicationOutreachActionResult | null = null;
@@ -63,6 +68,7 @@ type OutreachRow = {
   sentAt: string | null;
   emailLength: "SHORT" | "MEDIUM" | "LONG" | null;
   content: unknown;
+  claimFlagsJson?: unknown;
 };
 
 function Status({ result }: { result: ApplicationOutreachActionResult | null }) {
@@ -534,6 +540,14 @@ function OutreachMessageCard({
         <div className="space-y-2 text-sm text-slate-800">
           {composed.subject ? <p><span className="font-medium">Subject:</span> {composed.subject}</p> : null}
           <pre className="whitespace-pre-wrap font-sans">{composed.body}</pre>
+          {openClaimFlags(claimFlagsFromJson(asset.claimFlagsJson)).map((flag) => (
+            <ClaimFlagBanner
+              key={flag.id}
+              campaignId={campaignId}
+              assetId={asset.id}
+              flag={flag}
+            />
+          ))}
         </div>
       ) : (
         <p className="text-sm text-red-700">This message could not be displayed.</p>

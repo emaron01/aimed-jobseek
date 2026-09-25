@@ -8,6 +8,7 @@ import {
 } from "@/lib/application-assets/plan-service";
 import {
   approveApplicationAsset,
+  resolveApplicationAssetFlag,
   saveEditedApplicationAsset,
 } from "@/lib/application-assets/service";
 import { applicationAssetConfig, workspaceProgressText } from "@/lib/product-config";
@@ -193,6 +194,49 @@ export async function saveEditedApplicationAssetAction(
     return {
       ok: true,
       message: `Edited version ${result.version} saved.`,
+      assetId: result.assetId,
+      version: result.version,
+    };
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
+export async function resolveApplicationAssetFlagAction(
+  _previous: ApplicationAssetActionResult | null,
+  formData: FormData,
+): Promise<ApplicationAssetActionResult> {
+  try {
+    const [user, organizationId] = await Promise.all([
+      requireCurrentUser(),
+      requireOrganizationId(),
+    ]);
+    const id = campaignId(formData);
+    const assetId = String(formData.get("assetId") ?? "").trim();
+    const claimId = String(formData.get("claimId") ?? "").trim();
+    const action = String(formData.get("flagAction") ?? "").trim();
+    if (!assetId) throw new TenantError("Application asset is required.");
+    if (action !== "KEPT" && action !== "REMOVED") {
+      return { ok: false, message: "That flag action is not available." };
+    }
+    const result = await resolveApplicationAssetFlag({
+      organizationId,
+      campaignId: id,
+      userId: user.id,
+      assetId,
+      claimId,
+      action,
+    });
+    if (!result.ok) {
+      return { ok: false, message: result.message, violations: result.violations };
+    }
+    revalidate(id);
+    return {
+      ok: true,
+      message:
+        action === "KEPT"
+          ? applicationAssetConfig.labels.claimFlag.keep
+          : applicationAssetConfig.labels.claimFlag.remove,
       assetId: result.assetId,
       version: result.version,
     };

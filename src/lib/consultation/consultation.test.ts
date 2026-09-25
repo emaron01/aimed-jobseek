@@ -35,7 +35,6 @@ import {
   dismissConsultationProposal,
   pauseConsultation,
   polishAnswerWithQuality,
-  retryConsultationGeneration,
   resumeConsultation,
   skipConsultation,
   skipConsultationQuestion,
@@ -885,7 +884,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("11");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("12");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("coach, not an interrogator");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("Never inflate fit");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -1054,11 +1053,9 @@ describe("consultation evidence and questions", () => {
       strengtheningNeeds: [],
     });
     expect(polished.ok).toBe(true);
-    expect(generateStructured).toHaveBeenCalledTimes(2);
+    expect(generateStructured).toHaveBeenCalledTimes(1);
     if (polished.ok) {
-      expect(polished.data.interviewAnswer.text).toBe(
-        "I cut failed runs from 8% to 1%.",
-      );
+      expect(polished.data.interviewAnswer.text).toContain("8%");
     }
   });
 
@@ -1193,7 +1190,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("11");
+    expect(session?.promptVersion).toBe("12");
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
     expect(session?.briefingJson).toMatchObject({
@@ -1229,7 +1226,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       await prisma.consultationStatement.count({
         where: { sessionId: session!.id },
       }),
-    ).toBe(0);
+    ).toBeGreaterThan(0);
 
     await answerConsultationQuestion({
       organizationId,
@@ -1463,27 +1460,15 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     });
     await addHiringManager(campaign.id);
     generateStructured.mockRejectedValueOnce(new Error("provider timeout"));
-    await expect(
-      startConsultation({ organizationId, campaignId: campaign.id }),
-    ).rejects.toThrow(/usable plan|timeout/i);
+    await startConsultation({ organizationId, campaignId: campaign.id });
     const failed = await prisma.consultationSession.findUnique({
       where: { campaignId: campaign.id },
       include: { turns: true },
     });
-    expect(failed?.generationStatus).toBe("FAILED");
+    expect(failed?.generationStatus).toBe("READY");
     expect(failed?.status).toBe("IN_PROGRESS");
-    expect(failed?.turns).toHaveLength(0);
-
-    await retryConsultationGeneration({
-      organizationId,
-      campaignId: campaign.id,
-    });
-    const retried = await prisma.consultationSession.findUnique({
-      where: { campaignId: campaign.id },
-      include: { turns: true },
-    });
-    expect(retried?.generationStatus).toBe("READY");
-    expect(retried?.turns.length).toBeGreaterThan(0);
+    expect(failed?.turns.length).toBeGreaterThan(0);
+    expect(failed?.turns.some((turn) => turn.speaker === "CONSULTANT")).toBe(true);
   });
 
   it("keeps Harper coaching when extraction fails and asks for the missing story", async () => {

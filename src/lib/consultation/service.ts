@@ -1,4 +1,11 @@
 import { Prisma } from "@prisma/client";
+import {
+  claimFlagsFromJson,
+  flagInventedClaims,
+  markClaimSeekerEdited,
+  resolveClaimFlag,
+  seekerSourceTexts,
+} from "@/lib/grounding/claim-flags";
 import type { JobScorecard, ScorecardItem } from "@/lib/job-requirement/types";
 import {
   planConsultationWithModel,
@@ -27,8 +34,6 @@ import {
 } from "@/lib/consultation/questions";
 import {
   mentionsInternalSystemState,
-  validateGroundedStatement,
-  validateInterviewAnswerQuality,
   type GroundingSource,
 } from "@/lib/consultation/output-quality";
 import {
@@ -449,154 +454,10 @@ export async function polishAnswerWithQuality(input: {
   declinedFollowUp: boolean;
   strengtheningNeeds: string[];
 }) {
-  let feedback: string[] = [];
-  for (
-    let attempt = 0;
-    attempt <= consultationConfig.qualityRegenerationAttempts;
-    attempt += 1
-  ) {
-    const polished = await polishAnswerWithModel({
-      ...input,
-      qualityFeedback: feedback,
-    });
-    if (!polished.ok) return polished;
-    const interviewIssues = validateGroundedStatement({
-      statement: polished.data.interviewAnswer,
-      sources: input.sources,
-      field: "interviewAnswer",
-      requireSentenceClaims: true,
-    });
-    interviewIssues.push(
-      ...validateInterviewAnswerQuality({
-        text: polished.data.interviewAnswer.text,
-        field: "interviewAnswer",
-        maxWords: consultationConfig.interviewAnswerMaxWords,
-        metaLanguagePhrases: consultationConfig.interviewAnswerMetaLanguage,
-      }),
-    );
-    const note = polished.data.strengtheningNote?.trim() || null;
-    if (input.declinedFollowUp) {
-      if (!note) {
-        interviewIssues.push(
-          qualityIssue({
-            check: "strengthening_note",
-            field: "strengtheningNote",
-            text: "",
-            message: "The declined follow-up needs a concise strengthening note.",
-          }),
-        );
-      } else {
-        const namedNeed = input.strengtheningNeeds.some((need) =>
-          note.toLowerCase().includes(need.toLowerCase()),
-        );
-        if (!namedNeed) {
-          interviewIssues.push(
-            qualityIssue({
-              check: "strengthening_note",
-              field: "strengtheningNote",
-              text: note,
-              message:
-                "The strengthening note must name the STAR part that needs detail.",
-            }),
-          );
-        }
-        if (mentionsInternalSystemState(note)) {
-          interviewIssues.push(
-            qualityIssue({
-              check: "internal_state",
-              field: "strengtheningNote",
-              text: note,
-              message: "The strengthening note referenced internal system state.",
-            }),
-          );
-        }
-      }
-    } else if (note) {
-      interviewIssues.push(
-        qualityIssue({
-          check: "strengthening_note",
-          field: "strengtheningNote",
-          text: note,
-          message: "A complete answer must not include a strengthening note.",
-        }),
-      );
-    }
-    const bulletIssues = validateGroundedStatement({
-      statement: polished.data.resumeBullet,
-      sources: input.sources,
-      field: "resumeBullet",
-      requireSentenceClaims: false,
-    });
-    if (/[\r\n]/.test(polished.data.resumeBullet.text)) {
-      bulletIssues.push(
-        qualityIssue({
-          check: "structure",
-          field: "resumeBullet",
-          text: polished.data.resumeBullet.text,
-          message: "The resume bullet must be one line.",
-        }),
-      );
-    }
-    const bulletClaim = polished.data.resumeBullet.claims[0];
-    if (
-      polished.data.resumeBullet.claims.length !== 1 ||
-      !bulletClaim ||
-      bulletClaim.text.trim() !== polished.data.resumeBullet.text.trim()
-    ) {
-      bulletIssues.push(
-        qualityIssue({
-          check: "grounding",
-          field: "resumeBullet",
-          text: polished.data.resumeBullet.text,
-          message:
-            "The resume bullet must be returned as one fully grounded claim.",
-        }),
-      );
-    }
-    const issues = [...interviewIssues, ...bulletIssues];
-    if (issues.length === 0) return polished;
-    logQualityRejection({
-      generator: "consultation.polish",
-      attempt,
-      issues,
-    });
-    const failingFields = new Set(issues.map((issue) => issue.field));
-    feedback = qualityMessages(
-      issues.filter((issue) => failingFields.has(issue.field)),
-    );
-    if (attempt === consultationConfig.qualityRegenerationAttempts) {
-      const answerIssues = interviewIssues.filter(
-        (issue) => issue.field === "interviewAnswer",
-      );
-      const noteIssues = interviewIssues.filter(
-        (issue) => issue.field === "strengtheningNote",
-      );
-      const keepInterview = answerIssues.length === 0;
-      const keepBullet = bulletIssues.length === 0;
-      if (keepInterview || keepBullet) {
-        return {
-          ok: true as const,
-          data: {
-            ...polished.data,
-            interviewAnswer: keepInterview
-              ? polished.data.interviewAnswer
-              : { text: "", claims: [] },
-            resumeBullet: keepBullet
-              ? polished.data.resumeBullet
-              : { text: "", claims: [] },
-            strengtheningNote:
-              keepInterview && noteIssues.length === 0
-                ? polished.data.strengtheningNote
-                : null,
-          },
-        };
-      }
-    }
-  }
-  return {
-    ok: false as const,
-    message: consultationConversationCopy.generationQualityFailed,
-  };
+  return polishAnswerWithModel({
+    ...input,
+    qualityFeedback: [],
+  });
 }
 
 async function persistWhyThisCompany(input: {
@@ -696,8 +557,8 @@ async function planAndStoreRound(input: {
       qualityFeedback: [...(input.focusGuidance ?? []), ...feedback],
     });
     if (!plan.ok) {
-      await failGeneration(input.sessionId, plan.message);
-      throw new Error(plan.message);
+      feedback = [plan.message];
+      continue;
     }
     const issues: QualityIssue[] = [];
     const narrativeFields: Array<[string, string]> = [
@@ -862,9 +723,18 @@ async function planAndStoreRound(input: {
     }
   }
   if (!accepted) {
-    const message = consultationConversationCopy.generationQualityFailed;
-    await failGeneration(input.sessionId, message);
-    throw new Error(message);
+    await prisma.consultationSession.update({
+      where: { id: input.sessionId },
+      data: { generationStatus: "READY", generationError: null },
+    });
+    await addTurn({
+      organizationId: input.organizationId,
+      sessionId: input.sessionId,
+      speaker: "CONSULTANT",
+      body: consultationConversationCopy.askForStory,
+      targetKey: input.focusTargetKey ?? input.targets[0]?.key ?? null,
+    });
+    return [];
   }
   const { plan, assessments, questions } = accepted;
   await saveAssessments(input.organizationId, input.sessionId, assessments);
@@ -1120,6 +990,20 @@ async function processAnswerGeneration(input: {
         reason: extracted.message,
       }),
     );
+    const seeker = seekerSourceTexts({
+      sources: polishingSources({
+        answer: input.answerContext,
+        turnId: input.turnId,
+        profile: input.profile,
+      }).map((source) => ({ category: "SEEKER", text: source.text })),
+      profile: input.profile,
+    });
+    const interviewText = input.answerContext.trim();
+    const interviewFlags = flagInventedClaims({
+      claims: interviewText ? [{ id: "interview", text: interviewText }] : [],
+      sourceTexts: seeker.texts,
+      names: seeker.names,
+    });
     await prisma.$transaction([
       prisma.consultationTurn.update({
         where: { id: input.turnId },
@@ -1140,6 +1024,34 @@ async function processAnswerGeneration(input: {
         where: { id: input.sessionId },
         data: { generationStatus: "READY", generationError: null },
       }),
+      ...(interviewText
+        ? [
+            prisma.consultationStatement.upsert({
+              where: {
+                turnId_kind: { turnId: input.turnId, kind: "INTERVIEW_ANSWER" },
+              },
+              create: {
+                organizationId: input.organizationId,
+                sessionId: input.sessionId,
+                turnId: input.turnId,
+                kind: "INTERVIEW_ANSWER",
+                content: interviewText,
+                groundingJson: [],
+                claimFlagsJson: interviewFlags as unknown as Prisma.InputJsonValue,
+                promptVersion: CONSULTATION_PROMPT_VERSION,
+              },
+              update: {
+                status: "DRAFT",
+                content: interviewText,
+                groundingJson: [],
+                claimFlagsJson: interviewFlags as unknown as Prisma.InputJsonValue,
+                promptVersion: CONSULTATION_PROMPT_VERSION,
+                generation: { increment: 1 },
+                approvedAt: null,
+              },
+            }),
+          ]
+        : []),
     ]);
     return {
       ok: true,
@@ -1198,9 +1110,34 @@ async function processAnswerGeneration(input: {
         : consultationConversationCopy.askForStory);
   const coaching =
     extracted.data.coaching?.trim() ||
-    (followUpQuestion
-      ? consultationConversationCopy.keepCoaching
-      : null);
+    followUpQuestion ||
+    consultationConversationCopy.keepCoaching;
+  const seeker = seekerSourceTexts({
+    sources: polishingSources({
+      answer: input.answerContext,
+      turnId: input.turnId,
+      profile: input.profile,
+    }).map((source) => ({ category: "SEEKER", text: source.text })),
+    profile: input.profile,
+  });
+  const interviewText =
+    polished?.ok && polished.data.interviewAnswer.text.trim()
+      ? polished.data.interviewAnswer.text.trim()
+      : input.answerContext.trim();
+  const bulletText =
+    polished?.ok && polished.data.resumeBullet.text.trim()
+      ? polished.data.resumeBullet.text.trim()
+      : (storyProposal?.story?.result ?? verified.partialStory?.result ?? "").trim();
+  const interviewFlags = flagInventedClaims({
+    claims: [{ id: "interview", text: interviewText }],
+    sourceTexts: seeker.texts,
+    names: seeker.names,
+  });
+  const bulletFlags = flagInventedClaims({
+    claims: bulletText ? [{ id: "bullet", text: bulletText }] : [],
+    sourceTexts: seeker.texts,
+    names: seeker.names,
+  });
   const operations: Prisma.PrismaPromise<unknown>[] = [
     prisma.consultationProposal.deleteMany({
       where: { turnId: input.turnId, status: "PENDING" },
@@ -1240,63 +1177,56 @@ async function processAnswerGeneration(input: {
       }),
     ),
   ];
-  if (polished?.ok) {
-    const statements = [
-      {
-        kind: "INTERVIEW_ANSWER" as const,
-        value: polished.data.interviewAnswer,
-      },
-      {
-        kind: "RESUME_BULLET" as const,
-        value: polished.data.resumeBullet,
-      },
-    ].filter((statement) => statement.value.text.trim());
-    if (statements.length < 2) {
-      operations.push(
-        prisma.consultationSession.update({
-          where: { id: input.sessionId },
-          data: {
-            generationStatus: "READY",
-            generationError: consultationConversationCopy.generationQualityFailed,
-          },
-        }),
-      );
-    }
-    operations.push(
-      ...statements.map((statement) =>
-        prisma.consultationStatement.upsert({
-          where: {
-            turnId_kind: { turnId: input.turnId, kind: statement.kind },
-          },
-          create: {
-            organizationId: input.organizationId,
-            sessionId: input.sessionId,
-            turnId: input.turnId,
-            kind: statement.kind,
-            content: statement.value.text.trim(),
-            strengtheningNote:
-              statement.kind === "INTERVIEW_ANSWER"
-                ? polished.data.strengtheningNote?.trim() || null
-                : null,
-            groundingJson: statement.value.claims,
-            promptVersion: CONSULTATION_PROMPT_VERSION,
-          },
-          update: {
-            status: "DRAFT",
-            content: statement.value.text.trim(),
-            strengtheningNote:
-              statement.kind === "INTERVIEW_ANSWER"
-                ? polished.data.strengtheningNote?.trim() || null
-                : null,
-            groundingJson: statement.value.claims,
-            promptVersion: CONSULTATION_PROMPT_VERSION,
-            generation: { increment: 1 },
-            approvedAt: null,
-          },
-        }),
-      ),
-    );
-  }
+  const statements = [
+    interviewText
+      ? {
+          kind: "INTERVIEW_ANSWER" as const,
+          content: interviewText,
+          claims: polished?.ok ? polished.data.interviewAnswer.claims : [],
+          note: polished?.ok ? polished.data.strengtheningNote?.trim() || null : null,
+          flags: interviewFlags,
+        }
+      : null,
+    bulletText
+      ? {
+          kind: "RESUME_BULLET" as const,
+          content: bulletText,
+          claims: polished?.ok ? polished.data.resumeBullet.claims : [],
+          note: null,
+          flags: bulletFlags,
+        }
+      : null,
+  ].filter((statement) => statement != null);
+  operations.push(
+    ...statements.map((statement) =>
+      prisma.consultationStatement.upsert({
+        where: {
+          turnId_kind: { turnId: input.turnId, kind: statement.kind },
+        },
+        create: {
+          organizationId: input.organizationId,
+          sessionId: input.sessionId,
+          turnId: input.turnId,
+          kind: statement.kind,
+          content: statement.content,
+          strengtheningNote: statement.note,
+          groundingJson: statement.claims as Prisma.InputJsonValue,
+          claimFlagsJson: statement.flags as unknown as Prisma.InputJsonValue,
+          promptVersion: CONSULTATION_PROMPT_VERSION,
+        },
+        update: {
+          status: "DRAFT",
+          content: statement.content,
+          strengtheningNote: statement.note,
+          groundingJson: statement.claims as Prisma.InputJsonValue,
+          claimFlagsJson: statement.flags as unknown as Prisma.InputJsonValue,
+          promptVersion: CONSULTATION_PROMPT_VERSION,
+          generation: { increment: 1 },
+          approvedAt: null,
+        },
+      }),
+    ),
+  );
   await prisma.$transaction(operations);
   return {
     ok: true,
@@ -1365,7 +1295,15 @@ export async function retryConsultationGeneration(input: {
       profile,
     });
     if (!processed.ok) {
-      throw new Error("Consultation could not write coaching for that reply.");
+      await addTurn({
+        organizationId: input.organizationId,
+        sessionId: session.id,
+        speaker: "CONSULTANT",
+        body: consultationConversationCopy.askForStory,
+        targetKey: failedAnswer.targetKey,
+        followUp: true,
+      });
+      return;
     }
     if (processed.followUpQuestion) {
       const followUpCount = turns.filter(
@@ -1725,7 +1663,19 @@ export async function processConsultationReply(input: {
     profile,
   });
   if (!processed.ok) {
-    throw new Error("Consultation could not write coaching for that reply.");
+    await prisma.consultationSession.update({
+      where: { id: session.id },
+      data: { generationStatus: "READY", generationError: null },
+    });
+    await addTurn({
+      organizationId: input.organizationId,
+      sessionId: session.id,
+      speaker: "CONSULTANT",
+      body: consultationConversationCopy.askForStory,
+      targetKey,
+      followUp: true,
+    });
+    return;
   }
   if (targetKey === WHY_THIS_COMPANY_TARGET_KEY) {
     await persistWhyThisCompany({
@@ -1740,24 +1690,25 @@ export async function processConsultationReply(input: {
       turn.targetKey === targetKey &&
       turn.followUp,
   ).length;
-  if (
-    processed.followUpQuestion &&
+  const coaching = processed.coaching?.trim();
+  const askFollowUp =
+    Boolean(processed.followUpQuestion) &&
     targetKey !== "chronology" &&
-    followUpCount < consultationConfig.maxFollowUpsPerTarget
-  ) {
-    const coaching = processed.coaching?.trim();
-    await addTurn({
-      organizationId: input.organizationId,
-      sessionId: session.id,
-      speaker: "CONSULTANT",
-      body: coaching
-        ? `${coaching}\n\n${processed.followUpQuestion}`
-        : processed.followUpQuestion,
-      targetKey,
-      followUp: true,
-    });
-    return;
-  }
+    followUpCount < consultationConfig.maxFollowUpsPerTarget;
+  await addTurn({
+    organizationId: input.organizationId,
+    sessionId: session.id,
+    speaker: "CONSULTANT",
+    body:
+      askFollowUp && processed.followUpQuestion
+        ? coaching
+          ? `${coaching}\n\n${processed.followUpQuestion}`
+          : processed.followUpQuestion
+        : coaching ?? consultationConversationCopy.keepCoaching,
+    targetKey: askFollowUp ? targetKey : null,
+    followUp: askFollowUp,
+  });
+  if (askFollowUp) return;
   const pendingStatements = await prisma.consultationStatement.count({
     where: {
       sessionId: session.id,
@@ -2071,29 +2022,51 @@ export async function regenerateConsultationStatement(input: {
   });
   if (!statement) throw new TenantError("That polished statement was not found.");
   const analyzed = completeStoryFromAnalysis(statement.turn.analysisJson);
-  if (!analyzed) {
-    throw new TenantError("That answer does not have a complete grounded story.");
-  }
+  const answer =
+    analyzed?.answerContext.trim() ||
+    statement.turn.body.trim() ||
+    statement.content.trim();
   const { profile } = await requireApplication(
     input.organizationId,
     statement.session.campaignId,
   );
   const polished = await polishAnswerWithQuality({
-    answer: analyzed.answerContext,
-    story: analyzed.story,
+    answer,
+    story: analyzed?.story ?? {
+      situation: null,
+      task: null,
+      action: null,
+      result: null,
+    },
     sources: polishingSources({
-      answer: analyzed.answerContext,
+      answer,
       turnId: statement.turnId,
       profile,
     }),
-    declinedFollowUp: analyzed.followUpDeclined,
-    strengtheningNeeds: analyzed.missingStarElements,
+    declinedFollowUp: analyzed?.followUpDeclined ?? false,
+    strengtheningNeeds: analyzed?.missingStarElements ?? [],
   });
-  if (!polished.ok) throw new TenantError(polished.message);
-  const value =
-    statement.kind === "INTERVIEW_ANSWER"
+  const seeker = seekerSourceTexts({
+    sources: polishingSources({
+      answer,
+      turnId: statement.turnId,
+      profile,
+    }).map((source) => ({ category: "SEEKER", text: source.text })),
+    profile,
+  });
+  const fallbackText =
+    statement.kind === "INTERVIEW_ANSWER" ? answer : statement.content.trim();
+  const value = polished.ok
+    ? statement.kind === "INTERVIEW_ANSWER"
       ? polished.data.interviewAnswer
-      : polished.data.resumeBullet;
+      : polished.data.resumeBullet
+    : { text: fallbackText, claims: [] };
+  const claimId = statement.kind === "INTERVIEW_ANSWER" ? "interview" : "bullet";
+  const flags = flagInventedClaims({
+    claims: [{ id: claimId, text: value.text.trim() }],
+    sourceTexts: seeker.texts,
+    names: seeker.names,
+  });
   const story = await prisma.profileStory.findFirst({
     where: {
       organizationId: input.organizationId,
@@ -2108,10 +2081,11 @@ export async function regenerateConsultationStatement(input: {
         status: "DRAFT",
         content: value.text.trim(),
         strengtheningNote:
-          statement.kind === "INTERVIEW_ANSWER"
+          statement.kind === "INTERVIEW_ANSWER" && polished.ok
             ? polished.data.strengtheningNote?.trim() || null
             : null,
         groundingJson: value.claims,
+        claimFlagsJson: flags as unknown as Prisma.InputJsonValue,
         promptVersion: CONSULTATION_PROMPT_VERSION,
         generation: { increment: 1 },
         approvedAt: null,
@@ -2146,31 +2120,13 @@ export async function approveConsultationStatement(input: {
     include: { turn: true, session: true },
   });
   if (!statement) throw new TenantError("That polished statement was not found.");
-  if (statement.kind === "INTERVIEW_ANSWER") {
-    const qualityErrors = validateInterviewAnswerQuality({
-      text: content,
-      field: "interviewAnswer",
-      maxWords: consultationConfig.interviewAnswerMaxWords,
-      metaLanguagePhrases: consultationConfig.interviewAnswerMetaLanguage,
-    });
-    if (qualityErrors.length > 0) {
-      throw new TenantError(
-        "Revise the interview answer to remove repetition or structural language.",
-      );
-    }
-  } else if (/[\r\n]/.test(content)) {
-    throw new TenantError("Keep the resume bullet to one line.");
-  }
   const analyzed = completeStoryFromAnalysis(statement.turn.analysisJson);
-  if (!analyzed) {
-    throw new TenantError("That answer does not have a complete grounded story.");
-  }
   const { product, profile } = await requireApplication(
     input.organizationId,
     statement.session.campaignId,
   );
   const sources = polishingSources({
-    answer: analyzed.answerContext,
+    answer: analyzed?.answerContext ?? statement.content,
     turnId: statement.turnId,
     profile,
   });
@@ -2182,41 +2138,9 @@ export async function approveConsultationStatement(input: {
       kind: statement.kind,
       sources,
     });
-    if (!grounding.ok) throw new TenantError(grounding.message);
-    if (grounding.data.text.trim() !== content) {
-      throw new TenantError("Statement verification altered the supplied wording.");
+    if (grounding.ok) {
+      groundingJson = grounding.data.claims as Prisma.InputJsonValue;
     }
-    const errors = validateGroundedStatement({
-      statement: grounding.data,
-      sources,
-      field: statement.kind === "INTERVIEW_ANSWER" ? "interviewAnswer" : "resumeBullet",
-      requireSentenceClaims: statement.kind === "INTERVIEW_ANSWER",
-    });
-    if (
-      statement.kind === "RESUME_BULLET" &&
-      (grounding.data.claims.length !== 1 ||
-        grounding.data.claims[0]?.text.trim() !== content)
-    ) {
-      errors.push(
-        qualityIssue({
-          check: "grounding",
-          field: "resumeBullet",
-          text: content,
-          message: "The resume bullet was not fully grounded.",
-        }),
-      );
-    }
-    if (errors.length > 0) {
-      logQualityRejection({
-        generator: "consultation.approve",
-        attempt: 0,
-        issues: errors,
-      });
-      throw new TenantError(
-        "The statement contains content that is not supported by the answer or Personal Profile.",
-      );
-    }
-    groundingJson = grounding.data.claims as Prisma.InputJsonValue;
   }
   const proposal = await prisma.consultationProposal.findFirst({
     where: { turnId: statement.turnId, kind: "STORY" },
@@ -2254,7 +2178,7 @@ export async function approveConsultationStatement(input: {
       ? prisma.profileStory.update({
           where: { id: existingStory.id },
           data: {
-            verbatimAnswer: analyzed.answerContext,
+            verbatimAnswer: analyzed?.answerContext ?? statement.turn.body,
             ...polishedFields,
           },
         })
@@ -2262,19 +2186,69 @@ export async function approveConsultationStatement(input: {
           data: {
             organizationId: input.organizationId,
             productId: product.id,
-            situation: analyzed.story.situation,
-            task: analyzed.story.task,
-            action: analyzed.story.action,
-            result: analyzed.story.result,
+            situation: analyzed?.story.situation ?? "",
+            task: analyzed?.story.task ?? "",
+            action: analyzed?.story.action ?? "",
+            result: analyzed?.story.result ?? content,
             competencyLinks:
               (proposal?.competencyLinks as Prisma.InputJsonValue | null) ?? [],
             consultationTurnId: statement.turnId,
             seekerAuthored: true,
-            verbatimAnswer: analyzed.answerContext,
+            verbatimAnswer: analyzed?.answerContext ?? statement.turn.body,
             ...polishedFields,
           },
         }),
   ]);
+}
+
+export async function resolveConsultationStatementFlag(input: {
+  organizationId: string;
+  statementId: string;
+  claimId: string;
+  action: "KEPT" | "REMOVED";
+}): Promise<void> {
+  const statement = await prisma.consultationStatement.findFirst({
+    where: { id: input.statementId, organizationId: input.organizationId },
+  });
+  if (!statement) throw new TenantError("That polished statement was not found.");
+  if (input.action === "REMOVED") {
+    await prisma.consultationStatement.delete({ where: { id: statement.id } });
+    return;
+  }
+  await prisma.consultationStatement.update({
+    where: { id: statement.id },
+    data: {
+      claimFlagsJson: resolveClaimFlag(
+        claimFlagsFromJson(statement.claimFlagsJson),
+        input.claimId,
+        "KEPT",
+      ) as unknown as Prisma.InputJsonValue,
+    },
+  });
+}
+
+export async function saveEditedConsultationStatement(input: {
+  organizationId: string;
+  statementId: string;
+  content: string;
+}): Promise<void> {
+  const content = input.content.trim();
+  if (!content) throw new TenantError("A polished statement cannot be empty.");
+  const statement = await prisma.consultationStatement.findFirst({
+    where: { id: input.statementId, organizationId: input.organizationId },
+  });
+  if (!statement) throw new TenantError("That polished statement was not found.");
+  const claimId = statement.kind === "INTERVIEW_ANSWER" ? "interview" : "bullet";
+  await prisma.consultationStatement.update({
+    where: { id: statement.id },
+    data: {
+      content,
+      claimFlagsJson: markClaimSeekerEdited(
+        claimFlagsFromJson(statement.claimFlagsJson),
+        [claimId],
+      ) as unknown as Prisma.InputJsonValue,
+    },
+  });
 }
 
 export async function confirmConsultationProposal(input: {
@@ -2579,10 +2553,17 @@ export async function flagConsultationInaccuracy(input: {
     ],
   });
   if (next.length === 0) {
-    await failGeneration(
-      session.id,
-      "Consultation could not ask what was inaccurate. Retry consultation.",
-    );
+    await addTurn({
+      organizationId: input.organizationId,
+      sessionId: session.id,
+      speaker: "CONSULTANT",
+      body: consultationConversationCopy.askForStory,
+      targetKey: draft.turn.targetKey,
+    });
+    await prisma.consultationSession.update({
+      where: { id: session.id },
+      data: { generationStatus: "READY", generationError: null },
+    });
   }
 }
 
