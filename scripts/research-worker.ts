@@ -1,19 +1,24 @@
 /**
  * Render Background Worker entrypoint for durable ResearchRun batches
- * (list research and application employer research).
+ * (list research and application employer research) and ApplicationJob work.
  *
  * Migration ownership: web service runs `npm run render:pre-deploy` before deploy.
  * This process never runs prisma migrate — it waits for the ResearchRun table.
  *
  * On Render, start with `tsx scripts/research-worker.ts` — env vars come from the
  * dashboard. Do not rely on .env.local (not present on Render).
+ *
+ * Concurrency: RESEARCH_WORKER_CONCURRENCY applies to application jobs and
+ * research runs together. CONSULTATION jobs are claimed first.
  */
 import { isResearchAiConfigured } from "@/lib/ai/config";
 import { waitForResearchRunSchema } from "@/lib/research/schema-readiness";
+import { getResearchWorkerConcurrency } from "@/lib/research/config";
 import {
   abandonStaleApplicationJobs,
   claimNextApplicationJob,
 } from "@/lib/application-jobs/service";
+import { formatApplicationJobLog } from "@/lib/application-jobs/types";
 import {
   abandonStaleResearchRuns,
   claimNextResearchRun,
@@ -27,7 +32,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-let inFlight: Promise<void> | null = null;
+const inFlight = new Set<Promise<void>>();
 
 process.on("SIGTERM", () => {
   console.log(
@@ -36,11 +41,48 @@ process.on("SIGTERM", () => {
   researchWorkerShutdown.requested = true;
 });
 
+function track(work: Promise<void>): void {
+  inFlight.add(work);
+  void work.finally(() => {
+    inFlight.delete(work);
+  });
+}
+
+async function runApplicationJob(jobId: string): Promise<void> {
+  const { processApplicationJob } = await import(
+    "@/lib/application-jobs/process"
+  );
+  const result = await processApplicationJob(jobId);
+  if (result.ok) {
+    console.log(formatApplicationJobLog(result));
+    return;
+  }
+  console.error(formatApplicationJobLog(result));
+}
+
+async function runResearch(runId: string): Promise<void> {
+  const started = Date.now();
+  console.log(`[research-worker] processing run ${runId}`);
+  try {
+    await processResearchRun(runId);
+    console.log(
+      `[research-worker] research run ${runId} durationMs=${Date.now() - started} outcome=succeeded`,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(
+      `[research-worker] research run ${runId} durationMs=${Date.now() - started} outcome=failed error=${message}`,
+    );
+  }
+}
+
 async function main(): Promise<void> {
+  const concurrency = getResearchWorkerConcurrency();
   console.log("[research-worker] starting (migrations owned by web pre-deploy)");
   console.log(
     `[research-worker] research AI configured: ${isResearchAiConfigured()}`,
   );
+  console.log(`[research-worker] concurrency: ${concurrency}`);
   await waitForResearchRunSchema();
   console.log("[research-worker] schema ready");
 
@@ -48,51 +90,26 @@ async function main(): Promise<void> {
     await abandonStaleResearchRuns();
     await abandonStaleApplicationJobs();
 
-    const jobId = await claimNextApplicationJob();
-    if (jobId) {
-      const { processApplicationJob } = await import(
-        "@/lib/application-jobs/process"
-      );
-      console.log(`[research-worker] processing application job ${jobId}`);
-      inFlight = processApplicationJob(jobId)
-        .then(() => {
-          console.log(`[research-worker] finished application job ${jobId}`);
-        })
-        .catch((error) => {
-          console.error(`[research-worker] application job ${jobId} failed`, error);
-        });
-      await inFlight;
-      inFlight = null;
-      continue;
+    while (!researchWorkerShutdown.requested && inFlight.size < concurrency) {
+      const jobId = await claimNextApplicationJob();
+      if (jobId) {
+        track(runApplicationJob(jobId));
+        continue;
+      }
+      const runId = await claimNextResearchRun();
+      if (!runId) break;
+      track(runResearch(runId));
     }
 
-    const runId = await claimNextResearchRun();
-    if (!runId) {
+    if (inFlight.size === 0) {
       await sleep(IDLE_POLL_MS);
       continue;
     }
-
-    console.log(`[research-worker] processing run ${runId}`);
-    inFlight = processResearchRun(runId)
-      .then(() => {
-        console.log(`[research-worker] finished run ${runId}`);
-      })
-      .catch((error) => {
-        console.error(`[research-worker] run ${runId} failed`, error);
-        throw error;
-      });
-    try {
-      await inFlight;
-    } catch {
-      // Logged above; keep polling so one bad run does not exit the worker.
-    }
-    inFlight = null;
+    await Promise.race(inFlight);
   }
 
-  if (inFlight) {
-    await inFlight.catch((error) => {
-      console.error("[research-worker] in-flight run failed during shutdown", error);
-    });
+  if (inFlight.size > 0) {
+    await Promise.allSettled([...inFlight]);
   }
 
   console.log(

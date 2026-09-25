@@ -12,7 +12,7 @@ import {
   isHiringTeamPersonaBuilt,
   queueHiringTeamBuild,
 } from "@/lib/hiring-team/build";
-import { hiringTeamConfig, isOutreachAssetType } from "@/lib/product-config";
+import { hiringTeamConfig, isOutreachAssetType, workspaceProgressText } from "@/lib/product-config";
 import { prisma } from "@/lib/prisma";
 import {
   addApplicationContact,
@@ -236,7 +236,7 @@ export async function generateOutreachAssetAction(
       },
     });
     revalidate(id);
-    return { ok: true, message: "Outreach generation was queued." };
+    return { ok: true, message: workspaceProgressText("OUTREACH") };
   } catch (error) {
     return errorResult(error);
   }

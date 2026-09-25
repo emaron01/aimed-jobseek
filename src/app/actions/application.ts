@@ -166,7 +166,6 @@ export async function overrideApplicationFitAction(
     const user = await requireCurrentUser();
     const campaignId = String(formData.get("campaignId") ?? "").trim();
     const bucket = String(formData.get("bucket") ?? "").trim();
-    const reason = String(formData.get("reason") ?? "").trim();
     if (!campaignId) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }
@@ -175,7 +174,6 @@ export async function overrideApplicationFitAction(
       campaignId,
       userId: user.id,
       bucket,
-      reason,
     });
     revalidatePath(`/campaigns/${campaignId}`);
     return { ok: true, message: "Employer-fit override saved." };

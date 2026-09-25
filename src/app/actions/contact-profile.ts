@@ -65,6 +65,6 @@ export async function buildIndividualProfileAction(
     revalidatePath(`/campaigns/${campaignId}`);
     return { ok: true, message: outreachConfig.labels.buildIndividual };
   } catch (error) {
-    return fail(error, "The individual profile could not be queued.");
+    return fail(error, "The individual profile could not be started.");
   }
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
+import { workspaceProgressText } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 
 export type ApplicationSummaryActionResult = {
@@ -28,7 +29,7 @@ export async function generateApplicationSummaryAction(
       payload: { userId: user.id },
     });
     revalidatePath(`/campaigns/${campaignId}/summary`);
-    return { ok: true, message: "Application Summary generation was queued." };
+    return { ok: true, message: workspaceProgressText("APPLICATION_SUMMARY") };
   } catch (error) {
     if (error instanceof TenantError) {
       return { ok: false, message: error.message };

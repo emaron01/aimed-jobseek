@@ -11,6 +11,9 @@ import {
   useConsultationResultAction,
 } from "@/app/actions/consultation";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
+import { WorkspaceProgress } from "@/components/ApplicationWorkspaceLive";
+import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
+import { workspaceJobCopy } from "@/lib/product-config";
 import { consultationBriefingSchema } from "@/lib/consultation/contract";
 import {
   profileEvidenceItems,
@@ -82,11 +85,13 @@ export async function ConsultationSection({
   organizationId,
   canEdit,
   defaultOpen = true,
+  jobs = [],
 }: {
   campaignId: string;
   organizationId: string;
   canEdit: boolean;
   defaultOpen?: boolean;
+  jobs?: WorkspaceJobStatusView[];
 }) {
   const [session, campaign] = await Promise.all([
     prisma.consultationSession.findFirst({
@@ -125,6 +130,7 @@ export async function ConsultationSection({
   return (
     <details
       open={defaultOpen}
+      id="consultation"
       className="space-y-4 rounded-lg border border-slate-200 bg-white p-5"
       data-testid="consultation"
     >
@@ -132,6 +138,16 @@ export async function ConsultationSection({
         Consultation with {consultationConfig.displayName}
       </summary>
       <div className="mt-4 space-y-4">
+      <WorkspaceProgress jobs={jobs} type="CONSULTATION" stayAndWatch />
+      {jobs.some(
+        (job) =>
+          job.type === "CONSULTATION" &&
+          (job.status === "PENDING" || job.status === "IN_PROGRESS"),
+      ) || session?.generationStatus === "GENERATING" ? (
+        <p className="text-sm text-slate-600" data-testid="harper-typing">
+          {workspaceJobCopy.typing}
+        </p>
+      ) : null}
       <p className="text-sm text-slate-600">
         {consultationConfig.displayName} compares this job with the {vocab.product.singular} and draws out the stories behind the gaps. Nothing is added to the {vocab.product.singular} until you confirm it.
       </p>
@@ -271,7 +287,13 @@ export async function ConsultationSection({
         <p className="text-sm text-slate-700">{consultationConversationCopy.planComplete}</p>
       ) : null}
 
-      {canEdit && !session ? (
+      {canEdit &&
+      !session &&
+      !jobs.some(
+        (job) =>
+          job.type === "CONSULTATION" &&
+          (job.status === "PENDING" || job.status === "IN_PROGRESS"),
+      ) ? (
         <div className="flex flex-wrap gap-3">
           <ApplicationActionForm
             action={startConsultationAction}
@@ -378,7 +400,13 @@ export async function ConsultationSection({
 
       {canEdit &&
       session?.status === "IN_PROGRESS" &&
-      !failed ? (
+      !failed &&
+      !jobs.some(
+        (job) =>
+          job.type === "CONSULTATION" &&
+          (job.status === "PENDING" || job.status === "IN_PROGRESS"),
+      ) &&
+      session.generationStatus !== "GENERATING" ? (
         <div className="space-y-4">
           <ApplicationActionForm
             action={replyConsultationAction}

@@ -12,7 +12,7 @@ export const hiringTeamConfig = {
   },
   status: {
     identified: "Identified",
-    queued: "Queued",
+    queued: "Starting…",
     building: "Building",
     built: "Built",
     failed: "Failed",
@@ -24,11 +24,15 @@ export const hiringTeamConfig = {
     buildAllDirect: "Build all Direct roles",
     rebuild: "Rebuild",
     retry: "Retry",
+    edit: "Edit",
+    addPerson: "Add person",
   },
-  queuedIdentify: `${vocab.persona.nav} identification was queued.`,
-  queuedBuild: `${vocab.persona.Singular} build was queued.`,
-  queuedBuildAllDirect: "Direct role builds were queued.",
-  needsBuildFirst: `Build this ${vocab.persona.singular} first. The build was queued.`,
+  addPersonNote:
+    "When you know who will be interviewing you for this role, add them to their Hiring Team role.",
+  queuedIdentify: `Identifying the ${vocab.persona.nav}…`,
+  queuedBuild: `Building this ${vocab.persona.singular}…`,
+  queuedBuildAllDirect: "Building all Direct roles…",
+  needsBuildFirst: `Build this ${vocab.persona.singular} first. Building it now…`,
   controls: {
     expandAll: "Expand all",
     collapseAll: "Collapse all",

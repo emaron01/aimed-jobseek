@@ -2,17 +2,23 @@ import Link from "next/link";
 import {
   confirmApplicationEmployerIdentityAction,
   nameApplicationEmployerAction,
-  overrideApplicationFitAction,
   rejectApplicationEmployerIdentityAction,
   rescoreApplicationFitAction,
   retryApplicationNextStepAction,
   retryApplicationResearchAction,
 } from "@/app/actions/application";
 import { ApplicationResearchStatus } from "@/components/ApplicationResearchStatus";
+import { ApplicationFitOverride } from "@/components/ApplicationFitOverride";
+import {
+  ApplicationWorkspaceLive,
+  WorkspaceProgress,
+} from "@/components/ApplicationWorkspaceLive";
+import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-status";
 import { getApplicationResearchStatus } from "@/lib/application/research-status";
 import type { ApplicationResearchStatusView } from "@/lib/application/research-status";
 import {
   addApplicationRoleAction,
+  addHiringTeamPersonAction,
   addTemplateRoleAction,
   approveApplicationRoleAction,
   buildAllDirectRolesAction,
@@ -52,7 +58,7 @@ import {
 } from "@/lib/application-assets/service";
 import { presentationPlanSchema } from "@/lib/application-assets/plan-contract";
 import { ensureApplicationNextStep } from "@/lib/application/next-step";
-import { applicationResearchCopy, applicationSummaryConfig, applicationWorkspaceCopy, consultationConversationCopy, criterionFlags, employerIdentityCopy, hiringTeamConfig, vocab } from "@/lib/product-config";
+import { applicationResearchCopy, applicationSummaryConfig, applicationWorkspaceCopy, consultationConversationCopy, criterionFlags, employerIdentityCopy, hiringTeamConfig, outreachConfig, vocab } from "@/lib/product-config";
 import {
   parseIdentityVerification,
 } from "@/lib/job-requirement/identity-verification";
@@ -411,10 +417,19 @@ export async function ApplicationWorkspace({
         )
       : [],
   });
-  const nextStep = await ensureApplicationNextStep({
-    organizationId,
-    campaignId,
-  });
+  const [nextStep, live] = await Promise.all([
+    ensureApplicationNextStep({
+      organizationId,
+      campaignId,
+    }),
+    getApplicationWorkspaceLive({ organizationId, campaignId }),
+  ]);
+  const invalidPlanTypes = requirement.campaign.presentationPlans.flatMap(
+    (row) =>
+      presentationPlanSchema.safeParse(row.planJson).success
+        ? []
+        : [row.type as "RESUME" | "COVER_LETTER"],
+  );
   const presentationPlans = requirement.campaign.presentationPlans.flatMap(
     (row) => {
       const parsed = presentationPlanSchema.safeParse(row.planJson);
@@ -450,9 +465,11 @@ export async function ApplicationWorkspace({
       className="space-y-3 rounded-lg border border-slate-200 bg-white p-5"
       data-testid="application-next-step"
     >
-      <h2 className="text-base font-semibold text-slate-900">
+      <h2 id="application-next-step" className="text-base font-semibold text-slate-900">
         {consultationConversationCopy.nextStepTitle}
       </h2>
+      <ApplicationWorkspaceLive campaignId={campaignId} initialJobs={live.jobs} />
+      <WorkspaceProgress jobs={live.jobs} type="NEXT_STEP" />
       {nextStep.failed ? (
         <div className="space-y-2">
           <p className="text-sm text-amber-950">
@@ -472,6 +489,29 @@ export async function ApplicationWorkspace({
         <p className="text-sm text-slate-800">{nextStep.text}</p>
       )}
     </section>
+    <details
+      className="space-y-4 rounded-lg border border-slate-200 bg-white p-5"
+      data-testid="application-company"
+      id="company"
+    >
+      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+        {applicationWorkspaceCopy.companyTitle}
+      </summary>
+      <div className="mt-4 space-y-4">
+        <ApplicationResearchStatus
+          campaignId={campaignId}
+          canEdit={canEdit}
+          initialStatus={researchStatus}
+        />
+        <IdentityVerificationPanel
+          campaignId={campaignId}
+          canEdit={canEdit}
+          requirement={requirement}
+          research={research}
+          researchStatus={researchStatus}
+        />
+      </div>
+    </details>
     <details className="space-y-4 rounded-lg border border-slate-200 bg-white p-5" data-testid="application-workspace">
       <summary className="cursor-pointer text-base font-semibold text-slate-900">
         {applicationWorkspaceCopy.jobRequirementTitle}
@@ -487,12 +527,6 @@ export async function ApplicationWorkspace({
             Parsed from the pasted posting. Empty fields were not in the posting.
           </p>
         </div>
-        <Link
-          href={`/campaigns/${campaignId}/summary`}
-          className={SECONDARY_BUTTON_CLASS}
-        >
-          {applicationSummaryConfig.title}
-        </Link>
       </div>
       <dl className="grid gap-3 md:grid-cols-2">
         <Field label="Title" value={requirement.title} />
@@ -555,16 +589,18 @@ export async function ApplicationWorkspace({
         </ApplicationActionForm>
       ) : null}
 
-      <IdentityVerificationPanel
-        campaignId={campaignId}
-        canEdit={canEdit}
-        requirement={requirement}
-        research={research}
-        researchStatus={researchStatus}
-      />
-
-      <div className="space-y-3 border-t border-slate-200 pt-4" data-testid="employer-fit">
-        <h2 className="text-base font-semibold text-slate-900">Employer fit</h2>
+    </section>
+      </div>
+    </details>
+    <details
+      className="space-y-4 rounded-lg border border-slate-200 bg-white p-5"
+      data-testid="employer-fit"
+      id="employer-fit"
+    >
+      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+        {applicationWorkspaceCopy.employerFitTitle}
+      </summary>
+      <div className="mt-4 space-y-3">
         <p className="text-sm text-slate-600">
           Scored against {icp.name}. A mismatch is a signal. It does not block contacts or outreach.
         </p>
@@ -577,11 +613,6 @@ export async function ApplicationWorkspace({
         ) : (
           <p className="text-sm text-slate-600">Fit has not been scored.</p>
         )}
-        {fit?.overrideReason ? (
-          <p className="text-sm text-slate-700" data-testid="employer-fit-override">
-            Override: {fit.overrideReason}
-          </p>
-        ) : null}
         {stale?.stale ? (
           <p className="text-sm text-amber-900" data-testid="employer-fit-stale">
             {stale.reason}
@@ -618,29 +649,11 @@ export async function ApplicationWorkspace({
             );
           })}
         </ul>
-        {canEdit && fit ? (
-          <ApplicationActionForm
-            action={overrideApplicationFitAction}
-            submitLabel="Save override"
-            testId="employer-fit-override-form"
-          >
-            <input type="hidden" name="campaignId" value={requirement.campaignId} />
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Your result</span>
-              <select name="bucket" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" defaultValue={shownBucket ?? "NEEDS_REVIEW"}>
-                <option value="GOOD">{formatFitBucketLabel("GOOD")}</option>
-                <option value="NEEDS_REVIEW">
-                  {formatFitBucketLabel("NEEDS_REVIEW")}
-                </option>
-                <option value="POOR_FIT">{formatFitBucketLabel("POOR_FIT")}</option>
-                <option value="EXCLUDED">{formatFitBucketLabel("EXCLUDED")}</option>
-              </select>
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Reason</span>
-              <textarea name="reason" required rows={2} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
-            </label>
-          </ApplicationActionForm>
+        {canEdit && fit && shownBucket ? (
+          <ApplicationFitOverride
+            campaignId={requirement.campaignId}
+            bucket={shownBucket}
+          />
         ) : null}
         {canEdit && stale?.stale && requirement.employerDisposition === "IDENTIFIED" ? (
           <ApplicationActionForm
@@ -652,57 +665,29 @@ export async function ApplicationWorkspace({
           </ApplicationActionForm>
         ) : null}
       </div>
-    </section>
-      </div>
     </details>
     <HiringTeamSection
       campaignId={requirement.campaignId}
       organizationId={organizationId}
       canEdit={canEdit}
+      jobs={live.jobs}
     />
     <ConsultationSection
       campaignId={requirement.campaignId}
       organizationId={organizationId}
       canEdit={canEdit}
       defaultOpen={consultationOpen}
+      jobs={live.jobs}
     />
-    <details
-      className="rounded-lg border border-slate-200 bg-white p-5"
-      data-testid="application-applied-wrap"
-    >
-      <summary className="cursor-pointer text-base font-semibold text-slate-900">
-        {applicationWorkspaceCopy.appliedTitle}
-      </summary>
-      <div className="mt-4">
-    <ApplicationAppliedSection
-      campaignId={requirement.campaignId}
-      canEdit={canEdit}
-      appliedAt={requirement.campaign.appliedAt?.toISOString() ?? null}
-      applicationProgress={requirement.campaign.applicationProgress}
-    />
-      </div>
-    </details>
-    <details
-      className="rounded-lg border border-slate-200 bg-white p-5"
-      data-testid="application-contacts-wrap"
-    >
-      <summary className="cursor-pointer text-base font-semibold text-slate-900">
-        {applicationWorkspaceCopy.contactsTitle}
-      </summary>
-      <div className="mt-4">
-    <ApplicationContactsSection
-      campaignId={requirement.campaignId}
-      canEdit={canEdit}
-      roles={requirement.campaign.hiringTeamRoles}
-      contacts={requirement.campaign.contacts.map(toContactRow)}
-    />
-      </div>
-    </details>
+    <div id="assets">
+    <WorkspaceProgress jobs={live.jobs} type="RESUME" />
+    <WorkspaceProgress jobs={live.jobs} type="COVER_LETTER" />
     <ApplicationAssetsSection
       campaignId={requirement.campaignId}
       canEdit={canEdit}
       defaultOpen={assetsOpen}
       plans={presentationPlans}
+      invalidPlanTypes={invalidPlanTypes}
       coverLetterThinNotice={
         coverLetterEvidenceThin ? coverLetterThinEvidenceCopy() : null
       }
@@ -735,6 +720,26 @@ export async function ApplicationWorkspace({
           createdAt: asset.createdAt.toISOString(),
         }))}
     />
+    </div>
+    <details
+      className="rounded-lg border border-slate-200 bg-white p-5"
+      data-testid="application-contacts-wrap"
+      id="contacts"
+    >
+      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+        {applicationWorkspaceCopy.contactsTitle}
+      </summary>
+      <div className="mt-4">
+    <ApplicationContactsSection
+      campaignId={requirement.campaignId}
+      canEdit={canEdit}
+      roles={requirement.campaign.hiringTeamRoles}
+      contacts={requirement.campaign.contacts.map(toContactRow)}
+    />
+      </div>
+    </details>
+    <div id="outreach">
+    <WorkspaceProgress jobs={live.jobs} type="OUTREACH" />
     <ApplicationOutreachSection
       campaignId={requirement.campaignId}
       canEdit={canEdit}
@@ -762,6 +767,25 @@ export async function ApplicationWorkspace({
           content: asset.contentJson,
         }))}
     />
+    </div>
+    <details
+      className="rounded-lg border border-slate-200 bg-white p-5"
+      data-testid="application-applied-wrap"
+    >
+      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+        {applicationWorkspaceCopy.appliedTitle}
+      </summary>
+      <div className="mt-4">
+    <ApplicationAppliedSection
+      campaignId={requirement.campaignId}
+      canEdit={canEdit}
+      appliedAt={requirement.campaign.appliedAt?.toISOString() ?? null}
+      applicationProgress={requirement.campaign.applicationProgress}
+    />
+      </div>
+    </details>
+    <div id="interviews">
+    <WorkspaceProgress jobs={live.jobs} type="INTERVIEW_GUIDE" />
     <InterviewStagesSection
       campaignId={requirement.campaignId}
       organizationId={organizationId}
@@ -772,6 +796,23 @@ export async function ApplicationWorkspace({
         personaId: row.chosenPersonaId,
       }))}
     />
+    </div>
+    <details
+      className="rounded-lg border border-slate-200 bg-white p-5"
+      data-testid="application-summary-wrap"
+      id="application-summary"
+    >
+      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+        {applicationSummaryConfig.title}
+      </summary>
+      <div className="mt-4 space-y-3">
+        <WorkspaceProgress jobs={live.jobs} type="APPLICATION_SUMMARY" />
+        <p className="text-sm text-slate-600">{applicationSummaryConfig.description}</p>
+        <Link href={`/campaigns/${campaignId}/summary`} className={SECONDARY_BUTTON_CLASS}>
+          {applicationSummaryConfig.title}
+        </Link>
+      </div>
+    </details>
     </>
   );
 }
@@ -908,10 +949,12 @@ async function HiringTeamSection({
   campaignId,
   organizationId,
   canEdit,
+  jobs = [],
 }: {
   campaignId: string;
   organizationId: string;
   canEdit: boolean;
+  jobs?: import("@/lib/application-jobs/workspace-status").WorkspaceJobStatusView[];
 }) {
   const [roles, templates] = await Promise.all([
     prisma.persona.findMany({
@@ -1002,6 +1045,10 @@ async function HiringTeamSection({
         ) : null}
         {canEdit ? (
           <div className="space-y-3 print:hidden">
+            <details>
+              <summary className="cursor-pointer text-sm font-semibold text-slate-900">
+                {hiringTeamConfig.actions.edit}
+              </summary>
             <ApplicationActionForm
               action={updateApplicationRoleAction}
               submitLabel="Save edits"
@@ -1045,6 +1092,42 @@ async function HiringTeamSection({
                 />
               </label>
             </ApplicationActionForm>
+            </details>
+            <details>
+              <summary className="cursor-pointer text-sm font-semibold text-slate-900">
+                {hiringTeamConfig.actions.addPerson}
+              </summary>
+              <ApplicationActionForm
+                action={addHiringTeamPersonAction}
+                submitLabel={hiringTeamConfig.actions.addPerson}
+                testId={`add-person-${role.id}`}
+              >
+                <input type="hidden" name="campaignId" value={campaignId} />
+                <input type="hidden" name="personaId" value={role.id} />
+                <label className="block text-sm">
+                  <span className="font-medium text-slate-700">First name</span>
+                  <input name="firstName" required className={fieldClass} />
+                </label>
+                <label className="block text-sm">
+                  <span className="font-medium text-slate-700">Last name</span>
+                  <input name="lastName" required className={fieldClass} />
+                </label>
+                <label className="block text-sm">
+                  <span className="font-medium text-slate-700">Title</span>
+                  <input name="title" required className={fieldClass} />
+                </label>
+                <label className="block text-sm">
+                  <span className="font-medium text-slate-700">Email</span>
+                  <input name="email" type="email" className={fieldClass} />
+                </label>
+                <label className="block text-sm">
+                  <span className="font-medium text-slate-700">
+                    {outreachConfig.labels.pasteLinkedIn}
+                  </span>
+                  <textarea name="linkedInProfileText" rows={6} className={fieldClass} />
+                </label>
+              </ApplicationActionForm>
+            </details>
             <div className="flex flex-wrap gap-3">
               <ApplicationActionForm
                 action={
@@ -1095,11 +1178,17 @@ async function HiringTeamSection({
     </details>
   );
   return (
-    <details className="space-y-4 rounded-lg border border-slate-200 bg-white p-5" data-testid="hiring-team">
+    <details id="hiring-team" className="space-y-4 rounded-lg border border-slate-200 bg-white p-5" data-testid="hiring-team">
       <summary className="cursor-pointer text-base font-semibold text-slate-900">
         {hiringTeamConfig.workspaceTitle}
       </summary>
       <div className="mt-4 space-y-4">
+      <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+        {hiringTeamConfig.addPersonNote}
+      </p>
+      <WorkspaceProgress jobs={jobs} type="HIRING_TEAM_IDENTIFY" />
+      <WorkspaceProgress jobs={jobs} type="HIRING_TEAM_BUILD" />
+      <WorkspaceProgress jobs={jobs} type="CONTACT_PROFILE" />
       <div>
         <p className="mt-1 text-sm text-slate-600">
           Roles for this {vocab.campaign.singular} are identified from the job and employer research. Review each draft before you rely on it. Saved templates are added only when you choose one.

@@ -15,6 +15,8 @@ export const applicationAssetConfig = Object.freeze({
     hideRolesLegend: "Roles to hide",
     acceptPlan: "Accept this plan",
     writePlan: `Ask ${consultationConfig.displayName} for a plan`,
+    writingPlan: `${consultationConfig.displayName} is writing a plan…`,
+    readyPlan: "The plan is ready.",
     adjustPlan: `Adjust with ${consultationConfig.displayName}`,
     adjustPlanPrompt: "What should change?",
     adjustManually: "Adjust manually",
@@ -92,6 +94,7 @@ export const applicationAssetConfig = Object.freeze({
   ],
   presentation: {
     earlierExperienceYears: 10,
+    earlierExperienceHeading: "Earlier experience",
   },
   generation: {
     qualityRegenerationAttempts: 4,

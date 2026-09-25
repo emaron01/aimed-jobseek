@@ -239,6 +239,29 @@ describe("application employer fit", () => {
     expect(stored.overriddenAt).toEqual(new Date("2026-09-02T00:00:00Z"));
   });
 
+  it("saves an override without a reason", () => {
+    const stored = applyFitOverride(
+      {
+        bucket: "NEEDS_REVIEW" as const,
+        overrideBucket: null,
+        overrideReason: null,
+        overriddenAt: null,
+        stale: false,
+        staleReason: null,
+        computedAt: new Date("2026-09-01T00:00:00Z"),
+        icpUpdatedAt: new Date("2026-09-01T00:00:00Z"),
+        companyResearchUpdatedAt: new Date("2026-09-01T00:00:00Z"),
+        interpretationPromptVersion: "7",
+      },
+      {
+        bucket: "GOOD",
+        at: new Date("2026-09-02T00:00:00Z"),
+      },
+    );
+    expect(stored.overrideBucket).toBe("GOOD");
+    expect(stored.overrideReason).toBeNull();
+  });
+
   it("goes stale when research refreshes or the Target Employer profile changes", () => {
     const base = {
       computedAt: new Date("2026-09-01T00:00:00Z"),

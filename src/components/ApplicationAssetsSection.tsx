@@ -51,8 +51,15 @@ type PlanRow = {
 
 const initial: ApplicationAssetActionResult | null = null;
 
-function Status({ result }: { result: ApplicationAssetActionResult | null }) {
+function Status({
+  result,
+  errorsOnly = false,
+}: {
+  result: ApplicationAssetActionResult | null;
+  errorsOnly?: boolean;
+}) {
   if (!result) return null;
+  if (errorsOnly && result.ok) return null;
   return (
     <div
       role="status"
@@ -386,7 +393,7 @@ function PlanPanel({
           <input type="hidden" name="campaignId" value={campaignId} />
           <input type="hidden" name="type" value={type} />
           <SubmitButton>{applicationAssetConfig.labels.writePlan}</SubmitButton>
-          <Status result={writeResult} />
+          <Status result={writeResult} errorsOnly />
         </form>
       ) : null}
       {canEdit && plan?.status === "DRAFT" ? (
@@ -413,7 +420,7 @@ function PlanPanel({
             <SubmitButton>{applicationAssetConfig.labels.adjustPlan}</SubmitButton>
           </form>
           <Status result={acceptResult} />
-          <Status result={writeResult} />
+          <Status result={writeResult} errorsOnly />
         </div>
       ) : null}
     </div>
@@ -426,6 +433,7 @@ function AssetTypePanel({
   rows,
   profileRoles,
   plan,
+  planError,
   canEdit,
   thinNotice,
 }: {
@@ -434,6 +442,7 @@ function AssetTypePanel({
   rows: AssetRow[];
   profileRoles: ProfileRole[];
   plan: PlanRow | null;
+  planError: string | null;
   canEdit: boolean;
   thinNotice: string | null;
 }) {
@@ -457,6 +466,11 @@ function AssetTypePanel({
             {thinNotice}
           </p>
         ) : null}
+      {planError ? (
+        <p className="text-sm text-red-700" role="status">
+          {planError}
+        </p>
+      ) : null}
       <PlanPanel campaignId={campaignId} type={type} plan={plan} canEdit={canEdit} />
       {canEdit && accepted ? <form action={action} className="space-y-3">
         <input type="hidden" name="campaignId" value={campaignId} />
@@ -508,7 +522,7 @@ function AssetTypePanel({
             ? applicationAssetConfig.labels.regenerate
             : applicationAssetConfig.labels.generate}
         </SubmitButton>
-        <Status result={result} />
+        <Status result={result} errorsOnly />
       </form> : null}
       {rows.length ? (
         <AssetHistory
@@ -531,6 +545,7 @@ export function ApplicationAssetsSection({
   assets,
   profileRoles,
   plans,
+  invalidPlanTypes = [],
   canEdit,
   coverLetterThinNotice = null,
   defaultOpen = false,
@@ -539,6 +554,7 @@ export function ApplicationAssetsSection({
   assets: Array<Omit<AssetRow, "content"> & { content: unknown }>;
   profileRoles: ProfileRole[];
   plans: PlanRow[];
+  invalidPlanTypes?: Array<"RESUME" | "COVER_LETTER">;
   canEdit: boolean;
   coverLetterThinNotice?: string | null;
   defaultOpen?: boolean;
@@ -569,6 +585,11 @@ export function ApplicationAssetsSection({
             rows={valid.filter((asset) => asset.type === type)}
             profileRoles={profileRoles}
             plan={plans.find((item) => item.type === type) ?? null}
+            planError={
+              invalidPlanTypes.includes(type)
+                ? applicationAssetConfig.labels.planFailed
+                : null
+            }
             canEdit={canEdit}
             thinNotice={type === "COVER_LETTER" ? coverLetterThinNotice : null}
           />

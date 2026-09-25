@@ -1,7 +1,8 @@
 import type { EvidenceAssessment } from "@/lib/consultation/assess";
 import { openGaps, requirementMeaning } from "@/lib/consultation/assess";
 import { questionRestatesTarget } from "@/lib/consultation/output-quality";
-import { consultationConfig } from "@/lib/product-config/consultation";
+import { consultationConfig, consultationConversationCopy } from "@/lib/product-config/consultation";
+import { WHY_THIS_COMPANY_TARGET_KEY } from "@/lib/consultation/contract";
 
 export type PlannedQuestion = {
   targetKey: string;
@@ -110,6 +111,12 @@ export function planQuestionRound(input: {
   } else if (focus) {
     const remaining = gaps.filter((gap) => gap.key !== focus.key);
     gaps.splice(0, gaps.length, focus, ...remaining);
+  } else {
+    const why = gaps.find((gap) => gap.key === WHY_THIS_COMPANY_TARGET_KEY);
+    if (why) {
+      const remaining = gaps.filter((gap) => gap.key !== WHY_THIS_COMPANY_TARGET_KEY);
+      gaps.splice(0, gaps.length, why, ...remaining);
+    }
   }
   const selected: EvidenceAssessment[] = [];
   const selectedMeanings = new Set<string>();
@@ -127,8 +134,26 @@ export function planQuestionRound(input: {
       .map((question) => [question.targetKey, question]),
   );
   const rolesById = new Map(input.hiringTeam.map((role) => [role.id, role]));
-  const questions: PlannedQuestion[] = selected.map((gap) => {
+  const questions: PlannedQuestion[] = [];
+  for (const gap of selected) {
     const modelQuestion = byKey.get(gap.key);
+    if (!modelQuestion && gap.key === WHY_THIS_COMPANY_TARGET_KEY) {
+      const role = input.hiringTeam[0];
+      if (!role) {
+        throw new Error(
+          `Consultation AI did not write a valid question for ${gap.key}.`,
+        );
+      }
+      questions.push({
+        targetKey: gap.key,
+        followUp: false,
+        text: consultationConversationCopy.whyThisCompanyQuestion,
+        requirementInterpretation: null,
+        hiringTeamRoleId: role.id,
+        whoCaresNote: `${role.name} will hear why this company matters to the seeker.`,
+      });
+      continue;
+    }
     if (!modelQuestion) {
       throw new Error(`Consultation AI did not write a valid question for ${gap.key}.`);
     }
@@ -167,7 +192,7 @@ export function planQuestionRound(input: {
         `Consultation AI asked for an estimated duration instead of exact dates for ${gap.key}.`,
       );
     }
-    return {
+    questions.push({
       targetKey: gap.key,
       followUp: false,
       text,
@@ -175,8 +200,8 @@ export function planQuestionRound(input: {
         modelQuestion.requirementInterpretation?.trim() || null,
       hiringTeamRoleId: role.id,
       whoCaresNote: modelQuestion.whoCaresNote.trim(),
-    };
-  });
+    });
+  }
   if (
     input.includeChronology &&
     !input.chronologyAsked &&

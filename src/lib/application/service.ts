@@ -285,7 +285,7 @@ export async function overrideApplicationFit(input: {
   campaignId: string;
   userId: string;
   bucket: string;
-  reason: string;
+  reason?: string | null;
 }): Promise<void> {
   const fit = await prisma.applicationFit.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },

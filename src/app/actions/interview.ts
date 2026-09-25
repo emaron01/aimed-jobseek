@@ -10,6 +10,7 @@ import {
   createInterviewStage,
   updateInterviewStage,
 } from "@/lib/interview/stages";
+import { workspaceProgressText } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 
@@ -198,7 +199,7 @@ export async function generateInterviewGuideAction(
       },
     });
     revalidate(id, stageId);
-    return { ok: true, message: "Interview guide generation was queued." };
+    return { ok: true, message: workspaceProgressText("INTERVIEW_GUIDE") };
   } catch (error) {
     return errorResult(error);
   }

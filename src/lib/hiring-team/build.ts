@@ -613,12 +613,24 @@ export async function rebuildApplicationHiringTeamRole(input: {
     );
   }
   const fields = personaFields(role, draft);
+  const edited = seekerEdited(persona.manuallyEditedFields);
   await prisma.persona.update({
     where: { id: persona.id },
     data: {
       ...fields,
+      ...(edited
+        ? {
+            name: persona.name,
+            targetTitles: persona.targetTitles as Prisma.InputJsonValue,
+            department: persona.department,
+            whyThisPersonaMatters: persona.whyThisPersonaMatters,
+            additionalContext: persona.additionalContext,
+          }
+        : {}),
       suggestionKey: persona.suggestionKey ?? role.roleKey,
-      manuallyEditedFields: [],
+      manuallyEditedFields: edited
+        ? (persona.manuallyEditedFields as Prisma.InputJsonValue)
+        : [],
       staleAt: draft.narrative ? null : persona.staleAt,
       staleReason: draft.narrative ? null : persona.staleReason,
       profileJson: profilePayload({

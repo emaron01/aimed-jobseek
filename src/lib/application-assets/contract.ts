@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const RESUME_ASSET_PROMPT_VERSION = "5";
-export const COVER_LETTER_ASSET_PROMPT_VERSION = "11";
+export const COVER_LETTER_ASSET_PROMPT_VERSION = "12";
 export const OUTREACH_EMAIL_PROMPT_VERSION = "5";
 export const OUTREACH_LINKEDIN_NOTE_PROMPT_VERSION = "5";
 export const OUTREACH_LINKEDIN_INMAIL_PROMPT_VERSION = "5";

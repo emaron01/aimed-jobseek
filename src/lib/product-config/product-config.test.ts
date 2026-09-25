@@ -56,7 +56,7 @@ describe("vocabulary", () => {
       "Alex Chen's workspace",
     );
     expect(signupCopy.emailLabel).toBe("Email");
-    expect(applicationResearchCopy.queued).toBe("Queued");
+    expect(applicationResearchCopy.queued).toBe("Starting research…");
     expect(applicationResearchCopy.researching).toBe("Researching");
     expect(applicationResearchCopy.done).toBe("Done");
     expect(applicationResearchCopy.failed).toBe("Failed");

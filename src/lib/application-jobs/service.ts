@@ -129,22 +129,29 @@ export async function latestApplicationJob(input: {
 
 export async function claimNextApplicationJob(): Promise<string | null> {
   const staleBefore = new Date(Date.now() - HEARTBEAT_STALE_MS);
-  const claimed = await prisma.$transaction(async (tx) => {
-    const next = await tx.applicationJob.findFirst({
-      where: {
+  const claimable = {
+    OR: [
+      { status: "PENDING" as const },
+      {
+        status: "IN_PROGRESS" as const,
         OR: [
-          { status: "PENDING" },
-          {
-            status: "IN_PROGRESS",
-            OR: [
-              { workerHeartbeatAt: null },
-              { workerHeartbeatAt: { lt: staleBefore } },
-            ],
-          },
+          { workerHeartbeatAt: null },
+          { workerHeartbeatAt: { lt: staleBefore } },
         ],
       },
+    ],
+  };
+  const claimed = await prisma.$transaction(async (tx) => {
+    const consultation = await tx.applicationJob.findFirst({
+      where: { ...claimable, type: "CONSULTATION" },
       orderBy: { createdAt: "asc" },
     });
+    const next =
+      consultation ??
+      (await tx.applicationJob.findFirst({
+        where: claimable,
+        orderBy: { createdAt: "asc" },
+      }));
     if (!next) return null;
     await tx.applicationJob.update({
       where: { id: next.id },

@@ -56,7 +56,7 @@ export async function startConsultationAction(
       payload: { operation: "start" },
     });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: `${consultationConversationCopy.start} was queued.` };
+    return { ok: true, message: consultationConversationCopy.starting };
   } catch (error) {
     return fail(error, "The consultation could not be started.");
   }
@@ -80,7 +80,7 @@ export async function retryConsultationAction(
       payload: { operation: "retry" },
     });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: `${consultationConversationCopy.retry} was queued.` };
+    return { ok: true, message: consultationConversationCopy.starting };
   } catch (error) {
     return fail(error, "The consultation could not be retried.");
   }
@@ -185,7 +185,7 @@ export async function answerConsultationAction(
       payload: { operation: "answer", targetKey, answer },
     });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: "Answer queued." };
+    return { ok: true, message: consultationConversationCopy.typing };
   } catch (error) {
     return fail(error, "The answer could not be saved.");
   }
@@ -321,7 +321,7 @@ export async function replyConsultationAction(
       payload: { operation: "reply", answer },
     });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: `${consultationConversationCopy.threadReply} was queued.` };
+    return { ok: true, message: consultationConversationCopy.typing };
   } catch (error) {
     return fail(error, "The reply could not be sent.");
   }

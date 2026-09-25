@@ -190,18 +190,14 @@ export function applyFitOverride<T extends StoredApplicationFit>(
   fit: T,
   override: {
     bucket: QualificationBucket;
-    reason: string;
+    reason?: string | null;
     at: Date;
   },
 ): T {
-  const reason = override.reason.trim();
-  if (!reason) {
-    throw new Error("An override needs a reason.");
-  }
   return {
     ...fit,
     overrideBucket: override.bucket,
-    overrideReason: reason,
+    overrideReason: override.reason?.trim() || fit.overrideReason,
     overriddenAt: override.at,
   };
 }

@@ -5,9 +5,12 @@ import {
 } from "@/lib/ai";
 import {
   coverLetterPresentationPlanSchema,
+  normalizeCoverLetterPresentationPlan,
+  normalizeResumePresentationPlan,
   resumePresentationPlanSchema,
   type PresentationPlan,
 } from "@/lib/application-assets/plan-contract";
+import { AiValidationError } from "@/lib/ai/errors";
 import { buildPresentationPlanMessages } from "@/lib/application-assets/plan-prompt";
 import { consultationConfig } from "@/lib/product-config";
 
@@ -50,7 +53,9 @@ export async function writePresentationPlanWithModel(input: {
             ...structuredOutputRequest("resumePresentationPlan"),
             messages,
             parseOutput: (raw) => ({
-              data: resumePresentationPlanSchema.parse(raw),
+              data: resumePresentationPlanSchema.parse(
+                normalizeResumePresentationPlan(raw),
+              ),
               coercedFields: [],
             }),
           })
@@ -58,7 +63,9 @@ export async function writePresentationPlanWithModel(input: {
             ...structuredOutputRequest("coverLetterPresentationPlan"),
             messages,
             parseOutput: (raw) => ({
-              data: coverLetterPresentationPlanSchema.parse(raw),
+              data: coverLetterPresentationPlanSchema.parse(
+                normalizeCoverLetterPresentationPlan(raw),
+              ),
               coercedFields: [],
             }),
           });
@@ -69,8 +76,19 @@ export async function writePresentationPlanWithModel(input: {
       error instanceof Error && error.cause instanceof Error
         ? error.cause.message
         : message;
+    const issues =
+      error instanceof AiValidationError ? error.issues ?? [] : [];
     console.error(
-      JSON.stringify({ event: "presentation_plan_failed", message, cause }),
+      JSON.stringify({
+        event: "presentation_plan_failed",
+        message,
+        cause,
+        issues,
+        rawTextPreview:
+          error instanceof AiValidationError
+            ? error.rawTextPreview
+            : undefined,
+      }),
     );
     return {
       ok: false,

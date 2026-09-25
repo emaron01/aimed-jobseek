@@ -14,7 +14,10 @@ import {
   type EvidenceAssessment,
   type EvidenceTarget,
 } from "@/lib/consultation/assess";
-import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
+import {
+  CONSULTATION_PROMPT_VERSION,
+  WHY_THIS_COMPANY_TARGET_KEY,
+} from "@/lib/consultation/contract";
 import { isHiringTeamPersonaBuilt } from "@/lib/hiring-team/build";
 import {
   matchConsultationFocus,
@@ -33,7 +36,11 @@ import {
   proposalsFromExtraction,
 } from "@/lib/consultation/write-back";
 import { prisma } from "@/lib/prisma-client";
-import { consultationConfig, vocab } from "@/lib/product-config";
+import {
+  consultationConfig,
+  consultationConversationCopy,
+  vocab,
+} from "@/lib/product-config";
 import {
   emptyCandidateProfile,
   parseCandidateProfile,
@@ -72,7 +79,7 @@ function readScorecard(value: unknown): JobScorecard {
 async function requireApplication(organizationId: string, campaignId: string) {
   const campaign = await prisma.campaign.findFirst({
     where: { id: campaignId, organizationId },
-    select: { id: true, productId: true },
+    select: { id: true, productId: true, whyThisCompany: true },
   });
   if (!campaign) {
     throw new TenantError(`${vocab.campaign.Singular} was not found.`);
@@ -102,16 +109,59 @@ async function requireApplication(organizationId: string, campaignId: string) {
   return { campaign, requirement, product, profile: parsed.profile };
 }
 
+function whyThisCompanyTarget(): EvidenceTarget {
+  return {
+    key: WHY_THIS_COMPANY_TARGET_KEY,
+    kind: "MISSION",
+    text: consultationConversationCopy.whyThisCompanyTarget,
+  };
+}
+
+function whyThisCompanyFactId(campaignId: string): string {
+  return `why-this-company:${campaignId}`;
+}
+
+function whyThisCompanyAlreadyAnswered(input: {
+  campaignId: string;
+  whyThisCompany: string | null;
+  profile: ReturnType<typeof parseCandidateProfile>;
+}): boolean {
+  if (input.whyThisCompany?.trim()) return true;
+  const factId = whyThisCompanyFactId(input.campaignId);
+  return (
+    input.profile.skills.some((item) => item.id === factId) ||
+    input.profile.experience.some((role) =>
+      role.achievements.some((item) => item.id === factId),
+    )
+  );
+}
+
+function markWhyThisCompanyAsked(
+  askedKeys: Set<string>,
+  input: {
+    campaignId: string;
+    whyThisCompany: string | null;
+    profile: ReturnType<typeof parseCandidateProfile>;
+  },
+): void {
+  if (whyThisCompanyAlreadyAnswered(input)) {
+    askedKeys.add(WHY_THIS_COMPANY_TARGET_KEY);
+  }
+}
+
 function targetsFromRequirement(requirement: {
   requiredItems: unknown;
   preferredItems: unknown;
   scorecardJson: unknown;
 }): EvidenceTarget[] {
-  return evidenceTargets({
-    requiredItems: parseStringArray(requirement.requiredItems),
-    preferredItems: parseStringArray(requirement.preferredItems),
-    scorecard: readScorecard(requirement.scorecardJson),
-  });
+  return [
+    whyThisCompanyTarget(),
+    ...evidenceTargets({
+      requiredItems: parseStringArray(requirement.requiredItems),
+      preferredItems: parseStringArray(requirement.preferredItems),
+      scorecard: readScorecard(requirement.scorecardJson),
+    }),
+  ];
 }
 
 async function hiringTeam(
@@ -436,6 +486,32 @@ export async function polishAnswerWithQuality(input: {
   };
 }
 
+async function persistWhyThisCompany(input: {
+  organizationId: string;
+  campaignId: string;
+  answer: string;
+}): Promise<void> {
+  const text = input.answer.trim();
+  if (!text) return;
+  await prisma.campaign.update({
+    where: { id: input.campaignId },
+    data: { whyThisCompany: text },
+  });
+  const { product, profile } = await requireApplication(
+    input.organizationId,
+    input.campaignId,
+  );
+  const next = appendConfirmedFact(profile, {
+    id: whyThisCompanyFactId(input.campaignId),
+    text,
+    turnId: WHY_THIS_COMPANY_TARGET_KEY,
+  });
+  await prisma.product.update({
+    where: { id: product.id },
+    data: { profileJson: next },
+  });
+}
+
 async function failGeneration(sessionId: string, message: string): Promise<void> {
   console.error(
     JSON.stringify({
@@ -507,7 +583,7 @@ async function planAndStoreRound(input: {
     });
     if (!plan.ok) {
       await failGeneration(input.sessionId, plan.message);
-      return [];
+      throw new Error(plan.message);
     }
     const allNarrative = [
       plan.data.commentary,
@@ -567,11 +643,10 @@ async function planAndStoreRound(input: {
     feedback = errors;
   }
   if (!accepted) {
-    await failGeneration(
-      input.sessionId,
-      "Consultation output did not pass quality checks. Retry consultation.",
-    );
-    return [];
+    const message =
+      "Consultation output did not pass quality checks. Retry consultation.";
+    await failGeneration(input.sessionId, message);
+    throw new Error(message);
   }
   const { plan, assessments, questions } = accepted;
   await saveAssessments(input.organizationId, input.sessionId, assessments);
@@ -726,20 +801,34 @@ export async function startConsultation(input: {
       data: { status: "IN_PROGRESS", generationStatus: "READY" },
     });
   }
-  if (
-    existing?.status === "IN_PROGRESS" &&
-    existing.generationStatus !== "FAILED" &&
-    !hasFocus
-  ) {
-    return;
-  }
-  if (existing) {
-    const turns = await loadSessionTurns(existing.id);
-    const { askedKeys, skippedKeys } = askedAndSkipped(turns);
-    const roles = await hiringTeam(input.organizationId, input.campaignId);
+  const hasBriefing =
+    existing?.briefingJson != null &&
+    existing.generationStatus === "READY" &&
+    existing.status === "IN_PROGRESS";
+  if (hasBriefing && !hasFocus) return;
+  const session =
+    existing ??
+    (await prisma.consultationSession.create({
+      data: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        productId: campaign.productId,
+        status: "IN_PROGRESS",
+        promptVersion: CONSULTATION_PROMPT_VERSION,
+      },
+    }));
+  const turns = existing ? await loadSessionTurns(existing.id) : [];
+  const { askedKeys, skippedKeys } = askedAndSkipped(turns);
+  markWhyThisCompanyAsked(askedKeys, {
+    campaignId: campaign.id,
+    whyThisCompany: campaign.whyThisCompany,
+    profile,
+  });
+  const roles = await hiringTeam(input.organizationId, input.campaignId);
+  try {
     await planAndStoreRound({
       organizationId: input.organizationId,
-      sessionId: existing.id,
+      sessionId: session.id,
       askedKeys,
       skippedKeys,
       profile,
@@ -748,29 +837,12 @@ export async function startConsultation(input: {
       roles,
       focusTargetKey,
     });
-    return;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Consultation could not start.";
+    await failGeneration(session.id, message);
+    throw error;
   }
-  const session = await prisma.consultationSession.create({
-    data: {
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      productId: campaign.productId,
-      status: "IN_PROGRESS",
-      promptVersion: CONSULTATION_PROMPT_VERSION,
-    },
-  });
-  const roles = await hiringTeam(input.organizationId, input.campaignId);
-  await planAndStoreRound({
-    organizationId: input.organizationId,
-    sessionId: session.id,
-    askedKeys: new Set(),
-    skippedKeys: new Set(),
-    profile,
-    requirement,
-    targets,
-    roles,
-    focusTargetKey,
-  });
 }
 
 async function processAnswerGeneration(input: {
@@ -1008,7 +1080,9 @@ export async function retryConsultationGeneration(input: {
       targets,
       profile,
     });
-    if (!processed.ok) return;
+    if (!processed.ok) {
+      throw new Error("Consultation could not write coaching for that reply.");
+    }
     if (processed.followUpQuestion) {
       const followUpCount = turns.filter(
         (turn) =>
@@ -1158,7 +1232,7 @@ async function continueAfterAnsweredRound(input: {
     where: { sessionId: input.sessionId, status: "DRAFT" },
   });
   if (pendingConfirmation > 0) return;
-  const { requirement, profile } = await requireApplication(
+  const { campaign, requirement, profile } = await requireApplication(
     input.organizationId,
     input.campaignId,
   );
@@ -1167,6 +1241,11 @@ async function continueAfterAnsweredRound(input: {
   });
   const assessments = stored.map(storedAssessment);
   const { askedKeys, skippedKeys } = askedAndSkipped(refreshed);
+  markWhyThisCompanyAsked(askedKeys, {
+    campaignId: campaign.id,
+    whyThisCompany: campaign.whyThisCompany,
+    profile,
+  });
   if (gapsAreCovered(assessments, skippedKeys)) {
     await prisma.consultationSession.update({
       where: { id: input.sessionId },
@@ -1244,7 +1323,16 @@ export async function answerConsultationQuestion(input: {
     targets,
     profile,
   });
-  if (!processed.ok) return;
+  if (!processed.ok) {
+    throw new Error("Consultation could not write coaching for that reply.");
+  }
+  if (input.targetKey === WHY_THIS_COMPANY_TARGET_KEY) {
+    await persistWhyThisCompany({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      answer,
+    });
+  }
   const followUpCount = turns.filter(
     (turn) =>
       turn.speaker === "CONSULTANT" &&
@@ -1490,7 +1578,7 @@ export async function skipConsultationQuestion(input: {
       unanswered(refreshed, turn.targetKey),
   );
   if (stillOpen) return;
-  const { requirement, profile } = await requireApplication(
+  const { campaign, requirement, profile } = await requireApplication(
     input.organizationId,
     input.campaignId,
   );
@@ -1499,6 +1587,11 @@ export async function skipConsultationQuestion(input: {
   });
   const assessments = stored.map(storedAssessment);
   const { askedKeys, skippedKeys } = askedAndSkipped(refreshed);
+  markWhyThisCompanyAsked(askedKeys, {
+    campaignId: campaign.id,
+    whyThisCompany: campaign.whyThisCompany,
+    profile,
+  });
   if (gapsAreCovered(assessments, skippedKeys)) {
     await prisma.consultationSession.update({
       where: { id: session.id },
@@ -2027,10 +2120,16 @@ export async function flagConsultationInaccuracy(input: {
   const turns = await loadSessionTurns(session.id);
   const { askedKeys, skippedKeys } = askedAndSkipped(turns);
   askedKeys.delete(draft.turn.targetKey);
-  const { requirement, profile } = await requireApplication(
+  const { campaign, requirement, profile } = await requireApplication(
     input.organizationId,
     input.campaignId,
   );
+  markWhyThisCompanyAsked(askedKeys, {
+    campaignId: campaign.id,
+    whyThisCompany: campaign.whyThisCompany,
+    profile,
+  });
+  askedKeys.delete(draft.turn.targetKey);
   const roles = await hiringTeam(input.organizationId, input.campaignId);
   const next = await planAndStoreRound({
     organizationId: input.organizationId,

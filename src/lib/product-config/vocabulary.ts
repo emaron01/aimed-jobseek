@@ -182,22 +182,22 @@ export function organizationNameFromSeeker(input: {
 
 export const applicationResearchCopy = Object.freeze({
   title: "Employer research",
-  queued: "Queued",
+  queued: "Starting research…",
   researching: "Researching",
   done: "Done",
   failed: "Failed",
   notStarted: "Research has not started",
   notStartedDetail:
     "A background worker has not picked up this research yet. Retry after the worker is running, or contact support if this continues.",
-  queuedDetail: "Research is waiting for a background worker.",
+  queuedDetail: "Research is starting. This usually takes a minute or two.",
   researchingDetail: "Research is in progress.",
   doneDetail: "Research finished.",
   failedDetail: "Research failed. You can retry.",
   idle: "Not requested",
   idleDetail: "Research has not been requested for this employer.",
   saveEmployer: "Save employer and research",
-  savedQueued: "Employer saved. Research will run in the background.",
-  retriedQueued: "Research was queued again.",
+  savedQueued: "Researching this employer…",
+  retriedQueued: "Researching this employer again…",
 });
 
 export const applicationWorkspaceCopy = Object.freeze({
@@ -206,6 +206,14 @@ export const applicationWorkspaceCopy = Object.freeze({
   hiringTeamTitle: "Review/ Edit The Assumed Hiring Personas",
   appliedTitle: "Update Application Date and Status",
   contactsTitle: "Add/ Review Interview Contacts",
+  companyTitle: "Company",
+  employerFitTitle: "Employer fit",
+  interviewsTitle: "Interviews",
+  keepWorking:
+    "This usually takes a minute or two. You can keep working; it will appear here when it's ready.",
+  readyNotice: "Ready",
+  readyLink: "View it",
+  typing: "{consultant} is typing…",
 });
 
 export const employerIdentityCopy = Object.freeze({

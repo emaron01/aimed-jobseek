@@ -745,7 +745,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("6");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("7");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("coach, not an interrogator");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("Never inflate fit");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -1009,6 +1009,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
         name: `Application ${suffix}`,
         productId,
         icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
       },
     });
     campaignId = campaign.id;
@@ -1048,7 +1049,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("6");
+    expect(session?.promptVersion).toBe("7");
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
     expect(session?.briefingJson).toMatchObject({
@@ -1192,6 +1193,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
         name: `Thin STAR ${suffix}`,
         productId,
         icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
       },
     });
     const parsed = normalizeParsedJobRequirement(
@@ -1280,6 +1282,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
         name: `Retry ${suffix}`,
         productId,
         icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
       },
     });
     const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
@@ -1298,7 +1301,9 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     });
     await addHiringManager(campaign.id);
     generateStructured.mockRejectedValueOnce(new Error("provider timeout"));
-    await startConsultation({ organizationId, campaignId: campaign.id });
+    await expect(
+      startConsultation({ organizationId, campaignId: campaign.id }),
+    ).rejects.toThrow(/could not be generated|timeout/i);
     const failed = await prisma.consultationSession.findUnique({
       where: { campaignId: campaign.id },
       include: { turns: true },
@@ -1327,6 +1332,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
         name: `Dismiss ${suffix}`,
         productId,
         icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
       },
     });
     const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
@@ -1422,6 +1428,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
         name: `Skipped ${suffix}`,
         productId,
         icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
       },
     });
     const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
@@ -1458,6 +1465,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
         name: `Gap consult ${suffix}`,
         productId,
         icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
       },
     });
     const parsed = normalizeParsedJobRequirement(

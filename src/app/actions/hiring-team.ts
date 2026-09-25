@@ -12,7 +12,12 @@ import {
   updateApplicationHiringTeamRole,
 } from "@/lib/hiring-team/build";
 import { retryApplicationJob } from "@/lib/application-jobs/service";
-import { hiringTeamConfig } from "@/lib/product-config";
+import { addApplicationContact } from "@/lib/application/contacts";
+import {
+  queueIndividualProfileBuild,
+  saveLinkedInPaste,
+} from "@/lib/contact-profile/service";
+import { hiringTeamConfig, workspaceProgressText } from "@/lib/product-config";
 import {
   createPersonaTemplate,
   deletePersonaTemplate,
@@ -245,7 +250,7 @@ export async function buildApplicationRoleAction(
     revalidatePath(`/campaigns/${campaignId}`);
     return { ok: true, message: hiringTeamConfig.queuedBuild };
   } catch (error) {
-    return fail(error, `The ${vocab.persona.singular} could not be queued.`);
+    return fail(error, `The ${vocab.persona.singular} could not be started.`);
   }
 }
 
@@ -264,7 +269,7 @@ export async function buildAllDirectRolesAction(
     revalidatePath(`/campaigns/${campaignId}`);
     return { ok: true, message: hiringTeamConfig.queuedBuildAllDirect };
   } catch (error) {
-    return fail(error, "Direct role builds could not be queued.");
+    return fail(error, "Direct role builds could not be started.");
   }
 }
 
@@ -285,6 +290,55 @@ export async function retryApplicationJobAction(
     return { ok: true, message: hiringTeamConfig.actions.retry };
   } catch (error) {
     return fail(error, "The job could not be retried.");
+  }
+}
+
+export async function addHiringTeamPersonAction(
+  _prev: HiringTeamActionResult | null,
+  formData: FormData,
+): Promise<HiringTeamActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    const user = await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    const personaId = String(formData.get("personaId") ?? "").trim();
+    if (!campaignId || !personaId) {
+      return { ok: false, message: `${vocab.persona.Singular} was not found.` };
+    }
+    const added = await addApplicationContact({
+      organizationId,
+      campaignId,
+      userId: user.id,
+      firstName: String(formData.get("firstName") ?? ""),
+      lastName: String(formData.get("lastName") ?? ""),
+      title: String(formData.get("title") ?? ""),
+      email: String(formData.get("email") ?? "").trim() || null,
+      linkedinUrl: String(formData.get("linkedinUrl") ?? "").trim() || null,
+      personaId,
+      confirmRole: true,
+    });
+    const pastedText = String(formData.get("linkedInProfileText") ?? "").trim();
+    if (pastedText) {
+      await saveLinkedInPaste({
+        organizationId,
+        campaignId,
+        contactId: added.contactId,
+        pastedText,
+        personaId,
+      });
+    }
+    await queueIndividualProfileBuild({
+      organizationId,
+      campaignId,
+      contactId: added.contactId,
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return {
+      ok: true,
+      message: workspaceProgressText("CONTACT_PROFILE"),
+    };
+  } catch (error) {
+    return fail(error, `${vocab.contact.Singular} could not be added.`);
   }
 }
 

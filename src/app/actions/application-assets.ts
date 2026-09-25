@@ -10,7 +10,7 @@ import {
   approveApplicationAsset,
   saveEditedApplicationAsset,
 } from "@/lib/application-assets/service";
-import { applicationAssetConfig } from "@/lib/product-config";
+import { applicationAssetConfig, workspaceProgressText } from "@/lib/product-config";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
 
@@ -70,7 +70,7 @@ export async function writePresentationPlanAction(
       },
     });
     revalidate(id);
-    return { ok: true, message: `${applicationAssetConfig.labels.writePlan} was queued.` };
+    return { ok: true, message: workspaceProgressText(type, null, "plan") };
   } catch (error) {
     return errorResult(error);
   }
@@ -125,7 +125,7 @@ export async function generateApplicationAssetAction(
     revalidate(id);
     return {
       ok: true,
-      message: "Generation was queued.",
+      message: workspaceProgressText(type),
     };
   } catch (error) {
     return errorResult(error);

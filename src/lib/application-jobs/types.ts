@@ -37,3 +37,23 @@ export type ApplicationJobPayload = {
 export function isTimeoutMessage(message: string): boolean {
   return /timed out|timeout/i.test(message);
 }
+
+export type ApplicationJobResult = {
+  ok: boolean;
+  jobId: string;
+  type: ApplicationJobType | "UNKNOWN";
+  campaignId: string | null;
+  durationMs: number;
+  error?: string;
+};
+
+export function formatApplicationJobLog(result: ApplicationJobResult): string {
+  const outcome = result.ok ? "succeeded" : "failed";
+  const type = result.type;
+  const applicationId = result.campaignId ?? "unknown";
+  const base =
+    `[research-worker] application job ${result.jobId} type=${type} ` +
+    `application=${applicationId} durationMs=${result.durationMs} outcome=${outcome}`;
+  if (result.ok) return base;
+  return `${base} error=${result.error ?? "Application job failed."}`;
+}

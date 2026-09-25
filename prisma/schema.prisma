@@ -2357,6 +2357,8 @@ model Campaign {
   /// Harper-written next step for the current application state.
   nextStepText        String?
   nextStepStateKey    String?
+  /// Seeker FACT: why they want to work at this company.
+  whyThisCompany      String?
 
   @@index([organizationId])
   @@index([organizationId, createdAt])

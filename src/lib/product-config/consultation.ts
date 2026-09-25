@@ -2,7 +2,7 @@
  * Consultation product settings. The display name is the only place the
  * consultant is named.
  */
-import { applicationWorkspaceCopy } from "./vocabulary";
+import { applicationWorkspaceCopy, vocab } from "./vocabulary";
 export const consultationConfig = Object.freeze({
   displayName: "Harper",
   roundSize: 1,
@@ -77,6 +77,11 @@ export const consultationConversationCopy = Object.freeze({
   retry: `Retry ${consultationConfig.displayName}`,
   start: `Start with ${consultationConfig.displayName}`,
   planComplete: "The plan for this conversation is complete.",
+  starting: `${consultationConfig.displayName} is reading your ${vocab.product.singular} and the job…`,
+  typing: `${consultationConfig.displayName} is typing…`,
+  whyThisCompanyTarget: "Why the seeker wants to work at this company",
+  whyThisCompanyQuestion:
+    "Why do you want to work at this company? Say what specifically draws you to it for this role.",
   nextStepTitle: applicationWorkspaceCopy.nextStepTitle,
   nextStepFailed: `${consultationConfig.displayName} could not write the next step. Retry when the consultation model is available.`,
   nextStepRetry: "Retry next step",

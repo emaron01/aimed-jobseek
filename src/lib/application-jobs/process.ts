@@ -3,6 +3,7 @@ import {
   failApplicationJob,
   readJobPayload,
 } from "@/lib/application-jobs/service";
+import type { ApplicationJobResult } from "@/lib/application-jobs/types";
 import { processApplicationNextStep } from "@/lib/application/next-step";
 import { generateApplicationAsset } from "@/lib/application-assets/service";
 import { generateOutreachAsset } from "@/lib/application-assets/outreach";
@@ -24,9 +25,21 @@ import {
 import { writePresentationPlan } from "@/lib/application-assets/plan-service";
 import type { ApplicationAssetType, EmailLength } from "@prisma/client";
 
-export async function processApplicationJob(jobId: string): Promise<void> {
+export async function processApplicationJob(
+  jobId: string,
+): Promise<ApplicationJobResult> {
+  const started = Date.now();
   const job = await prisma.applicationJob.findFirst({ where: { id: jobId } });
-  if (!job) return;
+  if (!job) {
+    return {
+      ok: false,
+      jobId,
+      type: "UNKNOWN",
+      campaignId: null,
+      durationMs: Date.now() - started,
+      error: "Application job was not found.",
+    };
+  }
   const payload = readJobPayload(job.payload);
   try {
     await runWithTenantContext(
@@ -74,12 +87,13 @@ export async function processApplicationJob(jobId: string): Promise<void> {
           case "RESUME":
           case "COVER_LETTER":
             if (payload.operation === "plan") {
-              await writePresentationPlan({
+              const planned = await writePresentationPlan({
                 organizationId: job.organizationId,
                 campaignId: job.campaignId,
                 type: job.type,
                 adjustmentNote: payload.adjustmentNote ?? null,
               });
+              if (!planned.ok) throw new Error(planned.message);
               break;
             }
             {
@@ -155,6 +169,13 @@ export async function processApplicationJob(jobId: string): Promise<void> {
       },
     );
     await completeApplicationJob(job.id);
+    return {
+      ok: true,
+      jobId: job.id,
+      type: job.type,
+      campaignId: job.campaignId,
+      durationMs: Date.now() - started,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Application job failed.";
     console.error(
@@ -162,10 +183,20 @@ export async function processApplicationJob(jobId: string): Promise<void> {
         event: "application_job_failed",
         jobId: job.id,
         type: job.type,
+        campaignId: job.campaignId,
         message,
+        cause: error instanceof Error ? error.stack ?? error.message : message,
       }),
     );
     await failApplicationJob({ jobId: job.id, message });
+    return {
+      ok: false,
+      jobId: job.id,
+      type: job.type,
+      campaignId: job.campaignId,
+      durationMs: Date.now() - started,
+      error: message,
+    };
   }
 }
 

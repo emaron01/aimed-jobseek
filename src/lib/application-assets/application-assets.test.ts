@@ -1029,7 +1029,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
   });
 
   it("rejects and regenerates a cover letter that pairs an acknowledged gap with unrelated experience", async () => {
-    expect(COVER_LETTER_ASSET_PROMPT_VERSION).toBe("11");
+    expect(COVER_LETTER_ASSET_PROMPT_VERSION).toBe("12");
     const session =
       (await prisma.consultationSession.findUnique({ where: { campaignId } })) ??
       (await prisma.consultationSession.create({
@@ -1157,7 +1157,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
   });
 
   it("rejects a cover letter that omits approved outcome statements or drops the result", async () => {
-    expect(COVER_LETTER_ASSET_PROMPT_VERSION).toBe("11");
+    expect(COVER_LETTER_ASSET_PROMPT_VERSION).toBe("12");
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     const session =
       (await prisma.consultationSession.findUnique({ where: { campaignId } })) ??

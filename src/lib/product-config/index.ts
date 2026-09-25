@@ -48,6 +48,15 @@ export {
 export { FEATURE_FLAGS, anyListFeatureEnabled, features } from "./features";
 export type { FeatureFlag } from "./features";
 export { hiringTeamConfig } from "./hiring-team";
+export {
+  WORKSPACE_JOB_TYPES,
+  workspaceJobCopy,
+  workspaceProgressText,
+  workspaceReadyText,
+  workspaceSectionId,
+  workspaceWaitKind,
+} from "./workspace-jobs";
+export type { WorkspaceWaitKind } from "./workspace-jobs";
 export { applicationSummaryConfig } from "./application-summary";
 export {
   interviewConfig,

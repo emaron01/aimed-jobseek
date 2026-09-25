@@ -292,6 +292,14 @@ export async function loadApplicationGenerationContext(
       url: null,
     });
   }
+  if (campaign.whyThisCompany?.trim()) {
+    addSource(sources, {
+      id: `why-this-company:${campaign.id}`,
+      text: campaign.whyThisCompany.trim(),
+      category: "PROFILE_FACT",
+      url: null,
+    });
+  }
   for (const assessment of campaign.consultationSession?.assessments ?? []) {
     addSource(sources, {
       id: `assessment:${assessment.targetKey}`,

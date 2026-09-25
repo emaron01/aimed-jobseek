@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const APPLICATION_SUMMARY_PROMPT_VERSION = "1";
+export const APPLICATION_SUMMARY_PROMPT_VERSION = "2";
 
 const supportSchema = z.object({
   sourceId: z.string(),
