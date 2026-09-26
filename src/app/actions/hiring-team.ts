@@ -14,10 +14,7 @@ import {
 } from "@/lib/hiring-team/build";
 import { retryApplicationJob } from "@/lib/application-jobs/service";
 import { addApplicationContact } from "@/lib/application/contacts";
-import {
-  queueIndividualProfileBuild,
-  saveLinkedInPaste,
-} from "@/lib/contact-profile/service";
+import { saveLinkedInPaste } from "@/lib/contact-profile/service";
 import { hiringTeamConfig, workspaceProgressText } from "@/lib/product-config";
 import {
   createPersonaTemplate,
@@ -358,11 +355,6 @@ export async function addHiringTeamPersonAction(
         personaId,
       });
     }
-    await queueIndividualProfileBuild({
-      organizationId,
-      campaignId,
-      contactId: added.contactId,
-    });
     const { offerPersonPrep } = await import("@/lib/interview/person-prep");
     await offerPersonPrep({
       organizationId,
@@ -373,7 +365,9 @@ export async function addHiringTeamPersonAction(
     revalidatePath(`/campaigns/${campaignId}`);
     return {
       ok: true,
-      message: workspaceProgressText("CONTACT_PROFILE"),
+      message: pastedText
+        ? workspaceProgressText("CONTACT_PROFILE")
+        : `${vocab.contact.Singular} added.`,
     };
   } catch (error) {
     return fail(error, `${vocab.contact.Singular} could not be added.`);

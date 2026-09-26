@@ -202,7 +202,7 @@ describe("persona edit protection and add person", () => {
     expect(build).toContain("name: persona.name");
     const actions = readFileSync("src/app/actions/hiring-team.ts", "utf8");
     expect(actions).toContain("addHiringTeamPersonAction");
-    expect(actions).toContain("queueIndividualProfileBuild");
+    expect(actions).toContain("saveLinkedInPaste");
     expect(actions).toContain("confirmRole: true");
   });
 });

@@ -1,34 +1,19 @@
+import { getPersonaAiProvider, isPersonaAiConfigured } from "@/lib/ai";
+import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
+import type { AiCallUsageContext } from "@/lib/ai/types";
 import {
+  CONTACT_PROFILE_PROMPT_VERSION,
   LINKEDIN_PASTE_SOURCE,
+  interviewerExtractionSchema,
   linkedInExtractedSchema,
+  type InterviewerExtractionResult,
   type LinkedInExtracted,
 } from "@/lib/contact-profile/contract";
+import { INTERVIEWER_EXTRACTION_INSTRUCTIONS } from "@/lib/prompt-content/interviewer-extraction";
+import { aiCallTracking } from "@/lib/usage/ai-call";
 
-const SECTION_HEADINGS = [
-  "About",
-  "Activity",
-  "Awards",
-  "Certifications",
-  "Courses",
-  "Education",
-  "Experience",
-  "Honors",
-  "Interests",
-  "Languages",
-  "Licenses",
-  "Organizations",
-  "Patents",
-  "Projects",
-  "Publications",
-  "Recommendations",
-  "Skills",
-  "Volunteering",
-];
-
-/** Matches "Licenses & certifications" and "Honors & awards" as one heading. */
-const HEADING_TAIL = "(?:\\s*&[^\\n]*)?";
-
-const DATE_LINE = /\b(19\d{2}|20\d{2}|present)\b/i;
+const UNCONFIGURED =
+  "Persona AI is not configured, so the pasted profile could not be read.";
 
 function fact(text: string | null | undefined) {
   const value = text?.replace(/\s+/g, " ").trim();
@@ -40,102 +25,92 @@ function fact(text: string | null | undefined) {
   };
 }
 
-function facts(values: string[], limit: number) {
+function facts(values: string[]) {
   return values
     .map((value) => fact(value))
-    .filter((item): item is NonNullable<typeof item> => Boolean(item))
-    .slice(0, limit);
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
 }
 
-function section(text: string, heading: string): string {
-  const stop = SECTION_HEADINGS.join("|");
-  const pattern = new RegExp(
-    `(?:^|\\n)${heading}${HEADING_TAIL}\\n([\\s\\S]*?)(?=\\n(?:${stop})${HEADING_TAIL}\\n|$)`,
-    "i",
-  );
-  return text.match(pattern)?.[1]?.trim() ?? "";
-}
-
-function isHeading(line: string): boolean {
-  return new RegExp(`^(?:${SECTION_HEADINGS.join("|")})${HEADING_TAIL}$`, "i").test(
-    line,
-  );
-}
-
-function lines(text: string): string[] {
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
-/** The name, headline, and location block above the first section heading. */
-function topBlock(text: string): string[] {
-  const all = lines(text);
-  const stop = all.findIndex((line) => isHeading(line));
-  return stop === -1 ? all : all.slice(0, stop);
-}
-
-export function extractLinkedInFacts(pasted: string): LinkedInExtracted {
-  const text = pasted.replace(/\r\n/g, "\n").trim();
-  const experience = lines(section(text, "Experience"));
-  const education = lines(section(text, "Education"));
-  const about = lines(section(text, "About"));
-  const skills = lines(section(text, "Skills"));
-  const certifications = [
-    ...lines(section(text, "Licenses")),
-    ...lines(section(text, "Certifications")),
-  ];
-  const top = topBlock(text);
-
-  const titleLine =
-    top.find((line) =>
-      /\b(manager|director|lead|engineer|recruiter|partner|officer|analyst|specialist|head)\b/i.test(
-        line,
+/** Shapes the model result into the stored extract. Fields the text lacked stay empty. */
+export function interviewerExtractFromModel(
+  result: InterviewerExtractionResult,
+): LinkedInExtracted {
+  return linkedInExtractedSchema.parse({
+    headline: fact(result.headline),
+    about: fact(result.about),
+    currentTitle: fact(result.currentTitle),
+    currentEmployer: fact(result.currentEmployer),
+    currentTenure: fact(result.currentTenure),
+    workExperience: result.workExperience
+      .map((role) => ({
+        employer: fact(role.employer),
+        title: fact(role.title),
+        dates: fact(role.dates),
+        location: fact(role.location),
+        description: fact(role.description),
+        accomplishments: facts(role.accomplishments),
+      }))
+      .filter(
+        (role) =>
+          role.employer ||
+          role.title ||
+          role.description ||
+          role.accomplishments.length > 0,
       ),
-    ) ?? experience[1] ?? null;
-  const employerLine =
-    top.find((line) => /\bat\b/i.test(line)) ??
-    experience.find((line) => /·|full-time|part-time|present/i.test(line)) ??
-    experience[0] ??
-    null;
-  const tenureLine =
-    experience.find((line) =>
-      /\b(20\d{2}|present|mos?|yrs?|years?|months?)\b/i.test(line),
-    ) ?? null;
+    priorRoles: [],
+    education: facts(result.education),
+    certifications: facts(result.certifications),
+    skills: facts(result.skills),
+    statedFocus: facts(result.statedFocus),
+  });
+}
 
-  const priorRoles: LinkedInExtracted["priorRoles"] = [];
-  for (let index = 0; index < experience.length; index += 1) {
-    const line = experience[index]!;
-    if (index === 0) continue;
-    if (/\b(20\d{2}|present|full-time|part-time)\b/i.test(line)) continue;
-    const next = experience[index + 1] ?? "";
-    if (/\b(manager|director|lead|engineer|recruiter|partner|officer|analyst)\b/i.test(line)) {
-      const employer = fact(next && !/\b20\d{2}\b/.test(next) ? next : line);
-      const title = fact(line);
-      const dates =
-        experience.slice(index + 1, index + 4).find((item) => DATE_LINE.test(item)) ??
-        null;
-      if (employer) priorRoles.push({ employer, title, dates: fact(dates) });
-    }
+/**
+ * Reads whatever the seeker pasted about one interviewer. Works on a copied
+ * LinkedIn page, a bio, a team page, or notes; nothing depends on headings.
+ */
+export async function extractInterviewerFacts(input: {
+  pastedText: string;
+  contactName: string;
+  usage?: AiCallUsageContext;
+}): Promise<
+  { ok: true; data: LinkedInExtracted } | { ok: false; message: string }
+> {
+  const text = input.pastedText.trim();
+  if (!text) {
+    return { ok: false, message: "There was no pasted text to read." };
   }
-
-  const extracted = {
-    headline: fact(top[1]),
-    about: fact(about.join(" ")),
-    currentTitle: fact(titleLine?.replace(/\s+at\s+.+$/i, "")),
-    currentEmployer: fact(
-      employerLine
-        ?.replace(/^.*\bat\s+/i, "")
-        .replace(/\s*·.+$/, "")
-        .replace(/\s*(full-time|part-time).+$/i, ""),
-    ),
-    currentTenure: fact(tenureLine),
-    priorRoles: priorRoles.slice(0, 8),
-    education: facts(education, 6),
-    certifications: facts(certifications, 12),
-    skills: facts(skills, 40),
-    statedFocus: facts(about, 6),
-  };
-  return linkedInExtractedSchema.parse(extracted);
+  if (!isPersonaAiConfigured()) {
+    return { ok: false, message: UNCONFIGURED };
+  }
+  try {
+    const response = await getPersonaAiProvider().generateStructured({
+      ...structuredOutputRequest("interviewerExtraction"),
+      ...(input.usage ? aiCallTracking(input.usage) : {}),
+      messages: [
+        {
+          role: "system",
+          content: `Prompt version: ${CONTACT_PROFILE_PROMPT_VERSION}\n\n${INTERVIEWER_EXTRACTION_INSTRUCTIONS}`,
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            personName: input.contactName,
+            pastedText: text,
+          }),
+        },
+      ],
+      parseOutput: (raw) => ({
+        data: interviewerExtractionSchema.parse(raw),
+        coercedFields: [],
+      }),
+    });
+    return { ok: true, data: interviewerExtractFromModel(response.data) };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown";
+    console.error(
+      JSON.stringify({ event: "interviewer_extraction_failed", message }),
+    );
+    return { ok: false, message };
+  }
 }

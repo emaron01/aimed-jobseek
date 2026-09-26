@@ -21,6 +21,7 @@ import {
   addApplicationContact,
   updateApplicationContactRole,
 } from "@/lib/application/contacts";
+import { saveLinkedInPaste } from "@/lib/contact-profile/service";
 import { setApplicationProgress } from "@/lib/interview/stages";
 import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
@@ -94,6 +95,16 @@ export async function addApplicationContactAction(
       linkedinUrl: String(formData.get("linkedinUrl") ?? "").trim() || null,
       personaId,
     });
+    const pastedText = String(formData.get("linkedInProfileText") ?? "").trim();
+    if (pastedText) {
+      await saveLinkedInPaste({
+        organizationId,
+        campaignId: id,
+        contactId: result.contactId,
+        pastedText,
+        personaId,
+      });
+    }
     revalidate(id);
     return {
       ok: true,

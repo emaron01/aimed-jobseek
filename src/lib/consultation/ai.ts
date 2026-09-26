@@ -11,6 +11,7 @@ import {
   consultationExtractSchema,
   consultationPolishSchema,
   type AskedConsultationQuestion,
+  type CoachCompanyResearch,
   type CoachHiringTeamRole,
   type ConsultationPlanResult,
   type ConsultationExtractResult,
@@ -52,6 +53,7 @@ export async function planConsultationWithModel(input: {
   }>;
   hiringTeam: CoachHiringTeamRole[];
   seekerStatedFacts: SeekerStatedFactPayload[];
+  companyResearch: CoachCompanyResearch | null;
   askedQuestions: AskedConsultationQuestion[];
   chronologyRequested: boolean;
   coveredTargetKeys: string[];
@@ -101,6 +103,17 @@ export async function extractWithModel(input: {
   question: string;
   target: { key: string; kind: string; text: string } | null;
   targets: Array<{ key: string; kind: string; text: string }>;
+  profileItems: Array<{
+    id: string;
+    kind: string;
+    text: string;
+    itemType: string;
+    employer?: string | null;
+    title?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    roleId?: string | null;
+  }>;
   qualityFeedback?: string[];
   usage?: AiCallUsageContext;
 }): Promise<
@@ -146,6 +159,17 @@ export async function polishAnswerWithModel(input: {
   strengtheningNeeds: string[];
   qualityFeedback?: string[];
   voiceSamples?: Array<{ label: string; sampleText: string }>;
+  profileItems: Array<{
+    id: string;
+    kind: string;
+    text: string;
+    itemType: string;
+    employer?: string | null;
+    title?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    roleId?: string | null;
+  }>;
   usage?: AiCallUsageContext;
 }): Promise<
   | { ok: true; data: ConsultationPolishResult }

@@ -127,7 +127,7 @@ describe("Harper result quality", () => {
     const polish = readFileSync("src/lib/prompt-content/consultation.ts", "utf8");
     expect(polish).toContain("never return their reply unchanged");
     expect(polish).toContain(
-      "Use only facts from the person's answers and Personal Profile",
+      "Use only facts from the person's answers and the supplied Personal Profile",
     );
   });
 

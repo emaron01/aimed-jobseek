@@ -1,4 +1,8 @@
-import type { CommonGroundItem, LinkedInExtracted } from "@/lib/contact-profile/contract";
+import {
+  interviewerWorkExperience,
+  type CommonGroundItem,
+  type LinkedInExtracted,
+} from "@/lib/contact-profile/contract";
 import type { CandidateProfile } from "@/lib/product-research/candidate-profile";
 
 function normalize(value: string): string {
@@ -26,13 +30,14 @@ export function commonGroundFromProfiles(input: {
   profile: CandidateProfile;
 }): CommonGroundItem[] {
   const overlaps: CommonGroundItem[] = [];
+  const roles = interviewerWorkExperience(input.extracted);
   const contactEmployers = [
     input.extracted.currentEmployer?.text,
-    ...input.extracted.priorRoles.map((role) => role.employer.text),
+    ...roles.map((role) => role.employer?.text),
   ].filter((value): value is string => Boolean(value));
   const contactTitles = [
     input.extracted.currentTitle?.text,
-    ...input.extracted.priorRoles.map((role) => role.title?.text),
+    ...roles.map((role) => role.title?.text),
   ].filter((value): value is string => Boolean(value));
   const contactSchools = input.extracted.education.map((item) => item.text);
   const contactFocus = input.extracted.statedFocus.map((item) => item.text);

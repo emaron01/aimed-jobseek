@@ -362,6 +362,19 @@ export function ApplicationOutreachSection({
             <input name="linkedinUrl" className={fieldClass} />
           </label>
           <label className="text-sm md:col-span-2">
+            <span className="font-medium text-ink">
+              {outreachConfig.labels.pasteInterviewerProfile}
+            </span>
+            <textarea
+              name="linkedInProfileText"
+              rows={5}
+              className={fieldClass}
+            />
+            <span className="mt-1 block text-xs text-muted">
+              {outreachConfig.labels.pasteInterviewerProfileHelp}
+            </span>
+          </label>
+          <label className="text-sm md:col-span-2">
             <span className="font-medium text-ink">{outreachConfig.labels.assignRole}</span>
             <select name="personaId" required defaultValue="" className={fieldClass}>
               <option value="" disabled>

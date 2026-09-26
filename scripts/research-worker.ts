@@ -26,6 +26,7 @@ import {
   researchWorkerShutdown,
 } from "@/lib/research/runs-service";
 import { queueMissingNamedEmployerResearch } from "@/lib/application/service";
+import { queueExistingInterviewerProfileRebuilds } from "@/lib/contact-profile/service";
 
 const IDLE_POLL_MS = 5_000;
 
@@ -89,6 +90,10 @@ async function main(): Promise<void> {
   const backfilled = await queueMissingNamedEmployerResearch();
   console.log(
     `[research-worker] queued missing named-employer research: ${backfilled}`,
+  );
+  const rebuilt = await queueExistingInterviewerProfileRebuilds();
+  console.log(
+    `[research-worker] queued interviewer profile rebuilds: ${rebuilt}`,
   );
 
   while (!researchWorkerShutdown.requested) {

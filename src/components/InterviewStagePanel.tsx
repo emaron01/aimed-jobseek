@@ -134,14 +134,14 @@ export function InterviewStagePanel({
                     <input name="linkedinUrl" className={fieldClass} />
                   </label>
                   <label className="text-sm md:col-span-2">
-                    {outreachConfig.labels.pasteLinkedIn}
+                    {outreachConfig.labels.pasteInterviewerProfile}
                     <textarea
                       name="linkedInProfileText"
                       rows={5}
                       className={fieldClass}
                     />
                     <span className="mt-1 block text-xs text-muted">
-                      {outreachConfig.labels.pasteLinkedInHelp}
+                      {outreachConfig.labels.pasteInterviewerProfileHelp}
                     </span>
                   </label>
                 </div>

@@ -1155,6 +1155,19 @@ async function HiringTeamSection({
                     </span>
                     <input name="linkedinUrl" type="url" className={fieldClass} />
                   </label>
+                  <label className="block text-sm">
+                    <span className="font-medium text-ink">
+                      {outreachConfig.labels.pasteInterviewerProfile}
+                    </span>
+                    <textarea
+                      name="linkedInProfileText"
+                      rows={5}
+                      className={fieldClass}
+                    />
+                    <span className="mt-1 block text-xs text-muted">
+                      {outreachConfig.labels.pasteInterviewerProfileHelp}
+                    </span>
+                  </label>
                 </ApplicationActionForm>
               }
               editForm={

@@ -21,7 +21,10 @@ import {
   type CoachHiringTeamRole,
   type SeekerStatedFactPayload,
 } from "@/lib/consultation/contract";
-import { loadCoachHiringTeam } from "@/lib/consultation/hiring-team-context";
+import {
+  loadCoachCompanyResearch,
+  loadCoachHiringTeam,
+} from "@/lib/consultation/hiring-team-context";
 import type { AiCallUsageContext } from "@/lib/ai/types";
 import {
   askedQuestionsFromTurns,
@@ -50,7 +53,6 @@ import {
 import {
   consultationItemNeedsResultRepair,
   isRawSeekerResult,
-  resultIgnoresLatestAnswer,
 } from "@/lib/consultation/results";
 import { nextConsultationStatus } from "@/lib/consultation/state";
 import {
@@ -373,6 +375,7 @@ async function extractAnswerWithQuality(input: {
   question: string;
   target: EvidenceTarget | null;
   targets: EvidenceTarget[];
+  profileItems: ReturnType<typeof profileEvidenceItems>;
   usage?: AiCallUsageContext;
 }) {
   let lastFailure: string = consultationConversationCopy.generationFailed;
@@ -409,6 +412,7 @@ export async function polishAnswerWithQuality(input: {
   strengtheningNeeds: string[];
   seekerAnswers?: string[];
   firstName?: string | null;
+  profileItems: ReturnType<typeof profileEvidenceItems>;
   usage?: AiCallUsageContext;
 }) {
   const seekerAnswers =
@@ -434,6 +438,7 @@ export async function polishAnswerWithQuality(input: {
       strengtheningNeeds: input.strengtheningNeeds,
       qualityFeedback,
       voiceSamples,
+      profileItems: input.profileItems,
       usage: input.usage,
     });
     if (!polished.ok) {
@@ -445,22 +450,19 @@ export async function polishAnswerWithQuality(input: {
     const interviewBroken =
       !interviewText ||
       isRawSeekerResult(interviewText, seekerAnswers) ||
-      resultIgnoresLatestAnswer(interviewText, seekerAnswers) ||
       talkTrackVoiceViolations({
         text: interviewText,
         firstName: input.firstName ?? null,
       }).length > 0;
     const bulletBroken =
       !confirmedGap &&
-      (!bulletText ||
-        isRawSeekerResult(bulletText, seekerAnswers) ||
-        resultIgnoresLatestAnswer(bulletText, seekerAnswers));
+      (!bulletText || isRawSeekerResult(bulletText, seekerAnswers));
     if (interviewBroken || bulletBroken) {
       lastFailure = consultationConversationCopy.generationFailed;
       qualityFeedback = [
         confirmedGap
           ? "Write a first-person talk track for addressing this gap honestly. Do not invent experience. Do not copy the reply unchanged. Never refer to the person in third person."
-          : "The last interview answer or resume bullet copied the wording, ignored the latest reply, used third person, or used facts that were not in the supplied answer. Write polished first-person statements from every supplied reply.",
+          : "The last interview answer or resume bullet copied the wording or used third person. Write polished first-person statements. You may use the supplied Personal Profile; do not copy the reply unchanged.",
       ];
       continue;
     }
@@ -688,7 +690,7 @@ async function planAndStoreRound(input: {
     where: { id: input.sessionId },
     data: { generationStatus: "GENERATING", generationError: null },
   });
-  const [existingTurns, interviewStages] = await Promise.all([
+  const [existingTurns, interviewStages, companyResearch] = await Promise.all([
     loadSessionTurns(input.sessionId),
     prisma.interviewStage.findMany({
       where: {
@@ -697,6 +699,7 @@ async function planAndStoreRound(input: {
       },
       select: { id: true, notesBefore: true, notesAfter: true },
     }),
+    loadCoachCompanyResearch(input.organizationId, input.campaignId),
   ]);
   const askedQuestions = askedQuestionsFromTurns(existingTurns);
   const seekerStatedFacts = seekerStatedFactsForCoach({
@@ -738,6 +741,7 @@ async function planAndStoreRound(input: {
       seekerStatedFacts,
       askedQuestions,
       hiringTeam: input.roles,
+      companyResearch,
       usage: consultationUsage(
         input.organizationId,
         input.campaignId,
@@ -1159,6 +1163,7 @@ async function processAnswerGeneration(input: {
     question: input.question,
     target: input.target,
     targets: input.targets,
+    profileItems: profileEvidenceItems(input.profile),
     usage: replyUsage,
   });
   if (!extracted.ok) {
@@ -1304,6 +1309,7 @@ async function processAnswerGeneration(input: {
       .map((answer) => answer.trim())
       .filter(Boolean),
     firstName: profileFirstName(input.profile),
+    profileItems: profileEvidenceItems(input.profile),
     usage: replyUsage,
   });
   if (!polished.ok) {
@@ -2101,6 +2107,7 @@ async function declineConsultationFollowUp(input: {
     confirmedGap,
     firstName: profileFirstName(profile),
     strengtheningNeeds: analyzed.missingStarElements,
+    profileItems: profileEvidenceItems(profile),
     usage: consultationUsage(
       input.organizationId,
       input.campaignId,
@@ -2363,6 +2370,7 @@ export async function regenerateConsultationStatement(input: {
     confirmedGap,
     firstName: profileFirstName(profile),
     strengtheningNeeds: analyzed?.missingStarElements ?? [],
+    profileItems: profileEvidenceItems(profile),
     usage: consultationUsage(
       input.organizationId,
       statement.session.campaignId,

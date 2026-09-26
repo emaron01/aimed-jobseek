@@ -10,7 +10,7 @@ import { sourcesForPersonSection } from "@/lib/application-summary/service";
 
 describe("interviewer experience synthesis", () => {
   it("asks for a pattern with its evidence and an empty array when the profile is thin", () => {
-    expect(CONTACT_PROFILE_PROMPT_VERSION).toBe("2");
+    expect(CONTACT_PROFILE_PROMPT_VERSION).toBe("3");
     expect(CONTACT_INDIVIDUAL_PROFILE_INSTRUCTIONS).toContain("likelyToValue");
     expect(CONTACT_INDIVIDUAL_PROFILE_INSTRUCTIONS).toContain(
       "roles, role descriptions, and accomplishments",

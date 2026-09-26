@@ -1095,6 +1095,7 @@ export async function answerCheatSheetCoachItem(input: {
     ],
     declinedFollowUp: false,
     strengtheningNeeds: [],
+    profileItems: profileEvidenceItems(profileParsed.profile),
     usage: {
       organizationId: input.organizationId,
       campaignId: input.campaignId,

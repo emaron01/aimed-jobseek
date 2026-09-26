@@ -57,9 +57,10 @@ export const outreachConfig = Object.freeze({
     noContact: "No named contact",
     roleConfirmed: "Role confirmed",
     roleUnconfirmed: "Matched from title. Save a role to confirm it.",
-    pasteLinkedIn: "Paste LinkedIn profile text",
-    pasteLinkedInHelp:
-      "Paste the text of this person's LinkedIn profile. Nothing is fetched or scraped.",
+    pasteInterviewerProfile: "Paste Interviewer Profile",
+    pasteInterviewerProfileHelp:
+      "Paste anything you have about this person: their LinkedIn page, a bio, a team page, or notes. Nothing is fetched or scraped.",
+    pasteProfileRequired: "Paste the interviewer's profile text.",
     saveLinkedIn: "Save pasted profile",
     buildIndividual: "Generate individual profile",
     rebuildIndividual: "Regenerate individual profile",

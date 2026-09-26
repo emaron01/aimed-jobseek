@@ -1,5 +1,6 @@
 import { parseCheatSheetNotes } from "@/lib/application-summary/notes";
 import type {
+  CoachCompanyResearch,
   CoachGeneralPersona,
   CoachHiringTeamPerson,
   CoachHiringTeamRole,
@@ -9,11 +10,13 @@ import type {
 } from "@/lib/consultation/contract";
 import {
   individualProfileRecordSchema,
+  interviewerWorkExperience,
   linkedInExtractedSchema,
 } from "@/lib/contact-profile/contract";
 import { isHiringTeamPersonaBuilt } from "@/lib/hiring-team/build";
 import { parsePersonPrepAnswers } from "@/lib/interview/person-prep";
 import { prisma } from "@/lib/prisma-client";
+import { usableEmployerResearch } from "@/lib/job-requirement/identity-verification";
 import { parseStringArray } from "@/lib/research";
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -103,12 +106,16 @@ function personLinkedIn(input: {
     currentTitle: extracted?.currentTitle?.text ?? null,
     currentEmployer: extracted?.currentEmployer?.text ?? null,
     currentTenure: extracted?.currentTenure?.text ?? null,
-    priorRoles:
-      extracted?.priorRoles.map((item) => ({
-        employer: item.employer.text,
-        title: item.title?.text ?? null,
-        dates: item.dates?.text ?? null,
-      })) ?? [],
+    workExperience: extracted
+      ? interviewerWorkExperience(extracted).map((role) => ({
+          employer: role.employer?.text ?? null,
+          title: role.title?.text ?? null,
+          dates: role.dates?.text ?? null,
+          location: role.location?.text ?? null,
+          description: role.description?.text ?? null,
+          accomplishments: role.accomplishments.map((item) => item.text),
+        }))
+      : [],
     education: extracted?.education.map((item) => item.text) ?? [],
     certifications: extracted?.certifications.map((item) => item.text) ?? [],
     skills: extracted?.skills.map((item) => item.text) ?? [],
@@ -263,4 +270,47 @@ export async function loadCoachHiringTeam(
       people: peopleByRoleId.get(role.id) ?? [],
     };
   });
+}
+
+/** Application company research for Coach. Null when none is usable. */
+export async function loadCoachCompanyResearch(
+  organizationId: string,
+  campaignId: string,
+): Promise<CoachCompanyResearch | null> {
+  const requirement = await prisma.jobRequirement.findFirst({
+    where: { organizationId, campaignId },
+    include: {
+      company: {
+        include: { research: { orderBy: { updatedAt: "desc" }, take: 1 } },
+      },
+    },
+  });
+  if (!requirement) return null;
+  const researchRow = requirement.company?.research[0] ?? null;
+  const research = usableEmployerResearch(requirement, researchRow);
+  if (!research) return null;
+  const summary = trimmed(research.companySummary);
+  const whatTheySell = trimmed(research.whatTheySell);
+  const businessModel = trimmed(research.businessModel);
+  const companySizeContext = trimmed(research.companySizeContext);
+  const hiringSignals = parseStringArray(research.hiringSignals);
+  const riskSignals = parseStringArray(research.riskSignals);
+  if (
+    !summary &&
+    !whatTheySell &&
+    !businessModel &&
+    !companySizeContext &&
+    hiringSignals.length === 0 &&
+    riskSignals.length === 0
+  ) {
+    return null;
+  }
+  return {
+    companySummary: summary,
+    whatTheySell,
+    businessModel,
+    companySizeContext,
+    hiringSignals,
+    riskSignals,
+  };
 }

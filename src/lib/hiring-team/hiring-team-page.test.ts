@@ -85,7 +85,8 @@ describe("hiring team page copy and layout", () => {
     expect(workspace).not.toContain('name="email" required');
     expect(workspace).toContain('name="linkedinUrl"');
     expect(workspace).not.toContain('name="linkedinUrl" required');
-    expect(workspace).not.toContain('name="linkedInProfileText"');
+    expect(workspace).toContain('name="linkedInProfileText"');
+    expect(workspace).toContain("pasteInterviewerProfile");
     const cardBlock = workspace.slice(
       workspace.indexOf("hiring-team-role"),
       workspace.indexOf('id="hiring-team"'),

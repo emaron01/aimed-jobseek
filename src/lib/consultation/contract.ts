@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONSULTATION_PROMPT_VERSION = "18";
+export const CONSULTATION_PROMPT_VERSION = "19";
 
 export const WHY_THIS_COMPANY_TARGET_KEY = "why-this-company";
 export const PERSON_PREP_TARGET_PREFIX = "person-prep:";
@@ -121,6 +121,16 @@ export type SeekerStatedFactPayload = {
   source: "added_background" | "interview_learning";
 };
 
+/** Application company research sent to Coach. Null when none is usable. */
+export type CoachCompanyResearch = {
+  companySummary: string | null;
+  whatTheySell: string | null;
+  businessModel: string | null;
+  companySizeContext: string | null;
+  hiringSignals: string[];
+  riskSignals: string[];
+};
+
 /** The built general persona for a Hiring Team role. Null until the role is built. */
 export type CoachGeneralPersona = {
   definition: string | null;
@@ -166,10 +176,13 @@ export type CoachPersonLinkedIn = {
   currentTitle: string | null;
   currentEmployer: string | null;
   currentTenure: string | null;
-  priorRoles: Array<{
-    employer: string;
+  workExperience: Array<{
+    employer: string | null;
     title: string | null;
     dates: string | null;
+    location: string | null;
+    description: string | null;
+    accomplishments: string[];
   }>;
   education: string[];
   certifications: string[];

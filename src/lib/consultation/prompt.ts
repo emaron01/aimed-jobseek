@@ -2,6 +2,7 @@ import type { AiMessage } from "@/lib/ai/types";
 import {
   CONSULTATION_PROMPT_VERSION,
   type AskedConsultationQuestion,
+  type CoachCompanyResearch,
   type CoachHiringTeamRole,
   type SeekerStatedFactPayload,
 } from "@/lib/consultation/contract";
@@ -45,6 +46,7 @@ export function buildConsultationCoachMessages(input: {
   }>;
   hiringTeam: CoachHiringTeamRole[];
   seekerStatedFacts: SeekerStatedFactPayload[];
+  companyResearch: CoachCompanyResearch | null;
   askedQuestions: AskedConsultationQuestion[];
   chronologyRequested: boolean;
   coveredTargetKeys: string[];
@@ -59,11 +61,12 @@ export function buildConsultationCoachMessages(input: {
         consultantName: consultationConfig.displayName,
         personalProfileItems: input.profileItems,
         seekerStatedFacts: input.seekerStatedFacts,
+        companyResearch: input.companyResearch,
         targets: input.targets,
       }),
     },
-    // Hiring Team context follows the Personal Profile so the stable profile
-    // block stays a cacheable prefix as people and personas are added.
+    // Hiring Team context follows the Personal Profile and company research
+    // so that prefix stays cacheable as people and personas are added.
     {
       role: "user",
       content: JSON.stringify({
@@ -96,6 +99,17 @@ export function buildConsultationExtractMessages(input: {
   question: string;
   target: { key: string; kind: string; text: string } | null;
   targets: Array<{ key: string; kind: string; text: string }>;
+  profileItems: Array<{
+    id: string;
+    kind: string;
+    text: string;
+    itemType: string;
+    employer?: string | null;
+    title?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    roleId?: string | null;
+  }>;
   qualityFeedback?: string[];
 }): AiMessage[] {
   return [
@@ -104,6 +118,7 @@ export function buildConsultationExtractMessages(input: {
       role: "user",
       content: JSON.stringify({
         interviewAnswerMaxWords: consultationConfig.interviewAnswerMaxWords,
+        personalProfileItems: input.profileItems,
         availableTargets: input.targets,
       }),
     },
@@ -132,6 +147,17 @@ export function buildConsultationPolishMessages(input: {
   strengtheningNeeds: string[];
   qualityFeedback?: string[];
   voiceSamples?: Array<{ label: string; sampleText: string }>;
+  profileItems: Array<{
+    id: string;
+    kind: string;
+    text: string;
+    itemType: string;
+    employer?: string | null;
+    title?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    roleId?: string | null;
+  }>;
 }): AiMessage[] {
   return [
     { role: "system", content: polishSystem() },
@@ -142,6 +168,7 @@ export function buildConsultationPolishMessages(input: {
         interviewAnswerMetaLanguage:
           consultationConfig.interviewAnswerMetaLanguage,
         interviewAnswerMaxWords: consultationConfig.interviewAnswerMaxWords,
+        personalProfileItems: input.profileItems,
         voiceSamples: input.voiceSamples ?? [],
       }),
     },

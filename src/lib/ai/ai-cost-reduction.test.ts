@@ -323,7 +323,12 @@ describe("AI cost reduction", () => {
       question: "Tell a story",
       target: { key: "comp", kind: "COMPETENCY", text: "Ownership" },
       targets: [{ key: "comp", kind: "COMPETENCY", text: "Ownership" }],
+      profileItems: [{ id: "p1", kind: "FACT", text: "Led a rewrite", itemType: "ACHIEVEMENT" }],
     });
+    const profilePrefix = JSON.parse(messages[1]?.content ?? "{}") as {
+      personalProfileItems?: unknown[];
+    };
+    expect(profilePrefix.personalProfileItems).toHaveLength(1);
     expect(messages[0]?.role).toBe("system");
     const prefix = JSON.parse(messages[1]?.content ?? "{}") as {
       availableTargets: unknown;

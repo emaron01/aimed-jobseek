@@ -1256,7 +1256,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("18");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("19");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("You coach; you do not interrogate");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("askedQuestions");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -1559,6 +1559,7 @@ describe("consultation evidence and questions", () => {
           text: "I have never partnered with customer success on expansion.",
         },
       ],
+      profileItems: [],
       declinedFollowUp: false,
       confirmedGap: true,
       strengtheningNeeds: [],
@@ -1590,6 +1591,7 @@ describe("consultation evidence and questions", () => {
         result: null,
       },
       sources: [{ id: "answer:copy", text: "copy me exactly" }],
+      profileItems: [],
       declinedFollowUp: false,
       strengtheningNeeds: [],
       seekerAnswers: ["copy me exactly"],
@@ -1615,6 +1617,7 @@ describe("consultation evidence and questions", () => {
           text: "I cut failed runs from 8% to 1%.",
         },
       ],
+      profileItems: [],
       declinedFollowUp: false,
       strengtheningNeeds: [],
     });
@@ -1641,6 +1644,7 @@ describe("consultation evidence and questions", () => {
           "Over two quarters, failed runs fell from 8% to under 1%.",
       },
       sources: [{ id: "answer:rich", text: answer }],
+      profileItems: [],
       declinedFollowUp: false,
       strengtheningNeeds: [],
     });
@@ -1756,7 +1760,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("18");
+    expect(session?.promptVersion).toBe("19");
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
     expect(session?.briefingJson).toMatchObject({

@@ -6,7 +6,7 @@ import {
   readEmployerCorrectionFields,
 } from "@/lib/application/form-fields";
 import { isTimeoutMessage } from "@/lib/application-jobs/types";
-import { extractLinkedInFacts } from "@/lib/contact-profile/extract";
+import { interviewerExtractFromModel } from "@/lib/contact-profile/extract";
 import { commonGroundFromProfiles } from "@/lib/contact-profile/common-ground";
 import { emptyCandidateProfile } from "@/lib/product-research/candidate-profile";
 import { employerIdentityCopy, consultationConfig } from "@/lib/product-config";
@@ -169,17 +169,27 @@ describe("hiring team queue", () => {
 
 describe("LinkedIn paste and common ground", () => {
   it("extracts FACT title and only exact overlaps", () => {
-    const extracted = extractLinkedInFacts(`Alex Rivera
-Director of Partnerships at Northwind
-Experience
-Director of Partnerships
-Northwind · Full-time
-Jan 2022 - Present
-Education
-University of Delaware
-About
-Channel partnerships
-`);
+    const extracted = interviewerExtractFromModel({
+      headline: "Director of Partnerships at Northwind",
+      about: "Channel partnerships",
+      currentTitle: "Director of Partnerships",
+      currentEmployer: "Northwind",
+      currentTenure: "Jan 2022 - Present",
+      workExperience: [
+        {
+          employer: "Northwind",
+          title: "Director of Partnerships",
+          dates: "Jan 2022 - Present",
+          location: "",
+          description: "Owns channel partnerships.",
+          accomplishments: [],
+        },
+      ],
+      education: ["University of Delaware"],
+      certifications: [],
+      skills: [],
+      statedFocus: ["Channel partnerships"],
+    });
     expect(extracted.currentTitle?.kind).toBe("FACT");
     expect(extracted.currentTitle?.text).toMatch(/Director of Partnerships/i);
     expect(extracted.currentTitle?.provenance[0]?.sourceId).toBe("linkedin-paste");

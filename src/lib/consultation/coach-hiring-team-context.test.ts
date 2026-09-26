@@ -1,8 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildConsultationCoachMessages } from "@/lib/consultation/prompt";
 import type { CoachHiringTeamRole } from "@/lib/consultation/contract";
-import { linkedInExtractedSchema } from "@/lib/contact-profile/contract";
-import { extractLinkedInFacts } from "@/lib/contact-profile/extract";
+import {
+  interviewerWorkExperience,
+  linkedInExtractedSchema,
+} from "@/lib/contact-profile/contract";
 import { CONSULTATION_COACH_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content";
 import { fixtureAlexChenProfile } from "@/lib/product-research/fixtures/alex-chen-profile";
 import { hasTestDatabase } from "@/test/database";
@@ -61,11 +63,14 @@ function roleWithPerson(): CoachHiringTeamRole {
           currentTitle: "VP Revenue Operations",
           currentEmployer: "Northline",
           currentTenure: "3 years",
-          priorRoles: [
+          workExperience: [
             {
               employer: "Helios",
               title: "Director RevOps",
               dates: "Jan 2019 - Mar 2023",
+              location: null,
+              description: "Installed MEDDPICC across the enterprise team.",
+              accomplishments: ["Cut forecast slip by 12 points"],
             },
           ],
           education: ["Purdue"],
@@ -115,12 +120,21 @@ describe("Coach Hiring Team context", () => {
       ],
       hiringTeam: [roleWithPerson()],
       seekerStatedFacts: [],
+      companyResearch: {
+        companySummary: "Northline sells forecast software to mid-market sales teams.",
+        whatTheySell: "Forecast software",
+        businessModel: "Subscription",
+        companySizeContext: "200 employees",
+        hiringSignals: ["Building a RevOps team"],
+        riskSignals: [],
+      },
       askedQuestions: [],
       chronologyRequested: false,
       coveredTargetKeys: [],
     });
     const profileMessage = JSON.parse(messages[1]!.content);
     expect(profileMessage.personalProfileItems).toHaveLength(1);
+    expect(profileMessage.companyResearch.companySummary).toContain("Northline");
     expect(profileMessage.hiringTeam).toBeUndefined();
 
     const payload = JSON.parse(messages[2]!.content);
@@ -138,10 +152,13 @@ describe("Coach Hiring Team context", () => {
     expect(person.persona.likelyToValue[0]).toContain("MEDDPICC");
     expect(person.linkedIn.headline).toContain("Northline");
     expect(person.linkedIn.about).toContain("forecasts");
-    expect(person.linkedIn.priorRoles[0]).toEqual({
+    expect(person.linkedIn.workExperience[0]).toEqual({
       employer: "Helios",
       title: "Director RevOps",
       dates: "Jan 2019 - Mar 2023",
+      location: null,
+      description: "Installed MEDDPICC across the enterprise team.",
+      accomplishments: ["Cut forecast slip by 12 points"],
     });
     expect(person.linkedIn.certifications).toEqual(["Salesforce Administrator"]);
     expect(person.linkedIn.skills).toContain("Territory design");
@@ -172,6 +189,7 @@ describe("Coach Hiring Team context", () => {
           },
         ],
         seekerStatedFacts: [],
+        companyResearch: null,
         askedQuestions: [],
         chronologyRequested: false,
         coveredTargetKeys: [],
@@ -180,46 +198,6 @@ describe("Coach Hiring Team context", () => {
     expect(payload.hiringTeam[0].generalPersona).toBeNull();
     expect(payload.hiringTeam[0].people).toEqual([]);
     expect(payload.hiringTeam[0].whyThisRoleMatters).toBe("Runs the screen.");
-  });
-
-  it("extracts the headline, About, dated prior roles, certifications, and skills", () => {
-    const extracted = extractLinkedInFacts(`Dana Reyes
-VP Revenue Operations at Northline
-Indianapolis, Indiana
-About
-I rebuild forecasts leadership can trust.
-Experience
-VP Revenue Operations
-Northline · Full-time
-Apr 2023 - Present
-Director of Revenue Operations
-Helios
-Jan 2019 - Mar 2023
-Education
-Purdue University
-Licenses & certifications
-Salesforce Administrator
-Skills
-Forecasting
-Territory design
-`);
-    expect(extracted.headline?.text).toBe("VP Revenue Operations at Northline");
-    expect(extracted.about?.text).toBe("I rebuild forecasts leadership can trust.");
-    expect(extracted.certifications.map((item) => item.text)).toEqual([
-      "Salesforce Administrator",
-    ]);
-    expect(extracted.skills.map((item) => item.text)).toEqual([
-      "Forecasting",
-      "Territory design",
-    ]);
-    expect(extracted.education.map((item) => item.text)).toEqual([
-      "Purdue University",
-    ]);
-    const prior = extracted.priorRoles.find(
-      (role) => role.title?.text === "Director of Revenue Operations",
-    );
-    expect(prior?.employer.text).toBe("Helios");
-    expect(prior?.dates?.text).toBe("Jan 2019 - Mar 2023");
   });
 
   it("keeps already-stored extracts readable after the new fields were added", () => {
@@ -245,6 +223,7 @@ Territory design
     expect(stored.certifications).toEqual([]);
     expect(stored.skills).toEqual([]);
     expect(stored.priorRoles[0]?.dates).toBeNull();
+    expect(interviewerWorkExperience(stored)[0]?.employer?.text).toBe("Helios");
   });
 
   it("tells Harper to keep a person and the general persona separate", () => {
@@ -508,8 +487,23 @@ describe.skipIf(!hasTestDatabase())("Coach Hiring Team context from the database
     ]);
     expect(person?.linkedIn?.profileText).toContain("Dana Reyes");
     expect(person?.linkedIn?.currentEmployer).toBe("Northline");
-    expect(person?.linkedIn?.priorRoles).toEqual([
-      { employer: "Helios", title: null, dates: null },
+    expect(person?.linkedIn?.workExperience).toEqual([
+      {
+        employer: "Northline",
+        title: "VP Revenue Operations",
+        dates: null,
+        location: null,
+        description: null,
+        accomplishments: [],
+      },
+      {
+        employer: "Helios",
+        title: null,
+        dates: null,
+        location: null,
+        description: null,
+        accomplishments: [],
+      },
     ]);
     expect(person?.linkedIn?.certifications).toEqual([]);
     expect(person?.linkedIn?.skills).toEqual([]);

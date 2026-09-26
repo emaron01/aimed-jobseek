@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { matchHiringTeamRoleFromTitle } from "@/lib/application/contacts";
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { commonGroundFromProfiles } from "@/lib/contact-profile/common-ground";
@@ -10,7 +10,7 @@ import {
   type LinkedInExtracted,
 } from "@/lib/contact-profile/contract";
 import { generateIndividualProfileWithModel } from "@/lib/contact-profile/ai";
-import { extractLinkedInFacts } from "@/lib/contact-profile/extract";
+import { extractInterviewerFacts } from "@/lib/contact-profile/extract";
 import { isHiringTeamPersonaBuilt } from "@/lib/hiring-team/build";
 import { prisma } from "@/lib/prisma-client";
 import { outreachConfig, vocab } from "@/lib/product-config";
@@ -37,9 +37,9 @@ export async function saveLinkedInPaste(input: {
   contactId: string;
   pastedText: string;
   personaId?: string | null;
-}): Promise<{ extracted: LinkedInExtracted; suggestedPersonaId: string | null }> {
+}): Promise<{ suggestedPersonaId: string | null }> {
   const text = input.pastedText.trim();
-  if (!text) throw new TenantError("Paste the LinkedIn profile text.");
+  if (!text) throw new TenantError(outreachConfig.labels.pasteProfileRequired);
   const membership = await prisma.campaignContact.findFirst({
     where: {
       organizationId: input.organizationId,
@@ -53,35 +53,15 @@ export async function saveLinkedInPaste(input: {
       `${vocab.contact.Singular} was not found on this ${vocab.campaign.singular}.`,
     );
   }
-  const extracted = extractLinkedInFacts(text);
-  const title = extracted.currentTitle?.text ?? membership.contact.title;
-  if (extracted.currentTitle?.text && extracted.currentTitle.text !== membership.contact.title) {
-    await prisma.contact.update({
-      where: { id: membership.contactId },
-      data: {
-        previousTitle: membership.contact.title,
-        title: extracted.currentTitle.text,
-        titleChangedAt: new Date(),
-      },
-    });
-  }
-  const roles = await prisma.persona.findMany({
-    where: {
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      archivedAt: null,
-    },
-    select: { id: true, name: true, suggestionKey: true, targetTitles: true },
-  });
-  const matched = matchHiringTeamRoleFromTitle({ title, roles });
   const override = input.personaId?.trim() || null;
-  const nextPersonaId = override ?? matched.personaId ?? matched.suggestedPersonaId;
+  const nextPersonaId =
+    override ?? (await matchedPersonaId(input, membership.contact.title));
   await prisma.campaignContact.update({
     where: { id: membership.id },
     data: {
       linkedInProfileText: text,
-      linkedInExtractedJson: jsonValue(extracted),
-      individualProfileJson: undefined,
+      linkedInExtractedJson: Prisma.DbNull,
+      individualProfileJson: Prisma.DbNull,
       individualProfileStatus: "PENDING",
       individualProfileError: null,
       chosenPersonaId: nextPersonaId,
@@ -93,7 +73,56 @@ export async function saveLinkedInPaste(input: {
     type: "CONTACT_PROFILE",
     targetId: membership.contactId,
   });
-  return { extracted, suggestedPersonaId: nextPersonaId };
+  return { suggestedPersonaId: nextPersonaId };
+}
+
+/**
+ * The pasted text can name a newer title than the contact row carries. Keep the
+ * previous title for the audit trail, and only re-match the Hiring Team role
+ * when the seeker has not confirmed one.
+ */
+async function applyExtractedTitle(input: {
+  organizationId: string;
+  campaignId: string;
+  membershipId: string;
+  contactId: string;
+  currentTitle: string | null;
+  extractedTitle: string | null;
+  roleConfirmed: boolean;
+}): Promise<void> {
+  const title = input.extractedTitle?.trim();
+  if (!title || title === input.currentTitle) return;
+  await prisma.contact.update({
+    where: { id: input.contactId },
+    data: {
+      previousTitle: input.currentTitle,
+      title,
+      titleChangedAt: new Date(),
+    },
+  });
+  if (input.roleConfirmed) return;
+  const personaId = await matchedPersonaId(input, title);
+  if (!personaId) return;
+  await prisma.campaignContact.update({
+    where: { id: input.membershipId },
+    data: { chosenPersonaId: personaId },
+  });
+}
+
+async function matchedPersonaId(
+  scope: { organizationId: string; campaignId: string },
+  title: string | null,
+): Promise<string | null> {
+  const roles = await prisma.persona.findMany({
+    where: {
+      organizationId: scope.organizationId,
+      campaignId: scope.campaignId,
+      archivedAt: null,
+    },
+    select: { id: true, name: true, suggestionKey: true, targetTitles: true },
+  });
+  const matched = matchHiringTeamRoleFromTitle({ title, roles });
+  return matched.personaId ?? matched.suggestedPersonaId;
 }
 
 export async function queueIndividualProfileBuild(input: {
@@ -109,7 +138,7 @@ export async function queueIndividualProfileBuild(input: {
     },
   });
   if (!membership?.linkedInProfileText) {
-    throw new TenantError(outreachConfig.labels.pasteLinkedInHelp);
+    throw new TenantError(outreachConfig.labels.pasteProfileRequired);
   }
   await prisma.campaignContact.update({
     where: { id: membership.id },
@@ -144,15 +173,46 @@ export async function buildContactIndividualProfile(input: {
     },
   });
   if (!membership?.linkedInProfileText) {
-    throw new TenantError(outreachConfig.labels.pasteLinkedInHelp);
+    throw new TenantError(outreachConfig.labels.pasteProfileRequired);
   }
   await prisma.campaignContact.update({
     where: { id: membership.id },
     data: { individualProfileStatus: "IN_PROGRESS" },
   });
-  const extracted =
-    parseLinkedInExtracted(membership.linkedInExtractedJson) ??
-    extractLinkedInFacts(membership.linkedInProfileText);
+  const contactName = [membership.contact.firstName, membership.contact.lastName]
+    .filter(Boolean)
+    .join(" ");
+  const read = await extractInterviewerFacts({
+    pastedText: membership.linkedInProfileText,
+    contactName,
+    usage: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      contactId: input.contactId,
+      category: "PERSONA_RESEARCH",
+      operation: "CONTACT_PROFILE",
+    },
+  });
+  if (!read.ok) {
+    await prisma.campaignContact.update({
+      where: { id: membership.id },
+      data: {
+        individualProfileStatus: "FAILED",
+        individualProfileError: read.message,
+      },
+    });
+    throw new Error(read.message);
+  }
+  const extracted = read.data;
+  await applyExtractedTitle({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    membershipId: membership.id,
+    contactId: membership.contactId,
+    currentTitle: membership.contact.title,
+    extractedTitle: extracted.currentTitle?.text ?? null,
+    roleConfirmed: membership.roleConfirmed,
+  });
   const profile = parseCandidateProfileSafe(membership.campaign.product.profileJson);
   const commonGround = profile.ok
     ? commonGroundFromProfiles({ extracted, profile: profile.profile })
@@ -163,9 +223,7 @@ export async function buildContactIndividualProfile(input: {
       ? (role.profileJson as { narrative?: unknown }).narrative ?? null
       : null;
   const generated = await generateIndividualProfileWithModel({
-    contactName: [membership.contact.firstName, membership.contact.lastName]
-      .filter(Boolean)
-      .join(" "),
+    contactName,
     extracted,
     profileText: membership.linkedInProfileText,
     roleName: role?.name ?? null,
@@ -202,4 +260,53 @@ export async function buildContactIndividualProfile(input: {
       individualProfileError: null,
     },
   });
+}
+
+/**
+ * Re-run extraction and the individual profile for every person who already
+ * has pasted interviewer text, so they get the full extract and likelyToValue
+ * without the seeker pasting again.
+ */
+export async function queueExistingInterviewerProfileRebuilds(): Promise<number> {
+  const rows = await prisma.campaignContact.findMany({
+    where: {
+      linkedInProfileText: { not: null },
+    },
+    select: {
+      organizationId: true,
+      campaignId: true,
+      contactId: true,
+      linkedInProfileText: true,
+    },
+  });
+  let queued = 0;
+  for (const row of rows) {
+    if (!row.linkedInProfileText?.trim()) continue;
+    const before = await prisma.applicationJob.count({
+      where: {
+        organizationId: row.organizationId,
+        campaignId: row.campaignId,
+        type: "CONTACT_PROFILE",
+        targetId: row.contactId,
+        status: { in: ["PENDING", "IN_PROGRESS"] },
+      },
+    });
+    await enqueueApplicationJob({
+      organizationId: row.organizationId,
+      campaignId: row.campaignId,
+      type: "CONTACT_PROFILE",
+      targetId: row.contactId,
+    });
+    const after = await prisma.applicationJob.count({
+      where: {
+        organizationId: row.organizationId,
+        campaignId: row.campaignId,
+        type: "CONTACT_PROFILE",
+        targetId: row.contactId,
+        status: { in: ["PENDING", "IN_PROGRESS"] },
+      },
+    });
+    if (after > before) queued += 1;
+  }
+  return queued;
 }
