@@ -289,6 +289,33 @@ export function hiringTeamInvolvement(profileJson: unknown): "DIRECT" | "INDIREC
     : "DIRECT";
 }
 
+export function profileJsonWithInvolvement(
+  profileJson: unknown,
+  involvement: "DIRECT" | "INDIRECT",
+): Prisma.InputJsonValue {
+  if (involvement !== "DIRECT" && involvement !== "INDIRECT") {
+    throw new TenantError("Choose Direct or Indirect.");
+  }
+  const current =
+    profileJson && typeof profileJson === "object" && !Array.isArray(profileJson)
+      ? { ...(profileJson as Record<string, unknown>) }
+      : {};
+  const identification =
+    current.identification &&
+    typeof current.identification === "object" &&
+    !Array.isArray(current.identification)
+      ? {
+          ...(current.identification as Record<string, unknown>),
+          involvement,
+        }
+      : current.identification;
+  return {
+    ...current,
+    involvement,
+    ...(identification ? { identification } : {}),
+  };
+}
+
 export async function syncApplicationHiringTeam(input: {
   organizationId: string;
   campaignId: string;
@@ -534,6 +561,28 @@ export async function updateApplicationHiringTeamRole(input: {
       manuallyEditedFields: ["seeker"],
       approvalStatus: "NEEDS_REVIEW",
       setupStatus: "NEEDS_REVIEW",
+    },
+  });
+}
+
+export async function moveApplicationHiringTeamRoleInvolvement(input: {
+  organizationId: string;
+  campaignId: string;
+  personaId: string;
+  involvement: "DIRECT" | "INDIRECT";
+}): Promise<void> {
+  if (input.involvement !== "DIRECT" && input.involvement !== "INDIRECT") {
+    throw new TenantError("Choose Direct or Indirect.");
+  }
+  const persona = await requireRole(input);
+  await prisma.persona.update({
+    where: { id: persona.id },
+    data: {
+      profileJson: profileJsonWithInvolvement(
+        persona.profileJson,
+        input.involvement,
+      ),
+      manuallyEditedFields: ["seeker"],
     },
   });
 }

@@ -10,6 +10,7 @@ import {
   removeApplicationHiringTeamRole,
   savePersonaAsTemplate,
   updateApplicationHiringTeamRole,
+  moveApplicationHiringTeamRoleInvolvement,
 } from "@/lib/hiring-team/build";
 import { retryApplicationJob } from "@/lib/application-jobs/service";
 import { addApplicationContact } from "@/lib/application/contacts";
@@ -151,6 +152,36 @@ export async function updateApplicationRoleAction(
     return { ok: true, message: `${vocab.persona.Singular} updated.` };
   } catch (error) {
     return fail(error, `The ${vocab.persona.singular} could not be updated.`);
+  }
+}
+
+export async function moveApplicationRoleInvolvementAction(
+  _prev: HiringTeamActionResult | null,
+  formData: FormData,
+): Promise<HiringTeamActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    const personaId = String(formData.get("personaId") ?? "").trim();
+    const involvement = String(formData.get("involvement") ?? "").trim();
+    if (!campaignId || !personaId) {
+      return { ok: false, message: `${vocab.persona.Singular} was not found.` };
+    }
+    if (involvement !== "DIRECT" && involvement !== "INDIRECT") {
+      return { ok: false, message: "Choose Direct or Indirect." };
+    }
+    await moveApplicationHiringTeamRoleInvolvement({
+      organizationId,
+      campaignId,
+      personaId,
+      involvement,
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/campaigns/${campaignId}/hiring-team`);
+    return { ok: true, message: `${vocab.persona.Singular} moved.` };
+  } catch (error) {
+    return fail(error, `The ${vocab.persona.singular} could not be moved.`);
   }
 }
 

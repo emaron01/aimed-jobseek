@@ -29,6 +29,7 @@ import {
   approveApplicationRoleAction,
   buildAllDirectRolesAction,
   buildApplicationRoleAction,
+  moveApplicationRoleInvolvementAction,
   rebuildApplicationRoleAction,
   removeApplicationRoleAction,
   saveRoleAsTemplateAction,
@@ -72,7 +73,7 @@ import {
 } from "@/lib/application-assets/service";
 import { presentationPlanSchema } from "@/lib/application-assets/plan-contract";
 import { ensureApplicationNextStep } from "@/lib/application/next-step";
-import { applicationResearchCopy, applicationSummaryConfig, applicationWorkspaceCopy, consultationConversationCopy, criterionFlags, employerIdentityCopy, hiringTeamConfig, outreachConfig, polishCopy, vocab } from "@/lib/product-config";
+import { applicationResearchCopy, applicationSummaryConfig, applicationWorkspaceCopy, consultationConversationCopy, criterionFlags, employerIdentityCopy, hiringTeamConfig, hiringTeamDetailsTitle, outreachConfig, polishCopy, vocab } from "@/lib/product-config";
 import {
   parseIdentityVerification,
 } from "@/lib/job-requirement/identity-verification";
@@ -1098,35 +1099,57 @@ async function HiringTeamSection({
       data-testid="hiring-team-role"
     >
       <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <h4 className="text-sm font-semibold text-ink">{role.name}</h4>
-          <span className="text-xs text-subtle">
-            {hiringTeamStatusLabel(role.setupStatus, role.approvalStatus, role.staleAt)}
-          </span>
-        </div>
-        <p className="text-sm text-ink">
-          {textList(role.targetTitles).join(", ") || "No likely titles."}
-        </p>
-        {role.whyThisPersonaMatters ? (
-          <p className="text-sm text-ink">{role.whyThisPersonaMatters}</p>
-        ) : null}
-        {canEdit ? (
-          <HiringTeamRoleActions
-            campaignId={campaignId}
-            personaId={role.id}
-            buildAction={
-              role.setupStatus === "FAILED" || role.staleAt
-                ? rebuildApplicationRoleAction
-                : buildApplicationRoleAction
-            }
-            buildLabel={
-              role.setupStatus === "FAILED"
-                ? hiringTeamConfig.actions.retry
-                : role.staleAt
-                  ? hiringTeamConfig.actions.rebuild
-                  : hiringTeamConfig.actions.build
-            }
-            editForm={
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h4 className="text-sm font-semibold text-ink">{role.name}</h4>
+            <span className="text-xs text-subtle">
+              {hiringTeamStatusLabel(role.setupStatus, role.approvalStatus, role.staleAt)}
+            </span>
+          </div>
+          {canEdit ? (
+            <HiringTeamRoleActions
+              personaId={role.id}
+              addPersonForm={
+                <ApplicationActionForm
+                  action={addHiringTeamPersonAction}
+                  submitLabel={hiringTeamConfig.actions.addPerson}
+                  testId={`add-person-${role.id}`}
+                >
+                  <input type="hidden" name="campaignId" value={campaignId} />
+                  <input type="hidden" name="personaId" value={role.id} />
+                  <label className="block text-sm">
+                    <span className="font-medium text-ink">
+                      {outreachConfig.labels.fieldFirstName}
+                    </span>
+                    <input name="firstName" required className={fieldClass} />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="font-medium text-ink">
+                      {outreachConfig.labels.fieldLastName}
+                    </span>
+                    <input name="lastName" required className={fieldClass} />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="font-medium text-ink">
+                      {outreachConfig.labels.fieldTitle}
+                    </span>
+                    <input name="title" required className={fieldClass} />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="font-medium text-ink">
+                      {outreachConfig.labels.fieldEmail}
+                    </span>
+                    <input name="email" type="email" className={fieldClass} />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="font-medium text-ink">
+                      {outreachConfig.labels.fieldLinkedIn}
+                    </span>
+                    <input name="linkedinUrl" type="url" className={fieldClass} />
+                  </label>
+                </ApplicationActionForm>
+              }
+              editForm={
             <ApplicationActionForm
               action={updateApplicationRoleAction}
               submitLabel="Save edits"
@@ -1171,12 +1194,59 @@ async function HiringTeamSection({
               </label>
             </ApplicationActionForm>
             }
-          />
+            />
+          ) : null}
+        </div>
+        <p className="text-sm text-ink">
+          {textList(role.targetTitles).join(", ") || "No likely titles."}
+        </p>
+        {role.whyThisPersonaMatters ? (
+          <p className="text-sm text-ink">{role.whyThisPersonaMatters}</p>
+        ) : null}
+        {canEdit ? (
+          <ApplicationActionForm
+            action={
+              role.setupStatus === "FAILED" || role.staleAt
+                ? rebuildApplicationRoleAction
+                : buildApplicationRoleAction
+            }
+            submitLabel={
+              role.setupStatus === "FAILED"
+                ? hiringTeamConfig.actions.retry
+                : role.staleAt
+                  ? hiringTeamConfig.actions.rebuild
+                  : hiringTeamConfig.actions.build
+            }
+            testId={`build-role-${role.id}`}
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+            <input type="hidden" name="personaId" value={role.id} />
+          </ApplicationActionForm>
+        ) : null}
+        {canEdit ? (
+          <ApplicationActionForm
+            action={moveApplicationRoleInvolvementAction}
+            submitLabel={
+              narrative?.involvement === "INDIRECT"
+                ? hiringTeamConfig.actions.moveToDirect
+                : hiringTeamConfig.actions.moveToIndirect
+            }
+            variant="secondary"
+            testId={`move-role-involvement-${role.id}`}
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+            <input type="hidden" name="personaId" value={role.id} />
+            <input
+              type="hidden"
+              name="involvement"
+              value={narrative?.involvement === "INDIRECT" ? "DIRECT" : "INDIRECT"}
+            />
+          </ApplicationActionForm>
         ) : null}
       </div>
       <details className="mt-4 border-t border-edge pt-4">
       <summary className="cursor-pointer text-sm font-medium text-ink">
-        {role.name}
+        {hiringTeamDetailsTitle(role.name)}
       </summary>
       <div className="mt-4 space-y-3">
         {role.department ? (
@@ -1221,41 +1291,6 @@ async function HiringTeamSection({
         ) : null}
         {canEdit ? (
           <div className="space-y-3 print:hidden">
-            <details>
-              <summary className="cursor-pointer text-sm font-semibold text-ink">
-                {hiringTeamConfig.actions.addPerson}
-              </summary>
-              <ApplicationActionForm
-                action={addHiringTeamPersonAction}
-                submitLabel={hiringTeamConfig.actions.addPerson}
-                testId={`add-person-${role.id}`}
-              >
-                <input type="hidden" name="campaignId" value={campaignId} />
-                <input type="hidden" name="personaId" value={role.id} />
-                <label className="block text-sm">
-                  <span className="font-medium text-ink">First name</span>
-                  <input name="firstName" required className={fieldClass} />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-medium text-ink">Last name</span>
-                  <input name="lastName" required className={fieldClass} />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-medium text-ink">Title</span>
-                  <input name="title" required className={fieldClass} />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-medium text-ink">Email</span>
-                  <input name="email" type="email" className={fieldClass} />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-medium text-ink">
-                    {outreachConfig.labels.pasteLinkedIn}
-                  </span>
-                  <textarea name="linkedInProfileText" rows={6} className={fieldClass} />
-                </label>
-              </ApplicationActionForm>
-            </details>
             <div className="flex flex-wrap gap-3">
               <ApplicationActionForm
                 action={approveApplicationRoleAction}
@@ -1298,14 +1333,14 @@ async function HiringTeamSection({
       </summary>
       <div className="mt-4 space-y-4">
       <p className="rounded-md border border-edge bg-canvas px-3 py-2 text-sm text-ink">
-        {hiringTeamConfig.addPersonNote}
+        {hiringTeamConfig.assumptionIntro}
       </p>
       <WorkspaceProgress jobs={jobs} type="HIRING_TEAM_IDENTIFY" />
       <WorkspaceProgress jobs={jobs} type="HIRING_TEAM_BUILD" />
       <WorkspaceProgress jobs={jobs} type="CONTACT_PROFILE" />
       <div>
         <p className="mt-1 text-sm text-muted">
-          Roles for this {vocab.campaign.singular} are identified from the job and employer research. Review each draft before you rely on it. Saved templates are added only when you choose one.
+          Saved templates are added only when you choose one.
         </p>
       </div>
       {roles.length === 0 ? (

@@ -47,7 +47,7 @@ export {
 } from "./brand";
 export { FEATURE_FLAGS, anyListFeatureEnabled, features } from "./features";
 export type { FeatureFlag } from "./features";
-export { hiringTeamConfig } from "./hiring-team";
+export { hiringTeamConfig, hiringTeamDetailsTitle } from "./hiring-team";
 export {
   WORKSPACE_JOB_TYPES,
   workspaceJobCopy,

@@ -92,9 +92,10 @@ describe("hiring team persona actions", () => {
     );
     expect(actions).toContain("HiringTeamRoleActions");
     expect(actions).toContain("hiringTeamConfig.actions.edit");
-    expect(actions).toContain("build-role-");
+    expect(actions).toContain("hiringTeamConfig.actions.knowWhoInterviewing");
     expect(actions).toContain('variant="secondary"');
     expect(workspace).toContain("HiringTeamRoleActions");
+    expect(workspace).toContain("build-role-");
     expect(actions).toContain(hiringTeamConfig.actions.edit);
   });
 });

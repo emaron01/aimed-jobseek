@@ -1,4 +1,5 @@
 /** Hiring Team identification limits. Role names and titles come from the model. */
+import { consultationConfig } from "./consultation";
 import { applicationWorkspaceCopy, vocab } from "./vocabulary";
 import { polishCopy } from "./polish";
 
@@ -27,7 +28,13 @@ export const hiringTeamConfig = {
     retry: "Retry",
     edit: "Edit",
     addPerson: "Add person",
+    knowWhoInterviewing: "I know who is interviewing me in this group",
+    moveToDirect: "Move to Direct",
+    moveToIndirect: "Move to Indirect",
   },
+  addPersonTitle: "Add a Person",
+  detailsLabel: "Details",
+  assumptionIntro: `${consultationConfig.displayName} guessed these ${vocab.persona.plural} from the job posting and company research. They are assumptions. Confirm or correct them.`,
   addPersonNote:
     "When you know who will be interviewing you for this role, add them to their Hiring Team role.",
   queuedIdentify: `Identifying the ${vocab.persona.nav}…`,
@@ -46,3 +53,7 @@ export const hiringTeamConfig = {
     outcomesHint: `What they want to improve, achieve, reduce, or avoid in this role — not ${vocab.campaign.aSingular} call to action.`,
   },
 };
+
+export function hiringTeamDetailsTitle(name: string): string {
+  return `${name.trim() || vocab.persona.Singular} ${hiringTeamConfig.detailsLabel}`;
+}

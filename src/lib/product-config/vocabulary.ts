@@ -204,7 +204,7 @@ export const applicationResearchCopy = Object.freeze({
 export const applicationWorkspaceCopy = Object.freeze({
   nextStepTitle: "Let's walk through this application",
   jobRequirementTitle: "Review and edit the job requirements",
-  hiringTeamTitle: "Review the hiring team",
+  hiringTeamTitle: "Review Hiring Personas – Add Who Will Be Interviewing",
   appliedTitle: "Update application date and status",
   contactsTitle: "Add and review interview contacts",
   companyTitle: "Company",

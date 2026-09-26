@@ -94,7 +94,7 @@ describe("vocabulary", () => {
       "Review and edit the job requirements",
     );
     expect(hiringTeamConfig.workspaceTitle).toBe(
-      "Review the hiring team",
+      "Review Hiring Personas – Add Who Will Be Interviewing",
     );
     expect(outreachConfig.labels.appliedTitle).toBe(
       "Update application date and status",
