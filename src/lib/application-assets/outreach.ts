@@ -909,24 +909,29 @@ export async function generateOutreachAsset(input: {
           questions = limited;
           break;
         }
-        if (questions.length === 0) {
-          return {
-            ok: false,
-            message: "Thank-you questions could not be written. Retry.",
-            violations: [],
-          };
+        if (questions.length > 0) {
+          await prisma.interviewStage.update({
+            where: { id: interviewStageId },
+            data: {
+              thankYouClarifyJson: {
+                questions,
+                answers: [],
+                skipped: false,
+              },
+            },
+          });
+          return { ok: true, needsClarification: true, questions };
         }
         await prisma.interviewStage.update({
           where: { id: interviewStageId },
           data: {
             thankYouClarifyJson: {
-              questions,
+              questions: [],
               answers: [],
-              skipped: false,
+              skipped: true,
             },
           },
         });
-        return { ok: true, needsClarification: true, questions };
       }
       if (answers.length > 0) {
         interviewStageNotes = [interviewStageNotes, ...answers.map((row) => row.answer)]

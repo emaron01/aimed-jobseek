@@ -15,12 +15,14 @@ vi.mock("@/lib/ai", async (importOriginal) => {
   };
 });
 
+import { Prisma } from "@prisma/client";
 import {
   generateApplicationSummary,
   getApplicationSummaryView,
 } from "@/lib/application-summary/service";
+import { applicationSummaryConfig } from "@/lib/product-config";
 
-describe.skipIf(!hasTestDatabase())("Application Summary", () => {
+describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
   const suffix = Date.now().toString(36);
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";
@@ -409,6 +411,129 @@ describe.skipIf(!hasTestDatabase())("Application Summary", () => {
     }
   });
 
+  it("saves parseable guidance when facts are invented and flags them", async () => {
+    const invented = "I invented a $9,400,000 quota at FictionalCorp.";
+    generateStructured.mockImplementationOnce(async (request: {
+      messages: Array<{ content: string }>;
+    }) => {
+      const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
+        allowedSources: Array<{ id: string; text: string; category: string }>;
+        people: Array<{
+          sectionKey: string;
+          roleId: string;
+          contactId: string | null;
+          heading: string;
+          sectionKind: "RECRUITER" | "HIRING_MANAGER" | "EXECUTIVE" | "CROSS_FUNCTIONAL";
+        }>;
+      };
+      const source = payload.allowedSources[0]!;
+      const item = {
+        text: invented,
+        supports: [{ sourceId: source.id, quote: source.text }],
+      };
+      const question = {
+        text: `What should I be ready to discuss about ${source.text}?`,
+        supports: [{ sourceId: source.id, quote: source.text }],
+      };
+      return {
+        data: {
+          overview: {
+            thirtySecondFit: item,
+            careerRecap: item,
+            gapsToPrepare: [item, item],
+          },
+          stories: [
+            {
+              storyId: "story-1",
+              headline: "Operating cadence",
+              situation: source.text,
+              answers: [{ requirement: source.text, question: question.text }],
+              variations: [
+                { angle: "Forecast discipline", text: `${source.text} forecast`, supports: item.supports },
+                { angle: "Manager coaching", text: `${source.text} coaching`, supports: item.supports },
+              ],
+            },
+          ],
+          people: payload.people.map((person) => ({
+            sectionKey: person.sectionKey,
+            roleId: person.roleId,
+            contactId: person.contactId,
+            heading: person.heading,
+            sectionKind: person.sectionKind,
+            caresAbout: [item],
+            bestMaterial: [item],
+            likelyQuestions: [question],
+            questionsToAsk: [question],
+            storyIds: ["story-1"],
+            recruiter:
+              person.sectionKind === "RECRUITER"
+                ? {
+                    sixtySecondSummary: item,
+                    whyThisCompany: item,
+                    whyThisRole: item,
+                    logistics: item,
+                    compensationReadiness: item,
+                    flagAnswers: [item],
+                  }
+                : null,
+            hiringManager:
+              person.sectionKind === "HIRING_MANAGER"
+                ? {
+                    scorecardOutcomes: [
+                      { outcome: source.text, storyId: "story-1", note: source.text },
+                    ],
+                    firstNinetyDays: item,
+                    drillDowns: [question],
+                    gaps: [item],
+                  }
+                : null,
+            executive:
+              person.sectionKind === "EXECUTIVE"
+                ? { strategy: item, judgment: item, businessImpact: item }
+                : null,
+            crossFunctional:
+              person.sectionKind === "CROSS_FUNCTIONAL"
+                ? { howWorkedAcross: item, dayToDay: item }
+                : null,
+          })),
+        },
+      };
+    });
+    await generateApplicationSummary({ organizationId, campaignId, userId });
+    const view = await getApplicationSummaryView({ organizationId, campaignId });
+    expect(view.summary?.status).toBe("READY");
+    expect(view.guidance).not.toBeNull();
+    expect(view.summary?.generationError).toBeNull();
+    expect(view.claimFlags.length).toBeGreaterThan(0);
+    expect(view.claimFlags.some((flag) => flag.text.includes("FictionalCorp"))).toBe(
+      true,
+    );
+  });
+
+  it("does not render leftover Application Summary blocking errors", async () => {
+    await prisma.applicationSummary.upsert({
+      where: { campaignId },
+      create: {
+        organizationId,
+        campaignId,
+        status: "FAILED",
+        promptVersion: "test",
+        generationError:
+          "Application Summary guidance did not pass checks. The passing parts were not enough to save. Retry.",
+      },
+      update: {
+        status: "FAILED",
+        guidanceJson: Prisma.JsonNull,
+        generationError:
+          "Application Summary guidance did not pass checks. The passing parts were not enough to save. Retry.",
+      },
+    });
+    const view = await getApplicationSummaryView({ organizationId, campaignId });
+    expect(view.summary?.generationError).toBeNull();
+    expect(JSON.stringify(view.summary)).not.toContain("Application Summary");
+    expect(JSON.stringify(view.summary)).not.toContain("did not pass checks");
+  });
+
   it("stores failure with no substitute guidance and supports retry", async () => {
     generateStructured
       .mockRejectedValueOnce(new Error("provider timeout"))
@@ -457,5 +582,17 @@ describe("application summary seeker-facing labels", () => {
     expect(page).toContain("applicationSummaryConfig.title");
     expect(page).not.toContain("({assessment.strength})");
     expect(page).not.toContain("evidenceStrengthLabels");
+  });
+
+  it("never shows Application Summary to the seeker", () => {
+    expect(applicationSummaryConfig.title).toBe("Interview Cheat Sheet");
+    expect(JSON.stringify(applicationSummaryConfig)).not.toContain("Application Summary");
+    const page = readFileSync(
+      "src/app/(app)/campaigns/[id]/summary/page.tsx",
+      "utf8",
+    );
+    const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
+    expect(page).not.toContain("Application Summary");
+    expect(workspace).not.toContain("Application Summary");
   });
 });

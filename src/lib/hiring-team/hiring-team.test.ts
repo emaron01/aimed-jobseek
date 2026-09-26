@@ -410,6 +410,46 @@ describe("hiring team evidence and selectors", () => {
     }
   });
 
+  it("keeps the last parseable hiring-team draft when quality still fails", async () => {
+    const lines = jobRequirementLines(fixtureJob());
+    const restated = {
+      data: {
+        personaDraft: personaAiDraftSchema.parse({
+          name: "Hiring Manager",
+          roleSummary: "Feels the hire through the reporting line.",
+          impact: "Presses on the reporting line.",
+          needsFromHire: [
+            "They need the hire to deliver: 5 years of Python",
+            "They need the hire to deliver: Leads incident response",
+          ],
+          candidateConcerns: ["Hiring Manager will press on Reports to: Director of Engineering"],
+          talkingPoints: ["Connect a story to the reporting line."],
+          communicationApproach: ["Connect a story to Reports to: Director of Engineering"],
+          interviewStage: "hiring manager chronological walk-through",
+          organizationalPressures: ["Presses on Reports to: Director of Engineering"],
+        }),
+      },
+    };
+    isPersonaAiConfigured.mockReturnValue(true);
+    generateStructured.mockResolvedValueOnce(restated).mockResolvedValueOnce(restated);
+    const drafted = await synthesizeHiringTeamRole({
+      roleName: "Hiring Manager",
+      likelyTitles: ["Director of Engineering"],
+      department: "Engineering",
+      whyThisRoleMatters: "The posting says this job reports to Director of Engineering.",
+      involvement: "DIRECT",
+      notes: null,
+      excerpts: [],
+      peers: [],
+      jobLines: lines,
+      evidenceText: "Reports to: Director of Engineering",
+    });
+    expect(drafted.ok).toBe(true);
+    if (drafted.ok) {
+      expect(drafted.narrative.overview.text).toContain("reporting line");
+    }
+  });
+
   it("keeps seeker templates and removes only unedited defaults", () => {
     const created = new Date("2026-09-01T00:00:00.000Z");
     const edited = new Date("2026-09-02T00:00:00.000Z");

@@ -13,12 +13,17 @@ function obsoleteContainsFilter(field: "error" | "generationError") {
 export async function supersedeObsoleteWorkspaceFailures(input?: {
   organizationId?: string;
   campaignId?: string;
-}): Promise<{ jobs: number; sessions: number }> {
+}): Promise<{
+  jobs: number;
+  sessions: number;
+  summaries: number;
+  guides: number;
+}> {
   const scope = {
     ...(input?.organizationId ? { organizationId: input.organizationId } : {}),
     ...(input?.campaignId ? { campaignId: input.campaignId } : {}),
   };
-  const [jobResult, sessions] = await Promise.all([
+  const [jobResult, sessions, summaries, guides] = await Promise.all([
     prisma.applicationJob.updateMany({
       where: {
         ...scope,
@@ -39,6 +44,25 @@ export async function supersedeObsoleteWorkspaceFailures(input?: {
       },
       select: { id: true, generationStatus: true, generationError: true },
     }),
+    prisma.applicationSummary.findMany({
+      where: {
+        ...scope,
+        generationError: { not: null },
+        OR: obsoleteContainsFilter("generationError"),
+      },
+      select: { id: true, status: true, generationError: true, guidanceJson: true },
+    }),
+    prisma.interviewStageGuide.findMany({
+      where: {
+        ...(input?.organizationId ? { organizationId: input.organizationId } : {}),
+        generationError: { not: null },
+        OR: obsoleteContainsFilter("generationError"),
+        ...(input?.campaignId
+          ? { stage: { campaignId: input.campaignId } }
+          : {}),
+      },
+      select: { id: true, status: true, generationError: true, contentJson: true },
+    }),
   ]);
   let sessionCount = 0;
   for (const session of sessions) {
@@ -55,5 +79,38 @@ export async function supersedeObsoleteWorkspaceFailures(input?: {
     });
     sessionCount += 1;
   }
-  return { jobs: jobResult.count, sessions: sessionCount };
+  let summaryCount = 0;
+  for (const summary of summaries) {
+    if (!isObsoleteWorkspaceFailure(summary.generationError)) continue;
+    await prisma.applicationSummary.update({
+      where: { id: summary.id },
+      data: {
+        generationError: null,
+        status:
+          summary.status === "FAILED" && summary.guidanceJson
+            ? "READY"
+            : summary.status,
+      },
+    });
+    summaryCount += 1;
+  }
+  let guideCount = 0;
+  for (const guide of guides) {
+    if (!isObsoleteWorkspaceFailure(guide.generationError)) continue;
+    await prisma.interviewStageGuide.update({
+      where: { id: guide.id },
+      data: {
+        generationError: null,
+        status:
+          guide.status === "FAILED" && guide.contentJson ? "READY" : guide.status,
+      },
+    });
+    guideCount += 1;
+  }
+  return {
+    jobs: jobResult.count,
+    sessions: sessionCount,
+    summaries: summaryCount,
+    guides: guideCount,
+  };
 }

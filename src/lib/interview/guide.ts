@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma-client";
 import {
   consultationConfig,
   interviewConfig,
+  sanitizeWorkspaceFailure,
 } from "@/lib/product-config";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { parseStringArray } from "@/lib/research";
@@ -506,6 +507,7 @@ export async function requestInterviewGuide(input: {
     (input.answers && input.answers.length > 0) ||
     parseClarifyingAnswers(context.stage.guide?.clarifyingAnswersJson).length > 0;
 
+  let skipUnusableQuestions = false;
   if (missing.length > 0 && !alreadyResolved && !input.regenerationInstruction) {
     let feedback: string[] = [];
     let questions: InterviewClarifyingQuestions["questions"] = [];
@@ -532,29 +534,26 @@ export async function requestInterviewGuide(input: {
       questions = limited;
       break;
     }
-    if (questions.length === 0) {
-      return {
-        status: "FAILED",
-        message: "Clarifying questions could not be written. Retry.",
-      };
+    if (questions.length > 0) {
+      await prisma.interviewStageGuide.upsert({
+        where: { stageId: input.stageId },
+        create: {
+          organizationId: input.organizationId,
+          stageId: input.stageId,
+          status: "GENERATING",
+          clarifyingQuestionsJson: { questions },
+          promptVersion: INTERVIEW_GUIDE_PROMPT_VERSION,
+        },
+        update: {
+          status: "GENERATING",
+          clarifyingQuestionsJson: { questions },
+          generationError: null,
+          promptVersion: INTERVIEW_GUIDE_PROMPT_VERSION,
+        },
+      });
+      return { status: "NEEDS_CLARIFICATION", questions };
     }
-    await prisma.interviewStageGuide.upsert({
-      where: { stageId: input.stageId },
-      create: {
-        organizationId: input.organizationId,
-        stageId: input.stageId,
-        status: "GENERATING",
-        clarifyingQuestionsJson: { questions },
-        promptVersion: INTERVIEW_GUIDE_PROMPT_VERSION,
-      },
-      update: {
-        status: "GENERATING",
-        clarifyingQuestionsJson: { questions },
-        generationError: null,
-        promptVersion: INTERVIEW_GUIDE_PROMPT_VERSION,
-      },
-    });
-    return { status: "NEEDS_CLARIFICATION", questions };
+    skipUnusableQuestions = true;
   }
 
   const storedQuestions = parseClarifyingQuestions(
@@ -580,7 +579,10 @@ export async function requestInterviewGuide(input: {
       stageId: input.stageId,
       status: "GENERATING",
       clarifyingAnswersJson: clarifyingAnswers,
-      clarifyingSkipped: Boolean(input.skipQuestions),
+      clarifyingSkipped:
+        Boolean(input.skipQuestions) ||
+        skipUnusableQuestions ||
+        Boolean(context.stage.guide?.clarifyingSkipped),
       promptVersion: INTERVIEW_GUIDE_PROMPT_VERSION,
     },
     update: {
@@ -588,7 +590,9 @@ export async function requestInterviewGuide(input: {
       generationError: null,
       clarifyingAnswersJson: clarifyingAnswers,
       clarifyingSkipped:
-        Boolean(input.skipQuestions) || context.stage.guide?.clarifyingSkipped,
+        Boolean(input.skipQuestions) ||
+        skipUnusableQuestions ||
+        context.stage.guide?.clarifyingSkipped,
       promptVersion: INTERVIEW_GUIDE_PROMPT_VERSION,
     },
   });
@@ -731,7 +735,17 @@ export async function getInterviewGuideView(input: {
     ? interviewGuideContentSchema.safeParse(context.stage.guide.contentJson)
     : null;
   return {
-    stage: context.stage,
+    stage: {
+      ...context.stage,
+      guide: context.stage.guide
+        ? {
+            ...context.stage.guide,
+            generationError: sanitizeWorkspaceFailure(
+              context.stage.guide.generationError,
+            ),
+          }
+        : context.stage.guide,
+    },
     priorStages: context.priorStages,
     content: parsed?.success ? parsed.data : null,
     questions: parseClarifyingQuestions(context.stage.guide?.clarifyingQuestionsJson),

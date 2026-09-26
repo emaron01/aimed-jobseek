@@ -136,7 +136,7 @@ export type HiringTeamSynthesisResult =
   | { ok: true; narrative: HiringTeamNarrative }
   | { ok: false; status: "PARTIAL" | "FAILED"; message: string };
 
-/** Calls the model, rejects restated job text, and retries that rejection once. */
+/** Calls the model, retries restated job text once, then keeps the last parseable draft. */
 export async function synthesizeHiringTeamRole(input: {
   roleName: string;
   likelyTitles: string[];
@@ -154,9 +154,14 @@ export async function synthesizeHiringTeamRole(input: {
     return { ok: false, status: "PARTIAL", message: SYNTHESIS_UNAVAILABLE };
   }
   let rejection: string[] = [];
+  let lastParseable: {
+    draft: PersonaAiDraft;
+    fields: ReturnType<typeof fieldsFromPersonaDraft>;
+  } | null = null;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const model = await draftRoleWithModel({ ...input, rejection });
     if (!model.ok) {
+      if (lastParseable) break;
       return { ok: false, status: "FAILED", message: model.message };
     }
     const fields = fieldsFromPersonaDraft(model.draft);
@@ -166,6 +171,7 @@ export async function synthesizeHiringTeamRole(input: {
         input.evidenceText,
       );
     }
+    lastParseable = { draft: model.draft, fields };
     const assessment = assessHiringTeamDraft({
       fields,
       jobLines: input.jobLines,
@@ -186,9 +192,20 @@ export async function synthesizeHiringTeamRole(input: {
     }
     rejection = assessment.reasons;
   }
+  if (lastParseable) {
+    return {
+      ok: true,
+      narrative: narrativeFromDraft({
+        draft: lastParseable.draft,
+        fields: lastParseable.fields,
+        evidenceText: input.evidenceText,
+        involvement: input.involvement,
+      }),
+    };
+  }
   return {
     ok: false,
     status: "FAILED",
-    message: `${SYNTHESIS_FAILED} ${rejection.join(" ")}`,
+    message: SYNTHESIS_FAILED,
   };
 }

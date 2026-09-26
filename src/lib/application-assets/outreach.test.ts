@@ -255,6 +255,11 @@ describe("outreach greetings and claims", () => {
       ),
     ).toBe(true);
     expect(interviewConfig.thankYouClarifyingQuestionLimit).toBe(2);
+    const outreachSource = readFileSync(
+      "src/lib/application-assets/outreach.ts",
+      "utf8",
+    );
+    expect(outreachSource).not.toContain("Thank-you questions could not be written");
   });
 
   it("rejects messages that mention applying after Interviewing", () => {

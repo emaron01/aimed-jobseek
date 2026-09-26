@@ -11,6 +11,12 @@ export const obsoleteWorkspaceFailurePhrases = Object.freeze([
   applicationAssetConfig.labels.verificationFailed,
   consultationConversationCopy.planUnusable,
   "Consultation answer analysis did not return a fully grounded story.",
+  "did not pass checks",
+  "not enough to save",
+  "did not pass verification",
+  "could not be grounded",
+  "Clarifying questions could not be written.",
+  "Thank-you questions could not be written.",
 ]);
 
 export function isObsoleteWorkspaceFailure(

@@ -81,6 +81,9 @@ describe("vocabulary", () => {
     expect(obsoleteWorkspaceFailurePhrases).toContain(
       applicationAssetConfig.labels.verificationFailed,
     );
+    expect(obsoleteWorkspaceFailurePhrases).toContain("did not pass checks");
+    expect(obsoleteWorkspaceFailurePhrases).toContain("not enough to save");
+    expect(obsoleteWorkspaceFailurePhrases).toContain("could not be grounded");
     expect(applicationWorkspaceCopy.nextStepTitle).toBe(
       "Let's Walk Through The Application Process",
     );

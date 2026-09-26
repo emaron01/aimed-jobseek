@@ -401,6 +401,7 @@ async function extractAnswerWithQuality(input: {
   targets: EvidenceTarget[];
 }) {
   let feedback: string[] = [];
+  let lastExtracted: Awaited<ReturnType<typeof extractWithModel>> | null = null;
   for (
     let attempt = 0;
     attempt <= consultationConfig.qualityRegenerationAttempts;
@@ -411,6 +412,7 @@ async function extractAnswerWithQuality(input: {
       qualityFeedback: feedback,
     });
     if (!extracted.ok) return extracted;
+    lastExtracted = extracted;
     const issues = extractionQualityIssues(extracted.data);
     if (issues.length === 0) return extracted;
     logQualityRejection({
@@ -436,9 +438,10 @@ async function extractAnswerWithQuality(input: {
     }
     feedback = qualityMessages(issues);
   }
+  if (lastExtracted?.ok) return lastExtracted;
   return {
     ok: false as const,
-    message: consultationConversationCopy.generationQualityFailed,
+    message: consultationConversationCopy.generationFailed,
   };
 }
 

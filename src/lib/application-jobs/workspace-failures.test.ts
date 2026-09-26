@@ -17,12 +17,25 @@ const STALE_ASSET =
 const STALE_PLAN = consultationConversationCopy.planUnusable;
 const STALE_STORY =
   "Consultation answer analysis did not return a fully grounded story. Retry consultation.";
+const STALE_CHEAT_SHEET =
+  "Application Summary guidance did not pass checks. The passing parts were not enough to save. Retry.";
+const STALE_CLARIFY = "Clarifying questions could not be written. Retry.";
 
 describe("obsolete workspace failures", () => {
   it("treats removed fail-closed messages as obsolete", () => {
     expect(isObsoleteWorkspaceFailure(STALE_ASSET)).toBe(true);
     expect(isObsoleteWorkspaceFailure(STALE_PLAN)).toBe(true);
     expect(isObsoleteWorkspaceFailure(STALE_STORY)).toBe(true);
+    expect(isObsoleteWorkspaceFailure(STALE_CHEAT_SHEET)).toBe(true);
+    expect(isObsoleteWorkspaceFailure(STALE_CLARIFY)).toBe(true);
+    expect(
+      isObsoleteWorkspaceFailure(
+        "Interview Cheat Sheet guidance did not pass checks. The passing parts were not enough to save. Retry.",
+      ),
+    ).toBe(true);
+    expect(
+      isObsoleteWorkspaceFailure("Consultation answer analysis could not be grounded."),
+    ).toBe(true);
     expect(
       isObsoleteWorkspaceFailure(applicationAssetConfig.labels.verificationFailed),
     ).toBe(true);
@@ -116,6 +129,34 @@ describe.skipIf(!hasTestDatabase())("stale fail-closed records", () => {
         promptVersion: "test",
       },
     });
+    await prisma.applicationSummary.create({
+      data: {
+        organizationId,
+        campaignId,
+        status: "FAILED",
+        generationError: STALE_CHEAT_SHEET,
+        promptVersion: "test",
+      },
+    });
+    const stage = await prisma.interviewStage.create({
+      data: {
+        organizationId,
+        campaignId,
+        sortOrder: 0,
+        type: "RECRUITER_SCREEN",
+        scheduledAt: new Date(),
+        format: "VIDEO",
+      },
+    });
+    await prisma.interviewStageGuide.create({
+      data: {
+        organizationId,
+        stageId: stage.id,
+        status: "FAILED",
+        generationError: STALE_CLARIFY,
+        promptVersion: "test",
+      },
+    });
 
     const before = await getApplicationWorkspaceLive({
       organizationId,
@@ -144,6 +185,8 @@ describe.skipIf(!hasTestDatabase())("stale fail-closed records", () => {
     });
     expect(cleaned.jobs).toBeGreaterThanOrEqual(2);
     expect(cleaned.sessions).toBeGreaterThanOrEqual(1);
+    expect(cleaned.summaries).toBeGreaterThanOrEqual(1);
+    expect(cleaned.guides).toBeGreaterThanOrEqual(1);
 
     const after = await getApplicationWorkspaceLive({
       organizationId,
@@ -174,6 +217,14 @@ describe.skipIf(!hasTestDatabase())("stale fail-closed records", () => {
     expect(storedConsult.error).toBeNull();
     expect(session.generationError).toBeNull();
     expect(session.generationStatus).toBe("READY");
+    const summary = await prisma.applicationSummary.findUniqueOrThrow({
+      where: { campaignId },
+    });
+    expect(summary.generationError).toBeNull();
+    const guide = await prisma.interviewStageGuide.findUniqueOrThrow({
+      where: { stageId: stage.id },
+    });
+    expect(guide.generationError).toBeNull();
   });
 
   it("clears a failure on retry success", async () => {

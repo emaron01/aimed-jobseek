@@ -76,6 +76,8 @@ describe("interview guide rules", () => {
     expect(
       parseClarifyingQuestions({ questions: questions.slice(0, 2) }),
     ).toHaveLength(2);
+    const guideSource = readFileSync("src/lib/interview/guide.ts", "utf8");
+    expect(guideSource).not.toContain("Clarifying questions could not be written");
   });
 
   it("requires chronological preparation and rejects an invented leave reason", () => {

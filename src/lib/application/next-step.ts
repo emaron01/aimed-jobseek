@@ -127,6 +127,9 @@ export async function writeApplicationNextStep(input: {
         ],
       });
     }
+    if (lastText.trim()) {
+      return { ok: true, text: lastText };
+    }
     console.error(
       JSON.stringify({
         event: "application_next_step_rejected",

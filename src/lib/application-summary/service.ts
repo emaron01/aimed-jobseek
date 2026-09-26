@@ -20,7 +20,7 @@ import {
   cheatSheetSectionKind,
 } from "@/lib/application-summary/people";
 import { listPersonPreps } from "@/lib/interview/person-prep";
-import { vocab } from "@/lib/product-config";
+import { sanitizeWorkspaceFailure, vocab } from "@/lib/product-config";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
@@ -606,7 +606,14 @@ export async function getApplicationSummaryView(input: {
     assessments: data.campaign.consultationSession?.assessments ?? [],
     stories: data.stories,
     stages: data.stages,
-    summary: data.campaign.applicationSummary,
+    summary: data.campaign.applicationSummary
+      ? {
+          ...data.campaign.applicationSummary,
+          generationError: sanitizeWorkspaceFailure(
+            data.campaign.applicationSummary.generationError,
+          ),
+        }
+      : null,
     claimFlags: openClaimFlags(
       claimFlagsFromJson(data.campaign.applicationSummary?.claimFlagsJson),
     ),
