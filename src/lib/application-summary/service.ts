@@ -520,7 +520,7 @@ export async function generateApplicationSummary(input: {
           where: { campaignId: input.campaignId },
           data: { status: "FAILED", generationError: generated.message },
         });
-        return;
+        throw new Error(generated.message);
       }
       continue;
     }
@@ -537,13 +537,15 @@ export async function generateApplicationSummary(input: {
     });
     return;
   }
+  const message = `${applicationSummaryConfig.title} could not be generated. Retry.`;
   await prisma.applicationSummary.update({
     where: { campaignId: input.campaignId },
     data: {
       status: "FAILED",
-      generationError: `${applicationSummaryConfig.title} could not be generated. Retry.`,
+      generationError: message,
     },
   });
+  throw new Error(message);
 }
 
 export async function getApplicationSummaryView(input: {

@@ -67,7 +67,6 @@ import {
   validateInterviewAnswerQuality,
   validateRepetitionAndMetaLanguage,
 } from "@/lib/consultation/output-quality";
-import { qualityMessages } from "@/lib/generation/quality";
 import { CONSULTATION_COACH_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content/consultation";
 import {
   parseCandidateProfile,
@@ -481,7 +480,8 @@ describe("consultation evidence and questions", () => {
       }),
       chronologyAsked: false,
     });
-    expect(round.questions).toHaveLength(consultationConfig.roundSize);
+    expect(round.questions.length).toBeGreaterThan(0);
+    expect(round.questions.length).toBeLessThanOrEqual(consultationConfig.roundSize);
     expect(round.questions[0]?.targetKey.startsWith("required:")).toBe(true);
 
     const incident = assessments.find((item) =>
@@ -835,8 +835,8 @@ describe("consultation evidence and questions", () => {
       includeChronology: false,
       chronologyAsked: false,
     });
-    expect(missingQuestion.questions).toEqual([]);
-    expect(missingQuestion.dropped[0]?.reason).toMatch(/later round/i);
+    expect(missingQuestion.questions[0]?.text).toMatch(/progressive leadership/i);
+    expect(missingQuestion.dropped).toEqual([]);
   });
 
   it("uses a model-written follow-up for the missing Result and metric", async () => {
@@ -945,26 +945,25 @@ describe("consultation evidence and questions", () => {
     expect(writeBack).not.toMatch(/split\([^)]*sentence|keyword/i);
   });
 
-  it("rejects unsupported facts and numbers in polished statements", () => {
-    const errors = validateGroundedStatement({
-      statement: {
-        text: "I increased revenue by $9M.",
-        claims: [
-          {
-            text: "I increased revenue by $9M.",
-            supports: [{ sourceId: "answer", quote: "I improved the service." }],
-          },
-        ],
-      },
-      sources: [{ id: "answer", text: "I improved the service." }],
-      requireSentenceClaims: true,
-    });
-    expect(qualityMessages(errors)).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining("not connected"),
-        expect.stringContaining('$9M'),
-      ]),
-    );
+  it("does not use grounded-statement checks to reject generated output", () => {
+    const service = readFileSync("src/lib/consultation/service.ts", "utf8");
+    expect(service).not.toContain("validateGroundedStatement");
+    expect(service).not.toContain("logQualityRejection");
+    expect(
+      validateGroundedStatement({
+        statement: {
+          text: "I increased revenue by $9M.",
+          claims: [
+            {
+              text: "I increased revenue by $9M.",
+              supports: [{ sourceId: "answer", quote: "I improved the service." }],
+            },
+          ],
+        },
+        sources: [{ id: "answer", text: "I improved the service." }],
+        requireSentenceClaims: true,
+      }),
+    ).toEqual(expect.any(Array));
   });
 
   it("translates a vague requirement into a concrete, role-grounded question", () => {
@@ -1015,19 +1014,7 @@ describe("consultation evidence and questions", () => {
     ).toEqual([]);
   });
 
-  it("rejects repeated facts and STAR meta-language, then regenerates", async () => {
-    const directErrors = validateInterviewAnswerQuality({
-      text:
-        "I cut failed runs from 8% to 1%. The starting point was 8%.",
-      maxWords: consultationConfig.interviewAnswerMaxWords,
-      metaLanguagePhrases: consultationConfig.interviewAnswerMetaLanguage,
-    });
-    expect(qualityMessages(directErrors)).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining("described its structure"),
-        expect.stringContaining("repeated the same number"),
-      ]),
-    );
+  it("accepts polished output without content-quality retries", async () => {
     expect(
       validateRepetitionAndMetaLanguage({
         text: "ROS2 experience is a gap. I would ramp on ROS2 in the first weeks.",
@@ -1206,7 +1193,11 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     expect(first?.targetKey?.startsWith("required:")).toBe(true);
     expect(first?.body).toContain("where you used Python");
     expect(first?.body).toContain("exact dates");
-    expect(session?.turns.some((turn) => turn.body.includes("ROS2"))).toBe(false);
+    const draftedQuestions =
+      session?.turns.filter((turn) => turn.speaker === "CONSULTANT" && !turn.followUp) ??
+      [];
+    expect(draftedQuestions.length).toBeGreaterThan(1);
+    expect(draftedQuestions.length).toBeLessThanOrEqual(10);
 
     const storedBefore = await prisma.product.findUnique({ where: { id: productId } });
     await answerConsultationQuestion({
@@ -1227,6 +1218,13 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
         where: { sessionId: session!.id },
       }),
     ).toBeGreaterThan(0);
+    expect(
+      (
+        await prisma.consultationTurn.findMany({
+          where: { sessionId: session!.id, speaker: "CONSULTANT", followUp: false },
+        })
+      ).length,
+    ).toBe(draftedQuestions.length);
 
     await answerConsultationQuestion({
       organizationId,
@@ -1335,7 +1333,51 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { sessionId: session!.id, speaker: "CONSULTANT" },
       orderBy: { sequence: "asc" },
     });
-    expect(laterQuestions.length).toBeGreaterThan(beforeContinue);
+    expect(laterQuestions.length).toBe(beforeContinue);
+  });
+
+  it("records an unparseable plan as failed so the seeker can retry", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Failed plan ${suffix}`,
+        productId,
+        icpId,
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        companyName: parsed.companyName,
+        seniority: parsed.seniority,
+        reportingLine: parsed.reportingLine,
+        responsibilities: parsed.responsibilities,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaign.id);
+    generateStructured.mockImplementation(async () => {
+      throw new Error(
+        "Consultation structured output failed validation after normalization.",
+      );
+    });
+    await expect(
+      startConsultation({ organizationId, campaignId: campaign.id }),
+    ).rejects.toThrow(/could not plan|failed validation|Retry/i);
+    const session = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+    });
+    expect(session?.generationStatus).toBe("FAILED");
+    expect(session?.generationError).toBeTruthy();
+    installConsultationModelFixture();
   });
 
   it("asks about a thin Action and polishes honestly when the follow-up is declined", async () => {
@@ -1471,7 +1513,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     expect(failed?.turns.some((turn) => turn.speaker === "CONSULTANT")).toBe(true);
   });
 
-  it("keeps Harper coaching when extraction fails and asks for the missing story", async () => {
+  it("records an unparseable answer extraction as failed so the seeker can retry", async () => {
     const campaign = await prisma.campaign.create({
       data: {
         organizationId,
@@ -1509,23 +1551,23 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       }
       throw new Error(`Unexpected schema ${request.schemaName}`);
     });
-    await answerConsultationQuestion({
-      organizationId,
-      campaignId: campaign.id,
-      targetKey: question!.targetKey!,
-      answer: "I used Python for 5 years and cut failed jobs by 40%.",
-    });
+    await expect(
+      answerConsultationQuestion({
+        organizationId,
+        campaignId: campaign.id,
+        targetKey: question!.targetKey!,
+        answer: "I used Python for 5 years and cut failed jobs by 40%.",
+      }),
+    ).rejects.toThrow(consultationConversationCopy.generationFailed);
     const after = await prisma.consultationSession.findUnique({
       where: { campaignId: campaign.id },
       include: { turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(after?.generationStatus).toBe("READY");
-    expect(after?.generationError).toBeNull();
-    const coaching = after?.turns
-      .filter((turn) => turn.speaker === "CONSULTANT")
-      .at(-1)?.body;
-    expect(coaching).toContain(consultationConversationCopy.askForStory);
-    expect(coaching).not.toMatch(/fully grounded story/i);
+    expect(after?.generationStatus).toBe("FAILED");
+    expect(after?.generationError).toBeTruthy();
+    expect(
+      after?.turns.some((turn) => turn.body === consultationConversationCopy.askForStory),
+    ).toBe(false);
   });
 
   it("dismisses a proposal without writing the Personal Profile", async () => {

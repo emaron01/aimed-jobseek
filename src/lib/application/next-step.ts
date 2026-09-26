@@ -11,10 +11,6 @@ import { APPLICATION_NEXT_STEP_INSTRUCTIONS } from "@/lib/prompt-content/next-st
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { prisma } from "@/lib/prisma-client";
 import {
-  logQualityRejection,
-  qualityIssue,
-} from "@/lib/generation/quality";
-import {
   consultationConfig,
   consultationConversationCopy,
 } from "@/lib/product-config";
@@ -79,65 +75,43 @@ export async function writeApplicationNextStep(input: {
     return { ok: false, message: consultationConversationCopy.nextStepModelUnavailable };
   }
   try {
-    let lastText = "";
+    let lastFailure: string = consultationConversationCopy.nextStepFailed;
     for (
       let attempt = 0;
       attempt <= consultationConfig.qualityRegenerationAttempts;
       attempt += 1
     ) {
-      const response = await getConsultationAiProvider().generateStructured({
-        ...structuredOutputRequest("applicationNextStep"),
-        messages: [
-          {
-            role: "system",
-            content: `Prompt version: ${NEXT_STEP_PROMPT_VERSION}\n\n${APPLICATION_NEXT_STEP_INSTRUCTIONS}`,
-          },
-          {
-            role: "user",
-            content: JSON.stringify({
-              consultantName: consultationConfig.displayName,
-              state: input.state,
-              rejectedPrevious:
-                attempt > 0
-                  ? "The previous line was generic or said the coach was scheduled. Write a specific action the seeker can take in this workspace now."
-                  : null,
-            }),
-          },
-        ],
-        parseOutput: (raw) => ({
-          data: applicationNextStepSchema.parse(raw),
-          coercedFields: [],
-        }),
-      });
-      lastText = response.data.text;
-      if (!rejectedNextStep(response.data.text, input.state.key)) {
-        return { ok: true, text: response.data.text };
-      }
-      logQualityRejection({
-        generator: "application.next_step",
-        attempt,
-        issues: [
-          qualityIssue({
-            check: "next_step",
-            field: "text",
-            text: response.data.text,
-            message:
-              "The next-step line was generic or said the coach was scheduled.",
+      try {
+        const response = await getConsultationAiProvider().generateStructured({
+          ...structuredOutputRequest("applicationNextStep"),
+          messages: [
+            {
+              role: "system",
+              content: `Prompt version: ${NEXT_STEP_PROMPT_VERSION}\n\n${APPLICATION_NEXT_STEP_INSTRUCTIONS}`,
+            },
+            {
+              role: "user",
+              content: JSON.stringify({
+                consultantName: consultationConfig.displayName,
+                state: input.state,
+                rejectedPrevious: null,
+              }),
+            },
+          ],
+          parseOutput: (raw) => ({
+            data: applicationNextStepSchema.parse(raw),
+            coercedFields: [],
           }),
-        ],
-      });
+        });
+        return { ok: true, text: response.data.text };
+      } catch (error) {
+        lastFailure =
+          error instanceof Error
+            ? error.message
+            : consultationConversationCopy.nextStepFailed;
+      }
     }
-    if (lastText.trim()) {
-      return { ok: true, text: lastText };
-    }
-    console.error(
-      JSON.stringify({
-        event: "application_next_step_rejected",
-        stateKey: input.state.key,
-        text: lastText,
-      }),
-    );
-    return { ok: false, message: consultationConversationCopy.nextStepFailed };
+    return { ok: false, message: lastFailure };
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
     const cause =

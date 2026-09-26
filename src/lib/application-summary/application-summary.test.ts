@@ -534,7 +534,9 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
     generateStructured
       .mockRejectedValueOnce(new Error("provider timeout"))
       .mockRejectedValueOnce(new Error("provider timeout"));
-    await generateApplicationSummary({ organizationId, campaignId, userId });
+    await expect(
+      generateApplicationSummary({ organizationId, campaignId, userId }),
+    ).rejects.toThrow(/could not be generated|provider timeout/i);
     const failed = await getApplicationSummaryView({ organizationId, campaignId });
     expect(failed.summary?.status).toBe("FAILED");
     expect(failed.guidance).toBeNull();

@@ -25,16 +25,7 @@ import {
   seniorityWarrantsChronology,
   type QuestionRoundPlan,
 } from "@/lib/consultation/questions";
-import {
-  mentionsInternalSystemState,
-  type GroundingSource,
-} from "@/lib/consultation/output-quality";
-import {
-  logQualityRejection,
-  qualityIssue,
-  qualityMessages,
-  type QualityIssue,
-} from "@/lib/generation/quality";
+import { type GroundingSource } from "@/lib/consultation/output-quality";
 import { nextConsultationStatus } from "@/lib/consultation/state";
 import {
   appendConfirmedFact,
@@ -341,39 +332,6 @@ async function addTurn(input: {
   });
 }
 
-function extractionQualityIssues(extracted: {
-  demonstratedTargets: Array<{ explanation: string }>;
-  followUpQuestion: string | null;
-}): QualityIssue[] {
-  const issues: QualityIssue[] = [];
-  extracted.demonstratedTargets.forEach((item, index) => {
-    if (mentionsInternalSystemState(item.explanation)) {
-      issues.push(
-        qualityIssue({
-          check: "internal_state",
-          field: `demonstratedTargets.${index}.explanation`,
-          text: item.explanation,
-          message: "Remove references to internal system state.",
-        }),
-      );
-    }
-  });
-  if (
-    extracted.followUpQuestion &&
-    mentionsInternalSystemState(extracted.followUpQuestion)
-  ) {
-    issues.push(
-      qualityIssue({
-        check: "internal_state",
-        field: "followUpQuestion",
-        text: extracted.followUpQuestion,
-        message: "Remove references to internal system state.",
-      }),
-    );
-  }
-  return issues;
-}
-
 function polishingSources(input: {
   answer: string;
   turnId: string;
@@ -393,8 +351,7 @@ async function extractAnswerWithQuality(input: {
   target: EvidenceTarget | null;
   targets: EvidenceTarget[];
 }) {
-  let feedback: string[] = [];
-  let lastExtracted: Awaited<ReturnType<typeof extractWithModel>> | null = null;
+  let lastFailure: string = consultationConversationCopy.generationFailed;
   for (
     let attempt = 0;
     attempt <= consultationConfig.qualityRegenerationAttempts;
@@ -402,39 +359,14 @@ async function extractAnswerWithQuality(input: {
   ) {
     const extracted = await extractWithModel({
       ...input,
-      qualityFeedback: feedback,
+      qualityFeedback: [],
     });
-    if (!extracted.ok) return extracted;
-    lastExtracted = extracted;
-    const issues = extractionQualityIssues(extracted.data);
-    if (issues.length === 0) return extracted;
-    logQualityRejection({
-      generator: "consultation.extract",
-      attempt,
-      issues,
-    });
-    if (attempt === consultationConfig.qualityRegenerationAttempts) {
-      const failing = new Set(issues.map((issue) => issue.field));
-      return {
-        ok: true as const,
-        data: {
-          ...extracted.data,
-          demonstratedTargets: extracted.data.demonstratedTargets.filter(
-            (_, index) =>
-              !failing.has(`demonstratedTargets.${index}.explanation`),
-          ),
-          followUpQuestion: failing.has("followUpQuestion")
-            ? null
-            : extracted.data.followUpQuestion,
-        },
-      };
-    }
-    feedback = qualityMessages(issues);
+    if (extracted.ok) return extracted;
+    lastFailure = extracted.message;
   }
-  if (lastExtracted?.ok) return lastExtracted;
   return {
     ok: false as const,
-    message: consultationConversationCopy.generationFailed,
+    message: lastFailure,
   };
 }
 
@@ -450,10 +382,23 @@ export async function polishAnswerWithQuality(input: {
   declinedFollowUp: boolean;
   strengtheningNeeds: string[];
 }) {
-  return polishAnswerWithModel({
-    ...input,
-    qualityFeedback: [],
-  });
+  let lastFailure: string = consultationConversationCopy.generationFailed;
+  for (
+    let attempt = 0;
+    attempt <= consultationConfig.qualityRegenerationAttempts;
+    attempt += 1
+  ) {
+    const polished = await polishAnswerWithModel({
+      ...input,
+      qualityFeedback: [],
+    });
+    if (polished.ok) return polished;
+    lastFailure = polished.message;
+  }
+  return {
+    ok: false as const,
+    message: lastFailure,
+  };
 }
 
 async function persistWhyThisCompany(input: {
@@ -520,8 +465,7 @@ async function planAndStoreRound(input: {
     seniority: input.requirement.seniority,
     title: input.requirement.title,
   });
-  let feedback: string[] = [];
-  let partialError: string | null = null;
+  let lastFailure: string = consultationConversationCopy.planUnusable;
   let accepted:
     | {
         plan: Extract<
@@ -550,187 +494,34 @@ async function planAndStoreRound(input: {
         ),
       ],
       focusTargetKey: input.focusTargetKey ?? null,
-      qualityFeedback: [...(input.focusGuidance ?? []), ...feedback],
+      qualityFeedback: input.focusGuidance ?? [],
     });
     if (!plan.ok) {
-      feedback = [plan.message];
+      lastFailure = plan.message;
       continue;
     }
-    const issues: QualityIssue[] = [];
-    const narrativeFields: Array<[string, string]> = [
-      ["commentary", plan.data.commentary],
-      ["briefing.overall", plan.data.briefing.overall],
-      ...plan.data.briefing.strongestAngles.map(
-        (text, index): [string, string] => [`briefing.strongestAngles.${index}`, text],
-      ),
-      ...plan.data.briefing.importantGaps.map(
-        (text, index): [string, string] => [`briefing.importantGaps.${index}`, text],
-      ),
-      ...plan.data.briefing.storyPlan.map(
-        (text, index): [string, string] => [`briefing.storyPlan.${index}`, text],
-      ),
-      ["closingNote", plan.data.closingNote ?? ""],
-      ...plan.data.assessments.flatMap(
-        (item, index): Array<[string, string]> => [
-          [`assessments.${index}.explanation`, item.explanation],
-          [`assessments.${index}.strategy`, item.strategy],
-        ],
-      ),
-      ...plan.data.questions.flatMap(
-        (item, index): Array<[string, string]> => [
-          [`questions.${index}.text`, item.text],
-          [`questions.${index}.requirementInterpretation`, item.requirementInterpretation ?? ""],
-          [`questions.${index}.whoCaresNote`, item.whoCaresNote],
-        ],
-      ),
-    ];
-    for (const [field, text] of narrativeFields) {
-      if (text && mentionsInternalSystemState(text)) {
-        issues.push(
-          qualityIssue({
-            check: "internal_state",
-            field,
-            text,
-            message: "Remove references to internal system state.",
-          }),
-        );
-      }
-    }
-    let assessments: EvidenceAssessment[] = [];
-    let questions: QuestionRoundPlan["questions"] = [];
-    let droppedQuestions: QuestionRoundPlan["dropped"] = [];
-    try {
-      assessments = verifyModelAssessments({
-        targets: input.targets,
-        profileItems,
-        assessments: plan.data.assessments,
-        asOf: new Date(),
-      });
-      const planned = planQuestionRound({
-        assessments,
-        modelQuestions: plan.data.questions.filter(
-          (item, index) =>
-            !issues.some((issue) => issue.field.startsWith(`questions.${index}.`)),
-        ),
-        hiringTeam: input.roles,
-        askedKeys: input.askedKeys,
-        skippedKeys: input.skippedKeys,
-        includeChronology: chronologyRequested,
-        chronologyAsked: input.askedKeys.has("chronology"),
-        focusTargetKey: input.focusTargetKey ?? null,
-      });
-      questions = planned.questions;
-      droppedQuestions = planned.dropped;
-    } catch (error) {
-      issues.push(
-        qualityIssue({
-          check: "assessment_verification",
-          field: "assessments",
-          text:
-            error instanceof Error
-              ? error.message
-              : "Consultation could not verify one of the requirement assessments.",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Consultation could not verify one of the requirement assessments.",
-        }),
-      );
-    }
-    const questionIssues = droppedQuestions.map((drop) =>
-      qualityIssue({
-        check: "question_item",
-        field: `questions.${drop.targetKey}`,
-        text: drop.reason,
-        message: drop.reason,
-      }),
-    );
-    if (issues.length === 0 && (questionIssues.length === 0 || attempt === consultationConfig.qualityRegenerationAttempts)) {
-      for (const drop of droppedQuestions) {
-        console.info(
-          JSON.stringify({
-            event: "consultation_question_dropped",
-            sessionId: input.sessionId,
-            targetKey: drop.targetKey,
-            reason: drop.reason,
-            attempt,
-          }),
-        );
-      }
-      accepted = { plan, assessments, questions };
-      break;
-    }
-    if (issues.length === 0 && questionIssues.length > 0) {
-      logQualityRejection({
-        generator: "consultation.plan",
-        attempt,
-        issues: questionIssues,
-      });
-      feedback = qualityMessages(questionIssues);
-      continue;
-    }
-    logQualityRejection({
-      generator: "consultation.plan",
-      attempt,
-      issues,
+    const assessments = verifyModelAssessments({
+      targets: input.targets,
+      profileItems,
+      assessments: plan.data.assessments,
+      asOf: new Date(),
     });
-    feedback = qualityMessages(issues);
-    if (attempt === consultationConfig.qualityRegenerationAttempts) {
-      const failing = new Set(issues.map((issue) => issue.field));
-      const briefing = {
-        ...plan.data.briefing,
-        overall: failing.has("briefing.overall") ? "" : plan.data.briefing.overall,
-        strongestAngles: plan.data.briefing.strongestAngles.filter(
-          (_, index) => !failing.has(`briefing.strongestAngles.${index}`),
-        ),
-        importantGaps: plan.data.briefing.importantGaps.filter(
-          (_, index) => !failing.has(`briefing.importantGaps.${index}`),
-        ),
-        storyPlan: plan.data.briefing.storyPlan.filter(
-          (_, index) => !failing.has(`briefing.storyPlan.${index}`),
-        ),
-      };
-      const hasBriefing = Boolean(
-        briefing.overall.trim() ||
-          briefing.strongestAngles.length ||
-          briefing.importantGaps.length ||
-          briefing.storyPlan.length,
-      );
-      if (hasBriefing || questions.length > 0) {
-        accepted = {
-          plan: {
-            ...plan,
-            data: {
-              ...plan.data,
-              briefing,
-              commentary: failing.has("commentary") ? "" : plan.data.commentary,
-            },
-          },
-          assessments: issues.some(
-            (issue) => issue.check === "assessment_verification",
-          )
-            ? []
-            : assessments,
-          questions,
-        };
-        partialError = consultationConversationCopy.generationQualityFailed;
-        break;
-      }
-    }
+    const planned = planQuestionRound({
+      assessments,
+      modelQuestions: plan.data.questions,
+      hiringTeam: input.roles,
+      askedKeys: input.askedKeys,
+      skippedKeys: input.skippedKeys,
+      includeChronology: chronologyRequested,
+      chronologyAsked: input.askedKeys.has("chronology"),
+      focusTargetKey: input.focusTargetKey ?? null,
+    });
+    accepted = { plan, assessments, questions: planned.questions };
+    break;
   }
   if (!accepted) {
-    await prisma.consultationSession.update({
-      where: { id: input.sessionId },
-      data: { generationStatus: "READY", generationError: null },
-    });
-    await addTurn({
-      organizationId: input.organizationId,
-      sessionId: input.sessionId,
-      speaker: "CONSULTANT",
-      body: consultationConversationCopy.askForStory,
-      targetKey: input.focusTargetKey ?? input.targets[0]?.key ?? null,
-    });
-    return [];
+    await failGeneration(input.sessionId, lastFailure);
+    throw new Error(lastFailure);
   }
   const { plan, assessments, questions } = accepted;
   await saveAssessments(input.organizationId, input.sessionId, assessments);
@@ -755,7 +546,7 @@ async function planAndStoreRound(input: {
       coachNote: plan.data.commentary.trim() || null,
       briefingJson: plan.data.briefing as Prisma.InputJsonValue,
       generationStatus: "READY",
-      generationError: partialError,
+      generationError: null,
     },
   });
   if (questions.length === 0 && plan.data.closingNote?.trim()) {
@@ -977,69 +768,8 @@ async function processAnswerGeneration(input: {
     targets: input.targets,
   });
   if (!extracted.ok) {
-    const ask = consultationConversationCopy.askForStory;
-    console.error(
-      JSON.stringify({
-        event: "consultation_extraction_dropped",
-        turnId: input.turnId,
-        text: input.answerContext,
-        reason: extracted.message,
-      }),
-    );
-    const interviewText = input.answerContext.trim();
-    await prisma.$transaction([
-      prisma.consultationTurn.update({
-        where: { id: input.turnId },
-        data: {
-          analysisJson: {
-            status: "READY",
-            answerContext: input.answerContext,
-            story: null,
-            dropped: [
-              { text: input.answerContext, reason: extracted.message },
-            ],
-            missingStarElements: ["SITUATION", "TASK", "ACTION", "RESULT"],
-            demonstratedTargets: [],
-          },
-        },
-      }),
-      prisma.consultationSession.update({
-        where: { id: input.sessionId },
-        data: { generationStatus: "READY", generationError: null },
-      }),
-      ...(interviewText
-        ? [
-            prisma.consultationStatement.upsert({
-              where: {
-                turnId_kind: { turnId: input.turnId, kind: "INTERVIEW_ANSWER" },
-              },
-              create: {
-                organizationId: input.organizationId,
-                sessionId: input.sessionId,
-                turnId: input.turnId,
-                kind: "INTERVIEW_ANSWER",
-                content: interviewText,
-                groundingJson: [],
-                promptVersion: CONSULTATION_PROMPT_VERSION,
-              },
-              update: {
-                status: "DRAFT",
-                content: interviewText,
-                groundingJson: [],
-                promptVersion: CONSULTATION_PROMPT_VERSION,
-                generation: { increment: 1 },
-                approvedAt: null,
-              },
-            }),
-          ]
-        : []),
-    ]);
-    return {
-      ok: true,
-      followUpQuestion: ask,
-      coaching: ask,
-      missingStarElements: ["SITUATION", "TASK", "ACTION", "RESULT"],
-    };
+    await failGeneration(input.sessionId, extracted.message);
+    return { ok: false };
   }
   const verified = proposalsFromExtraction({
     answer: input.answerContext,
@@ -1071,15 +801,8 @@ async function processAnswerGeneration(input: {
       strengtheningNeeds: [],
     });
     if (!polished.ok) {
-      console.error(
-        JSON.stringify({
-          event: "consultation_polish_dropped",
-          turnId: input.turnId,
-          text: storyProposal.story.result,
-          reason: polished.message,
-        }),
-      );
-      polished = null;
+      await failGeneration(input.sessionId, polished.message);
+      return { ok: false };
     }
   }
   const followUpQuestion =
@@ -1254,15 +977,7 @@ export async function retryConsultationGeneration(input: {
       profile,
     });
     if (!processed.ok) {
-      await addTurn({
-        organizationId: input.organizationId,
-        sessionId: session.id,
-        speaker: "CONSULTANT",
-        body: consultationConversationCopy.askForStory,
-        targetKey: failedAnswer.targetKey,
-        followUp: true,
-      });
-      return;
+      throw new Error(consultationConversationCopy.generationFailed);
     }
     if (processed.followUpQuestion) {
       const followUpCount = turns.filter(
@@ -1286,11 +1001,6 @@ export async function retryConsultationGeneration(input: {
         return;
       }
     }
-    await continueAfterAnsweredRound({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      sessionId: session.id,
-    });
     return;
   }
   await startConsultation(input);
@@ -1396,56 +1106,6 @@ function unanswered(
       turn.sequence > latest.sequence,
   );
   return answered ? null : latest;
-}
-
-async function continueAfterAnsweredRound(input: {
-  organizationId: string;
-  campaignId: string;
-  sessionId: string;
-}): Promise<void> {
-  const refreshed = await loadSessionTurns(input.sessionId);
-  const open = refreshed.some((turn) => {
-    if (turn.speaker !== "CONSULTANT" || !turn.targetKey) return false;
-    return unanswered(refreshed, turn.targetKey) != null;
-  });
-  if (open) return;
-  const pendingConfirmation = await prisma.consultationStatement.count({
-    where: { sessionId: input.sessionId, status: "DRAFT" },
-  });
-  if (pendingConfirmation > 0) return;
-  const { campaign, requirement, profile } = await requireApplication(
-    input.organizationId,
-    input.campaignId,
-  );
-  const stored = await prisma.consultationAssessment.findMany({
-    where: { sessionId: input.sessionId },
-  });
-  const assessments = stored.map(storedAssessment);
-  const { askedKeys, skippedKeys } = askedAndSkipped(refreshed);
-  markWhyThisCompanyAsked(askedKeys, {
-    campaignId: campaign.id,
-    whyThisCompany: campaign.whyThisCompany,
-    profile,
-  });
-  if (gapsAreCovered(assessments, skippedKeys)) {
-    await prisma.consultationSession.update({
-      where: { id: input.sessionId },
-      data: { status: "DONE" },
-    });
-    return;
-  }
-  const roles = await hiringTeam(input.organizationId, input.campaignId);
-  const next = await planAndStoreRound({
-    organizationId: input.organizationId,
-    sessionId: input.sessionId,
-    askedKeys,
-    skippedKeys,
-    profile,
-    requirement,
-    targets: targetsFromRequirement(requirement),
-    roles,
-  });
-  await finishIfPlanningIsComplete(input.sessionId, next);
 }
 
 function analysisIsComplete(value: unknown): boolean {
@@ -1622,19 +1282,7 @@ export async function processConsultationReply(input: {
     profile,
   });
   if (!processed.ok) {
-    await prisma.consultationSession.update({
-      where: { id: session.id },
-      data: { generationStatus: "READY", generationError: null },
-    });
-    await addTurn({
-      organizationId: input.organizationId,
-      sessionId: session.id,
-      speaker: "CONSULTANT",
-      body: consultationConversationCopy.askForStory,
-      targetKey,
-      followUp: true,
-    });
-    return;
+    throw new Error(consultationConversationCopy.generationFailed);
   }
   if (targetKey === WHY_THIS_COMPANY_TARGET_KEY) {
     await persistWhyThisCompany({
@@ -1654,33 +1302,18 @@ export async function processConsultationReply(input: {
     Boolean(processed.followUpQuestion) &&
     targetKey !== "chronology" &&
     followUpCount < consultationConfig.maxFollowUpsPerTarget;
-  await addTurn({
-    organizationId: input.organizationId,
-    sessionId: session.id,
-    speaker: "CONSULTANT",
-    body:
-      askFollowUp && processed.followUpQuestion
-        ? coaching
-          ? `${coaching}\n\n${processed.followUpQuestion}`
-          : processed.followUpQuestion
-        : coaching ?? consultationConversationCopy.keepCoaching,
-    targetKey: askFollowUp ? targetKey : null,
-    followUp: askFollowUp,
-  });
-  if (askFollowUp) return;
-  const pendingStatements = await prisma.consultationStatement.count({
-    where: {
+  if (askFollowUp && processed.followUpQuestion) {
+    await addTurn({
+      organizationId: input.organizationId,
       sessionId: session.id,
-      turnId: seekerTurnId,
-      status: "DRAFT",
-    },
-  });
-  if (pendingStatements > 0) return;
-  await continueAfterAnsweredRound({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    sessionId: session.id,
-  });
+      speaker: "CONSULTANT",
+      body: coaching
+        ? `${coaching}\n\n${processed.followUpQuestion}`
+        : processed.followUpQuestion,
+      targetKey,
+      followUp: true,
+    });
+  }
 }
 
 function declinedPolishInput(value: unknown): {
@@ -1864,11 +1497,6 @@ export async function skipConsultationQuestion(input: {
       sessionId: session.id,
       question,
       turns,
-    });
-    await continueAfterAnsweredRound({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      sessionId: session.id,
     });
     return;
   }
@@ -2387,11 +2015,6 @@ export async function continueConsultationPlanning(input: {
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
   if (!session) throw new TenantError("The consultation has not started.");
-  await continueAfterAnsweredRound({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    sessionId: session.id,
-  });
 }
 
 export async function reviseConsultationResult(input: {

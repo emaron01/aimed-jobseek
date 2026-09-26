@@ -168,7 +168,8 @@ describe("why this company", () => {
       includeChronology: false,
       chronologyAsked: false,
     });
-    expect(planned.questions).toHaveLength(1);
+    expect(planned.questions.length).toBeGreaterThanOrEqual(1);
+    expect(planned.questions.length).toBeLessThanOrEqual(10);
     expect(planned.questions[0]?.targetKey).toBe(WHY_THIS_COMPANY_TARGET_KEY);
     expect(planned.questions[0]?.text).toBe(
       consultationConversationCopy.whyThisCompanyQuestion,

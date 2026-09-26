@@ -407,19 +407,27 @@ export function verifyModelAssessments(input: {
   asOf: Date;
 }): EvidenceAssessment[] {
   const byKey = new Map(input.assessments.map((item) => [item.targetKey, item]));
-  if (
-    byKey.size !== input.targets.length ||
-    input.targets.some((target) => !byKey.has(target.key))
-  ) {
-    throw new Error("Consultation AI did not assess every job target exactly once.");
-  }
   const itemsById = new Map(input.profileItems.map((item) => [item.id, item]));
   return input.targets.map((target) => {
-    const model = byKey.get(target.key)!;
-    if (!model.explanation.trim() || !model.strategy.trim()) {
-      throw new Error(
-        `Consultation AI did not write an explanation and strategy for ${target.key}.`,
-      );
+    const model = byKey.get(target.key);
+    if (!model) {
+      return {
+        key: target.key,
+        kind: target.kind,
+        text: target.text,
+        strength: "NONE" as const,
+        supportingFactIds: [],
+        strategy: "ACKNOWLEDGE" as const,
+        explanation: "",
+        strategyText: "",
+        verification: {
+          originalStrength: "NONE" as const,
+          invalidSupportingFactIds: [],
+          invalidRoleIds: [],
+          downgradeReasons: [],
+        },
+        experienceCalculation: null,
+      };
     }
     let strength = model.strength;
     const validFactIds = model.supportingFactIds.filter(

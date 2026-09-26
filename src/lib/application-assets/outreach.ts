@@ -869,8 +869,8 @@ export async function generateOutreachAsset(input: {
         input.thankYouAnswers?.filter((row) => row.answer.trim()) ?? stored.answers;
       const skipped = Boolean(input.skipThankYouQuestions) || stored.skipped;
       if (!notesDescribeConversation(interviewStageNotes) && !skipped && answers.length === 0) {
-        let feedback: string[] = [];
         let questions: Array<{ id: string; text: string }> = [];
+        let lastFailure: string | null = null;
         for (
           let attempt = 0;
           attempt <= consultationConfig.qualityRegenerationAttempts;
@@ -878,26 +878,20 @@ export async function generateOutreachAsset(input: {
         ) {
           const generated = await generateInterviewThankYouClarifyingQuestions({
             notes: interviewStageNotes,
-            qualityFeedback: feedback,
+            qualityFeedback: [],
           });
           if (!generated.ok) {
-            return { ok: false, message: generated.message, violations: [] };
+            lastFailure = generated.message;
+            continue;
           }
-          const limited = generated.data.questions.slice(
+          questions = generated.data.questions.slice(
             0,
             interviewConfig.thankYouClarifyingQuestionLimit,
           );
-          if (
-            limited.length === 0 ||
-            limited.some((question) => !question.text.trim().endsWith("?"))
-          ) {
-            feedback = [
-              "Write up to two short questions that end with a question mark.",
-            ];
-            continue;
-          }
-          questions = limited;
           break;
+        }
+        if (lastFailure && questions.length === 0) {
+          return { ok: false, message: lastFailure, violations: [] };
         }
         if (questions.length > 0) {
           await prisma.interviewStage.update({

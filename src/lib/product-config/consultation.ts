@@ -5,7 +5,7 @@
 import { applicationWorkspaceCopy, vocab } from "./vocabulary";
 export const consultationConfig = Object.freeze({
   displayName: "Harper",
-  roundSize: 1,
+  roundSize: 10,
   maxFollowUpsPerTarget: 1,
   qualityRegenerationAttempts: 2,
   interviewAnswerMaxWords: 220,

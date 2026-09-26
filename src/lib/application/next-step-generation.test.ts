@@ -21,7 +21,7 @@ describe("application next-step generation", () => {
     generateStructured.mockReset();
   });
 
-  it("saves the last parseable line after quality rejects", async () => {
+  it("saves the first parseable line without a content-quality retry", async () => {
     const text = `Schedule your initial consultation with ${consultationConfig.displayName}.`;
     generateStructured.mockResolvedValue({ data: { text } });
     const written = await writeApplicationNextStep({
@@ -29,7 +29,7 @@ describe("application next-step generation", () => {
     });
     expect(written.ok).toBe(true);
     if (written.ok) expect(written.text).toBe(text);
-    expect(generateStructured.mock.calls.length).toBeGreaterThan(1);
+    expect(generateStructured.mock.calls.length).toBe(1);
   });
 
   it("retries only when the model output is unparseable", async () => {

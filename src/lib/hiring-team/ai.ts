@@ -6,7 +6,6 @@ import {
 } from "@/lib/hiring-team/contract";
 import {
   applyHiringManagerInterviewStage,
-  assessHiringTeamDraft,
   fieldsFromPersonaDraft,
   narrativeFromDraft,
   type HiringTeamNarrative,
@@ -153,16 +152,12 @@ export async function synthesizeHiringTeamRole(input: {
   if (!isPersonaAiConfigured()) {
     return { ok: false, status: "PARTIAL", message: SYNTHESIS_UNAVAILABLE };
   }
-  let rejection: string[] = [];
-  let lastParseable: {
-    draft: PersonaAiDraft;
-    fields: ReturnType<typeof fieldsFromPersonaDraft>;
-  } | null = null;
+  let lastMessage = SYNTHESIS_FAILED;
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const model = await draftRoleWithModel({ ...input, rejection });
+    const model = await draftRoleWithModel({ ...input, rejection: [] });
     if (!model.ok) {
-      if (lastParseable) break;
-      return { ok: false, status: "FAILED", message: model.message };
+      lastMessage = model.message;
+      continue;
     }
     const fields = fieldsFromPersonaDraft(model.draft);
     if (input.isHiringManager) {
@@ -171,33 +166,11 @@ export async function synthesizeHiringTeamRole(input: {
         input.evidenceText,
       );
     }
-    lastParseable = { draft: model.draft, fields };
-    const assessment = assessHiringTeamDraft({
-      fields,
-      jobLines: input.jobLines,
-      involvement: input.involvement,
-      roleName: input.roleName,
-      likelyTitles: input.likelyTitles,
-    });
-    if (assessment.ok) {
-      return {
-        ok: true,
-        narrative: narrativeFromDraft({
-          draft: model.draft,
-          fields,
-          evidenceText: input.evidenceText,
-          involvement: input.involvement,
-        }),
-      };
-    }
-    rejection = assessment.reasons;
-  }
-  if (lastParseable) {
     return {
       ok: true,
       narrative: narrativeFromDraft({
-        draft: lastParseable.draft,
-        fields: lastParseable.fields,
+        draft: model.draft,
+        fields,
         evidenceText: input.evidenceText,
         involvement: input.involvement,
       }),
@@ -206,6 +179,6 @@ export async function synthesizeHiringTeamRole(input: {
   return {
     ok: false,
     status: "FAILED",
-    message: SYNTHESIS_FAILED,
+    message: lastMessage,
   };
 }

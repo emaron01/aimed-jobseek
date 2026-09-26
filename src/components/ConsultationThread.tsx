@@ -15,6 +15,7 @@ import {
 } from "@/lib/product-config";
 import {
   buildConsultationQaView,
+  type ConsultationQaItem,
   type QaStatement,
   type QaTurn,
 } from "@/lib/consultation/qa-view";
@@ -87,6 +88,110 @@ function ResultBody({ statement }: { statement: QaStatement }) {
   );
 }
 
+function QuestionCard({
+  campaignId,
+  canEdit,
+  item,
+  showReply,
+  pending,
+  onSubmitStart,
+}: {
+  campaignId: string;
+  canEdit: boolean;
+  item: ConsultationQaItem;
+  showReply: boolean;
+  pending: boolean;
+  onSubmitStart: (answer: string) => void;
+}) {
+  const hasResult = Boolean(item.resumeBullet || item.talkingPoint) && !item.followUp;
+  const canAnswer = showReply && Boolean(item.targetKey) && !hasResult;
+  return (
+    <details
+      className="min-w-0 overflow-hidden rounded-md border border-edge bg-canvas p-4"
+      data-testid={hasResult ? "consultation-answered" : "consultation-question-item"}
+    >
+      <summary
+        className="cursor-pointer text-sm font-medium text-ink"
+        data-testid="consultation-question"
+      >
+        {item.question}
+      </summary>
+      <div className="mt-3 space-y-3">
+        {item.followUp ? (
+          <p className={`text-sm text-ink ${wrapClass}`} data-testid="consultation-follow-up">
+            {item.followUp.text}
+          </p>
+        ) : null}
+        {hasResult ? (
+          <>
+            {item.resumeBullet ? <ResultBody statement={item.resumeBullet} /> : null}
+            {item.talkingPoint ? <ResultBody statement={item.talkingPoint} /> : null}
+            {canEdit ? (
+              <ResultActions
+                campaignId={campaignId}
+                statements={item.statements}
+                testId={`consultation-result-${item.questionTurnId}`}
+              />
+            ) : null}
+            {item.seekerAnswers.length > 0 ? (
+              <details className="mt-1" data-testid="consultation-seeker-answer">
+                <summary className="cursor-pointer text-sm font-medium text-ink">
+                  {consultationConversationCopy.yourAnswer}
+                </summary>
+                <div className="mt-2 space-y-2">
+                  {item.seekerAnswers.map((answer) => (
+                    <p
+                      key={answer.id}
+                      className={`text-sm text-ink ${wrapClass}`}
+                      data-testid="consultation-seeker-turn"
+                    >
+                      {answer.body}
+                    </p>
+                  ))}
+                </div>
+              </details>
+            ) : null}
+          </>
+        ) : canAnswer ? (
+          <ApplicationActionForm
+            action={replyConsultationAction}
+            submitLabel={consultationConversationCopy.threadReply}
+            pendingLabel={consultationConversationCopy.thinking}
+            testId="consultation-reply"
+            onSubmitStart={(formData) => {
+              const answer = String(formData.get("answer") ?? "").trim();
+              if (!answer) return;
+              onSubmitStart(answer);
+            }}
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+            <input type="hidden" name="targetKey" value={item.targetKey ?? ""} />
+            <label className="block text-sm">
+              <span className="font-medium text-ink">
+                {consultationConversationCopy.threadReply}
+              </span>
+              <textarea name="answer" required rows={4} className={fieldClass} />
+            </label>
+          </ApplicationActionForm>
+        ) : null}
+        {pending ? (
+          <div
+            className="flex items-center gap-2 text-sm text-muted"
+            data-testid="harper-thinking"
+            role="status"
+          >
+            <span
+              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-edge-strong border-t-ink"
+              aria-hidden
+            />
+            {consultationConversationCopy.thinking}
+          </div>
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
 export function ConsultationThread({
   campaignId,
   canEdit,
@@ -104,118 +209,33 @@ export function ConsultationThread({
   turns: ThreadTurn[];
   statements: ThreadStatement[];
 }) {
-  const [pendingReply, setPendingReply] = useState<string | null>(null);
+  const [pendingTarget, setPendingTarget] = useState<string | null>(null);
   const view = buildConsultationQaView({ turns, statements });
-  const persistedPending = Boolean(
-    pendingReply &&
-      turns.some((turn) => turn.speaker === "SEEKER" && turn.body === pendingReply),
-  );
-  const showThinking =
-    Boolean(pendingReply) && (jobsActive || generating || !persistedPending);
   const showReply =
     canEdit &&
     sessionStatus === "IN_PROGRESS" &&
     !jobsActive &&
-    !generating &&
-    Boolean(view.currentQuestion);
+    !generating;
 
   return (
-    <div className="min-w-0 space-y-4 overflow-hidden" data-testid="consultation-thread">
-      {view.answered.map((item) => (
-        <article
+    <div className="min-w-0 space-y-3 overflow-hidden" data-testid="consultation-thread">
+      <p className="text-xs font-medium uppercase tracking-wide text-subtle">
+        {consultationConfig.displayName}
+      </p>
+      {view.questions.map((item) => (
+        <QuestionCard
           key={item.questionTurnId}
-          className="min-w-0 overflow-hidden rounded-md border border-edge bg-canvas p-4"
-          data-testid="consultation-answered"
-        >
-          <p className="text-xs font-medium uppercase tracking-wide text-subtle">
-            {consultationConfig.displayName}
-          </p>
-          <p
-            className={`mt-1 text-sm text-ink ${wrapClass}`}
-            data-testid="consultation-question"
-          >
-            {item.question}
-          </p>
-          {item.seekerAnswers.length > 0 ? (
-            <details className="mt-3" data-testid="consultation-seeker-answer">
-              <summary className="cursor-pointer text-sm font-medium text-ink">
-                {consultationConversationCopy.yourAnswer}
-              </summary>
-              <div className="mt-2 space-y-2">
-                {item.seekerAnswers.map((answer) => (
-                  <p
-                    key={answer.id}
-                    className={`text-sm text-ink ${wrapClass}`}
-                    data-testid="consultation-seeker-turn"
-                  >
-                    {answer.body}
-                  </p>
-                ))}
-              </div>
-            </details>
-          ) : null}
-          {item.resumeBullet ? <ResultBody statement={item.resumeBullet} /> : null}
-          {item.talkingPoint ? <ResultBody statement={item.talkingPoint} /> : null}
-          {canEdit ? (
-            <ResultActions
-              campaignId={campaignId}
-              statements={item.statements}
-              testId={`consultation-result-${item.questionTurnId}`}
-            />
-          ) : null}
-        </article>
+          campaignId={campaignId}
+          canEdit={canEdit}
+          item={item}
+          showReply={showReply}
+          pending={pendingTarget === item.targetKey && (jobsActive || generating)}
+          onSubmitStart={(answer) => {
+            setPendingTarget(item.targetKey);
+            void answer;
+          }}
+        />
       ))}
-
-      {view.currentQuestion ? (
-        <div
-          className="min-w-0 overflow-hidden rounded-md border border-edge bg-canvas p-4"
-          data-testid="consultation-current-question"
-        >
-          <p className="text-xs font-medium uppercase tracking-wide text-subtle">
-            {consultationConfig.displayName}
-          </p>
-          <p className={`mt-1 text-sm text-ink ${wrapClass}`} data-testid="consultation-question">
-            {view.currentQuestion.text}
-          </p>
-          {showReply ? (
-            <div className="mt-3">
-              <ApplicationActionForm
-                action={replyConsultationAction}
-                submitLabel={consultationConversationCopy.threadReply}
-                pendingLabel={consultationConversationCopy.thinking}
-                testId="consultation-reply"
-                onSubmitStart={(formData) => {
-                  const answer = String(formData.get("answer") ?? "").trim();
-                  if (!answer) return;
-                  setPendingReply(answer);
-                }}
-              >
-                <input type="hidden" name="campaignId" value={campaignId} />
-                <label className="block text-sm">
-                  <span className="font-medium text-ink">
-                    {consultationConversationCopy.threadReply}
-                  </span>
-                  <textarea name="answer" required rows={4} className={fieldClass} />
-                </label>
-              </ApplicationActionForm>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {showThinking ? (
-        <div
-          className="flex items-center gap-2 text-sm text-muted"
-          data-testid="harper-thinking"
-          role="status"
-        >
-          <span
-            className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-edge-strong border-t-ink"
-            aria-hidden
-          />
-          {consultationConversationCopy.thinking}
-        </div>
-      ) : null}
     </div>
   );
 }

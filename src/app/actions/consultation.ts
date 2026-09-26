@@ -381,9 +381,11 @@ export async function replyConsultationAction(
     if (!answer) {
       return { ok: false, message: consultationConversationCopy.threadReply };
     }
+    const targetKey = String(formData.get("targetKey") ?? "").trim();
     const recorded = await recordConsultationReply({
       organizationId,
       campaignId,
+      targetKey: targetKey || null,
       answer,
       intent: "REPLY",
     });

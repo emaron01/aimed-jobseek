@@ -20,6 +20,7 @@ export type ConsultationQaItem = {
   questionTurnId: string;
   targetKey: string | null;
   question: string;
+  followUp: { turnId: string; text: string } | null;
   seekerAnswers: Array<{ id: string; body: string }>;
   statements: QaStatement[];
   resumeBullet: QaStatement | null;
@@ -27,8 +28,7 @@ export type ConsultationQaItem = {
 };
 
 export type ConsultationQaView = {
-  answered: ConsultationQaItem[];
-  currentQuestion: { turnId: string; text: string } | null;
+  questions: ConsultationQaItem[];
 };
 
 function laterSeekerAnswered(turns: QaTurn[], question: QaTurn): boolean {
@@ -60,9 +60,10 @@ export function buildConsultationQaView(input: {
     byTurn.set(statement.turnId, existing);
   }
 
-  const topics: ConsultationQaItem[] = [];
+  const questions: ConsultationQaItem[] = [];
   for (const turn of turns) {
     if (turn.speaker !== "CONSULTANT" || turn.followUp) continue;
+    if (!turn.targetKey && turn.sequence > 0 && questions.length > 0) continue;
     const seekerAnswers = turns
       .filter(
         (entry) =>
@@ -75,18 +76,35 @@ export function buildConsultationQaView(input: {
           (candidate) =>
             candidate.speaker === "CONSULTANT" &&
             !candidate.followUp &&
-            candidate.sequence > turn.sequence,
+            candidate.sequence > turn.sequence &&
+            (turn.targetKey == null ||
+              candidate.targetKey !== turn.targetKey),
         );
+        if (turn.targetKey) {
+          return entry.targetKey === turn.targetKey;
+        }
         return !nextPrimary || entry.sequence < nextPrimary.sequence;
       })
       .map((entry) => ({ id: entry.id, body: entry.body }));
     const statements = seekerAnswers.flatMap(
       (answer) => byTurn.get(answer.id) ?? [],
     );
-    topics.push({
+    const openFollowUp = [...turns]
+      .reverse()
+      .find(
+        (entry) =>
+          entry.speaker === "CONSULTANT" &&
+          entry.followUp &&
+          (turn.targetKey == null || entry.targetKey === turn.targetKey) &&
+          !laterSeekerAnswered(turns, entry),
+      );
+    questions.push({
       questionTurnId: turn.id,
       targetKey: turn.targetKey,
       question: turn.body,
+      followUp: openFollowUp
+        ? { turnId: openFollowUp.id, text: openFollowUp.body }
+        : null,
       seekerAnswers,
       statements,
       resumeBullet: latestOfKind(statements, "RESUME_BULLET"),
@@ -94,37 +112,5 @@ export function buildConsultationQaView(input: {
     });
   }
 
-  const openFollowUp = [...turns]
-    .reverse()
-    .find(
-      (turn) =>
-        turn.speaker === "CONSULTANT" &&
-        turn.followUp &&
-        !laterSeekerAnswered(turns, turn),
-    );
-  const openPrimary = [...turns]
-    .reverse()
-    .find(
-      (turn) =>
-        turn.speaker === "CONSULTANT" &&
-        !turn.followUp &&
-        !laterSeekerAnswered(turns, turn),
-    );
-  const current = openFollowUp ?? openPrimary ?? null;
-
-  const answered = topics.filter((topic) => {
-    if (topic.seekerAnswers.length === 0) return false;
-    if (!topic.resumeBullet && !topic.talkingPoint) return false;
-    if (current && current.followUp && current.targetKey === topic.targetKey) {
-      return false;
-    }
-    return true;
-  });
-
-  return {
-    answered,
-    currentQuestion: current
-      ? { turnId: current.id, text: current.body }
-      : null,
-  };
+  return { questions };
 }

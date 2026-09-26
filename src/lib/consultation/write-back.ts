@@ -3,7 +3,6 @@ import {
   WHY_THIS_COMPANY_TARGET_KEY,
   type ConsultationExtractResult,
 } from "@/lib/consultation/contract";
-import { validModelQuestion } from "@/lib/consultation/questions";
 import {
   factsSupportedBySources,
   knownNamesFromProfile,
@@ -195,10 +194,8 @@ export function proposalsFromExtraction(input: {
   }
   const followUpQuestion =
     missingStarElements.length > 0
-      ? input.extracted.followUpQuestion &&
-        validModelQuestion(input.extracted.followUpQuestion)
-        ? input.extracted.followUpQuestion.trim()
-        : followUpForMissingStar(missingStarElements)
+      ? input.extracted.followUpQuestion?.trim() ||
+        followUpForMissingStar(missingStarElements)
       : null;
   return {
     proposals,

@@ -16,22 +16,22 @@ const question = {
   sequence: 1,
 };
 
+const second = {
+  id: "q2",
+  speaker: "CONSULTANT" as const,
+  body: "Tell me about a sale you led.",
+  targetKey: "required:0",
+  followUp: false,
+  sequence: 2,
+};
+
 const followUp = {
   id: "q1b",
   speaker: "CONSULTANT" as const,
   body: "What was the result?",
   targetKey: "why",
   followUp: true,
-  sequence: 3,
-};
-
-const nextQuestion = {
-  id: "q2",
-  speaker: "CONSULTANT" as const,
-  body: "Tell me about a sale you led.",
-  targetKey: "required:0",
-  followUp: false,
-  sequence: 6,
+  sequence: 4,
 };
 
 function seeker(id: string, body: string, sequence: number, targetKey: string) {
@@ -45,33 +45,79 @@ function seeker(id: string, body: string, sequence: number, targetKey: string) {
   };
 }
 
-describe("Harper question-and-result coach", () => {
-  it("asks one question at a time and at most one follow-up before a result", () => {
-    expect(consultationConfig.roundSize).toBe(1);
+describe("Harper ten-question coach", () => {
+  it("drafts at most 10 questions in one step and lists each as collapsible", () => {
+    expect(consultationConfig.roundSize).toBe(10);
     expect(consultationConfig.maxFollowUpsPerTarget).toBe(1);
-    const waiting = buildConsultationQaView({
-      turns: [question, seeker("s1", "I like the mission.", 2, "why"), followUp],
+    const drafted = Array.from({ length: 12 }, (_, index) => ({
+      id: `q${index}`,
+      speaker: "CONSULTANT" as const,
+      body: `Question ${index + 1}?`,
+      targetKey: `gap:${index}`,
+      followUp: false,
+      sequence: index + 1,
+    }));
+    const view = buildConsultationQaView({ turns: drafted, statements: [] });
+    expect(view.questions.length).toBeGreaterThan(1);
+    expect(view.questions[0]?.question).toBe("Question 1?");
+    expect(view.questions[1]?.question).toBe("Question 2?");
+
+    const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
+    expect(thread).toContain("<details");
+    expect(thread).toContain("consultation-question");
+    expect(thread).toContain("consultation-question-item");
+    expect(thread).toContain("name=\"targetKey\"");
+  });
+
+  it("lets the seeker answer in any order and keeps the other questions", () => {
+    const afterSecond = buildConsultationQaView({
+      turns: [
+        question,
+        second,
+        seeker("s2", "I led a $4M renewal.", 3, "required:0"),
+      ],
       statements: [
         {
-          id: "st1",
-          turnId: "s1",
+          id: "st2",
+          turnId: "s2",
+          kind: "RESUME_BULLET",
+          status: "DRAFT",
+          content: "Led a $4M renewal.",
+          strengtheningNote: null,
+        },
+        {
+          id: "st3",
+          turnId: "s2",
           kind: "INTERVIEW_ANSWER",
           status: "DRAFT",
-          content: "Early draft",
+          content: "I led a $4M renewal.",
           strengtheningNote: null,
         },
       ],
     });
-    expect(waiting.answered).toHaveLength(0);
-    expect(waiting.currentQuestion?.text).toBe(followUp.body);
+    expect(afterSecond.questions).toHaveLength(2);
+    expect(afterSecond.questions[0]?.question).toBe(question.body);
+    expect(afterSecond.questions[0]?.resumeBullet).toBeNull();
+    expect(afterSecond.questions[1]?.resumeBullet?.content).toBe("Led a $4M renewal.");
+    expect(afterSecond.questions[1]?.talkingPoint?.content).toBe("I led a $4M renewal.");
+  });
 
-    const afterFollowUp = buildConsultationQaView({
+  it("asks at most one follow-up, then shows a resume bullet and talking point", () => {
+    const waiting = buildConsultationQaView({
+      turns: [question, second, seeker("s1", "I like the mission.", 3, "why"), followUp],
+      statements: [],
+    });
+    expect(waiting.questions[0]?.followUp?.text).toBe(followUp.body);
+    expect(waiting.questions[0]?.resumeBullet).toBeNull();
+    expect(waiting.questions[1]?.question).toBe(second.body);
+
+    const done = buildConsultationQaView({
       turns: [
         question,
-        seeker("s1", "I like the mission.", 2, "why"),
+        second,
+        seeker("s1", "I like the mission.", 3, "why"),
         followUp,
-        seeker("s2", "We grew the region 40%.", 4, "why"),
-        nextQuestion,
+        seeker("s2", "We grew the region 40%.", 5, "why"),
       ],
       statements: [
         {
@@ -92,58 +138,28 @@ describe("Harper question-and-result coach", () => {
         },
       ],
     });
-    expect(afterFollowUp.answered).toHaveLength(1);
-    expect(afterFollowUp.answered[0]?.question).toBe(question.body);
-    expect(afterFollowUp.currentQuestion?.text).toBe(nextQuestion.body);
-  });
-
-  it("keeps the question and result visible and collapses the seeker answer", () => {
-    const view = buildConsultationQaView({
-      turns: [
-        question,
-        seeker("s1", "I like the mission.", 2, "why"),
-        nextQuestion,
-      ],
-      statements: [
-        {
-          id: "st2",
-          turnId: "s1",
-          kind: "RESUME_BULLET",
-          status: "DRAFT",
-          content: "Grew enterprise revenue.",
-          strengtheningNote: null,
-        },
-        {
-          id: "st3",
-          turnId: "s1",
-          kind: "INTERVIEW_ANSWER",
-          status: "DRAFT",
-          content: "I grew enterprise revenue.",
-          strengtheningNote: null,
-        },
-      ],
-    });
-    expect(view.answered[0]?.resumeBullet?.content).toBe("Grew enterprise revenue.");
-    expect(view.answered[0]?.talkingPoint?.content).toBe(
-      "I grew enterprise revenue.",
-    );
-    expect(view.answered[0]?.seekerAnswers[0]?.body).toBe("I like the mission.");
+    expect(done.questions[0]?.followUp).toBeNull();
+    expect(done.questions[0]?.resumeBullet?.content).toBe("Grew the region 40%.");
+    expect(done.questions[0]?.talkingPoint?.content).toBe("I grew the region 40%.");
+    expect(done.questions[0]?.seekerAnswers.map((answer) => answer.body)).toEqual([
+      "I like the mission.",
+      "We grew the region 40%.",
+    ]);
+    expect(done.questions[1]?.question).toBe(second.body);
 
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
     expect(thread).toContain("consultation-answered");
-    expect(thread).toContain("consultation-question");
     expect(thread).toContain("consultation-statement-${statement.kind}");
     expect(thread).toContain("consultation-seeker-answer");
-    expect(thread).toContain("<details");
-    expect(thread).toContain("consultationConversationCopy.yourAnswer");
-    expect(thread).toContain("consultation-current-question");
     expect(thread).toContain("approveConsultationQaResultAction");
     expect(thread).toContain("regenerateConsultationQaResultAction");
     expect(thread).toContain("consultationConversationCopy.approve");
     expect(thread).toContain("polishCopy.regenerate");
+    expect(consultationConversationCopy.approve).toBe("Approve");
+    expect(polishCopy.regenerate).toBe("Regenerate");
   });
 
-  it("drops the Harper-page navigation buttons and keeps Where you stand below", () => {
+  it("keeps Where you stand below the questions and has no Harper-page navigation", () => {
     const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
     expect(section).not.toContain("HarperSuggestionList");
     expect(section).toContain("consultation-standing-panel");
@@ -151,7 +167,7 @@ describe("Harper question-and-result coach", () => {
       section.indexOf("consultation-standing-panel"),
     );
     expect(section).toContain("consultationConversationCopy.whereYouStand");
-    expect(consultationConversationCopy.approve).toBe("Approve");
-    expect(polishCopy.regenerate).toBe("Regenerate");
+    const service = readFileSync("src/lib/consultation/service.ts", "utf8");
+    expect(service).not.toContain("async function continueAfterAnsweredRound");
   });
 });

@@ -1,6 +1,5 @@
 import type { EvidenceAssessment } from "@/lib/consultation/assess";
 import { openGaps, requirementMeaning } from "@/lib/consultation/assess";
-import { questionRestatesTarget } from "@/lib/consultation/output-quality";
 import { consultationConfig, consultationConversationCopy } from "@/lib/product-config/consultation";
 import { WHY_THIS_COMPANY_TARGET_KEY } from "@/lib/consultation/contract";
 
@@ -33,12 +32,8 @@ export function seniorityWarrantsChronology(input: {
   return SENIOR_ROLE.test(`${input.seniority ?? ""} ${input.title ?? ""}`);
 }
 
-const INTERNAL_STATE =
-  /\b(?:research (?:status|is|isn't|has|hasn't|not|pending|incomplete|unavailable)|confidence(?: score)?|ambiguit(?:y|ies)|ambiguous|missing (?:data|information|context)|internal (?:state|system)|prompt|model (?:output|behavior|generation)|not configured)\b/i;
-
 export function validModelQuestion(text: string): boolean {
-  const cleaned = text.trim();
-  return cleaned.length >= 20 && !INTERNAL_STATE.test(cleaned);
+  return Boolean(text.trim());
 }
 
 function targetMeaning(text: string): string {
@@ -78,30 +73,6 @@ export function matchConsultationFocus(input: {
   return best?.key ?? null;
 }
 
-function asksForDates(text: string): boolean {
-  return /\b(?:date|dates|when|from|started|ended|month|year)\b/i.test(text);
-}
-
-function asksForEstimate(text: string): boolean {
-  return /\b(?:approximate(?:ly)?|roughly|estimate[ds]?)\b/i.test(text);
-}
-
-function canCalculateExperience(gap: EvidenceAssessment): boolean {
-  const calculation = gap.experienceCalculation;
-  return Boolean(
-    calculation &&
-      calculation.missingDateRoleIds.length === 0 &&
-      calculation.periods.length > 0,
-  );
-}
-
-function isDateOnlyQuestion(text: string): boolean {
-  if (!asksForDates(text)) return false;
-  return !/\b(?:used|use|which roles|where you|what did you|how did you)\b/i.test(
-    text,
-  );
-}
-
 function questionForGap(input: {
   gap: EvidenceAssessment;
   modelQuestion:
@@ -117,79 +88,29 @@ function questionForGap(input: {
   rolesById: Map<string, { id: string; name: string }>;
 }): { question: PlannedQuestion } | { dropped: DroppedQuestion } {
   const { gap, modelQuestion } = input;
-  if (!modelQuestion && gap.key === WHY_THIS_COMPANY_TARGET_KEY) {
-    const role = input.hiringTeam[0];
-    if (!role) {
-      return {
-        dropped: {
-          targetKey: gap.key,
-          reason:
-            "No hiring-team role was available to ask why this company matters, so that question was left for a later round.",
-        },
-      };
-    }
-    return {
-      question: {
-        targetKey: gap.key,
-        followUp: false,
-        text: consultationConversationCopy.whyThisCompanyQuestion,
-        requirementInterpretation: null,
-        hiringTeamRoleId: role.id,
-        whoCaresNote: `${role.name} will hear why this company matters to the seeker.`,
-      },
-    };
-  }
-  if (!modelQuestion) {
+  const role =
+    (modelQuestion
+      ? input.rolesById.get(modelQuestion.hiringTeamRoleId)
+      : undefined) ?? input.hiringTeam[0];
+  if (!role) {
     return {
       dropped: {
         targetKey: gap.key,
         reason:
-          "A usable question was not written for this requirement, so it was left for a later round.",
+          "No hiring-team role was available to attach this question to.",
       },
     };
   }
-  const text = modelQuestion.text.trim();
-  const role = input.rolesById.get(modelQuestion.hiringTeamRoleId);
-  if (
-    !role ||
-    !modelQuestion.whoCaresNote.trim() ||
-    !modelQuestion.whoCaresNote.toLowerCase().includes(role.name.toLowerCase())
-  ) {
+  const text =
+    modelQuestion?.text.trim() ||
+    (gap.key === WHY_THIS_COMPANY_TARGET_KEY
+      ? consultationConversationCopy.whyThisCompanyQuestion
+      : gap.text.trim());
+  if (!text) {
     return {
       dropped: {
         targetKey: gap.key,
-        reason:
-          "The question was not grounded in a hiring-team role, so it was left out of this round.",
-      },
-    };
-  }
-  if (
-    modelQuestion.requirementInterpretation &&
-    questionRestatesTarget(text, gap.text)
-  ) {
-    return {
-      dropped: {
-        targetKey: gap.key,
-        reason:
-          "The question repeated the job wording instead of asking for a concrete story, so it was left out of this round.",
-      },
-    };
-  }
-  if (canCalculateExperience(gap) && isDateOnlyQuestion(text)) {
-    return {
-      dropped: {
-        targetKey: gap.key,
-        reason:
-          "Role dates already support a conservative years calculation, so a date-only question was not asked.",
-      },
-    };
-  }
-  if (asksForEstimate(text)) {
-    return {
-      dropped: {
-        targetKey: gap.key,
-        reason:
-          "The question asked for an estimated duration instead of using the dates already in the profile, so it was left out of this round.",
+        reason: "The model did not return a question for this requirement.",
       },
     };
   }
@@ -199,9 +120,11 @@ function questionForGap(input: {
       followUp: false,
       text,
       requirementInterpretation:
-        modelQuestion.requirementInterpretation?.trim() || null,
+        modelQuestion?.requirementInterpretation?.trim() || null,
       hiringTeamRoleId: role.id,
-      whoCaresNote: modelQuestion.whoCaresNote.trim(),
+      whoCaresNote:
+        modelQuestion?.whoCaresNote.trim() ||
+        `${role.name} will hear the answer to this question.`,
     },
   };
 }
@@ -272,7 +195,7 @@ export function planQuestionRound(input: {
   }
   const byKey = new Map(
     input.modelQuestions
-      .filter((question) => validModelQuestion(question.text))
+      .filter((question) => question.text.trim())
       .map((question) => [question.targetKey, question]),
   );
   const rolesById = new Map(input.hiringTeam.map((role) => [role.id, role]));
@@ -300,15 +223,10 @@ export function planQuestionRound(input: {
     const role = modelQuestion
       ? rolesById.get(modelQuestion.hiringTeamRoleId)
       : null;
-    if (
-      !modelQuestion ||
-      !role ||
-      !modelQuestion.whoCaresNote.toLowerCase().includes(role.name.toLowerCase())
-    ) {
+    if (!modelQuestion || !role) {
       dropped.push({
         targetKey: "chronology",
-        reason:
-          "A usable chronology question was not written, so it was left out of this round.",
+        reason: "The model did not return a chronology question.",
       });
     } else {
       questions.push({

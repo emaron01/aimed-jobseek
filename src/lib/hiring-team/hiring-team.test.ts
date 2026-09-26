@@ -398,15 +398,10 @@ describe("hiring team evidence and selectors", () => {
       jobLines: lines,
       evidenceText: "Reports to: Director of Engineering",
     });
-    expect(generateStructured).toHaveBeenCalledTimes(2);
-    const retryPayload = JSON.stringify(generateStructured.mock.calls[1]?.[0]?.messages);
-    expect(retryPayload).toContain("synthesisRejection");
+    expect(generateStructured).toHaveBeenCalledTimes(1);
     expect(drafted.ok).toBe(true);
     if (drafted.ok) {
-      expect(drafted.narrative.overview.text).toContain("fleet");
-      expect(drafted.narrative.needs.some((item) => item.text.includes("5 years of Python"))).toBe(
-        false,
-      );
+      expect(drafted.narrative.overview.text).toContain("reporting line");
     }
   });
 

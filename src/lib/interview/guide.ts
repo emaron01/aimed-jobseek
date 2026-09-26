@@ -505,8 +505,8 @@ export async function requestInterviewGuide(input: {
 
   let skipUnusableQuestions = false;
   if (missing.length > 0 && !alreadyResolved && !input.regenerationInstruction) {
-    let feedback: string[] = [];
     let questions: InterviewClarifyingQuestions["questions"] = [];
+    let lastFailure: string | null = null;
     for (
       let attempt = 0;
       attempt <= consultationConfig.qualityRegenerationAttempts;
@@ -514,21 +514,17 @@ export async function requestInterviewGuide(input: {
     ) {
       const generated = await generateInterviewClarifyingQuestions({
         missing,
-        qualityFeedback: feedback,
+        qualityFeedback: [],
       });
       if (!generated.ok) {
-        return { status: "FAILED", message: generated.message };
-      }
-      const limited = limitClarifyingQuestions(generated.data.questions);
-      const invalid = limited.filter(
-        (question) => !question.text.trim().endsWith("?"),
-      );
-      if (limited.length === 0 || invalid.length > 0) {
-        feedback = ["Write up to three short questions that end with a question mark."];
+        lastFailure = generated.message;
         continue;
       }
-      questions = limited;
+      questions = limitClarifyingQuestions(generated.data.questions);
       break;
+    }
+    if (lastFailure && questions.length === 0) {
+      return { status: "FAILED", message: lastFailure };
     }
     if (questions.length > 0) {
       await prisma.interviewStageGuide.upsert({
