@@ -77,24 +77,45 @@ function JobErrorDetail({
 
 export function WorkspaceJobRefresh({
   campaignId,
+  initialSignature,
 }: {
   campaignId: string;
+  initialSignature?: string;
 }) {
   const router = useRouter();
-  const signature = useRef<string | null>(null);
+  const signature = useRef<string | null>(initialSignature ?? null);
 
   useEffect(() => {
-    const interval = window.setInterval(async () => {
-      const latest = await getApplicationWorkspaceLiveAction(campaignId);
-      if (!latest) return;
-      if (signature.current == null) {
-        signature.current = latest.signature;
-        return;
+    if (initialSignature != null) {
+      signature.current = initialSignature;
+    }
+  }, [initialSignature]);
+
+  useEffect(() => {
+    async function poll() {
+      try {
+        const latest = await getApplicationWorkspaceLiveAction(campaignId);
+        if (!latest) return;
+        if (signature.current == null) {
+          signature.current = latest.signature;
+          return;
+        }
+        if (latest.signature !== signature.current) {
+          signature.current = latest.signature;
+          router.refresh();
+        }
+      } catch (error) {
+        console.error(
+          JSON.stringify({
+            event: "workspace_job_refresh_failed",
+            message: error instanceof Error ? error.message : "unknown",
+          }),
+        );
       }
-      if (latest.signature !== signature.current) {
-        signature.current = latest.signature;
-        router.refresh();
-      }
+    }
+    void poll();
+    const interval = window.setInterval(() => {
+      void poll();
     }, POLL_MS);
     return () => window.clearInterval(interval);
   }, [campaignId, router]);

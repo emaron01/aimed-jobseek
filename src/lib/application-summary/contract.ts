@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const APPLICATION_SUMMARY_PROMPT_VERSION = "10";
+export const APPLICATION_SUMMARY_PROMPT_VERSION = "11";
 
 export const CHEAT_SHEET_SECTION_KINDS = [
   "RECRUITER",
@@ -116,19 +116,10 @@ function coerceOverview(value: unknown): unknown {
   const row = record(value);
   if (!row) return value;
   const thirty = record(row.thirtySecondFit);
-  const recap = record(row.careerRecap);
-  const fallback = thirty ?? recap;
   return {
     ...row,
-    companyBackground: row.companyBackground ?? recap ?? fallback,
-    jobRequirements: Array.isArray(row.jobRequirements)
-      ? row.jobRequirements
-      : Array.isArray(row.gapsToPrepare)
-        ? row.gapsToPrepare.map((item) => {
-            const entry = record(item);
-            return { text: typeof entry?.prompt === "string" ? entry.prompt : "", supports: [] };
-          })
-        : [],
+    companyBackground: row.companyBackground,
+    jobRequirements: Array.isArray(row.jobRequirements) ? row.jobRequirements : [],
     whereSeekerShines: Array.isArray(row.whereSeekerShines)
       ? row.whereSeekerShines
       : thirty
@@ -164,7 +155,10 @@ export const cheatSheetPersonSectionSchema = z.preprocess(
 );
 
 export const applicationSummaryOverviewGenerateSchema = z.object({
-  companyBackground: guidanceItemSchema,
+  companyBackground: z.object({
+    text: z.string().trim().min(1),
+    supports: z.array(supportSchema).optional().default([]),
+  }),
   jobRequirements: z.array(guidanceItemSchema).min(1).max(8),
   whereSeekerShines: z.array(guidanceItemSchema).min(1).max(6),
 });

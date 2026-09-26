@@ -4,15 +4,17 @@ import {
 } from "@/app/actions/application-summary";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { CheatSheetCoachItems } from "@/components/CheatSheetCoachItems";
+import { statedListItems } from "@/lib/application-summary/display";
 import type { CheatSheetNote } from "@/lib/application-summary/notes";
 import type { CheatSheetPersonSection } from "@/lib/application-summary/contract";
 import { applicationSummaryConfig } from "@/lib/product-config";
 
 function TextList({ items }: { items: readonly string[] }) {
-  if (items.length === 0) return <p className="text-sm text-subtle">Not stated.</p>;
+  const stated = statedListItems(items);
+  if (stated.length === 0) return <p className="text-sm text-subtle">Not stated.</p>;
   return (
     <ul className="list-disc space-y-2 pl-5 text-sm text-ink">
-      {items.map((item, index) => (
+      {stated.map((item, index) => (
         <li key={`${index}:${item}`}>{item}</li>
       ))}
     </ul>

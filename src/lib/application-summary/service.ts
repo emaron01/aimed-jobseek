@@ -114,6 +114,17 @@ export function sourcesForPersonSection(input: {
   });
 }
 
+const SHELL_EXCLUDED_SOURCE_CATEGORIES = new Set([
+  ...PER_PERSON_SOURCE_CATEGORIES,
+  "ASSESSMENT",
+]);
+
+export function sourcesForShell(sources: SummarySource[]): SummarySource[] {
+  return sources.filter(
+    (source) => !SHELL_EXCLUDED_SOURCE_CATEGORIES.has(source.category),
+  );
+}
+
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object"
     ? (value as Record<string, unknown>)
@@ -365,6 +376,30 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
   appendSource(sources, "job:location", requirement.location, "JOB");
   appendSource(sources, "job:work-arrangement", requirement.workArrangement, "JOB");
   appendSource(sources, "job:posting", requirement.rawText, "JOB");
+  for (const [index, item] of parseStringArray(requirement.requiredItems).entries()) {
+    appendSource(sources, `job:required:${index}`, item, "JOB");
+  }
+  for (const [index, item] of parseStringArray(requirement.responsibilities).entries()) {
+    appendSource(sources, `job:responsibility:${index}`, item, "JOB");
+  }
+  for (const [index, item] of parseStringArray(requirement.preferredItems).entries()) {
+    appendSource(sources, `job:preferred:${index}`, item, "JOB");
+  }
+  const scorecard = requirement.scorecardJson;
+  if (scorecard && typeof scorecard === "object") {
+    const card = scorecard as {
+      mission?: { text?: unknown };
+      outcomes?: Array<{ text?: unknown }>;
+    };
+    if (typeof card.mission?.text === "string") {
+      appendSource(sources, "job:mission", card.mission.text, "JOB");
+    }
+    for (const [index, outcome] of (card.outcomes ?? []).entries()) {
+      if (typeof outcome?.text === "string") {
+        appendSource(sources, `job:outcome:${index}`, outcome.text, "JOB");
+      }
+    }
+  }
   appendSource(
     sources,
     "job:learned-notes",
@@ -690,9 +725,7 @@ export async function generateApplicationSummary(input: {
   });
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const generated = await generateApplicationSummaryShell({
-      sources: data.sources.filter(
-        (source) => !PER_PERSON_SOURCE_CATEGORIES.has(source.category),
-      ),
+      sources: sourcesForShell(data.sources),
       usage,
     });
     if (!generated.ok) {

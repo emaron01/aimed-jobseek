@@ -35,6 +35,9 @@ function coachGuidance() {
   return assignCoachItemIds(
     applicationSummaryGuidanceSchema.parse({
       overview: {
+        companyBackground: { text: "Acme sells warehouse operations software.", supports: support },
+        jobRequirements: [{ text: "Build a repeatable enterprise motion.", supports: support }],
+        whereSeekerShines: [{ text: "I rebuilt the forecast cadence.", supports: support }],
         thirtySecondFit: { text: "I fit this role because I rebuilt forecast cadence.", supports: support },
         careerRecap: { text: "I have led enterprise sales teams.", supports: support },
         gapsToPrepare: [

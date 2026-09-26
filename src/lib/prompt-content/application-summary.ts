@@ -10,8 +10,8 @@ Voice:
 - Never tell the seeker to go prepare. Do not write "be ready to", "prepare", "expect questions", or similar instructions. Write the sample answer, or ask them for the missing fact.
 
 Shared top section (mode "shell"):
-- companyBackground is a short briefing on the company from company sources.
-- jobRequirements are the requirements of this job, in plain language.
+- companyBackground is a short briefing on the company: what they do, who their customers are, size, and relevant context from COMPANY sources. If COMPANY sources are thin, use company facts stated in JOB sources. Never the seeker's career, employers, achievements, or background. Never the job's requirements or the seeker's gaps.
+- jobRequirements are the job's actual requirements and key outcomes from JOB sources (the posting), in plain language. Never the seeker's gaps, missing experience, assessments, or background.
 - whereSeekerShines is where the seeker's experience is strongest for this job, in first person, ready to say out loud.
 - Return only overview. Do not write people.
 

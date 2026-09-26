@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import { generateApplicationPageMetadata } from "@/lib/application/page-metadata";
 import { generateApplicationSummaryAction } from "@/app/actions/application-summary";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
+import {
+  WorkspaceJobRefresh,
+  WorkspaceProgress,
+} from "@/components/ApplicationWorkspaceLive";
 import { AppActionLink } from "@/components/AppButton";
 import { CheatSheetPersonBody } from "@/components/CheatSheetPersonBody";
 import {
@@ -14,6 +18,8 @@ import {
 } from "@/components/CheatSheetPeopleFilter";
 import { PrintApplicationSummaryButton } from "@/components/PrintApplicationSummaryButton";
 import { PageHeader, TenantMissing } from "@/components/ui";
+import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-status";
+import { statedListItems } from "@/lib/application-summary/display";
 import { getApplicationSummaryView } from "@/lib/application-summary/service";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
@@ -53,10 +59,11 @@ function lines(value: unknown): string[] {
 }
 
 function TextList({ items }: { items: readonly string[] }) {
-  if (items.length === 0) return <p className="text-sm text-subtle">Not stated.</p>;
+  const stated = statedListItems(items);
+  if (stated.length === 0) return <p className="text-sm text-subtle">Not stated.</p>;
   return (
     <ul className="list-disc space-y-2 pl-5 text-sm text-ink">
-      {items.map((item, index) => (
+      {stated.map((item, index) => (
         <li key={`${index}:${item}`}>{item}</li>
       ))}
     </ul>
@@ -113,6 +120,10 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
     notFound();
   }
 
+  const live = await getApplicationWorkspaceLive({
+    organizationId: organization.id,
+    campaignId: id,
+  });
   const canGenerate = view.campaign.ownerUserId === user.id;
   const requirementScorecard = scorecard(view.requirement.scorecardJson);
   const summaryStatus = view.summary?.status ?? null;
@@ -154,6 +165,8 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
       />
 
       <div className="print:hidden">
+        <WorkspaceJobRefresh campaignId={id} initialSignature={live.signature} />
+        <WorkspaceProgress jobs={live.jobs} type="APPLICATION_SUMMARY" stayAndWatch />
         {filterOptions.length > 0 ? (
           <div className="mb-4">
             <CheatSheetPeopleFilter />
@@ -247,7 +260,9 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
           <h3 className="font-medium text-ink">Customers</h3>
           <TextList items={lines(view.research?.customerTypes)} />
         </div>
-        <TextList items={lines(view.research?.hiringSignals)} />
+        {statedListItems(lines(view.research?.hiringSignals)).length > 0 ? (
+          <TextList items={lines(view.research?.hiringSignals)} />
+        ) : null}
       </SummarySection>
 
       <SummarySection id="position" title={applicationSummaryConfig.sections.position}>
