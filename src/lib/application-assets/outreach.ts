@@ -19,11 +19,6 @@ import {
 } from "@/lib/generation/context";
 import { prisma } from "@/lib/prisma-client";
 import {
-  flagInventedClaims,
-  seekerSourceTexts,
-  type ClaimFlagRecord,
-} from "@/lib/grounding/claim-flags";
-import {
   applicationAssetConfig,
   consultationConfig,
   isApplicationInterviewingOrLater,
@@ -606,7 +601,6 @@ async function saveOutreachVersion(input: {
   emailLength: EmailLength | null;
   content: ApplicationAssetContent;
   guidance: string | null;
-  claimFlags?: ClaimFlagRecord;
 }): Promise<{ id: string; version: number }> {
   const groupKey = outreachGroupKey({
     type: input.type as "EMAIL" | "LINKEDIN_CONNECTION_NOTE" | "LINKEDIN_INMAIL",
@@ -642,10 +636,6 @@ async function saveOutreachVersion(input: {
           claimTraceJson: claimTrace(
             input.content,
           ) as unknown as Prisma.InputJsonValue,
-          claimFlagsJson: (input.claimFlags ?? {
-            flags: [],
-            seekerEditedIds: [],
-          }) as unknown as Prisma.InputJsonValue,
           guidance: input.guidance,
           promptVersion: outreachPromptVersion(input.type),
           status: "DRAFT",
@@ -1078,20 +1068,6 @@ export async function generateOutreachAsset(input: {
       continue;
     }
     const content = replaceEmDashesDeep(generated.data);
-    const seeker = seekerSourceTexts({
-      sources: context.sources,
-      profile: context.profile,
-      notes: [context.campaign.applicationGuidance],
-      requirement: context.requirement,
-    });
-    const claimFlags = flagInventedClaims({
-      claims: assetClaims(content).map((claim) => ({
-        id: claim.id,
-        text: claim.text,
-      })),
-      sourceTexts: seeker.texts,
-      names: seeker.names,
-    });
     const saved = await saveOutreachVersion({
       context,
       type: input.type,
@@ -1103,7 +1079,6 @@ export async function generateOutreachAsset(input: {
       emailLength,
       content,
       guidance: input.regenerationInstruction?.trim() || null,
-      claimFlags,
     });
     return { ok: true, assetId: saved.id, version: saved.version };
   }

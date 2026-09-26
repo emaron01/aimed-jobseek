@@ -12,6 +12,7 @@ import { WorkspaceProgress } from "@/components/ApplicationWorkspaceLive";
 import { listPersonPreps } from "@/lib/interview/person-prep";
 import { ConsultationStanding } from "@/components/ConsultationStanding";
 import { ConsultationThread } from "@/components/ConsultationThread";
+import { HarperSuggestionList } from "@/components/HarperSuggestionList";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
 import { OpenWorkspaceHashSection } from "@/components/OpenWorkspaceHashSection";
 import {
@@ -234,6 +235,7 @@ export async function ConsultationSection({
           {vocab.product.singular} and draws out the stories behind the gaps.
           Nothing is added to the {vocab.product.singular} until you confirm it.
         </p>
+        <HarperSuggestionList campaignId={campaignId} />
         <WorkspaceProgress jobs={jobs} type="CONSULTATION" stayAndWatch />
         {consultationBusy || session?.generationStatus === "GENERATING" ? (
           <p className="text-sm text-muted" data-testid="harper-typing">
@@ -336,7 +338,6 @@ export async function ConsultationSection({
               status: statement.status,
               content: statement.content,
               strengtheningNote: statement.strengtheningNote,
-              claimFlagsJson: statement.claimFlagsJson,
             }))}
             latestDraftTurnId={latestDraftTurnId}
           />

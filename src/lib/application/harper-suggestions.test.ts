@@ -59,5 +59,21 @@ describe("Harper suggestions", () => {
       people: [],
     });
     expect(applied.some((item) => item.type === "mark_applied")).toBe(false);
+
+    const consultation = buildHarperSuggestions({
+      campaignId: "camp_1",
+      step: "consultation",
+      facts: { ...facts, consultationStarted: true },
+      people: [],
+      productId: "prod_1",
+    });
+    expect(consultation.some((item) => item.type === "review_job")).toBe(true);
+    expect(consultation.some((item) => item.type === "open_profile")).toBe(true);
+    expect(consultation.find((item) => item.type === "open_profile")?.href).toBe(
+      "/setup/prod_1",
+    );
+    expect(consultation.some((item) => item.type === "start_consultation")).toBe(
+      false,
+    );
   });
 });

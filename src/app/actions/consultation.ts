@@ -333,9 +333,7 @@ export async function resolveConsultationStatementFlagAction(
     return {
       ok: true,
       message:
-        action === "KEPT"
-          ? applicationAssetConfig.labels.claimFlag.keep
-          : applicationAssetConfig.labels.claimFlag.remove,
+        "Saved.",
     };
   } catch (error) {
     return fail(error, "The claim flag could not be updated.");

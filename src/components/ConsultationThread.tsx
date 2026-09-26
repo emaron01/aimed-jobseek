@@ -1,21 +1,13 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import {
   flagConsultationInaccuracyAction,
   replyConsultationAction,
   reviseConsultationResultAction,
-  saveEditedConsultationStatementAction,
   useConsultationResultAction,
 } from "@/app/actions/consultation";
-import { ClaimFlagBanner } from "@/components/ClaimFlagBanner";
-import {
-  claimFlagsFromJson,
-  openClaimFlags,
-  type ClaimFlag,
-} from "@/lib/grounding/claim-flags";
-import { applicationAssetConfig } from "@/lib/product-config";
-import { SubmitButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import {
   consultationConfig,
@@ -39,7 +31,6 @@ export type ThreadStatement = {
   status: string;
   content: string;
   strengtheningNote: string | null;
-  claimFlagsJson?: unknown;
 };
 
 export function ConsultationThread({
@@ -62,10 +53,7 @@ export function ConsultationThread({
   latestDraftTurnId: string | null;
 }) {
   const [pendingReply, setPendingReply] = useState<string | null>(null);
-  const [, saveStatementAction] = useActionState(
-    saveEditedConsultationStatementAction,
-    null,
-  );
+  const [showSeekerReplies, setShowSeekerReplies] = useState(false);
   const statementsByTurn = new Map<string, ThreadStatement[]>();
   for (const statement of statements) {
     const existing = statementsByTurn.get(statement.turnId) ?? [];
@@ -85,10 +73,25 @@ export function ConsultationThread({
     });
   }
   const showThinking = Boolean(pendingReply) && (jobsActive || generating || !persistedPending);
+  const storedSeekerTurns = turns.filter((turn) => turn.speaker === "SEEKER");
 
   return (
     <div className="min-w-0 space-y-3 overflow-hidden" data-testid="consultation-thread">
+      {storedSeekerTurns.length > 0 ? (
+        <AppButton
+          type="button"
+          variant="secondary"
+          data-testid="toggle-seeker-replies"
+          onClick={() => setShowSeekerReplies((open) => !open)}
+        >
+          {showSeekerReplies
+            ? consultationConversationCopy.hideYourReplies
+            : consultationConversationCopy.showYourReplies}
+        </AppButton>
+      ) : null}
       {visibleTurns.map((turn) => {
+        const storedSeeker = turn.speaker === "SEEKER" && turn.id !== "optimistic-seeker";
+        if (storedSeeker && !showSeekerReplies) return null;
         const turnStatements = statementsByTurn.get(turn.id) ?? [];
         const showConfirm =
           canEdit &&
@@ -106,13 +109,13 @@ export function ConsultationThread({
             data-testid={
               turn.speaker === "CONSULTANT"
                 ? "consultation-question"
-                : "consultation-reply"
+                : "consultation-seeker-turn"
             }
           >
             <p className="text-xs font-medium uppercase tracking-wide text-subtle">
               {turn.speaker === "CONSULTANT"
                 ? consultationConfig.displayName
-                : "You"}
+                : consultationConversationCopy.seekerSpeaker}
             </p>
             <p className={`mt-1 text-sm text-ink ${wrapClass}`}>{turn.body}</p>
             {turnStatements.map((statement) => (
@@ -132,44 +135,7 @@ export function ConsultationThread({
                     {statement.strengtheningNote}
                   </p>
                 ) : null}
-                <p
-                  id={`claim-edit-${statement.id}`}
-                  className={`text-sm text-ink ${wrapClass}`}
-                >
-                  {statement.content}
-                </p>
-                {openClaimFlags(claimFlagsFromJson(statement.claimFlagsJson)).map(
-                  (flag: ClaimFlag) => (
-                    <div key={flag.id} className="space-y-2">
-                      <ClaimFlagBanner
-                        campaignId={campaignId}
-                        statementId={statement.id}
-                        flag={flag}
-                        editHref={`#claim-edit-form-${statement.id}`}
-                      />
-                      {canEdit ? (
-                        <form
-                          id={`claim-edit-form-${statement.id}`}
-                          action={saveStatementAction}
-                          className="space-y-2"
-                        >
-                          <input type="hidden" name="campaignId" value={campaignId} />
-                          <input type="hidden" name="statementId" value={statement.id} />
-                          <textarea
-                            name="content"
-                            required
-                            rows={3}
-                            defaultValue={statement.content}
-                            className={fieldClass}
-                          />
-                          <SubmitButton>
-                            {applicationAssetConfig.labels.saveNewVersion}
-                          </SubmitButton>
-                        </form>
-                      ) : null}
-                    </div>
-                  ),
-                )}
+                <p className={`text-sm text-ink ${wrapClass}`}>{statement.content}</p>
               </div>
             ))}
             {showConfirm ? (
@@ -177,7 +143,6 @@ export function ConsultationThread({
                 <ApplicationActionForm
                   action={useConsultationResultAction}
                   submitLabel={consultationConversationCopy.useThis}
-                  pendingLabel="Saving…"
                   testId="use-consultation-result"
                 >
                   <input type="hidden" name="campaignId" value={campaignId} />

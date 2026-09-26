@@ -234,9 +234,7 @@ export async function resolveApplicationAssetFlagAction(
     return {
       ok: true,
       message:
-        action === "KEPT"
-          ? applicationAssetConfig.labels.claimFlag.keep
-          : applicationAssetConfig.labels.claimFlag.remove,
+        "Saved.",
       assetId: result.assetId,
       version: result.version,
     };

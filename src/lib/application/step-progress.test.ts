@@ -50,6 +50,7 @@ describe("application step routes", () => {
       "/campaigns/camp_1/consultation",
     );
     expect(applicationStepList.map((step) => step.key)).toEqual([
+      "applied",
       "company",
       "job",
       "consultation",
@@ -58,7 +59,6 @@ describe("application step routes", () => {
       "outreach",
       "interviews",
       "summary",
-      "applied",
     ]);
     expect(applicationStepList.find((step) => step.key === "assets")?.title).toBe(
       applicationAssetConfig.labels.sectionTitle,

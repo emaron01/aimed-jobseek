@@ -504,10 +504,6 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
     expect(view.summary?.status).toBe("READY");
     expect(view.guidance).not.toBeNull();
     expect(view.summary?.generationError).toBeNull();
-    expect(view.claimFlags.length).toBeGreaterThan(0);
-    expect(view.claimFlags.some((flag) => flag.text.includes("FictionalCorp"))).toBe(
-      true,
-    );
   });
 
   it("does not render leftover Application Summary blocking errors", async () => {

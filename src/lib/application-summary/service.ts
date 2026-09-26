@@ -24,13 +24,6 @@ import { applicationSummaryConfig, sanitizeWorkspaceFailure, vocab } from "@/lib
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
-import {
-  claimFlagsFromJson,
-  flagInventedClaims,
-  openClaimFlags,
-  resolveClaimFlag,
-  seekerSourceTexts,
-} from "@/lib/grounding/claim-flags";
 import { usableEmployerResearch } from "@/lib/job-requirement/identity-verification";
 
 export type SummarySource = {
@@ -531,20 +524,11 @@ export async function generateApplicationSummary(input: {
       }
       continue;
     }
-    const seeker = seekerSourceTexts({
-      sources: data.sources,
-    });
-    const claimFlags = flagInventedClaims({
-      claims: flattenGuidanceTexts(generated.data),
-      sourceTexts: seeker.texts,
-      names: seeker.names,
-    });
     await prisma.applicationSummary.update({
       where: { campaignId: input.campaignId },
       data: {
         status: "READY",
         guidanceJson: generated.data,
-        claimFlagsJson: claimFlags as object,
         sourceHash: data.sourceHash,
         generationError: null,
         generatedAt: new Date(),
@@ -560,26 +544,6 @@ export async function generateApplicationSummary(input: {
       generationError: `${applicationSummaryConfig.title} could not be generated. Retry.`,
     },
   });
-}
-
-function flattenGuidanceTexts(
-  value: unknown,
-  path = "guidance",
-): Array<{ id: string; text: string }> {
-  if (typeof value === "string" && value.trim()) {
-    return [{ id: path, text: value }];
-  }
-  if (Array.isArray(value)) {
-    return value.flatMap((item, index) =>
-      flattenGuidanceTexts(item, `${path}.${index}`),
-    );
-  }
-  if (value && typeof value === "object") {
-    return Object.entries(value).flatMap(([key, item]) =>
-      flattenGuidanceTexts(item, path ? `${path}.${key}` : key),
-    );
-  }
-  return [];
 }
 
 export async function getApplicationSummaryView(input: {
@@ -614,9 +578,6 @@ export async function getApplicationSummaryView(input: {
           ),
         }
       : null,
-    claimFlags: openClaimFlags(
-      claimFlagsFromJson(data.campaign.applicationSummary?.claimFlagsJson),
-    ),
     guidance: guidance?.success ? guidance.data : null,
     stale:
       data.campaign.applicationSummary?.status === "READY" &&
@@ -657,15 +618,9 @@ export async function resolveApplicationSummaryFlag(input: {
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
   if (!summary) throw new TenantError(`${applicationSummaryConfig.title} was not found.`);
-  const nextFlags = resolveClaimFlag(
-    claimFlagsFromJson(summary.claimFlagsJson),
-    input.claimId,
-    input.action,
-  );
   await prisma.applicationSummary.update({
     where: { campaignId: input.campaignId },
     data: {
-      claimFlagsJson: nextFlags as object,
       guidanceJson:
         input.action === "REMOVED"
           ? (blankGuidancePath(summary.guidanceJson, input.claimId) as object)

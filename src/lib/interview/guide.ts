@@ -16,10 +16,6 @@ import {
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
-import {
-  flagInventedClaims,
-  seekerSourceTexts,
-} from "@/lib/grounding/claim-flags";
 import { generateInterviewClarifyingQuestions, generateInterviewGuideWithModel } from "./ai";
 import {
   INTERVIEW_GUIDE_PROMPT_VERSION,
@@ -619,24 +615,11 @@ export async function requestInterviewGuide(input: {
       }
       continue;
     }
-    const seeker = seekerSourceTexts({
-      sources: context.sources,
-      profile: { experience: context.experience },
-    });
-    const claimFlags = flagInventedClaims({
-      claims: interviewGuideClaims(generated.data).map((claim, index) => ({
-        id: claim.id ?? `guide_${index}`,
-        text: claim.text,
-      })),
-      sourceTexts: seeker.texts,
-      names: seeker.names,
-    });
     await prisma.interviewStageGuide.update({
       where: { stageId: input.stageId },
       data: {
         status: "READY",
         contentJson: generated.data as unknown as Prisma.InputJsonValue,
-        claimFlagsJson: claimFlags as unknown as Prisma.InputJsonValue,
         sourceHash: context.sourceHash,
         generationError: null,
         generatedAt: new Date(),

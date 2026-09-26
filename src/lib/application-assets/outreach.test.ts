@@ -79,8 +79,8 @@ describe("sales-only entry points", () => {
     const campaignPage = readFileSync("src/app/(app)/campaigns/[id]/page.tsx", "utf8");
     expect(campaignPage).toContain("anyListFeatureEnabled()");
     expect(campaignPage).toContain('anyListFeatureEnabled() && currentStage === "list"');
-    expect(campaignPage).toMatch(/anyListFeatureEnabled\(\)\s*\?\s*`Stage \$\{/);
-    expect(campaignPage).not.toMatch(/description=\{`Stage \$\{/);
+    expect(campaignPage).toMatch(/anyListFeatureEnabled\(\)\s*\?\s*\(/);
+    expect(campaignPage).toContain("description={`Stage ${");
     const workspace = readFileSync(
       "src/components/EmailSequenceWorkspace.tsx",
       "utf8",

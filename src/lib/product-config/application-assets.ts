@@ -29,20 +29,6 @@ export const applicationAssetConfig = Object.freeze({
       "This version was not saved because some claims did not match their sources.",
     violationFix:
       "Confirm this fact with {consultant} or edit the {product}.",
-    claimFlag: {
-      number: "This number isn't in your materials. Keep it, edit it, or remove it.",
-      employer:
-        "This employer isn't in your materials. Keep it, edit it, or remove it.",
-      title: "This title isn't in your materials. Keep it, edit it, or remove it.",
-      date: "This date isn't in your materials. Keep it, edit it, or remove it.",
-      credential:
-        "This credential isn't in your materials. Keep it, edit it, or remove it.",
-      outcome:
-        "This outcome isn't in your materials. Keep it, edit it, or remove it.",
-      keep: "Keep",
-      edit: "Edit",
-      remove: "Remove",
-    },
     saveNewVersion: "Save as new version",
     seekerEditedGuidance: "Edited by you",
     partialRemoved:

@@ -3,6 +3,13 @@
  * Accepts aliases so a renamed input still reaches the action.
  */
 
+export function readLineList(formData: FormData, name: string): string[] {
+  return String(formData.get(name) ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 export function readTrimmedField(
   formData: FormData,
   ...names: string[]

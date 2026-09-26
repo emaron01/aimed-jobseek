@@ -31,12 +31,12 @@ export function Sidebar({ items }: { items: SidebarNavItem[] }) {
   const campaignId = campaignIdFromPathname(pathname);
 
   return (
-    <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-ink bg-ink text-on-ink print:hidden">
-      <div className="border-b border-on-ink/15 px-5 py-5">
-        <p className="text-xs font-medium uppercase tracking-[0.14em] text-on-ink/70">
+    <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-on-nav/15 bg-nav text-on-nav print:hidden">
+      <div className="border-b border-on-nav/15 px-5 py-5">
+        <p className="text-xs font-medium uppercase tracking-[0.14em] text-on-nav/70">
           {brand.lockupEyebrow}
         </p>
-        <h1 className="mt-1 text-lg font-semibold tracking-tight text-on-ink">
+        <h1 className="mt-1 text-lg font-semibold tracking-tight text-on-nav">
           {brand.appName}
         </h1>
       </div>
@@ -53,7 +53,7 @@ export function Sidebar({ items }: { items: SidebarNavItem[] }) {
             <div key={item.href}>
               {item.separatorBefore ? (
                 <div
-                  className="my-2 border-t border-on-ink/15"
+                  className="my-2 border-t border-on-nav/15"
                   aria-hidden="true"
                 />
               ) : null}
@@ -61,10 +61,8 @@ export function Sidebar({ items }: { items: SidebarNavItem[] }) {
                 href={item.href}
                 data-testid={`sidebar-${item.href}`}
                 className={cn(
-                  "block rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-primary text-on-primary"
-                    : "text-on-ink/85 hover:bg-on-ink/10",
+                  "block rounded-md bg-surface px-3 py-2 text-sm font-medium text-ink transition-colors",
+                  active ? "bg-surface text-ink" : "hover:bg-surface",
                 )}
               >
                 {item.label}

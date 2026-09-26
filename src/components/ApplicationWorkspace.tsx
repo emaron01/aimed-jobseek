@@ -44,6 +44,8 @@ import {
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { InterviewStagesSection } from "@/components/InterviewStagesSection";
 import { ApplicationAssetsSection } from "@/components/ApplicationAssetsSection";
+import { ApplicationCompanyUpdateForm } from "@/components/ApplicationCompanyUpdateForm";
+import { ApplicationJobRequirementForm } from "@/components/ApplicationJobRequirementForm";
 import { EmptyState } from "@/components/design";
 import { OpenDetailsOnMount } from "@/components/OpenDetailsOnMount";
 import {
@@ -524,6 +526,26 @@ export async function ApplicationWorkspace({
 
   return (
     <div className={`space-y-4 ${WORKSPACE_CARD_WRAP_CLASS}`}>
+    {showFocus(focus, ["overview", "applied"]) ? (
+    <details
+      className="rounded-lg border border-edge bg-surface p-5"
+      data-testid="application-applied-wrap"
+      id="applied"
+    >
+      {asPage ? <OpenDetailsOnMount /> : null}
+      <summary className="cursor-pointer text-base font-semibold text-ink">
+        {applicationWorkspaceCopy.appliedTitle}
+      </summary>
+      <div className="mt-4">
+    <ApplicationAppliedSection
+      campaignId={requirement.campaignId}
+      canEdit={canEdit}
+      appliedAt={requirement.campaign.appliedAt?.toISOString() ?? null}
+      applicationProgress={requirement.campaign.applicationProgress}
+    />
+      </div>
+    </details>
+    ) : null}
     {showFocus(focus, ["overview"]) ? (
     <section
       className={`space-y-3 rounded-lg border border-edge bg-surface p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
@@ -581,6 +603,26 @@ export async function ApplicationWorkspace({
           research={research}
           researchStatus={researchStatus}
         />
+        {canEdit ? (
+          <ApplicationCompanyUpdateForm
+            campaignId={campaignId}
+            companyName={requirement.companyName}
+            defaults={{
+              companySummary: research?.companySummary ?? null,
+              whatTheySell: research?.whatTheySell ?? null,
+              businessModel: research?.businessModel ?? null,
+              companySizeContext: research?.companySizeContext ?? null,
+              estimatedAov: research?.estimatedAov ?? null,
+              aovReasoning: research?.aovReasoning ?? null,
+              customerTypes: research?.customerTypes ?? [],
+              primaryMarkets: research?.primaryMarkets ?? [],
+              relevantTechnologies: research?.relevantTechnologies ?? [],
+              buyingSignals: research?.buyingSignals ?? [],
+              hiringSignals: research?.hiringSignals ?? [],
+              riskSignals: research?.riskSignals ?? [],
+            }}
+          />
+        ) : null}
       </div>
     </details>
     ) : null}
@@ -616,6 +658,23 @@ export async function ApplicationWorkspace({
       <BulletList title={applicationWorkspaceCopy.responsibilitiesTitle} items={textList(requirement.responsibilities)} />
       <BulletList title={applicationWorkspaceCopy.requiredTitle} items={textList(requirement.requiredItems)} />
       <BulletList title={applicationWorkspaceCopy.preferredTitle} items={textList(requirement.preferredItems)} />
+      {canEdit ? (
+        <ApplicationJobRequirementForm
+          campaignId={requirement.campaignId}
+          title={requirement.title}
+          companyName={requirement.companyName}
+          location={requirement.location}
+          workArrangement={requirement.workArrangement}
+          employmentType={requirement.employmentType}
+          seniority={requirement.seniority}
+          compensationRange={requirement.compensationRange}
+          reportingLine={requirement.reportingLine}
+          responsibilities={requirement.responsibilities}
+          requiredItems={requirement.requiredItems}
+          preferredItems={requirement.preferredItems}
+          scorecard={scorecard}
+        />
+      ) : null}
       <div className="space-y-3 border-t border-edge pt-4">
         <h3 className="text-sm font-semibold text-ink">{applicationWorkspaceCopy.scorecardTitle}</h3>
         {scorecard.mission ? (
@@ -803,7 +862,6 @@ export async function ApplicationWorkspace({
           version: asset.version,
           status: asset.status,
           content: asset.contentJson,
-          claimFlagsJson: asset.claimFlagsJson,
           guidance: asset.guidance,
           promptVersion: asset.promptVersion,
           createdAt: asset.createdAt.toISOString(),
@@ -858,31 +916,10 @@ export async function ApplicationWorkspace({
           sentAt: asset.sentAt?.toISOString() ?? null,
           emailLength: asset.emailLength,
           content: asset.contentJson,
-          claimFlagsJson: asset.claimFlagsJson,
         }))}
     />
     </div>
     </>
-    ) : null}
-    {showFocus(focus, ["overview", "applied"]) ? (
-    <details
-      className="rounded-lg border border-edge bg-surface p-5"
-      data-testid="application-applied-wrap"
-      id="applied"
-    >
-      {asPage ? <OpenDetailsOnMount /> : null}
-      <summary className="cursor-pointer text-base font-semibold text-ink">
-        {applicationWorkspaceCopy.appliedTitle}
-      </summary>
-      <div className="mt-4">
-    <ApplicationAppliedSection
-      campaignId={requirement.campaignId}
-      canEdit={canEdit}
-      appliedAt={requirement.campaign.appliedAt?.toISOString() ?? null}
-      applicationProgress={requirement.campaign.applicationProgress}
-    />
-      </div>
-    </details>
     ) : null}
     {showFocus(focus, ["interviews"]) ? (
     <div id="interviews">

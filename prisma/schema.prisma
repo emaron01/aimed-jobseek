@@ -2646,8 +2646,6 @@ model ConsultationStatement {
   /// Model-written coaching shown separately from the seeker's reusable statement.
   strengtheningNote String?
   groundingJson     Json
-  /// Model-invented fact flags. Saving never waits on these.
-  claimFlagsJson    Json?
   promptVersion     String
   generation        Int                         @default(1)
   approvedAt        DateTime?
@@ -2701,7 +2699,6 @@ model ApplicationSummary {
   campaignId      String                       @unique
   status          ConsultationGenerationStatus @default(GENERATING)
   guidanceJson    Json?
-  claimFlagsJson  Json?
   sourceHash      String?
   promptVersion   String
   generationError String?
@@ -2734,8 +2731,6 @@ model ApplicationAsset {
   version           Int
   contentJson       Json
   claimTraceJson    Json
-  /// Model-invented fact flags. Saving never waits on these.
-  claimFlagsJson    Json?
   guidance          String?
   promptVersion     String
   status            ApplicationAssetStatus      @default(DRAFT)
@@ -2838,7 +2833,6 @@ model InterviewStageGuide {
   clarifyingAnswersJson    Json?
   clarifyingSkipped        Boolean                      @default(false)
   contentJson              Json?
-  claimFlagsJson           Json?
   sourceHash               String?
   promptVersion            String
   generationError          String?

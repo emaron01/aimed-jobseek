@@ -9,12 +9,6 @@ import {
   writePresentationPlanAction,
   type ApplicationAssetActionResult,
 } from "@/app/actions/application-assets";
-import { ClaimFlagBanner } from "@/components/ClaimFlagBanner";
-import {
-  claimFlagsFromJson,
-  openClaimFlags,
-  type ClaimFlag,
-} from "@/lib/grounding/claim-flags";
 import {
   applicationAssetContentSchema,
   type ApplicationAssetContent,
@@ -50,7 +44,6 @@ type AssetRow = {
   version: number;
   status: "DRAFT" | "APPROVED";
   content: ApplicationAssetContent;
-  claimFlags: ClaimFlag[];
   guidance: string | null;
   promptVersion: string;
   createdAt: string;
@@ -135,35 +128,10 @@ function Status({
   );
 }
 
-function ClaimFlagActions({
-  campaignId,
-  assetId,
-  flag,
-}: {
-  campaignId: string;
-  assetId: string;
-  flag: ClaimFlag;
-}) {
-  return (
-    <ClaimFlagBanner
-      campaignId={campaignId}
-      assetId={assetId}
-      flag={flag}
-      editHref={`#claim-edit-${flag.claimId}`}
-    />
-  );
-}
-
 function ClaimText({
   claim,
-  flag,
-  campaignId,
-  assetId,
 }: {
   claim: AssetClaim;
-  flag?: ClaimFlag;
-  campaignId?: string;
-  assetId?: string;
 }) {
   const support = claim.supports
     .map((item) => formatClaimSupportLabel(item.sourceId, item.quote))
@@ -173,29 +141,16 @@ function ClaimText({
       <span title={support} tabIndex={0} className="cursor-help underline decoration-dotted">
         {claim.text}
       </span>
-      {flag && campaignId && assetId ? (
-        <ClaimFlagActions campaignId={campaignId} assetId={assetId} flag={flag} />
-      ) : null}
     </span>
   );
-}
-
-function flagFor(flags: ClaimFlag[], claimId: string): ClaimFlag | undefined {
-  return flags.find((flag) => flag.claimId === claimId);
 }
 
 function AssetPreview({
   content,
   earlierExperienceHeading,
-  flags = [],
-  campaignId,
-  assetId,
 }: {
   content: ApplicationAssetContent;
   earlierExperienceHeading: string | null;
-  flags?: ClaimFlag[];
-  campaignId?: string;
-  assetId?: string;
 }) {
   if (content.type === "COVER_LETTER") {
     const paragraphs = visibleItems(content.paragraphs, (claim) => claim.text);
@@ -207,9 +162,6 @@ function AssetPreview({
             <p key={claim.id}>
               <ClaimText
                 claim={claim}
-                flag={flagFor(flags, claim.id)}
-                campaignId={campaignId}
-                assetId={assetId}
               />
             </p>
           ))
@@ -235,9 +187,6 @@ function AssetPreview({
         <h4 className="text-xl font-semibold">
           <ClaimText
             claim={content.header.name}
-            flag={flagFor(flags, content.header.name.id)}
-            campaignId={campaignId}
-            assetId={assetId}
           />
         </h4>
         <p className="mt-1">
@@ -246,9 +195,6 @@ function AssetPreview({
               {index > 0 ? " | " : ""}
               <ClaimText
                 claim={claim}
-                flag={flagFor(flags, claim.id)}
-                campaignId={campaignId}
-                assetId={assetId}
               />
             </span>
           ))}
@@ -260,9 +206,6 @@ function AssetPreview({
             <p key={claim.id}>
               <ClaimText
                 claim={claim}
-                flag={flagFor(flags, claim.id)}
-                campaignId={campaignId}
-                assetId={assetId}
               />
             </p>
           ))
@@ -292,9 +235,6 @@ function AssetPreview({
                   <li key={claim.id}>
                     <ClaimText
                 claim={claim}
-                flag={flagFor(flags, claim.id)}
-                campaignId={campaignId}
-                assetId={assetId}
               />
                   </li>
                 ))}
@@ -331,9 +271,6 @@ function AssetPreview({
                 <p key={claim.id}>
                   <ClaimText
                 claim={claim}
-                flag={flagFor(flags, claim.id)}
-                campaignId={campaignId}
-                assetId={assetId}
               />
                 </p>
               ),
@@ -435,13 +372,6 @@ function AssetEditor({
             }
             className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
           />
-          {flagFor(asset.claimFlags, claim.id) ? (
-            <ClaimFlagActions
-              campaignId={campaignId}
-              assetId={asset.id}
-              flag={flagFor(asset.claimFlags, claim.id)!}
-            />
-          ) : null}
         </label>
       ))}
       <SubmitButton>{applicationAssetConfig.labels.saveNewVersion}</SubmitButton>
@@ -483,9 +413,6 @@ function AssetHistory({
             <AssetPreview
               content={asset.content}
               earlierExperienceHeading={earlierExperienceHeading}
-              flags={asset.claimFlags}
-              campaignId={campaignId}
-              assetId={asset.id}
             />
             {asset.guidance ? (
               <p className="text-xs text-subtle">
@@ -755,9 +682,8 @@ export function ApplicationAssetsSection({
 }: {
   campaignId: string;
   assets: Array<
-    Omit<AssetRow, "content" | "claimFlags"> & {
+    Omit<AssetRow, "content"> & {
       content: unknown;
-      claimFlagsJson?: unknown;
     }
   >;
   profileRoles: ProfileRole[];
@@ -777,7 +703,6 @@ export function ApplicationAssetsSection({
         {
           ...asset,
           content: sanitizeAssetContent(parsed.data),
-          claimFlags: openClaimFlags(claimFlagsFromJson(asset.claimFlagsJson)),
         },
       ];
     }
@@ -798,9 +723,6 @@ export function ApplicationAssetsSection({
               {
                 ...asset,
                 content: retry.data,
-                claimFlags: openClaimFlags(
-                  claimFlagsFromJson(asset.claimFlagsJson),
-                ),
               },
             ]
           : [];

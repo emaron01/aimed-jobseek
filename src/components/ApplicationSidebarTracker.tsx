@@ -97,14 +97,12 @@ export function ApplicationTrackerList({
             data-testid={`tracker-step-${step.key}`}
             aria-current={step.isCurrent ? "page" : undefined}
             className={cn(
-              "flex items-start gap-2 rounded-md px-2 py-1.5 text-sm transition-colors duration-200 motion-reduce:transition-none",
+              "flex items-start gap-2 rounded-md bg-surface px-2 py-1.5 text-sm text-ink transition-colors duration-200 motion-reduce:transition-none",
               step.isCurrent
-                ? ink
-                  ? "bg-primary text-on-primary"
-                  : "bg-primary/10 text-primary"
+                ? "bg-surface text-ink"
                 : ink
-                  ? "text-on-ink/90 hover:bg-on-ink/10"
-                  : "text-ink hover:bg-canvas",
+                  ? "hover:bg-surface"
+                  : "hover:bg-canvas",
             )}
           >
             <ApplicationStepMarker state={step.state} current={step.isCurrent} />
@@ -180,7 +178,7 @@ export function ApplicationSidebarTracker({
   if (!loaded) {
     return (
       <div className="px-3 py-3" data-testid="application-tracker-loading">
-        <p className="text-xs font-medium uppercase tracking-[0.14em] text-on-ink/70">
+        <p className="text-xs font-medium uppercase tracking-[0.14em] text-on-nav/70">
           {applicationStepCopy.trackerLabel}
         </p>
         <Skeleton className="mt-2" lines={4} />
@@ -200,11 +198,11 @@ export function ApplicationSidebarTracker({
   if (!tracker) return null;
 
   return (
-    <div className="border-b border-on-ink/15 px-3 py-3">
-      <p className="truncate text-sm font-semibold text-on-ink" title={tracker.campaignName}>
+    <div className="border-b border-on-nav/15 px-3 py-3">
+      <p className="truncate text-sm font-semibold text-on-nav" title={tracker.campaignName}>
         {tracker.campaignName}
       </p>
-      <p className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-on-ink/70">
+      <p className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-on-nav/70">
         {applicationStepCopy.trackerLabel}
       </p>
       <div className="mt-2">

@@ -39,7 +39,6 @@ import {
   NORMAL_JOB_MODEL,
   NORMAL_JOB_POSTING,
 } from "@/lib/job-requirement/fixtures";
-import { claimFlagsFromJson } from "@/lib/grounding/claim-flags";
 import { applicationAssetConfig, vocab } from "@/lib/product-config";
 import { fixtureAlexChenProfile } from "@/lib/product-research/fixtures/alex-chen-profile";
 import { confirmProfileContactDetails } from "@/lib/product-research/contact-details";
@@ -642,9 +641,6 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     expect(
       keptContent.experience[0]?.bullets.some((item) => item.text.includes("18")),
     ).toBe(true);
-    const flags = claimFlagsFromJson(kept?.claimFlagsJson);
-    expect(flags.flags.some((flag) => flag.claimId === "bullet-1")).toBe(true);
-    expect(flags.flags[0]?.status).toBe("OPEN");
   });
 
   it("saves a resume with an invented fact and flags the line", async () => {
@@ -669,8 +665,6 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     });
     const content = saved?.contentJson as ResumeAssetContent | undefined;
     expect(content?.summary.some((item) => item.id === "fabricated")).toBe(true);
-    const flags = claimFlagsFromJson(saved?.claimFlagsJson);
-    expect(flags.flags.some((flag) => flag.claimId === "fabricated")).toBe(true);
     const kept = await resolveApplicationAssetFlag({
       organizationId,
       campaignId,
@@ -680,14 +674,6 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
       action: "KEPT",
     });
     expect(kept.ok).toBe(true);
-    const afterKeep = await prisma.applicationAsset.findFirst({
-      where: { id: saved!.id },
-    });
-    expect(
-      claimFlagsFromJson(afterKeep?.claimFlagsJson).flags.find(
-        (flag) => flag.claimId === "fabricated",
-      )?.status,
-    ).toBe("KEPT");
   });
 
   it("preserves exact roles and seeker hide choices", async () => {

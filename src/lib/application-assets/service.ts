@@ -25,14 +25,6 @@ import {
   validateAssetClaimsWithModel,
 } from "./ai";
 import {
-  claimFlagsFromJson,
-  flagInventedClaims,
-  markClaimSeekerEdited,
-  resolveClaimFlag,
-  seekerSourceTexts,
-  type ClaimFlagRecord,
-} from "@/lib/grounding/claim-flags";
-import {
   COVER_LETTER_ASSET_PROMPT_VERSION,
   RESUME_ASSET_PROMPT_VERSION,
   applicationAssetContentSchema,
@@ -730,43 +722,6 @@ export async function validateAssetContent(input: {
   return [...new Set(errors)];
 }
 
-function flaggableAssetClaims(content: ApplicationAssetContent): Array<{
-  id: string;
-  text: string;
-  section?: string;
-}> {
-  const credentialIds =
-    content.type === "RESUME"
-      ? new Set(content.credentials.map((claim) => claim.id))
-      : new Set<string>();
-  return assetClaims(content).map((claim) => ({
-    id: claim.id,
-    text: claim.text,
-    section: credentialIds.has(claim.id) ? "credentials" : undefined,
-  }));
-}
-
-function flagsForAssetContent(
-  content: ApplicationAssetContent,
-  context: ReadyApplicationGenerationContext,
-  previous?: ClaimFlagRecord,
-  seekerEditedIds?: Iterable<string>,
-): ClaimFlagRecord {
-  const seeker = seekerSourceTexts({
-    sources: context.sources,
-    profile: context.profile,
-    notes: [context.campaign.applicationGuidance],
-    requirement: context.requirement,
-  });
-  return flagInventedClaims({
-    claims: flaggableAssetClaims(content),
-    sourceTexts: seeker.texts,
-    names: seeker.names,
-    seekerEditedIds,
-    previous,
-  });
-}
-
 function coverLetterSalutation(context: ReadyApplicationGenerationContext): string {
   return context.hiringManagerContactName
     ? `Dear ${context.hiringManagerContactName},`
@@ -779,7 +734,6 @@ async function saveVersion(input: {
   personaId: string | null;
   content: ApplicationAssetContent;
   guidance: string | null;
-  claimFlags: ClaimFlagRecord;
 }): Promise<{ id: string; version: number }> {
   return prisma.$transaction(
     async (tx) => {
@@ -804,7 +758,6 @@ async function saveVersion(input: {
             input.content,
             input.context,
           ) as unknown as Prisma.InputJsonValue,
-          claimFlagsJson: input.claimFlags as unknown as Prisma.InputJsonValue,
           guidance: input.guidance,
           promptVersion: promptVersion(input.type),
           status: "DRAFT",
@@ -933,12 +886,11 @@ export async function generateApplicationAsset(input: {
         context.profile,
       ),
     );
-    const claimFlags = flagsForAssetContent(content, context);
     if (input.type === "COVER_LETTER") {
       logCoverLetterValidationAttempt({
         campaignId: context.campaign.id,
         attempt: attempt + 1,
-        reasons: claimFlags.flags.map((flag) => flag.message),
+        reasons: [],
         passed: true,
       });
     }
@@ -948,7 +900,6 @@ export async function generateApplicationAsset(input: {
       personaId,
       content,
       guidance: input.regenerationInstruction?.trim() || null,
-      claimFlags,
     });
     return { ok: true, assetId: saved.id, version: saved.version };
   }
@@ -1042,36 +993,12 @@ export async function saveEditedApplicationAsset(input: {
     };
   }
   const readyContext = context as ReadyApplicationGenerationContext;
-  const previousContent = applicationAssetContentSchema.safeParse(
-    existing.contentJson,
-  );
-  const previousTexts = new Map(
-    previousContent.success
-      ? assetClaims(previousContent.data).map((claim) => [claim.id, claim.text])
-      : [],
-  );
-  const editedIds = assetClaims(content)
-    .filter((claim) => previousTexts.get(claim.id) !== claim.text)
-    .map((claim) => claim.id);
-  const claimFlags = markClaimSeekerEdited(
-    flagsForAssetContent(
-      content,
-      readyContext,
-      claimFlagsFromJson(existing.claimFlagsJson),
-      [
-        ...claimFlagsFromJson(existing.claimFlagsJson).seekerEditedIds,
-        ...editedIds,
-      ],
-    ),
-    editedIds,
-  );
   const saved = await saveVersion({
     context: readyContext,
     type: existing.type,
     personaId: existing.personaId,
     content,
     guidance: applicationAssetConfig.labels.seekerEditedGuidance,
-    claimFlags,
   });
   return { ok: true, assetId: saved.id, version: saved.version };
 }
@@ -1121,11 +1048,6 @@ export async function resolveApplicationAssetFlag(input: {
   if (input.action === "REMOVED") {
     content = sanitizeAssetContent(stripClaimsById(content, new Set([claimId])));
   }
-  const claimFlags = resolveClaimFlag(
-    claimFlagsFromJson(existing.claimFlagsJson),
-    claimId,
-    input.action,
-  );
   const context = await loadApplicationGenerationContext(
     input.campaignId,
     input.userId,
@@ -1142,7 +1064,6 @@ export async function resolveApplicationAssetFlag(input: {
     where: { id: existing.id },
     data: {
       contentJson: content as unknown as Prisma.InputJsonValue,
-      claimFlagsJson: claimFlags as unknown as Prisma.InputJsonValue,
       claimTraceJson: claimTrace(
         content,
         context as ReadyApplicationGenerationContext,

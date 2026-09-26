@@ -9,13 +9,24 @@ import {
   rejectApplicationEmployerIdentity,
   rescoreApplicationFit,
   retryApplicationResearch,
+  updateApplicationCompanyInformation,
+  updateApplicationJobRequirement,
 } from "@/lib/application/service";
 import { consultationConversationCopy } from "@/lib/product-config";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { getApplicationResearchStatus } from "@/lib/application/research-status";
 import type { ApplicationResearchStatusView } from "@/lib/application/research-status";
-import { applicationResearchCopy, employerIdentityCopy, vocab } from "@/lib/product-config";
-import { readEmployerCorrectionFields } from "@/lib/application/form-fields";
+import {
+  applicationResearchCopy,
+  applicationWorkspaceCopy,
+  employerIdentityCopy,
+  vocab,
+} from "@/lib/product-config";
+import {
+  readEmployerCorrectionFields,
+  readLineList,
+  readTrimmedField,
+} from "@/lib/application/form-fields";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
 
@@ -198,5 +209,78 @@ export async function retryApplicationNextStepAction(
     return { ok: true, message: consultationConversationCopy.nextStepRetry };
   } catch (error) {
     return fail(error, consultationConversationCopy.nextStepFailed);
+  }
+}
+
+export async function updateApplicationCompanyInformationAction(
+  _prev: ApplicationActionResult | null,
+  formData: FormData,
+): Promise<ApplicationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = readTrimmedField(formData, "campaignId");
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    await updateApplicationCompanyInformation({
+      organizationId,
+      campaignId,
+      companyName: readTrimmedField(formData, "companyName"),
+      companySummary: readTrimmedField(formData, "companySummary"),
+      whatTheySell: readTrimmedField(formData, "whatTheySell"),
+      businessModel: readTrimmedField(formData, "businessModel"),
+      companySizeContext: readTrimmedField(formData, "companySizeContext"),
+      estimatedAov: readTrimmedField(formData, "estimatedAov"),
+      aovReasoning: readTrimmedField(formData, "aovReasoning"),
+      customerTypes: readLineList(formData, "customerTypes"),
+      primaryMarkets: readLineList(formData, "primaryMarkets"),
+      relevantTechnologies: readLineList(formData, "relevantTechnologies"),
+      buyingSignals: readLineList(formData, "buyingSignals"),
+      hiringSignals: readLineList(formData, "hiringSignals"),
+      riskSignals: readLineList(formData, "riskSignals"),
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/campaigns/${campaignId}/company`);
+    return { ok: true, message: applicationWorkspaceCopy.companyUpdateSave };
+  } catch (error) {
+    return fail(error, applicationWorkspaceCopy.companyUpdateFailed);
+  }
+}
+
+export async function updateApplicationJobRequirementAction(
+  _prev: ApplicationActionResult | null,
+  formData: FormData,
+): Promise<ApplicationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = readTrimmedField(formData, "campaignId");
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    await updateApplicationJobRequirement({
+      organizationId,
+      campaignId,
+      title: readTrimmedField(formData, "title"),
+      companyName: readTrimmedField(formData, "companyName"),
+      location: readTrimmedField(formData, "location"),
+      workArrangement: readTrimmedField(formData, "workArrangement"),
+      employmentType: readTrimmedField(formData, "employmentType"),
+      seniority: readTrimmedField(formData, "seniority"),
+      compensationRange: readTrimmedField(formData, "compensationRange"),
+      reportingLine: readTrimmedField(formData, "reportingLine"),
+      responsibilities: readLineList(formData, "responsibilities"),
+      requiredItems: readLineList(formData, "requiredItems"),
+      preferredItems: readLineList(formData, "preferredItems"),
+      mission: readTrimmedField(formData, "mission"),
+      outcomes: readLineList(formData, "outcomes"),
+      competencies: readLineList(formData, "competencies"),
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/campaigns/${campaignId}/job`);
+    return { ok: true, message: applicationWorkspaceCopy.jobEditSave };
+  } catch (error) {
+    return fail(error, applicationWorkspaceCopy.jobEditFailed);
   }
 }

@@ -12,6 +12,7 @@ import { consultationConfig, consultationConversationCopy } from "./consultation
 import { applicationWorkspaceCopy, vocab } from "./vocabulary";
 
 export const APPLICATION_STEP_KEYS = [
+  "applied",
   "company",
   "job",
   "consultation",
@@ -20,7 +21,6 @@ export const APPLICATION_STEP_KEYS = [
   "outreach",
   "interviews",
   "summary",
-  "applied",
 ] as const;
 
 export type ApplicationStepKey = (typeof APPLICATION_STEP_KEYS)[number];
@@ -36,67 +36,67 @@ export type ApplicationStepDefinition = {
 export const applicationStepList: readonly ApplicationStepDefinition[] =
   Object.freeze([
     {
-      key: "company",
+      key: "applied",
       number: 1,
+      hrefSegment: null,
+      title: applicationWorkspaceCopy.appliedTitle,
+      emptyGuidance: outreachConfig.labels.appliedHelp,
+    },
+    {
+      key: "company",
+      number: 2,
       hrefSegment: "company",
       title: applicationWorkspaceCopy.companyTitle,
       emptyGuidance: "Research this employer so the rest of the application has a company to work from.",
     },
     {
       key: "job",
-      number: 2,
+      number: 3,
       hrefSegment: "job",
       title: applicationWorkspaceCopy.jobRequirementTitle,
       emptyGuidance: "Review the posting, location, compensation, and employer fit before you write materials.",
     },
     {
       key: "consultation",
-      number: 3,
+      number: 4,
       hrefSegment: "consultation",
       title: consultationConfig.displayName,
       emptyGuidance: consultationConversationCopy.start,
     },
     {
       key: "assets",
-      number: 4,
+      number: 5,
       hrefSegment: "assets",
       title: applicationAssetConfig.labels.sectionTitle,
       emptyGuidance: applicationAssetConfig.labels.sectionHelp,
     },
     {
       key: "hiring-team",
-      number: 5,
+      number: 6,
       hrefSegment: "hiring-team",
       title: hiringTeamConfig.workspaceTitle,
       emptyGuidance: "Identify who will evaluate you so outreach and interview prep have people to aim at.",
     },
     {
       key: "outreach",
-      number: 6,
+      number: 7,
       hrefSegment: "outreach",
       title: outreachConfig.labels.sectionTitle,
       emptyGuidance: outreachConfig.labels.sectionHelp,
     },
     {
       key: "interviews",
-      number: 7,
+      number: 8,
       hrefSegment: "interviews",
       title: interviewConfig.labels.sectionTitle,
       emptyGuidance: interviewConfig.labels.sectionHelp,
     },
     {
       key: "summary",
-      number: 8,
+      number: 9,
       hrefSegment: "summary",
       title: applicationSummaryConfig.title,
       emptyGuidance: applicationSummaryConfig.description,
-    },
-    {
-      key: "applied",
-      number: 9,
-      hrefSegment: null,
-      title: applicationWorkspaceCopy.appliedTitle,
-      emptyGuidance: outreachConfig.labels.appliedHelp,
     },
   ]);
 

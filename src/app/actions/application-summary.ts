@@ -5,7 +5,7 @@ import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { resolveApplicationSummaryFlag } from "@/lib/application-summary/service";
-import { applicationAssetConfig, applicationSummaryConfig, workspaceProgressText } from "@/lib/product-config";
+import { applicationSummaryConfig, workspaceProgressText } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 
 export type ApplicationSummaryActionResult = {
@@ -72,9 +72,7 @@ export async function resolveApplicationSummaryFlagAction(
     return {
       ok: true,
       message:
-        action === "KEPT"
-          ? applicationAssetConfig.labels.claimFlag.keep
-          : applicationAssetConfig.labels.claimFlag.remove,
+        "Saved.",
     };
   } catch (error) {
     if (error instanceof TenantError) {

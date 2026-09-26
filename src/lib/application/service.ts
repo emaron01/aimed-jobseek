@@ -21,7 +21,7 @@ import {
   verifyEmployerIdentity,
 } from "@/lib/job-requirement/identity-verification";
 import { employerIdentityCopy } from "@/lib/product-config";
-import type { ParsedJobRequirement } from "@/lib/job-requirement/types";
+import type { JobScorecard, ParsedJobRequirement, ScorecardItem } from "@/lib/job-requirement/types";
 import { JOB_REQUIREMENT_PROMPT_VERSION } from "@/lib/job-requirement/types";
 import { prisma } from "@/lib/prisma";
 import { vocab } from "@/lib/product-config";
@@ -559,6 +559,213 @@ export async function ensureHiringTeamAfterResearch(input: {
   await queueHiringTeamIdentify({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
+  });
+}
+
+function scorecardItemFromText(
+  existing: ScorecardItem[],
+  text: string,
+  prefix: string,
+  index: number,
+): ScorecardItem {
+  const found = existing.find((item) => item.text === text);
+  if (found) return found;
+  return { id: `${prefix}_${index}`, text, inferred: false };
+}
+
+function scorecardFromForm(input: {
+  existing: JobScorecard;
+  mission: string;
+  outcomes: string[];
+  competencies: string[];
+}): JobScorecard {
+  return {
+    mission: input.mission
+      ? scorecardItemFromText(
+          input.existing.mission ? [input.existing.mission] : [],
+          input.mission,
+          "mission",
+          0,
+        )
+      : null,
+    outcomes: input.outcomes.map((text, index) =>
+      scorecardItemFromText(input.existing.outcomes, text, "outcome", index),
+    ),
+    competencies: input.competencies.map((text, index) =>
+      scorecardItemFromText(
+        input.existing.competencies,
+        text,
+        "competency",
+        index,
+      ),
+    ),
+  };
+}
+
+function readStoredScorecard(value: unknown): JobScorecard {
+  if (!value || typeof value !== "object") {
+    return { mission: null, outcomes: [], competencies: [] };
+  }
+  const row = value as Partial<JobScorecard>;
+  const item = (entry: unknown): ScorecardItem | null => {
+    if (!entry || typeof entry !== "object") return null;
+    const candidate = entry as Partial<ScorecardItem>;
+    if (typeof candidate.text !== "string" || !candidate.text.trim()) return null;
+    if (typeof candidate.id !== "string") return null;
+    return {
+      id: candidate.id,
+      text: candidate.text,
+      inferred: candidate.inferred === true,
+    };
+  };
+  return {
+    mission: item(row.mission),
+    outcomes: Array.isArray(row.outcomes)
+      ? row.outcomes.flatMap((entry) => {
+          const next = item(entry);
+          return next ? [next] : [];
+        })
+      : [],
+    competencies: Array.isArray(row.competencies)
+      ? row.competencies.flatMap((entry) => {
+          const next = item(entry);
+          return next ? [next] : [];
+        })
+      : [],
+  };
+}
+
+export async function updateApplicationCompanyInformation(input: {
+  organizationId: string;
+  campaignId: string;
+  companyName: string;
+  companySummary: string;
+  whatTheySell: string;
+  businessModel: string;
+  companySizeContext: string;
+  estimatedAov: string;
+  aovReasoning: string;
+  customerTypes: string[];
+  primaryMarkets: string[];
+  relevantTechnologies: string[];
+  buyingSignals: string[];
+  hiringSignals: string[];
+  riskSignals: string[];
+}): Promise<void> {
+  const requirement = await prisma.jobRequirement.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+    include: {
+      company: {
+        include: { research: { orderBy: { updatedAt: "desc" }, take: 1 } },
+      },
+    },
+  });
+  if (!requirement) {
+    throw new TenantError(
+      `This ${vocab.campaign.singular} has no job requirement.`,
+    );
+  }
+  const companyName = input.companyName.trim() || requirement.companyName;
+  let companyId = requirement.companyId;
+  if (!companyId && companyName) {
+    const created = await resolveOrCreateCompany({ name: companyName });
+    if (!created) {
+      throw new TenantError("The employer could not be saved.");
+    }
+    companyId = created.id;
+  }
+  await prisma.jobRequirement.update({
+    where: { id: requirement.id },
+    data: {
+      companyName,
+      ...(companyId ? { companyId } : {}),
+    },
+  });
+  if (!companyId) {
+    throw new TenantError("Enter the employer's name.");
+  }
+  const research = requirement.company?.research[0] ?? null;
+  const researchData = {
+    companySummary: input.companySummary.trim() || null,
+    whatTheySell: input.whatTheySell.trim() || null,
+    businessModel: input.businessModel.trim() || null,
+    companySizeContext: input.companySizeContext.trim() || null,
+    estimatedAov: input.estimatedAov.trim() || null,
+    aovReasoning: input.aovReasoning.trim() || null,
+    customerTypes: jsonValue(input.customerTypes),
+    primaryMarkets: jsonValue(input.primaryMarkets),
+    relevantTechnologies: jsonValue(input.relevantTechnologies),
+    buyingSignals: jsonValue(input.buyingSignals),
+    hiringSignals: jsonValue(input.hiringSignals),
+    riskSignals: jsonValue(input.riskSignals),
+    researchMethod: "MANUAL" as const,
+    status: "COMPLETED" as const,
+    researchedAt: new Date(),
+  };
+  if (research) {
+    await prisma.companyResearch.update({
+      where: { id: research.id },
+      data: researchData,
+    });
+    return;
+  }
+  await prisma.companyResearch.create({
+    data: {
+      organizationId: input.organizationId,
+      companyId,
+      ...researchData,
+    },
+  });
+}
+
+export async function updateApplicationJobRequirement(input: {
+  organizationId: string;
+  campaignId: string;
+  title: string;
+  companyName: string;
+  location: string;
+  workArrangement: string;
+  employmentType: string;
+  seniority: string;
+  compensationRange: string;
+  reportingLine: string;
+  responsibilities: string[];
+  requiredItems: string[];
+  preferredItems: string[];
+  mission: string;
+  outcomes: string[];
+  competencies: string[];
+}): Promise<void> {
+  const requirement = await prisma.jobRequirement.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+  });
+  if (!requirement) {
+    throw new TenantError(
+      `This ${vocab.campaign.singular} has no job requirement.`,
+    );
+  }
+  const scorecard = scorecardFromForm({
+    existing: readStoredScorecard(requirement.scorecardJson),
+    mission: input.mission.trim(),
+    outcomes: input.outcomes,
+    competencies: input.competencies,
+  });
+  await prisma.jobRequirement.update({
+    where: { id: requirement.id },
+    data: {
+      title: input.title.trim() || null,
+      companyName: input.companyName.trim() || null,
+      location: input.location.trim() || null,
+      workArrangement: input.workArrangement.trim() || null,
+      employmentType: input.employmentType.trim() || null,
+      seniority: input.seniority.trim() || null,
+      compensationRange: input.compensationRange.trim() || null,
+      reportingLine: input.reportingLine.trim() || null,
+      responsibilities: jsonValue(input.responsibilities),
+      requiredItems: jsonValue(input.requiredItems),
+      preferredItems: jsonValue(input.preferredItems),
+      scorecardJson: jsonValue(scorecard),
+    },
   });
 }
 

@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { generateApplicationPageMetadata } from "@/lib/application/page-metadata";
 import { generateApplicationSummaryAction } from "@/app/actions/application-summary";
-import { ClaimFlagBanner } from "@/components/ClaimFlagBanner";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { AppActionLink } from "@/components/AppButton";
 import { PrintApplicationSummaryButton } from "@/components/PrintApplicationSummaryButton";
@@ -188,19 +187,6 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
           </div>
         ) : null}
       </div>
-
-      {view.claimFlags.length > 0 ? (
-        <div className="space-y-2 print:hidden" data-testid="summary-claim-flags">
-          {view.claimFlags.map((flag) => (
-            <ClaimFlagBanner
-              key={flag.id}
-              campaignId={id}
-              flag={flag}
-              summary
-            />
-          ))}
-        </div>
-      ) : null}
 
       <SummarySection id="overview" title={applicationSummaryConfig.sections.overview}>
         {summaryStatus !== "READY" || !guidance ? (

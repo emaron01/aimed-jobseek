@@ -86,6 +86,7 @@ describe("seeker-facing progress copy", () => {
 describe("workspace order and Harper start", () => {
   it("keeps the required workspace order", () => {
     expect(applicationStepList.map((step) => step.key)).toEqual([
+      "applied",
       "company",
       "job",
       "consultation",
@@ -94,7 +95,6 @@ describe("workspace order and Harper start", () => {
       "outreach",
       "interviews",
       "summary",
-      "applied",
     ]);
     const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
     const chrome = readFileSync("src/components/ApplicationWorkspaceChrome.tsx", "utf8");

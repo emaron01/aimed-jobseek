@@ -1,4 +1,7 @@
-import { workspaceConsultationHref } from "@/lib/application/workspace-links";
+import {
+  workspaceConsultationHref,
+  workspaceProfileHref,
+} from "@/lib/application/workspace-links";
 import { loadApplicationStepFacts } from "@/lib/application/tracker";
 import { prisma } from "@/lib/prisma-client";
 import {
@@ -25,6 +28,7 @@ export function buildHarperSuggestions(input: {
   facts: ApplicationStepFactInput;
   people: Array<{ name: string }>;
   nextStageId?: string | null;
+  productId?: string | null;
 }): HarperSuggestion[] {
   const types = harperActionTypesForStep(input.step);
   const suggestions: HarperSuggestion[] = [];
@@ -42,6 +46,7 @@ function suggestionForType(
     facts: ApplicationStepFactInput;
     people: Array<{ name: string }>;
     nextStageId?: string | null;
+    productId?: string | null;
   },
 ): HarperSuggestion | null {
   const href = (key: ApplicationStepKey) =>
@@ -91,8 +96,15 @@ function suggestionForType(
     case "mark_applied":
       if (input.facts.appliedAt) return null;
       return { type, label: harperActionLabel(type), href: href("applied") };
-    case "open_profile":
-      return null;
+    case "open_profile": {
+      const productId = input.productId?.trim();
+      if (!productId) return null;
+      return {
+        type,
+        label: harperActionLabel(type),
+        href: workspaceProfileHref(productId),
+      };
+    }
     default: {
       const exhaustive: never = type;
       throw new Error(`Unknown Harper action: ${String(exhaustive)}`);
@@ -113,7 +125,7 @@ export async function loadHarperSuggestions(input: {
   const current = step === "overview" ? "overview" : step;
   const facts = await loadApplicationStepFacts(input);
   if (!facts) return null;
-  const [people, nextStage] = await Promise.all([
+  const [people, nextStage, campaign] = await Promise.all([
     prisma.campaignContact.findMany({
       where: {
         campaignId: input.campaignId,
@@ -135,6 +147,13 @@ export async function loadHarperSuggestions(input: {
       orderBy: { createdAt: "asc" },
       select: { id: true },
     }),
+    prisma.campaign.findFirst({
+      where: {
+        id: input.campaignId,
+        organizationId: input.organizationId,
+      },
+      select: { productId: true },
+    }),
   ]);
   return {
     step: current,
@@ -152,6 +171,7 @@ export async function loadHarperSuggestions(input: {
           "",
       })).filter((person) => person.name),
       nextStageId: nextStage?.id ?? null,
+      productId: campaign?.productId ?? null,
     }),
   };
 }

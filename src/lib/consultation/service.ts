@@ -1,11 +1,4 @@
 import { Prisma } from "@prisma/client";
-import {
-  claimFlagsFromJson,
-  flagInventedClaims,
-  markClaimSeekerEdited,
-  resolveClaimFlag,
-  seekerSourceTexts,
-} from "@/lib/grounding/claim-flags";
 import type { JobScorecard, ScorecardItem } from "@/lib/job-requirement/types";
 import {
   planConsultationWithModel,
@@ -993,20 +986,7 @@ async function processAnswerGeneration(input: {
         reason: extracted.message,
       }),
     );
-    const seeker = seekerSourceTexts({
-      sources: polishingSources({
-        answer: input.answerContext,
-        turnId: input.turnId,
-        profile: input.profile,
-      }).map((source) => ({ category: "SEEKER", text: source.text })),
-      profile: input.profile,
-    });
     const interviewText = input.answerContext.trim();
-    const interviewFlags = flagInventedClaims({
-      claims: interviewText ? [{ id: "interview", text: interviewText }] : [],
-      sourceTexts: seeker.texts,
-      names: seeker.names,
-    });
     await prisma.$transaction([
       prisma.consultationTurn.update({
         where: { id: input.turnId },
@@ -1040,14 +1020,12 @@ async function processAnswerGeneration(input: {
                 kind: "INTERVIEW_ANSWER",
                 content: interviewText,
                 groundingJson: [],
-                claimFlagsJson: interviewFlags as unknown as Prisma.InputJsonValue,
                 promptVersion: CONSULTATION_PROMPT_VERSION,
               },
               update: {
                 status: "DRAFT",
                 content: interviewText,
                 groundingJson: [],
-                claimFlagsJson: interviewFlags as unknown as Prisma.InputJsonValue,
                 promptVersion: CONSULTATION_PROMPT_VERSION,
                 generation: { increment: 1 },
                 approvedAt: null,
@@ -1115,14 +1093,6 @@ async function processAnswerGeneration(input: {
     extracted.data.coaching?.trim() ||
     followUpQuestion ||
     consultationConversationCopy.keepCoaching;
-  const seeker = seekerSourceTexts({
-    sources: polishingSources({
-      answer: input.answerContext,
-      turnId: input.turnId,
-      profile: input.profile,
-    }).map((source) => ({ category: "SEEKER", text: source.text })),
-    profile: input.profile,
-  });
   const interviewText =
     polished?.ok && polished.data.interviewAnswer.text.trim()
       ? polished.data.interviewAnswer.text.trim()
@@ -1131,16 +1101,6 @@ async function processAnswerGeneration(input: {
     polished?.ok && polished.data.resumeBullet.text.trim()
       ? polished.data.resumeBullet.text.trim()
       : (storyProposal?.story?.result ?? verified.partialStory?.result ?? "").trim();
-  const interviewFlags = flagInventedClaims({
-    claims: [{ id: "interview", text: interviewText }],
-    sourceTexts: seeker.texts,
-    names: seeker.names,
-  });
-  const bulletFlags = flagInventedClaims({
-    claims: bulletText ? [{ id: "bullet", text: bulletText }] : [],
-    sourceTexts: seeker.texts,
-    names: seeker.names,
-  });
   const operations: Prisma.PrismaPromise<unknown>[] = [
     prisma.consultationProposal.deleteMany({
       where: { turnId: input.turnId, status: "PENDING" },
@@ -1187,7 +1147,6 @@ async function processAnswerGeneration(input: {
           content: interviewText,
           claims: polished?.ok ? polished.data.interviewAnswer.claims : [],
           note: polished?.ok ? polished.data.strengtheningNote?.trim() || null : null,
-          flags: interviewFlags,
         }
       : null,
     bulletText
@@ -1196,7 +1155,6 @@ async function processAnswerGeneration(input: {
           content: bulletText,
           claims: polished?.ok ? polished.data.resumeBullet.claims : [],
           note: null,
-          flags: bulletFlags,
         }
       : null,
   ].filter((statement) => statement != null);
@@ -1214,7 +1172,6 @@ async function processAnswerGeneration(input: {
           content: statement.content,
           strengtheningNote: statement.note,
           groundingJson: statement.claims as Prisma.InputJsonValue,
-          claimFlagsJson: statement.flags as unknown as Prisma.InputJsonValue,
           promptVersion: CONSULTATION_PROMPT_VERSION,
         },
         update: {
@@ -1222,7 +1179,6 @@ async function processAnswerGeneration(input: {
           content: statement.content,
           strengtheningNote: statement.note,
           groundingJson: statement.claims as Prisma.InputJsonValue,
-          claimFlagsJson: statement.flags as unknown as Prisma.InputJsonValue,
           promptVersion: CONSULTATION_PROMPT_VERSION,
           generation: { increment: 1 },
           approvedAt: null,
@@ -2049,14 +2005,6 @@ export async function regenerateConsultationStatement(input: {
     declinedFollowUp: analyzed?.followUpDeclined ?? false,
     strengtheningNeeds: analyzed?.missingStarElements ?? [],
   });
-  const seeker = seekerSourceTexts({
-    sources: polishingSources({
-      answer,
-      turnId: statement.turnId,
-      profile,
-    }).map((source) => ({ category: "SEEKER", text: source.text })),
-    profile,
-  });
   const fallbackText =
     statement.kind === "INTERVIEW_ANSWER" ? answer : statement.content.trim();
   const value = polished.ok
@@ -2064,12 +2012,6 @@ export async function regenerateConsultationStatement(input: {
       ? polished.data.interviewAnswer
       : polished.data.resumeBullet
     : { text: fallbackText, claims: [] };
-  const claimId = statement.kind === "INTERVIEW_ANSWER" ? "interview" : "bullet";
-  const flags = flagInventedClaims({
-    claims: [{ id: claimId, text: value.text.trim() }],
-    sourceTexts: seeker.texts,
-    names: seeker.names,
-  });
   const story = await prisma.profileStory.findFirst({
     where: {
       organizationId: input.organizationId,
@@ -2088,7 +2030,6 @@ export async function regenerateConsultationStatement(input: {
             ? polished.data.strengtheningNote?.trim() || null
             : null,
         groundingJson: value.claims,
-        claimFlagsJson: flags as unknown as Prisma.InputJsonValue,
         promptVersion: CONSULTATION_PROMPT_VERSION,
         generation: { increment: 1 },
         approvedAt: null,
@@ -2218,16 +2159,6 @@ export async function resolveConsultationStatementFlag(input: {
     await prisma.consultationStatement.delete({ where: { id: statement.id } });
     return;
   }
-  await prisma.consultationStatement.update({
-    where: { id: statement.id },
-    data: {
-      claimFlagsJson: resolveClaimFlag(
-        claimFlagsFromJson(statement.claimFlagsJson),
-        input.claimId,
-        "KEPT",
-      ) as unknown as Prisma.InputJsonValue,
-    },
-  });
 }
 
 export async function saveEditedConsultationStatement(input: {
@@ -2241,15 +2172,10 @@ export async function saveEditedConsultationStatement(input: {
     where: { id: input.statementId, organizationId: input.organizationId },
   });
   if (!statement) throw new TenantError("That polished statement was not found.");
-  const claimId = statement.kind === "INTERVIEW_ANSWER" ? "interview" : "bullet";
   await prisma.consultationStatement.update({
     where: { id: statement.id },
     data: {
       content,
-      claimFlagsJson: markClaimSeekerEdited(
-        claimFlagsFromJson(statement.claimFlagsJson),
-        [claimId],
-      ) as unknown as Prisma.InputJsonValue,
     },
   });
 }
