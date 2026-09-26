@@ -97,7 +97,8 @@ function personLinkedIn(input: {
   if (!profileText && !parsed.success) return null;
   const extracted = parsed.success ? parsed.data : null;
   return {
-    profileText,
+    headline: extracted?.headline?.text ?? null,
+    about: extracted?.about?.text ?? null,
     currentTitle: extracted?.currentTitle?.text ?? null,
     currentEmployer: extracted?.currentEmployer?.text ?? null,
     currentTenure: extracted?.currentTenure?.text ?? null,
@@ -105,9 +106,13 @@ function personLinkedIn(input: {
       extracted?.priorRoles.map((item) => ({
         employer: item.employer.text,
         title: item.title?.text ?? null,
+        dates: item.dates?.text ?? null,
       })) ?? [],
     education: extracted?.education.map((item) => item.text) ?? [],
+    certifications: extracted?.certifications.map((item) => item.text) ?? [],
+    skills: extracted?.skills.map((item) => item.text) ?? [],
     statedFocus: extracted?.statedFocus.map((item) => item.text) ?? [],
+    profileText,
   };
 }
 

@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildConsultationCoachMessages } from "@/lib/consultation/prompt";
 import type { CoachHiringTeamRole } from "@/lib/consultation/contract";
+import { linkedInExtractedSchema } from "@/lib/contact-profile/contract";
+import { extractLinkedInFacts } from "@/lib/contact-profile/extract";
 import { CONSULTATION_COACH_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content";
 import { fixtureAlexChenProfile } from "@/lib/product-research/fixtures/alex-chen-profile";
 import { hasTestDatabase } from "@/test/database";
@@ -51,13 +53,23 @@ function roleWithPerson(): CoachHiringTeamRole {
           ],
         },
         linkedIn: {
-          profileText: "Dana Reyes — VP Revenue Operations at Northline.",
+          headline: "VP Revenue Operations at Northline",
+          about: "I rebuild forecasts that leadership can trust.",
           currentTitle: "VP Revenue Operations",
           currentEmployer: "Northline",
           currentTenure: "3 years",
-          priorRoles: [{ employer: "Helios", title: "Director RevOps" }],
+          priorRoles: [
+            {
+              employer: "Helios",
+              title: "Director RevOps",
+              dates: "Jan 2019 - Mar 2023",
+            },
+          ],
           education: ["Purdue"],
+          certifications: ["Salesforce Administrator"],
+          skills: ["Forecasting", "Territory design"],
           statedFocus: ["Forecast discipline"],
+          profileText: "Dana Reyes — VP Revenue Operations at Northline.",
         },
         recordedNotes: [
           {
@@ -88,17 +100,27 @@ function roleWithPerson(): CoachHiringTeamRole {
 
 describe("Coach Hiring Team context", () => {
   it("sends the general persona and each person as separate entries", () => {
-    const payload = JSON.parse(
-      buildConsultationCoachMessages({
-        targets: [{ key: "forecasting", kind: "REQUIRED", text: "Forecasting" }],
-        profileItems: [],
-        hiringTeam: [roleWithPerson()],
-        seekerStatedFacts: [],
-        askedQuestions: [],
-        chronologyRequested: false,
-        coveredTargetKeys: [],
-      })[1]!.content,
-    );
+    const messages = buildConsultationCoachMessages({
+      targets: [{ key: "forecasting", kind: "REQUIRED", text: "Forecasting" }],
+      profileItems: [
+        {
+          id: "fact_1",
+          kind: "FACT",
+          text: "Rebuilt the forecast at Helios.",
+          itemType: "ACHIEVEMENT",
+        },
+      ],
+      hiringTeam: [roleWithPerson()],
+      seekerStatedFacts: [],
+      askedQuestions: [],
+      chronologyRequested: false,
+      coveredTargetKeys: [],
+    });
+    const profileMessage = JSON.parse(messages[1]!.content);
+    expect(profileMessage.personalProfileItems).toHaveLength(1);
+    expect(profileMessage.hiringTeam).toBeUndefined();
+
+    const payload = JSON.parse(messages[2]!.content);
     const role = payload.hiringTeam[0];
     expect(role.personaBuilt).toBe(true);
     expect(role.generalPersona.impact).toBe("Owns the number the board sees.");
@@ -110,8 +132,16 @@ describe("Coach Hiring Team context", () => {
     const person = role.people[0];
     expect(person.contactId).toBe("contact_1");
     expect(person.persona.caresAbout[0]).toContain("Territory design");
+    expect(person.linkedIn.headline).toContain("Northline");
+    expect(person.linkedIn.about).toContain("forecasts");
+    expect(person.linkedIn.priorRoles[0]).toEqual({
+      employer: "Helios",
+      title: "Director RevOps",
+      dates: "Jan 2019 - Mar 2023",
+    });
+    expect(person.linkedIn.certifications).toEqual(["Salesforce Administrator"]);
+    expect(person.linkedIn.skills).toContain("Territory design");
     expect(person.linkedIn.profileText).toContain("Dana Reyes");
-    expect(person.linkedIn.priorRoles[0].employer).toBe("Helios");
     expect(person.recordedNotes[0].text).toContain("Invitation:");
     expect(person.interviewStages[0].notesAfter).toContain("data hygiene");
     expect(person.interviewLearnings[0]).toContain("failed Clari rollout");
@@ -141,11 +171,76 @@ describe("Coach Hiring Team context", () => {
         askedQuestions: [],
         chronologyRequested: false,
         coveredTargetKeys: [],
-      })[1]!.content,
+      })[2]!.content,
     );
     expect(payload.hiringTeam[0].generalPersona).toBeNull();
     expect(payload.hiringTeam[0].people).toEqual([]);
     expect(payload.hiringTeam[0].whyThisRoleMatters).toBe("Runs the screen.");
+  });
+
+  it("extracts the headline, About, dated prior roles, certifications, and skills", () => {
+    const extracted = extractLinkedInFacts(`Dana Reyes
+VP Revenue Operations at Northline
+Indianapolis, Indiana
+About
+I rebuild forecasts leadership can trust.
+Experience
+VP Revenue Operations
+Northline · Full-time
+Apr 2023 - Present
+Director of Revenue Operations
+Helios
+Jan 2019 - Mar 2023
+Education
+Purdue University
+Licenses & certifications
+Salesforce Administrator
+Skills
+Forecasting
+Territory design
+`);
+    expect(extracted.headline?.text).toBe("VP Revenue Operations at Northline");
+    expect(extracted.about?.text).toBe("I rebuild forecasts leadership can trust.");
+    expect(extracted.certifications.map((item) => item.text)).toEqual([
+      "Salesforce Administrator",
+    ]);
+    expect(extracted.skills.map((item) => item.text)).toEqual([
+      "Forecasting",
+      "Territory design",
+    ]);
+    expect(extracted.education.map((item) => item.text)).toEqual([
+      "Purdue University",
+    ]);
+    const prior = extracted.priorRoles.find(
+      (role) => role.title?.text === "Director of Revenue Operations",
+    );
+    expect(prior?.employer.text).toBe("Helios");
+    expect(prior?.dates?.text).toBe("Jan 2019 - Mar 2023");
+  });
+
+  it("keeps already-stored extracts readable after the new fields were added", () => {
+    const stored = linkedInExtractedSchema.parse({
+      currentTitle: null,
+      currentEmployer: null,
+      currentTenure: null,
+      priorRoles: [
+        {
+          employer: {
+            text: "Helios",
+            kind: "FACT",
+            provenance: [{ sourceId: "linkedin-paste" }],
+          },
+          title: null,
+        },
+      ],
+      education: [],
+      statedFocus: [],
+    });
+    expect(stored.headline).toBeNull();
+    expect(stored.about).toBeNull();
+    expect(stored.certifications).toEqual([]);
+    expect(stored.skills).toEqual([]);
+    expect(stored.priorRoles[0]?.dates).toBeNull();
   });
 
   it("tells Harper to keep a person and the general persona separate", () => {
@@ -168,6 +263,7 @@ describe.skipIf(!hasTestDatabase())("Coach Hiring Team context from the database
   let builtRoleId = "";
   let unbuiltRoleId = "";
   let contactId = "";
+  let noLinkedInContactId = "";
   let stageId = "";
 
   beforeAll(async () => {
@@ -315,6 +411,35 @@ describe.skipIf(!hasTestDatabase())("Coach Hiring Team context from the database
         ],
       },
     });
+    const withoutLinkedIn = await prisma.contact.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        firstName: "Sam",
+        lastName: "Okafor",
+        title: "Director of Sales",
+      },
+    });
+    noLinkedInContactId = withoutLinkedIn.id;
+    await prisma.campaignContact.create({
+      data: {
+        organizationId,
+        campaignId,
+        contactId: noLinkedInContactId,
+        chosenPersonaId: builtRoleId,
+        cheatSheetNotesJson: [
+          {
+            id: "note_2",
+            text: "Invitation: 30 minutes on pipeline hygiene.",
+            stageId: null,
+            createdAt: "2026-09-21T00:00:00.000Z",
+          },
+        ],
+        personPrepAnswersJson: [
+          { text: "They own the SDR team.", turnId: "turn_2" },
+        ],
+      },
+    });
     const stage = await prisma.interviewStage.create({
       data: {
         organizationId,
@@ -359,7 +484,7 @@ describe.skipIf(!hasTestDatabase())("Coach Hiring Team context from the database
     expect(unbuilt?.persona).toBeNull();
     expect(unbuilt?.people).toEqual([]);
 
-    const person = built?.people[0];
+    const person = built?.people.find((item) => item.contactId === contactId);
     expect(person?.contactId).toBe(contactId);
     expect(person?.name).toBe("Dana Reyes");
     expect(person?.title).toBe("VP Revenue Operations");
@@ -371,8 +496,10 @@ describe.skipIf(!hasTestDatabase())("Coach Hiring Team context from the database
     expect(person?.linkedIn?.profileText).toContain("Dana Reyes");
     expect(person?.linkedIn?.currentEmployer).toBe("Northline");
     expect(person?.linkedIn?.priorRoles).toEqual([
-      { employer: "Helios", title: null },
+      { employer: "Helios", title: null, dates: null },
     ]);
+    expect(person?.linkedIn?.certifications).toEqual([]);
+    expect(person?.linkedIn?.skills).toEqual([]);
     expect(person?.recordedNotes[0]?.text).toContain("Invitation:");
     expect(person?.interviewStages).toHaveLength(1);
     expect(person?.interviewStages[0]?.id).toBe(stageId);
@@ -382,6 +509,20 @@ describe.skipIf(!hasTestDatabase())("Coach Hiring Team context from the database
     expect(person?.interviewLearnings).toEqual([
       "They are replacing a failed Clari rollout.",
     ]);
+  });
+
+  it("sends the other evidence with no LinkedIn fields when nothing was pasted", async () => {
+    const { loadCoachHiringTeam } = await import(
+      "@/lib/consultation/hiring-team-context"
+    );
+    const roles = await loadCoachHiringTeam(organizationId, campaignId);
+    const person = roles
+      .find((role) => role.id === builtRoleId)
+      ?.people.find((item) => item.contactId === noLinkedInContactId);
+    expect(person?.name).toBe("Sam Okafor");
+    expect(person?.linkedIn).toBeNull();
+    expect(person?.recordedNotes[0]?.text).toContain("pipeline hygiene");
+    expect(person?.interviewLearnings).toEqual(["They own the SDR team."]);
   });
 
   it("keeps the person's evidence out of the general persona", async () => {

@@ -60,6 +60,13 @@ export function buildConsultationCoachMessages(input: {
         personalProfileItems: input.profileItems,
         seekerStatedFacts: input.seekerStatedFacts,
         targets: input.targets,
+      }),
+    },
+    // Hiring Team context follows the Personal Profile so the stable profile
+    // block stays a cacheable prefix as people and personas are added.
+    {
+      role: "user",
+      content: JSON.stringify({
         hiringTeam: input.hiringTeam.map((role) => ({
           id: role.id,
           name: role.name,

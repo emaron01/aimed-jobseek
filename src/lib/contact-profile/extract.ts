@@ -4,6 +4,32 @@ import {
   type LinkedInExtracted,
 } from "@/lib/contact-profile/contract";
 
+const SECTION_HEADINGS = [
+  "About",
+  "Activity",
+  "Awards",
+  "Certifications",
+  "Courses",
+  "Education",
+  "Experience",
+  "Honors",
+  "Interests",
+  "Languages",
+  "Licenses",
+  "Organizations",
+  "Patents",
+  "Projects",
+  "Publications",
+  "Recommendations",
+  "Skills",
+  "Volunteering",
+];
+
+/** Matches "Licenses & certifications" and "Honors & awards" as one heading. */
+const HEADING_TAIL = "(?:\\s*&[^\\n]*)?";
+
+const DATE_LINE = /\b(19\d{2}|20\d{2}|present)\b/i;
+
 function fact(text: string | null | undefined) {
   const value = text?.replace(/\s+/g, " ").trim();
   if (!value) return null;
@@ -14,12 +40,26 @@ function fact(text: string | null | undefined) {
   };
 }
 
+function facts(values: string[], limit: number) {
+  return values
+    .map((value) => fact(value))
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .slice(0, limit);
+}
+
 function section(text: string, heading: string): string {
+  const stop = SECTION_HEADINGS.join("|");
   const pattern = new RegExp(
-    `(?:^|\\n)${heading}\\n([\\s\\S]*?)(?=\\n(?:Experience|Education|Skills|About|Licenses|Honors|Languages|Interests)\\n|$)`,
+    `(?:^|\\n)${heading}${HEADING_TAIL}\\n([\\s\\S]*?)(?=\\n(?:${stop})${HEADING_TAIL}\\n|$)`,
     "i",
   );
   return text.match(pattern)?.[1]?.trim() ?? "";
+}
+
+function isHeading(line: string): boolean {
+  return new RegExp(`^(?:${SECTION_HEADINGS.join("|")})${HEADING_TAIL}$`, "i").test(
+    line,
+  );
 }
 
 function lines(text: string): string[] {
@@ -29,21 +69,33 @@ function lines(text: string): string[] {
     .filter(Boolean);
 }
 
+/** The name, headline, and location block above the first section heading. */
+function topBlock(text: string): string[] {
+  const all = lines(text);
+  const stop = all.findIndex((line) => isHeading(line));
+  return stop === -1 ? all : all.slice(0, stop);
+}
+
 export function extractLinkedInFacts(pasted: string): LinkedInExtracted {
   const text = pasted.replace(/\r\n/g, "\n").trim();
   const experience = lines(section(text, "Experience"));
   const education = lines(section(text, "Education"));
   const about = lines(section(text, "About"));
-  const headline = lines(text).slice(0, 6);
+  const skills = lines(section(text, "Skills"));
+  const certifications = [
+    ...lines(section(text, "Licenses")),
+    ...lines(section(text, "Certifications")),
+  ];
+  const top = topBlock(text);
 
   const titleLine =
-    headline.find((line) =>
+    top.find((line) =>
       /\b(manager|director|lead|engineer|recruiter|partner|officer|analyst|specialist|head)\b/i.test(
         line,
       ),
     ) ?? experience[1] ?? null;
   const employerLine =
-    headline.find((line) => /\bat\b/i.test(line)) ??
+    top.find((line) => /\bat\b/i.test(line)) ??
     experience.find((line) => /·|full-time|part-time|present/i.test(line)) ??
     experience[0] ??
     null;
@@ -61,11 +113,16 @@ export function extractLinkedInFacts(pasted: string): LinkedInExtracted {
     if (/\b(manager|director|lead|engineer|recruiter|partner|officer|analyst)\b/i.test(line)) {
       const employer = fact(next && !/\b20\d{2}\b/.test(next) ? next : line);
       const title = fact(line);
-      if (employer) priorRoles.push({ employer, title });
+      const dates =
+        experience.slice(index + 1, index + 4).find((item) => DATE_LINE.test(item)) ??
+        null;
+      if (employer) priorRoles.push({ employer, title, dates: fact(dates) });
     }
   }
 
   const extracted = {
+    headline: fact(top[1]),
+    about: fact(about.join(" ")),
     currentTitle: fact(titleLine?.replace(/\s+at\s+.+$/i, "")),
     currentEmployer: fact(
       employerLine
@@ -75,14 +132,10 @@ export function extractLinkedInFacts(pasted: string): LinkedInExtracted {
     ),
     currentTenure: fact(tenureLine),
     priorRoles: priorRoles.slice(0, 8),
-    education: education
-      .map((line) => fact(line))
-      .filter((item): item is NonNullable<typeof item> => Boolean(item))
-      .slice(0, 6),
-    statedFocus: about
-      .map((line) => fact(line))
-      .filter((item): item is NonNullable<typeof item> => Boolean(item))
-      .slice(0, 6),
+    education: facts(education, 6),
+    certifications: facts(certifications, 12),
+    skills: facts(skills, 40),
+    statedFocus: facts(about, 6),
   };
   return linkedInExtractedSchema.parse(extracted);
 }

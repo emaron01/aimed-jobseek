@@ -153,14 +153,27 @@ export type CoachPersonPersona = {
   }>;
 };
 
+/**
+ * Everything relevant from a person's LinkedIn profile, for analysis only. The
+ * structured extract is sent with the full pasted text so anything the extract
+ * missed, such as recent posts or recommendations, is still available.
+ */
 export type CoachPersonLinkedIn = {
-  profileText: string | null;
+  headline: string | null;
+  about: string | null;
   currentTitle: string | null;
   currentEmployer: string | null;
   currentTenure: string | null;
-  priorRoles: Array<{ employer: string; title: string | null }>;
+  priorRoles: Array<{
+    employer: string;
+    title: string | null;
+    dates: string | null;
+  }>;
   education: string[];
+  certifications: string[];
+  skills: string[];
   statedFocus: string[];
+  profileText: string | null;
 };
 
 /** Invitation details and anything else recorded about this person, newest last. */

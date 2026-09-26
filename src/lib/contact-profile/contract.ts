@@ -14,7 +14,10 @@ const inferenceItem = z.object({
   kind: z.literal("INFERENCE"),
 });
 
+/** Fields added after the first release default so already-stored extracts still parse. */
 export const linkedInExtractedSchema = z.object({
+  headline: factItem.nullable().default(null),
+  about: factItem.nullable().default(null),
   currentTitle: factItem.nullable(),
   currentEmployer: factItem.nullable(),
   currentTenure: factItem.nullable(),
@@ -22,9 +25,12 @@ export const linkedInExtractedSchema = z.object({
     z.object({
       employer: factItem,
       title: factItem.nullable(),
+      dates: factItem.nullable().default(null),
     }),
   ),
   education: z.array(factItem),
+  certifications: z.array(factItem).default([]),
+  skills: z.array(factItem).default([]),
   statedFocus: z.array(factItem),
 });
 
