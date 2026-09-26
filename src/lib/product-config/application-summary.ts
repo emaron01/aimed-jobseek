@@ -1,4 +1,5 @@
 import { consultationConfig } from "./consultation";
+import { vocab } from "./vocabulary";
 
 export const applicationSummaryConfig = Object.freeze({
   title: "Interview cheat sheet",
@@ -9,6 +10,10 @@ export const applicationSummaryConfig = Object.freeze({
     retry: "Retry cheat sheet",
     print: "Print or save as PDF",
     printSection: "Print this section",
+    filterPeople: `Find a person or ${vocab.persona.singular}`,
+    filterPlaceholder: `Search by name, ${vocab.persona.singular}, or title`,
+    filterClear: "Clear",
+    filterNoMatches: "No matching people",
   },
   sections: {
     overview: "At a glance",

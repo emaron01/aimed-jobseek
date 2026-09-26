@@ -5,6 +5,13 @@ import { generateApplicationSummaryAction } from "@/app/actions/application-summ
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { AppActionLink } from "@/components/AppButton";
 import { CheatSheetCoachItems } from "@/components/CheatSheetCoachItems";
+import {
+  CheatSheetFilterProvider,
+  CheatSheetPeopleFilter,
+  CheatSheetPersonSection,
+  CheatSheetPrintButton,
+  CheatSheetSharedSection,
+} from "@/components/CheatSheetPeopleFilter";
 import { PrintApplicationSummaryButton } from "@/components/PrintApplicationSummaryButton";
 import { PageHeader, TenantMissing } from "@/components/ui";
 import { getApplicationSummaryView } from "@/lib/application-summary/service";
@@ -142,8 +149,16 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
         ? applicationSummaryConfig.actions.regenerate
         : applicationSummaryConfig.actions.generate;
   const guidance = view.guidance;
+  const filterOptions = view.people.map((person) => ({
+    sectionKey: person.sectionKey,
+    heading: person.heading,
+    personName: person.contactId ? person.heading : null,
+    personaName: person.roleName,
+    titles: person.titles,
+  }));
 
   return (
+    <CheatSheetFilterProvider options={filterOptions}>
     <main className="application-summary mx-auto max-w-5xl space-y-6">
       <style>{`
         @media print {
@@ -156,7 +171,7 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
         description={`${view.campaign.name} · ${applicationSummaryConfig.description}`}
         actions={
           <div className="flex flex-wrap gap-2 print:hidden">
-            {summaryStatus === "READY" ? <PrintApplicationSummaryButton /> : null}
+            {summaryStatus === "READY" ? <CheatSheetPrintButton /> : null}
             <AppActionLink href={`/campaigns/${id}`}>
               Back to application
             </AppActionLink>
@@ -165,6 +180,11 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
       />
 
       <div className="print:hidden">
+        {filterOptions.length > 0 ? (
+          <div className="mb-4">
+            <CheatSheetPeopleFilter />
+          </div>
+        ) : null}
         {view.summary?.generatedAt ? (
           <p className="text-sm text-muted">
             Generated {view.summary.generatedAt.toLocaleString()}
@@ -189,6 +209,7 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
         ) : null}
       </div>
 
+      <CheatSheetSharedSection>
       <SummarySection id="overview" title={applicationSummaryConfig.sections.overview}>
         {summaryStatus !== "READY" || !guidance ? (
           <p className="text-sm text-muted">
@@ -223,13 +244,15 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
           </>
         )}
       </SummarySection>
+      </CheatSheetSharedSection>
 
       {(guidance?.people ?? view.people).map((person) => {
         const section = guidance?.people.find((item) => item.sectionKey === ("sectionKey" in person ? person.sectionKey : ""));
         const heading = section?.heading ?? ("heading" in person ? person.heading : "");
         const sectionKey = section?.sectionKey ?? ("sectionKey" in person ? person.sectionKey : heading);
         return (
-          <SummarySection key={sectionKey} id={sectionKey} title={heading}>
+          <CheatSheetPersonSection key={sectionKey} sectionKey={sectionKey}>
+          <SummarySection id={sectionKey} title={heading}>
             {!section ? (
               <p className="text-sm text-muted">
                 Generate the {applicationSummaryConfig.title} for this person.
@@ -407,9 +430,11 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
               </>
             )}
           </SummarySection>
+          </CheatSheetPersonSection>
         );
       })}
 
+      <CheatSheetSharedSection>
       <SummarySection id="stories" title={applicationSummaryConfig.sections.stories}>
         {guidance && guidance.stories.length > 0 ? (
           guidance.stories.map((story) => (
@@ -526,6 +551,8 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
           </>
         )}
       </SummarySection>
+      </CheatSheetSharedSection>
     </main>
+    </CheatSheetFilterProvider>
   );
 }
