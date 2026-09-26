@@ -32,10 +32,10 @@ describe("designed view states", () => {
   });
 
   it("shows designed errors when Harper or the tracker cannot load", () => {
-    const harper = readFileSync(join(ROOT, "src/components/HarperDock.tsx"), "utf8");
+    const harper = readFileSync(join(ROOT, "src/components/ConsultationSection.tsx"), "utf8");
     const tracker = readFileSync(join(ROOT, "src/components/ApplicationSidebarTracker.tsx"), "utf8");
-    expect(harper).toContain("ErrorState");
-    expect(harper).toContain("polishCopy.harperSuggestionsFailed");
+    expect(harper).toContain("consultation-failed");
+    expect(harper).toContain("consultationConversationCopy.generationFailed");
     expect(tracker).toContain("ErrorState");
     expect(tracker).toContain("polishCopy.trackerLoadFailed");
     expect(tracker).toContain("Skeleton");

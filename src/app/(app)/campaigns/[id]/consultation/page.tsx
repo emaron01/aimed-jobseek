@@ -31,7 +31,6 @@ export default async function ApplicationConsultationPage({
       campaignId={access.campaignId}
       organizationId={access.organizationId}
       canEdit={access.canEdit}
-      layout="page"
       jobs={live.jobs}
     />
   );

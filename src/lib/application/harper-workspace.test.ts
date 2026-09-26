@@ -99,8 +99,18 @@ describe("workspace order and Harper start", () => {
     const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
     const chrome = readFileSync("src/components/ApplicationWorkspaceChrome.tsx", "utf8");
     const layout = readFileSync("src/app/(app)/campaigns/[id]/layout.tsx", "utf8");
-    expect(chrome).toContain("HarperDock");
-    expect(layout).toContain('layout="dock"');
+    const consultationPage = readFileSync(
+      "src/app/(app)/campaigns/[id]/consultation/page.tsx",
+      "utf8",
+    );
+    const consultation = readFileSync("src/components/ConsultationSection.tsx", "utf8");
+    expect(chrome).not.toContain("HarperDock");
+    expect(layout).not.toContain("ConsultationSection");
+    expect(consultationPage).toContain("ConsultationSection");
+    expect(consultation).toContain("ConsultationThread");
+    expect(consultation.indexOf("ConsultationThread")).toBeLessThan(
+      consultation.indexOf("consultation-briefing"),
+    );
     expect(workspace).not.toContain("<ConsultationSection");
     expect(workspace).toContain("addHiringTeamPersonAction");
     expect(workspace).toContain("hiringTeamConfig.actions.edit");

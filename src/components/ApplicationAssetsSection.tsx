@@ -34,15 +34,14 @@ import {
   applicationAssetConfig,
   consultationConfig,
   vocab,
-  workspaceSectionId,
 } from "@/lib/product-config";
+import { usePathname } from "next/navigation";
 import { AppActionLink, SubmitButton } from "@/components/ui";
 import {
-  openWorkspaceSection,
   WORKSPACE_CARD_WRAP_CLASS,
   WORKSPACE_MESSAGE_WRAP_CLASS,
   workspaceAssetDocxHref,
-  workspaceConsultationHref,
+  workspaceConsultationHrefFromPathname,
 } from "@/lib/application/workspace-links";
 
 type AssetRow = {
@@ -82,6 +81,7 @@ function Status({
   errorsOnly?: boolean;
   profileHref?: string | null;
 }) {
+  const pathname = usePathname() || "";
   if (!result) return null;
   if (errorsOnly && result.ok) return null;
   const violations = visibleItems(result.violations ?? [], (item) => item);
@@ -119,11 +119,8 @@ function Status({
             .replace("{consultant}", consultationConfig.displayName)
             .replace("{product}", vocab.product.singular)}{" "}
           <AppActionLink
-            href={workspaceConsultationHref()}
+            href={workspaceConsultationHrefFromPathname(pathname)}
             variant="chip"
-            onClick={() =>
-              openWorkspaceSection(workspaceSectionId("CONSULTATION"))
-            }
           >
             {consultationConfig.displayName}
           </AppActionLink>{" "}

@@ -134,16 +134,12 @@ export async function ConsultationSection({
   campaignId,
   organizationId,
   canEdit,
-  defaultOpen = true,
   jobs = [],
-  layout = "page",
 }: {
   campaignId: string;
   organizationId: string;
   canEdit: boolean;
-  defaultOpen?: boolean;
   jobs?: WorkspaceJobStatusView[];
-  layout?: "page" | "dock";
 }) {
   const [session, campaign] = await Promise.all([
     prisma.consultationSession.findFirst({
@@ -183,247 +179,247 @@ export async function ConsultationSection({
   );
   const statements = session?.statements ?? [];
   const latestDraftTurnId = draftStatements.at(-1)?.turnId ?? null;
-
-  const body = (
-      <div className={layout === "dock" ? "space-y-4" : "mt-4 space-y-4"}>
-      <WorkspaceProgress jobs={jobs} type="CONSULTATION" stayAndWatch />
-      {jobs.some(
-        (job) =>
-          job.type === "CONSULTATION" &&
-          (job.status === "PENDING" || job.status === "IN_PROGRESS"),
-      ) || session?.generationStatus === "GENERATING" ? (
-        <p className="text-sm text-muted" data-testid="harper-typing">
-          <AppPendingIndicator label={workspaceJobCopy.typing} />
-        </p>
-      ) : null}
-      <p className="text-sm text-muted">
-        {consultationConfig.displayName} compares this job with the {vocab.product.singular} and draws out the stories behind the gaps. Nothing is added to the {vocab.product.singular} until you confirm it.
-      </p>
-      {personPreps.length > 0 ? (
-        <div className="space-y-3" data-testid="person-prep-offers">
-          {personPreps.map((prep) => (
-            <article
-              key={prep.contactId}
-              className="rounded-md border border-edge bg-canvas p-4"
-            >
-              <h4 className="text-sm font-semibold text-ink">
-                {interviewConfig.labels.personPrepOffer}: {prep.name || prep.roleName}
-              </h4>
-              {prep.openingText ? (
-                <p className="mt-2 text-sm text-ink">{prep.openingText}</p>
-              ) : (
-                <p className="mt-2 text-sm text-muted">
-                  <AppPendingIndicator label={workspaceJobCopy.typing} />
-                </p>
-              )}
-              {prep.confirmedAnswers.length > 0 ? (
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-ink">
-                  {prep.confirmedAnswers.map((answer) => (
-                    <li key={answer.turnId}>{answer.text}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </article>
-          ))}
-        </div>
-      ) : null}
-
-      {briefing?.success ? (
-        <div
-          className="space-y-2 rounded-md border border-edge bg-canvas p-4"
-          data-testid="consultation-briefing"
-        >
-          <p className="text-sm text-ink">{briefing.data.overall}</p>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
-            {briefing.data.strongestAngles.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
-            {briefing.data.importantGaps.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-          <ol className="list-decimal space-y-1 pl-5 text-sm text-ink">
-            {briefing.data.storyPlan.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ol>
-        </div>
-      ) : null}
-
-      {session && session.assessments.length > 0 ? (
-        <ConsultationStanding
-          overall={briefing?.success ? briefing.data.overall : null}
-          gaps={briefing?.success ? briefing.data.importantGaps : []}
-          careerRecap={
-            parsed.ok
-              ? parsed.profile.positioning?.text?.trim() ||
-                parsed.profile.identity.headline?.text?.trim() ||
-                null
-              : null
-          }
-          requirements={session.assessments.map((item) => {
-            const facts = resolveEvidenceLabels(
-              parseStringArray(item.supportingFactIds),
-              profileItems,
-            );
-            const calculation = experienceCalculation(
-              item.experienceCalculationJson,
-            );
-            const roleLabels = calculation
-              ? resolveEvidenceLabels(
-                  [
-                    ...calculation.periods.map((period) => period.roleId),
-                    ...calculation.missingDateRoleIds,
-                  ],
-                  profileItems,
-                )
-              : [];
-            return {
-              id: item.id,
-              text: item.text,
-              strength: item.strength,
-              explanation: item.explanation,
-              facts: facts.map((fact) => ({
-                id: fact.id,
-                label: fact.label,
-                detail: fact.detail,
-              })),
-              experience: calculation
-                ? formatExperienceRange({ ...calculation, roleLabels })
-                : null,
-            };
-          })}
-        />
-      ) : (
-        <p className="text-sm text-muted">Evidence has not been assessed yet.</p>
-      )}
-
-      {qualityNote ? (
-        <div
-          className={`space-y-2 rounded-md border border-warning bg-warning-tint p-3 ${WORKSPACE_CARD_WRAP_CLASS}`}
-          data-testid="consultation-failed"
-        >
-          <p className={`text-sm text-warning ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>{qualityNote}</p>
-          {canEdit ? (
-            <ApplicationActionForm
-              action={retryConsultationAction}
-              submitLabel={consultationConversationCopy.retry}
-              testId="retry-consultation"
-            >
-              <input type="hidden" name="campaignId" value={campaignId} />
-            </ApplicationActionForm>
-          ) : null}
-        </div>
-      ) : null}
-
-      {session?.status === "SKIPPED" ? (
-        <p className="text-sm text-ink">
-          Consultation is skipped. Materials can still be generated from the {vocab.product.singular} alone.
-        </p>
-      ) : null}
-      {session?.status === "PAUSED" ? (
-        <p className="text-sm text-ink">Paused. Resume when you want to continue.</p>
-      ) : null}
-      {session?.status === "DONE" ? (
-        <p className="text-sm text-ink">{consultationConversationCopy.planComplete}</p>
-      ) : null}
-
-      {canEdit &&
-      !session &&
-      !jobs.some(
-        (job) =>
-          job.type === "CONSULTATION" &&
-          (job.status === "PENDING" || job.status === "IN_PROGRESS"),
-      ) ? (
-        <div className="flex flex-wrap gap-3">
-          <ApplicationActionForm
-            action={startConsultationAction}
-            submitLabel={consultationConversationCopy.start}
-            testId="start-consultation"
-          >
-            <input type="hidden" name="campaignId" value={campaignId} />
-          </ApplicationActionForm>
-          <ApplicationActionForm action={skipConsultationAction} submitLabel="Skip consultation" testId="skip-consultation">
-            <input type="hidden" name="campaignId" value={campaignId} />
-          </ApplicationActionForm>
-        </div>
-      ) : null}
-
-      {session && !failed ? (
-        <ConsultationThread
-          campaignId={campaignId}
-          canEdit={canEdit}
-          sessionStatus={session.status}
-          jobsActive={jobs.some(
-            (job) =>
-              job.type === "CONSULTATION" &&
-              (job.status === "PENDING" || job.status === "IN_PROGRESS"),
-          )}
-          generating={session.generationStatus === "GENERATING"}
-          turns={session.turns.map((turn) => ({
-            id: turn.id,
-            speaker: turn.speaker,
-            body: turn.body,
-          }))}
-          statements={statements.map((statement) => ({
-            id: statement.id,
-            turnId: statement.turnId,
-            kind: statement.kind,
-            status: statement.status,
-            content: statement.content,
-            strengtheningNote: statement.strengtheningNote,
-            claimFlagsJson: statement.claimFlagsJson,
-          }))}
-          latestDraftTurnId={latestDraftTurnId}
-        />
-      ) : null}
-
-      {canEdit && session?.status === "IN_PROGRESS" && !failed ? (
-        <div className="flex flex-wrap gap-3">
-          <ApplicationActionForm action={pauseConsultationAction} submitLabel="Pause" testId="pause-consultation">
-            <input type="hidden" name="campaignId" value={campaignId} />
-          </ApplicationActionForm>
-          <ApplicationActionForm action={completeConsultationAction} submitLabel="Done" testId="done-consultation">
-            <input type="hidden" name="campaignId" value={campaignId} />
-          </ApplicationActionForm>
-          <ApplicationActionForm action={skipConsultationAction} submitLabel="Skip the rest" testId="skip-consultation-open">
-            <input type="hidden" name="campaignId" value={campaignId} />
-          </ApplicationActionForm>
-        </div>
-      ) : null}
-
-      {canEdit && (session?.status === "PAUSED" || session?.status === "SKIPPED") ? (
-        <ApplicationActionForm action={resumeConsultationAction} submitLabel="Resume" testId="resume-consultation">
-          <input type="hidden" name="campaignId" value={campaignId} />
-        </ApplicationActionForm>
-      ) : null}
-      </div>
+  const consultationBusy = jobs.some(
+    (job) =>
+      job.type === "CONSULTATION" &&
+      (job.status === "PENDING" || job.status === "IN_PROGRESS"),
   );
-
-  if (layout === "dock") {
-    return (
-      <div className={WORKSPACE_CARD_WRAP_CLASS} data-testid="consultation">
-        {body}
-      </div>
-    );
-  }
+  const standingRequirements =
+    session?.assessments.map((item) => {
+      const facts = resolveEvidenceLabels(
+        parseStringArray(item.supportingFactIds),
+        profileItems,
+      );
+      const calculation = experienceCalculation(item.experienceCalculationJson);
+      const roleLabels = calculation
+        ? resolveEvidenceLabels(
+            [
+              ...calculation.periods.map((period) => period.roleId),
+              ...calculation.missingDateRoleIds,
+            ],
+            profileItems,
+          )
+        : [];
+      return {
+        id: item.id,
+        text: item.text,
+        strength: item.strength,
+        explanation: item.explanation,
+        facts: facts.map((fact) => ({
+          id: fact.id,
+          label: fact.label,
+          detail: fact.detail,
+        })),
+        experience: calculation
+          ? formatExperienceRange({ ...calculation, roleLabels })
+          : null,
+      };
+    }) ?? [];
+  const hasStanding =
+    briefing?.success || (session != null && session.assessments.length > 0);
 
   return (
     <>
-    <OpenWorkspaceHashSection sectionId={workspaceSectionId("CONSULTATION")} />
-    <details
-      open={defaultOpen}
-      id={workspaceSectionId("CONSULTATION")}
-      className={`space-y-4 rounded-lg border border-edge bg-surface p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
-      data-testid="consultation"
-    >
-      <summary className="cursor-pointer text-base font-semibold text-ink">
-        Consultation with {consultationConfig.displayName}
-      </summary>
-      {body}
-    </details>
+      <OpenWorkspaceHashSection sectionId={workspaceSectionId("CONSULTATION")} />
+      <section
+        id={workspaceSectionId("CONSULTATION")}
+        className={`space-y-4 rounded-lg border border-edge bg-surface p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
+        data-testid="consultation"
+      >
+        <h2 className="text-base font-semibold text-ink">
+          {consultationConfig.displayName}
+        </h2>
+        <p className={`text-sm text-muted ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
+          {consultationConfig.displayName} compares this job with the{" "}
+          {vocab.product.singular} and draws out the stories behind the gaps.
+          Nothing is added to the {vocab.product.singular} until you confirm it.
+        </p>
+        <WorkspaceProgress jobs={jobs} type="CONSULTATION" stayAndWatch />
+        {consultationBusy || session?.generationStatus === "GENERATING" ? (
+          <p className="text-sm text-muted" data-testid="harper-typing">
+            <AppPendingIndicator label={workspaceJobCopy.typing} />
+          </p>
+        ) : null}
+        {personPreps.length > 0 ? (
+          <div className="space-y-3" data-testid="person-prep-offers">
+            {personPreps.map((prep) => (
+              <article
+                key={prep.contactId}
+                className="rounded-md border border-edge bg-canvas p-4"
+              >
+                <h4 className="text-sm font-semibold text-ink">
+                  {interviewConfig.labels.personPrepOffer}: {prep.name || prep.roleName}
+                </h4>
+                {prep.openingText ? (
+                  <p className="mt-2 text-sm text-ink">{prep.openingText}</p>
+                ) : (
+                  <p className="mt-2 text-sm text-muted">
+                    <AppPendingIndicator label={workspaceJobCopy.typing} />
+                  </p>
+                )}
+                {prep.confirmedAnswers.length > 0 ? (
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-ink">
+                    {prep.confirmedAnswers.map((answer) => (
+                      <li key={answer.turnId}>{answer.text}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : null}
+        {qualityNote ? (
+          <div
+            className={`space-y-2 rounded-md border border-warning bg-warning-tint p-3 ${WORKSPACE_CARD_WRAP_CLASS}`}
+            data-testid="consultation-failed"
+          >
+            <p className={`text-sm text-warning ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
+              {qualityNote}
+            </p>
+            {canEdit ? (
+              <ApplicationActionForm
+                action={retryConsultationAction}
+                submitLabel={consultationConversationCopy.retry}
+                testId="retry-consultation"
+              >
+                <input type="hidden" name="campaignId" value={campaignId} />
+              </ApplicationActionForm>
+            ) : null}
+          </div>
+        ) : null}
+        {session?.status === "SKIPPED" ? (
+          <p className="text-sm text-ink">
+            Consultation is skipped. Materials can still be generated from the{" "}
+            {vocab.product.singular} alone.
+          </p>
+        ) : null}
+        {session?.status === "PAUSED" ? (
+          <p className="text-sm text-ink">Paused. Resume when you want to continue.</p>
+        ) : null}
+        {session?.status === "DONE" ? (
+          <p className="text-sm text-ink">{consultationConversationCopy.planComplete}</p>
+        ) : null}
+        {canEdit && !session && !consultationBusy ? (
+          <div className="flex flex-wrap gap-3">
+            <ApplicationActionForm
+              action={startConsultationAction}
+              submitLabel={consultationConversationCopy.start}
+              testId="start-consultation"
+            >
+              <input type="hidden" name="campaignId" value={campaignId} />
+            </ApplicationActionForm>
+            <ApplicationActionForm
+              action={skipConsultationAction}
+              submitLabel="Skip consultation"
+              testId="skip-consultation"
+            >
+              <input type="hidden" name="campaignId" value={campaignId} />
+            </ApplicationActionForm>
+          </div>
+        ) : null}
+        {session && !failed ? (
+          <ConsultationThread
+            campaignId={campaignId}
+            canEdit={canEdit}
+            sessionStatus={session.status}
+            jobsActive={consultationBusy}
+            generating={session.generationStatus === "GENERATING"}
+            turns={session.turns.map((turn) => ({
+              id: turn.id,
+              speaker: turn.speaker,
+              body: turn.body,
+            }))}
+            statements={statements.map((statement) => ({
+              id: statement.id,
+              turnId: statement.turnId,
+              kind: statement.kind,
+              status: statement.status,
+              content: statement.content,
+              strengtheningNote: statement.strengtheningNote,
+              claimFlagsJson: statement.claimFlagsJson,
+            }))}
+            latestDraftTurnId={latestDraftTurnId}
+          />
+        ) : null}
+        {canEdit && session?.status === "IN_PROGRESS" && !failed ? (
+          <div className="flex flex-wrap gap-3">
+            <ApplicationActionForm
+              action={pauseConsultationAction}
+              submitLabel="Pause"
+              testId="pause-consultation"
+            >
+              <input type="hidden" name="campaignId" value={campaignId} />
+            </ApplicationActionForm>
+            <ApplicationActionForm
+              action={completeConsultationAction}
+              submitLabel="Done"
+              testId="done-consultation"
+            >
+              <input type="hidden" name="campaignId" value={campaignId} />
+            </ApplicationActionForm>
+            <ApplicationActionForm
+              action={skipConsultationAction}
+              submitLabel="Skip the rest"
+              testId="skip-consultation-open"
+            >
+              <input type="hidden" name="campaignId" value={campaignId} />
+            </ApplicationActionForm>
+          </div>
+        ) : null}
+        {canEdit && (session?.status === "PAUSED" || session?.status === "SKIPPED") ? (
+          <ApplicationActionForm
+            action={resumeConsultationAction}
+            submitLabel="Resume"
+            testId="resume-consultation"
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+          </ApplicationActionForm>
+        ) : null}
+        {hasStanding ? (
+          <details
+            className="rounded-md border border-edge bg-canvas p-4"
+            data-testid="consultation-standing-panel"
+          >
+            <summary className="cursor-pointer text-sm font-semibold text-ink">
+              {consultationConversationCopy.whereYouStand}
+            </summary>
+            <div className="mt-4 space-y-4">
+              {briefing?.success ? (
+                <div className="space-y-2" data-testid="consultation-briefing">
+                  <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
+                    {briefing.data.strongestAngles.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                  <ol className="list-decimal space-y-1 pl-5 text-sm text-ink">
+                    {briefing.data.storyPlan.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ol>
+                </div>
+              ) : null}
+              {session && session.assessments.length > 0 ? (
+                <ConsultationStanding
+                  overall={briefing?.success ? briefing.data.overall : null}
+                  gaps={briefing?.success ? briefing.data.importantGaps : []}
+                  careerRecap={
+                    parsed.ok
+                      ? parsed.profile.positioning?.text?.trim() ||
+                        parsed.profile.identity.headline?.text?.trim() ||
+                        null
+                      : null
+                  }
+                  requirements={standingRequirements}
+                />
+              ) : (
+                <p className="text-sm text-muted">
+                  Evidence has not been assessed yet.
+                </p>
+              )}
+            </div>
+          </details>
+        ) : null}
+      </section>
     </>
   );
 }

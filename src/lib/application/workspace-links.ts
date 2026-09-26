@@ -31,6 +31,15 @@ export function workspaceConsultationHref(campaignId?: string): string {
   );
 }
 
+export function workspaceConsultationHrefFromPathname(pathname: string): string {
+  const match = pathname.match(/^\/campaigns\/([^/]+)/);
+  const id = match?.[1]?.trim();
+  if (!id) {
+    throw new Error("Harper link is missing an application.");
+  }
+  return applicationStepHref(id, "consultation");
+}
+
 export function workspaceCampaignHref(campaignId: string): string {
   const id = campaignId.trim();
   if (!id) {
@@ -77,7 +86,7 @@ export function listWorkspaceHrefs(input: {
   return [
     workspaceProfileHref(input.productId),
     workspaceProfileEditHref(input.productId),
-    workspaceConsultationHref(),
+    workspaceConsultationHref(input.campaignId),
     workspaceCampaignHref(input.campaignId),
     workspaceCampaignSummaryHref(input.campaignId),
     workspaceInterviewStageHref(input.campaignId, input.interviewStageId),
@@ -95,7 +104,11 @@ export function openWorkspaceSection(sectionId: string): void {
     throw new Error("Workspace sections can only be opened in the browser.");
   }
   if (sectionId === workspaceSectionId("CONSULTATION")) {
-    window.dispatchEvent(new Event("harper-open"));
+    const match = window.location.pathname.match(/^\/campaigns\/([^/]+)/);
+    if (match?.[1]) {
+      window.location.assign(applicationStepHref(match[1], "consultation"));
+      return;
+    }
   }
   const el = document.getElementById(sectionId);
   if (!el) {

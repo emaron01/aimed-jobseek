@@ -1,23 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { getApplicationWorkspaceLiveAction } from "@/app/actions/application-jobs";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { retryApplicationJobAction } from "@/app/actions/application-jobs";
-import {
-  workspaceJobCopy,
-  workspaceSectionId,
-} from "@/lib/product-config";
+import { workspaceJobCopy } from "@/lib/product-config";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
 import { AppPendingIndicator } from "@/components/AppButton";
 import { AppActionLink } from "@/components/ui";
 import { hasVisibleText } from "@/lib/grounding/fact-tokens";
 import {
-  openWorkspaceSection,
   WORKSPACE_CARD_WRAP_CLASS,
   WORKSPACE_MESSAGE_WRAP_CLASS,
-  workspaceConsultationHref,
+  workspaceConsultationHrefFromPathname,
 } from "@/lib/application/workspace-links";
 import { applicationAssetConfig, consultationConfig, vocab } from "@/lib/product-config";
 
@@ -38,6 +34,7 @@ function JobErrorDetail({
   const violations = lines.slice(1);
   const showFix =
     /claim|source|verif/i.test(error ?? "") || violations.length > 0;
+  const pathname = usePathname() || "";
   return (
     <div className={`space-y-2 ${WORKSPACE_CARD_WRAP_CLASS}`}>
       <p className={`text-sm text-warning ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
@@ -62,11 +59,8 @@ function JobErrorDetail({
             .replace("{consultant}", consultationConfig.displayName)
             .replace("{product}", vocab.product.singular)}{" "}
           <AppActionLink
-            href={workspaceConsultationHref()}
+            href={workspaceConsultationHrefFromPathname(pathname)}
             variant="chip"
-            onClick={() =>
-              openWorkspaceSection(workspaceSectionId("CONSULTATION"))
-            }
           >
             {consultationConfig.displayName}
           </AppActionLink>{" "}

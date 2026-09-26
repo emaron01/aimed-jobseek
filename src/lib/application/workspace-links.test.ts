@@ -7,6 +7,7 @@ import {
   WORKSPACE_CARD_WRAP_CLASS,
   WORKSPACE_MESSAGE_WRAP_CLASS,
   workspaceConsultationHref,
+  workspaceConsultationHrefFromPathname,
   workspaceProfileHref,
 } from "@/lib/application/workspace-links";
 import { workspaceSectionId } from "@/lib/product-config";
@@ -111,6 +112,10 @@ describe("workspace links", () => {
     expect(workspaceProfileHref("prod_1")).toBe("/setup/prod_1");
     expect(hrefs).toContain("/setup/prod_1/edit");
     expect(workspaceConsultationHref()).toBe("#consultation");
+    expect(workspaceConsultationHref("camp_1")).toBe("/campaigns/camp_1/consultation");
+    expect(workspaceConsultationHrefFromPathname("/campaigns/camp_1/assets")).toBe(
+      "/campaigns/camp_1/consultation",
+    );
     expect(workspaceHrefResolves("/campaigns/camp_1/company")).toBe(true);
     expect(workspaceHrefResolves("/campaigns/camp_1/job")).toBe(true);
     expect(workspaceHrefResolves("/campaigns/camp_1/hiring-team")).toBe(true);
@@ -118,7 +123,7 @@ describe("workspace links", () => {
     expect(workspaceHrefResolves("/campaigns/camp_1/outreach")).toBe(true);
     expect(workspaceHrefResolves("/campaigns/camp_1/interviews")).toBe(true);
     expect(workspaceHrefResolves("/products/prod_1")).toBe(false);
-    expect(workspaceHrefResolves("/campaigns/camp_1/consultation")).toBe(false);
+    expect(workspaceHrefResolves("/campaigns/camp_1/consultation")).toBe(true);
   });
 
   it("uses the shared href helpers in workspace components", () => {
@@ -142,8 +147,8 @@ describe("workspace links", () => {
     const joined = [workspace, live, assets, interview, outreach].join("\n");
     expect(workspace).toContain("workspaceProfileHref");
     expect(workspace).toContain("workspaceCampaignSummaryHref");
-    expect(live).toContain("workspaceConsultationHref");
-    expect(assets).toContain("workspaceConsultationHref");
+    expect(live).toContain("workspaceConsultationHrefFromPathname");
+    expect(assets).toContain("workspaceConsultationHrefFromPathname");
     expect(assets).toContain("workspaceAssetDocxHref");
     expect(interview).toContain("workspaceInterviewStageHref");
     expect(outreach).toContain("workspaceAssetDocxHref");
