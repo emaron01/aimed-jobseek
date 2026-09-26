@@ -209,6 +209,90 @@ export default async function PlatformCostsPage({
         </div>
       </section>
 
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Spend by operation</h2>
+        <p className="text-sm text-muted">
+          Cached input tokens: {report.cachedInputTokens.toLocaleString()}. Cache
+          writes: {report.cacheWriteTokens.toLocaleString()}.
+        </p>
+        <div className="overflow-x-auto rounded-lg border border-edge bg-surface">
+          <table className="min-w-full text-left text-sm">
+            <thead className="border-b border-edge bg-canvas text-xs uppercase tracking-wide text-subtle">
+              <tr>
+                <th className="px-3 py-2 font-medium">Operation</th>
+                <th className="px-3 py-2 font-medium">Estimated USD</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(report.byOperation)
+                .sort((a, b) => b[1] - a[1])
+                .map(([operation, usd]) => (
+                  <tr
+                    key={operation}
+                    className="border-b border-edge last:border-0"
+                  >
+                    <td className="px-3 py-2">{operation}</td>
+                    <td className="px-3 py-2 tabular-nums">{formatUsd(usd)}</td>
+                  </tr>
+                ))}
+              {Object.keys(report.byOperation).length === 0 ? (
+                <tr>
+                  <td colSpan={2} className="px-3 py-6 text-center text-subtle">
+                    No usage in this window.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Spend per application</h2>
+        <div className="overflow-x-auto rounded-lg border border-edge bg-surface">
+          <table className="min-w-full text-left text-sm">
+            <thead className="border-b border-edge bg-canvas text-xs uppercase tracking-wide text-subtle">
+              <tr>
+                <th className="px-3 py-2 font-medium">Application</th>
+                <th className="px-3 py-2 font-medium">Input tokens</th>
+                <th className="px-3 py-2 font-medium">Cached input</th>
+                <th className="px-3 py-2 font-medium">Output tokens</th>
+                <th className="px-3 py-2 font-medium">Estimated USD</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.byApplication.map((row) => (
+                <tr
+                  key={row.campaignId}
+                  className="border-b border-edge last:border-0"
+                >
+                  <td className="px-3 py-2">{row.name}</td>
+                  <td className="px-3 py-2 tabular-nums">
+                    {row.inputTokens.toLocaleString()}
+                  </td>
+                  <td className="px-3 py-2 tabular-nums">
+                    {row.cachedInputTokens.toLocaleString()}
+                  </td>
+                  <td className="px-3 py-2 tabular-nums">
+                    {row.outputTokens.toLocaleString()}
+                  </td>
+                  <td className="px-3 py-2 tabular-nums">
+                    {formatUsd(row.estimatedSpendUsd)}
+                  </td>
+                </tr>
+              ))}
+              {report.byApplication.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-3 py-6 text-center text-subtle">
+                    No application-linked usage in this window.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       {/* 5. Per-org table */}
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Per organization</h2>
@@ -273,6 +357,8 @@ export default async function PlatformCostsPage({
                 <th className="px-3 py-2 font-medium">Provider</th>
                 <th className="px-3 py-2 font-medium">Model</th>
                 <th className="px-3 py-2 font-medium">Input / 1M</th>
+                <th className="px-3 py-2 font-medium">Cached / 1M</th>
+                <th className="px-3 py-2 font-medium">Cache write / 1M</th>
                 <th className="px-3 py-2 font-medium">Output / 1M</th>
                 <th className="px-3 py-2 font-medium">Web search</th>
                 <th className="px-3 py-2 font-medium">Effective from</th>
@@ -289,6 +375,12 @@ export default async function PlatformCostsPage({
                   <td className="px-3 py-2 font-mono text-xs">{r.model}</td>
                   <td className="px-3 py-2 tabular-nums">
                     {formatUsd(r.inputPer1MUsd)}
+                  </td>
+                  <td className="px-3 py-2 tabular-nums">
+                    {formatUsd(r.cachedInputPer1MUsd)}
+                  </td>
+                  <td className="px-3 py-2 tabular-nums">
+                    {formatUsd(r.cacheWritePer1MUsd)}
                   </td>
                   <td className="px-3 py-2 tabular-nums">
                     {formatUsd(r.outputPer1MUsd)}
@@ -334,6 +426,28 @@ export default async function PlatformCostsPage({
               Input $/1M tokens
               <input
                 name="inputPer1MUsd"
+                type="number"
+                step="0.000001"
+                min={0}
+                required
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
+              />
+            </label>
+            <label className="block text-sm">
+              Cached input $/1M tokens
+              <input
+                name="cachedInputPer1MUsd"
+                type="number"
+                step="0.000001"
+                min={0}
+                required
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
+              />
+            </label>
+            <label className="block text-sm">
+              Cache write $/1M tokens
+              <input
+                name="cacheWritePer1MUsd"
                 type="number"
                 step="0.000001"
                 min={0}

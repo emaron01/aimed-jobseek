@@ -9,8 +9,12 @@ vi.mock("@/lib/ai", async (importOriginal) => {
   return {
     ...actual,
     isAssetAiConfigured,
+    isEmailAiConfigured: isAssetAiConfigured,
+    isEmailFactsAiConfigured: isAssetAiConfigured,
     getAssetAiProvider: () => ({ generateStructured }),
     getAssetValidationAiProvider: () => ({ generateStructured }),
+    getEmailAiProvider: () => ({ generateStructured }),
+    getEmailFactsAiProvider: () => ({ generateStructured }),
   };
 });
 
@@ -427,6 +431,25 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     }
   });
 
+  function mergedCoverLetterPayload(
+    messages: Array<{ content: string }>,
+  ): {
+    salutation: string;
+    signerName: string;
+    sources: Array<{ id: string; text: string; url: string | null }>;
+  } {
+    return messages.reduce(
+      (acc, message) => {
+        try {
+          return { ...acc, ...JSON.parse(message.content) };
+        } catch {
+          return acc;
+        }
+      },
+      { salutation: "", signerName: "", sources: [] },
+    );
+  }
+
   function validCoverLetter(
     payload: {
       salutation: string;
@@ -491,11 +514,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
           return { data: resumes.shift() ?? validResume() };
         }
         if (request.schemaName === "application_cover_letter") {
-          const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
-            salutation: string;
-            signerName: string;
-            sources: Array<{ id: string; text: string; url: string | null }>;
-          };
+          const payload = mergedCoverLetterPayload(request.messages);
           return {
             data:
               coverLetters.shift() ??
@@ -841,11 +860,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
           return { data: validResume() };
         }
         if (request.schemaName === "application_cover_letter") {
-          const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
-            salutation: string;
-            signerName: string;
-            sources: Array<{ id: string; text: string; url: string | null }>;
-          };
+          const payload = mergedCoverLetterPayload(request.messages);
           const letter = validCoverLetter(payload);
           letter.paragraphs[0] = {
             ...letter.paragraphs[0]!,
@@ -910,11 +925,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     generateStructured.mockImplementation(
       async (request: { schemaName: string; messages: Array<{ content: string }> }) => {
         if (request.schemaName === "application_cover_letter") {
-          const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
-            salutation: string;
-            signerName: string;
-            sources: Array<{ id: string; text: string; url: string | null }>;
-          };
+          const payload = mergedCoverLetterPayload(request.messages);
           return { data: noClaim(payload) };
         }
         if (request.schemaName === "application_asset_claim_validation") {
@@ -935,11 +946,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     generateStructured.mockImplementation(
       async (request: { schemaName: string; messages: Array<{ content: string }> }) => {
         if (request.schemaName === "application_cover_letter") {
-          const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
-            salutation: string;
-            signerName: string;
-            sources: Array<{ id: string; text: string; url: string | null }>;
-          };
+          const payload = mergedCoverLetterPayload(request.messages);
           const letter = validCoverLetter(payload);
           letter.paragraphs[2] = {
             id: "cover-close",
@@ -1022,11 +1029,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     generateStructured.mockImplementation(
       async (request: { schemaName: string; messages: Array<{ content: string }> }) => {
         if (request.schemaName === "application_cover_letter") {
-          const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
-            salutation: string;
-            signerName: string;
-            sources: Array<{ id: string; text: string; url: string | null }>;
-          };
+          const payload = mergedCoverLetterPayload(request.messages);
           expect(
             payload.sources.some((source) => source.id.startsWith("research:")),
           ).toBe(false);
@@ -1174,11 +1177,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     generateStructured.mockImplementation(
       async (request: { schemaName: string; messages: Array<{ content: string }> }) => {
         if (request.schemaName === "application_cover_letter") {
-          const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
-            salutation: string;
-            signerName: string;
-            sources: Array<{ id: string; text: string; url: string | null }>;
-          };
+          const payload = mergedCoverLetterPayload(request.messages);
           coverLetterCalls += 1;
           return {
             data: coverLetterCalls === 1 ? mixed(payload) : coherent(payload),
@@ -1301,11 +1300,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     generateStructured.mockImplementation(
       async (request: { schemaName: string; messages: Array<{ content: string }> }) => {
         if (request.schemaName === "application_cover_letter") {
-          const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
-            salutation: string;
-            signerName: string;
-            sources: Array<{ id: string; text: string; url: string | null }>;
-          };
+          const payload = mergedCoverLetterPayload(request.messages);
           coverLetterCalls += 1;
           return {
             data: coverLetterCalls === 1 ? thinBody(payload) : withStatement(payload),

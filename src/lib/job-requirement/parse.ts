@@ -1,6 +1,8 @@
 import { isInterpretationAiConfigured } from "@/lib/ai/config";
 import { getInterpretationAiProvider } from "@/lib/ai/provider";
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
+import type { AiCallUsageContext } from "@/lib/ai/types";
+import { aiCallTracking } from "@/lib/usage/ai-call";
 import { normalizeParsedJobRequirement } from "@/lib/job-requirement/normalize";
 import { buildJobRequirementMessages } from "@/lib/job-requirement/prompt";
 import { jobRequirementAiResultSchema } from "@/lib/job-requirement/schema";
@@ -10,6 +12,7 @@ import { TenantError } from "@/lib/tenant/errors";
 
 export async function interpretJobPosting(
   rawText: string,
+  usage?: AiCallUsageContext,
 ): Promise<ParsedJobRequirement> {
   const posting = rawText.trim();
   if (!posting) {
@@ -28,6 +31,7 @@ export async function interpretJobPosting(
   try {
     const response = await ai.generateStructured({
       ...structuredOutputRequest("jobRequirement"),
+      ...(usage ? aiCallTracking(usage) : {}),
       messages: buildJobRequirementMessages(posting),
     });
     data = response.data;

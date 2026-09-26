@@ -3,6 +3,8 @@ import {
   getConsultationAiProvider,
   isConsultationAiConfigured,
 } from "@/lib/ai";
+import type { AiCallUsageContext } from "@/lib/ai/types";
+import { aiCallTracking } from "@/lib/usage/ai-call";
 import {
   coverLetterPresentationPlanSchema,
   normalizeCoverLetterPresentationPlan,
@@ -29,6 +31,7 @@ export async function writePresentationPlanWithModel(input: {
   assessments: Array<{ text: string; strength: string; explanation: string }>;
   adjustmentNote: string | null;
   qualityFeedback?: string[];
+  usage?: AiCallUsageContext;
 }): Promise<{ ok: true; data: PresentationPlan } | { ok: false; message: string }> {
   if (!isConsultationAiConfigured()) {
     console.error(
@@ -51,6 +54,7 @@ export async function writePresentationPlanWithModel(input: {
       input.type === "RESUME"
         ? await getConsultationAiProvider().generateStructured({
             ...structuredOutputRequest("resumePresentationPlan"),
+            ...(input.usage ? aiCallTracking(input.usage) : {}),
             messages,
             parseOutput: (raw) => ({
               data: resumePresentationPlanSchema.parse(
@@ -61,6 +65,7 @@ export async function writePresentationPlanWithModel(input: {
           })
         : await getConsultationAiProvider().generateStructured({
             ...structuredOutputRequest("coverLetterPresentationPlan"),
+            ...(input.usage ? aiCallTracking(input.usage) : {}),
             messages,
             parseOutput: (raw) => ({
               data: coverLetterPresentationPlanSchema.parse(

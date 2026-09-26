@@ -522,7 +522,12 @@ export async function createCampaignAction(
       },
     });
     const { interpretJobPosting } = await import("@/lib/job-requirement/parse");
-    const parsedJob = await interpretJobPosting(parsed.fields.postingText);
+    const parsedJob = await interpretJobPosting(parsed.fields.postingText, {
+      organizationId,
+      userId: user.id,
+      category: "INTERPRETATION",
+      operation: "JOB_REQUIREMENT_PARSE",
+    });
     const campaign = await createCampaign({
       ...parsed.fields,
       contactIds: parsed.contactIds,

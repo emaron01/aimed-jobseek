@@ -513,6 +513,12 @@ export async function generateApplicationSummary(input: {
       sources: data.sources,
       people,
       qualityFeedback: [],
+      usage: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        category: "CONSULTATION",
+        operation: "APPLICATION_SUMMARY",
+      },
     });
     if (!generated.ok) {
       if (attempt === 1) {

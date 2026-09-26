@@ -268,6 +268,7 @@ enum UsageCategory {
   PRODUCT_RESEARCH
   PERSONA_RESEARCH
   ASSET_GENERATION
+  CONSULTATION
 }
 
 enum UsageOperation {
@@ -297,6 +298,13 @@ enum UsageOperation {
   TITLE_SUGGESTION
   JOB_REQUIREMENT_PARSE
   APPLICATION_ASSET_GENERATION
+  CONSULTATION
+  CONSULTATION_REPLY
+  APPLICATION_NEXT_STEP
+  APPLICATION_SUMMARY
+  INTERVIEW_GUIDE
+  HIRING_TEAM
+  CONTACT_PROFILE
 }
 
 enum CriterionDataType {
@@ -654,8 +662,12 @@ model AiModelRate {
   id                  String   @id @default(cuid())
   provider            String
   model               String
-  /// USD per 1M input tokens.
+  /// USD per 1M uncached input tokens.
   inputPer1MUsd       Decimal  @db.Decimal(12, 6)
+  /// USD per 1M cached input tokens.
+  cachedInputPer1MUsd Decimal  @default(0) @db.Decimal(12, 6)
+  /// USD per 1M cache-write tokens (OpenAI bills writes at 1.25× uncached input).
+  cacheWritePer1MUsd  Decimal  @default(0) @db.Decimal(12, 6)
   /// USD per 1M output tokens.
   outputPer1MUsd      Decimal  @db.Decimal(12, 6)
   /// USD per web_search tool call (search content tokens still billed via input).
@@ -1182,9 +1194,11 @@ model UsageEvent {
   campaignId     String?
   /// Links attempt/retry events for the same logical operation when used.
   operationId    String?
-  inputTokens    Int?
-  outputTokens   Int?
-  webSearchCalls Int?
+  inputTokens       Int?
+  cachedInputTokens Int?
+  cacheWriteTokens  Int?
+  outputTokens      Int?
+  webSearchCalls    Int?
   status         UsageEventStatus
   retryCount     Int              @default(0)
   durationMs     Int?

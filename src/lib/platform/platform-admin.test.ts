@@ -264,6 +264,8 @@ describe("phase B cost reporting seams", () => {
     expect(page).toContain("Cost per company researched");
     expect(page).toContain("{vocab.contact.Plural} per company");
     expect(page).toContain("Projected monthly cost");
+    expect(page).toContain("Spend by operation");
+    expect(page).toContain("Spend per application");
     expect(page).toContain("ensureAiModelRatesSeeded");
     expect(page).toContain("upsertAiModelRateAction");
     expect(page).toContain("recordSpendReconciliationAction");

@@ -1,6 +1,7 @@
 import {
   assertAssetAiConfigured,
   assertConsultationAiConfigured,
+  assertConsultationReplyAiConfigured,
 } from "@/lib/ai/config";
 import { assertBrandDeploymentConfig } from "@/lib/product-config/deployment";
 
@@ -14,5 +15,6 @@ export async function register() {
   if (process.env.NODE_ENV !== "production") return;
   assertBrandDeploymentConfig();
   assertConsultationAiConfigured();
+  assertConsultationReplyAiConfigured();
   assertAssetAiConfigured();
 }

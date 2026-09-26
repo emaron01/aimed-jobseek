@@ -18,12 +18,23 @@ export type CostableEvent = {
   provider?: string | null;
   model?: string | null;
   inputTokens?: number | null;
+  cachedInputTokens?: number | null;
+  cacheWriteTokens?: number | null;
   outputTokens?: number | null;
   webSearchCalls?: number | null;
   occurredAt: Date;
   category?: UsageCategory;
   operation?: string;
   status?: string;
+};
+
+export type ApplicationCostRow = {
+  campaignId: string;
+  name: string;
+  estimatedSpendUsd: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
 };
 
 export type ProjectionEmails = 100 | 300 | 500;
@@ -40,10 +51,13 @@ export type CostReport = {
   until: Date;
   estimatedSpendUsd: number;
   inputTokens: number;
+  cachedInputTokens: number;
+  cacheWriteTokens: number;
   outputTokens: number;
   webSearchCalls: number;
   byCategory: Record<string, number>;
   byOperation: Record<string, number>;
+  byApplication: ApplicationCostRow[];
   unratedEventCount: number;
   companiesResearched: number;
   costPerCompanyUsd: number | null;
@@ -98,11 +112,23 @@ export function estimateEventCostUsd(
   if (!rate) return 0;
 
   const inputTokens = event.inputTokens ?? 0;
+  const cachedInputTokens = Math.min(
+    Math.max(event.cachedInputTokens ?? 0, 0),
+    inputTokens,
+  );
+  const uncachedInputTokens = inputTokens - cachedInputTokens;
+  const cacheWriteTokens = Math.min(
+    Math.max(event.cacheWriteTokens ?? 0, 0),
+    uncachedInputTokens,
+  );
+  const billedUncachedTokens = uncachedInputTokens - cacheWriteTokens;
   const outputTokens = event.outputTokens ?? 0;
   const webSearchCalls = event.webSearchCalls ?? 0;
 
   return (
-    (inputTokens / 1_000_000) * rate.inputPer1MUsd +
+    (billedUncachedTokens / 1_000_000) * rate.inputPer1MUsd +
+    (cachedInputTokens / 1_000_000) * rate.cachedInputPer1MUsd +
+    (cacheWriteTokens / 1_000_000) * rate.cacheWritePer1MUsd +
     (outputTokens / 1_000_000) * rate.outputPer1MUsd +
     webSearchCalls * rate.webSearchPerCallUsd
   );
@@ -176,6 +202,8 @@ function accumulateEvent(
     | "provider"
     | "model"
     | "inputTokens"
+    | "cachedInputTokens"
+    | "cacheWriteTokens"
     | "outputTokens"
     | "webSearchCalls"
     | "occurredAt"
@@ -187,6 +215,8 @@ function accumulateEvent(
   acc: {
     estimatedSpendUsd: number;
     inputTokens: number;
+    cachedInputTokens: number;
+    cacheWriteTokens: number;
     outputTokens: number;
     webSearchCalls: number;
     byCategory: Record<string, number>;
@@ -200,6 +230,8 @@ function accumulateEvent(
     provider: event.provider,
     model: event.model,
     inputTokens: event.inputTokens,
+    cachedInputTokens: event.cachedInputTokens,
+    cacheWriteTokens: event.cacheWriteTokens,
     outputTokens: event.outputTokens,
     webSearchCalls: event.webSearchCalls,
     occurredAt: event.occurredAt,
@@ -210,6 +242,8 @@ function accumulateEvent(
   const usd = estimateEventCostUsd(costable, rates);
   acc.estimatedSpendUsd += usd;
   acc.inputTokens += event.inputTokens ?? 0;
+  acc.cachedInputTokens += event.cachedInputTokens ?? 0;
+  acc.cacheWriteTokens += event.cacheWriteTokens ?? 0;
   acc.outputTokens += event.outputTokens ?? 0;
   acc.webSearchCalls += event.webSearchCalls ?? 0;
   acc.byCategory[event.category] = (acc.byCategory[event.category] ?? 0) + usd;
@@ -329,18 +363,23 @@ export async function computeCostReport(input: {
       provider: true,
       model: true,
       inputTokens: true,
+      cachedInputTokens: true,
+      cacheWriteTokens: true,
       outputTokens: true,
       webSearchCalls: true,
       occurredAt: true,
       category: true,
       operation: true,
       status: true,
+      campaignId: true,
     },
   });
 
   const acc = {
     estimatedSpendUsd: 0,
     inputTokens: 0,
+    cachedInputTokens: 0,
+    cacheWriteTokens: 0,
     outputTokens: 0,
     webSearchCalls: 0,
     byCategory: {} as Record<string, number>,
@@ -349,10 +388,50 @@ export async function computeCostReport(input: {
     emailGenerationSpendUsd: 0,
     emailDraftCount: 0,
   };
+  const byApplicationMap = new Map<
+    string,
+    {
+      campaignId: string;
+      estimatedSpendUsd: number;
+      inputTokens: number;
+      cachedInputTokens: number;
+      outputTokens: number;
+    }
+  >();
 
   for (const event of events) {
     accumulateEvent(event, rates, acc);
+    if (!event.campaignId) continue;
+    const usd = estimateEventCostUsd(event, rates);
+    const row = byApplicationMap.get(event.campaignId) ?? {
+      campaignId: event.campaignId,
+      estimatedSpendUsd: 0,
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+    };
+    row.estimatedSpendUsd += usd;
+    row.inputTokens += event.inputTokens ?? 0;
+    row.cachedInputTokens += event.cachedInputTokens ?? 0;
+    row.outputTokens += event.outputTokens ?? 0;
+    byApplicationMap.set(event.campaignId, row);
   }
+
+  const campaignIds = [...byApplicationMap.keys()];
+  const campaigns =
+    campaignIds.length > 0
+      ? await prisma.campaign.findMany({
+          where: { id: { in: campaignIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+  const campaignNames = new Map(campaigns.map((row) => [row.id, row.name]));
+  const byApplication = [...byApplicationMap.values()]
+    .map((row) => ({
+      ...row,
+      name: campaignNames.get(row.campaignId) ?? row.campaignId,
+    }))
+    .sort((a, b) => b.estimatedSpendUsd - a.estimatedSpendUsd);
 
   let companiesResearched = await countCompaniesResearchedInWindow({
     organizationId: input.organizationId,
@@ -410,10 +489,13 @@ export async function computeCostReport(input: {
     until,
     estimatedSpendUsd: acc.estimatedSpendUsd,
     inputTokens: acc.inputTokens,
+    cachedInputTokens: acc.cachedInputTokens,
+    cacheWriteTokens: acc.cacheWriteTokens,
     outputTokens: acc.outputTokens,
     webSearchCalls: acc.webSearchCalls,
     byCategory: acc.byCategory,
     byOperation: acc.byOperation,
+    byApplication,
     unratedEventCount: acc.unratedEventCount,
     companiesResearched,
     costPerCompanyUsd,
@@ -480,6 +562,8 @@ export async function estimateSpendForPeriod(input: {
       provider: true,
       model: true,
       inputTokens: true,
+      cachedInputTokens: true,
+      cacheWriteTokens: true,
       outputTokens: true,
       webSearchCalls: true,
       occurredAt: true,

@@ -699,6 +699,7 @@ export async function validateAssetContent(input: {
   const modelValidation = await validateAssetClaimsWithModel({
     claims,
     sources: input.context.sources,
+    context: input.context,
   });
   if (!modelValidation.ok) {
     return [...new Set([...errors, modelValidation.message])];

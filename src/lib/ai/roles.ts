@@ -3,6 +3,7 @@ import {
   getContactResearchAiConfig,
   getEmailAiConfig,
   getConsultationAiConfig,
+  getConsultationReplyAiConfig,
   getEmailFactsAiConfig,
   getInterpretationAiConfig,
   getPersonaAiConfig,
@@ -147,6 +148,22 @@ export const AI_ROLE_CATALOG: readonly AiRoleCatalogEntry[] = [
     requiredForScoring: false,
   },
   {
+    role: "consultation_reply",
+    label: "Consultation reply",
+    requiredEnv: [
+      "CONSULTATION_REPLY_AI_PROVIDER",
+      "CONSULTATION_REPLY_AI_MODEL",
+      "CONSULTATION_REPLY_AI_MODEL_URL",
+      "CONSULTATION_REPLY_AI_API_KEY",
+    ],
+    operations: [
+      "Consultation answer extract",
+      "Consultation statement polish",
+      "Application next-step",
+    ],
+    requiredForScoring: false,
+  },
+  {
     role: "asset",
     label: "Resume and cover letter generation",
     requiredEnv: [
@@ -171,6 +188,7 @@ const LOADERS: Record<AiRole, () => unknown> = {
   email: getEmailAiConfig,
   email_facts: getEmailFactsAiConfig,
   consultation: getConsultationAiConfig,
+  consultation_reply: getConsultationReplyAiConfig,
   asset: getAssetAiConfig,
 };
 

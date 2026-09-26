@@ -62,6 +62,14 @@ export async function upsertAiModelRateAction(
         formData.get("inputPer1MUsd"),
         "Input rate",
       ),
+      cachedInputPer1MUsd: requirePositiveMoney(
+        formData.get("cachedInputPer1MUsd"),
+        "Cached input rate",
+      ),
+      cacheWritePer1MUsd: requirePositiveMoney(
+        formData.get("cacheWritePer1MUsd"),
+        "Cache write rate",
+      ),
       outputPer1MUsd: requirePositiveMoney(
         formData.get("outputPer1MUsd"),
         "Output rate",

@@ -18,7 +18,7 @@ import {
   CONSULTATION_PROMPT_VERSION,
   WHY_THIS_COMPANY_TARGET_KEY,
 } from "@/lib/consultation/contract";
-import { isHiringTeamPersonaBuilt } from "@/lib/hiring-team/build";
+import type { AiCallUsageContext } from "@/lib/ai/types";
 import {
   matchConsultationFocus,
   planQuestionRound,
@@ -119,6 +119,19 @@ async function requireApplication(organizationId: string, campaignId: string) {
   return { campaign, requirement, product, profile };
 }
 
+function consultationUsage(
+  organizationId: string,
+  campaignId: string,
+  operation: "CONSULTATION" | "CONSULTATION_REPLY",
+): AiCallUsageContext {
+  return {
+    organizationId,
+    campaignId,
+    category: "CONSULTATION",
+    operation,
+  };
+}
+
 function whyThisCompanyTarget(): EvidenceTarget {
   return {
     key: WHY_THIS_COMPANY_TARGET_KEY,
@@ -186,30 +199,14 @@ async function hiringTeam(
       name: true,
       targetTitles: true,
       whyThisPersonaMatters: true,
-      profileJson: true,
-      setupStatus: true,
     },
   });
-  return roles.map((role) => {
-    const built = isHiringTeamPersonaBuilt(role);
-    const profile =
-      role.profileJson && typeof role.profileJson === "object"
-        ? (role.profileJson as Record<string, unknown>)
-        : {};
-    return {
-      id: role.id,
-      name: role.name,
-      likelyTitles: parseStringArray(role.targetTitles),
-      whyThisRoleMatters: role.whyThisPersonaMatters,
-      personaContext: built
-        ? role.profileJson
-        : {
-            involvement: profile.involvement ?? "DIRECT",
-            identification: profile.identification ?? null,
-            built: false,
-          },
-    };
-  });
+  return roles.map((role) => ({
+    id: role.id,
+    name: role.name,
+    likelyTitles: parseStringArray(role.targetTitles),
+    whyThisRoleMatters: role.whyThisPersonaMatters,
+  }));
 }
 
 async function saveAssessments(
@@ -350,6 +347,7 @@ async function extractAnswerWithQuality(input: {
   question: string;
   target: EvidenceTarget | null;
   targets: EvidenceTarget[];
+  usage?: AiCallUsageContext;
 }) {
   let lastFailure: string = consultationConversationCopy.generationFailed;
   for (
@@ -360,6 +358,7 @@ async function extractAnswerWithQuality(input: {
     const extracted = await extractWithModel({
       ...input,
       qualityFeedback: [],
+      usage: input.usage,
     });
     if (extracted.ok) return extracted;
     lastFailure = extracted.message;
@@ -381,6 +380,7 @@ export async function polishAnswerWithQuality(input: {
   sources: GroundingSource[];
   declinedFollowUp: boolean;
   strengtheningNeeds: string[];
+  usage?: AiCallUsageContext;
 }) {
   let lastFailure: string = consultationConversationCopy.generationFailed;
   for (
@@ -391,6 +391,7 @@ export async function polishAnswerWithQuality(input: {
     const polished = await polishAnswerWithModel({
       ...input,
       qualityFeedback: [],
+      usage: input.usage,
     });
     if (polished.ok) return polished;
     lastFailure = polished.message;
@@ -446,6 +447,7 @@ async function failGeneration(sessionId: string, message: string): Promise<void>
 
 async function planAndStoreRound(input: {
   organizationId: string;
+  campaignId: string;
   sessionId: string;
   askedKeys: Set<string>;
   skippedKeys: Set<string>;
@@ -485,6 +487,11 @@ async function planAndStoreRound(input: {
       targets: input.targets,
       profileItems,
       hiringTeam: input.roles,
+      usage: consultationUsage(
+        input.organizationId,
+        input.campaignId,
+        "CONSULTATION",
+      ),
       chronologyRequested,
       coveredTargetKeys: [
         ...new Set(
@@ -726,6 +733,7 @@ export async function startConsultation(input: {
   try {
     await planAndStoreRound({
       organizationId: input.organizationId,
+      campaignId: input.campaignId,
       sessionId: session.id,
       askedKeys,
       skippedKeys,
@@ -745,6 +753,7 @@ export async function startConsultation(input: {
 
 async function processAnswerGeneration(input: {
   organizationId: string;
+  campaignId: string;
   sessionId: string;
   turnId: string;
   answerContext: string;
@@ -761,11 +770,17 @@ async function processAnswerGeneration(input: {
     }
   | { ok: false }
 > {
+  const replyUsage = consultationUsage(
+    input.organizationId,
+    input.campaignId,
+    "CONSULTATION_REPLY",
+  );
   const extracted = await extractAnswerWithQuality({
     answer: input.answerContext,
     question: input.question,
     target: input.target,
     targets: input.targets,
+    usage: replyUsage,
   });
   if (!extracted.ok) {
     await failGeneration(input.sessionId, extracted.message);
@@ -799,6 +814,7 @@ async function processAnswerGeneration(input: {
       }),
       declinedFollowUp: false,
       strengtheningNeeds: [],
+      usage: replyUsage,
     });
     if (!polished.ok) {
       await failGeneration(input.sessionId, polished.message);
@@ -968,6 +984,7 @@ export async function retryConsultationGeneration(input: {
       .join("\n");
     const processed = await processAnswerGeneration({
       organizationId: input.organizationId,
+      campaignId: input.campaignId,
       sessionId: session.id,
       turnId: failedAnswer.id,
       answerContext,
@@ -1273,6 +1290,7 @@ export async function processConsultationReply(input: {
     .join("\n");
   const processed = await processAnswerGeneration({
     organizationId: input.organizationId,
+    campaignId: input.campaignId,
     sessionId: session.id,
     turnId: seekerTurnId,
     answerContext,
@@ -1398,6 +1416,11 @@ async function declineConsultationFollowUp(input: {
     }),
     declinedFollowUp: true,
     strengtheningNeeds: analyzed.missingStarElements,
+    usage: consultationUsage(
+      input.organizationId,
+      input.campaignId,
+      "CONSULTATION_REPLY",
+    ),
   });
   if (!polished.ok) throw new TenantError(polished.message);
   const nextSequence =
@@ -1541,6 +1564,7 @@ export async function skipConsultationQuestion(input: {
   const roles = await hiringTeam(input.organizationId, input.campaignId);
   const next = await planAndStoreRound({
     organizationId: input.organizationId,
+    campaignId: input.campaignId,
     sessionId: session.id,
     askedKeys,
     skippedKeys,
@@ -1632,6 +1656,11 @@ export async function regenerateConsultationStatement(input: {
     }),
     declinedFollowUp: analyzed?.followUpDeclined ?? false,
     strengtheningNeeds: analyzed?.missingStarElements ?? [],
+    usage: consultationUsage(
+      input.organizationId,
+      statement.session.campaignId,
+      "CONSULTATION_REPLY",
+    ),
   });
   const fallbackText =
     statement.kind === "INTERVIEW_ANSWER" ? answer : statement.content.trim();
@@ -1745,6 +1774,11 @@ export async function approveConsultationStatement(input: {
       statement: content,
       kind: statement.kind,
       sources,
+      usage: consultationUsage(
+        input.organizationId,
+        statement.session.campaignId,
+        "CONSULTATION_REPLY",
+      ),
     });
     if (grounding.ok) {
       groundingJson = grounding.data.claims as Prisma.InputJsonValue;
@@ -2077,6 +2111,7 @@ export async function reviseConsultationResult(input: {
   });
   await processAnswerGeneration({
     organizationId: input.organizationId,
+    campaignId: input.campaignId,
     sessionId: session.id,
     turnId: seekerTurn.id,
     answerContext: prior.map((item) => item.body).filter(Boolean).join("\n"),
@@ -2128,6 +2163,7 @@ export async function flagConsultationInaccuracy(input: {
   const roles = await hiringTeam(input.organizationId, input.campaignId);
   const next = await planAndStoreRound({
     organizationId: input.organizationId,
+    campaignId: input.campaignId,
     sessionId: session.id,
     askedKeys,
     skippedKeys,

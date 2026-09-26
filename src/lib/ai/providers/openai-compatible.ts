@@ -10,7 +10,10 @@ import type {
   AiProvider,
   AiStructuredRequest,
   AiStructuredResponse,
+  AiUsageMetadata,
 } from "@/lib/ai/types";
+import { parseResponsesUsage } from "@/lib/ai/providers/openai-responses";
+import { recordAiStructuredUsage } from "@/lib/usage/ai-call";
 import { ZodError } from "zod";
 
 /**
@@ -29,6 +32,8 @@ export function createOpenAiCompatibleProvider(
         () => controller.abort(),
         config.timeoutMs,
       );
+      const started = Date.now();
+      let recordedUsage: AiUsageMetadata | undefined;
 
       try {
         const response = await fetch(config.modelUrl, {
@@ -76,6 +81,9 @@ export function createOpenAiCompatibleProvider(
           );
         }
 
+        recordedUsage = parseResponsesUsage(
+          (parsedJson as { usage?: Record<string, unknown> }).usage,
+        );
         const content = extractMessageContent(parsedJson);
         if (!content) {
           throw new AiProviderError(
@@ -144,15 +152,52 @@ export function createOpenAiCompatibleProvider(
           data = validated.data;
         }
 
-        return {
+        const result = {
           data,
           rawText: content,
           provider: config.provider,
           model: config.model,
           modelUrlIdentifier: config.modelUrlIdentifier,
+          usage: recordedUsage,
           coercedFields: coercedFields.length > 0 ? coercedFields : undefined,
         };
+        if (request.usage) {
+          await recordAiStructuredUsage({
+            context: request.usage,
+            provider: config.provider,
+            model: config.model,
+            usage: recordedUsage,
+            durationMs: Date.now() - started,
+            status: "SUCCESS",
+          });
+        }
+        return result;
       } catch (error) {
+        if (request.usage) {
+          try {
+            await recordAiStructuredUsage({
+              context: request.usage,
+              provider: config.provider,
+              model: config.model,
+              usage:
+                error instanceof AiValidationError
+                  ? error.usage
+                  : recordedUsage,
+              durationMs: Date.now() - started,
+              status: "FAILED",
+            });
+          } catch (recordError) {
+            console.error(
+              JSON.stringify({
+                event: "ai_usage_record_failed",
+                message:
+                  recordError instanceof Error
+                    ? recordError.message
+                    : "unknown",
+              }),
+            );
+          }
+        }
         if (error instanceof Error && error.name === "AbortError") {
           throw new AiTimeoutError(
             `AI request timed out after ${config.timeoutMs}ms.`,

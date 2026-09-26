@@ -60,17 +60,48 @@ function outreachCitableSources(
     }));
 }
 
-function commonPayload(context: ReadyApplicationGenerationContext) {
+function jobRequirementPrefix(context: ReadyApplicationGenerationContext) {
+  const requirement = context.requirement;
+  if (!requirement) return null;
   return {
-    application: context.campaign,
-    jobRequirement: context.requirement,
-    companyResearch: context.companyResearch,
-    persona: context.persona,
-    assessments: context.assessments,
-    approvedStatements: context.approvedStatements,
-    approvedStories: context.stories,
-    voiceSamples: context.voiceSamples,
-    sources: context.sources,
+    title: requirement.title,
+    companyName: requirement.companyName,
+    location: requirement.location,
+    workArrangement: requirement.workArrangement,
+    seniority: requirement.seniority,
+    reportingLine: requirement.reportingLine,
+    compensationRange: requirement.compensationRange,
+    responsibilities: requirement.responsibilities,
+    requiredItems: requirement.requiredItems,
+    preferredItems: requirement.preferredItems,
+    scorecard: requirement.scorecard,
+  };
+}
+
+function companyResearchPrefix(context: ReadyApplicationGenerationContext) {
+  const research = context.companyResearch;
+  if (!research) return null;
+  return {
+    companySummary: research.companySummary,
+    whatTheySell: research.whatTheySell,
+    customerTypes: research.customerTypes,
+    primaryMarkets: research.primaryMarkets,
+    businessModel: research.businessModel,
+    companySizeContext: research.companySizeContext,
+    hiringSignals: research.hiringSignals,
+    riskSignals: research.riskSignals,
+  };
+}
+
+function personalProfilePrefix(context: ReadyApplicationGenerationContext) {
+  const profile = context.profile;
+  if (!profile) return null;
+  return {
+    identity: profile.identity,
+    experience: profile.experience,
+    education: profile.education,
+    skills: profile.skills,
+    credentials: profile.credentials,
   };
 }
 
@@ -109,7 +140,26 @@ export function buildResumeAssetMessages(input: {
     {
       role: "user",
       content: JSON.stringify({
-        ...commonPayload(input.context),
+        personalProfile: personalProfilePrefix(input.context),
+        jobRequirement: jobRequirementPrefix(input.context),
+        companyResearch: companyResearchPrefix(input.context),
+        approvedStatements: input.context.approvedStatements,
+        approvedStories: input.context.stories,
+        seekerSources: seekerSources(input.context),
+        sources: input.context.sources.filter((source) =>
+          [
+            "PROFILE_FACT",
+            "APPROVED_STATEMENT",
+            "APPROVED_STORY",
+            "JOB_REQUIREMENT",
+            "COMPANY_RESEARCH",
+          ].includes(source.category),
+        ),
+      }),
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
         applicationGuidance: input.context.campaign.applicationGuidance,
         regenerationInstruction: input.regenerationInstruction,
         qualityFeedback: input.qualityFeedback,
@@ -128,10 +178,8 @@ export function buildResumeAssetMessages(input: {
             sourceId: `profile:${item!.id}`,
             text: item!.text,
           })),
-        experience: input.context.profile.experience,
         hiddenRoleIds: input.hiddenRoleIds,
         condensedRoleIds: input.condensedRoleIds,
-        seekerSources: seekerSources(input.context),
         responseShape: {
           type: "RESUME",
           header: {
@@ -180,7 +228,27 @@ export function buildCoverLetterAssetMessages(input: {
     {
       role: "user",
       content: JSON.stringify({
-        ...commonPayload(input.context),
+        personalProfile: personalProfilePrefix(input.context),
+        jobRequirement: jobRequirementPrefix(input.context),
+        companyResearch: companyResearchPrefix(input.context),
+        approvedStatements: input.context.approvedStatements,
+        approvedStories: input.context.stories,
+        voiceSamples: input.context.voiceSamples,
+        seekerSources: seekerSources(input.context),
+        sources: input.context.sources.filter((source) =>
+          [
+            "PROFILE_FACT",
+            "APPROVED_STATEMENT",
+            "APPROVED_STORY",
+            "JOB_REQUIREMENT",
+            "COMPANY_RESEARCH",
+          ].includes(source.category),
+        ),
+      }),
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
         applicationGuidance: input.context.campaign.applicationGuidance,
         regenerationInstruction: input.regenerationInstruction,
         qualityFeedback: input.qualityFeedback,
@@ -212,8 +280,76 @@ function outreachClaimShape() {
   };
 }
 
+export type OutreachFactCandidate = {
+  candidateId: string;
+  text: string;
+};
+
+export function outreachFactCandidates(
+  context: ReadyApplicationGenerationContext,
+): OutreachFactCandidate[] {
+  const candidates: OutreachFactCandidate[] = [];
+  const research = companyResearchPrefix(context);
+  if (research) {
+    const fields: Array<[string, string | string[] | null]> = [
+      ["summary", research.companySummary],
+      ["whatTheySell", research.whatTheySell],
+      ["businessModel", research.businessModel],
+      ["companySize", research.companySizeContext],
+      ["customers", research.customerTypes],
+      ["markets", research.primaryMarkets],
+      ["hiringSignals", research.hiringSignals],
+    ];
+    for (const [key, value] of fields) {
+      const text = Array.isArray(value)
+        ? value.filter(Boolean).join("; ")
+        : value?.trim() ?? "";
+      if (text) candidates.push({ candidateId: `research:${key}`, text });
+    }
+  }
+  if (context.persona) {
+    candidates.push({
+      candidateId: `persona:${context.persona.id}`,
+      text: [context.persona.name, context.persona.likelyTitles.join(", ")]
+        .filter(Boolean)
+        .join(" — "),
+    });
+  }
+  return candidates;
+}
+
+export function buildOutreachFactSelectionMessages(input: {
+  context: ReadyApplicationGenerationContext;
+  purpose: OutreachGenerationInput["purpose"];
+  candidates: OutreachFactCandidate[];
+}): AiMessage[] {
+  return [
+    {
+      role: "system",
+      content:
+        "Select up to three company or role facts that should shape this outreach. Prefer concrete, current facts. If none are relevant, set noneRelevant true.",
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        jobRequirement: jobRequirementPrefix(input.context),
+        companyResearch: companyResearchPrefix(input.context),
+      }),
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        purpose: input.purpose,
+        candidates: input.candidates,
+      }),
+    },
+  ];
+}
+
 export function buildOutreachAssetMessages(
-  input: OutreachGenerationInput,
+  input: OutreachGenerationInput & {
+    selectedFacts: OutreachFactCandidate[];
+  },
 ): AiMessage[] {
   const instructions =
     input.type === "EMAIL"
@@ -264,13 +400,33 @@ export function buildOutreachAssetMessages(
     {
       role: "user",
       content: JSON.stringify({
-        ...commonPayload(input.context),
+        personalProfile: personalProfilePrefix(input.context),
+        jobRequirement: jobRequirementPrefix(input.context),
+        selectedFacts: input.selectedFacts,
+        recipientRole: input.context.persona
+          ? {
+              id: input.context.persona.id,
+              name: input.context.persona.name,
+              likelyTitles: input.context.persona.likelyTitles,
+            }
+          : null,
+        approvedStatements: input.context.approvedStatements,
+        approvedStories: input.context.stories,
+        voiceSamples: input.context.voiceSamples,
+        seekerAnswers: input.context.seekerAnswers,
+        citableSources: outreachCitableSources(
+          input.context,
+          input.mentionApplied,
+        ),
+      }),
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
         applicationGuidance: input.context.campaign.applicationGuidance,
         appliedAt: input.mentionApplied ? input.context.campaign.appliedAt : null,
         mentionApplied: input.mentionApplied,
         applicationProgress: input.context.campaign.applicationProgress,
-        voiceSamples: input.context.voiceSamples,
-        seekerAnswers: input.context.seekerAnswers,
         greeting: input.greeting,
         signerName: input.signerName,
         confirmedHiringManagerRole: input.confirmedHiringManagerRole,
@@ -281,10 +437,6 @@ export function buildOutreachAssetMessages(
         interviewStageNotes: input.interviewStageNotes,
         emailLength: input.emailLength,
         wordTarget,
-        citableSources: outreachCitableSources(
-          input.context,
-          input.mentionApplied,
-        ),
         characterLimits: {
           connectionNote: outreachConfig.linkedinLimits.connectionNoteChars,
           bodyMaxChars:
@@ -315,8 +467,13 @@ export function buildAssetClaimValidationMessages(input: {
     {
       role: "user",
       content: JSON.stringify({
-        claims: input.claims,
         sources: input.sources,
+      }),
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        claims: input.claims,
         responseShape: {
           violations: [{ claimId: "string", reason: "string" }],
         },

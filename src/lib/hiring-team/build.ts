@@ -135,6 +135,8 @@ async function loadApplication(organizationId: string, campaignId: string) {
 }
 
 async function identifiedRoles(input: {
+  organizationId: string;
+  campaignId: string;
   job: HiringTeamJobEvidence;
   research: HiringTeamResearchEvidence | null;
   includeResearch: boolean;
@@ -146,7 +148,15 @@ async function identifiedRoles(input: {
   dropped: Array<{ name: string; reason: string }>;
 }> {
   const excerpts = hiringTeamEvidenceExcerpts(input);
-  const model = await identifyRolesWithModel({ evidence: excerpts });
+  const model = await identifyRolesWithModel({
+    evidence: excerpts,
+    usage: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      category: "PERSONA_RESEARCH",
+      operation: "HIRING_TEAM",
+    },
+  });
   const guarded = applyHiringTeamIdentificationGuardrails({
     roles: model.ok ? model.data.roles : [],
     job: input.job,
@@ -173,6 +183,8 @@ type RoleDraft = {
 };
 
 async function draftsFor(input: {
+  organizationId: string;
+  campaignId: string;
   roles: IdentifiedHiringRole[];
   job: HiringTeamJobEvidence;
   researchText: string;
@@ -185,6 +197,12 @@ async function draftsFor(input: {
   const drafts: RoleDraft[] = [];
   for (const role of input.roles) {
     const outcome = await synthesizeHiringTeamRole({
+      usage: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        category: "PERSONA_RESEARCH",
+        operation: "HIRING_TEAM",
+      },
       roleName: role.name,
       likelyTitles: role.likelyTitles,
       department: role.department,
@@ -289,6 +307,8 @@ export async function syncApplicationHiringTeam(input: {
     },
   });
   const { roles, modelNote, corrections, dropped } = await identifiedRoles({
+    organizationId: input.organizationId,
+    campaignId: loaded.campaign.id,
     job: loaded.job,
     research: loaded.research,
     includeResearch: loaded.includeResearch,
@@ -555,6 +575,8 @@ export async function rebuildApplicationHiringTeamRole(input: {
     select: { suggestionKey: true, name: true, targetTitles: true },
   });
   const { roles, corrections, dropped } = await identifiedRoles({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
     job: loaded.job,
     research: loaded.research,
     includeResearch: loaded.includeResearch,
@@ -596,6 +618,8 @@ export async function rebuildApplicationHiringTeamRole(input: {
     select: { id: true, name: true, painPoints: true, messagingNotes: true },
   });
   const [draft] = await draftsFor({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
     roles: [role],
     job: loaded.job,
     researchText: evidenceTextFor({

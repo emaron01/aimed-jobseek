@@ -59,6 +59,8 @@ export class AiValidationError extends AiError {
   /** Usage returned with the response before validation failed (never invented). */
   readonly usage?: {
     inputTokens?: number;
+    cachedInputTokens?: number;
+    cacheWriteTokens?: number;
     outputTokens?: number;
     webSearchCalls?: number;
   };
@@ -71,6 +73,8 @@ export class AiValidationError extends AiError {
       issues?: AiValidationIssue[];
       usage?: {
         inputTokens?: number;
+        cachedInputTokens?: number;
+        cacheWriteTokens?: number;
         outputTokens?: number;
         webSearchCalls?: number;
       };

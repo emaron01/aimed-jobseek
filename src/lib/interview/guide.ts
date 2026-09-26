@@ -515,6 +515,13 @@ export async function requestInterviewGuide(input: {
       const generated = await generateInterviewClarifyingQuestions({
         missing,
         qualityFeedback: [],
+        usage: {
+          organizationId: input.organizationId,
+          campaignId: input.campaignId,
+          userId: input.userId,
+          category: "ASSET_GENERATION",
+          operation: "INTERVIEW_GUIDE",
+        },
       });
       if (!generated.ok) {
         lastFailure = generated.message;
@@ -593,6 +600,13 @@ export async function requestInterviewGuide(input: {
     const generated = await generateInterviewGuideWithModel({
       ...promptInput,
       qualityFeedback: feedback,
+      usage: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        userId: input.userId,
+        category: "ASSET_GENERATION",
+        operation: "INTERVIEW_GUIDE",
+      },
     });
     if (!generated.ok) {
       console.error(

@@ -1,6 +1,20 @@
+import type {
+  UsageCategory,
+  UsageOperation,
+} from "@prisma/client";
 import type { z } from "zod";
 
 export type AiMessageRole = "system" | "user" | "assistant";
+
+export type AiCallUsageContext = {
+  organizationId: string;
+  userId?: string | null;
+  campaignId?: string | null;
+  companyId?: string | null;
+  contactId?: string | null;
+  category: UsageCategory;
+  operation: UsageOperation;
+};
 
 export type AiMessage = {
   role: AiMessageRole;
@@ -27,6 +41,10 @@ export type AiStructuredRequest<T> = {
    * tools (website-first / structured-only stage). Default: enabled for research.
    */
   webSearchEnabled?: boolean;
+  /** When set, the provider writes a UsageEvent for this call. */
+  usage?: AiCallUsageContext;
+  /** OpenAI Responses prompt_cache_key — use one key per application. */
+  promptCacheKey?: string;
 };
 
 /** Adapter-normalized web/tool sources — never OpenAI-specific objects. */
@@ -38,6 +56,8 @@ export type NormalizedRetrievedSource = {
 
 export type AiUsageMetadata = {
   inputTokens?: number;
+  cachedInputTokens?: number;
+  cacheWriteTokens?: number;
   outputTokens?: number;
   webSearchCalls?: number;
 };

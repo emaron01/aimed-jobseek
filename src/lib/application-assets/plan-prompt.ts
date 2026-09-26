@@ -38,13 +38,18 @@ export function buildPresentationPlanMessages(input: {
       role: "user",
       content: JSON.stringify({
         consultantName: consultationConfig.displayName,
-        type: input.type,
         application: input.application,
         roles: input.roles,
         stories: input.stories,
         assessments: input.assessments,
         earlierExperienceYears:
           applicationAssetConfig.presentation.earlierExperienceYears,
+      }),
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        type: input.type,
         adjustmentNote: input.adjustmentNote,
         qualityFeedback: input.qualityFeedback,
       }),

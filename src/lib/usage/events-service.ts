@@ -39,6 +39,8 @@ export type RecordUsageEventInput = {
   campaignId?: string | null;
   operationId?: string | null;
   inputTokens?: number | null;
+  cachedInputTokens?: number | null;
+  cacheWriteTokens?: number | null;
   outputTokens?: number | null;
   webSearchCalls?: number | null;
   status: UsageEventStatus;
@@ -65,6 +67,8 @@ export async function recordUsageEvent(
       campaignId: input.campaignId ?? null,
       operationId: input.operationId ?? null,
       inputTokens: input.inputTokens ?? null,
+      cachedInputTokens: input.cachedInputTokens ?? null,
+      cacheWriteTokens: input.cacheWriteTokens ?? null,
       outputTokens: input.outputTokens ?? null,
       webSearchCalls: input.webSearchCalls ?? null,
       status: input.status,

@@ -232,7 +232,13 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
     generateStructured.mockImplementation(async (request: {
       messages: Array<{ content: string }>;
     }) => {
-      const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
+      const payload = request.messages.reduce((acc, message) => {
+        try {
+          return { ...acc, ...JSON.parse(message.content) };
+        } catch {
+          return acc;
+        }
+      }, {}) as {
         allowedSources: Array<{ id: string; text: string; category: string }>;
         people: Array<{
           sectionKey: string;
@@ -416,7 +422,13 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
     generateStructured.mockImplementationOnce(async (request: {
       messages: Array<{ content: string }>;
     }) => {
-      const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
+      const payload = request.messages.reduce((acc, message) => {
+        try {
+          return { ...acc, ...JSON.parse(message.content) };
+        } catch {
+          return acc;
+        }
+      }, {}) as {
         allowedSources: Array<{ id: string; text: string; category: string }>;
         people: Array<{
           sectionKey: string;

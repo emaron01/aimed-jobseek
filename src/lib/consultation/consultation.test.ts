@@ -9,7 +9,9 @@ vi.mock("@/lib/ai", async (importOriginal) => {
   return {
     ...actual,
     isConsultationAiConfigured,
+    isConsultationReplyAiConfigured: isConsultationAiConfigured,
     getConsultationAiProvider: () => ({ generateStructured }),
+    getConsultationReplyAiProvider: () => ({ generateStructured }),
   };
 });
 
@@ -90,7 +92,13 @@ function installConsultationModelFixture() {
     schemaName: string;
     messages: Array<{ content: string }>;
   }) => {
-    const payload = JSON.parse(request.messages.at(-1)?.content ?? "{}") as {
+    const payload = request.messages.reduce((acc, message) => {
+      try {
+        return { ...acc, ...JSON.parse(message.content) };
+      } catch {
+        return acc;
+      }
+    }, {}) as {
       targets?: Array<{ key: string; kind: string; text: string }>;
       answer?: string;
       target?: { key: string } | null;

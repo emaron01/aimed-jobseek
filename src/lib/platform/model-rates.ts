@@ -9,6 +9,8 @@ export const SEED_AI_MODEL_RATES: Array<{
   provider: string;
   model: string;
   inputPer1MUsd: number;
+  cachedInputPer1MUsd: number;
+  cacheWritePer1MUsd: number;
   outputPer1MUsd: number;
   webSearchPerCallUsd: number;
   effectiveFrom: Date;
@@ -18,15 +20,30 @@ export const SEED_AI_MODEL_RATES: Array<{
     provider: "openai",
     model: "gpt-5.6-luna",
     inputPer1MUsd: 0.2,
+    cachedInputPer1MUsd: 0.02,
+    cacheWritePer1MUsd: 0.25,
     outputPer1MUsd: 1.2,
     webSearchPerCallUsd: 0.01,
     effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
-    note: "Seed: Aug 2026 OpenAI-ish actuals",
+    note: "Seed: luna cached input $0.02/1M, cache write 1.25x input",
+  },
+  {
+    provider: "openai",
+    model: "gpt-5.6-terra",
+    inputPer1MUsd: 2.0,
+    cachedInputPer1MUsd: 0.2,
+    cacheWritePer1MUsd: 2.5,
+    outputPer1MUsd: 12.0,
+    webSearchPerCallUsd: 0.01,
+    effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
+    note: "Seed: terra cached input $0.20/1M, cache write 1.25x input",
   },
   {
     provider: "openai",
     model: "gpt-5",
     inputPer1MUsd: 1.25,
+    cachedInputPer1MUsd: 0.125,
+    cacheWritePer1MUsd: 1.5625,
     outputPer1MUsd: 10.0,
     webSearchPerCallUsd: 0.01,
     effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
@@ -36,6 +53,8 @@ export const SEED_AI_MODEL_RATES: Array<{
     provider: "openai",
     model: "gpt-4.1",
     inputPer1MUsd: 2.0,
+    cachedInputPer1MUsd: 0.2,
+    cacheWritePer1MUsd: 2.5,
     outputPer1MUsd: 8.0,
     webSearchPerCallUsd: 0.01,
     effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
@@ -45,6 +64,8 @@ export const SEED_AI_MODEL_RATES: Array<{
     provider: "openai",
     model: "gpt-4o",
     inputPer1MUsd: 2.5,
+    cachedInputPer1MUsd: 0.25,
+    cacheWritePer1MUsd: 3.125,
     outputPer1MUsd: 10.0,
     webSearchPerCallUsd: 0.01,
     effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
@@ -54,6 +75,8 @@ export const SEED_AI_MODEL_RATES: Array<{
     provider: "openai",
     model: "*",
     inputPer1MUsd: 2.0,
+    cachedInputPer1MUsd: 0.2,
+    cacheWritePer1MUsd: 2.5,
     outputPer1MUsd: 10.0,
     webSearchPerCallUsd: 0.01,
     effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
@@ -66,6 +89,8 @@ export type AiModelRateRow = {
   provider: string;
   model: string;
   inputPer1MUsd: number;
+  cachedInputPer1MUsd: number;
+  cacheWritePer1MUsd: number;
   outputPer1MUsd: number;
   webSearchPerCallUsd: number;
   effectiveFrom: Date;
@@ -91,6 +116,8 @@ export async function ensureAiModelRatesSeeded(): Promise<void> {
         provider: row.provider,
         model: row.model,
         inputPer1MUsd: row.inputPer1MUsd,
+        cachedInputPer1MUsd: row.cachedInputPer1MUsd,
+        cacheWritePer1MUsd: row.cacheWritePer1MUsd,
         outputPer1MUsd: row.outputPer1MUsd,
         webSearchPerCallUsd: row.webSearchPerCallUsd,
         effectiveFrom: row.effectiveFrom,
@@ -113,6 +140,8 @@ export async function listAiModelRates(): Promise<AiModelRateRow[]> {
     provider: r.provider,
     model: r.model,
     inputPer1MUsd: decimalToNumber(r.inputPer1MUsd),
+    cachedInputPer1MUsd: decimalToNumber(r.cachedInputPer1MUsd),
+    cacheWritePer1MUsd: decimalToNumber(r.cacheWritePer1MUsd),
     outputPer1MUsd: decimalToNumber(r.outputPer1MUsd),
     webSearchPerCallUsd: decimalToNumber(r.webSearchPerCallUsd),
     effectiveFrom: r.effectiveFrom,
@@ -128,6 +157,8 @@ export async function upsertAiModelRate(input: {
   provider: string;
   model: string;
   inputPer1MUsd: number;
+  cachedInputPer1MUsd: number;
+  cacheWritePer1MUsd: number;
   outputPer1MUsd: number;
   webSearchPerCallUsd: number;
   effectiveFrom: Date;
@@ -139,6 +170,8 @@ export async function upsertAiModelRate(input: {
   if (!model) throw new Error("Model is required.");
   for (const [label, n] of [
     ["Input rate", input.inputPer1MUsd],
+    ["Cached input rate", input.cachedInputPer1MUsd],
+    ["Cache write rate", input.cacheWritePer1MUsd],
     ["Output rate", input.outputPer1MUsd],
     ["Web search rate", input.webSearchPerCallUsd],
   ] as const) {
@@ -152,6 +185,8 @@ export async function upsertAiModelRate(input: {
       provider,
       model,
       inputPer1MUsd: input.inputPer1MUsd,
+      cachedInputPer1MUsd: input.cachedInputPer1MUsd,
+      cacheWritePer1MUsd: input.cacheWritePer1MUsd,
       outputPer1MUsd: input.outputPer1MUsd,
       webSearchPerCallUsd: input.webSearchPerCallUsd,
       effectiveFrom: input.effectiveFrom,
@@ -167,6 +202,8 @@ export async function upsertAiModelRate(input: {
       provider,
       model,
       inputPer1MUsd: input.inputPer1MUsd,
+      cachedInputPer1MUsd: input.cachedInputPer1MUsd,
+      cacheWritePer1MUsd: input.cacheWritePer1MUsd,
       outputPer1MUsd: input.outputPer1MUsd,
       webSearchPerCallUsd: input.webSearchPerCallUsd,
       effectiveFrom: input.effectiveFrom.toISOString(),
@@ -178,6 +215,8 @@ export async function upsertAiModelRate(input: {
     provider: created.provider,
     model: created.model,
     inputPer1MUsd: decimalToNumber(created.inputPer1MUsd),
+    cachedInputPer1MUsd: decimalToNumber(created.cachedInputPer1MUsd),
+    cacheWritePer1MUsd: decimalToNumber(created.cacheWritePer1MUsd),
     outputPer1MUsd: decimalToNumber(created.outputPer1MUsd),
     webSearchPerCallUsd: decimalToNumber(created.webSearchPerCallUsd),
     effectiveFrom: created.effectiveFrom,

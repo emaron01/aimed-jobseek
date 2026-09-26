@@ -22,6 +22,8 @@ const RATES: AiModelRateRow[] = [
     provider: "openai",
     model: "gpt-5.6-luna",
     inputPer1MUsd: 0.2,
+    cachedInputPer1MUsd: 0.02,
+    cacheWritePer1MUsd: 0.25,
     outputPer1MUsd: 1.2,
     webSearchPerCallUsd: 0.01,
     effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
@@ -30,6 +32,8 @@ const RATES: AiModelRateRow[] = [
     provider: "openai",
     model: "*",
     inputPer1MUsd: 2.0,
+    cachedInputPer1MUsd: 0.2,
+    cacheWritePer1MUsd: 2.5,
     outputPer1MUsd: 10.0,
     webSearchPerCallUsd: 0.01,
     effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
@@ -51,6 +55,24 @@ describe("estimateEventCostUsd", () => {
     );
     // 1M * 0.20 + 0.5M * 1.20 + 3 * 0.01 = 0.20 + 0.60 + 0.03 = 0.83
     expect(usd).toBeCloseTo(0.83, 6);
+  });
+
+  it("prices cached input and cache writes from the rate table", () => {
+    const usd = estimateEventCostUsd(
+      {
+        provider: "openai",
+        model: "gpt-5.6-luna",
+        inputTokens: 1_000_000,
+        cachedInputTokens: 800_000,
+        cacheWriteTokens: 100_000,
+        outputTokens: 0,
+        webSearchCalls: 0,
+        occurredAt: new Date("2026-06-01T00:00:00.000Z"),
+      },
+      RATES,
+    );
+    // uncached 100k * 0.20 + cached 800k * 0.02 + write 100k * 0.25
+    expect(usd).toBeCloseTo(0.061, 6);
   });
 
   it("falls back to provider wildcard for unmatched models", () => {
@@ -83,6 +105,8 @@ describe("estimateEventCostUsd", () => {
           provider: "openai",
           model: "gpt-5",
           inputPer1MUsd: 1,
+          cachedInputPer1MUsd: 0.1,
+          cacheWritePer1MUsd: 1.25,
           outputPer1MUsd: 1,
           webSearchPerCallUsd: 0.01,
           effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
@@ -100,6 +124,8 @@ describe("resolveRate history", () => {
         provider: "openai",
         model: "gpt-5",
         inputPer1MUsd: 1,
+        cachedInputPer1MUsd: 0.1,
+        cacheWritePer1MUsd: 1.25,
         outputPer1MUsd: 1,
         webSearchPerCallUsd: 0,
         effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
@@ -108,6 +134,8 @@ describe("resolveRate history", () => {
         provider: "openai",
         model: "gpt-5",
         inputPer1MUsd: 9,
+        cachedInputPer1MUsd: 0.9,
+        cacheWritePer1MUsd: 11.25,
         outputPer1MUsd: 9,
         webSearchPerCallUsd: 0,
         effectiveFrom: new Date("2026-06-01T00:00:00.000Z"),
@@ -166,16 +194,26 @@ describe("drift threshold", () => {
 });
 
 describe("seed rates", () => {
-  it("SEED_AI_MODEL_RATES includes luna, gpt-5, wildcard", () => {
+  it("SEED_AI_MODEL_RATES includes luna, terra, gpt-5, wildcard", () => {
     expect(SEED_AI_MODEL_RATES.some((r) => r.model === "gpt-5.6-luna")).toBe(
+      true,
+    );
+    expect(SEED_AI_MODEL_RATES.some((r) => r.model === "gpt-5.6-terra")).toBe(
       true,
     );
     expect(SEED_AI_MODEL_RATES.some((r) => r.model === "gpt-5")).toBe(true);
     expect(SEED_AI_MODEL_RATES.some((r) => r.model === "*")).toBe(true);
     const luna = SEED_AI_MODEL_RATES.find((r) => r.model === "gpt-5.6-luna")!;
     expect(luna.inputPer1MUsd).toBe(0.2);
+    expect(luna.cachedInputPer1MUsd).toBe(0.02);
+    expect(luna.cacheWritePer1MUsd).toBe(0.25);
     expect(luna.outputPer1MUsd).toBe(1.2);
     expect(luna.webSearchPerCallUsd).toBe(0.01);
+    const terra = SEED_AI_MODEL_RATES.find((r) => r.model === "gpt-5.6-terra")!;
+    expect(terra.inputPer1MUsd).toBe(2);
+    expect(terra.cachedInputPer1MUsd).toBe(0.2);
+    expect(terra.cacheWritePer1MUsd).toBe(2.5);
+    expect(terra.outputPer1MUsd).toBe(12);
   });
 
   it("ensureAiModelRatesSeeded is exported from model-rates", () => {

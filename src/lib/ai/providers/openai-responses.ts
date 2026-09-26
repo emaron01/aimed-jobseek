@@ -13,6 +13,7 @@ import type {
   NormalizedRetrievedSource,
   AiUsageMetadata,
 } from "@/lib/ai/types";
+import { recordAiStructuredUsage } from "@/lib/usage/ai-call";
 import { ZodError } from "zod";
 import { vocab } from "@/lib/product-config";
 
@@ -158,6 +159,7 @@ function roleMode(config: AiConfig): ResponsesRoleMode {
     // Was omitted when email_facts was added to parseProvider; no special mode needed.
     config.role === "email_facts" ||
     config.role === "consultation" ||
+    config.role === "consultation_reply" ||
     config.role === "asset"
   ) {
     return "structured_only";
@@ -188,6 +190,8 @@ function roleLabel(config: AiConfig): string {
       return "Email company-fact selection";
     case "consultation":
       return "Consultation";
+    case "consultation_reply":
+      return "Consultation reply";
     case "asset":
       return "Application asset generation";
     default:
@@ -254,6 +258,8 @@ export function createOpenAiResponsesProvider(config: AiConfig): AiProvider {
     ): Promise<AiStructuredResponse<T>> {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), config.timeoutMs);
+      const started = Date.now();
+      let recordedUsage: AiUsageMetadata | undefined;
 
       try {
         const input = request.messages.map((message) => ({
@@ -282,6 +288,9 @@ export function createOpenAiResponsesProvider(config: AiConfig): AiProvider {
                   ? { temperature: config.temperature }
                   : {}),
                 ...(reasoning ? { reasoning } : {}),
+                ...(request.promptCacheKey
+                  ? { prompt_cache_key: request.promptCacheKey }
+                  : {}),
                 text: structuredTextFormat(request),
               }
             : {
@@ -292,6 +301,9 @@ export function createOpenAiResponsesProvider(config: AiConfig): AiProvider {
                   ? { temperature: config.temperature }
                   : {}),
                 ...(reasoning ? { reasoning } : {}),
+                ...(request.promptCacheKey
+                  ? { prompt_cache_key: request.promptCacheKey }
+                  : {}),
                 text: structuredTextFormat(request),
               };
 
@@ -343,6 +355,7 @@ export function createOpenAiResponsesProvider(config: AiConfig): AiProvider {
         }
 
         const parsed = parseResponsesPayload(parsedJson, config.apiKey, label);
+        recordedUsage = parsed.usage;
 
         if (
           useWebSearch &&
@@ -379,7 +392,7 @@ export function createOpenAiResponsesProvider(config: AiConfig): AiProvider {
           parsed.outputText,
         );
 
-        return {
+        const result = {
           data: validated.data,
           rawText: parsed.outputText,
           provider: config.provider,
@@ -395,7 +408,42 @@ export function createOpenAiResponsesProvider(config: AiConfig): AiProvider {
               ? validated.coercedFields
               : undefined,
         };
+        if (request.usage) {
+          await recordAiStructuredUsage({
+            context: request.usage,
+            provider: config.provider,
+            model: config.model,
+            usage: result.usage,
+            durationMs: Date.now() - started,
+            status: "SUCCESS",
+          });
+        }
+        return result;
       } catch (error) {
+        const usageFromError =
+          error instanceof AiValidationError ? error.usage : recordedUsage;
+        if (request.usage) {
+          try {
+            await recordAiStructuredUsage({
+              context: request.usage,
+              provider: config.provider,
+              model: config.model,
+              usage: usageFromError,
+              durationMs: Date.now() - started,
+              status: "FAILED",
+            });
+          } catch (recordError) {
+            console.error(
+              JSON.stringify({
+                event: "ai_usage_record_failed",
+                message:
+                  recordError instanceof Error
+                    ? recordError.message
+                    : "unknown",
+              }),
+            );
+          }
+        }
         if (error instanceof Error && error.name === "AbortError") {
           throw new AiTimeoutError(
             `${label} Responses API timed out after ${config.timeoutMs}ms.`,
@@ -406,6 +454,45 @@ export function createOpenAiResponsesProvider(config: AiConfig): AiProvider {
         clearTimeout(timer);
       }
     },
+  };
+}
+
+export function parseResponsesUsage(
+  usageRaw: Record<string, unknown> | undefined,
+): AiUsageMetadata {
+  const details =
+    usageRaw?.input_tokens_details &&
+    typeof usageRaw.input_tokens_details === "object"
+      ? (usageRaw.input_tokens_details as Record<string, unknown>)
+      : usageRaw?.prompt_tokens_details &&
+          typeof usageRaw.prompt_tokens_details === "object"
+        ? (usageRaw.prompt_tokens_details as Record<string, unknown>)
+        : undefined;
+  const cachedTokens =
+    typeof details?.cached_tokens === "number"
+      ? details.cached_tokens
+      : undefined;
+  const cacheWriteTokens =
+    typeof details?.cache_write_tokens === "number"
+      ? details.cache_write_tokens
+      : typeof details?.cache_creation_input_tokens === "number"
+        ? details.cache_creation_input_tokens
+        : undefined;
+  return {
+    inputTokens:
+      typeof usageRaw?.input_tokens === "number"
+        ? usageRaw.input_tokens
+        : typeof usageRaw?.prompt_tokens === "number"
+          ? usageRaw.prompt_tokens
+          : undefined,
+    cachedInputTokens: cachedTokens,
+    cacheWriteTokens,
+    outputTokens:
+      typeof usageRaw?.output_tokens === "number"
+        ? usageRaw.output_tokens
+        : typeof usageRaw?.completion_tokens === "number"
+          ? usageRaw.completion_tokens
+          : undefined,
   };
 }
 
@@ -492,20 +579,7 @@ export function parseResponsesPayload(
   }
 
   const usageRaw = root.usage as Record<string, unknown> | undefined;
-  const usage: AiUsageMetadata = {
-    inputTokens:
-      typeof usageRaw?.input_tokens === "number"
-        ? usageRaw.input_tokens
-        : typeof usageRaw?.prompt_tokens === "number"
-          ? usageRaw.prompt_tokens
-          : undefined,
-    outputTokens:
-      typeof usageRaw?.output_tokens === "number"
-        ? usageRaw.output_tokens
-        : typeof usageRaw?.completion_tokens === "number"
-          ? usageRaw.completion_tokens
-          : undefined,
-  };
+  const usage = parseResponsesUsage(usageRaw);
 
   const outputText = textParts.join("\n").trim();
   if (!outputText) {

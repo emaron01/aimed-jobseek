@@ -2,6 +2,7 @@ import {
   getContactResearchAiConfig,
   getEmailAiConfig,
   getConsultationAiConfig,
+  getConsultationReplyAiConfig,
   getEmailFactsAiConfig,
   getInterpretationAiConfig,
   getPersonaAiConfig,
@@ -69,6 +70,10 @@ const emailFactsCache: { key: string; provider: AiProvider | null } = {
   provider: null,
 };
 const consultationCache: { key: string; provider: AiProvider | null } = {
+  key: "",
+  provider: null,
+};
+const consultationReplyCache: { key: string; provider: AiProvider | null } = {
   key: "",
   provider: null,
 };
@@ -202,6 +207,19 @@ export function getConsultationAiProvider(): AiProvider {
   return provider;
 }
 
+/** Per-answer consultation AI only — never uses Consultation AI configuration. */
+export function getConsultationReplyAiProvider(): AiProvider {
+  const config = getConsultationReplyAiConfig();
+  const key = cacheKey(config);
+  if (consultationReplyCache.key === key && consultationReplyCache.provider) {
+    return consultationReplyCache.provider;
+  }
+  const provider = createAiProvider(config);
+  consultationReplyCache.key = key;
+  consultationReplyCache.provider = provider;
+  return provider;
+}
+
 export function getAssetAiProvider(): AiProvider {
   const config = getAssetAiConfig();
   const key = `${cacheKey(config)}|${config.temperature}`;
@@ -247,6 +265,8 @@ export function clearAiProviderCache(): void {
   emailFactsCache.provider = null;
   consultationCache.key = "";
   consultationCache.provider = null;
+  consultationReplyCache.key = "";
+  consultationReplyCache.provider = null;
   assetCache.key = "";
   assetCache.provider = null;
   assetValidationCache.key = "";

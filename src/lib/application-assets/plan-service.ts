@@ -95,6 +95,12 @@ export async function writePresentationPlan(input: {
       explanation: item.explanation ?? "",
     })),
     adjustmentNote: input.adjustmentNote ?? null,
+    usage: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      category: "CONSULTATION",
+      operation: "CONSULTATION",
+    },
   });
   if (!written.ok) return written;
   const roleIds = new Set(parsed.profile.experience.map((role) => role.id));

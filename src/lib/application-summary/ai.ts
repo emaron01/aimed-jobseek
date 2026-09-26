@@ -2,7 +2,9 @@ import {
   getConsultationAiProvider,
   isConsultationAiConfigured,
 } from "@/lib/ai";
+import type { AiCallUsageContext } from "@/lib/ai/types";
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
+import { aiCallTracking } from "@/lib/usage/ai-call";
 import {
   applicationSummaryGuidanceSchema,
   type ApplicationSummaryGuidance,
@@ -22,6 +24,7 @@ export async function generateApplicationSummaryGuidance(input: {
     sectionKind: string;
   }>;
   qualityFeedback?: string[];
+  usage?: AiCallUsageContext;
 }): Promise<
   | { ok: true; data: ApplicationSummaryGuidance }
   | { ok: false; message: string }
@@ -36,6 +39,7 @@ export async function generateApplicationSummaryGuidance(input: {
   try {
     const response = await getConsultationAiProvider().generateStructured({
       ...structuredOutputRequest("applicationSummaryGuidance"),
+      ...(input.usage ? aiCallTracking(input.usage) : {}),
       messages: buildApplicationSummaryGuidanceMessages(input),
       parseOutput: (raw) => ({
         data: applicationSummaryGuidanceSchema.parse(raw),

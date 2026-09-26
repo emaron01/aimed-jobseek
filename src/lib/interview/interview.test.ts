@@ -270,7 +270,9 @@ describe("interview guide rules", () => {
       sources: [],
       qualityFeedback: [],
     });
-    expect(messages[1]!.content).toContain("incident leadership");
+    expect(messages.map((message) => message.content).join("\n")).toContain(
+      "incident leadership",
+    );
     expect(
       validateInterviewGuideContent({
         content: withCite,

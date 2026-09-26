@@ -64,7 +64,14 @@ export type StructuredOutputSchemaEntry = {
     | "TITLE_SUGGESTION"
     | "JOB_REQUIREMENT_PARSE"
     | "CONSULTATION"
-    | "APPLICATION_ASSET_GENERATION")[];
+    | "CONSULTATION_REPLY"
+    | "APPLICATION_NEXT_STEP"
+    | "APPLICATION_SUMMARY"
+    | "INTERVIEW_GUIDE"
+    | "HIRING_TEAM"
+    | "CONTACT_PROFILE"
+    | "APPLICATION_ASSET_GENERATION"
+    | "EMAIL_GENERATION")[];
 };
 
 /**
@@ -81,12 +88,12 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   personaSynthesis: {
     schemaName: "persona_setup_synthesis",
     schema: personaAiResponseSchema,
-    usageOperations: ["PERSONA_SYNTHESIS"],
+    usageOperations: ["PERSONA_SYNTHESIS", "HIRING_TEAM"],
   },
   hiringTeamIdentification: {
     schemaName: "hiring_team_identification",
     schema: hiringTeamIdentificationSchema,
-    usageOperations: ["PERSONA_SYNTHESIS"],
+    usageOperations: ["HIRING_TEAM"],
   },
   contactScoring: {
     schemaName: "AiScoringAssessment",
@@ -156,22 +163,22 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   consultationExtract: {
     schemaName: "consultation_extract",
     schema: consultationExtractSchema,
-    usageOperations: ["CONSULTATION"],
+    usageOperations: ["CONSULTATION_REPLY"],
   },
   consultationPolish: {
     schemaName: "consultation_polish",
     schema: consultationPolishSchema,
-    usageOperations: ["CONSULTATION"],
+    usageOperations: ["CONSULTATION_REPLY"],
   },
   consultationStatementGrounding: {
     schemaName: "consultation_statement_grounding",
     schema: consultationStatementGroundingSchema,
-    usageOperations: ["CONSULTATION"],
+    usageOperations: ["CONSULTATION_REPLY"],
   },
   applicationSummaryGuidance: {
     schemaName: "application_summary_guidance",
     schema: applicationSummaryGuidanceSchema,
-    usageOperations: ["CONSULTATION"],
+    usageOperations: ["APPLICATION_SUMMARY"],
   },
   resumePresentationPlan: {
     schemaName: "resume_presentation_plan",
@@ -186,12 +193,12 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   applicationNextStep: {
     schemaName: "application_next_step",
     schema: applicationNextStepSchema,
-    usageOperations: ["CONSULTATION"],
+    usageOperations: ["APPLICATION_NEXT_STEP"],
   },
   contactIndividualProfile: {
     schemaName: "contact_individual_profile",
     schema: individualProfileSchema,
-    usageOperations: ["PERSONA_SYNTHESIS"],
+    usageOperations: ["CONTACT_PROFILE"],
   },
   resumeAsset: {
     schemaName: "application_resume",
@@ -206,17 +213,17 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   outreachEmailAsset: {
     schemaName: "application_outreach_email",
     schema: emailAssetContentSchema,
-    usageOperations: ["APPLICATION_ASSET_GENERATION"],
+    usageOperations: ["EMAIL_GENERATION"],
   },
   outreachLinkedinNoteAsset: {
     schemaName: "application_outreach_linkedin_note",
     schema: linkedinNoteAssetContentSchema,
-    usageOperations: ["APPLICATION_ASSET_GENERATION"],
+    usageOperations: ["EMAIL_GENERATION"],
   },
   outreachLinkedinInmailAsset: {
     schemaName: "application_outreach_linkedin_inmail",
     schema: linkedinInmailAssetContentSchema,
-    usageOperations: ["APPLICATION_ASSET_GENERATION"],
+    usageOperations: ["EMAIL_GENERATION"],
   },
   applicationAssetClaimValidation: {
     schemaName: "application_asset_claim_validation",
@@ -226,17 +233,17 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   interviewClarifyingQuestions: {
     schemaName: "interview_clarifying_questions",
     schema: interviewClarifyingQuestionsSchema,
-    usageOperations: ["APPLICATION_ASSET_GENERATION"],
+    usageOperations: ["INTERVIEW_GUIDE"],
   },
   interviewGuide: {
     schemaName: "interview_stage_guide",
     schema: interviewGuideContentSchema,
-    usageOperations: ["APPLICATION_ASSET_GENERATION"],
+    usageOperations: ["INTERVIEW_GUIDE"],
   },
   interviewThankYouClarifyingQuestions: {
     schemaName: "interview_thank_you_clarifying_questions",
     schema: interviewThankYouClarifyingQuestionsSchema,
-    usageOperations: ["APPLICATION_ASSET_GENERATION"],
+    usageOperations: ["INTERVIEW_GUIDE"],
   },
   prospectReplyClassification: {
     schemaName: "prospect_reply_classification",

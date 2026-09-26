@@ -570,6 +570,7 @@ export async function validateOutreachContent(input: {
   const modelValidation = await validateAssetClaimsWithModel({
     claims: citedClaims,
     sources: input.context.sources,
+    context: input.context,
   });
   if (!modelValidation.ok) return [modelValidation.message];
   return [
@@ -879,6 +880,13 @@ export async function generateOutreachAsset(input: {
           const generated = await generateInterviewThankYouClarifyingQuestions({
             notes: interviewStageNotes,
             qualityFeedback: [],
+            usage: {
+              organizationId: input.organizationId,
+              campaignId: input.campaignId,
+              userId: input.userId,
+              category: "ASSET_GENERATION",
+              operation: "INTERVIEW_GUIDE",
+            },
           });
           if (!generated.ok) {
             lastFailure = generated.message;

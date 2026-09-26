@@ -88,6 +88,18 @@ export function buildInterviewGuideMessages(
     {
       role: "user",
       content: JSON.stringify({
+        profileRoles: input.profileRoles,
+        approvedStatements: input.approvedStatements,
+        approvedStories: input.approvedStories,
+        scorecardCompetencies: input.scorecardCompetencies,
+        consultationGaps: input.consultationGaps,
+        personas: input.personas,
+        citableSources: input.sources,
+      }),
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
         stageType: input.stageType,
         format: input.format,
         scheduledAt: input.scheduledAt,
@@ -97,13 +109,6 @@ export function buildInterviewGuideMessages(
         interviewers: input.interviewers,
         priorStageNotes: input.priorStageNotes,
         clarifyingAnswers: input.clarifyingAnswers,
-        profileRoles: input.profileRoles,
-        approvedStatements: input.approvedStatements,
-        approvedStories: input.approvedStories,
-        scorecardCompetencies: input.scorecardCompetencies,
-        consultationGaps: input.consultationGaps,
-        personas: input.personas,
-        citableSources: input.sources,
         allowedSourceIds: input.sources.map((source) => source.id),
         requiredWalkthroughRoleIds: input.profileRoles.map((role) => role.roleId),
         unknownLeaveReasonRoleIds: input.profileRoles

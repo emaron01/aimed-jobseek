@@ -1,5 +1,7 @@
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import { getPersonaAiProvider, isPersonaAiConfigured } from "@/lib/ai";
+import type { AiCallUsageContext } from "@/lib/ai/types";
+import { aiCallTracking } from "@/lib/usage/ai-call";
 import {
   hiringTeamIdentificationSchema,
   type HiringTeamIdentificationResult,
@@ -27,6 +29,7 @@ const SYNTHESIS_FAILED =
 
 export async function identifyRolesWithModel(input: {
   evidence: EvidenceExcerpt[];
+  usage?: AiCallUsageContext;
 }): Promise<
   | { ok: true; data: HiringTeamIdentificationResult }
   | { ok: false; message: string }
@@ -40,6 +43,7 @@ export async function identifyRolesWithModel(input: {
   try {
     const response = await getPersonaAiProvider().generateStructured({
       ...structuredOutputRequest("hiringTeamIdentification"),
+      ...(input.usage ? aiCallTracking(input.usage) : {}),
       messages: buildHiringTeamIdentificationMessages({
         evidence: input.evidence,
       }),
@@ -71,6 +75,7 @@ export async function draftRoleWithModel(input: {
   excerpts: EvidenceExcerpt[];
   peers: PersonaDifferentiationInput[];
   rejection?: string[];
+  usage?: AiCallUsageContext;
 }): Promise<{ ok: true; draft: PersonaAiDraft } | { ok: false; message: string }> {
   if (!isPersonaAiConfigured()) {
     return { ok: false, message: SYNTHESIS_UNAVAILABLE };
@@ -86,6 +91,7 @@ export async function draftRoleWithModel(input: {
   try {
     const response = await getPersonaAiProvider().generateStructured({
       ...structuredOutputRequest("personaSynthesis"),
+      ...(input.usage ? aiCallTracking(input.usage) : {}),
       messages: buildPersonaSynthesisMessages({
         productName: input.roleName,
         productSnapshot: {
@@ -148,13 +154,18 @@ export async function synthesizeHiringTeamRole(input: {
   jobLines: string[];
   evidenceText: string;
   isHiringManager?: boolean;
+  usage?: AiCallUsageContext;
 }): Promise<HiringTeamSynthesisResult> {
   if (!isPersonaAiConfigured()) {
     return { ok: false, status: "PARTIAL", message: SYNTHESIS_UNAVAILABLE };
   }
   let lastMessage = SYNTHESIS_FAILED;
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const model = await draftRoleWithModel({ ...input, rejection: [] });
+    const model = await draftRoleWithModel({
+      ...input,
+      rejection: [],
+      usage: input.usage,
+    });
     if (!model.ok) {
       lastMessage = model.message;
       continue;

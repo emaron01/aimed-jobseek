@@ -169,6 +169,13 @@ export async function buildContactIndividualProfile(input: {
     extracted,
     roleName: role?.name ?? null,
     roleNarrative: narrative,
+    usage: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      contactId: input.contactId,
+      category: "PERSONA_RESEARCH",
+      operation: "CONTACT_PROFILE",
+    },
   });
   if (!generated.ok) {
     await prisma.campaignContact.update({

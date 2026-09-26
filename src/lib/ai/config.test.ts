@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { clearAiProviderCache, createAiProvider } from "@/lib/ai/provider";
 import {
   assertConsultationAiConfigured,
+  assertConsultationReplyAiConfigured,
   getEmailAiConfig,
   getEmailFactsAiConfig,
   getResearchAiConfig,
@@ -56,6 +57,7 @@ function clearAllAiEnv() {
       key.startsWith("EMAIL_AI_") ||
       key.startsWith("EMAIL_FACTS_AI_") ||
       key.startsWith("CONSULTATION_AI_") ||
+      key.startsWith("CONSULTATION_REPLY_AI_") ||
       key.startsWith("ASSET_AI_") ||
       key.startsWith("AI_")
     ) {
@@ -224,8 +226,10 @@ describe("role-specific AI configuration", () => {
   it("fails loudly when CONSULTATION_AI configuration is missing", () => {
     clearAllAiEnv();
     expect(() => assertConsultationAiConfigured()).toThrow(/CONSULTATION_AI_API_KEY|Consultation AI is not configured/);
+    expect(() => assertConsultationReplyAiConfigured()).toThrow(/CONSULTATION_REPLY_AI_API_KEY|Consultation reply AI is not configured/);
     const instrumentation = readFileSync("src/instrumentation.ts", "utf8");
     expect(instrumentation).toContain("assertConsultationAiConfigured");
+    expect(instrumentation).toContain("assertConsultationReplyAiConfigured");
     expect(instrumentation).toContain("assertAssetAiConfigured");
   });
 

@@ -348,6 +348,7 @@ describe("outreach greetings and claims", () => {
       mentionApplied: false,
       regenerationInstruction: null,
       qualityFeedback: [],
+      selectedFacts: [],
     });
     const payload = JSON.parse(messages[1]!.content) as {
       citableSources: Array<{ id: string; text: string }>;
@@ -566,12 +567,15 @@ describe("outreach greetings and claims", () => {
       mentionApplied: true,
       regenerationInstruction: null,
       qualityFeedback: [],
+      selectedFacts: [],
     });
-    const payload = JSON.parse(messages[1]!.content) as {
+    const shared = JSON.parse(messages[1]!.content) as {
       citableSources: Array<{ id: string }>;
+    };
+    const payload = JSON.parse(messages[2]!.content) as {
       characterLimits: { bodyMaxChars: number; connectionNote: number };
     };
-    expect(payload.citableSources.map((source) => source.id)).toEqual([
+    expect(shared.citableSources.map((source) => source.id)).toEqual([
       "profile:ach_1",
     ]);
     expect(payload.characterLimits.bodyMaxChars).toBe(

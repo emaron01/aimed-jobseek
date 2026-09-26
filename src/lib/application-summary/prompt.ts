@@ -28,6 +28,11 @@ ${APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS}`,
       content: JSON.stringify({
         consultantName: consultationConfig.displayName,
         allowedSources: input.sources,
+      }),
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
         people: input.people,
         qualityFeedback: input.qualityFeedback ?? [],
       }),

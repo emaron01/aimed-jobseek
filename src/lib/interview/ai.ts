@@ -1,6 +1,8 @@
 import { getAssetAiProvider, isAssetAiConfigured } from "@/lib/ai";
 import { AiValidationError } from "@/lib/ai/errors";
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
+import type { AiCallUsageContext } from "@/lib/ai/types";
+import { aiCallTracking } from "@/lib/usage/ai-call";
 import {
   interviewClarifyingQuestionsSchema,
   interviewGuideContentSchema,
@@ -40,6 +42,7 @@ function failure(operation: string, error: unknown, message: string): Result<nev
 export function generateInterviewClarifyingQuestions(input: {
   missing: string[];
   qualityFeedback: string[];
+  usage?: AiCallUsageContext;
 }): Promise<Result<InterviewClarifyingQuestions>> {
   if (!isAssetAiConfigured()) {
     return Promise.resolve({ ok: false, message: UNCONFIGURED });
@@ -47,6 +50,7 @@ export function generateInterviewClarifyingQuestions(input: {
   return getAssetAiProvider()
     .generateStructured({
       ...structuredOutputRequest("interviewClarifyingQuestions"),
+      ...(input.usage ? aiCallTracking(input.usage) : {}),
       messages: buildInterviewClarifyingMessages(input),
       parseOutput: (raw) => ({
         data: interviewClarifyingQuestionsSchema.parse(raw),
@@ -66,6 +70,7 @@ export function generateInterviewClarifyingQuestions(input: {
 export function generateInterviewThankYouClarifyingQuestions(input: {
   notes: string;
   qualityFeedback: string[];
+  usage?: AiCallUsageContext;
 }): Promise<Result<InterviewThankYouClarifyingQuestions>> {
   if (!isAssetAiConfigured()) {
     return Promise.resolve({ ok: false, message: UNCONFIGURED });
@@ -73,6 +78,7 @@ export function generateInterviewThankYouClarifyingQuestions(input: {
   return getAssetAiProvider()
     .generateStructured({
       ...structuredOutputRequest("interviewThankYouClarifyingQuestions"),
+      ...(input.usage ? aiCallTracking(input.usage) : {}),
       messages: buildInterviewThankYouClarifyingMessages(input),
       parseOutput: (raw) => ({
         data: interviewThankYouClarifyingQuestionsSchema.parse(raw),
@@ -90,7 +96,7 @@ export function generateInterviewThankYouClarifyingQuestions(input: {
 }
 
 export function generateInterviewGuideWithModel(
-  input: InterviewGuidePromptInput,
+  input: InterviewGuidePromptInput & { usage?: AiCallUsageContext },
 ): Promise<Result<InterviewGuideContent>> {
   if (!isAssetAiConfigured()) {
     return Promise.resolve({ ok: false, message: UNCONFIGURED });
@@ -98,6 +104,7 @@ export function generateInterviewGuideWithModel(
   return getAssetAiProvider()
     .generateStructured({
       ...structuredOutputRequest("interviewGuide"),
+      ...(input.usage ? aiCallTracking(input.usage) : {}),
       messages: buildInterviewGuideMessages(input),
       parseOutput: (raw) => {
         const payload =

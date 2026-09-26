@@ -8,7 +8,9 @@ vi.mock("@/lib/ai", async (importOriginal) => {
   return {
     ...actual,
     isConsultationAiConfigured,
+    isConsultationReplyAiConfigured: isConsultationAiConfigured,
     getConsultationAiProvider: () => ({ generateStructured }),
+    getConsultationReplyAiProvider: () => ({ generateStructured }),
   };
 });
 

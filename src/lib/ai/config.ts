@@ -37,6 +37,7 @@ export type AiRole =
   | "email"
   | "email_facts"
   | "consultation"
+  | "consultation_reply"
   | "asset";
 
 /**
@@ -176,6 +177,16 @@ const ROLE_ENV: Record<AiRole, RoleEnv> = {
     maxRetries: "CONSULTATION_AI_MAX_RETRIES",
     temperature: "CONSULTATION_AI_TEMPERATURE",
   },
+  consultation_reply: {
+    provider: "CONSULTATION_REPLY_AI_PROVIDER",
+    model: "CONSULTATION_REPLY_AI_MODEL",
+    modelUrl: "CONSULTATION_REPLY_AI_MODEL_URL",
+    apiKey: "CONSULTATION_REPLY_AI_API_KEY",
+    timeoutMs: "CONSULTATION_REPLY_AI_TIMEOUT_MS",
+    maxRetries: "CONSULTATION_REPLY_AI_MAX_RETRIES",
+    temperature: "CONSULTATION_REPLY_AI_TEMPERATURE",
+    reasoningEffort: "CONSULTATION_REPLY_AI_REASONING_EFFORT",
+  },
   asset: {
     provider: "ASSET_AI_PROVIDER",
     model: "ASSET_AI_MODEL",
@@ -207,6 +218,8 @@ function notConfiguredMessage(role: AiRole): string {
       return "Email company-fact selection AI is not configured.";
     case "consultation":
       return "Consultation AI is not configured.";
+    case "consultation_reply":
+      return "Consultation reply AI is not configured.";
     case "asset":
       return "Application asset AI is not configured.";
   }
@@ -266,6 +279,7 @@ function parseProvider(
       role === "email" ||
       role === "email_facts" ||
       role === "consultation" ||
+      role === "consultation_reply" ||
       role === "asset"
     ) {
       return "openai-responses";
@@ -315,9 +329,12 @@ function getAiConfigForRole(role: AiRole): AiConfig {
       min: 0,
       max: 2,
     }),
-    // Product/Persona synthesis defaults to low effort; other roles omit reasoning.
+    // Product/Persona/consultation-reply default to low effort; other roles omit reasoning.
     reasoningEffort:
-      (role === "product" || role === "persona") && env.reasoningEffort
+      (role === "product" ||
+        role === "persona" ||
+        role === "consultation_reply") &&
+      env.reasoningEffort
         ? readOptionalReasoningEffort(role, env.reasoningEffort, "low")
         : null,
   };
@@ -449,9 +466,28 @@ export function isConsultationAiConfigured(): boolean {
   }
 }
 
+/** Fail closed for per-answer consultation work. Never reads Consultation AI vars. */
+export function getConsultationReplyAiConfig(): AiConfig {
+  return getAiConfigForRole("consultation_reply");
+}
+
+export function isConsultationReplyAiConfigured(): boolean {
+  try {
+    getConsultationReplyAiConfig();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Production boot: fail loudly when Consultation AI env is missing. */
 export function assertConsultationAiConfigured(): void {
   getConsultationAiConfig();
+}
+
+/** Production boot: fail loudly when Consultation reply AI env is missing. */
+export function assertConsultationReplyAiConfigured(): void {
+  getConsultationReplyAiConfig();
 }
 
 /** Production boot: fail loudly when Application asset AI env is missing. */

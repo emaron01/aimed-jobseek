@@ -1,7 +1,8 @@
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
+import type { AiCallUsageContext } from "@/lib/ai/types";
 import {
-  getConsultationAiProvider,
-  isConsultationAiConfigured,
+  getConsultationReplyAiProvider,
+  isConsultationReplyAiConfigured,
 } from "@/lib/ai";
 import {
   NEXT_STEP_PROMPT_VERSION,
@@ -14,6 +15,7 @@ import {
   consultationConfig,
   consultationConversationCopy,
 } from "@/lib/product-config";
+import { aiCallTracking } from "@/lib/usage/ai-call";
 
 export type NextStepState = {
   key: string;
@@ -64,12 +66,13 @@ export function applicationNextStepState(input: {
 
 export async function writeApplicationNextStep(input: {
   state: NextStepState;
+  usage?: AiCallUsageContext;
 }): Promise<{ ok: true; text: string } | { ok: false; message: string }> {
-  if (!isConsultationAiConfigured()) {
+  if (!isConsultationReplyAiConfigured()) {
     console.error(
       JSON.stringify({
         event: "application_next_step_failed",
-        cause: "CONSULTATION_AI_not_configured",
+        cause: "CONSULTATION_REPLY_AI_not_configured",
       }),
     );
     return { ok: false, message: consultationConversationCopy.nextStepModelUnavailable };
@@ -82,8 +85,9 @@ export async function writeApplicationNextStep(input: {
       attempt += 1
     ) {
       try {
-        const response = await getConsultationAiProvider().generateStructured({
+        const response = await getConsultationReplyAiProvider().generateStructured({
           ...structuredOutputRequest("applicationNextStep"),
+          ...(input.usage ? aiCallTracking(input.usage) : {}),
           messages: [
             {
               role: "system",
@@ -93,6 +97,11 @@ export async function writeApplicationNextStep(input: {
               role: "user",
               content: JSON.stringify({
                 consultantName: consultationConfig.displayName,
+              }),
+            },
+            {
+              role: "user",
+              content: JSON.stringify({
                 state: input.state,
                 rejectedPrevious: null,
               }),
@@ -249,7 +258,15 @@ async function writeStoredApplicationNextStep(input: {
     ),
     appliedAt: campaign.appliedAt?.toISOString() ?? null,
   });
-  const written = await writeApplicationNextStep({ state });
+  const written = await writeApplicationNextStep({
+    state,
+    usage: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      category: "CONSULTATION",
+      operation: "APPLICATION_NEXT_STEP",
+    },
+  });
   if (!written.ok) {
     await prisma.campaign.update({
       where: { id: input.campaignId },
@@ -284,4 +301,3 @@ export async function retryApplicationNextStep(input: {
     type: "NEXT_STEP",
   });
 }
-

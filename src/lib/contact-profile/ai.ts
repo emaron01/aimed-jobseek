@@ -1,5 +1,7 @@
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import { getPersonaAiProvider, isPersonaAiConfigured } from "@/lib/ai";
+import type { AiCallUsageContext } from "@/lib/ai/types";
+import { aiCallTracking } from "@/lib/usage/ai-call";
 import {
   CONTACT_PROFILE_PROMPT_VERSION,
   individualProfileSchema,
@@ -13,6 +15,7 @@ export async function generateIndividualProfileWithModel(input: {
   extracted: LinkedInExtracted;
   roleName: string | null;
   roleNarrative: unknown;
+  usage?: AiCallUsageContext;
 }): Promise<
   | { ok: true; data: IndividualProfileDraft }
   | { ok: false; message: string }
@@ -26,6 +29,7 @@ export async function generateIndividualProfileWithModel(input: {
   try {
     const response = await getPersonaAiProvider().generateStructured({
       ...structuredOutputRequest("contactIndividualProfile"),
+      ...(input.usage ? aiCallTracking(input.usage) : {}),
       messages: [
         {
           role: "system",

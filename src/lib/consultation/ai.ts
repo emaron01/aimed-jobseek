@@ -1,7 +1,10 @@
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
+import type { AiCallUsageContext } from "@/lib/ai/types";
 import {
   getConsultationAiProvider,
+  getConsultationReplyAiProvider,
   isConsultationAiConfigured,
+  isConsultationReplyAiConfigured,
 } from "@/lib/ai";
 import {
   consultationPlanSchema,
@@ -20,12 +23,19 @@ import {
   buildConsultationStatementGroundingMessages,
 } from "@/lib/consultation/prompt";
 import { consultationConversationCopy } from "@/lib/product-config";
+import { aiCallTracking } from "@/lib/usage/ai-call";
 
 export type ConsultationPlanAiResult =
   | { ok: true; data: ConsultationPlanResult }
   | { ok: false; message: string };
 
 const UNCONFIGURED = consultationConversationCopy.modelUnavailable;
+const REPLY_UNCONFIGURED =
+  "Consultation reply AI is not configured. Configure CONSULTATION_REPLY_AI_*, then retry.";
+
+function tracking(usage?: AiCallUsageContext) {
+  return usage ? aiCallTracking(usage) : {};
+}
 
 export async function planConsultationWithModel(input: {
   targets: Array<{ key: string; kind: string; text: string }>;
@@ -45,12 +55,12 @@ export async function planConsultationWithModel(input: {
     name: string;
     likelyTitles: string[];
     whyThisRoleMatters: string | null;
-    personaContext: unknown;
   }>;
   chronologyRequested: boolean;
   coveredTargetKeys: string[];
   focusTargetKey?: string | null;
   qualityFeedback?: string[];
+  usage?: AiCallUsageContext;
 }): Promise<ConsultationPlanAiResult> {
   if (!isConsultationAiConfigured()) {
     console.error(
@@ -65,6 +75,7 @@ export async function planConsultationWithModel(input: {
   try {
     const response = await getConsultationAiProvider().generateStructured({
       ...structuredOutputRequest("consultationPlan"),
+      ...tracking(input.usage),
       messages: buildConsultationCoachMessages(input),
       parseOutput: (raw) => ({
         data: consultationPlanSchema.parse(raw),
@@ -94,16 +105,18 @@ export async function extractWithModel(input: {
   target: { key: string; kind: string; text: string } | null;
   targets: Array<{ key: string; kind: string; text: string }>;
   qualityFeedback?: string[];
+  usage?: AiCallUsageContext;
 }): Promise<
   | { ok: true; data: ConsultationExtractResult }
   | { ok: false; message: string }
 > {
-  if (!isConsultationAiConfigured()) {
-    return { ok: false, message: UNCONFIGURED };
+  if (!isConsultationReplyAiConfigured()) {
+    return { ok: false, message: REPLY_UNCONFIGURED };
   }
   try {
-    const response = await getConsultationAiProvider().generateStructured({
+    const response = await getConsultationReplyAiProvider().generateStructured({
       ...structuredOutputRequest("consultationExtract"),
+      ...tracking(input.usage),
       messages: buildConsultationExtractMessages(input),
       parseOutput: (raw) => ({
         data: consultationExtractSchema.parse(raw),
@@ -135,16 +148,18 @@ export async function polishAnswerWithModel(input: {
   declinedFollowUp: boolean;
   strengtheningNeeds: string[];
   qualityFeedback?: string[];
+  usage?: AiCallUsageContext;
 }): Promise<
   | { ok: true; data: ConsultationPolishResult }
   | { ok: false; message: string }
 > {
-  if (!isConsultationAiConfigured()) {
-    return { ok: false, message: UNCONFIGURED };
+  if (!isConsultationReplyAiConfigured()) {
+    return { ok: false, message: REPLY_UNCONFIGURED };
   }
   try {
-    const response = await getConsultationAiProvider().generateStructured({
+    const response = await getConsultationReplyAiProvider().generateStructured({
       ...structuredOutputRequest("consultationPolish"),
+      ...tracking(input.usage),
       messages: buildConsultationPolishMessages(input),
       parseOutput: (raw) => ({
         data: consultationPolishSchema.parse(raw),
@@ -168,16 +183,18 @@ export async function groundStatementWithModel(input: {
   statement: string;
   kind: "INTERVIEW_ANSWER" | "RESUME_BULLET";
   sources: Array<{ id: string; text: string }>;
+  usage?: AiCallUsageContext;
 }): Promise<
   | { ok: true; data: ConsultationStatementGroundingResult }
   | { ok: false; message: string }
 > {
-  if (!isConsultationAiConfigured()) {
-    return { ok: false, message: UNCONFIGURED };
+  if (!isConsultationReplyAiConfigured()) {
+    return { ok: false, message: REPLY_UNCONFIGURED };
   }
   try {
-    const response = await getConsultationAiProvider().generateStructured({
+    const response = await getConsultationReplyAiProvider().generateStructured({
       ...structuredOutputRequest("consultationStatementGrounding"),
+      ...tracking(input.usage),
       messages: buildConsultationStatementGroundingMessages(input),
       parseOutput: (raw) => ({
         data: consultationStatementGroundingSchema.parse(raw),
