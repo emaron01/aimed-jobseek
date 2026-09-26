@@ -74,6 +74,7 @@ export type {
 } from "./interview";
 export { applicationAssetConfig } from "./application-assets";
 export type { ApplicationAssetTypeValue } from "./application-assets";
+export { candidateProfileEditCopy } from "./candidate-profile";
 export {
   isObsoleteWorkspaceFailure,
   obsoleteWorkspaceFailurePhrases,

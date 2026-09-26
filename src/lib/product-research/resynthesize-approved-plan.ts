@@ -81,6 +81,8 @@ function sectionValue(
       return profile.education;
     case "credentials":
       return profile.credentials;
+    case "awards":
+      return profile.awards;
     case "domainVocabulary":
       return profile.domainVocabulary;
     case "gaps":
@@ -185,6 +187,9 @@ function setSectionValue(
       break;
     case "credentials":
       next.credentials = value as CandidateProfile["credentials"];
+      break;
+    case "awards":
+      next.awards = value as CandidateProfile["awards"];
       break;
     case "domainVocabulary":
       next.domainVocabulary = value as CandidateProfile["domainVocabulary"];

@@ -53,7 +53,6 @@ function ApplyPlanList({
 export function ProductResynthesisReview({
   productId,
   productName,
-  websiteUrl,
   setupRunId,
   evidenceBundleId,
   draft,
@@ -64,7 +63,6 @@ export function ProductResynthesisReview({
 }: {
   productId: string;
   productName: string;
-  websiteUrl: string | null;
   setupRunId: string;
   evidenceBundleId: string;
   draft: CandidateProfile | null;
@@ -214,8 +212,6 @@ export function ProductResynthesisReview({
       <form action={action} className="space-y-4 border-t border-slate-200 pt-5">
         <input type="hidden" name="productId" value={productId} />
         <input type="hidden" name="setupRunId" value={setupRunId} />
-        <input type="hidden" name="name" value={productName} />
-        <input type="hidden" name="websiteUrl" value={websiteUrl ?? ""} />
         <input
           type="hidden"
           name="candidateProfileJson"

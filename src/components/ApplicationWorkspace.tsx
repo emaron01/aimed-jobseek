@@ -19,6 +19,7 @@ import {
   WORKSPACE_CARD_WRAP_CLASS,
   WORKSPACE_MESSAGE_WRAP_CLASS,
   workspaceCampaignSummaryHref,
+  workspaceProfileEditHref,
   workspaceProfileHref,
 } from "@/lib/application/workspace-links";
 import { mergeExistingHiringTeamRoles } from "@/lib/hiring-team/merge-existing";
@@ -452,6 +453,9 @@ export async function ApplicationWorkspace({
     getApplicationWorkspaceLive({ organizationId, campaignId }),
   ]);
   const profileHref = workspaceProfileHref(requirement.campaign.product.id);
+  const profileEditHref = workspaceProfileEditHref(
+    requirement.campaign.product.id,
+  );
   const invalidPlanTypes = requirement.campaign.presentationPlans.flatMap(
     (row) =>
       presentationPlanSchema.safeParse(row.planJson).success
@@ -735,6 +739,7 @@ export async function ApplicationWorkspace({
         profile.ok ? missingResumeContactLabels(profile.profile) : []
       }
       profileHref={profileHref}
+      profileEditHref={profileEditHref}
       profileRoles={
         profile.ok
           ? profile.profile.experience.map((role) => ({

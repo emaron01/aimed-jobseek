@@ -13,6 +13,10 @@ export function workspaceProfileHref(productId: string): string {
   return `/setup/${id}`;
 }
 
+export function workspaceProfileEditHref(productId: string): string {
+  return `${workspaceProfileHref(productId)}/edit`;
+}
+
 export function workspaceConsultationHref(): string {
   return `#${workspaceSectionId("CONSULTATION")}`;
 }
@@ -62,6 +66,7 @@ export function listWorkspaceHrefs(input: {
 }): string[] {
   return [
     workspaceProfileHref(input.productId),
+    workspaceProfileEditHref(input.productId),
     workspaceConsultationHref(),
     workspaceCampaignHref(input.campaignId),
     workspaceCampaignSummaryHref(input.campaignId),

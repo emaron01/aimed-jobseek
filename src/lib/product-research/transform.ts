@@ -100,6 +100,7 @@ function filterCandidateProfile(
     ),
     education: profile.education.map((item) => filterFactItem(item, allowed)),
     credentials: profile.credentials.map((item) => filterFactItem(item, allowed)),
+    awards: profile.awards.map((item) => filterFactItem(item, allowed)),
     domainVocabulary: profile.domainVocabulary.map((item) =>
       filterFactItem(item, allowed),
     ),

@@ -332,8 +332,6 @@ export function ProductDraftReview({
   );
   const router = useRouter();
   const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(productName);
-  const [url, setUrl] = useState(websiteUrl ?? "");
   const [profile, setProfile] = useState<CandidateProfile>(() =>
     normalizeProfile(draft),
   );
@@ -342,8 +340,6 @@ export function ProductDraftReview({
   const [appliedDraftKey, setAppliedDraftKey] = useState(draftKey);
   if (draftKey !== appliedDraftKey) {
     setAppliedDraftKey(draftKey);
-    setName(productName);
-    setUrl(websiteUrl ?? "");
     setProfile(normalizeProfile(draft));
   }
   if (state?.ok && editing) {
@@ -402,24 +398,19 @@ export function ProductDraftReview({
           name="candidateProfileJson"
           value={JSON.stringify(profile)}
         />
-        {!editing ? (
-          <>
-            <input type="hidden" name="name" value={name} />
-            <input type="hidden" name="websiteUrl" value={url} />
-          </>
-        ) : null}
-
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-xl font-semibold text-slate-900">
               {editing ? (
                 <span className="sr-only">Edit {vocab.product.singular}</span>
               ) : (
-                name
+                profile.identity.name?.text || productName
               )}
             </h3>
-            {!editing && url ? (
-              <p className="mt-1 text-sm text-slate-500">{url}</p>
+            {!editing && profile.identity.personalSite?.text ? (
+              <p className="mt-1 text-sm text-slate-500">
+                {profile.identity.personalSite.text}
+              </p>
             ) : null}
           </div>
           <div className="flex flex-wrap gap-2" data-print-hide>
@@ -435,22 +426,6 @@ export function ProductDraftReview({
 
         {editing ? (
           <div className="space-y-5">
-            <EditField
-              label={`${vocab.product.Singular} name`}
-              name="name"
-              hint={CANDIDATE_PROFILE_FIELD_HINTS.name}
-              value={name}
-              onChange={setName}
-              singleLine
-            />
-            <EditField
-              label="Personal site, portfolio, or GitHub"
-              name="websiteUrl"
-              hint={CANDIDATE_PROFILE_FIELD_HINTS.websiteUrl}
-              value={url}
-              onChange={setUrl}
-              singleLine
-            />
             <EditField
               label="Name"
               hint={CANDIDATE_PROFILE_FIELD_HINTS["identity.name"]}
@@ -780,6 +755,17 @@ export function ProductDraftReview({
               }
             />
             <EditField
+              label="Awards"
+              hint={CANDIDATE_PROFILE_FIELD_HINTS.awards}
+              value={profile.awards.map((item) => item.text).join("\n")}
+              onChange={(value) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  awards: updateFactList(prev.awards, value, "award"),
+                }))
+              }
+            />
+            <EditField
               label="Domain vocabulary"
               hint={CANDIDATE_PROFILE_FIELD_HINTS.domainVocabulary}
               value={profile.domainVocabulary.map((item) => item.text).join("\n")}
@@ -970,6 +956,14 @@ export function ProductDraftReview({
             <ReadSection title="Credentials" empty={profile.credentials.length === 0}>
               <FactList
                 items={profile.credentials}
+                sources={sources}
+                sourceIndex={sourceIndex}
+              />
+            </ReadSection>
+
+            <ReadSection title="Awards" empty={profile.awards.length === 0}>
+              <FactList
+                items={profile.awards}
                 sources={sources}
                 sourceIndex={sourceIndex}
               />

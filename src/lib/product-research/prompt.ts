@@ -70,6 +70,7 @@ ${PROFILE_SYNTHESIS_SYSTEM_INSTRUCTIONS}`;
         differentiators: ["factItem"],
         education: ["factItem"],
         credentials: ["factItem"],
+        awards: ["factItem"],
         domainVocabulary: ["factItem"],
         gaps: [{ id: "string", area: "string", detail: "string" }],
       },

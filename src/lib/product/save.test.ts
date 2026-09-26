@@ -80,20 +80,26 @@ describe("readProductFormValues", () => {
 
 describe("Product save UI seam", () => {
   it("wires useActionState result into visible status on success and failure", () => {
-    const formSrc = readFileSync("src/components/ProductDetailsForm.tsx", "utf8");
-    const actionsSrc = readFileSync("src/app/actions.ts", "utf8");
+    const formSrc = readFileSync(
+      "src/components/CandidateProfileEditForm.tsx",
+      "utf8",
+    );
+    const actionsSrc = readFileSync(
+      "src/app/actions/candidate-profile.ts",
+      "utf8",
+    );
     const setupSrc = readFileSync("src/app/(app)/products/new/page.tsx", "utf8");
 
     expect(actionsSrc).toMatch(
-      /export async function upsertProductAction\([\s\S]*Promise<ProductActionResult>/,
+      /export async function saveCandidateProfileAction\([\s\S]*Promise<CandidateProfileActionResult>/,
     );
     expect(actionsSrc).toContain("ok: true");
-    expect(actionsSrc).toContain("values: parsed.values");
+    expect(actionsSrc).toContain("manuallyEditedFields");
 
     expect(formSrc).toContain("useActionState");
-    expect(formSrc).toContain("upsertProductAction");
-    expect(formSrc).toContain('data-testid="product-action-status"');
-    expect(formSrc).toContain("state.values");
+    expect(formSrc).toContain("saveCandidateProfileAction");
+    expect(formSrc).toContain('data-testid="candidate-profile-edit-status"');
+    expect(formSrc).toContain("state.message");
 
     expect(setupSrc).toContain("AssistedProductIntake");
     expect(setupSrc).not.toContain("AddProductForm");

@@ -76,6 +76,32 @@ describe("mergeProtectedProductDraftFields", () => {
     expect(merged.positioning?.text).toBe(current.positioning?.text);
     expect(merged.identity.headline?.text).toBe("AI headline");
   });
+
+  it("keeps seeker-edited role dates including year-only and Present", () => {
+    const current = {
+      ...fixtureAlexChenProfile(),
+      experience: fixtureAlexChenProfile().experience.map((role, index) =>
+        index === 0
+          ? { ...role, startDate: "2021", endDate: "Present" }
+          : role,
+      ),
+    };
+    const proposed = {
+      ...current,
+      experience: current.experience.map((role, index) =>
+        index === 0
+          ? { ...role, startDate: "January 2021", endDate: "2026" }
+          : role,
+      ),
+    };
+    const merged = mergeProtectedProductDraftFields({
+      current,
+      proposed,
+      manuallyEditedFields: ["experience"],
+    });
+    expect(merged.experience[0]?.startDate).toBe("2021");
+    expect(merged.experience[0]?.endDate).toBe("Present");
+  });
 });
 
 describe("productDraftFromApprovedProfile", () => {

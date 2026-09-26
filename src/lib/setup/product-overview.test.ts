@@ -146,25 +146,29 @@ describe("productCompletionState", () => {
 describe("write paths unchanged", () => {
   it("edit forms still submit via the same server actions", () => {
     const productForm = readFileSync(
-      "src/components/ProductDetailsForm.tsx",
+      "src/components/CandidateProfileEditForm.tsx",
       "utf8",
     );
     const icpForm = readFileSync("src/components/IcpDetailsForm.tsx", "utf8");
     const personaForm = readFileSync("src/components/PersonaForm.tsx", "utf8");
     const actions = readFileSync("src/app/actions.ts", "utf8");
+    const profileActions = readFileSync(
+      "src/app/actions/candidate-profile.ts",
+      "utf8",
+    );
 
-    expect(productForm).toContain("upsertProductAction");
+    expect(productForm).toContain("saveCandidateProfileAction");
     expect(productForm).toContain("useActionState");
-    expect(productForm).toContain('data-testid="product-action-status"');
-    expect(productForm).toContain("productNameDomainMismatchWarning");
-    expect(productForm).toContain("product-name-domain-warning");
+    expect(productForm).toContain('data-testid="candidate-profile-edit-status"');
+    expect(profileActions).toContain(
+      "export async function saveCandidateProfileAction",
+    );
     expect(icpForm).toContain("upsertIcpAction");
     expect(icpForm).toContain("useActionState");
     expect(icpForm).toContain("icp-action-status");
     expect(personaForm).toContain("upsertPersonaAction");
     expect(personaForm).toContain("action={saveAction}");
 
-    expect(actions).toContain("export async function upsertProductAction");
     expect(actions).toContain("export async function upsertIcpAction");
     expect(actions).toContain("export async function upsertPersonaAction");
 

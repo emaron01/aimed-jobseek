@@ -22,7 +22,7 @@ import {
   productCompletionState,
   truncateText,
 } from "@/lib/setup/product-overview";
-import { vocab } from "@/lib/product-config";
+import { candidateProfileEditCopy, vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ productId: string }>;
@@ -164,11 +164,11 @@ export default async function SetupProductPage({ params }: PageProps) {
   );
 
   const completion = productCompletionState(product);
+  const profile = productDraftFromApprovedProfile(product.profileJson);
   const productBlurb = truncateText(
-    product.description || product.valueProposition,
+    profile.identity.headline?.text || profile.positioning?.text,
     140,
   );
-  const profile = productDraftFromApprovedProfile(product.profileJson);
   const primaryIcp = icps[0] ?? null;
   const primaryIcpCriteria = primaryIcp
     ? (icpCriteriaMap.get(primaryIcp.id) ?? [])
@@ -226,7 +226,7 @@ export default async function SetupProductPage({ params }: PageProps) {
                   </p>
                 ) : (
                   <p className="mt-2 text-sm text-slate-500 print:hidden">
-                    No description yet.
+                    {candidateProfileEditCopy.emptyBlurb}
                   </p>
                 )}
               </div>
@@ -239,44 +239,47 @@ export default async function SetupProductPage({ params }: PageProps) {
 
             <div className="mt-6 hidden space-y-5 print:block">
               <PrintProse
-                title="Headline"
-                text={profile.identity.headline?.text || product.description}
+                title={candidateProfileEditCopy.headline}
+                text={profile.identity.headline?.text}
               />
               <PrintProse
-                title="Positioning"
-                text={profile.positioning?.text || product.valueProposition}
+                title={candidateProfileEditCopy.positioning}
+                text={profile.positioning?.text}
               />
-              <PrintProse title="Personal site" text={product.websiteUrl} />
+              <PrintProse
+                title={candidateProfileEditCopy.personalWebsite}
+                text={profile.identity.personalSite?.text}
+              />
               <PrintList
-                title="Target titles"
+                title={candidateProfileEditCopy.targetTitles}
                 items={factTexts(profile.direction.targetTitles)}
               />
               <PrintProse
-                title="Seniority"
+                title={candidateProfileEditCopy.seniority}
                 text={profile.direction.seniority?.text}
               />
               <PrintList
-                title="Career functions"
+                title={candidateProfileEditCopy.functions}
                 items={factTexts(profile.direction.functions)}
               />
               <PrintList
-                title="Skills"
+                title={candidateProfileEditCopy.skills}
                 items={factTexts(profile.skills)}
               />
               <PrintList
-                title="Problems solved for employers"
+                title={candidateProfileEditCopy.problemsSolved}
                 items={factTexts(profile.problemsSolved)}
               />
               <PrintList
-                title="Differentiators"
+                title={candidateProfileEditCopy.differentiators}
                 items={factTexts(profile.differentiators)}
               />
               <PrintList
-                title="Education"
+                title={candidateProfileEditCopy.education}
                 items={factTexts(profile.education)}
               />
               <PrintList
-                title="Domain vocabulary"
+                title={candidateProfileEditCopy.domainVocabulary}
                 items={factTexts(profile.domainVocabulary)}
               />
             </div>

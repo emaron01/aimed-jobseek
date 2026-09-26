@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ProductDetailsForm } from "@/components/ProductDetailsForm";
+import { CandidateProfileEditForm } from "@/components/CandidateProfileEditForm";
 import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
 import { getProduct } from "@/lib/tenant/data";
 import {
   getCurrentOrganization,
   TenantError,
 } from "@/lib/tenant/getCurrentOrganization";
-import { vocab } from "@/lib/product-config";
+import { candidateProfileEditCopy } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ productId: string }>;
@@ -20,7 +20,7 @@ export default async function EditProductPage({ params }: PageProps) {
   if (!organization) {
     return (
       <div>
-        <PageHeader title={`Edit ${vocab.product.singular}`} />
+        <PageHeader title={candidateProfileEditCopy.pageTitle} />
         <TenantMissing />
       </div>
     );
@@ -37,8 +37,8 @@ export default async function EditProductPage({ params }: PageProps) {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
-        title={`Edit: ${product.name}`}
-        description={`Update ${vocab.product.singular} details.`}
+        title={`${candidateProfileEditCopy.pageTitle}: ${product.name}`}
+        description={candidateProfileEditCopy.pageHelp}
         actions={
           <Link
             href={`/setup/${product.id}`}
@@ -49,7 +49,10 @@ export default async function EditProductPage({ params }: PageProps) {
         }
       />
       <div className="rounded-lg border border-slate-200 bg-white p-5">
-        <ProductDetailsForm product={product} />
+        <CandidateProfileEditForm
+          productId={product.id}
+          profileJson={product.profileJson}
+        />
       </div>
     </div>
   );

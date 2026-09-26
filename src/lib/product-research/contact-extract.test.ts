@@ -85,4 +85,21 @@ describe("resume header contact details", () => {
     const texts = header.contactDetails.map((claim) => claim.text);
     expect(texts.length).toBeGreaterThan(0);
   });
+
+  it("does not list LinkedIn or a personal website as missing", () => {
+    const profile = fixtureAlexChenProfile();
+    const missing = missingResumeHeaderContacts({
+      ...profile,
+      identity: {
+        ...profile.identity,
+        linkedinUrl: null,
+        personalSite: null,
+        phone: null,
+        email: null,
+      },
+    });
+    expect(missing).toEqual(["phone", "email"]);
+    expect(missing).not.toContain("linkedinUrl");
+    expect(missing).not.toContain("cityState");
+  });
 });

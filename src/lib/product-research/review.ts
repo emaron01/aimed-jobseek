@@ -60,6 +60,7 @@ export const CANDIDATE_PROFILE_FIELD_PATHS = [
   "differentiators",
   "education",
   "credentials",
+  "awards",
   "domainVocabulary",
   "gaps",
 ] as const;
@@ -94,6 +95,7 @@ export const CANDIDATE_PROFILE_FIELD_LABELS: Record<
   differentiators: "Differentiators",
   education: "Education",
   credentials: "Credentials",
+  awards: "Awards",
   domainVocabulary: "Domain vocabulary",
   gaps: "Gaps",
 };
@@ -127,6 +129,7 @@ export const CANDIDATE_PROFILE_FIELD_HINTS: Record<
   differentiators: "One differentiator per line.",
   education: "One education item per line.",
   credentials: "One credential per line.",
+  awards: "One award per line.",
   domainVocabulary: "One term per line.",
   gaps: "Missing dates, achievements without results, or unclear scope.",
 };
@@ -207,6 +210,8 @@ function sectionValue(
       return profile.education;
     case "credentials":
       return profile.credentials;
+    case "awards":
+      return profile.awards;
     case "domainVocabulary":
       return profile.domainVocabulary;
     case "gaps":

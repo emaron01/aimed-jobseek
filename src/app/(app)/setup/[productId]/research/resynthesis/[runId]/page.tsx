@@ -81,7 +81,6 @@ export default async function ProductResynthesisReviewPage({ params }: PageProps
         <ProductResynthesisReview
           productId={product.id}
           productName={product.name}
-          websiteUrl={product.websiteUrl}
           setupRunId={run.id}
           evidenceBundleId={run.evidenceBundleId}
           draft={draft}

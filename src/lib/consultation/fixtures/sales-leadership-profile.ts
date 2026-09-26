@@ -207,6 +207,7 @@ export function fixtureSalesLeadershipProfile(): CandidateProfile {
     differentiators: [],
     education: [],
     credentials: [],
+    awards: [],
     domainVocabulary: [],
     compensation: null,
     gaps: [],

@@ -97,6 +97,7 @@ export const candidateProfileSchema = z.object({
   differentiators: z.array(profileFactItemSchema).default([]),
   education: z.array(profileFactItemSchema).default([]),
   credentials: z.array(profileFactItemSchema).default([]),
+  awards: z.array(profileFactItemSchema).default([]),
   domainVocabulary: z.array(profileFactItemSchema).default([]),
   compensation: z
     .object({
@@ -246,6 +247,7 @@ export function flattenProfileTextsForEvidence(
   profile.differentiators.forEach(pushFact);
   profile.education.forEach(pushFact);
   profile.credentials.forEach(pushFact);
+  profile.awards.forEach(pushFact);
   profile.domainVocabulary.forEach(pushFact);
   return texts;
 }

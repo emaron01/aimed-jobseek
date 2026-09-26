@@ -619,6 +619,7 @@ function AssetTypePanel({
   thinNotice,
   missingContacts,
   profileHref,
+  profileEditHref,
 }: {
   campaignId: string;
   type: "RESUME" | "COVER_LETTER";
@@ -630,6 +631,7 @@ function AssetTypePanel({
   thinNotice: string | null;
   missingContacts: string[];
   profileHref: string | null;
+  profileEditHref: string | null;
 }) {
   const [result, action] = useActionState(generateApplicationAssetAction, initial);
   const latestResume =
@@ -649,8 +651,8 @@ function AssetTypePanel({
         {type === "RESUME" && missingContacts.length > 0 ? (
           <p className={`text-sm text-amber-900 ${WORKSPACE_MESSAGE_WRAP_CLASS}`} data-testid="resume-missing-contact">
             {applicationAssetConfig.missingContact.heading}: {missingContacts.join(", ")}.{" "}
-            {profileHref ? (
-              <AppActionLink href={profileHref} variant="chip">
+            {profileEditHref ? (
+              <AppActionLink href={profileEditHref} variant="chip">
                 {vocab.product.Singular}
               </AppActionLink>
             ) : null}{" "}
@@ -751,6 +753,7 @@ export function ApplicationAssetsSection({
   coverLetterThinNotice = null,
   missingResumeContacts = [],
   profileHref = null,
+  profileEditHref = null,
   defaultOpen = false,
 }: {
   campaignId: string;
@@ -767,6 +770,7 @@ export function ApplicationAssetsSection({
   coverLetterThinNotice?: string | null;
   missingResumeContacts?: string[];
   profileHref?: string | null;
+  profileEditHref?: string | null;
   defaultOpen?: boolean;
 }) {
   const valid = assets.flatMap((asset) => {
@@ -840,6 +844,7 @@ export function ApplicationAssetsSection({
             thinNotice={type === "COVER_LETTER" ? coverLetterThinNotice : null}
             missingContacts={type === "RESUME" ? missingResumeContacts : []}
             profileHref={profileHref}
+            profileEditHref={profileEditHref}
           />
         ))}
       </div>

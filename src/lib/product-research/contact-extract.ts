@@ -133,12 +133,16 @@ export const RESUME_HEADER_CONTACT_KEYS = [
   "linkedinUrl",
 ] as const;
 
+export const SUGGESTED_RESUME_CONTACT_KEYS = ["phone", "email"] as const;
+
 export type ResumeHeaderContactKey = (typeof RESUME_HEADER_CONTACT_KEYS)[number];
+export type SuggestedResumeContactKey =
+  (typeof SUGGESTED_RESUME_CONTACT_KEYS)[number];
 
 export function missingResumeHeaderContacts(
   profile: CandidateProfile,
-): ResumeHeaderContactKey[] {
-  return RESUME_HEADER_CONTACT_KEYS.filter(
+): SuggestedResumeContactKey[] {
+  return SUGGESTED_RESUME_CONTACT_KEYS.filter(
     (key) => !profile.identity[key]?.text.trim(),
   );
 }

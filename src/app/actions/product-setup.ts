@@ -6,7 +6,6 @@ import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
 import { PaymentLockError } from "@/lib/billing/payment-lock";
 import { createProduct, updateProduct } from "@/lib/tenant/data";
-import { toOptionalFloat } from "@/lib/utils";
 import { researchAndBuildProduct } from "@/lib/product-research/workflow";
 import {
   approvePersonaFromDraft,
@@ -369,11 +368,10 @@ export async function applyProductResynthesisAction(
     const organizationId = await requireOrganizationId();
     const productId = String(formData.get("productId") || "").trim();
     const setupRunId = String(formData.get("setupRunId") || "").trim();
-    const name = String(formData.get("name") || "").trim();
-    if (!productId || !setupRunId || !name) {
+    if (!productId || !setupRunId) {
       return {
         ok: false,
-        message: `${vocab.product.Singular}, setup run, and name are required.`,
+        message: `${vocab.product.Singular} and setup run are required.`,
       };
     }
 
@@ -386,18 +384,20 @@ export async function applyProductResynthesisAction(
 
     const existingProduct = await prisma.product.findFirst({
       where: { id: productId, organizationId },
-      select: { name: true, websiteUrl: true },
+      select: { name: true, websiteUrl: true, averageOrderValue: true },
     });
     const originalDraft = storedProfileFromJson(run.productDraftJson);
     const profile = parseCandidateProfileFromFormData(formData);
-    const websiteUrl = String(formData.get("websiteUrl") || "").trim() || null;
+    const profileName =
+      profile.identity.name?.text.trim() || existingProduct?.name || "";
+    if (!profileName) {
+      return { ok: false, message: `${vocab.product.Singular} name is required.` };
+    }
+    const websiteUrl =
+      profile.identity.personalSite?.text.trim() ||
+      existingProduct?.websiteUrl ||
+      null;
     const editedFields = diffCandidateProfileFields(originalDraft, profile);
-    if (existingProduct && name !== existingProduct.name) {
-      editedFields.push("name");
-    }
-    if (existingProduct && websiteUrl !== (existingProduct.websiteUrl ?? null)) {
-      editedFields.push("websiteUrl");
-    }
 
     await applyApprovedProductResynthesis({
       organizationId,
@@ -405,9 +405,12 @@ export async function applyProductResynthesisAction(
       userId: user.id,
       setupRunId,
       fields: {
-        name,
+        name: profileName,
         websiteUrl,
-        averageOrderValue: toOptionalFloat(formData.get("averageOrderValue")),
+        averageOrderValue:
+          existingProduct?.averageOrderValue != null
+            ? Number(existingProduct.averageOrderValue)
+            : null,
       },
       profile,
       editedFields,
@@ -464,11 +467,10 @@ export async function saveApprovedProductAction(
     const organizationId = await requireOrganizationId();
     const productId = String(formData.get("productId") || "").trim();
     const setupRunId = String(formData.get("setupRunId") || "").trim();
-    const name = String(formData.get("name") || "").trim();
-    if (!productId || !setupRunId || !name) {
+    if (!productId || !setupRunId) {
       return {
         ok: false,
-        message: `${vocab.product.Singular}, setup run, and name are required.`,
+        message: `${vocab.product.Singular} and setup run are required.`,
       };
     }
 
@@ -481,18 +483,20 @@ export async function saveApprovedProductAction(
 
     const existingProduct = await prisma.product.findFirst({
       where: { id: productId, organizationId },
-      select: { name: true, websiteUrl: true },
+      select: { name: true, websiteUrl: true, averageOrderValue: true },
     });
     const originalDraft = storedProfileFromJson(run.productDraftJson);
     let profile = parseCandidateProfileFromFormData(formData);
-    const websiteUrl = String(formData.get("websiteUrl") || "").trim() || null;
+    const profileName =
+      profile.identity.name?.text.trim() || existingProduct?.name || "";
+    if (!profileName) {
+      return { ok: false, message: `${vocab.product.Singular} name is required.` };
+    }
+    const websiteUrl =
+      profile.identity.personalSite?.text.trim() ||
+      existingProduct?.websiteUrl ||
+      null;
     const editedFields = diffCandidateProfileFields(originalDraft, profile);
-    if (existingProduct && name !== existingProduct.name) {
-      editedFields.push("name");
-    }
-    if (existingProduct && websiteUrl !== (existingProduct.websiteUrl ?? null)) {
-      editedFields.push("websiteUrl");
-    }
     profile = await confirmProfileContactDetails({
       organizationId,
       productId,
@@ -507,9 +511,12 @@ export async function saveApprovedProductAction(
       setupRunId,
       fields: {
         ...productFieldsFromCandidateProfile(profile),
-        name,
+        name: profileName,
         websiteUrl,
-        averageOrderValue: toOptionalFloat(formData.get("averageOrderValue")),
+        averageOrderValue:
+          existingProduct?.averageOrderValue != null
+            ? Number(existingProduct.averageOrderValue)
+            : null,
       },
       profile,
       messaging: (run.messagingDraftJson as ProductMessagingDraft | null) ?? null,

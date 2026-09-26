@@ -3,18 +3,16 @@ import type { ReadyApplicationGenerationContext } from "@/lib/generation/context
 import {
   RESUME_HEADER_CONTACT_KEYS,
   missingResumeHeaderContacts,
-  type ResumeHeaderContactKey,
+  type SuggestedResumeContactKey,
 } from "@/lib/product-research/contact-extract";
 import type { CandidateProfile } from "@/lib/product-research/candidate-profile";
 import { applicationAssetConfig } from "@/lib/product-config";
 
 export type ResumeHeaderContactClaim = AssetClaim;
 
-const CONTACT_LABELS: Record<ResumeHeaderContactKey, string> = {
-  cityState: applicationAssetConfig.missingContact.cityState,
+const CONTACT_LABELS: Record<SuggestedResumeContactKey, string> = {
   phone: applicationAssetConfig.missingContact.phone,
   email: applicationAssetConfig.missingContact.email,
-  linkedinUrl: applicationAssetConfig.missingContact.linkedinUrl,
 };
 
 export function resumeContactClaimsFromProfile(

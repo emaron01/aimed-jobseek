@@ -109,6 +109,7 @@ describe("workspace links", () => {
       expect(workspaceHrefResolves(href), href).toBe(true);
     }
     expect(workspaceProfileHref("prod_1")).toBe("/setup/prod_1");
+    expect(hrefs).toContain("/setup/prod_1/edit");
     expect(workspaceConsultationHref()).toBe("#consultation");
     expect(workspaceHrefResolves("/products/prod_1")).toBe(false);
     expect(workspaceHrefResolves("/campaigns/camp_1/consultation")).toBe(false);
