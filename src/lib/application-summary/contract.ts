@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const APPLICATION_SUMMARY_PROMPT_VERSION = "6";
+export const APPLICATION_SUMMARY_PROMPT_VERSION = "7";
 
 export const CHEAT_SHEET_SECTION_KINDS = [
   "RECRUITER",
@@ -100,15 +100,30 @@ export const cheatSheetPersonSectionSchema = z.object({
       dayToDay: guidanceItemSchema,
     })
     .nullable(),
+  linkedinAddendum: z
+    .object({
+      background: guidanceItemSchema,
+      focus: guidanceItemSchema,
+      seekerConnection: guidanceItemSchema,
+    })
+    .nullable()
+    .optional(),
+});
+
+export const applicationSummaryOverviewSchema = z.object({
+  thirtySecondFit: guidanceItemSchema,
+  careerRecap: guidanceItemSchema,
+  gapsToPrepare: z.array(cheatSheetCoachItemSchema).min(1).max(3),
+});
+
+export const applicationSummaryShellSchema = z.object({
+  overview: applicationSummaryOverviewSchema,
+  stories: z.array(cheatSheetStorySchema),
 });
 
 export const applicationSummaryGuidanceSchema = z.object({
-  overview: z.object({
-    thirtySecondFit: guidanceItemSchema,
-    careerRecap: guidanceItemSchema,
-    gapsToPrepare: z.array(cheatSheetCoachItemSchema).min(1).max(3),
-  }),
-  stories: z.array(cheatSheetStorySchema),
+  overview: applicationSummaryOverviewSchema.optional(),
+  stories: z.array(cheatSheetStorySchema).default([]),
   people: z.array(cheatSheetPersonSectionSchema),
 });
 

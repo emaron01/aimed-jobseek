@@ -164,6 +164,8 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
   let assessmentId = "";
   let statementId = "";
   let capturedSources: Array<{ id: string; text: string; category: string }> = [];
+  let capturedPeopleCount = -1;
+  let capturedMode = "";
 
   beforeAll(async () => {
     const { PrismaClient } = await import("@prisma/client");
@@ -357,6 +359,8 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
 
   beforeEach(() => {
     capturedSources = [];
+    capturedPeopleCount = -1;
+    capturedMode = "";
     isConsultationAiConfigured.mockReturnValue(true);
     generateStructured.mockReset();
     generateStructured.mockImplementation(async (request: {
@@ -370,6 +374,7 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
         }
       }, {}) as {
         allowedSources: Array<{ id: string; text: string; category: string }>;
+        mode?: string;
         people: Array<{
           sectionKey: string;
           roleId: string;
@@ -379,7 +384,16 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
         }>;
       };
       capturedSources = payload.allowedSources;
-      return { data: mockCheatSheetGuidance(payload) };
+      capturedPeopleCount = payload.people?.length ?? 0;
+      capturedMode = payload.mode ?? "";
+      const full = mockCheatSheetGuidance({
+        allowedSources: payload.allowedSources,
+        people: payload.people ?? [],
+      });
+      if (payload.mode === "person" || (payload.people?.length ?? 0) === 1) {
+        return { data: full.people[0] };
+      }
+      return { data: { overview: full.overview, stories: full.stories } };
     });
   });
 
@@ -547,6 +561,30 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
       (await getApplicationSummaryView({ organizationId, campaignId })).summary
         ?.status,
     ).toBe("READY");
+  });
+
+  it("generates overview without person sections, then one section on demand", async () => {
+    await generateApplicationSummary({ organizationId, campaignId, userId });
+    expect(capturedMode).toBe("shell");
+    expect(capturedPeopleCount).toBe(0);
+    const shell = await getApplicationSummaryView({ organizationId, campaignId });
+    expect(shell.guidance?.overview).toBeTruthy();
+    expect(shell.guidance?.people).toEqual([]);
+
+    const sectionKey = `role:${roleId}`;
+    await generateApplicationSummary({
+      organizationId,
+      campaignId,
+      userId,
+      sectionKey,
+    });
+    expect(capturedMode).toBe("person");
+    expect(capturedPeopleCount).toBe(1);
+    const withPerson = await getApplicationSummaryView({ organizationId, campaignId });
+    expect(withPerson.guidance?.people.map((person) => person.sectionKey)).toEqual([
+      sectionKey,
+    ]);
+    expect(withPerson.guidance?.overview).toEqual(shell.guidance?.overview);
   });
 
   it("keeps Direct before Indirect and includes dedicated print rules", () => {

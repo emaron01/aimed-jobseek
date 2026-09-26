@@ -23,7 +23,11 @@ import {
   consultationStatementGroundingSchema,
 } from "@/lib/consultation/contract";
 import { hiringTeamIdentificationSchema } from "@/lib/hiring-team/contract";
-import { applicationSummaryGuidanceSchema } from "@/lib/application-summary/contract";
+import {
+  applicationSummaryGuidanceSchema,
+  applicationSummaryShellSchema,
+  cheatSheetPersonSectionSchema,
+} from "@/lib/application-summary/contract";
 import {
   assetClaimValidationSchema,
   coverLetterAssetContentSchema,
@@ -178,6 +182,16 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   applicationSummaryGuidance: {
     schemaName: "application_summary_guidance",
     schema: applicationSummaryGuidanceSchema,
+    usageOperations: ["APPLICATION_SUMMARY"],
+  },
+  applicationSummaryShell: {
+    schemaName: "application_summary_shell",
+    schema: applicationSummaryShellSchema,
+    usageOperations: ["APPLICATION_SUMMARY"],
+  },
+  cheatSheetPersonSection: {
+    schemaName: "cheat_sheet_person_section",
+    schema: cheatSheetPersonSectionSchema,
     usageOperations: ["APPLICATION_SUMMARY"],
   },
   resumePresentationPlan: {

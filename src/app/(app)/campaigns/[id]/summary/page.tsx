@@ -5,6 +5,7 @@ import { generateApplicationSummaryAction } from "@/app/actions/application-summ
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { AppActionLink } from "@/components/AppButton";
 import { CheatSheetCoachItems } from "@/components/CheatSheetCoachItems";
+import { CheatSheetPersonBody } from "@/components/CheatSheetPersonBody";
 import {
   CheatSheetFilterProvider,
   CheatSheetPeopleFilter,
@@ -211,7 +212,7 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
 
       <CheatSheetSharedSection>
       <SummarySection id="overview" title={applicationSummaryConfig.sections.overview}>
-        {summaryStatus !== "READY" || !guidance ? (
+        {!guidance?.overview ? (
           <p className="text-sm text-muted">
             {summaryStatus === "FAILED"
               ? "Guidance generation failed. Use Retry above."
@@ -246,189 +247,22 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
       </SummarySection>
       </CheatSheetSharedSection>
 
-      {(guidance?.people ?? view.people).map((person) => {
-        const section = guidance?.people.find((item) => item.sectionKey === ("sectionKey" in person ? person.sectionKey : ""));
-        const heading = section?.heading ?? ("heading" in person ? person.heading : "");
-        const sectionKey = section?.sectionKey ?? ("sectionKey" in person ? person.sectionKey : heading);
+      {view.people.map((person) => {
+        const section =
+          guidance?.people.find((item) => item.sectionKey === person.sectionKey) ?? null;
+        const notes = person.contactId
+          ? view.notesByContactId.get(person.contactId) ?? []
+          : [];
         return (
-          <CheatSheetPersonSection key={sectionKey} sectionKey={sectionKey}>
-          <SummarySection id={sectionKey} title={heading}>
-            {!section ? (
-              <p className="text-sm text-muted">
-                Generate the {applicationSummaryConfig.title} for this person.
-              </p>
-            ) : (
-              <>
-                <div>
-                  <h3 className="font-medium text-ink">
-                    {applicationSummaryConfig.sections.caresAbout}
-                  </h3>
-                  <TextList items={section.caresAbout.map((item) => item.text)} />
-                </div>
-                <div>
-                  <h3 className="font-medium text-ink">
-                    {applicationSummaryConfig.sections.bestMaterial}
-                  </h3>
-                  <TextList items={section.bestMaterial.map((item) => item.text)} />
-                </div>
-                {section.recruiter ? (
-                  <>
-                    <div>
-                      <h3 className="font-medium text-ink">
-                        {applicationSummaryConfig.sections.recruiterSummary}
-                      </h3>
-                      <p className="mt-1 text-sm text-ink">
-                        {section.recruiter.sixtySecondSummary.text}
-                      </p>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-ink">
-                        {applicationSummaryConfig.sections.whyThisCompany}
-                      </h3>
-                      <p className="mt-1 text-sm text-ink">
-                        {section.recruiter.whyThisCompany.text}
-                      </p>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-ink">
-                        {applicationSummaryConfig.sections.whyThisRole}
-                      </h3>
-                      <p className="mt-1 text-sm text-ink">{section.recruiter.whyThisRole.text}</p>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-ink">
-                        {applicationSummaryConfig.sections.logistics}
-                      </h3>
-                      <p className="mt-1 text-sm text-ink">{section.recruiter.logistics.text}</p>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-ink">
-                        {applicationSummaryConfig.sections.compensation}
-                      </h3>
-                      <p className="mt-1 text-sm text-ink">
-                        {section.recruiter.compensationReadiness.text}
-                      </p>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-ink">
-                        {applicationSummaryConfig.sections.flagAnswers}
-                      </h3>
-                      <CheatSheetCoachItems
-                        campaignId={id}
-                        canEdit={canGenerate}
-                        items={section.recruiter.flagAnswers}
-                      />
-                    </div>
-                  </>
-                ) : null}
-                {section.hiringManager ? (
-                  <>
-                    <div>
-                      <h3 className="font-medium text-ink">
-                        {applicationSummaryConfig.sections.scorecard}
-                      </h3>
-                      <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-ink">
-                        {section.hiringManager.scorecardOutcomes.map((item) => (
-                          <li key={item.outcome}>
-                            {item.outcome}
-                            {item.storyId ? ` · story ${item.storyId}` : ""}
-                            {item.note ? ` — ${item.note}` : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-ink">
-                        {applicationSummaryConfig.sections.firstNinetyDays}
-                      </h3>
-                      <p className="mt-1 text-sm text-ink">
-                        {section.hiringManager.firstNinetyDays.text}
-                      </p>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-ink">
-                        {applicationSummaryConfig.sections.drillDowns}
-                      </h3>
-                      <CheatSheetCoachItems
-                        campaignId={id}
-                        canEdit={canGenerate}
-                        items={section.hiringManager.drillDowns}
-                      />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-ink">
-                        {applicationSummaryConfig.sections.gapsToPrepare}
-                      </h3>
-                      <CheatSheetCoachItems
-                        campaignId={id}
-                        canEdit={canGenerate}
-                        items={section.hiringManager.gaps}
-                      />
-                    </div>
-                  </>
-                ) : null}
-                {section.executive ? (
-                  <>
-                    <div>
-                      <h3 className="font-medium text-ink">
-                        {applicationSummaryConfig.sections.strategy}
-                      </h3>
-                      <p className="mt-1 text-sm text-ink">{section.executive.strategy.text}</p>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-ink">
-                        {applicationSummaryConfig.sections.judgment}
-                      </h3>
-                      <p className="mt-1 text-sm text-ink">{section.executive.judgment.text}</p>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-ink">
-                        {applicationSummaryConfig.sections.businessImpact}
-                      </h3>
-                      <p className="mt-1 text-sm text-ink">
-                        {section.executive.businessImpact.text}
-                      </p>
-                    </div>
-                  </>
-                ) : null}
-                {section.crossFunctional ? (
-                  <>
-                    <div>
-                      <h3 className="font-medium text-ink">
-                        {applicationSummaryConfig.sections.howWorkedAcross}
-                      </h3>
-                      <p className="mt-1 text-sm text-ink">
-                        {section.crossFunctional.howWorkedAcross.text}
-                      </p>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-ink">
-                        {applicationSummaryConfig.sections.dayToDay}
-                      </h3>
-                      <p className="mt-1 text-sm text-ink">
-                        {section.crossFunctional.dayToDay.text}
-                      </p>
-                    </div>
-                  </>
-                ) : null}
-                <div>
-                  <h3 className="font-medium text-ink">
-                    {applicationSummaryConfig.sections.likelyQuestions}
-                  </h3>
-                  <CheatSheetCoachItems
-                    campaignId={id}
-                    canEdit={canGenerate}
-                    items={section.likelyQuestions}
-                  />
-                </div>
-                <div>
-                  <h3 className="font-medium text-ink">
-                    {applicationSummaryConfig.sections.questionsToAsk}
-                  </h3>
-                  <TextList items={section.questionsToAsk.map((item) => item.text)} />
-                </div>
-              </>
-            )}
+          <CheatSheetPersonSection key={person.sectionKey} sectionKey={person.sectionKey}>
+          <SummarySection id={person.sectionKey} title={person.heading}>
+            <CheatSheetPersonBody
+              campaignId={id}
+              canEdit={canGenerate}
+              sectionKey={person.sectionKey}
+              section={section}
+              notes={notes}
+            />
           </SummarySection>
           </CheatSheetPersonSection>
         );

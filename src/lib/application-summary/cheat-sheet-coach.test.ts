@@ -134,13 +134,14 @@ function coachGuidance() {
 describe("Interview cheat sheet coach", () => {
   it("gives every likely question, drill-down, and flag a sample answer or Harper question with a reply box", () => {
     const page = readFileSync("src/app/(app)/campaigns/[id]/summary/page.tsx", "utf8");
+    const personBody = readFileSync("src/components/CheatSheetPersonBody.tsx", "utf8");
     const widget = readFileSync("src/components/CheatSheetCoachItems.tsx", "utf8");
     const prompt = readFileSync("src/lib/prompt-content/application-summary.ts", "utf8");
     expect(page).toContain("CheatSheetCoachItems");
-    expect(page).toContain("section.likelyQuestions");
-    expect(page).toContain("section.hiringManager.drillDowns");
-    expect(page).toContain("section.hiringManager.gaps");
-    expect(page).toContain("section.recruiter.flagAnswers");
+    expect(personBody).toContain("section.likelyQuestions");
+    expect(personBody).toContain("section.hiringManager.drillDowns");
+    expect(personBody).toContain("section.hiringManager.gaps");
+    expect(personBody).toContain("section.recruiter.flagAnswers");
     expect(widget).toContain("sampleAnswer");
     expect(widget).toContain("harperQuestion");
     expect(widget).toContain("name=\"answer\"");

@@ -170,6 +170,7 @@ export async function processApplicationJob(
               organizationId: job.organizationId,
               campaignId: job.campaignId,
               userId: payload.userId ?? job.initiatedByUserId ?? "",
+              sectionKey: payload.sectionKey,
             });
             break;
           case "NEXT_STEP":

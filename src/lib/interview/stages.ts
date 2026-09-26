@@ -5,6 +5,8 @@ import type {
   InterviewStageType,
 } from "@prisma/client";
 import { addApplicationContact } from "@/lib/application/contacts";
+import { enqueueApplicationJob } from "@/lib/application-jobs/service";
+import { saveLinkedInPaste } from "@/lib/contact-profile/service";
 import { prisma } from "@/lib/prisma-client";
 import {
   interviewConfig,
@@ -202,6 +204,138 @@ export async function setApplicationProgress(input: {
   }
 }
 
+async function requireStage(input: {
+  organizationId: string;
+  campaignId: string;
+  stageId: string;
+}) {
+  const stage = await prisma.interviewStage.findFirst({
+    where: {
+      id: input.stageId,
+      campaignId: input.campaignId,
+      organizationId: input.organizationId,
+    },
+    select: { id: true },
+  });
+  if (!stage) throw new TenantError("Interview stage was not found.");
+  return stage;
+}
+
+async function replaceStageInterviewer(input: {
+  organizationId: string;
+  stageId: string;
+  contactId: string;
+}) {
+  await prisma.interviewStageInterviewer.deleteMany({
+    where: {
+      stageId: input.stageId,
+      contactId: { not: input.contactId },
+    },
+  });
+  await prisma.interviewStageInterviewer.upsert({
+    where: {
+      stageId_contactId: {
+        stageId: input.stageId,
+        contactId: input.contactId,
+      },
+    },
+    update: {},
+    create: {
+      organizationId: input.organizationId,
+      stageId: input.stageId,
+      contactId: input.contactId,
+    },
+  });
+}
+
+export async function enqueueInterviewerCheatSheetSection(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  contactId: string;
+}) {
+  const sectionKey = `contact:${input.contactId}`;
+  const summary = await prisma.applicationSummary.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+    },
+    select: { guidanceJson: true },
+  });
+  const people = Array.isArray(
+    summary?.guidanceJson && typeof summary.guidanceJson === "object"
+      ? (summary.guidanceJson as { people?: unknown }).people
+      : null,
+  )
+    ? (summary!.guidanceJson as { people: Array<{ sectionKey?: string }> }).people
+    : [];
+  if (people.some((person) => person.sectionKey === sectionKey)) {
+    return;
+  }
+  await enqueueApplicationJob({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    type: "APPLICATION_SUMMARY",
+    targetId: sectionKey,
+    initiatedByUserId: input.userId,
+    payload: { userId: input.userId, sectionKey },
+  });
+}
+
+export async function assignExistingInterviewStageInterviewer(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  stageId: string;
+  contactId: string;
+  personaId?: string | null;
+}) {
+  await requireOwnedCampaign(input);
+  const stage = await requireStage(input);
+  const membership = await prisma.campaignContact.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      contactId: input.contactId,
+    },
+    select: { id: true, chosenPersonaId: true },
+  });
+  if (!membership) {
+    throw new TenantError(
+      `${vocab.contact.Singular} was not found on this ${vocab.campaign.singular}.`,
+    );
+  }
+  const personaId = input.personaId?.trim() || membership.chosenPersonaId;
+  if (!personaId) {
+    throw new TenantError(`Choose ${vocab.persona.aSingular} for this interviewer.`);
+  }
+  if (membership.chosenPersonaId !== personaId) {
+    await prisma.campaignContact.update({
+      where: { id: membership.id },
+      data: { chosenPersonaId: personaId, roleConfirmed: true },
+    });
+  }
+  await replaceStageInterviewer({
+    organizationId: input.organizationId,
+    stageId: stage.id,
+    contactId: input.contactId,
+  });
+  const { offerPersonPrep } = await import("@/lib/interview/person-prep");
+  await offerPersonPrep({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    contactId: input.contactId,
+    personaId,
+  });
+  await enqueueInterviewerCheatSheetSection({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    userId: input.userId,
+    contactId: input.contactId,
+  });
+  return { contactId: input.contactId, personaId };
+}
+
 export async function addInterviewStageInterviewer(input: {
   organizationId: string;
   campaignId: string;
@@ -212,18 +346,11 @@ export async function addInterviewStageInterviewer(input: {
   title: string;
   email?: string | null;
   linkedinUrl?: string | null;
+  linkedInProfileText?: string | null;
   personaId?: string | null;
 }) {
   await requireOwnedCampaign(input);
-  const stage = await prisma.interviewStage.findFirst({
-    where: {
-      id: input.stageId,
-      campaignId: input.campaignId,
-      organizationId: input.organizationId,
-    },
-    select: { id: true },
-  });
-  if (!stage) throw new TenantError("Interview stage was not found.");
+  const stage = await requireStage(input);
   const added = await addApplicationContact({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
@@ -236,19 +363,20 @@ export async function addInterviewStageInterviewer(input: {
     personaId: input.personaId,
     confirmRole: true,
   });
-  await prisma.interviewStageInterviewer.upsert({
-    where: {
-      stageId_contactId: {
-        stageId: stage.id,
-        contactId: added.contactId,
-      },
-    },
-    update: {},
-    create: {
+  const pasted = input.linkedInProfileText?.trim() || "";
+  if (pasted) {
+    await saveLinkedInPaste({
       organizationId: input.organizationId,
-      stageId: stage.id,
+      campaignId: input.campaignId,
       contactId: added.contactId,
-    },
+      pastedText: pasted,
+      personaId: added.personaId,
+    });
+  }
+  await replaceStageInterviewer({
+    organizationId: input.organizationId,
+    stageId: stage.id,
+    contactId: added.contactId,
   });
   const { offerPersonPrep } = await import("@/lib/interview/person-prep");
   await offerPersonPrep({
@@ -256,6 +384,12 @@ export async function addInterviewStageInterviewer(input: {
     campaignId: input.campaignId,
     contactId: added.contactId,
     personaId: input.personaId,
+  });
+  await enqueueInterviewerCheatSheetSection({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    userId: input.userId,
+    contactId: added.contactId,
   });
   return added;
 }

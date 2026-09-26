@@ -14,6 +14,7 @@ export function buildApplicationSummaryGuidanceMessages(input: {
     titles: string[];
     sectionKind: string;
   }>;
+  mode: "shell" | "person";
   qualityFeedback?: string[];
 }): AiMessage[] {
   return [
@@ -28,6 +29,7 @@ ${APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS}`,
       content: JSON.stringify({
         consultantName: consultationConfig.displayName,
         allowedSources: input.sources,
+        mode: input.mode,
       }),
     },
     {

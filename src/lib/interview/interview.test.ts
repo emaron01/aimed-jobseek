@@ -14,8 +14,11 @@ import {
   type InterviewGuideContent,
 } from "@/lib/interview/guide";
 import { buildInterviewGuideMessages } from "@/lib/interview/prompt";
+import { addApplicationContact } from "@/lib/application/contacts";
+import { addCheatSheetInterviewNote } from "@/lib/application-summary/service";
 import {
   addInterviewStageInterviewer,
+  assignExistingInterviewStageInterviewer,
   createInterviewStage,
   detectInterviewNoteGap,
   updateInterviewStage,
@@ -480,5 +483,100 @@ describeDb("interview stages persistence", () => {
       where: { id: stage.id },
     });
     expect(updated?.outcome).toBe("ADVANCED");
+  });
+
+  it("assigns an existing or new interviewer, stores LinkedIn and notes on the cheat sheet, and does not create a stage guide", async () => {
+    const existing = await addApplicationContact({
+      organizationId,
+      campaignId,
+      userId,
+      firstName: "Avery",
+      lastName: "Ng",
+      title: "Technical Recruiter",
+      personaId: recruiterRoleId,
+      confirmRole: true,
+    });
+    const existingStage = await createInterviewStage({
+      organizationId,
+      campaignId,
+      userId,
+      type: "RECRUITER_SCREEN",
+      scheduledAt: new Date("2026-10-02T15:00:00.000Z"),
+      format: "PHONE",
+    });
+    await assignExistingInterviewStageInterviewer({
+      organizationId,
+      campaignId,
+      userId,
+      stageId: existingStage.id,
+      contactId: existing.contactId,
+      personaId: recruiterRoleId,
+    });
+    const assigned = await prisma.interviewStageInterviewer.findMany({
+      where: { stageId: existingStage.id },
+    });
+    expect(assigned.map((row) => row.contactId)).toEqual([existing.contactId]);
+
+    const newStage = await createInterviewStage({
+      organizationId,
+      campaignId,
+      userId,
+      type: "HIRING_MANAGER",
+      scheduledAt: new Date("2026-10-03T15:00:00.000Z"),
+      format: "VIDEO",
+    });
+    const linkedInText = Array.from({ length: 90 }, () => "experience").join(" ");
+    const added = await addInterviewStageInterviewer({
+      organizationId,
+      campaignId,
+      userId,
+      stageId: newStage.id,
+      firstName: "Jordan",
+      lastName: "Lee",
+      title: "VP Sales",
+      personaId: recruiterRoleId,
+      linkedInProfileText: linkedInText,
+    });
+    const membership = await prisma.campaignContact.findFirst({
+      where: { campaignId, contactId: added.contactId },
+    });
+    expect(membership?.linkedInProfileText).toBe(linkedInText);
+    expect(membership?.chosenPersonaId).toBe(recruiterRoleId);
+
+    await addCheatSheetInterviewNote({
+      organizationId,
+      campaignId,
+      userId,
+      contactId: added.contactId,
+      stageId: newStage.id,
+      text: "Invitation: they want to hear about enterprise motion.",
+    });
+    const noted = await prisma.campaignContact.findFirst({
+      where: { campaignId, contactId: added.contactId },
+    });
+    expect(JSON.stringify(noted?.cheatSheetNotesJson)).toContain(
+      "Invitation: they want to hear about enterprise motion.",
+    );
+
+    expect(
+      await prisma.interviewStageGuide.count({
+        where: { stageId: { in: [existingStage.id, newStage.id] } },
+      }),
+    ).toBe(0);
+    const jobs = await prisma.applicationJob.findMany({
+      where: {
+        campaignId,
+        type: "APPLICATION_SUMMARY",
+      },
+    });
+    expect(jobs.some((job) => job.targetId === `contact:${existing.contactId}`)).toBe(
+      true,
+    );
+    expect(jobs.some((job) => job.targetId === `contact:${added.contactId}`)).toBe(true);
+    expect(
+      await prisma.applicationJob.count({
+        where: { campaignId, type: "INTERVIEW_GUIDE" },
+      }),
+    ).toBe(0);
   });
 });

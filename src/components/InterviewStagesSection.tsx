@@ -1,16 +1,17 @@
 import { generateOutreachAssetAction } from "@/app/actions/application-outreach";
 import {
-  addInterviewInterviewerAction,
   createInterviewStageAction,
-  generateInterviewGuideAction,
   startInterviewGapConsultationAction,
   updateInterviewStageAction,
 } from "@/app/actions/interview";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
+import { InterviewStagePanel } from "@/components/InterviewStagePanel";
+import { listApplicationContacts } from "@/lib/application/contacts";
+import { getApplicationSummaryView } from "@/lib/application-summary/service";
 import { listInterviewStages, stageTypeLabel } from "@/lib/interview/stages";
-import { parseClarifyingQuestions } from "@/lib/interview/guide";
-import { interviewConfig, vocab } from "@/lib/product-config";
-import {AppActionLink } from "@/components/ui";
+import { interviewConfig } from "@/lib/product-config";
+import { TenantError } from "@/lib/tenant/errors";
+import { AppActionLink } from "@/components/ui";
 import { workspaceInterviewStageHref } from "@/lib/application/workspace-links";
 
 type RoleOption = { id: string; name: string; suggestionKey: string | null };
@@ -40,7 +41,24 @@ export async function InterviewStagesSection({
   roles: RoleOption[];
   contacts: Array<{ contactId: string; personaId: string | null }>;
 }) {
-  const stages = await listInterviewStages({ organizationId, campaignId });
+  const [stages, memberships, summary] = await Promise.all([
+    listInterviewStages({ organizationId, campaignId }),
+    listApplicationContacts({ organizationId, campaignId }),
+    getApplicationSummaryView({ organizationId, campaignId }).catch((error) => {
+      if (error instanceof TenantError) return null;
+      throw error;
+    }),
+  ]);
+  const people = memberships.map((row) => ({
+    contactId: row.contactId,
+    name: [row.contact.firstName, row.contact.lastName].filter(Boolean).join(" ").trim()
+      || row.contact.title
+      || row.chosenPersona?.name
+      || row.contactId,
+    title: row.contact.title,
+    personaId: row.chosenPersonaId,
+    personaName: row.chosenPersona?.name ?? null,
+  }));
   const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
 
   return (
@@ -104,13 +122,29 @@ export async function InterviewStagesSection({
       ) : (
         <div className="space-y-6">
           {stages.map((stage) => {
-            const questions = parseClarifyingQuestions(
-              stage.guide?.clarifyingQuestionsJson,
-            );
             const interviewerPersona = (contactId: string) =>
               contacts.find((row) => row.contactId === contactId)?.personaId ??
               roles[0]?.id ??
               "";
+            const interviewer = stage.interviewers[0] ?? null;
+            const sectionKey = interviewer ? `contact:${interviewer.contactId}` : null;
+            const person = sectionKey
+              ? summary?.people.find((item) => item.sectionKey === sectionKey)
+              : null;
+            const section = sectionKey
+              ? summary?.guidance?.people.find((item) => item.sectionKey === sectionKey) ?? null
+              : null;
+            const notes = interviewer
+              ? summary?.notesByContactId.get(interviewer.contactId) ?? []
+              : [];
+            const heading =
+              person?.heading
+              ?? (interviewer
+                ? [interviewer.contact.firstName, interviewer.contact.lastName]
+                    .filter(Boolean)
+                    .join(" ")
+                    .trim()
+                : "");
             const offer =
               stage.consultationOfferJson &&
               typeof stage.consultationOfferJson === "object"
@@ -160,16 +194,18 @@ export async function InterviewStagesSection({
                     ? ` · ${interviewConfig.outcomes[stage.outcome]}`
                     : ""}
                 </p>
-                <ul className="text-sm text-ink">
-                  {stage.interviewers.map((row) => (
-                    <li key={row.id}>
-                      {[row.contact.firstName, row.contact.lastName]
-                        .filter(Boolean)
-                        .join(" ")}
-                      {row.contact.title ? ` · ${row.contact.title}` : ""}
-                    </li>
-                  ))}
-                </ul>
+                <InterviewStagePanel
+                  campaignId={campaignId}
+                  canEdit={canEdit}
+                  stageId={stage.id}
+                  interviewerContactId={interviewer?.contactId ?? null}
+                  people={people}
+                  roles={roles}
+                  heading={heading || interviewConfig.labels.interviewer}
+                  sectionKey={sectionKey}
+                  section={section}
+                  notes={notes}
+                />
 
                 {canEdit ? (
                   <>
@@ -230,85 +266,6 @@ export async function InterviewStagesSection({
                           )}
                         </select>
                       </label>
-                    </ApplicationActionForm>
-
-                    <ApplicationActionForm
-                      action={addInterviewInterviewerAction}
-                      submitLabel={interviewConfig.labels.addInterviewer}
-                      testId={`add-interviewer-${stage.id}`}
-                    >
-                      <input type="hidden" name="campaignId" value={campaignId} />
-                      <input type="hidden" name="stageId" value={stage.id} />
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <label className="text-sm">
-                          First name
-                          <input name="firstName" required className={fieldClass} />
-                        </label>
-                        <label className="text-sm">
-                          Last name
-                          <input name="lastName" required className={fieldClass} />
-                        </label>
-                        <label className="text-sm">
-                          Title
-                          <input name="title" required className={fieldClass} />
-                        </label>
-                        <label className="text-sm">
-                          {vocab.persona.Singular}
-                          <select name="personaId" className={fieldClass}>
-                            <option value="">Match from title</option>
-                            {roles.map((role) => (
-                              <option key={role.id} value={role.id}>
-                                {role.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="text-sm">
-                          Email
-                          <input name="email" type="email" className={fieldClass} />
-                        </label>
-                        <label className="text-sm">
-                          LinkedIn URL
-                          <input name="linkedinUrl" className={fieldClass} />
-                        </label>
-                      </div>
-                    </ApplicationActionForm>
-
-                    {questions.length > 0 && stage.guide?.status !== "READY" ? (
-                      <ApplicationActionForm
-                        action={generateInterviewGuideAction}
-                        submitLabel={interviewConfig.labels.answerQuestions}
-                        testId={`guide-answers-${stage.id}`}
-                      >
-                        <input type="hidden" name="campaignId" value={campaignId} />
-                        <input type="hidden" name="stageId" value={stage.id} />
-                        <p className="text-sm text-muted">
-                          {interviewConfig.labels.clarifyingHelp}
-                        </p>
-                        {questions.map((question) => (
-                          <label key={question.id} className="text-sm">
-                            {question.text}
-                            <input type="hidden" name="answerId" value={question.id} />
-                            <textarea name="answer" rows={2} className={fieldClass} />
-                          </label>
-                        ))}
-                      </ApplicationActionForm>
-                    ) : null}
-
-                    <ApplicationActionForm
-                      action={generateInterviewGuideAction}
-                      submitLabel={
-                        stage.guide?.status === "READY"
-                          ? interviewConfig.labels.regenerateGuide
-                          : interviewConfig.labels.generateGuide
-                      }
-                      testId={`generate-guide-${stage.id}`}
-                    >
-                      <input type="hidden" name="campaignId" value={campaignId} />
-                      <input type="hidden" name="stageId" value={stage.id} />
-                      {questions.length > 0 ? (
-                        <input type="hidden" name="skipQuestions" value="1" />
-                      ) : null}
                     </ApplicationActionForm>
 
                     {stage.notesAfter && stage.interviewers[0] ? (

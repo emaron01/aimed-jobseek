@@ -15,7 +15,7 @@ const support = [{ sourceId: "story:1", quote: "I rebuilt the forecast cadence."
 describe("Interview Cheat Sheet", () => {
   it("renames the surface through the vocabulary module", () => {
     expect(applicationSummaryConfig.title).toBe("Interview cheat sheet");
-    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("6");
+    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("7");
     expect(JSON.stringify(applicationSummaryConfig)).not.toContain("Application Summary");
   });
 

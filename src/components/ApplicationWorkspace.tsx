@@ -890,7 +890,7 @@ export async function ApplicationWorkspace({
     ) : null}
     {showFocus(focus, ["interviews"]) ? (
     <div id="interviews">
-    <WorkspaceProgress jobs={live.jobs} type="INTERVIEW_GUIDE" />
+    <WorkspaceProgress jobs={live.jobs} type="APPLICATION_SUMMARY" />
     <InterviewStagesSection
       campaignId={requirement.campaignId}
       organizationId={organizationId}

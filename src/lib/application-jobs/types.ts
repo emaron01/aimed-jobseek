@@ -34,6 +34,7 @@ export type ApplicationJobPayload = {
   questionTurnId?: string;
   adjustmentNote?: string | null;
   planType?: "RESUME" | "COVER_LETTER";
+  sectionKey?: string;
 };
 
 export function isTimeoutMessage(message: string): boolean {

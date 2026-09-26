@@ -29,14 +29,17 @@ export async function generateApplicationSummaryAction(
   try {
     const organizationId = await requireOrganizationId();
     const user = await requireCurrentUser();
+    const sectionKey = String(formData.get("sectionKey") ?? "").trim() || undefined;
     await enqueueApplicationJob({
       organizationId,
       campaignId,
       type: "APPLICATION_SUMMARY",
+      targetId: sectionKey ?? null,
       initiatedByUserId: user.id,
-      payload: { userId: user.id },
+      payload: { userId: user.id, sectionKey },
     });
     revalidatePath(`/campaigns/${campaignId}/summary`);
+    revalidatePath(`/campaigns/${campaignId}/interviews`);
     return { ok: true, message: workspaceProgressText("APPLICATION_SUMMARY") };
   } catch (error) {
     if (error instanceof TenantError) {

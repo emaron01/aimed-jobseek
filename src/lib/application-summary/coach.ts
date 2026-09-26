@@ -48,7 +48,7 @@ export function collectCoachItems(
   guidance: ApplicationSummaryGuidance,
 ): CheatSheetCoachItem[] {
   return [
-    ...guidance.overview.gapsToPrepare,
+    ...(guidance.overview?.gapsToPrepare ?? []),
     ...guidance.people.flatMap((person) => [
       ...person.likelyQuestions,
       ...(person.recruiter?.flagAnswers ?? []),
@@ -65,13 +65,15 @@ export function assignCoachItemIds(
     current?.trim() || `${prefix}:${index + 1}`;
   return {
     ...guidance,
-    overview: {
-      ...guidance.overview,
-      gapsToPrepare: guidance.overview.gapsToPrepare.map((item, index) => ({
-        ...item,
-        id: nextId("overview:gap", index, item.id),
-      })),
-    },
+    overview: guidance.overview
+      ? {
+          ...guidance.overview,
+          gapsToPrepare: guidance.overview.gapsToPrepare.map((item, index) => ({
+            ...item,
+            id: nextId("overview:gap", index, item.id),
+          })),
+        }
+      : undefined,
     people: guidance.people.map((person) => ({
       ...person,
       likelyQuestions: person.likelyQuestions.map((item, index) => ({
@@ -120,10 +122,12 @@ export function replaceCoachItem(
     items.map((item) => (item.id === itemId ? next : item));
   return {
     ...guidance,
-    overview: {
-      ...guidance.overview,
-      gapsToPrepare: mapItems(guidance.overview.gapsToPrepare),
-    },
+    overview: guidance.overview
+      ? {
+          ...guidance.overview,
+          gapsToPrepare: mapItems(guidance.overview.gapsToPrepare),
+        }
+      : undefined,
     people: guidance.people.map((person) => ({
       ...person,
       likelyQuestions: mapItems(person.likelyQuestions),

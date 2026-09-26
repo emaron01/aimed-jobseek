@@ -6,43 +6,52 @@ import type { AiCallUsageContext } from "@/lib/ai/types";
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import { aiCallTracking } from "@/lib/usage/ai-call";
 import {
-  applicationSummaryGuidanceSchema,
+  applicationSummaryShellSchema,
+  cheatSheetPersonSectionSchema,
   type ApplicationSummaryGuidance,
+  type CheatSheetPersonSection,
 } from "@/lib/application-summary/contract";
 import { buildApplicationSummaryGuidanceMessages } from "@/lib/application-summary/prompt";
 import { applicationSummaryConfig } from "@/lib/product-config";
 
-export async function generateApplicationSummaryGuidance(input: {
+type PersonInput = {
+  sectionKey: string;
+  roleId: string;
+  contactId: string | null;
+  heading: string;
+  roleName: string;
+  titles: string[];
+  sectionKind: string;
+};
+
+async function unavailable() {
+  return {
+    ok: false as const,
+    message: `${applicationSummaryConfig.title} is not available. Retry.`,
+  };
+}
+
+export async function generateApplicationSummaryShell(input: {
   sources: Array<{ id: string; text: string; category: string }>;
-  people: Array<{
-    sectionKey: string;
-    roleId: string;
-    contactId: string | null;
-    heading: string;
-    roleName: string;
-    titles: string[];
-    sectionKind: string;
-  }>;
   qualityFeedback?: string[];
   usage?: AiCallUsageContext;
 }): Promise<
-  | { ok: true; data: ApplicationSummaryGuidance }
+  | { ok: true; data: Pick<ApplicationSummaryGuidance, "overview" | "stories"> }
   | { ok: false; message: string }
 > {
-  if (!isConsultationAiConfigured()) {
-    return {
-      ok: false,
-      message:
-        `${applicationSummaryConfig.title} is not available. Retry.`,
-    };
-  }
+  if (!isConsultationAiConfigured()) return unavailable();
   try {
     const response = await getConsultationAiProvider().generateStructured({
-      ...structuredOutputRequest("applicationSummaryGuidance"),
+      ...structuredOutputRequest("applicationSummaryShell"),
       ...(input.usage ? aiCallTracking(input.usage) : {}),
-      messages: buildApplicationSummaryGuidanceMessages(input),
+      messages: buildApplicationSummaryGuidanceMessages({
+        sources: input.sources,
+        people: [],
+        mode: "shell",
+        qualityFeedback: input.qualityFeedback,
+      }),
       parseOutput: (raw) => ({
-        data: applicationSummaryGuidanceSchema.parse(raw),
+        data: applicationSummaryShellSchema.parse(raw),
         coercedFields: [],
       }),
     });
@@ -50,7 +59,47 @@ export async function generateApplicationSummaryGuidance(input: {
   } catch (error) {
     console.error(
       JSON.stringify({
-        event: "application_summary_guidance_failed",
+        event: "application_summary_shell_failed",
+        message: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+    return {
+      ok: false,
+      message: `${applicationSummaryConfig.title} could not be generated. Retry.`,
+    };
+  }
+}
+
+export async function generateCheatSheetPersonSectionGuidance(input: {
+  sources: Array<{ id: string; text: string; category: string }>;
+  person: PersonInput;
+  qualityFeedback?: string[];
+  usage?: AiCallUsageContext;
+}): Promise<
+  | { ok: true; data: CheatSheetPersonSection }
+  | { ok: false; message: string }
+> {
+  if (!isConsultationAiConfigured()) return unavailable();
+  try {
+    const response = await getConsultationAiProvider().generateStructured({
+      ...structuredOutputRequest("cheatSheetPersonSection"),
+      ...(input.usage ? aiCallTracking(input.usage) : {}),
+      messages: buildApplicationSummaryGuidanceMessages({
+        sources: input.sources,
+        people: [input.person],
+        mode: "person",
+        qualityFeedback: input.qualityFeedback,
+      }),
+      parseOutput: (raw) => ({
+        data: cheatSheetPersonSectionSchema.parse(raw),
+        coercedFields: [],
+      }),
+    });
+    return { ok: true, data: response.data };
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "cheat_sheet_person_section_failed",
         message: error instanceof Error ? error.message : "unknown",
       }),
     );

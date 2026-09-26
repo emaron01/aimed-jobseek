@@ -14,6 +14,7 @@ export const applicationSummaryConfig = Object.freeze({
     filterPlaceholder: `Search by name, ${vocab.persona.singular}, or title`,
     filterClear: "Clear",
     filterNoMatches: "No matching people",
+    generateSection: "Generate",
   },
   sections: {
     overview: "At a glance",
@@ -48,6 +49,10 @@ export const applicationSummaryConfig = Object.freeze({
     businessImpact: "Business impact",
     howWorkedAcross: "Working across their function",
     dayToDay: "Day to day with this person",
+    linkedinBackground: "Their background",
+    linkedinFocus: "What they focus on",
+    linkedinConnection: "How your experience connects",
+    gainedInformation: "What you learned for this interview",
   },
   cultureEvidenceLabel: "Based on limited public evidence",
   missingWhyThisCompany:

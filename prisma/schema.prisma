@@ -2904,6 +2904,8 @@ model CampaignContact {
   roleConfirmed           Boolean               @default(false)
   /// Pasted LinkedIn profile text. Never fetched or scraped.
   linkedInProfileText     String?
+  /// Notes added from interview stages. Stored on this person's cheat sheet section.
+  cheatSheetNotesJson     Json?
   linkedInExtractedJson   Json?
   individualProfileJson   Json?
   individualProfileStatus ApplicationJobStatus?

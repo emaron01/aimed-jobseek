@@ -5,8 +5,10 @@ import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { startConsultation } from "@/lib/consultation/service";
 import { requireCurrentUser } from "@/lib/auth/authz";
 import { refreshConsultationOffer } from "@/lib/interview/guide";
+import { addCheatSheetInterviewNote } from "@/lib/application-summary/service";
 import {
   addInterviewStageInterviewer,
+  assignExistingInterviewStageInterviewer,
   createInterviewStage,
   updateInterviewStage,
 } from "@/lib/interview/stages";
@@ -157,10 +159,68 @@ export async function addInterviewInterviewerAction(
       title: String(formData.get("title") ?? ""),
       email: String(formData.get("email") ?? "").trim() || null,
       linkedinUrl: String(formData.get("linkedinUrl") ?? "").trim() || null,
+      linkedInProfileText: String(formData.get("linkedInProfileText") ?? ""),
       personaId: String(formData.get("personaId") ?? "").trim() || null,
     });
     revalidate(id, stageId);
     return { ok: true, message: "Interviewer added." };
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
+export async function assignExistingInterviewerAction(
+  _previous: InterviewActionResult | null,
+  formData: FormData,
+): Promise<InterviewActionResult> {
+  try {
+    const [user, organizationId] = await Promise.all([
+      requireCurrentUser(),
+      requireOrganizationId(),
+    ]);
+    const id = campaignId(formData);
+    const stageId = String(formData.get("stageId") ?? "").trim();
+    const contactId = String(formData.get("contactId") ?? "").trim();
+    if (!stageId) throw new TenantError("Interview stage is required.");
+    if (!contactId) throw new TenantError("Choose an interviewer.");
+    await assignExistingInterviewStageInterviewer({
+      organizationId,
+      campaignId: id,
+      userId: user.id,
+      stageId,
+      contactId,
+      personaId: String(formData.get("personaId") ?? "").trim() || null,
+    });
+    revalidate(id, stageId);
+    return { ok: true, message: "Interviewer saved." };
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
+export async function addCheatSheetInterviewNoteAction(
+  _previous: InterviewActionResult | null,
+  formData: FormData,
+): Promise<InterviewActionResult> {
+  try {
+    const [user, organizationId] = await Promise.all([
+      requireCurrentUser(),
+      requireOrganizationId(),
+    ]);
+    const id = campaignId(formData);
+    const contactId = String(formData.get("contactId") ?? "").trim();
+    const stageId = String(formData.get("stageId") ?? "").trim();
+    if (!contactId) throw new TenantError("Choose an interviewer first.");
+    await addCheatSheetInterviewNote({
+      organizationId,
+      campaignId: id,
+      userId: user.id,
+      contactId,
+      stageId: stageId || null,
+      text: String(formData.get("note") ?? ""),
+    });
+    revalidate(id, stageId || undefined);
+    return { ok: true, message: "Saved to the cheat sheet." };
   } catch (error) {
     return errorResult(error);
   }
