@@ -1,5 +1,5 @@
 "use client";
-import { SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 
 import { useActionState, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -83,8 +83,8 @@ export function ConfirmDeleteForm({
       {!open ? (
         <AppButton
           type="button"
+          variant={tone === "danger" ? "danger" : "secondary"}
           onClick={() => setOpen(true)}
-          className={SECONDARY_BUTTON_CLASS}
         >
           {triggerLabel}
         </AppButton>
@@ -110,11 +110,7 @@ export function ConfirmDeleteForm({
             <AppButton
               type="submit"
               disabled={pending}
-              className={
-                tone === "warning"
-                  ? "inline-flex items-center justify-center rounded-md bg-warning px-3.5 py-2 text-sm font-medium text-on-ink disabled:opacity-60"
-                  : "inline-flex items-center justify-center rounded-md bg-danger px-3.5 py-2 text-sm font-medium text-on-ink disabled:opacity-60"
-              }
+              variant={tone === "warning" ? "secondary" : "danger"}
               data-testid="confirm-delete-submit"
             >
               {pending
@@ -123,9 +119,9 @@ export function ConfirmDeleteForm({
             </AppButton>
             <AppButton
               type="button"
+              variant="secondary"
               onClick={() => setOpen(false)}
               disabled={pending}
-              className={SECONDARY_BUTTON_CLASS}
             >
               Cancel
             </AppButton>

@@ -1,17 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   addContactsToCampaignAction,
   addScoringRunContactsToCampaignAction,
   type CampaignContactsActionResult,
 } from "@/app/actions/campaign-contacts";
 import { listIndexHref, scoringRunDisplayName } from "@/lib/lists/campaign-query";
-import {
-  PRIMARY_BUTTON_CLASS,
-  SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import {AppButton, AppActionLink } from "@/components/ui";
 import { vocab } from "@/lib/product-config";
 
 const initial: CampaignContactsActionResult | null = null;
@@ -72,17 +70,17 @@ export function CampaignContactsManager({
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-start gap-2">
-        <Link
+        <AppActionLink
           href={listIndexHref({ campaignId })}
-          className={PRIMARY_BUTTON_CLASS}
+          variant="primary"
         >
           Select an Existing {vocab.list.Singular} To Be Researched and Scored
-        </Link>
+        </AppActionLink>
         <AppButton
           type="submit"
           form="campaign-scored-run-form"
           disabled={!hasScoredRuns || runPending}
-          className={SECONDARY_BUTTON_CLASS}
+          variant="secondary"
         >
           {runPending ? "Adding…" : "Add from Scored Run"}
         </AppButton>
@@ -167,7 +165,7 @@ export function CampaignContactsManager({
           </label>
           <AppButton
             type="submit"
-            className={`${SECONDARY_BUTTON_CLASS}`}
+            variant="secondary"
           >
             Search
           </AppButton>
@@ -230,7 +228,7 @@ export function CampaignContactsManager({
               <AppButton
                 type="submit"
                 disabled={contactPending}
-                className={PRIMARY_BUTTON_CLASS}
+                
               >
                 {contactPending ? "Adding…" : `Add selected ${vocab.contact.plural}`}
               </AppButton>

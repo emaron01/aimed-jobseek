@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { AutosizeTextarea } from "@/components/AutosizeTextarea";
-import { SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 import { referralShareMessage } from "@/lib/billing/referral-share-message";
 import { cn } from "@/lib/utils";
 
@@ -124,7 +124,7 @@ export function ReferralShareFields({
             </code>
             <AppButton
               type="button"
-              className={cn(SECONDARY_BUTTON_CLASS, "!px-3")}
+              variant="secondary" className={cn("!px-3")}
               data-testid={`${testIdPrefix}-copy-code`}
               onClick={() => onCopy("code", code)}
             >
@@ -148,7 +148,7 @@ export function ReferralShareFields({
             />
             <AppButton
               type="button"
-              className={cn(SECONDARY_BUTTON_CLASS, "!px-3")}
+              variant="secondary" className={cn("!px-3")}
               data-testid={`${testIdPrefix}-copy-message`}
               onClick={() => onCopy("message", message)}
             >

@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CompanyResearchBriefing } from "@/components/CompanyResearchBriefing";
-import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import {
   getCompany,
   researchStatusLabel,
@@ -52,12 +51,12 @@ export default async function CompanyResearchPage({ params }: PageProps) {
           title="Company briefing"
           description={`Employer research for this ${vocab.campaign.singular}. ${vocab.product.Singular}/${vocab.icp.singular} fit is scored separately.`}
           actions={
-            <Link
+            <AppActionLink
               href="/campaigns"
-              className={SECONDARY_BUTTON_CLASS}
+              variant="secondary"
             >
               Back to {vocab.campaign.plural}
-            </Link>
+            </AppActionLink>
           }
         />
       </div>

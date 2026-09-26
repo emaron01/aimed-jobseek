@@ -1,8 +1,9 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
-import { cn } from "@/lib/utils";
 
 import Link from "next/link";
+import { AppButton } from "@/components/ui";
+import { cn } from "@/lib/utils";
+
 import { useTransition } from "react";
 import type { CampaignDueSummary } from "@/lib/cadence/dashboard";
 import { bulkGenerateDueForCampaignAction } from "@/app/actions/cadence";
@@ -97,7 +98,7 @@ export function DueContactsPanel({
                     await bulkGenerateDueForCampaignAction(campaign.campaignId);
                   })
                 }
-                className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
+                className={cn("!px-3")}
               >
                 Generate all due
               </AppButton>

@@ -1,5 +1,5 @@
 "use client";
-import { SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -35,7 +35,7 @@ export function UnarchiveForm({
         <AppButton
           type="submit"
           disabled={pending}
-          className={SECONDARY_BUTTON_CLASS}
+          variant="secondary"
           data-testid="unarchive-submit"
         >
           {pending ? "Restoring…" : label}

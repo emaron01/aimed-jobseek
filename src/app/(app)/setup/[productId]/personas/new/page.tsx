@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BuildPersonaForm } from "@/components/BuildPersonaForm";
-import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { getProduct } from "@/lib/tenant/data";
 import {
   getCurrentOrganization,
@@ -56,12 +56,12 @@ export default async function NewPersonaPage({ params }: PageProps) {
         title={`New ${vocab.persona.singular}: ${product.name}`}
         description={`Name the ${vocab.buyer.singular} and add any context you have. Synthesis builds the ${vocab.persona.singular} from job and company evidence and peer differentiation — then you review and edit.`}
         actions={
-          <Link
+          <AppActionLink
             href={`/setup/${product.id}`}
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
           >
             Back
-          </Link>
+          </AppActionLink>
         }
       />
       <section className="rounded-lg border border-edge bg-surface p-5">

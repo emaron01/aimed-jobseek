@@ -10,7 +10,7 @@ import {
 import { AutosizeTextarea } from "@/components/AutosizeTextarea";
 import { ExportPdfButton } from "@/components/ExportPdfButton";
 import { PersonaBriefingDocument } from "@/components/PersonaBriefingDocument";
-import { SECONDARY_BUTTON_CLASS, SecondaryButton, SubmitButton, AppButton } from "@/components/ui";
+import { SecondaryButton, SubmitButton, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { PersonaAiDraft } from "@/lib/persona-research/contract";
 import {
@@ -207,7 +207,7 @@ function PersonaCriteriaEditor({
                   ))}
                   <AppButton
                     type="button"
-                    className={cn(SECONDARY_BUTTON_CLASS, "py-1", "!px-2", "!py-1", "!text-[11px]")}
+                    variant="secondary" className={cn("py-1", "!px-2", "!py-1", "!text-[11px]")}
                     onClick={() => dismissNeedsReview(row.name)}
                   >
                     Dismiss

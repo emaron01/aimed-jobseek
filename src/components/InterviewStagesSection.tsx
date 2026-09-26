@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { generateOutreachAssetAction } from "@/app/actions/application-outreach";
 import {
   addInterviewInterviewerAction,
@@ -11,7 +10,7 @@ import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { listInterviewStages, stageTypeLabel } from "@/lib/interview/stages";
 import { parseClarifyingQuestions } from "@/lib/interview/guide";
 import { interviewConfig, vocab } from "@/lib/product-config";
-import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import {AppActionLink } from "@/components/ui";
 import { workspaceInterviewStageHref } from "@/lib/application/workspace-links";
 
 type RoleOption = { id: string; name: string; suggestionKey: string | null };
@@ -148,12 +147,12 @@ export async function InterviewStagesSection({
                     {stageTypeLabel(stage.type)} ·{" "}
                     {interviewConfig.formats[stage.format]}
                   </h3>
-                  <Link
+                  <AppActionLink
                     href={workspaceInterviewStageHref(campaignId, stage.id)}
-                    className={SECONDARY_BUTTON_CLASS}
+                    variant="secondary"
                   >
                     {interviewConfig.labels.openGuide}
-                  </Link>
+                  </AppActionLink>
                 </div>
                 <p className="text-sm text-muted">
                   {stage.scheduledAt.toLocaleString()}

@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -326,9 +326,7 @@ export function EmailDraftsStage({
         <AppButton
           type="button"
           onClick={() => setView("write")}
-          className={
-            view === "write" ? PRIMARY_BUTTON_CLASS : SECONDARY_BUTTON_CLASS
-          }
+          variant={view === "write" ? "primary" : "secondary"}
         >
           Write
         </AppButton>
@@ -336,9 +334,7 @@ export function EmailDraftsStage({
           type="button"
           data-testid="compare-drafts-toggle"
           onClick={() => setView("compare")}
-          className={
-            view === "compare" ? PRIMARY_BUTTON_CLASS : SECONDARY_BUTTON_CLASS
-          }
+          variant={view === "compare" ? "primary" : "secondary"}
         >
           Compare drafts
         </AppButton>
@@ -573,7 +569,7 @@ function CampaignDraftCompare({
             <AppButton
               type="button"
               onClick={() => onOpenInWrite(contact.campaignContactId)}
-              className={cn(SECONDARY_BUTTON_CLASS, "px-2.5", "!px-2.5", "!py-1.5", "!text-xs")}
+              variant="secondary" className={cn("px-2.5", "!px-2.5", "!py-1.5", "!text-xs")}
             >
               Open in Write
             </AppButton>

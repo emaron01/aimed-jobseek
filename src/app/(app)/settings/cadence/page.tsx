@@ -1,6 +1,6 @@
-import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
-import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { AppButton } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { ActionFeedbackForm } from "@/components/ActionFeedbackForm";
 import {
   loadCadencePolicyForSettings,
@@ -106,7 +106,7 @@ export default async function CadenceSettingsPage() {
           </label>
           <AppButton
             type="submit"
-            className={cn(PRIMARY_BUTTON_CLASS, "sm:col-span-2", "w-fit", "!px-3")}
+            className={cn("sm:col-span-2", "w-fit", "!px-3")}
           >
             Save reminder settings
           </AppButton>

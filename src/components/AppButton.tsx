@@ -9,13 +9,15 @@ import {
   type Ref,
 } from "react";
 
-export type AppButtonVariant = "primary" | "secondary" | "chip";
+export type AppButtonVariant = "primary" | "secondary" | "danger" | "chip";
 
 const VARIANT_CLASS: Record<AppButtonVariant, string> = {
   primary:
     "bg-primary text-on-primary hover:bg-primary-hover active:bg-primary-hover focus-visible:outline-focus disabled:bg-edge-strong disabled:text-on-ink",
   secondary:
     "border border-edge-strong bg-surface text-ink shadow-sm hover:border-edge-strong hover:bg-canvas active:bg-canvas focus-visible:outline-focus disabled:border-edge disabled:bg-canvas disabled:text-subtle disabled:shadow-none",
+  danger:
+    "bg-danger text-on-ink hover:bg-danger active:bg-danger focus-visible:outline-focus disabled:bg-edge-strong disabled:text-on-ink",
   chip:
     "border border-edge-strong bg-surface px-2 py-0.5 text-[11px] text-ink underline decoration-edge-strong underline-offset-2 shadow-sm hover:bg-canvas active:bg-canvas focus-visible:outline-focus disabled:border-edge disabled:text-subtle disabled:no-underline",
 };
@@ -88,7 +90,7 @@ function AppButtonInner({
       {isPending ? (
         <AppPendingIndicator
           label={pendingLabel ?? (typeof children === "string" ? children : "Working…")}
-          light={variant === "primary"}
+          light={variant === "primary" || variant === "danger"}
         />
       ) : (
         children
@@ -135,6 +137,9 @@ export function AppActionLink({
   disabledReason,
   title,
   onClick,
+  target,
+  rel,
+  "data-testid": testId,
 }: {
   href: string;
   children: ReactNode;
@@ -146,6 +151,9 @@ export function AppActionLink({
   disabledReason?: string;
   title?: string;
   onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
+  target?: string;
+  rel?: string;
+  "data-testid"?: string;
 }) {
   const isDisabled = disabled || pending;
   const classes = `${BASE_CLASS} ${VARIANT_CLASS[variant]} ${className}`.trim();
@@ -156,11 +164,12 @@ export function AppActionLink({
         aria-disabled="true"
         title={disabledReason || title}
         className={`${classes} pointer-events-none`}
+        data-testid={testId}
       >
         {pending ? (
           <AppPendingIndicator
             label={pendingLabel ?? (typeof children === "string" ? children : "Working…")}
-            light={variant === "primary"}
+            light={variant === "primary" || variant === "danger"}
           />
         ) : (
           children
@@ -168,15 +177,28 @@ export function AppActionLink({
       </span>
     );
   }
-  if (href.startsWith("#")) {
+  if (
+    href.startsWith("#") ||
+    href.startsWith("mailto:") ||
+    href.startsWith("https://") ||
+    href.startsWith("http://")
+  ) {
     return (
-      <a href={href} className={classes} title={title} onClick={onClick}>
+      <a
+        href={href}
+        className={classes}
+        title={title}
+        onClick={onClick}
+        target={target}
+        rel={rel}
+        data-testid={testId}
+      >
         {children}
       </a>
     );
   }
   return (
-    <Link href={href} className={classes} title={title} onClick={onClick}>
+    <Link href={href} className={classes} title={title} onClick={onClick} data-testid={testId}>
       {children}
     </Link>
   );

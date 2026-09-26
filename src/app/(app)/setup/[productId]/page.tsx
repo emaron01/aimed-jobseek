@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Product } from "@prisma/client";
 import type { ReactNode } from "react";
@@ -6,8 +5,7 @@ import { deleteProductAction } from "@/app/actions";
 import { ConfirmDeleteForm } from "@/components/ConfirmDeleteForm";
 import { DeleteSuccessNotice } from "@/components/DeleteSuccessNotice";
 import { ExportPdfButton } from "@/components/ExportPdfButton";
-import { PageHeader, Panel, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { PageHeader, Panel, TenantMissing, AppActionLink } from "@/components/ui";
 import { listIcpCriteria } from "@/lib/interpretation/icp";
 import { factTexts } from "@/lib/product-research/candidate-profile";
 import { productDraftFromApprovedProfile } from "@/lib/product-research/resynthesize-approved-plan";
@@ -76,16 +74,13 @@ function ActionLink({
   primary?: boolean;
 }) {
   return (
-    <Link
+    <AppActionLink
       href={href}
-      className={
-        primary
-          ? cn(PRIMARY_BUTTON_CLASS, "!px-3", "!py-1.5")
-          : cn(SECONDARY_BUTTON_CLASS, "!px-3", "!py-1.5")
-      }
+      variant={primary ? "primary" : "secondary"}
+      className="!px-3 !py-1.5"
     >
       {children}
-    </Link>
+    </AppActionLink>
   );
 }
 
@@ -182,18 +177,18 @@ export default async function SetupProductPage({ params }: PageProps) {
           description="Track setup progress. Edit details only when you choose to."
           actions={
             <div className="flex flex-wrap gap-2">
-              <Link
+              <AppActionLink
                 href={`/setup/${product.id}/research`}
-                className={PRIMARY_BUTTON_CLASS}
+                variant="primary"
               >
                 {polishCopy.researchAndGenerate}
-              </Link>
-              <Link
+              </AppActionLink>
+              <AppActionLink
                 href="/setup"
-                className={SECONDARY_BUTTON_CLASS}
+                variant="secondary"
               >
                 All {vocab.product.plural}
-              </Link>
+              </AppActionLink>
             </div>
           }
         />

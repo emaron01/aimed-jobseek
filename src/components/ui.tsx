@@ -69,7 +69,7 @@ export function EmptyState({
 }
 
 import { AutosizeTextarea } from "@/components/AutosizeTextarea";
-import { AppButton } from "@/components/AppButton";
+import { AppActionLink, AppButton } from "@/components/AppButton";
 
 export {
   AppActionLink,
@@ -239,15 +239,12 @@ export function TenantMissing() {
       description="You are signed in, but this account is not a member of a customer workspace. Open Account settings, or contact support if you need access."
       actions={
         <>
-          <a
-            href="/settings/account"
-            className="font-medium text-primary underline"
-          >
+          <AppActionLink href="/settings/account" variant="secondary">
             Account settings
-          </a>
-          <a href="/login" className="text-muted underline">
+          </AppActionLink>
+          <AppActionLink href="/login" variant="secondary">
             Switch account
-          </a>
+          </AppActionLink>
         </>
       }
     />

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { HomeSetupRail } from "@/components/HomeSetupRail";
-import { PageHeader, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, TenantMissing, AppButton } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { PageHeader, TenantMissing, AppButton, AppActionLink } from "@/components/ui";
 import { ShowArchivedToggle } from "@/components/ShowArchivedToggle";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -15,12 +14,12 @@ import { anyListFeatureEnabled, polishCopy, vocab } from "@/lib/product-config";
 
 function HomeNavLink({ href, label }: { href: string; label: string }) {
   return (
-    <Link
+    <AppActionLink
       href={href}
-      className={SECONDARY_BUTTON_CLASS}
+      variant="secondary"
     >
       {label}
-    </Link>
+    </AppActionLink>
   );
 }
 
@@ -99,18 +98,14 @@ export default async function DashboardPage({
       <div className="mt-8 mb-4 flex items-center justify-between gap-4">
         <h2 className="text-xl font-semibold text-ink">{vocab.campaign.Plural}</h2>
         {workflow.setupComplete ? (
-          <Link
-            href="/campaigns/new"
-            className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
-          >
+          <AppActionLink href="/campaigns/new" variant="primary">
             New {vocab.campaign.singular}
-          </Link>
+          </AppActionLink>
         ) : (
           <AppButton
             type="button"
             disabled
-            title={`Finish ${vocab.product.singular} setup first`}
-            className="cursor-not-allowed rounded-md bg-edge-strong px-3 py-2 text-sm font-medium text-subtle"
+            disabledReason={`Finish ${vocab.product.singular} setup first`}
           >
             New {vocab.campaign.singular}
           </AppButton>
@@ -135,12 +130,9 @@ export default async function DashboardPage({
               : `Finish ${vocab.product.singular} setup to create ${vocab.campaign.aSingular}.`}
           </p>
           {workflow.setupComplete ? (
-            <Link
-              href="/campaigns/new"
-              className={cn(PRIMARY_BUTTON_CLASS, "mt-4", "!px-3")}
-            >
+            <AppActionLink href="/campaigns/new" variant="primary" className="mt-4">
               New {vocab.campaign.singular}
-            </Link>
+            </AppActionLink>
           ) : null}
         </section>
       ) : (

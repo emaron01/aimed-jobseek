@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import {AppButton, AppActionLink } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import { useActionState } from "react";
@@ -71,12 +71,12 @@ export function MailboxConnectionPanel({
 
       <div className="mt-5 flex flex-wrap gap-3">
         {!connected ? (
-          <a
+          <AppActionLink
             href="/api/mailbox/microsoft/connect?returnTo=/settings/email"
-            className={cn(PRIMARY_BUTTON_CLASS, "!px-4")}
+            variant="primary" className={cn("!px-4")}
           >
             {connection ? "Reconnect Microsoft 365" : "Connect Microsoft 365"}
-          </a>
+          </AppActionLink>
         ) : null}
         {connection ? (
           <form action={action}>

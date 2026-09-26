@@ -37,7 +37,8 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
     <div className="relative" ref={rootRef}>
       <AppButton
         type="button"
-        className="flex items-center gap-3 rounded-md px-1 py-1 text-left hover:bg-canvas"
+        variant="secondary"
+        className="gap-3 !px-2 !py-1"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
@@ -48,7 +49,7 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
           <p className="text-sm font-medium text-ink">
             {model.displayName || model.email}
           </p>
-          <p className="text-xs text-subtle">
+          <p className="text-xs text-muted">
             {model.organizationName
               ? model.organizationName
               : model.platformRoleLabel
@@ -57,7 +58,7 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
           </p>
         </div>
         <div
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-xs font-semibold text-on-ink"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-on-primary"
           aria-hidden
         >
           {model.avatarInitial}
@@ -124,9 +125,10 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
                     />
                     <AppButton
                       type="submit"
+                      variant="secondary"
                       role="menuitem"
                       data-testid={`workspace-option-${ws.organizationId}`}
-                      className="w-full truncate px-4 py-2 text-left text-sm text-ink hover:bg-canvas"
+                      className="w-full !justify-start truncate"
                     >
                       {ws.name}
                     </AppButton>
@@ -161,9 +163,10 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
             <form action={logoutAction}>
               <AppButton
                 type="submit"
+                variant="secondary"
                 role="menuitem"
                 data-testid="user-menu-log_out"
-                className="w-full rounded-sm px-3 py-2 text-left text-sm text-ink hover:bg-canvas"
+                className="w-full !justify-start"
               >
                 Log Out
               </AppButton>

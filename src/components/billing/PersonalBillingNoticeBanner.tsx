@@ -7,7 +7,7 @@ import {
   openOwnedOrgBillingPortalAction,
   type WorkspaceActionResult,
 } from "@/app/actions/workspace";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 export type PersonalBillingNoticeOrg = {
@@ -77,13 +77,13 @@ function PersonalBillingNoticeRow({ org }: { org: PersonalBillingNoticeOrg }) {
       <div className="flex flex-wrap items-center gap-2">
         <form action={openOwnedOrgBillingPortalAction}>
           <input type="hidden" name="organizationId" value={org.organizationId} />
-          <AppButton type="submit" className={cn(PRIMARY_BUTTON_CLASS, "!px-3 !py-1.5 !text-sm")}>
+          <AppButton type="submit" className={cn("!px-3 !py-1.5 !text-sm")}>
             Manage / cancel in Stripe
           </AppButton>
         </form>
         <AppButton
           type="button"
-          className={cn(SECONDARY_BUTTON_CLASS, "!px-3 !py-1.5 !text-sm")}
+          variant="secondary" className={cn("!px-3 !py-1.5 !text-sm")}
           onClick={() => setConfirmOpen((v) => !v)}
         >
           {confirmOpen ? "Hide cancel form" : "Cancel Standard here"}
@@ -119,10 +119,8 @@ function PersonalBillingNoticeRow({ org }: { org: PersonalBillingNoticeOrg }) {
           <AppButton
             type="submit"
             disabled={cancelPending || confirmText !== "CANCEL"}
-            className={cn(
-              PRIMARY_BUTTON_CLASS,
-              "!bg-danger !px-3 !py-1.5 !text-sm hover:!bg-danger disabled:opacity-50",
-            )}
+            variant="danger"
+            className="!px-3 !py-1.5 !text-sm"
           >
             {cancelPending ? "Canceling…" : "Cancel subscription"}
           </AppButton>

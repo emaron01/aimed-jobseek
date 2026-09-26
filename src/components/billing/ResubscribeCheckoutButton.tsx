@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { vocab } from "@/lib/product-config";
 
@@ -19,7 +19,7 @@ export function ResubscribeCheckoutButton() {
       <AppButton
         type="button"
         disabled={pending}
-        className={cn(PRIMARY_BUTTON_CLASS, "!px-4 !py-2.5")}
+        className={cn("!px-4 !py-2.5")}
         onClick={() => {
           setError(null);
           startTransition(async () => {

@@ -8,7 +8,7 @@ import {
   retryProductSynthesisAction,
   type ProductSetupActionResult,
 } from "@/app/actions/product-setup";
-import { Field, SECONDARY_BUTTON_CLASS, SecondaryButton, SubmitButton, AppButton } from "@/components/ui";
+import { Field, SecondaryButton, SubmitButton, AppButton } from "@/components/ui";
 import { polishCopy, vocab } from "@/lib/product-config";
 
 const initial: ProductSetupActionResult | null = null;
@@ -185,7 +185,7 @@ export function AssistedProductIntake({
               type="submit"
               formAction={saveAction}
               disabled={pending || savePending}
-              className={SECONDARY_BUTTON_CLASS}
+              variant="secondary"
             >
               {savePending ? "Saving…" : `Save ${vocab.product.Singular} only`}
             </AppButton>

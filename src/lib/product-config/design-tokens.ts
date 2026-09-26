@@ -66,6 +66,7 @@ export const tokenContrastPairs = Object.freeze([
   { name: "primary on surface", fg: designTokens.color.primary, bg: designTokens.color.surface },
   { name: "success on success tint", fg: designTokens.color.success, bg: designTokens.color.successTint },
   { name: "danger on danger tint", fg: designTokens.color.danger, bg: designTokens.color.dangerTint },
+  { name: "white on danger", fg: designTokens.color.onInk, bg: designTokens.color.danger },
   { name: "warning on warning tint", fg: designTokens.color.warning, bg: designTokens.color.warningTint },
   { name: "ink on canvas", fg: designTokens.color.ink, bg: designTokens.color.canvas },
 ] as const);

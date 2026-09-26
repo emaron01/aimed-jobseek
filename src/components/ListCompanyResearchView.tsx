@@ -1,5 +1,4 @@
-import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
-import Link from "next/link";
+import {AppActionLink } from "@/components/ui";
 import { RefreshCompanyResearchForm } from "@/components/RefreshCompanyResearchForm";
 import { SuppressContactForm } from "@/components/SuppressContactForm";
 import type { ContactListCompanyGroup } from "@/lib/tenant/companies";
@@ -103,12 +102,12 @@ export function ListCompanyResearchView({
                   ) : null}
                 </div>
                 {isLinkedCompany && research ? (
-                  <Link
+                  <AppActionLink
                     href={`/companies/${group.companyId}`}
-                    className={cn(SECONDARY_BUTTON_CLASS, "shrink-0", "!px-3", "!py-1.5")}
+                    variant="secondary" className={cn("shrink-0", "!px-3", "!py-1.5")}
                   >
                     Company briefing
-                  </Link>
+                  </AppActionLink>
                 ) : null}
               </div>
             </div>

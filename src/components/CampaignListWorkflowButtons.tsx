@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { AppButton, AppActionLink } from "@/components/ui";
 import {
   campaignListScoreButtonLabel,
   listScoreHref,
@@ -55,13 +53,9 @@ export function CampaignListWorkflowButtons({
             ? "Research Companies, complete"
             : "Research Companies"
         }
+        variant="primary"
         className={
-          researchComplete
-            ? cn(
-                PRIMARY_BUTTON_CLASS,
-                "gap-1.5 whitespace-nowrap !bg-success hover:!bg-success",
-              )
-            : PRIMARY_BUTTON_CLASS
+          researchComplete ? "gap-1.5 whitespace-nowrap" : undefined
         }
       >
         {researchComplete ? (
@@ -81,24 +75,23 @@ export function CampaignListWorkflowButtons({
       ) : null}
       {allowScore ? (
       researchComplete ? (
-        <Link
+        <AppActionLink
           href={listScoreHref(listId, campaignId)}
+          variant="primary"
           data-testid="campaign-list-score-button"
-          className={PRIMARY_BUTTON_CLASS}
         >
           {scoreLabel}
-        </Link>
+        </AppActionLink>
       ) : (
-        <span
+        <AppActionLink
+          href={listScoreHref(listId, campaignId)}
+          variant="secondary"
+          disabled
+          disabledReason={`Research companies on this ${vocab.list.singular} first`}
           data-testid="campaign-list-score-button"
-          title={`Research companies on this ${vocab.list.singular} first`}
-          className={cn(
-            SECONDARY_BUTTON_CLASS,
-            "cursor-not-allowed border-edge-strong bg-canvas text-subtle hover:border-edge-strong hover:bg-canvas hover:text-subtle",
-          )}
         >
           {scoreLabel}
-        </span>
+        </AppActionLink>
       )
       ) : null}
     </>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { StartFreeTrialButton } from "@/components/billing/StartFreeTrialButton";
-import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import {AppButton, AppActionLink } from "@/components/ui";
 import type { CatalogPlanEntry } from "@/lib/billing/billing-catalog";
 import { cn } from "@/lib/utils";
 import { features, supportMailtoHref, vocab } from "@/lib/product-config";
@@ -112,12 +112,12 @@ export function PlanSelector({
           ) : null}
 
           {selected === "ENTERPRISE" && features.contactSales ? (
-            <a
+            <AppActionLink
               href={supportMailtoHref(supportEmail)}
-              className={cn(PRIMARY_BUTTON_CLASS, "w-full !px-4 !py-3")}
+              variant="primary" className={cn("w-full !px-4 !py-3")}
             >
               Contact us
-            </a>
+            </AppActionLink>
           ) : selected === "ENTERPRISE" ? null : (
             <StartFreeTrialButton
               disabledReason={disabledReason}

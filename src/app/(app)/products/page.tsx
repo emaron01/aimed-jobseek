@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { DeleteSuccessNotice } from "@/components/DeleteSuccessNotice";
-import { EmptyState, PageHeader, PRIMARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {EmptyState, PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ProductCatalogPanel } from "@/components/ProductCatalogPanel";
 import { listProductsWithCounts } from "@/lib/tenant/data";
@@ -30,12 +29,12 @@ export default async function ProductsPage() {
         title={vocab.product.Plural}
           description={`${vocab.product.ASingular} is the candidate record later ${vocab.campaign.plural} read from. After you approve it, define ${vocab.icp.plural}.`}
         actions={
-          <Link
+          <AppActionLink
             href="/products/new"
-            className={PRIMARY_BUTTON_CLASS}
+            variant="primary"
           >
             New {vocab.product.singular}
-          </Link>
+          </AppActionLink>
         }
       />
 
@@ -46,12 +45,12 @@ export default async function ProductsPage() {
           title={`No ${vocab.product.plural} yet`}
           description={`${vocab.product.ASingular} is built from your resume and other materials. Research it once, then define the ${vocab.icp.plural} that belong to it.`}
           actions={
-            <Link
+            <AppActionLink
               href="/products/new"
-              className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
+              variant="primary" className={cn("!px-3")}
             >
               New {vocab.product.singular}
-            </Link>
+            </AppActionLink>
           }
         />
       ) : (

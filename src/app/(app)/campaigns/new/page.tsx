@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { NewCampaignForm } from "@/components/NewCampaignForm";
-import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { listIcps, listPersonas } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { getHomeWorkflow } from "@/lib/workflow/home";
@@ -38,12 +38,12 @@ export default async function NewCampaignPage() {
         title={`New ${vocab.campaign.singular}`}
         description={`Paste a job posting. ${vocab.product.Singular} and ${vocab.icp.singular} are selected for you when you have exactly one; otherwise you choose.`}
         actions={
-          <Link
+          <AppActionLink
             href="/campaigns"
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
           >
             Back to {vocab.campaign.plural}
-          </Link>
+          </AppActionLink>
         }
       />
 

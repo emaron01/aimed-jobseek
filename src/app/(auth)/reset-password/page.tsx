@@ -1,6 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { AppButton } from "@/components/ui";
 
 import Link from "next/link";
 import { FormEvent, useState, Suspense } from "react";
@@ -81,7 +80,7 @@ function ResetPasswordInner() {
         <AppButton
           type="submit"
           disabled={loading}
-          className={cn(PRIMARY_BUTTON_CLASS, "w-full", "!px-3")}
+          className="w-full"
         >
           {loading ? "Updating…" : "Update password"}
         </AppButton>

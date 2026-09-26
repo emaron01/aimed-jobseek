@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import { useActionState, useEffect } from "react";
@@ -118,7 +118,7 @@ export function VoiceSamplesForm({
         <AppButton
           type="submit"
           disabled={pending}
-          className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
+          className={cn("!px-3")}
         >
           {pending ? "Saving…" : "Save sample"}
         </AppButton>

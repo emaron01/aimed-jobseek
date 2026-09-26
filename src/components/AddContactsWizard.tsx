@@ -23,7 +23,7 @@ import {
   type ParsedTable,
   type ValidatedRow,
 } from "@/lib/import";
-import { PRIMARY_BUTTON_CLASS, PrimaryButton, SecondaryButton, AppButton } from "@/components/ui";
+import { PrimaryButton, SecondaryButton, AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { vocab, vocabExamples } from "@/lib/product-config";
 
@@ -313,7 +313,7 @@ export function AddContactsWizard() {
                     <input
                       type="file"
                       accept=".csv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                      className={cn(PRIMARY_BUTTON_CLASS, "mt-2", "block", "w-full")}
+                      className="mt-2 block w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink"
                       onChange={(event) => {
                         const file = event.target.files?.[0];
                         if (file) void handleParseUpload(file);

@@ -1,11 +1,10 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ScoreLabel, ResearchStatus } from "@prisma/client";
 import { ResearchRunPanel } from "@/components/ResearchRunPanel";
 import { ScoreContactsPanel } from "@/components/ScoreContactsPanel";
 import { ScoreReportClient } from "@/components/ScoreReportClient";
 import { TitleSuggestionReview } from "@/components/TitleSuggestionReview";
-import { PageHeader, Panel, PrimaryButton, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, Panel, PrimaryButton, TenantMissing, AppActionLink } from "@/components/ui";
 import {
   getCampaignForListWorkflow,
   getScoreReportRows,
@@ -193,14 +192,14 @@ export default async function ScoringReportPage({
         actions={
           <div className="flex flex-wrap gap-2">
             {backToCampaignButton}
-            <Link
+            <AppActionLink
               href={listDetailHref(run.contactListId, {
                 campaignId: campaign?.id,
               })}
-              className={SECONDARY_BUTTON_CLASS}
+              variant="secondary"
             >
               Back to {vocab.list.singular}
-            </Link>
+            </AppActionLink>
           </div>
         }
       />

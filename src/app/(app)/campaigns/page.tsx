@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { DeleteSuccessNotice } from "@/components/DeleteSuccessNotice";
 import { SharedCampaignActions } from "@/components/SharedCampaignActions";
-import { EmptyState, PageHeader, PRIMARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import { EmptyState, PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { ShowArchivedToggle } from "@/components/ShowArchivedToggle";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
 import { requireCurrentUser } from "@/lib/auth/session";
@@ -89,12 +89,12 @@ export default async function CampaignsPage({
               label={vocab.campaign.plural}
             />
             {canCreate ? (
-              <Link
+              <AppActionLink
                 href="/campaigns/new"
-                className={PRIMARY_BUTTON_CLASS}
+                variant="primary"
               >
                 New {vocab.campaign.singular}
-              </Link>
+              </AppActionLink>
             ) : (
               <span
                 title={`Add ${vocab.product.aSingular} first`}
@@ -157,19 +157,19 @@ export default async function CampaignsPage({
           }
           actions={
             canCreate && effectiveView === CAMPAIGN_LIST_VIEW_MY ? (
-              <Link
+              <AppActionLink
                 href="/campaigns/new"
-                className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
+                variant="primary" className={cn("!px-3")}
               >
                 New {vocab.campaign.singular}
-              </Link>
+              </AppActionLink>
             ) : !canCreate && effectiveView === CAMPAIGN_LIST_VIEW_MY ? (
-              <Link
+              <AppActionLink
                 href="/products/new"
-                className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
+                variant="primary" className={cn("!px-3")}
               >
                 New {vocab.product.singular}
-              </Link>
+              </AppActionLink>
             ) : null
           }
         />

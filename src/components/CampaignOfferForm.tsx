@@ -1,14 +1,13 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   updateCampaignOfferAction,
   type CampaignOfferActionResult,
 } from "@/app/actions/campaign-offer";
 import type { CampaignOfferFields } from "@/lib/campaign/offer-validation";
-import { Field, PRIMARY_BUTTON_CLASS, SubmitButton } from "@/components/ui";
+import {Field, SubmitButton, AppActionLink } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { vocab } from "@/lib/product-config";
 
@@ -59,12 +58,12 @@ export function CampaignOfferForm({
             An offer is optional. Continue to the {vocab.list.Singular} stage to research, score,
             and add {vocab.contact.plural}.
           </p>
-          <Link
+          <AppActionLink
             href={`/campaigns/${campaignId}?stage=list`}
-            className={cn(PRIMARY_BUTTON_CLASS, "mt-3")}
+            variant="primary" className={cn("mt-3")}
           >
             Continue to {vocab.list.Singular}
-          </Link>
+          </AppActionLink>
         </div>
       ) : null}
 

@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -829,7 +829,7 @@ export function EmailSequenceWorkspace({
                 ),
               )
             }
-            className={cn(SECONDARY_BUTTON_CLASS, "mt-3", "disabled:border-edge", "disabled:bg-canvas", "disabled:text-subtle", "!px-3")}
+            variant="secondary" className={cn("mt-3", "disabled:border-edge", "disabled:bg-canvas", "disabled:text-subtle", "!px-3")}
           >
             + Add email to {vocab.sequence.singular}
           </AppButton>
@@ -1013,7 +1013,7 @@ export function EmailSequenceWorkspace({
                 ),
               )
             }
-            className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
+            className={cn("!px-3")}
           >
             {aiBusy
               ? "Generating…"
@@ -1165,7 +1165,7 @@ export function EmailSequenceWorkspace({
                         ),
                       )
                     }
-                    className={cn(SECONDARY_BUTTON_CLASS, "!px-3")}
+                    variant="secondary" className={cn("!px-3")}
                   >
                     {aiBusy ? "Regenerating…" : "Regenerate"}
                   </AppButton>
@@ -1245,7 +1245,7 @@ export function EmailSequenceWorkspace({
                     type="button"
                     disabled={handoffLocked}
                     onClick={markSent}
-                    className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
+                    className={cn("!px-3")}
                   >
                     {sendBusy === "mark"
                       ? "Marking…"
@@ -1333,7 +1333,6 @@ export function EmailSequenceWorkspace({
                       )
                     }
                     className={cn(
-                      SECONDARY_BUTTON_CLASS,
                       "disabled:border-edge",
                       "disabled:bg-canvas",
                       "disabled:text-subtle",
@@ -1403,7 +1402,7 @@ export function EmailSequenceWorkspace({
                   onClick={() =>
                     run(() => draftReplyAction(selected.id, replyText))
                   }
-                  className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
+                  className={cn("!px-3")}
                 >
                   {aiBusy ? "Classifying…" : "They replied"}
                 </AppButton>
@@ -1445,7 +1444,7 @@ export function EmailSequenceWorkspace({
                 type="button"
                 disabled={sendBusy !== null}
                 onClick={() => answerSendConfirm("yes")}
-                className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
+                className={cn("!px-3")}
               >
                 Yes
               </AppButton>
@@ -1453,7 +1452,7 @@ export function EmailSequenceWorkspace({
                 type="button"
                 disabled={sendBusy !== null}
                 onClick={() => answerSendConfirm("no")}
-                className={cn(SECONDARY_BUTTON_CLASS, "!px-3")}
+                variant="secondary" className={cn("!px-3")}
               >
                 No
               </AppButton>
@@ -1461,7 +1460,7 @@ export function EmailSequenceWorkspace({
                 type="button"
                 disabled={sendBusy !== null}
                 onClick={() => answerSendConfirm("not_yet")}
-                className={cn(SECONDARY_BUTTON_CLASS, "!px-3")}
+                variant="secondary" className={cn("!px-3")}
               >
                 Not yet
               </AppButton>

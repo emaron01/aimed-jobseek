@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ProductContinuePicker } from "@/components/ProductContinuePicker";
-import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { listProducts } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { vocab } from "@/lib/product-config";
@@ -41,12 +41,12 @@ export default async function NewIcpPage({
         title={`New ${vocab.icp.singular}`}
         description={`Choose which ${vocab.product.singular} this ${vocab.icp.singular} belongs to, then continue to define and interpret it.`}
         actions={
-          <Link
+          <AppActionLink
             href="/icps"
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
           >
             Back to {vocab.icp.plural}
-          </Link>
+          </AppActionLink>
         }
       />
 

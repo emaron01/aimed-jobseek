@@ -1,8 +1,9 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
-import { cn } from "@/lib/utils";
 
 import Link from "next/link";
+import { AppButton } from "@/components/ui";
+import { cn } from "@/lib/utils";
+
 import { useMemo, useState, useTransition } from "react";
 import type {
   QualificationBucket,
@@ -250,7 +251,7 @@ export function QualificationBuckets({
                         group.rows.map((row) => `${row.targetType}:${row.id}`),
                       )
                     }
-                    className={cn(SECONDARY_BUTTON_CLASS, "py-1", "!px-2", "!py-1", "!text-xs")}
+                    variant="secondary" className={cn("py-1", "!px-2", "!py-1", "!text-xs")}
                   >
                     {EXCLUSION_REVIEW_COPY.keepExcluded}
                   </AppButton>
@@ -285,7 +286,7 @@ export function QualificationBuckets({
                           onClick={() =>
                             keepExcluded(`${row.targetType}:${row.id}`)
                           }
-                          className={cn(SECONDARY_BUTTON_CLASS, "py-1", "!px-2", "!py-1", "!text-xs")}
+                          variant="secondary" className={cn("py-1", "!px-2", "!py-1", "!text-xs")}
                         >
                           {EXCLUSION_REVIEW_COPY.keepExcluded}
                         </AppButton>
@@ -315,7 +316,7 @@ export function QualificationBuckets({
           </p>
           <Link
             href={emptyActionHref}
-            className={cn(PRIMARY_BUTTON_CLASS, "mt-4", "!px-3")}
+            className={cn("mt-4", "!px-3")}
           >
             {emptyActionLabel}
           </Link>
@@ -360,7 +361,7 @@ export function QualificationBuckets({
                           type="button"
                           disabled={pending || !canActOnRow(row)}
                           onClick={() => restore(row, bucket)}
-                          className={cn(SECONDARY_BUTTON_CLASS, "py-1", "!px-2", "!py-1", "!text-xs")}
+                          variant="secondary" className={cn("py-1", "!px-2", "!py-1", "!text-xs")}
                         >
                           Move to {QUALIFICATION_BUCKET_LABELS[bucket]}
                         </AppButton>

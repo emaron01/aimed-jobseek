@@ -6,7 +6,7 @@ import {
   setCampaignVisibilityAction,
   type CampaignSharingActionResult,
 } from "@/app/actions/campaign-sharing";
-import { SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 import { vocab } from "@/lib/product-config";
 
 const initial: CampaignSharingActionResult | null = null;
@@ -45,7 +45,7 @@ export function CampaignVisibilityButton({
       <AppButton
         type="submit"
         disabled={pending}
-        className={SECONDARY_BUTTON_CLASS}
+        variant="secondary"
         title={
           sharing
             ? `Make this ${vocab.campaign.singular} setup available to the team`

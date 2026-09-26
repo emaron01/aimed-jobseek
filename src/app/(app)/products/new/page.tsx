@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { AssistedProductIntake } from "@/components/AssistedProductSetup";
-import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { vocab } from "@/lib/product-config";
 
@@ -25,12 +24,12 @@ export default async function NewProductPage() {
         title={`New ${vocab.product.singular}`}
         description={`Name the ${vocab.product.singular} and supply materials you already use. Research builds a draft profile for your review.`}
         actions={
-          <Link
+          <AppActionLink
             href="/products"
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
           >
             Back to {vocab.product.plural}
-          </Link>
+          </AppActionLink>
         }
       />
       <div className="rounded-lg border border-edge bg-surface p-5">

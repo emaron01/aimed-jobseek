@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { IcpDetailsForm } from "@/components/IcpDetailsForm";
-import { PageHeader, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { serializeIcpForClient } from "@/lib/icp/save";
 import { listIcpCriteria } from "@/lib/interpretation/icp";
 import { getProduct, listIcps } from "@/lib/tenant/data";
@@ -54,18 +53,18 @@ export default async function ListIcpsPage({ params }: PageProps) {
         title={`${vocab.icp.plural}: ${product.name}`}
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link
+            <AppActionLink
               href={`/setup/${product.id}/icps/new`}
-              className={PRIMARY_BUTTON_CLASS}
+              variant="primary"
             >
               Add {vocab.icp.singular}
-            </Link>
-            <Link
+            </AppActionLink>
+            <AppActionLink
               href={`/setup/${product.id}`}
-              className={SECONDARY_BUTTON_CLASS}
+              variant="secondary"
             >
               Back to overview
-            </Link>
+            </AppActionLink>
           </div>
         }
       />

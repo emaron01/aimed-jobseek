@@ -1,5 +1,4 @@
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from "@/components/ui";
-import Link from "next/link";
+import {AppActionLink } from "@/components/ui";
 import { deleteProductAction } from "@/app/actions";
 import { ConfirmDeleteForm } from "@/components/ConfirmDeleteForm";
 import type { ProductWithCounts } from "@/lib/tenant/data";
@@ -32,18 +31,18 @@ export function ProductCatalogPanel({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link
+            <AppActionLink
               href={`/setup/${product.id}/research`}
-              className={SECONDARY_BUTTON_CLASS}
+              variant="secondary"
             >
               Research
-            </Link>
-            <Link
+            </AppActionLink>
+            <AppActionLink
               href={`/setup/${product.id}`}
-              className={PRIMARY_BUTTON_CLASS}
+              variant="primary"
             >
               Manage
-            </Link>
+            </AppActionLink>
             <ConfirmDeleteForm
               action={deleteProductAction}
               hiddenFields={{ id: product.id }}

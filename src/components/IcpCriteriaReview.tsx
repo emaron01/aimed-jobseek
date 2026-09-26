@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import { useActionState, useEffect, useState } from "react";
@@ -90,7 +90,7 @@ function DecisionForm({
           <AppButton
             type="submit"
             disabled={pending}
-            className={cn(PRIMARY_BUTTON_CLASS, "!px-2.5", "!py-1.5", "!text-xs")}
+            className={cn("!px-2.5", "!py-1.5", "!text-xs")}
           >
             Keep — confirm when found, never penalize when not found
           </AppButton>
@@ -103,7 +103,7 @@ function DecisionForm({
           <AppButton
             type="submit"
             disabled={pending}
-            className={cn(SECONDARY_BUTTON_CLASS, "px-2.5", "!px-2.5", "!py-1.5", "!text-xs")}
+            variant="secondary" className={cn("px-2.5", "!px-2.5", "!py-1.5", "!text-xs")}
           >
             Make supporting
           </AppButton>

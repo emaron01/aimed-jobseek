@@ -1,6 +1,6 @@
-import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
-import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { AppButton } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import {
   updateOrganizationTimezoneAction,
   renameWorkspaceAction,
@@ -116,7 +116,7 @@ export default async function OrganizationSettingsPage() {
           />
           <AppButton
             type="submit"
-            className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
+            className={cn("!px-3")}
           >
             Save
           </AppButton>
@@ -142,7 +142,7 @@ export default async function OrganizationSettingsPage() {
           />
           <AppButton
             type="submit"
-            className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
+            className={cn("!px-3")}
           >
             Save
           </AppButton>
@@ -366,7 +366,7 @@ export default async function OrganizationSettingsPage() {
               </select>
               <AppButton
                 type="submit"
-                className={cn(PRIMARY_BUTTON_CLASS, "sm:col-span-3", "w-fit", "!px-3")}
+                className={cn("sm:col-span-3", "w-fit", "!px-3")}
               >
                 Create invitation
               </AppButton>

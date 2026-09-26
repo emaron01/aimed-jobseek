@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -8,7 +7,7 @@ import {
   retryApprovedProductResynthesisAction,
   type ProductSetupActionResult,
 } from "@/app/actions/product-setup";
-import { SECONDARY_BUTTON_CLASS, SecondaryButton, SubmitButton } from "@/components/ui";
+import {SecondaryButton, SubmitButton, AppActionLink } from "@/components/ui";
 import type { CandidateProfile } from "@/lib/product-research/candidate-profile";
 import {
   buildProductResynthesisApplyPlan,
@@ -135,12 +134,12 @@ export function ProductResynthesisReview({
           <SecondaryButton type="submit" disabled={retryPending}>
             {retryPending ? "Retrying…" : "Retry re-synthesis"}
           </SecondaryButton>
-          <Link
+          <AppActionLink
             href={`/setup/${productId}/research`}
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
           >
             Cancel
-          </Link>
+          </AppActionLink>
         </form>
         {retry ? (
           <p className="text-sm text-danger">{retry.message}</p>
@@ -222,12 +221,12 @@ export function ProductResynthesisReview({
           <SubmitButton disabled={pending}>
             {pending ? "Applying…" : "Confirm update"}
           </SubmitButton>
-          <Link
+          <AppActionLink
             href={`/setup/${productId}/research`}
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
           >
             Cancel
-          </Link>
+          </AppActionLink>
         </div>
         {state ? (
           <p

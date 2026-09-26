@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   confirmApplicationEmployerIdentityAction,
   nameApplicationEmployerAction,
@@ -55,11 +54,11 @@ import {
 } from "@/lib/product-config";
 import {
   ApplicationAppliedSection,
-  ApplicationContactsSection,
   ApplicationOutreachSection,
 } from "@/components/ApplicationOutreachSections";
 import { isOutreachAssetType } from "@/lib/product-config";
 import { HiringTeamDisclosureGroup } from "@/components/HiringTeamDisclosureGroup";
+import { HiringTeamRoleActions } from "@/components/HiringTeamRoleActions";
 import {
   displayedFitBucket,
   fitSignalLabels,
@@ -80,7 +79,7 @@ import {
   parseIdentityVerification,
 } from "@/lib/job-requirement/identity-verification";
 import { ensureHiringTeamAfterResearch, ensureIdentityVerification } from "@/lib/application/service";
-import { AppActionLink, SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { AppActionLink } from "@/components/ui";
 import { parseStringArray } from "@/lib/research";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { persistExtractedExperienceDates } from "@/lib/product-research/restore-role-dates";
@@ -308,11 +307,6 @@ function IdentityVerificationPanel({
       ) : null}
 
       <div className="space-y-2">
-        <ApplicationResearchStatus
-          campaignId={campaignId}
-          canEdit={canEdit}
-          initialStatus={researchStatus}
-        />
         {confirmedResearch ? (
           <div className="space-y-2 text-sm text-ink">
             <p>{research.companySummary || "No summary yet."}</p>
@@ -870,26 +864,8 @@ export async function ApplicationWorkspace({
     </div>
     ) : null}
     {showFocus(focus, ["outreach"]) ? (
-    <>
-    <details
-      className="rounded-lg border border-edge bg-surface p-5"
-      data-testid="application-contacts-wrap"
-      id="contacts"
-    >
-      {asPage ? <OpenDetailsOnMount /> : null}
-      <summary className="cursor-pointer text-base font-semibold text-ink">
-        {applicationWorkspaceCopy.contactsTitle}
-      </summary>
-      <div className="mt-4">
-    <ApplicationContactsSection
-      campaignId={requirement.campaignId}
-      canEdit={canEdit}
-      roles={requirement.campaign.hiringTeamRoles}
-      contacts={requirement.campaign.contacts.map(toContactRow)}
-    />
-      </div>
-    </details>
-    <div id="outreach">
+    <div id="outreach" data-testid="application-contacts-wrap">
+    <p className="sr-only">{applicationWorkspaceCopy.contactsTitle}</p>
     <WorkspaceProgress jobs={live.jobs} type="OUTREACH" />
     <ApplicationOutreachSection
       campaignId={requirement.campaignId}
@@ -914,12 +890,12 @@ export async function ApplicationWorkspace({
           contactId: asset.contactId,
           purpose: asset.purpose,
           sentAt: asset.sentAt?.toISOString() ?? null,
+          createdAt: asset.createdAt.toISOString(),
           emailLength: asset.emailLength,
           content: asset.contentJson,
         }))}
     />
     </div>
-    </>
     ) : null}
     {showFocus(focus, ["interviews"]) ? (
     <div id="interviews">
@@ -949,9 +925,9 @@ export async function ApplicationWorkspace({
       <div className="mt-4 space-y-3">
         <WorkspaceProgress jobs={live.jobs} type="APPLICATION_SUMMARY" />
         <p className="text-sm text-muted">{applicationSummaryConfig.description}</p>
-        <Link href={workspaceCampaignSummaryHref(campaignId)} className={SECONDARY_BUTTON_CLASS}>
+        <AppActionLink href={workspaceCampaignSummaryHref(campaignId)} variant="secondary">
           {applicationSummaryConfig.title}
-        </Link>
+        </AppActionLink>
       </div>
     </details>
     ) : null}
@@ -1127,12 +1103,12 @@ async function HiringTeamSection({
     role,
     narrative,
   }: (typeof organizedRoles)[number]) => (
-    <details
+    <div
       key={role.id}
       className="rounded-md border border-edge p-4"
       data-testid="hiring-team-role"
     >
-      <summary className="cursor-pointer list-none space-y-2">
+      <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <h4 className="text-sm font-semibold text-ink">{role.name}</h4>
           <span className="text-xs text-subtle">
@@ -1145,8 +1121,75 @@ async function HiringTeamSection({
         {role.whyThisPersonaMatters ? (
           <p className="text-sm text-ink">{role.whyThisPersonaMatters}</p>
         ) : null}
+        {canEdit ? (
+          <HiringTeamRoleActions
+            campaignId={campaignId}
+            personaId={role.id}
+            buildAction={
+              role.setupStatus === "FAILED" || role.staleAt
+                ? rebuildApplicationRoleAction
+                : buildApplicationRoleAction
+            }
+            buildLabel={
+              role.setupStatus === "FAILED"
+                ? hiringTeamConfig.actions.retry
+                : role.staleAt
+                  ? hiringTeamConfig.actions.rebuild
+                  : hiringTeamConfig.actions.build
+            }
+            editForm={
+            <ApplicationActionForm
+              action={updateApplicationRoleAction}
+              submitLabel="Save edits"
+              testId={`save-role-${role.id}`}
+            >
+              <input type="hidden" name="campaignId" value={campaignId} />
+              <input type="hidden" name="personaId" value={role.id} />
+              <label className="block text-sm">
+                <span className="font-medium text-ink">Name</span>
+                <input name="name" required defaultValue={role.name} className={fieldClass} />
+              </label>
+              <label className="block text-sm">
+                <span className="font-medium text-ink">Likely titles</span>
+                <textarea
+                  name="likelyTitles"
+                  rows={2}
+                  defaultValue={textList(role.targetTitles).join("\n")}
+                  className={fieldClass}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="font-medium text-ink">Department</span>
+                <input name="department" defaultValue={role.department ?? ""} className={fieldClass} />
+              </label>
+              <label className="block text-sm">
+                <span className="font-medium text-ink">Why this role matters</span>
+                <textarea
+                  name="whyThisRoleMatters"
+                  rows={2}
+                  defaultValue={role.whyThisPersonaMatters ?? ""}
+                  className={fieldClass}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="font-medium text-ink">Notes</span>
+                <textarea
+                  name="notes"
+                  rows={2}
+                  defaultValue={role.additionalContext ?? ""}
+                  className={fieldClass}
+                />
+              </label>
+            </ApplicationActionForm>
+            }
+          />
+        ) : null}
+      </div>
+      <details className="mt-4 border-t border-edge pt-4">
+      <summary className="cursor-pointer text-sm font-medium text-ink">
+        {role.name}
       </summary>
-      <div className="mt-4 space-y-3 border-t border-edge pt-4">
+      <div className="mt-4 space-y-3">
         {role.department ? (
           <p className="text-sm text-ink">{role.department}</p>
         ) : null}
@@ -1191,54 +1234,6 @@ async function HiringTeamSection({
           <div className="space-y-3 print:hidden">
             <details>
               <summary className="cursor-pointer text-sm font-semibold text-ink">
-                {hiringTeamConfig.actions.edit}
-              </summary>
-            <ApplicationActionForm
-              action={updateApplicationRoleAction}
-              submitLabel="Save edits"
-              testId={`edit-role-${role.id}`}
-            >
-              <input type="hidden" name="campaignId" value={campaignId} />
-              <input type="hidden" name="personaId" value={role.id} />
-              <label className="block text-sm">
-                <span className="font-medium text-ink">Name</span>
-                <input name="name" required defaultValue={role.name} className={fieldClass} />
-              </label>
-              <label className="block text-sm">
-                <span className="font-medium text-ink">Likely titles</span>
-                <textarea
-                  name="likelyTitles"
-                  rows={2}
-                  defaultValue={textList(role.targetTitles).join("\n")}
-                  className={fieldClass}
-                />
-              </label>
-              <label className="block text-sm">
-                <span className="font-medium text-ink">Department</span>
-                <input name="department" defaultValue={role.department ?? ""} className={fieldClass} />
-              </label>
-              <label className="block text-sm">
-                <span className="font-medium text-ink">Why this role matters</span>
-                <textarea
-                  name="whyThisRoleMatters"
-                  rows={2}
-                  defaultValue={role.whyThisPersonaMatters ?? ""}
-                  className={fieldClass}
-                />
-              </label>
-              <label className="block text-sm">
-                <span className="font-medium text-ink">Notes</span>
-                <textarea
-                  name="notes"
-                  rows={2}
-                  defaultValue={role.additionalContext ?? ""}
-                  className={fieldClass}
-                />
-              </label>
-            </ApplicationActionForm>
-            </details>
-            <details>
-              <summary className="cursor-pointer text-sm font-semibold text-ink">
                 {hiringTeamConfig.actions.addPerson}
               </summary>
               <ApplicationActionForm
@@ -1274,24 +1269,6 @@ async function HiringTeamSection({
             </details>
             <div className="flex flex-wrap gap-3">
               <ApplicationActionForm
-                action={
-                  role.setupStatus === "FAILED" || role.staleAt
-                    ? rebuildApplicationRoleAction
-                    : buildApplicationRoleAction
-                }
-                submitLabel={
-                  role.setupStatus === "FAILED"
-                    ? hiringTeamConfig.actions.retry
-                    : role.staleAt
-                      ? hiringTeamConfig.actions.rebuild
-                      : hiringTeamConfig.actions.build
-                }
-                testId={`build-role-${role.id}`}
-              >
-                <input type="hidden" name="campaignId" value={campaignId} />
-                <input type="hidden" name="personaId" value={role.id} />
-              </ApplicationActionForm>
-              <ApplicationActionForm
                 action={approveApplicationRoleAction}
                 submitLabel="Approve"
                 testId={`approve-role-${role.id}`}
@@ -1302,6 +1279,7 @@ async function HiringTeamSection({
               <ApplicationActionForm
                 action={removeApplicationRoleAction}
                 submitLabel="Remove role"
+                variant="danger"
                 testId={`remove-role-${role.id}`}
               >
                 <input type="hidden" name="campaignId" value={campaignId} />
@@ -1311,6 +1289,7 @@ async function HiringTeamSection({
                 action={saveRoleAsTemplateAction}
                 submitLabel="Save as template"
                 testId={`save-role-template-${role.id}`}
+                variant="secondary"
               >
                 <input type="hidden" name="campaignId" value={campaignId} />
                 <input type="hidden" name="personaId" value={role.id} />
@@ -1319,7 +1298,8 @@ async function HiringTeamSection({
           </div>
         ) : null}
       </div>
-    </details>
+      </details>
+    </div>
   );
   return (
     <details id="hiring-team" className="space-y-4 rounded-lg border border-edge bg-surface p-5" data-testid="hiring-team">

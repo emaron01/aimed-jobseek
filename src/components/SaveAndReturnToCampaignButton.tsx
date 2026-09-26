@@ -2,7 +2,7 @@
 
 import { useFormStatus } from "react-dom";
 import { saveScoringRunAndReturnToCampaignAction } from "@/app/actions/campaign-contacts";
-import { SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 import { vocab } from "@/lib/product-config";
 
 function SubmitButton({
@@ -16,7 +16,7 @@ function SubmitButton({
       type="submit"
       disabled={pending}
       data-testid={testId}
-      className={SECONDARY_BUTTON_CLASS}
+      variant="secondary"
     >
       {pending ? "Saving…" : `Save and return to ${vocab.campaign.singular}`}
     </AppButton>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ScoreListForm } from "@/components/ScoreListForm";
-import { PageHeader, Panel, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, Panel, TenantMissing, AppActionLink } from "@/components/ui";
 import {
   listDetailHref,
   parseCampaignId,
@@ -74,12 +74,12 @@ export default async function ScoreListPage({ params, searchParams }: PageProps)
         }
         description={`Select ${vocab.product.Singular} → ${vocab.icp.singular} → ${vocab.persona.Singular}. Default is All ${vocab.persona.plural} so mixed ${vocab.list.plural} are scored against every ${vocab.buyer.singular}.`}
         actions={
-          <Link
+          <AppActionLink
             href={listDetailHref(id, { campaignId: campaign?.id })}
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
           >
             Back to {vocab.list.singular}
-          </Link>
+          </AppActionLink>
         }
       />
 

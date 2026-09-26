@@ -6,8 +6,7 @@ import {
   addProductSourcesAction,
   type ProductSetupActionResult,
 } from "@/app/actions/product-setup";
-import { Field, SECONDARY_BUTTON_CLASS, SubmitButton } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { Field, SubmitButton } from "@/components/ui";
 import { vocab } from "@/lib/product-config";
 
 const initial: ProductSetupActionResult | null = null;
@@ -67,7 +66,7 @@ export function AddProductMaterialPanel({ productId }: { productId: string }) {
             name="files"
             multiple
             accept=".pdf,.doc,.docx,.txt,.md,.rtf"
-            className={cn(SECONDARY_BUTTON_CLASS, "mt-1", "block", "w-full")}
+            className="mt-1 block w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink"
           />
         </label>
         <SubmitButton disabled={pending}>

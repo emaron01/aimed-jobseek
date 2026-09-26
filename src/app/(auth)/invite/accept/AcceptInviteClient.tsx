@@ -1,8 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { AppButton } from "@/components/ui";
 import Link from "next/link";
 import {
   acceptInviteAction,
@@ -58,7 +57,6 @@ export function AcceptInviteClient({
           <input type="hidden" name="next" value={returnTo} />
           <AppButton
             type="submit"
-            className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
             data-testid="invite-accept-switch-account"
           >
             Sign out and continue
@@ -90,7 +88,6 @@ export function AcceptInviteClient({
         <AppButton
           type="submit"
           disabled={pending}
-          className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
           data-testid="invite-accept-submit"
         >
           {pending ? "Joining…" : "Accept invitation"}
@@ -103,7 +100,7 @@ export function AcceptInviteClient({
       ) : null}
       <form action={logoutForInviteAction}>
         <input type="hidden" name="next" value={returnTo} />
-        <AppButton type="submit" className={cn(SECONDARY_BUTTON_CLASS, "!px-3", "text-xs")}>
+        <AppButton type="submit" variant="secondary">
           Use a different account
         </AppButton>
       </form>

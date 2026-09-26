@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 type SeatPreview = {
@@ -97,7 +97,7 @@ export function SeatManagementPanel({
           disabled={!canAdd || pending}
           title={!canAdd ? (addDisabledReason ?? undefined) : undefined}
           onClick={() => void loadPreview("add")}
-          className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
+          className={cn("!px-3")}
         >
           {pending && preview?.direction !== "remove"
             ? "Loading…"
@@ -108,7 +108,7 @@ export function SeatManagementPanel({
           disabled={!canRemove || pending}
           title={!canRemove ? (removeDisabledReason ?? undefined) : undefined}
           onClick={() => void loadPreview("remove")}
-          className={cn(SECONDARY_BUTTON_CLASS, "!px-3")}
+          variant="secondary" className={cn("!px-3")}
         >
           Remove a seat
         </AppButton>
@@ -136,7 +136,7 @@ export function SeatManagementPanel({
               type="button"
               disabled={pending}
               onClick={() => void confirmChange()}
-              className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
+              className={cn("!px-3")}
             >
               {pending ? "Updating…" : "Confirm seat change"}
             </AppButton>
@@ -144,7 +144,7 @@ export function SeatManagementPanel({
               type="button"
               disabled={pending}
               onClick={() => setPreview(null)}
-              className={cn(SECONDARY_BUTTON_CLASS, "!px-3")}
+              variant="secondary" className={cn("!px-3")}
             >
               Cancel
             </AppButton>

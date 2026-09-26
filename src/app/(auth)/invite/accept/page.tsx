@@ -1,6 +1,4 @@
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from "@/components/ui";
-import { cn } from "@/lib/utils";
-import Link from "next/link";
+import { AppActionLink } from "@/components/ui";
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getInvitationPreviewByRawToken } from "@/lib/org/signup";
@@ -29,9 +27,9 @@ async function AcceptInviteBody({ token }: { token: string | null }) {
           resend the invite.
         </p>
         <p className="mt-4 text-sm">
-          <Link href="/login" className="underline">
+          <AppActionLink href="/login" variant="secondary">
             Sign in
-          </Link>
+          </AppActionLink>
         </p>
       </div>
     );
@@ -72,20 +70,20 @@ async function AcceptInviteBody({ token }: { token: string | null }) {
           .
         </p>
         <div className="mt-6 flex flex-col gap-3 text-sm">
-          <Link
+          <AppActionLink
             href={signupHref}
-            className={cn(PRIMARY_BUTTON_CLASS, "!px-3", "text-center")}
+            variant="primary"
             data-testid="invite-create-account"
           >
             Create account
-          </Link>
-          <Link
+          </AppActionLink>
+          <AppActionLink
             href={`/login?next=${encodeURIComponent(next)}`}
-            className={cn(SECONDARY_BUTTON_CLASS, "!px-3", "text-center")}
+            variant="secondary"
             data-testid="invite-sign-in"
           >
             Already have an account? Sign in
-          </Link>
+          </AppActionLink>
         </div>
       </div>
     );

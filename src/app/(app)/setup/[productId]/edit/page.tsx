@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CandidateProfileEditForm } from "@/components/CandidateProfileEditForm";
-import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { getProduct } from "@/lib/tenant/data";
 import {
   getCurrentOrganization,
@@ -40,12 +39,12 @@ export default async function EditProductPage({ params }: PageProps) {
         title={`${candidateProfileEditCopy.pageTitle}: ${product.name}`}
         description={candidateProfileEditCopy.pageHelp}
         actions={
-          <Link
+          <AppActionLink
             href={`/setup/${product.id}`}
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
           >
             Back to overview
-          </Link>
+          </AppActionLink>
         }
       />
       <div className="rounded-lg border border-edge bg-surface p-5">

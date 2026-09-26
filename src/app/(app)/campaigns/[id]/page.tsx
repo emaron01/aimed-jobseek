@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { ApplicationOverview } from "@/components/ApplicationOverview";
 import { ApplicationWorkspace } from "@/components/ApplicationWorkspace";
 import { generateApplicationPageMetadata } from "@/lib/application/page-metadata";
@@ -16,7 +16,7 @@ import { EmailDraftsStage } from "@/components/EmailDraftsStage";
 import { CampaignStageShell } from "@/components/CampaignStageShell";
 import { CampaignStageRail } from "@/components/CampaignStageRail";
 import { QualificationBuckets } from "@/components/QualificationBuckets";
-import { PageHeader, Panel, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, Panel, TenantMissing, AppActionLink } from "@/components/ui";
 import { campaignDeleteConfirmBody } from "@/lib/tenant/campaign-delete";
 import { campaignArchiveConfirmBody } from "@/lib/tenant/campaign-archive";
 import {
@@ -514,12 +514,12 @@ export default async function CampaignDetailPage({
                 visibility={campaign.visibility}
               />
             ) : null}
-            <Link
+            <AppActionLink
               href="/campaigns"
-              className={SECONDARY_BUTTON_CLASS}
+              variant="secondary"
             >
               Back to {vocab.campaign.plural}
-            </Link>
+            </AppActionLink>
             {canEditTemplate && campaignArchived ? (
               <UnarchiveForm
                 action={unarchiveCampaignAction}
@@ -562,9 +562,9 @@ export default async function CampaignDetailPage({
       />
       ) : (
       <div className="flex flex-wrap items-center gap-2">
-        <Link href="/campaigns" className={SECONDARY_BUTTON_CLASS}>
+        <AppActionLink href="/campaigns" variant="secondary">
           {polishCopy.backToApplications}
-        </Link>
+        </AppActionLink>
         {canEditTemplate && campaignArchived ? (
           <UnarchiveForm
             action={unarchiveCampaignAction}
@@ -938,12 +938,12 @@ export default async function CampaignDetailPage({
           {campaignArchived || !canEditTemplate ? (
             <div className="space-y-4">
               <div className="flex flex-col items-start gap-2">
-                <Link
+                <AppActionLink
                   href={listIndexHref({ campaignId: campaign.id })}
-                  className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
+                  variant="primary" className={cn("!px-3")}
                 >
                   Select an Existing {vocab.list.Singular} To Be Researched and Scored
-                </Link>
+                </AppActionLink>
               </div>
               <p className="text-sm text-muted">
                 {campaignArchived

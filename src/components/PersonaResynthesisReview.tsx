@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -9,7 +8,7 @@ import {
   type PersonaSetupActionResult,
 } from "@/app/actions/persona-setup";
 import { AutosizeTextarea } from "@/components/AutosizeTextarea";
-import { SECONDARY_BUTTON_CLASS, SecondaryButton, SubmitButton } from "@/components/ui";
+import {SecondaryButton, SubmitButton, AppActionLink } from "@/components/ui";
 import type { PersonaAiDraft } from "@/lib/persona-research/contract";
 import {
   buildPersonaCriteriaForReview,
@@ -286,12 +285,12 @@ export function PersonaResynthesisReview({
           <SecondaryButton type="submit" disabled={retryPending}>
             {retryPending ? "Retrying…" : "Retry rebuild"}
           </SecondaryButton>
-          <Link
+          <AppActionLink
             href={`/setup/${productId}/personas/manage/${personaId}`}
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
           >
             Cancel
-          </Link>
+          </AppActionLink>
         </form>
         {retry ? (
           <p className="text-sm text-danger">{retry.message}</p>
@@ -389,12 +388,12 @@ export function PersonaResynthesisReview({
           <SubmitButton disabled={pending}>
             {pending ? "Applying…" : "Confirm rebuild"}
           </SubmitButton>
-          <Link
+          <AppActionLink
             href={`/setup/${productId}/personas/manage/${personaId}`}
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
           >
             Cancel
-          </Link>
+          </AppActionLink>
         </div>
         {state ? (
           <p

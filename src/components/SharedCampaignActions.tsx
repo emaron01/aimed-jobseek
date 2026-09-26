@@ -1,5 +1,5 @@
 import { useSharedCampaignAction } from "@/app/actions/campaign-sharing";
-import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { vocab } from "@/lib/product-config";
 
@@ -16,7 +16,7 @@ export function SharedCampaignActions({ campaignId }: { campaignId: string }) {
         <input type="hidden" name="campaignId" value={campaignId} />
         <AppButton
           type="submit"
-          className={cn(PRIMARY_BUTTON_CLASS, "w-full !px-3 !py-1.5")}
+          className={cn("w-full !px-3 !py-1.5")}
           title={`Create a personal copy with the same ${vocab.product.singular}, ${vocab.icp.singular}, ${vocab.persona.plural}, offer, and email guidance. Empty of ${vocab.list.plural} and ${vocab.contact.plural}.`}
         >
           Use this {vocab.campaign.singular}

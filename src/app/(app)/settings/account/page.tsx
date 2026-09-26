@@ -1,7 +1,7 @@
-import { PRIMARY_BUTTON_CLASS, AppButton, PageHeader } from "@/components/ui";
+import Link from "next/link";
+import { AppButton, PageHeader } from "@/components/ui";
 import { polishCopy } from "@/lib/product-config";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 import { requireCurrentUser } from "@/lib/auth/authz";
 import { isEmailVerified } from "@/lib/auth/account-policy";
 import { logoutAction } from "@/app/actions/account";
@@ -111,7 +111,7 @@ export default async function AccountSettingsPage() {
             </label>
             <AppButton
               type="submit"
-              className={cn(PRIMARY_BUTTON_CLASS, "sm:col-span-2", "w-fit", "!px-3")}
+              className={cn("sm:col-span-2", "w-fit", "!px-3")}
             >
               Save digest preferences
             </AppButton>

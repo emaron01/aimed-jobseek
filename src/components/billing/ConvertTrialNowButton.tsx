@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -74,7 +74,8 @@ export function ConvertTrialNowButton({
           <AppButton
             type="button"
             disabled={pending}
-            className={className ?? PRIMARY_BUTTON_CLASS}
+            variant="primary"
+            className={className}
             onClick={() => {
               setError(null);
               startTransition(async () => {
@@ -109,7 +110,7 @@ export function ConvertTrialNowButton({
           <AppButton
             type="button"
             disabled={pending}
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
             onClick={() => setConfirming(false)}
           >
             Cancel
@@ -126,7 +127,8 @@ export function ConvertTrialNowButton({
         type="button"
         disabled={pending}
         data-testid="convert-trial-now"
-        className={className ?? PRIMARY_BUTTON_CLASS}
+        variant="primary"
+        className={className}
         onClick={() => {
           setError(null);
           setConfirming(true);

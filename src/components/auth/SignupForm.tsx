@@ -1,11 +1,11 @@
 "use client";
 
-import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import Link from "next/link";
+import { AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { prepareSignupCompanyAction } from "@/app/actions/pending-signup";
 import { signupCopy } from "@/lib/product-config";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
@@ -211,7 +211,7 @@ export function SignupForm({
         <AppButton
           type="submit"
           disabled={loading || (requirePlan && !planSummary)}
-          className={cn(PRIMARY_BUTTON_CLASS, "w-full", "!px-3")}
+          className={cn("w-full", "!px-3")}
         >
           {loading
             ? "Creating account…"

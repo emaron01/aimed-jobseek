@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   getResearchRunStatusAction,
@@ -12,7 +12,7 @@ import {
 } from "@/app/actions/research";
 import { CompanyResearchAllowanceBanner } from "@/components/CompanyResearchAllowanceBanner";
 import { ConvertTrialNowButton } from "@/components/billing/ConvertTrialNowButton";
-import { PrimaryButton, SECONDARY_BUTTON_CLASS, SecondaryButton } from "@/components/ui";
+import {PrimaryButton, SecondaryButton, AppActionLink } from "@/components/ui";
 import { billingPlanLabel } from "@/lib/billing/billing-state";
 import {
   isResearchRunPaused,
@@ -456,12 +456,12 @@ export function ResearchRunPanel({
             >
               Continue anyway
             </PrimaryButton>
-            <Link
+            <AppActionLink
               href={quotaCta.href}
-              className={SECONDARY_BUTTON_CLASS}
+              variant="secondary"
             >
               {isTrialing ? "View Billing" : "Buy more"}
-            </Link>
+            </AppActionLink>
             <SecondaryButton
               type="button"
               disabled={pending}

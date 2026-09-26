@@ -1,12 +1,12 @@
 "use client";
 
-import { useActionState, useState } from "react";
 import Link from "next/link";
+import { useActionState, useState } from "react";
 import {
   setPendingSignupPlanAction,
   type PendingSignupActionResult,
 } from "@/app/actions/pending-signup";
-import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 import {
   BILLING_PLAN_ENTERPRISE,
   BILLING_PLAN_STANDARD,
@@ -179,7 +179,7 @@ export function SignupPlanSelector({
         {planCode === BILLING_PLAN_ENTERPRISE && features.contactSales ? (
           <a
             href={supportMailtoHref(supportEmail)}
-            className={cn(PRIMARY_BUTTON_CLASS, "w-full !px-4 !py-3")}
+            className={cn("w-full !px-4 !py-3")}
           >
             Contact us
           </a>
@@ -196,7 +196,7 @@ export function SignupPlanSelector({
             <AppButton
               type="submit"
               disabled={pending}
-              className={cn(PRIMARY_BUTTON_CLASS, "w-full !px-4 !py-3")}
+              className={cn("w-full !px-4 !py-3")}
             >
               {pending ? "Continuing…" : "Continue to create account"}
             </AppButton>

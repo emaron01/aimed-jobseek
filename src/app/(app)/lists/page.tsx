@@ -3,7 +3,7 @@ import { AddContactsWizard } from "@/components/AddContactsWizard";
 import { CompanyResearchAllowanceBanner } from "@/components/CompanyResearchAllowanceBanner";
 import { DeleteSuccessNotice } from "@/components/DeleteSuccessNotice";
 import { ShowArchivedToggle } from "@/components/ShowArchivedToggle";
-import { EmptyState, PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {EmptyState, PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { loadResearchBillingContext } from "@/lib/billing/research-billing-context";
 import { getMembershipForCurrentUser } from "@/lib/org/authz";
 import {
@@ -68,12 +68,12 @@ export default async function ListsPage({
         actions={
           <div className="flex flex-wrap items-center gap-3">
             {campaign ? (
-              <Link
+              <AppActionLink
                 href={campaignListStageHref(campaign.id)}
-                className={SECONDARY_BUTTON_CLASS}
+                variant="secondary"
               >
                 Back to {campaign.name}
-              </Link>
+              </AppActionLink>
             ) : null}
             <ShowArchivedToggle
               href={listIndexHref({

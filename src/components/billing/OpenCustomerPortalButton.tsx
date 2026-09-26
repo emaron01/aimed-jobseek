@@ -1,5 +1,5 @@
 "use client";
-import { SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 import { useState, useTransition } from "react";
@@ -17,7 +17,7 @@ export function OpenCustomerPortalButton() {
       <AppButton
         type="button"
         disabled={pending}
-        className={cn(SECONDARY_BUTTON_CLASS, "!px-3")}
+        variant="secondary" className={cn("!px-3")}
         onClick={() => {
           setError(null);
           startTransition(async () => {

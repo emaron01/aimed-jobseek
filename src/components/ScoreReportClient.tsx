@@ -19,7 +19,6 @@ import {
   Field,
   PrimaryButton,
   SecondaryButton,
-  SECONDARY_BUTTON_CLASS,
   SubmitButton, AppButton } from "@/components/ui";
 import { contactDisplayName, cn } from "@/lib/utils";
 import { hasUsableCompanyResearchFields } from "@/lib/research/freshness";
@@ -704,10 +703,8 @@ export function ScoreReportClient({
                       ) : (
                         <AppButton
                           type="button"
-                          className={cn(
-                            SECONDARY_BUTTON_CLASS,
-                            "w-full !px-2 !py-1.5 text-left",
-                          )}
+                          variant="secondary"
+                          className="w-full !px-2 !py-1.5 !justify-start"
                           title={resolvedQualification.reason ?? "Pending"}
                           aria-expanded={open}
                           onClick={() => setExpandedId(open ? null : row.id)}

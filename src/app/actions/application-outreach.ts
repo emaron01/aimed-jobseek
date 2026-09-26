@@ -12,7 +12,7 @@ import {
   isHiringTeamPersonaBuilt,
   queueHiringTeamBuild,
 } from "@/lib/hiring-team/build";
-import { hiringTeamConfig, isOutreachAssetType, workspaceProgressText } from "@/lib/product-config";
+import { hiringTeamConfig, isOutreachAssetType, vocab, workspaceProgressText } from "@/lib/product-config";
 import { prisma } from "@/lib/prisma";
 import {
   addApplicationContact,
@@ -76,6 +76,10 @@ export async function addApplicationContactAction(
       requireOrganizationId(),
     ]);
     const id = campaignId(formData);
+    const personaId = String(formData.get("personaId") ?? "").trim();
+    if (!personaId) {
+      return { ok: false, message: `Choose ${vocab.persona.aSingular}.` };
+    }
     const result = await addApplicationContact({
       organizationId,
       campaignId: id,
@@ -85,7 +89,7 @@ export async function addApplicationContactAction(
       title: String(formData.get("title") ?? ""),
       email: String(formData.get("email") ?? "").trim() || null,
       linkedinUrl: String(formData.get("linkedinUrl") ?? "").trim() || null,
-      personaId: String(formData.get("personaId") ?? "").trim() || null,
+      personaId,
     });
     revalidate(id);
     return {

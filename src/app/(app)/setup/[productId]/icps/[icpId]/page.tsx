@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { IcpDetailsForm } from "@/components/IcpDetailsForm";
-import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { serializeIcpForClient } from "@/lib/icp/save";
 import { listIcpCriteria } from "@/lib/interpretation/icp";
 import { getIcp, getProduct } from "@/lib/tenant/data";
@@ -50,12 +49,12 @@ export default async function EditIcpPage({ params }: PageProps) {
         title={icp.name}
         description={`${vocab.idealCustomer.Singular} profile for ${product.name}.`}
         actions={
-          <Link
+          <AppActionLink
             href={`/setup/${product.id}`}
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
           >
             Back to overview
-          </Link>
+          </AppActionLink>
         }
       />
       <IcpDetailsForm

@@ -1,6 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { AppButton } from "@/components/ui";
 
 import Link from "next/link";
 import { FormEvent, useState, Suspense, useTransition } from "react";
@@ -85,7 +84,7 @@ function VerifyEmailInner() {
           type="submit"
           disabled={pending}
           data-testid="resend-verification"
-          className={cn(PRIMARY_BUTTON_CLASS, "w-full", "!px-3")}
+          className="w-full"
         >
           {pending ? "Sending…" : "Send a new verification email"}
         </AppButton>

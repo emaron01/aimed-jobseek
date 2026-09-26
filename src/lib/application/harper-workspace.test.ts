@@ -113,7 +113,10 @@ describe("workspace order and Harper start", () => {
     );
     expect(workspace).not.toContain("<ConsultationSection");
     expect(workspace).toContain("addHiringTeamPersonAction");
-    expect(workspace).toContain("hiringTeamConfig.actions.edit");
+    expect(workspace).toContain("HiringTeamRoleActions");
+    expect(
+      readFileSync("src/components/HiringTeamRoleActions.tsx", "utf8"),
+    ).toContain("hiringTeamConfig.actions.edit");
     expect(workspace).not.toContain('name="reason"');
   });
 });

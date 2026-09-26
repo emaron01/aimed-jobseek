@@ -43,8 +43,8 @@ describe("campaign contact management seams", () => {
       "Select an Existing {vocab.list.Singular} To Be Researched and Scored",
     );
     expect(manager).toContain("listIndexHref({ campaignId })");
-    expect(manager).toContain("SECONDARY_BUTTON_CLASS");
-    expect(manager).toContain("PRIMARY_BUTTON_CLASS");
+    expect(manager).toContain("AppButton");
+    expect(manager).toContain("AppActionLink");
     expect(manager).toContain("flex flex-col items-start gap-2");
     expect(manager).toContain("campaign-list-score-hint");
     expect(manager).toContain("campaign-contacts-status");

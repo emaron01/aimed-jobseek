@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PersonaDraftReview } from "@/components/PersonaDraftReview";
-import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import { getProduct } from "@/lib/tenant/data";
 import {
@@ -75,12 +74,12 @@ export default async function PersonaSetupRunPage({ params }: PageProps) {
         title={`${vocab.persona.Singular} draft: ${product.name}`}
         description={`Review and save to make this ${vocab.persona.Singular} authoritative.`}
         actions={
-          <Link
+          <AppActionLink
             href={`/setup/${product.id}/research`}
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
           >
             Suggested roles
-          </Link>
+          </AppActionLink>
         }
       />
       <section className="rounded-lg border border-edge bg-surface p-5">

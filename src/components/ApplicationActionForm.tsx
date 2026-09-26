@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent, type ReactNode } from "react";
-import { AppButton } from "@/components/AppButton";
+import { AppButton, type AppButtonVariant } from "@/components/AppButton";
 
 type ActionResult = { ok: boolean; message: string };
 
@@ -35,6 +35,7 @@ export function ApplicationActionForm({
   pendingLabel = "Saving…",
   testId,
   onSubmitStart,
+  variant = "primary",
   children,
 }: {
   action: (
@@ -45,6 +46,7 @@ export function ApplicationActionForm({
   pendingLabel?: string;
   testId: string;
   onSubmitStart?: (formData: FormData) => void;
+  variant?: AppButtonVariant;
   children: ReactNode;
 }) {
   const [state, setState] = useState<ActionResult | null>(null);
@@ -71,7 +73,7 @@ export function ApplicationActionForm({
           {state.message}
         </p>
       ) : null}
-      <AppButton type="submit" pending={pending} pendingLabel={pendingLabel}>
+      <AppButton type="submit" variant={variant} pending={pending} pendingLabel={pendingLabel}>
         {submitLabel}
       </AppButton>
     </form>

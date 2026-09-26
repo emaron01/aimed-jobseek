@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PersonaForm } from "@/components/PersonaForm";
-import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { listPersonaCriteria } from "@/lib/interpretation/persona";
 import { prisma } from "@/lib/prisma";
 import { getPersona, getProduct } from "@/lib/tenant/data";
@@ -85,12 +84,12 @@ export default async function ManagePersonaPage({ params }: PageProps) {
         title={persona.name}
         description={`${vocab.persona.Singular} for ${product.name}.`}
         actions={
-          <Link
+          <AppActionLink
             href={`/setup/${product.id}`}
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
           >
             Back to overview
-          </Link>
+          </AppActionLink>
         }
       />
       <PersonaForm

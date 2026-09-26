@@ -10,7 +10,7 @@ import { CampaignListWorkflowButtons } from "@/components/CampaignListWorkflowBu
 import { ListCompanyResearchView } from "@/components/ListCompanyResearchView";
 import { ResearchRunPanel } from "@/components/ResearchRunPanel";
 import { UnarchiveForm } from "@/components/UnarchiveForm";
-import { EmptyState, PageHeader, Panel, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {EmptyState, PageHeader, Panel, TenantMissing, AppActionLink } from "@/components/ui";
 import { isResearchAiConfigured } from "@/lib/ai/config";
 import { loadResearchBillingContext } from "@/lib/billing/research-billing-context";
 import { getMembershipForCurrentUser } from "@/lib/org/authz";
@@ -180,12 +180,12 @@ export default async function ListDetailPage({
                     allowScore={features.listBulkScoring}
                   />
                 ) : features.listBulkScoring ? (
-                  <Link
+                  <AppActionLink
                     href={scoreHref}
-                    className={PRIMARY_BUTTON_CLASS}
+                    variant="primary"
                   >
                     Score {vocab.list.Singular}
-                  </Link>
+                  </AppActionLink>
                 ) : null}
                 <ConfirmDeleteForm
                   action={archiveContactListAction}
@@ -216,12 +216,12 @@ export default async function ListDetailPage({
                 onSuccessNavigate={listsHref}
               />
             ) : null}
-            <Link
+            <AppActionLink
               href={listsHref}
-              className={SECONDARY_BUTTON_CLASS}
+              variant="secondary"
             >
               Back to {vocab.list.plural}
-            </Link>
+            </AppActionLink>
           </div>
         }
       />
@@ -312,12 +312,12 @@ export default async function ListDetailPage({
                       {formatNumber(run.totalContacts)} {vocab.contact.plural} · {run.status}
                     </p>
                   </div>
-                  <Link
+                  <AppActionLink
                     href={`/scoring/${run.id}${campaign?.id ? `?campaign=${campaign.id}` : ""}`}
-                    className={cn(SECONDARY_BUTTON_CLASS, "!px-3", "!py-1.5")}
+                    variant="secondary" className={cn("!px-3", "!py-1.5")}
                   >
                     View Report
-                  </Link>
+                  </AppActionLink>
                 </div>
               ))}
             </div>
@@ -349,26 +349,26 @@ export default async function ListDetailPage({
               </span>
               <div className="flex gap-2">
                 {page > 1 ? (
-                  <Link
+                  <AppActionLink
                     href={listDetailHref(id, {
                       campaignId: campaign?.id,
                       page: page - 1,
                     })}
-                    className={cn(SECONDARY_BUTTON_CLASS, "!px-3", "!py-1.5")}
+                    variant="secondary" className={cn("!px-3", "!py-1.5")}
                   >
                     Previous
-                  </Link>
+                  </AppActionLink>
                 ) : null}
                 {page < totalPages ? (
-                  <Link
+                  <AppActionLink
                     href={listDetailHref(id, {
                       campaignId: campaign?.id,
                       page: page + 1,
                     })}
-                    className={cn(SECONDARY_BUTTON_CLASS, "!px-3", "!py-1.5")}
+                    variant="secondary" className={cn("!px-3", "!py-1.5")}
                   >
                     Next
-                  </Link>
+                  </AppActionLink>
                 ) : null}
               </div>
             </div>

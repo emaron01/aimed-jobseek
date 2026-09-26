@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProductResynthesisReview } from "@/components/ProductResynthesisReview";
-import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import type { CandidateProfile } from "@/lib/product-research/candidate-profile";
 import { PRODUCT_RESYNTHESIS_USER_CONTEXT_FLAG } from "@/lib/product-research/resynthesize-approved";
@@ -62,18 +61,18 @@ export default async function ProductResynthesisReviewPage({ params }: PageProps
         description={`Review new material against your approved ${vocab.product.singular} profile. Nothing changes until you confirm.`}
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link
+            <AppActionLink
               href="/products"
-              className={SECONDARY_BUTTON_CLASS}
+              variant="secondary"
             >
               All {vocab.product.plural}
-            </Link>
-            <Link
+            </AppActionLink>
+            <AppActionLink
               href={`/setup/${product.id}/research`}
-              className={SECONDARY_BUTTON_CLASS}
+              variant="secondary"
             >
               Back to research
-            </Link>
+            </AppActionLink>
           </div>
         }
       />

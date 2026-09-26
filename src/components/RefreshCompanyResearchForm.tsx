@@ -1,5 +1,5 @@
 "use client";
-import { SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 
 import { ActionFeedbackForm } from "@/components/ActionFeedbackForm";
 import { refreshCompanyResearchAction } from "@/app/actions/research";
@@ -21,7 +21,7 @@ export function RefreshCompanyResearchForm({
       ) : null}
       <AppButton
         type="submit"
-        className={SECONDARY_BUTTON_CLASS}
+        variant="secondary"
       >
         {label}
       </AppButton>

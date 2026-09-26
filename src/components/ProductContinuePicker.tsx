@@ -1,5 +1,5 @@
 "use client";
-import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -60,7 +60,7 @@ export function ProductContinuePicker({
           if (!productId) return;
           router.push(buildProductContinuePath(continuePathTemplate, productId));
         }}
-        className={PRIMARY_BUTTON_CLASS}
+        
       >
         {continueLabel}
       </AppButton>

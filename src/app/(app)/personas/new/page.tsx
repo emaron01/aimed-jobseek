@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ProductContinuePicker } from "@/components/ProductContinuePicker";
-import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { listProducts } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { vocab } from "@/lib/product-config";
@@ -43,12 +43,12 @@ export default async function NewPersonaPage({
         title={`New ${vocab.persona.singular}`}
         description={`Choose which ${vocab.product.singular} this ${vocab.persona.singular} belongs to, then continue to build it from suggested roles or from scratch.`}
         actions={
-          <Link
+          <AppActionLink
             href="/personas"
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
           >
             Back to {vocab.persona.plural}
-          </Link>
+          </AppActionLink>
         }
       />
 

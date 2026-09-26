@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PersonaResynthesisReview } from "@/components/PersonaResynthesisReview";
-import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { listPersonaCriteria } from "@/lib/interpretation/persona";
 import { prisma } from "@/lib/prisma";
 import type { PersonaAiDraft } from "@/lib/persona-research/contract";
@@ -77,18 +76,18 @@ export default async function PersonaResynthesisReviewPage({ params }: PageProps
         description={`Review ${vocab.product.singular}-evidence rebuild for ${product.name}. Nothing changes until you confirm.`}
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link
+            <AppActionLink
               href={`/personas?product=${product.id}`}
-              className={SECONDARY_BUTTON_CLASS}
+              variant="secondary"
             >
               All {vocab.persona.plural}
-            </Link>
-            <Link
+            </AppActionLink>
+            <AppActionLink
               href={`/setup/${product.id}/personas/manage/${persona.id}`}
-              className={SECONDARY_BUTTON_CLASS}
+              variant="secondary"
             >
               Back to {vocab.persona.singular}
-            </Link>
+            </AppActionLink>
           </div>
         }
       />

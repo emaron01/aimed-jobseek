@@ -23,7 +23,7 @@ import { projectPersonaSignalsFromProfileAction, rebuildPersonaFromProductEviden
 import { ConfirmDeleteForm } from "@/components/ConfirmDeleteForm";
 import { ExportPdfButton } from "@/components/ExportPdfButton";
 import { PersonaBriefingDocument } from "@/components/PersonaBriefingDocument";
-import { Field, SECONDARY_BUTTON_CLASS, SecondaryButton, SubmitButton, AppButton } from "@/components/ui";
+import { Field, SecondaryButton, SubmitButton, AppButton } from "@/components/ui";
 import { formatCriterionDisplay } from "@/lib/criteria/types";
 import type { PersonaActionResult } from "@/lib/persona/save";
 import {
@@ -287,7 +287,7 @@ function NeedsReviewCriterionRow({
             <input type="hidden" name="productId" value={productId} />
             <AppButton
               type="submit"
-              className={cn(SECONDARY_BUTTON_CLASS, "py-1", "!px-2", "!py-1", "!text-[11px]")}
+              variant="secondary" className={cn("py-1", "!px-2", "!py-1", "!text-[11px]")}
             >
               Dismiss
             </AppButton>
@@ -458,7 +458,7 @@ function NewPersonaForm({
             type="submit"
             formAction={interpretAction}
             disabled={pending}
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
           >
             {interpretPending
               ? "Regenerating criteria…"
@@ -709,7 +709,7 @@ export function PersonaForm({
                 type="submit"
                 formAction={interpretAction}
                 disabled={pending}
-                className={SECONDARY_BUTTON_CLASS}
+                variant="secondary"
               >
                 {interpretPending
                   ? "Regenerating criteria…"
@@ -735,7 +735,7 @@ export function PersonaForm({
               <AppButton
                 type="submit"
                 disabled={interpretPending}
-                className={SECONDARY_BUTTON_CLASS}
+                variant="secondary"
               >
                 {interpretPending
                   ? "Regenerating criteria…"
@@ -749,7 +749,7 @@ export function PersonaForm({
                 <AppButton
                   type="submit"
                   disabled={rebuildPending}
-                  className={SECONDARY_BUTTON_CLASS}
+                  variant="secondary"
                 >
                   {rebuildPending
                     ? "Rebuilding…"

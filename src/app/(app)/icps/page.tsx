@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ArtifactProductFilter } from "@/components/ArtifactProductFilter";
-import { EmptyState, PageHeader, PRIMARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {EmptyState, PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { listIcps, listProducts } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
@@ -42,14 +42,14 @@ export default async function IcpsPage({
         description={`Org-wide ${vocab.icp.singular} list. Open ${vocab.icp.aSingular} to review criteria or attach it to ${vocab.campaign.aSingular}.`}
         actions={
           canCreate ? (
-            <Link
+            <AppActionLink
               href={
                 productId ? `/icps/new?product=${productId}` : "/icps/new"
               }
-              className={PRIMARY_BUTTON_CLASS}
+              variant="primary"
             >
               New {vocab.icp.singular}
-            </Link>
+            </AppActionLink>
           ) : (
             <span
               title={`Add ${vocab.product.aSingular} first`}
@@ -79,19 +79,19 @@ export default async function IcpsPage({
           description={`${vocab.icp.ASingular} describes the kind of company you want to work for — natural-language criteria interpreted for scoring and ${vocab.campaign.plural}.`}
           actions={
             canCreate ? (
-              <Link
+              <AppActionLink
                 href="/icps/new"
-                className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
+                variant="primary" className={cn("!px-3")}
               >
                 New {vocab.icp.singular}
-              </Link>
+              </AppActionLink>
             ) : (
-              <Link
+              <AppActionLink
                 href="/products/new"
-                className={cn(PRIMARY_BUTTON_CLASS, "!px-3")}
+                variant="primary" className={cn("!px-3")}
               >
                 New {vocab.product.singular}
-              </Link>
+              </AppActionLink>
             )
           }
         />

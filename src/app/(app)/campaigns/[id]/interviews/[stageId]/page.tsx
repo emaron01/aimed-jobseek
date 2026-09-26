@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { generateInterviewGuideAction } from "@/app/actions/interview";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { PrintApplicationSummaryButton } from "@/components/PrintApplicationSummaryButton";
-import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
 import { canOpenCampaignDetail } from "@/lib/campaign/visibility";
@@ -56,9 +55,9 @@ export default async function InterviewGuidePage({ params }: PageProps) {
         actions={
           <div className="flex flex-wrap gap-2 print:hidden">
             {content ? <PrintApplicationSummaryButton /> : null}
-            <Link href={`/campaigns/${id}`} className={SECONDARY_BUTTON_CLASS}>
+            <AppActionLink href={`/campaigns/${id}`} variant="secondary">
               Back to application
-            </Link>
+            </AppActionLink>
           </div>
         }
       />

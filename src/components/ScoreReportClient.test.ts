@@ -50,6 +50,6 @@ describe("ScoreReportClient table layout", () => {
     expect(source).toContain("line-clamp-2");
     expect(source).toContain("Show details");
     expect(source).toContain("resolvedQualification.reason");
-    expect(source).toContain("SECONDARY_BUTTON_CLASS");
+    expect(source).toContain('variant="secondary"');
   });
 });

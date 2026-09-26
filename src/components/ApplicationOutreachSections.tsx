@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useState } from "react";
 import {
   addApplicationContactAction,
   generateOutreachAssetAction,
@@ -10,11 +10,6 @@ import {
   updateApplicationContactRoleAction,
   type ApplicationOutreachActionResult,
 } from "@/app/actions/application-outreach";
-import {
-  buildIndividualProfileAction,
-  saveLinkedInPasteAction,
-} from "@/app/actions/contact-profile";
-import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { interviewConfig } from "@/lib/product-config";
 import {
   applicationAssetContentSchema,
@@ -28,7 +23,7 @@ import {
   outreachConfig,
   vocab,
 } from "@/lib/product-config";
-import { SECONDARY_BUTTON_CLASS, SubmitButton, AppButton } from "@/components/ui";
+import { SubmitButton, AppButton, AppActionLink } from "@/components/ui";
 import {
   WORKSPACE_CARD_WRAP_CLASS,
   WORKSPACE_MESSAGE_WRAP_CLASS,
@@ -66,6 +61,7 @@ type OutreachRow = {
   contactId: string | null;
   purpose: "PROACTIVE" | "FOLLOW_UP" | "THANK_YOU" | "CHECK_IN" | null;
   sentAt: string | null;
+  createdAt: string;
   emailLength: "SHORT" | "MEDIUM" | "LONG" | null;
   content: unknown;
 };
@@ -95,6 +91,32 @@ function todayInputValue(value?: string | null): string {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${now.getFullYear()}-${month}-${day}`;
+}
+
+function contactName(contact: ContactRow): string {
+  return [contact.firstName, contact.lastName].filter(Boolean).join(" ") || vocab.contact.Singular;
+}
+
+function messagesForContact(assets: OutreachRow[], contactId: string): OutreachRow[] {
+  return assets
+    .filter((asset) => asset.contactId === contactId)
+    .sort((left, right) => {
+      const time = left.createdAt.localeCompare(right.createdAt);
+      return time !== 0 ? time : left.version - right.version;
+    });
+}
+
+export function contactOutreachStatus(
+  assets: OutreachRow[],
+  contactId: string,
+): string {
+  const messages = messagesForContact(assets, contactId);
+  if (messages.length === 0) return outreachConfig.labels.contactStatusNone;
+  const sent = [...messages].reverse().find((asset) => asset.sentAt);
+  if (sent?.sentAt) {
+    return `${outreachConfig.labels.sentStatus} ${todayInputValue(sent.sentAt)}`;
+  }
+  return outreachConfig.labels.contactStatusDraft;
 }
 
 export function ApplicationAppliedSection({
@@ -180,191 +202,24 @@ export function ApplicationContactsSection({
   canEdit,
   roles,
   contacts,
+  assets = [],
 }: {
   campaignId: string;
   canEdit: boolean;
   roles: RoleOption[];
   contacts: ContactRow[];
+  assets?: OutreachRow[];
 }) {
-  const [addState, addAction] = useActionState(addApplicationContactAction, initial);
-  const [roleState, roleAction] = useActionState(
-    updateApplicationContactRoleAction,
-    initial,
-  );
   return (
-    <section
-      className={`space-y-4 rounded-lg border border-edge bg-surface p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
-      data-testid="application-contacts"
-    >
-      <div>
-        <h2 className="text-base font-semibold text-ink">
-          {outreachConfig.labels.contactsTitle}
-        </h2>
-        <p className="mt-1 text-sm text-muted">{outreachConfig.labels.contactsHelp}</p>
-      </div>
-      {contacts.length === 0 ? (
-        <p className="text-sm text-muted">No contacts on this {vocab.campaign.singular} yet.</p>
-      ) : (
-        <ul className="divide-y divide-slate-100">
-          {contacts.map((contact) => (
-            <li key={contact.contactId} className="py-3 text-sm">
-              <p className="font-medium text-ink">
-                {[contact.firstName, contact.lastName].filter(Boolean).join(" ")}
-              </p>
-              <p className="text-muted">
-                {contact.title ?? "—"}
-                {contact.email ? ` · ${contact.email}` : ""}
-              </p>
-              {canEdit ? (
-                <form action={roleAction} className="mt-2 flex flex-wrap items-end gap-2">
-                  <input type="hidden" name="campaignId" value={campaignId} />
-                  <input type="hidden" name="contactId" value={contact.contactId} />
-                  <label className="text-sm">
-                    <span className="font-medium text-ink">{vocab.persona.Singular}</span>
-                    <select
-                      name="personaId"
-                      defaultValue={contact.personaId ?? ""}
-                      className="mt-1 block rounded-md border border-edge-strong px-3 py-2 text-sm"
-                    >
-                      <option value="" disabled>
-                        Choose {vocab.persona.aSingular}
-                      </option>
-                      {roles.map((role) => (
-                        <option key={role.id} value={role.id}>
-                          {role.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <SubmitButton>Save role</SubmitButton>
-                </form>
-              ) : (
-                <p className="mt-1 text-muted">{contact.personaName ?? "No role matched"}</p>
-              )}
-              <p className="mt-1 text-xs text-subtle">
-                {contact.roleConfirmed
-                  ? outreachConfig.labels.roleConfirmed
-                  : outreachConfig.labels.roleUnconfirmed}
-              </p>
-              {contact.extractedTitle ? (
-                <p className="mt-1 text-xs text-muted">
-                  Title from paste: {contact.extractedTitle}
-                </p>
-              ) : null}
-              {canEdit ? (
-                <ApplicationActionForm
-                  action={saveLinkedInPasteAction}
-                  submitLabel={outreachConfig.labels.saveLinkedIn}
-                  testId={`linkedin-paste-${contact.contactId}`}
-                >
-                  <input type="hidden" name="campaignId" value={campaignId} />
-                  <input type="hidden" name="contactId" value={contact.contactId} />
-                  {contact.personaId ? (
-                    <input type="hidden" name="personaId" value={contact.personaId} />
-                  ) : null}
-                  <label className="block text-sm">
-                    <span className="font-medium text-ink">
-                      {outreachConfig.labels.pasteLinkedIn}
-                    </span>
-                    <textarea
-                      name="linkedInProfileText"
-                      rows={5}
-                      defaultValue={contact.linkedInProfileText ?? ""}
-                      className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
-                    />
-                  </label>
-                  <p className="text-xs text-subtle">
-                    {outreachConfig.labels.pasteLinkedInHelp}
-                  </p>
-                </ApplicationActionForm>
-              ) : null}
-              {contact.individualStatus ? (
-                <p className="mt-2 text-xs text-muted">
-                  {outreachConfig.labels.individualProfile}: {contact.individualStatus}
-                  {contact.individualError ? ` — ${contact.individualError}` : ""}
-                </p>
-              ) : null}
-              {contact.individualStatus === "FAILED" && canEdit ? (
-                <ApplicationActionForm
-                  action={buildIndividualProfileAction}
-                  submitLabel={outreachConfig.labels.rebuildIndividual}
-                  testId={`retry-individual-${contact.contactId}`}
-                >
-                  <input type="hidden" name="campaignId" value={campaignId} />
-                  <input type="hidden" name="contactId" value={contact.contactId} />
-                </ApplicationActionForm>
-              ) : null}
-              {contact.commonGround.length > 0 ? (
-                <div className="mt-2">
-                  <p className="text-xs font-medium text-ink">
-                    {outreachConfig.labels.commonGround}
-                  </p>
-                  <ul className="mt-1 list-disc pl-5 text-xs text-muted">
-                    {contact.commonGround.map((item) => (
-                      <li key={item.text}>
-                        {item.text} ({item.seekerSource}; {item.contactSource})
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {contact.caresAbout.length > 0 ? (
-                <ul className="mt-2 list-disc pl-5 text-xs text-muted">
-                  {contact.caresAbout.map((item) => (
-                    <li key={item.text}>{item.text}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
-      {canEdit ? (
-        <form action={addAction} className="grid gap-3 md:grid-cols-2" data-testid="add-application-contact">
-          <input type="hidden" name="campaignId" value={campaignId} />
-          <label className="text-sm">
-            <span className="font-medium text-ink">First name</span>
-            <input name="firstName" required className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2" />
-          </label>
-          <label className="text-sm">
-            <span className="font-medium text-ink">Last name</span>
-            <input name="lastName" required className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2" />
-          </label>
-          <label className="text-sm">
-            <span className="font-medium text-ink">Title</span>
-            <input name="title" required className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2" />
-          </label>
-          <label className="text-sm">
-            <span className="font-medium text-ink">Email</span>
-            <input name="email" type="email" className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2" />
-          </label>
-          <label className="text-sm md:col-span-2">
-            <span className="font-medium text-ink">LinkedIn URL</span>
-            <input name="linkedinUrl" className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2" />
-          </label>
-          <label className="text-sm md:col-span-2">
-            <span className="font-medium text-ink">{vocab.persona.Singular} override</span>
-            <select name="personaId" defaultValue="" className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2">
-              <option value="">Match from title</option>
-              {roles.map((role) => (
-                <option key={role.id} value={role.id}>
-                  {role.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <SubmitButton>Add {vocab.contact.singular}</SubmitButton>
-        </form>
-      ) : null}
-      <Status result={addState} />
-      <Status result={roleState} />
-    </section>
+    <ApplicationOutreachSection
+      campaignId={campaignId}
+      canEdit={canEdit}
+      roles={roles}
+      contacts={contacts}
+      assets={assets}
+      approvedResumeId={null}
+    />
   );
-}
-
-function parsedContent(value: unknown): ApplicationAssetContent | null {
-  const parsed = applicationAssetContentSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
 }
 
 export function ApplicationOutreachSection({
@@ -382,21 +237,26 @@ export function ApplicationOutreachSection({
   assets: OutreachRow[];
   approvedResumeId: string | null;
 }) {
+  const [addState, addAction] = useActionState(addApplicationContactAction, initial);
+  const [roleState, roleAction] = useActionState(
+    updateApplicationContactRoleAction,
+    initial,
+  );
   const [generateState, generateAction] = useActionState(
     generateOutreachAssetAction,
     initial,
   );
   const [sentState, sentAction] = useActionState(markOutreachSentAction, initial);
-  const sentAssets = assets.filter((asset) => asset.sentAt);
-  const latestByGroup = useMemo(() => {
-    const map = new Map<string, OutreachRow>();
-    for (const asset of assets) {
-      const key = `${asset.type}:${asset.personaId ?? ""}:${asset.contactId ?? ""}:${asset.purpose ?? ""}`;
-      const existing = map.get(key);
-      if (!existing || existing.version < asset.version) map.set(key, asset);
-    }
-    return [...map.values()];
-  }, [assets]);
+  const [selectedId, setSelectedId] = useState(contacts[0]?.contactId ?? "");
+  const selected =
+    contacts.find((contact) => contact.contactId === selectedId) ??
+    contacts[0] ??
+    null;
+  const selectedMessages = selected
+    ? messagesForContact(assets, selected.contactId)
+    : [];
+  const lastSent = [...selectedMessages].reverse().find((asset) => asset.sentAt);
+  const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
 
   return (
     <section
@@ -409,20 +269,42 @@ export function ApplicationOutreachSection({
         </h2>
         <p className="mt-1 text-sm text-muted">{outreachConfig.labels.sectionHelp}</p>
       </div>
+
       {canEdit ? (
-        <form action={generateAction} className="grid gap-3 md:grid-cols-2" data-testid="generate-outreach">
+        <form
+          action={addAction}
+          className="grid gap-3 md:grid-cols-2"
+          data-testid="add-application-contact"
+        >
           <input type="hidden" name="campaignId" value={campaignId} />
           <label className="text-sm">
-            <span className="font-medium text-ink">Channel</span>
-            <select name="type" defaultValue="EMAIL" className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2">
-              <option value="EMAIL">Email</option>
-              <option value="LINKEDIN_CONNECTION_NOTE">LinkedIn connection note</option>
-              <option value="LINKEDIN_INMAIL">LinkedIn InMail</option>
-            </select>
+            <span className="font-medium text-ink">{outreachConfig.labels.fieldFirstName}</span>
+            <input name="firstName" required className={fieldClass} />
           </label>
           <label className="text-sm">
-            <span className="font-medium text-ink">{vocab.persona.Singular}</span>
-            <select name="personaId" required defaultValue={roles[0]?.id ?? ""} className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2">
+            <span className="font-medium text-ink">{outreachConfig.labels.fieldLastName}</span>
+            <input name="lastName" required className={fieldClass} />
+          </label>
+          <label className="text-sm">
+            <span className="font-medium text-ink">{outreachConfig.labels.fieldTitle}</span>
+            <input name="title" required className={fieldClass} />
+          </label>
+          <label className="text-sm">
+            <span className="font-medium text-ink">{outreachConfig.labels.fieldEmail}</span>
+            <input name="email" type="email" className={fieldClass} />
+          </label>
+          <label className="text-sm md:col-span-2">
+            <span className="font-medium text-ink">{outreachConfig.labels.fieldLinkedIn}</span>
+            <input name="linkedinUrl" className={fieldClass} />
+          </label>
+          <label className="text-sm md:col-span-2">
+            <span className="font-medium text-ink">{outreachConfig.labels.assignRole}</span>
+            <select name="personaId" required defaultValue="" className={fieldClass}>
+              <option value="" disabled>
+                {roles.length === 0
+                  ? `No ${vocab.persona.plural} yet`
+                  : `Choose ${vocab.persona.aSingular}`}
+              </option>
               {roles.map((role) => (
                 <option key={role.id} value={role.id}>
                   {role.name}
@@ -430,71 +312,191 @@ export function ApplicationOutreachSection({
               ))}
             </select>
           </label>
-          <label className="text-sm">
-            <span className="font-medium text-ink">{vocab.contact.Singular}</span>
-            <select name="contactId" defaultValue="" className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2">
-              <option value="">{outreachConfig.labels.noContact}</option>
-              {contacts.map((contact) => (
-                <option key={contact.contactId} value={contact.contactId}>
-                  {[contact.firstName, contact.lastName].filter(Boolean).join(" ")}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm">
-            <span className="font-medium text-ink">Purpose</span>
-            <select name="purpose" defaultValue="PROACTIVE" className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2">
-              <option value="PROACTIVE">{outreachConfig.labels.purposeProactive}</option>
-              <option value="FOLLOW_UP">{outreachConfig.labels.purposeFollowUp}</option>
-            </select>
-          </label>
-          <label className="text-sm">
-            <span className="font-medium text-ink">Follow-up to</span>
-            <select name="followUpToAssetId" defaultValue="" className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2">
-              <option value="">None</option>
-              {sentAssets.map((asset) => (
-                <option key={asset.id} value={asset.id}>
-                  {formatOutreachTypeLabel(asset.type)} v{asset.version}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm">
-            <span className="font-medium text-ink">Email length</span>
-            <select name="emailLength" defaultValue="MEDIUM" className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2">
-              <option value="SHORT">Short</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="LONG">Long</option>
-            </select>
-          </label>
-          <label className="text-sm md:col-span-2">
-            <span className="font-medium text-ink">{outreachConfig.labels.changeInstruction}</span>
-            <textarea
-              name="regenerationInstruction"
-              rows={2}
-              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
-            />
-          </label>
-          <SubmitButton>{outreachConfig.labels.generate}</SubmitButton>
+          <SubmitButton>Add {vocab.contact.singular}</SubmitButton>
         </form>
       ) : null}
-      <Status result={generateState} />
-      <div className="space-y-4">
-        {latestByGroup.map((asset) => (
-          <OutreachMessageCard
-            key={asset.id}
-            campaignId={campaignId}
-            canEdit={canEdit}
-            asset={asset}
-            contacts={contacts}
-            approvedResumeId={approvedResumeId}
-            sentAction={sentAction}
-          />
-        ))}
+      <Status result={addState} />
+
+      <div
+        className="grid gap-4 lg:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)]"
+        data-testid="application-contacts"
+      >
+        <nav
+          aria-label={outreachConfig.labels.contactsTitle}
+          className="rounded-md border border-edge bg-canvas p-2"
+        >
+          <p className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-subtle">
+            {vocab.contact.Plural}
+          </p>
+          {contacts.length === 0 ? (
+            <p className="px-2 py-3 text-sm text-muted">
+              No contacts on this {vocab.campaign.singular} yet.
+            </p>
+          ) : (
+            <ul className="mt-1 space-y-1">
+              {contacts.map((contact) => {
+                const active = contact.contactId === selected?.contactId;
+                const status = contactOutreachStatus(assets, contact.contactId);
+                return (
+                  <li key={contact.contactId}>
+                    <AppButton
+                      type="button"
+                      variant="secondary"
+                      data-testid={`outreach-contact-${contact.contactId}`}
+                      onClick={() => setSelectedId(contact.contactId)}
+                      className={`w-full !justify-start ${
+                        active ? "ring-1 ring-edge-strong" : ""
+                      }`}
+                    >
+                      <span className="block min-w-0 text-left">
+                        <span className="block truncate font-medium">{contactName(contact)}</span>
+                        <span className="mt-0.5 block truncate text-xs text-subtle">
+                          {contact.title ?? "—"}
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs text-ink">
+                          {contact.personaName ?? outreachConfig.labels.assignRole}
+                        </span>
+                        <span
+                          className="mt-1 block text-xs text-subtle"
+                          data-testid={`outreach-contact-status-${contact.contactId}`}
+                        >
+                          {status}
+                        </span>
+                      </span>
+                    </AppButton>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </nav>
+
+        {selected ? (
+          <div className="space-y-4" data-testid="outreach-sequence">
+            <div>
+              <h3 className="text-sm font-semibold text-ink">
+                {contactName(selected)}
+              </h3>
+              <p className="text-sm text-muted">
+                {selected.title ?? "—"}
+                {selected.personaName ? ` · ${selected.personaName}` : ""}
+              </p>
+            </div>
+            {canEdit ? (
+              <form action={roleAction} className="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="campaignId" value={campaignId} />
+                <input type="hidden" name="contactId" value={selected.contactId} />
+                <label className="text-sm">
+                  <span className="font-medium text-ink">{outreachConfig.labels.assignRole}</span>
+                  <select
+                    name="personaId"
+                    defaultValue={selected.personaId ?? ""}
+                    required
+                    className="mt-1 block rounded-md border border-edge-strong px-3 py-2 text-sm"
+                  >
+                    <option value="" disabled>
+                      Choose {vocab.persona.aSingular}
+                    </option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <SubmitButton>Save role</SubmitButton>
+              </form>
+            ) : null}
+            <Status result={roleState} />
+
+            <div>
+              <h4 className="text-sm font-semibold text-ink">
+                {outreachConfig.labels.sequenceTitle}
+              </h4>
+              {selectedMessages.length === 0 ? (
+                <p className="mt-2 text-sm text-muted">
+                  {outreachConfig.labels.contactStatusNone}
+                </p>
+              ) : (
+                <ol className="mt-2 space-y-3">
+                  {selectedMessages.map((asset) => (
+                    <li key={asset.id}>
+                      <OutreachMessageCard
+                        campaignId={campaignId}
+                        canEdit={canEdit}
+                        asset={asset}
+                        contacts={contacts}
+                        approvedResumeId={approvedResumeId}
+                        sentAction={sentAction}
+                      />
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+            <Status result={sentState} />
+
+            {canEdit ? (
+              <form
+                action={generateAction}
+                className="grid gap-3 md:grid-cols-2"
+                data-testid="add-next-outreach"
+              >
+                <input type="hidden" name="campaignId" value={campaignId} />
+                <input type="hidden" name="contactId" value={selected.contactId} />
+                <input
+                  type="hidden"
+                  name="personaId"
+                  value={selected.personaId ?? ""}
+                />
+                <input
+                  type="hidden"
+                  name="purpose"
+                  value={lastSent ? "FOLLOW_UP" : "PROACTIVE"}
+                />
+                {lastSent ? (
+                  <input type="hidden" name="followUpToAssetId" value={lastSent.id} />
+                ) : null}
+                <label className="text-sm">
+                  <span className="font-medium text-ink">
+                    {outreachConfig.labels.addNextMessage}
+                  </span>
+                  <select
+                    name="type"
+                    defaultValue="EMAIL"
+                    className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
+                  >
+                    <option value="EMAIL">{formatOutreachTypeLabel("EMAIL")}</option>
+                    <option value="LINKEDIN_CONNECTION_NOTE">
+                      {formatOutreachTypeLabel("LINKEDIN_CONNECTION_NOTE")}
+                    </option>
+                    <option value="LINKEDIN_INMAIL">
+                      {formatOutreachTypeLabel("LINKEDIN_INMAIL")}
+                    </option>
+                  </select>
+                </label>
+                <label className="text-sm">
+                  <span className="font-medium text-ink">{outreachConfig.labels.changeInstruction}</span>
+                  <textarea
+                    name="regenerationInstruction"
+                    rows={2}
+                    className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
+                  />
+                </label>
+                <SubmitButton>{outreachConfig.labels.generate}</SubmitButton>
+              </form>
+            ) : null}
+            <Status result={generateState} />
+          </div>
+        ) : null}
       </div>
-      <Status result={sentState} />
     </section>
   );
+}
+
+function parsedContent(value: unknown): ApplicationAssetContent | null {
+  const parsed = applicationAssetContentSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 function OutreachMessageCard({
@@ -525,15 +527,27 @@ function OutreachMessageCard({
     : null;
 
   async function copy(label: string, value: string) {
-    await navigator.clipboard.writeText(value);
-    setCopied(label);
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(label);
+    } catch (error) {
+      setCopied(null);
+      console.error(
+        JSON.stringify({
+          event: "outreach_copy_failed",
+          message: error instanceof Error ? error.message : "unknown",
+        }),
+      );
+    }
   }
 
   return (
     <article className={`space-y-3 rounded-md border border-edge p-4 ${WORKSPACE_CARD_WRAP_CLASS}`} data-testid="outreach-message">
       <p className="text-sm font-medium text-ink">
-        {formatOutreachTypeLabel(asset.type)} · v{asset.version}
-        {asset.sentAt ? ` · ${outreachConfig.labels.sentStatus} ${todayInputValue(asset.sentAt)}` : ""}
+        {formatOutreachTypeLabel(asset.type)}
+        {asset.sentAt
+          ? ` · ${outreachConfig.labels.sentStatus} ${todayInputValue(asset.sentAt)}`
+          : ` · ${outreachConfig.labels.contactStatusDraft}`}
       </p>
       {composed ? (
         <div className={`space-y-2 text-sm text-ink ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
@@ -547,32 +561,29 @@ function OutreachMessageCard({
         <div className="flex flex-wrap gap-2" data-testid="email-handoff">
           <AppButton
             type="button"
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
             onClick={() => handoff.outlookWeb.href && openEmailClientHref(handoff.outlookWeb.href)}
           >
             {outreachConfig.labels.openOutlookWeb}
           </AppButton>
           <AppButton
             type="button"
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
             onClick={() => openEmailClientHref(handoff.outlookDesktop.href)}
           >
             {outreachConfig.labels.openOutlookDesktop}
           </AppButton>
           <AppButton
             type="button"
-            className={SECONDARY_BUTTON_CLASS}
+            variant="secondary"
             onClick={() => handoff.gmailWeb.href && openEmailClientHref(handoff.gmailWeb.href)}
           >
             {outreachConfig.labels.openGmail}
           </AppButton>
           {approvedResumeId ? (
-            <a
-              href={workspaceAssetDocxHref(approvedResumeId)}
-              className={SECONDARY_BUTTON_CLASS}
-            >
+            <AppActionLink href={workspaceAssetDocxHref(approvedResumeId)}>
               {outreachConfig.labels.downloadResume}
-            </a>
+            </AppActionLink>
           ) : null}
           <p className="w-full text-xs text-muted">{outreachConfig.labels.attachResumeReminder}</p>
         </div>
@@ -580,17 +591,17 @@ function OutreachMessageCard({
       {canEdit && composed && asset.type !== "EMAIL" ? (
         <div className="flex flex-wrap gap-2" data-testid="linkedin-handoff">
           {composed.subject ? (
-            <AppButton type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => copy("subject", composed.subject ?? "")}>
+            <AppButton type="button" variant="secondary" onClick={() => void copy("subject", composed.subject ?? "")}>
               {outreachConfig.labels.copySubject}
             </AppButton>
           ) : null}
-          <AppButton type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => copy("body", composed.body)}>
+          <AppButton type="button" variant="secondary" onClick={() => void copy("body", composed.body)}>
             {outreachConfig.labels.copyBody}
           </AppButton>
           {contact?.linkedinUrl ? (
-            <a href={contact.linkedinUrl} target="_blank" rel="noreferrer" className={SECONDARY_BUTTON_CLASS}>
+            <AppActionLink href={contact.linkedinUrl} target="_blank" rel="noreferrer">
               {outreachConfig.labels.openLinkedIn}
-            </a>
+            </AppActionLink>
           ) : null}
           {copied ? <span className="text-xs text-success">Copied {copied}.</span> : null}
         </div>

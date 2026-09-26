@@ -4,7 +4,7 @@ import { AssistedProductIntake } from "@/components/AssistedProductSetup";
 import { AddProductMaterialPanel } from "@/components/AddProductMaterialPanel";
 import { ApprovedProductProfile } from "@/components/ApprovedProductProfile";
 import { ProductDraftReview } from "@/components/ProductDraftReview";
-import { PageHeader, SECONDARY_BUTTON_CLASS, TenantMissing } from "@/components/ui";
+import {PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import { getProduct } from "@/lib/tenant/data";
 import {
@@ -148,12 +148,12 @@ export default async function ProductResearchPage({ params }: PageProps) {
           title={`Review ${product.name}`}
           description={`Review the ${vocab.product.singular}. Approve it. Then define ${vocab.icp.plural}.`}
           actions={
-            <Link
+            <AppActionLink
               href={`/setup/${product.id}`}
-              className={SECONDARY_BUTTON_CLASS}
+              variant="secondary"
             >
               {vocab.product.Singular} setup
-            </Link>
+            </AppActionLink>
           }
         />
       </div>
