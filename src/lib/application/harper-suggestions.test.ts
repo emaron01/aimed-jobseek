@@ -16,6 +16,7 @@ const facts: ApplicationStepFactInput = {
   interviewStageCount: 1,
   cheatSheetReady: false,
   appliedAt: null,
+  consultationStarted: false,
 };
 
 describe("Harper suggestions", () => {

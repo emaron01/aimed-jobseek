@@ -24,6 +24,7 @@ const idle: ApplicationStepFactInput = {
   interviewStageCount: 0,
   cheatSheetReady: false,
   appliedAt: null,
+  consultationStarted: false,
 };
 
 describe("application step routes", () => {
@@ -45,11 +46,15 @@ describe("application step routes", () => {
     expect(applicationStepFromPathname("/campaigns/camp_1/interviews/stage_1")).toBe(
       "interviews",
     );
+    expect(applicationStepHref("camp_1", "consultation")).toBe(
+      "/campaigns/camp_1/consultation",
+    );
     expect(applicationStepList.map((step) => step.key)).toEqual([
       "company",
       "job",
-      "hiring-team",
+      "consultation",
       "assets",
+      "hiring-team",
       "outreach",
       "interviews",
       "summary",

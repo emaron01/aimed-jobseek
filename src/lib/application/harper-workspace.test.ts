@@ -88,8 +88,9 @@ describe("workspace order and Harper start", () => {
     expect(applicationStepList.map((step) => step.key)).toEqual([
       "company",
       "job",
-      "hiring-team",
+      "consultation",
       "assets",
+      "hiring-team",
       "outreach",
       "interviews",
       "summary",
