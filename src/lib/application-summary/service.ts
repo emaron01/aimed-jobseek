@@ -5,7 +5,20 @@ import {
   APPLICATION_SUMMARY_PROMPT_VERSION,
   applicationSummaryGuidanceSchema,
   type ApplicationSummaryGuidance,
+  type CheatSheetCoachItem,
 } from "@/lib/application-summary/contract";
+import {
+  assignCoachItemIds,
+  findCoachItem,
+  replaceCoachItem,
+  seekerFirstName,
+  validateCoachItems,
+  validateSeekerVoice,
+} from "@/lib/application-summary/coach";
+import { appendConfirmedFact } from "@/lib/consultation/write-back";
+import { polishAnswerWithQuality } from "@/lib/consultation/service";
+import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
+import { profileEvidenceItems } from "@/lib/consultation/assess";
 import {
   mentionsInternalSystemState,
   validateGroundedStatement,
@@ -13,15 +26,22 @@ import {
 import {
   qualityMessages,
 } from "@/lib/generation/quality";
-import { profileEvidenceItems } from "@/lib/consultation/assess";
 import { prisma } from "@/lib/prisma-client";
 import {
   buildCheatSheetPeople,
   cheatSheetSectionKind,
 } from "@/lib/application-summary/people";
 import { listPersonPreps } from "@/lib/interview/person-prep";
-import { applicationSummaryConfig, sanitizeWorkspaceFailure, vocab } from "@/lib/product-config";
-import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
+import {
+  applicationSummaryConfig,
+  consultationConfig,
+  consultationConversationCopy,
+  sanitizeWorkspaceFailure,
+  vocab,
+} from "@/lib/product-config";
+import {
+  parseCandidateProfileSafe,
+} from "@/lib/product-research/candidate-profile";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
 import { usableEmployerResearch } from "@/lib/job-requirement/identity-verification";
@@ -330,21 +350,23 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
   };
 }
 
+function coachItemTexts(item: CheatSheetCoachItem): string[] {
+  return [item.prompt, item.sampleAnswer, item.harperQuestion].filter(
+    (text): text is string => Boolean(text?.trim()),
+  );
+}
+
 function guidanceItemTexts(guidance: ApplicationSummaryGuidance): string[] {
   const personItems = guidance.people.flatMap((person) => [
     ...person.caresAbout,
     ...person.bestMaterial,
-    ...person.likelyQuestions,
     ...person.questionsToAsk,
     person.recruiter?.sixtySecondSummary,
     person.recruiter?.whyThisCompany,
     person.recruiter?.whyThisRole,
     person.recruiter?.logistics,
     person.recruiter?.compensationReadiness,
-    ...(person.recruiter?.flagAnswers ?? []),
     person.hiringManager?.firstNinetyDays,
-    ...(person.hiringManager?.drillDowns ?? []),
-    ...(person.hiringManager?.gaps ?? []),
     person.executive?.strategy,
     person.executive?.judgment,
     person.executive?.businessImpact,
@@ -354,8 +376,14 @@ function guidanceItemTexts(guidance: ApplicationSummaryGuidance): string[] {
   return [
     guidance.overview.thirtySecondFit.text,
     guidance.overview.careerRecap.text,
-    ...guidance.overview.gapsToPrepare.map((item) => item.text),
     ...personItems.filter(Boolean).map((item) => item!.text),
+    ...guidance.overview.gapsToPrepare.flatMap(coachItemTexts),
+    ...guidance.people.flatMap((person) => [
+      ...person.likelyQuestions.flatMap(coachItemTexts),
+      ...(person.recruiter?.flagAnswers.flatMap(coachItemTexts) ?? []),
+      ...(person.hiringManager?.drillDowns.flatMap(coachItemTexts) ?? []),
+      ...(person.hiringManager?.gaps.flatMap(coachItemTexts) ?? []),
+    ]),
     ...guidance.stories.flatMap((story) => [
       story.situation,
       ...story.variations.map((item) => item.text),
@@ -363,15 +391,23 @@ function guidanceItemTexts(guidance: ApplicationSummaryGuidance): string[] {
   ];
 }
 
+function coachItemAsGuidance(item: CheatSheetCoachItem) {
+  const text =
+    item.sampleAnswer?.trim() ||
+    item.harperQuestion?.trim() ||
+    item.prompt;
+  return { text, supports: item.supports };
+}
+
 function guidanceSupportItems(guidance: ApplicationSummaryGuidance) {
   return [
     guidance.overview.thirtySecondFit,
     guidance.overview.careerRecap,
-    ...guidance.overview.gapsToPrepare,
+    ...guidance.overview.gapsToPrepare.map(coachItemAsGuidance),
     ...guidance.people.flatMap((person) => [
       ...person.caresAbout,
       ...person.bestMaterial,
-      ...person.likelyQuestions,
+      ...person.likelyQuestions.map(coachItemAsGuidance),
       ...person.questionsToAsk,
       ...(person.recruiter
         ? [
@@ -380,14 +416,14 @@ function guidanceSupportItems(guidance: ApplicationSummaryGuidance) {
             person.recruiter.whyThisRole,
             person.recruiter.logistics,
             person.recruiter.compensationReadiness,
-            ...person.recruiter.flagAnswers,
+            ...person.recruiter.flagAnswers.map(coachItemAsGuidance),
           ]
         : []),
       ...(person.hiringManager
         ? [
             person.hiringManager.firstNinetyDays,
-            ...person.hiringManager.drillDowns,
-            ...person.hiringManager.gaps,
+            ...person.hiringManager.drillDowns.map(coachItemAsGuidance),
+            ...person.hiringManager.gaps.map(coachItemAsGuidance),
           ]
         : []),
       ...(person.executive
@@ -419,10 +455,58 @@ export function storyTextsRepeatVerbatim(guidance: ApplicationSummaryGuidance): 
   return false;
 }
 
+function seekerVoiceTexts(guidance: ApplicationSummaryGuidance): string[] {
+  return [
+    guidance.overview.thirtySecondFit.text,
+    guidance.overview.careerRecap.text,
+    ...guidance.overview.gapsToPrepare.flatMap((item) => [
+      item.sampleAnswer,
+      item.harperQuestion,
+    ]),
+    ...guidance.people.flatMap((person) => [
+      ...person.bestMaterial.map((item) => item.text),
+      ...person.likelyQuestions.flatMap((item) => [
+        item.sampleAnswer,
+        item.harperQuestion,
+      ]),
+      person.recruiter?.sixtySecondSummary.text,
+      person.recruiter?.whyThisCompany.text,
+      person.recruiter?.whyThisRole.text,
+      person.recruiter?.logistics.text,
+      person.recruiter?.compensationReadiness.text,
+      ...(person.recruiter?.flagAnswers.flatMap((item) => [
+        item.sampleAnswer,
+        item.harperQuestion,
+      ]) ?? []),
+      person.hiringManager?.firstNinetyDays.text,
+      ...(person.hiringManager?.scorecardOutcomes.map((item) => item.note) ?? []),
+      ...(person.hiringManager?.drillDowns.flatMap((item) => [
+        item.sampleAnswer,
+        item.harperQuestion,
+      ]) ?? []),
+      ...(person.hiringManager?.gaps.flatMap((item) => [
+        item.sampleAnswer,
+        item.harperQuestion,
+      ]) ?? []),
+      person.executive?.strategy.text,
+      person.executive?.judgment.text,
+      person.executive?.businessImpact.text,
+      person.crossFunctional?.howWorkedAcross.text,
+      person.crossFunctional?.dayToDay.text,
+    ]),
+    ...guidance.stories.flatMap((story) => [
+      story.situation,
+      ...story.variations.map((item) => item.text),
+    ]),
+  ].filter((text): text is string => Boolean(text?.trim()));
+}
+
 export function validateApplicationSummaryGuidance(input: {
   guidance: ApplicationSummaryGuidance;
   sources: SummarySource[];
   people: Array<{ sectionKey: string; heading: string; sectionKind: string }>;
+  firstName?: string | null;
+  checkGrounding?: boolean;
 }): string[] {
   const errors: string[] = [];
   if (guidanceItemTexts(input.guidance).some(mentionsInternalSystemState)) {
@@ -438,26 +522,45 @@ export function validateApplicationSummaryGuidance(input: {
         errors.push("A person section referenced a story that is not in the story bank.");
       }
     }
-    for (const item of [...person.likelyQuestions, ...person.questionsToAsk]) {
+    for (const item of person.questionsToAsk) {
       if (!item.text.trim().endsWith("?")) {
         errors.push("Every guidance question must be written as a question.");
       }
     }
+    for (const item of [
+      ...person.likelyQuestions,
+      ...(person.hiringManager?.drillDowns ?? []),
+    ]) {
+      if (!item.prompt.trim().endsWith("?")) {
+        errors.push("Every likely question and drill-down must be written as a question.");
+      }
+    }
   }
-  for (const item of guidanceSupportItems(input.guidance)) {
+  errors.push(...validateCoachItems(input.guidance));
+  if (input.firstName !== undefined) {
     errors.push(
-      ...qualityMessages(
-        validateGroundedStatement({
-          statement: {
-            text: item.text,
-            claims: [{ text: item.text, supports: item.supports }],
-          },
-          sources: input.sources,
-          field: item.text.slice(0, 40),
-          requireSentenceClaims: false,
-        }),
-      ),
+      ...validateSeekerVoice({
+        texts: seekerVoiceTexts(input.guidance),
+        firstName: input.firstName,
+      }),
     );
+  }
+  if (input.checkGrounding) {
+    for (const item of guidanceSupportItems(input.guidance)) {
+      errors.push(
+        ...qualityMessages(
+          validateGroundedStatement({
+            statement: {
+              text: item.text,
+              claims: [{ text: item.text, supports: item.supports }],
+            },
+            sources: input.sources,
+            field: item.text.slice(0, 40),
+            requireSentenceClaims: false,
+          }),
+        ),
+      );
+    }
   }
   const expected = new Map(input.people.map((person) => [person.sectionKey, person]));
   const seen = new Set<string>();
@@ -514,11 +617,18 @@ export async function generateApplicationSummary(input: {
     titles: person.titles,
     sectionKind: person.sectionKind,
   }));
+  const profile = data.campaign.product.profileJson
+    ? parseCandidateProfileSafe(data.campaign.product.profileJson)
+    : null;
+  const firstName = seekerFirstName(
+    profile?.ok ? profile.profile.identity.name?.text ?? null : null,
+  );
+  let qualityFeedback: string[] = [];
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const generated = await generateApplicationSummaryGuidance({
       sources: data.sources,
       people,
-      qualityFeedback: [],
+      qualityFeedback,
       usage: {
         organizationId: input.organizationId,
         campaignId: input.campaignId,
@@ -536,11 +646,32 @@ export async function generateApplicationSummary(input: {
       }
       continue;
     }
+    const guidance = assignCoachItemIds(generated.data);
+    const errors = validateApplicationSummaryGuidance({
+      guidance,
+      sources: data.sources,
+      people,
+      firstName,
+    });
+    if (errors.length > 0) {
+      qualityFeedback = errors;
+      if (attempt === 1) {
+        await prisma.applicationSummary.update({
+          where: { campaignId: input.campaignId },
+          data: {
+            status: "FAILED",
+            generationError: `${applicationSummaryConfig.title} could not be generated. Retry.`,
+          },
+        });
+        throw new Error(errors[0]);
+      }
+      continue;
+    }
     await prisma.applicationSummary.update({
       where: { campaignId: input.campaignId },
       data: {
         status: "READY",
-        guidanceJson: generated.data,
+        guidanceJson: guidance,
         sourceHash: data.sourceHash,
         generationError: null,
         generatedAt: new Date(),
@@ -620,6 +751,196 @@ function blankGuidancePath(value: unknown, path: string): unknown {
       : (cursor as Record<string, unknown>)[String(key)];
   }
   return clone;
+}
+
+export async function answerCheatSheetCoachItem(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  itemId: string;
+  answer: string;
+}): Promise<void> {
+  const answer = input.answer.trim();
+  if (!answer) {
+    throw new TenantError("Write an answer, or skip the question.");
+  }
+  const data = await loadSummaryData(input.organizationId, input.campaignId);
+  if (data.campaign.ownerUserId !== input.userId) {
+    throw new TenantError(`Only the owner can update this ${vocab.campaign.singular}.`);
+  }
+  const parsed = applicationSummaryGuidanceSchema.safeParse(
+    data.campaign.applicationSummary?.guidanceJson,
+  );
+  if (!parsed.success || data.campaign.applicationSummary?.status !== "READY") {
+    throw new TenantError(`${applicationSummaryConfig.title} is not ready.`);
+  }
+  const guidance = assignCoachItemIds(parsed.data);
+  const item = findCoachItem(guidance, input.itemId);
+  if (!item?.harperQuestion?.trim()) {
+    throw new TenantError(
+      `${consultationConfig.displayName} is not asking for an answer on this item.`,
+    );
+  }
+  const product = data.campaign.product;
+  const profileParsed = product.profileJson
+    ? parseCandidateProfileSafe(product.profileJson)
+    : null;
+  if (!profileParsed?.ok) {
+    throw new TenantError(
+      `The ${vocab.product.singular} could not be read, so this was not saved.`,
+    );
+  }
+  const session =
+    data.campaign.consultationSession ??
+    (await prisma.consultationSession.create({
+      data: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        productId: product.id,
+        status: "DONE",
+        generationStatus: "READY",
+        promptVersion: CONSULTATION_PROMPT_VERSION,
+      },
+    }));
+  const lastTurn = await prisma.consultationTurn.findFirst({
+    where: { sessionId: session.id },
+    orderBy: { sequence: "desc" },
+    select: { sequence: true },
+  });
+  const nextSequence = (lastTurn?.sequence ?? 0) + 1;
+  const targetKey = `cheatSheet:${input.itemId}`;
+  const questionTurn = await prisma.consultationTurn.create({
+    data: {
+      organizationId: input.organizationId,
+      sessionId: session.id,
+      sequence: nextSequence,
+      speaker: "CONSULTANT",
+      body: item.harperQuestion.trim(),
+      targetKey,
+    },
+  });
+  const seekerTurn = await prisma.consultationTurn.create({
+    data: {
+      organizationId: input.organizationId,
+      sessionId: session.id,
+      sequence: nextSequence + 1,
+      speaker: "SEEKER",
+      body: answer,
+      targetKey,
+      seekerAuthored: true,
+      analysisJson: { replyToTurnId: questionTurn.id, status: "READY" },
+    },
+  });
+  const polished = await polishAnswerWithQuality({
+    answer,
+    story: {
+      situation: answer,
+      task: item.prompt,
+      action: answer,
+      result: answer,
+    },
+    sources: [
+      { id: `answer:${seekerTurn.id}`, text: answer },
+      ...profileEvidenceItems(profileParsed.profile)
+        .filter((entry) => entry.kind === "FACT")
+        .map((entry) => ({ id: entry.id, text: entry.text })),
+    ],
+    declinedFollowUp: false,
+    strengtheningNeeds: [],
+    usage: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      category: "CONSULTATION",
+      operation: "CONSULTATION_REPLY",
+    },
+  });
+  if (!polished.ok) {
+    throw new TenantError(polished.message);
+  }
+  const sampleAnswer = polished.data.interviewAnswer.text.trim();
+  if (!sampleAnswer) {
+    throw new TenantError(consultationConversationCopy.generationFailed);
+  }
+  const nextProfile = appendConfirmedFact(profileParsed.profile, {
+    id: `cheatSheet:${input.itemId}`,
+    text: answer,
+    turnId: seekerTurn.id,
+  });
+  const existingStory = await prisma.profileStory.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      consultationTurnId: seekerTurn.id,
+    },
+    select: { id: true },
+  });
+  const now = new Date();
+  const storyData = {
+    situation: answer,
+    task: item.prompt,
+    action: answer,
+    result: answer,
+    competencyLinks: [] as Prisma.InputJsonValue,
+    verbatimAnswer: answer,
+    interviewAnswer: sampleAnswer,
+    interviewAnswerApprovedAt: now,
+    resumeBullet: polished.data.resumeBullet.text.trim() || null,
+    resumeBulletApprovedAt: polished.data.resumeBullet.text.trim() ? now : null,
+    seekerAuthored: true,
+  };
+  const nextGuidance = replaceCoachItem(guidance, input.itemId, {
+    ...item,
+    sampleAnswer,
+    harperQuestion: null,
+    supports: [
+      ...item.supports,
+      { sourceId: `answer:${seekerTurn.id}`, quote: answer },
+    ],
+  });
+  await prisma.$transaction([
+    prisma.product.update({
+      where: { id: product.id },
+      data: { profileJson: nextProfile as unknown as Prisma.InputJsonValue },
+    }),
+    existingStory
+      ? prisma.profileStory.update({
+          where: { id: existingStory.id },
+          data: storyData,
+        })
+      : prisma.profileStory.create({
+          data: {
+            organizationId: input.organizationId,
+            productId: product.id,
+            consultationTurnId: seekerTurn.id,
+            ...storyData,
+          },
+        }),
+    prisma.consultationStatement.upsert({
+      where: {
+        turnId_kind: { turnId: seekerTurn.id, kind: "INTERVIEW_ANSWER" },
+      },
+      create: {
+        organizationId: input.organizationId,
+        sessionId: session.id,
+        turnId: seekerTurn.id,
+        kind: "INTERVIEW_ANSWER",
+        content: sampleAnswer,
+        status: "APPROVED",
+        groundingJson: polished.data.interviewAnswer.claims as Prisma.InputJsonValue,
+        promptVersion: CONSULTATION_PROMPT_VERSION,
+        approvedAt: now,
+      },
+      update: {
+        content: sampleAnswer,
+        status: "APPROVED",
+        groundingJson: polished.data.interviewAnswer.claims as Prisma.InputJsonValue,
+        approvedAt: now,
+      },
+    }),
+    prisma.applicationSummary.update({
+      where: { campaignId: input.campaignId },
+      data: { guidanceJson: nextGuidance },
+    }),
+  ]);
 }
 
 export async function resolveApplicationSummaryFlag(input: {

@@ -4,6 +4,7 @@ import { generateApplicationPageMetadata } from "@/lib/application/page-metadata
 import { generateApplicationSummaryAction } from "@/app/actions/application-summary";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { AppActionLink } from "@/components/AppButton";
+import { CheatSheetCoachItems } from "@/components/CheatSheetCoachItems";
 import { PrintApplicationSummaryButton } from "@/components/PrintApplicationSummaryButton";
 import { PageHeader, TenantMissing } from "@/components/ui";
 import { getApplicationSummaryView } from "@/lib/application-summary/service";
@@ -213,7 +214,11 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
               <h3 className="font-medium text-ink">
                 {applicationSummaryConfig.sections.gapsToPrepare}
               </h3>
-              <TextList items={guidance.overview.gapsToPrepare.map((item) => item.text)} />
+              <CheatSheetCoachItems
+                campaignId={id}
+                canEdit={canGenerate}
+                items={guidance.overview.gapsToPrepare}
+              />
             </div>
           </>
         )}
@@ -285,7 +290,11 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
                       <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.flagAnswers}
                       </h3>
-                      <TextList items={section.recruiter.flagAnswers.map((item) => item.text)} />
+                      <CheatSheetCoachItems
+                        campaignId={id}
+                        canEdit={canGenerate}
+                        items={section.recruiter.flagAnswers}
+                      />
                     </div>
                   </>
                 ) : null}
@@ -317,15 +326,21 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
                       <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.drillDowns}
                       </h3>
-                      <TextList
-                        items={section.hiringManager.drillDowns.map((item) => item.text)}
+                      <CheatSheetCoachItems
+                        campaignId={id}
+                        canEdit={canGenerate}
+                        items={section.hiringManager.drillDowns}
                       />
                     </div>
                     <div>
                       <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.gapsToPrepare}
                       </h3>
-                      <TextList items={section.hiringManager.gaps.map((item) => item.text)} />
+                      <CheatSheetCoachItems
+                        campaignId={id}
+                        canEdit={canGenerate}
+                        items={section.hiringManager.gaps}
+                      />
                     </div>
                   </>
                 ) : null}
@@ -377,7 +392,11 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
                   <h3 className="font-medium text-ink">
                     {applicationSummaryConfig.sections.likelyQuestions}
                   </h3>
-                  <TextList items={section.likelyQuestions.map((item) => item.text)} />
+                  <CheatSheetCoachItems
+                    campaignId={id}
+                    canEdit={canGenerate}
+                    items={section.likelyQuestions}
+                  />
                 </div>
                 <div>
                   <h3 className="font-medium text-ink">

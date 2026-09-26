@@ -4,8 +4,15 @@ import { revalidatePath } from "next/cache";
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
-import { resolveApplicationSummaryFlag } from "@/lib/application-summary/service";
-import { applicationSummaryConfig, workspaceProgressText } from "@/lib/product-config";
+import {
+  answerCheatSheetCoachItem,
+  resolveApplicationSummaryFlag,
+} from "@/lib/application-summary/service";
+import {
+  applicationSummaryConfig,
+  consultationConversationCopy,
+  workspaceProgressText,
+} from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 
 export type ApplicationSummaryActionResult = {
@@ -45,6 +52,47 @@ export async function generateApplicationSummaryAction(
       ok: false,
       message: `${applicationSummaryConfig.title} could not be generated. Retry.`,
     };
+  }
+}
+
+export async function answerCheatSheetCoachAction(
+  _previous: ApplicationSummaryActionResult | null,
+  formData: FormData,
+): Promise<ApplicationSummaryActionResult> {
+  const campaignId = String(formData.get("campaignId") ?? "").trim();
+  const itemId = String(formData.get("itemId") ?? "").trim();
+  const answer = String(formData.get("answer") ?? "");
+  if (!campaignId) return { ok: false, message: "Application was not found." };
+  if (!itemId) {
+    return { ok: false, message: "That question was not found." };
+  }
+  try {
+    const [organizationId, user] = await Promise.all([
+      requireOrganizationId(),
+      requireCurrentUser(),
+    ]);
+    await answerCheatSheetCoachItem({
+      organizationId,
+      campaignId,
+      userId: user.id,
+      itemId,
+      answer,
+    });
+    revalidatePath(`/campaigns/${campaignId}/summary`);
+    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/campaigns/${campaignId}/assets`);
+    return { ok: true, message: "Saved." };
+  } catch (error) {
+    if (error instanceof TenantError) {
+      return { ok: false, message: error.message };
+    }
+    console.error(
+      JSON.stringify({
+        event: "cheat_sheet_coach_reply_failed",
+        message: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+    return { ok: false, message: consultationConversationCopy.replyFailed };
   }
 }
 

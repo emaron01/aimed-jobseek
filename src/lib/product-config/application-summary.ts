@@ -1,6 +1,8 @@
+import { consultationConfig } from "./consultation";
+
 export const applicationSummaryConfig = Object.freeze({
   title: "Interview cheat sheet",
-  description: "Prep organized by the people you will meet",
+  description: "Answers organized by the people you will meet",
   actions: {
     generate: "Generate cheat sheet",
     regenerate: "Regenerate cheat sheet",
@@ -12,7 +14,9 @@ export const applicationSummaryConfig = Object.freeze({
     overview: "At a glance",
     thirtySecondFit: "30-second fit",
     careerRecap: "Career recap",
-    gapsToPrepare: "Gaps to be ready for",
+    gapsToPrepare: "Gaps to address",
+    sampleAnswer: "Sample answer",
+    harperQuestion: `${consultationConfig.displayName} still needs this`,
     company: "Company",
     position: "Position",
     people: "People you will meet",

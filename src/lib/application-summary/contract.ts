@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const APPLICATION_SUMMARY_PROMPT_VERSION = "5";
+export const APPLICATION_SUMMARY_PROMPT_VERSION = "6";
 
 export const CHEAT_SHEET_SECTION_KINDS = [
   "RECRUITER",
@@ -18,6 +18,14 @@ const supportSchema = z.object({
 
 const guidanceItemSchema = z.object({
   text: z.string(),
+  supports: z.array(supportSchema),
+});
+
+export const cheatSheetCoachItemSchema = z.object({
+  id: z.string().trim().min(1).optional(),
+  prompt: z.string().trim().min(1),
+  sampleAnswer: z.string().nullable().optional(),
+  harperQuestion: z.string().nullable().optional(),
   supports: z.array(supportSchema),
 });
 
@@ -50,7 +58,7 @@ export const cheatSheetPersonSectionSchema = z.object({
   sectionKind: z.enum(CHEAT_SHEET_SECTION_KINDS),
   caresAbout: z.array(guidanceItemSchema).min(1).max(4),
   bestMaterial: z.array(guidanceItemSchema).min(1).max(4),
-  likelyQuestions: z.array(guidanceItemSchema).min(1).max(4),
+  likelyQuestions: z.array(cheatSheetCoachItemSchema).min(1).max(4),
   questionsToAsk: z.array(guidanceItemSchema).min(1).max(4),
   storyIds: z.array(z.string()).max(4),
   recruiter: z
@@ -60,7 +68,7 @@ export const cheatSheetPersonSectionSchema = z.object({
       whyThisRole: guidanceItemSchema,
       logistics: guidanceItemSchema,
       compensationReadiness: guidanceItemSchema,
-      flagAnswers: z.array(guidanceItemSchema).max(3),
+      flagAnswers: z.array(cheatSheetCoachItemSchema).max(3),
     })
     .nullable(),
   hiringManager: z
@@ -75,8 +83,8 @@ export const cheatSheetPersonSectionSchema = z.object({
         )
         .max(5),
       firstNinetyDays: guidanceItemSchema,
-      drillDowns: z.array(guidanceItemSchema).max(4),
-      gaps: z.array(guidanceItemSchema).max(3),
+      drillDowns: z.array(cheatSheetCoachItemSchema).max(4),
+      gaps: z.array(cheatSheetCoachItemSchema).max(3),
     })
     .nullable(),
   executive: z
@@ -98,7 +106,7 @@ export const applicationSummaryGuidanceSchema = z.object({
   overview: z.object({
     thirtySecondFit: guidanceItemSchema,
     careerRecap: guidanceItemSchema,
-    gapsToPrepare: z.array(guidanceItemSchema).min(1).max(3),
+    gapsToPrepare: z.array(cheatSheetCoachItemSchema).min(1).max(3),
   }),
   stories: z.array(cheatSheetStorySchema),
   people: z.array(cheatSheetPersonSectionSchema),
@@ -109,3 +117,4 @@ export type ApplicationSummaryGuidance = z.infer<
 >;
 export type CheatSheetPersonSection = z.infer<typeof cheatSheetPersonSectionSchema>;
 export type CheatSheetStory = z.infer<typeof cheatSheetStorySchema>;
+export type CheatSheetCoachItem = z.infer<typeof cheatSheetCoachItemSchema>;

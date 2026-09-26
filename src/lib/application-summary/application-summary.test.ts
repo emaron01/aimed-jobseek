@@ -6,6 +6,136 @@ import { fixtureAlexChenProfile } from "@/lib/product-research/fixtures/alex-che
 const generateStructured = vi.hoisted(() => vi.fn());
 const isConsultationAiConfigured = vi.hoisted(() => vi.fn(() => true));
 
+const spoken =
+  "I built a weekly operating cadence and reduced failed jobs by 40%.";
+
+function mockCheatSheetGuidance(
+  payload: {
+    allowedSources: Array<{ id: string; text: string; category: string }>;
+    people: Array<{
+      sectionKey: string;
+      roleId: string;
+      contactId: string | null;
+      heading: string;
+      sectionKind: "RECRUITER" | "HIRING_MANAGER" | "EXECUTIVE" | "CROSS_FUNCTIONAL";
+    }>;
+  },
+  body = spoken,
+) {
+  const source = payload.allowedSources[0]!;
+  const supports = [{ sourceId: source.id, quote: source.text }];
+  const item = { text: body, supports };
+  const askThem = {
+    text: "What operating cadence do you want from this hire?",
+    supports,
+  };
+  const answered = (id: string, prompt: string) => ({
+    id,
+    prompt,
+    sampleAnswer: body,
+    harperQuestion: null,
+    supports,
+  });
+  const needed = (id: string, prompt: string, question: string) => ({
+    id,
+    prompt,
+    sampleAnswer: null,
+    harperQuestion: question,
+    supports,
+  });
+  return {
+    overview: {
+      thirtySecondFit: item,
+      careerRecap: item,
+      gapsToPrepare: [
+        answered("overview:gap:1", "Enterprise motion still needs a local example"),
+        needed(
+          "overview:gap:2",
+          "Front-line manager development",
+          "Have you developed a front-line manager? Tell me what wasn't working and what changed?",
+        ),
+      ],
+    },
+    stories: [
+      {
+        storyId: "story-1",
+        headline: "Operating cadence",
+        situation: body,
+        answers: [
+          {
+            requirement: "Build a repeatable enterprise motion",
+            question: "How do you run a weekly operating cadence?",
+          },
+        ],
+        variations: [
+          { angle: "Forecast discipline", text: `${body} I inspect commits weekly.`, supports },
+          { angle: "Manager coaching", text: `${body} I coach managers on deal inspection.`, supports },
+        ],
+      },
+    ],
+    people: payload.people.map((person) => ({
+      sectionKey: person.sectionKey,
+      roleId: person.roleId,
+      contactId: person.contactId,
+      heading: person.heading,
+      sectionKind: person.sectionKind,
+      caresAbout: [item],
+      bestMaterial: [item],
+      likelyQuestions: [
+        answered(
+          `${person.sectionKey}:likely:1`,
+          "How do you run a weekly operating cadence?",
+        ),
+      ],
+      questionsToAsk: [askThem],
+      storyIds: ["story-1"],
+      recruiter:
+        person.sectionKind === "RECRUITER"
+          ? {
+              sixtySecondSummary: item,
+              whyThisCompany: item,
+              whyThisRole: item,
+              logistics: item,
+              compensationReadiness: item,
+              flagAnswers: [
+                answered(`${person.sectionKey}:flag:1`, "Recent job change"),
+              ],
+            }
+          : null,
+      hiringManager:
+        person.sectionKind === "HIRING_MANAGER"
+          ? {
+              scorecardOutcomes: [
+                { outcome: source.text, storyId: "story-1", note: body },
+              ],
+              firstNinetyDays: item,
+              drillDowns: [
+                answered(
+                  `${person.sectionKey}:drill:1`,
+                  "Which KPIs moved after you changed the cadence?",
+                ),
+              ],
+              gaps: [
+                needed(
+                  `${person.sectionKey}:gap:1`,
+                  "Front-line manager development",
+                  "Have you developed a front-line manager? Tell me what wasn't working and what changed?",
+                ),
+              ],
+            }
+          : null,
+      executive:
+        person.sectionKind === "EXECUTIVE"
+          ? { strategy: item, judgment: item, businessImpact: item }
+          : null,
+      crossFunctional:
+        person.sectionKind === "CROSS_FUNCTIONAL"
+          ? { howWorkedAcross: item, dayToDay: item }
+          : null,
+    })),
+  };
+}
+
 vi.mock("@/lib/ai", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/ai")>();
   return {
@@ -249,78 +379,7 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
         }>;
       };
       capturedSources = payload.allowedSources;
-      const source = payload.allowedSources[0]!;
-      const item = {
-        text: source.text,
-        supports: [{ sourceId: source.id, quote: source.text }],
-      };
-      const question = {
-        text: `What should I be ready to discuss about ${source.text}?`,
-        supports: [{ sourceId: source.id, quote: source.text }],
-      };
-      return {
-        data: {
-          overview: {
-            thirtySecondFit: item,
-            careerRecap: item,
-            gapsToPrepare: [item, item],
-          },
-          stories: [
-            {
-              storyId: "story-1",
-              headline: "Operating cadence",
-              situation: source.text,
-              answers: [{ requirement: source.text, question: question.text }],
-              variations: [
-                { angle: "Forecast discipline", text: `${source.text} forecast`, supports: item.supports },
-                { angle: "Manager coaching", text: `${source.text} coaching`, supports: item.supports },
-              ],
-            },
-          ],
-          people: payload.people.map((person) => ({
-            sectionKey: person.sectionKey,
-            roleId: person.roleId,
-            contactId: person.contactId,
-            heading: person.heading,
-            sectionKind: person.sectionKind,
-            caresAbout: [item],
-            bestMaterial: [item],
-            likelyQuestions: [question],
-            questionsToAsk: [question],
-            storyIds: ["story-1"],
-            recruiter:
-              person.sectionKind === "RECRUITER"
-                ? {
-                    sixtySecondSummary: item,
-                    whyThisCompany: item,
-                    whyThisRole: item,
-                    logistics: item,
-                    compensationReadiness: item,
-                    flagAnswers: [item],
-                  }
-                : null,
-            hiringManager:
-              person.sectionKind === "HIRING_MANAGER"
-                ? {
-                    scorecardOutcomes: [
-                      { outcome: source.text, storyId: "story-1", note: source.text },
-                    ],
-                    firstNinetyDays: item,
-                    drillDowns: [question],
-                    gaps: [item],
-                  }
-                : null,
-            executive:
-              person.sectionKind === "EXECUTIVE"
-                ? { strategy: item, judgment: item, businessImpact: item }
-                : null,
-            crossFunctional:
-              person.sectionKind === "CROSS_FUNCTIONAL"
-                ? { howWorkedAcross: item, dayToDay: item }
-                : null,
-          })),
-        },
-      };
+      return { data: mockCheatSheetGuidance(payload) };
     });
   });
 
@@ -438,78 +497,7 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
           sectionKind: "RECRUITER" | "HIRING_MANAGER" | "EXECUTIVE" | "CROSS_FUNCTIONAL";
         }>;
       };
-      const source = payload.allowedSources[0]!;
-      const item = {
-        text: invented,
-        supports: [{ sourceId: source.id, quote: source.text }],
-      };
-      const question = {
-        text: `What should I be ready to discuss about ${source.text}?`,
-        supports: [{ sourceId: source.id, quote: source.text }],
-      };
-      return {
-        data: {
-          overview: {
-            thirtySecondFit: item,
-            careerRecap: item,
-            gapsToPrepare: [item, item],
-          },
-          stories: [
-            {
-              storyId: "story-1",
-              headline: "Operating cadence",
-              situation: source.text,
-              answers: [{ requirement: source.text, question: question.text }],
-              variations: [
-                { angle: "Forecast discipline", text: `${source.text} forecast`, supports: item.supports },
-                { angle: "Manager coaching", text: `${source.text} coaching`, supports: item.supports },
-              ],
-            },
-          ],
-          people: payload.people.map((person) => ({
-            sectionKey: person.sectionKey,
-            roleId: person.roleId,
-            contactId: person.contactId,
-            heading: person.heading,
-            sectionKind: person.sectionKind,
-            caresAbout: [item],
-            bestMaterial: [item],
-            likelyQuestions: [question],
-            questionsToAsk: [question],
-            storyIds: ["story-1"],
-            recruiter:
-              person.sectionKind === "RECRUITER"
-                ? {
-                    sixtySecondSummary: item,
-                    whyThisCompany: item,
-                    whyThisRole: item,
-                    logistics: item,
-                    compensationReadiness: item,
-                    flagAnswers: [item],
-                  }
-                : null,
-            hiringManager:
-              person.sectionKind === "HIRING_MANAGER"
-                ? {
-                    scorecardOutcomes: [
-                      { outcome: source.text, storyId: "story-1", note: source.text },
-                    ],
-                    firstNinetyDays: item,
-                    drillDowns: [question],
-                    gaps: [item],
-                  }
-                : null,
-            executive:
-              person.sectionKind === "EXECUTIVE"
-                ? { strategy: item, judgment: item, businessImpact: item }
-                : null,
-            crossFunctional:
-              person.sectionKind === "CROSS_FUNCTIONAL"
-                ? { howWorkedAcross: item, dayToDay: item }
-                : null,
-          })),
-        },
-      };
+      return { data: mockCheatSheetGuidance(payload, invented) };
     });
     await generateApplicationSummary({ organizationId, campaignId, userId });
     const view = await getApplicationSummaryView({ organizationId, campaignId });

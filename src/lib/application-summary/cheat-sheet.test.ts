@@ -15,7 +15,7 @@ const support = [{ sourceId: "story:1", quote: "I rebuilt the forecast cadence."
 describe("Interview Cheat Sheet", () => {
   it("renames the surface through the vocabulary module", () => {
     expect(applicationSummaryConfig.title).toBe("Interview cheat sheet");
-    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("5");
+    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("6");
     expect(JSON.stringify(applicationSummaryConfig)).not.toContain("Application Summary");
   });
 
@@ -69,7 +69,15 @@ describe("Interview Cheat Sheet", () => {
       overview: {
         thirtySecondFit: { text: "Fit.", supports: support },
         careerRecap: { text: "Recap.", supports: support },
-        gapsToPrepare: [{ text: "Gap.", supports: support }],
+        gapsToPrepare: [
+          {
+            id: "overview:gap:1",
+            prompt: "Enterprise motion still needs a local example",
+            sampleAnswer: "I have not run this motion in this market yet, so I would start with two customer visits in the first two weeks.",
+            harperQuestion: null,
+            supports: support,
+          },
+        ],
       },
       stories: [
         {
