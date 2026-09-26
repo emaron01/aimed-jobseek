@@ -71,6 +71,8 @@ export const consultationConversationCopy = Object.freeze({
   notAccurate: "Not accurate",
   changePrompt: "What should change?",
   generationFailed: `${consultationConfig.displayName} could not finish this coaching. Retry.`,
+  replyFailed: "The reply could not be sent.",
+  notAcceptingReplies: `${consultationConfig.displayName} is not taking replies right now.`,
   generationQualityFailed: `${consultationConfig.displayName} could not keep one part of this coaching after checks. The rest is below. Retry the missing part.`,
   planUnusable: `${consultationConfig.displayName} could not plan this conversation. Retry.`,
   askForStory:

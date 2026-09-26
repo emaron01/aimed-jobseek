@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { buildConsultationQaView } from "@/lib/consultation/qa-view";
+import {
+  buildConsultationQaView,
+  consultationQuestionAcceptsReply,
+  consultationReplyTargetKey,
+  resolveReplyableQaItem,
+} from "@/lib/consultation/qa-view";
 import {
   consultationConfig,
   consultationConversationCopy,
@@ -200,6 +205,71 @@ describe("Harper ten-question coach", () => {
     expect(view.questions[1]?.question).toBe(csc.body);
     expect(view.questions[1]?.resumeBullet).toBeNull();
     expect(view.questions[1]?.seekerAnswers).toEqual([]);
+    expect(consultationQuestionAcceptsReply(view.questions[0]!)).toBe(false);
+    expect(consultationQuestionAcceptsReply(view.questions[1]!)).toBe(true);
+    expect(
+      resolveReplyableQaItem(view, consultationReplyTargetKey(csc.id))
+        ?.questionTurnId,
+    ).toBe(csc.id);
+    expect(resolveReplyableQaItem(view, "why-this-company")?.questionTurnId).toBe(
+      csc.id,
+    );
+    expect(
+      resolveReplyableQaItem(view, consultationReplyTargetKey(opentext.id)),
+    ).toBeNull();
+  });
+
+  it("pins a later reply to the card the seeker answered when keys are shared", () => {
+    const opentext = {
+      id: "q-old",
+      speaker: "CONSULTANT" as const,
+      body: "Walk me through the OpenText ARM go-to-market rebuild.",
+      targetKey: "why-this-company",
+      followUp: false,
+      sequence: 1,
+    };
+    const csc = {
+      id: "q-new",
+      speaker: "CONSULTANT" as const,
+      body: "What specifically draws you to CSC?",
+      targetKey: "why-this-company",
+      followUp: false,
+      sequence: 8,
+    };
+    const view = buildConsultationQaView({
+      turns: [
+        opentext,
+        seeker("s-old", "I rebuilt ARM GTM at OpenText.", 2, "why-this-company"),
+        csc,
+        {
+          ...seeker(
+            "s-new",
+            "I developed an emerging manager at Login VSI.",
+            9,
+            "why-this-company",
+          ),
+          analysisJson: { status: "PENDING", replyToTurnId: opentext.id },
+        },
+      ],
+      statements: [
+        {
+          id: "st-old",
+          turnId: "s-old",
+          kind: "RESUME_BULLET",
+          status: "DRAFT",
+          content: "Rebuilt OpenText ARM go-to-market.",
+          strengtheningNote: null,
+        },
+      ],
+    });
+    expect(view.questions[0]?.seekerAnswers.map((answer) => answer.body)).toEqual(
+      [
+        "I rebuilt ARM GTM at OpenText.",
+        "I developed an emerging manager at Login VSI.",
+      ],
+    );
+    expect(view.questions[1]?.seekerAnswers).toEqual([]);
+    expect(consultationQuestionAcceptsReply(view.questions[1]!)).toBe(true);
   });
 
   it("keeps an answer whose original question is gone as its own answered question", () => {
@@ -296,6 +366,49 @@ describe("Harper ten-question coach", () => {
       consultationConversationCopy.askForStory,
     );
     expect(view.questions[0]?.resumeBullet).toBeNull();
+    expect(consultationQuestionAcceptsReply(view.questions[0]!)).toBe(true);
+
+    const afterFollowUp = buildConsultationQaView({
+      turns: [
+        question,
+        second,
+        seeker("s1", "I like the mission.", 3, "why"),
+        {
+          id: "generic",
+          speaker: "CONSULTANT" as const,
+          body: consultationConversationCopy.askForStory,
+          targetKey: "why",
+          followUp: false,
+          sequence: 4,
+        },
+        {
+          ...seeker("s2", "We grew the region 40%.", 5, "why"),
+          analysisJson: { status: "READY", replyToTurnId: question.id },
+        },
+      ],
+      statements: [
+        {
+          id: "st2",
+          turnId: "s2",
+          kind: "RESUME_BULLET",
+          status: "DRAFT",
+          content: "Grew the region 40%.",
+          strengtheningNote: null,
+        },
+        {
+          id: "st3",
+          turnId: "s2",
+          kind: "INTERVIEW_ANSWER",
+          status: "DRAFT",
+          content: "I grew the region 40%.",
+          strengtheningNote: null,
+        },
+      ],
+    });
+    expect(afterFollowUp.questions[0]?.followUp).toBeNull();
+    expect(consultationQuestionAcceptsReply(afterFollowUp.questions[0]!)).toBe(
+      false,
+    );
   });
 
   it("keeps Where you stand below the questions and has no Harper-page navigation", () => {
@@ -327,6 +440,15 @@ describe("Harper ten-question coach", () => {
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
     expect(thread).toContain("consultation-result-");
     expect(thread).toContain("-approved");
-    expect(thread).toContain("question:${item.questionTurnId}");
+    expect(thread).toContain("consultationReplyTargetKey");
+    expect(thread).toContain("consultationQuestionAcceptsReply");
+    expect(thread).not.toContain("item.targetKey ||");
+    expect(thread).not.toContain("That question is not open.");
+    expect(service).not.toContain("That question is not open.");
+    expect(actions).not.toContain("That question is not open.");
+    expect(actions).not.toContain("That question was not found.");
+    expect(consultationConversationCopy.replyFailed).toBe(
+      "The reply could not be sent.",
+    );
   });
 });

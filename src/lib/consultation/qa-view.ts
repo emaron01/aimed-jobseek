@@ -7,6 +7,7 @@ export type QaTurn = {
   targetKey: string | null;
   followUp: boolean;
   sequence: number;
+  analysisJson?: unknown;
 };
 
 export type QaStatement = {
@@ -66,7 +67,73 @@ function emptyItem(turn: QaTurn): ConsultationQaItem {
   };
 }
 
+export function replyToTurnIdFromAnalysis(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const id = (value as { replyToTurnId?: unknown }).replyToTurnId;
+  return typeof id === "string" && id.trim() ? id.trim() : null;
+}
+
+export function consultationReplyTargetKey(questionTurnId: string): string {
+  return `question:${questionTurnId}`;
+}
+
+export function parseConsultationReplyTarget(requested: string): {
+  questionTurnId: string | null;
+  raw: string;
+} {
+  const raw = requested.trim();
+  if (raw.startsWith("question:")) {
+    const questionTurnId = raw.slice("question:".length).trim();
+    return { questionTurnId: questionTurnId || null, raw };
+  }
+  return { questionTurnId: null, raw };
+}
+
+export function consultationQuestionAcceptsReply(
+  item: ConsultationQaItem,
+): boolean {
+  return item.followUp != null || (!item.resumeBullet && !item.talkingPoint);
+}
+
+export function resolveReplyableQaItem(
+  view: ConsultationQaView,
+  requested: string,
+): ConsultationQaItem | null {
+  const { questionTurnId, raw } = parseConsultationReplyTarget(requested);
+  if (questionTurnId) {
+    const item = view.questions.find(
+      (question) => question.questionTurnId === questionTurnId,
+    );
+    return item && consultationQuestionAcceptsReply(item) ? item : null;
+  }
+  if (!raw) return null;
+  const replyable = view.questions.filter(
+    (item) =>
+      consultationQuestionAcceptsReply(item) &&
+      (item.targetKey === raw || item.questionTurnId === raw),
+  );
+  return replyable[0] ?? null;
+}
+
+export function consultationFollowUpCount(
+  turns: QaTurn[],
+  questionTurnId: string,
+): number {
+  return turns.filter((turn) => {
+    if (turn.speaker !== "CONSULTANT") return false;
+    if (!turn.followUp && !isGenericFollowUpText(turn.body)) return false;
+    return primaryFor(turns, turn).id === questionTurnId;
+  }).length;
+}
+
 function questionAnsweredBy(turns: QaTurn[], seeker: QaTurn): QaTurn | null {
+  const pinnedId = replyToTurnIdFromAnalysis(seeker.analysisJson);
+  if (pinnedId) {
+    const pinned = turns.find(
+      (turn) => turn.id === pinnedId && turn.speaker === "CONSULTANT",
+    );
+    if (pinned) return pinned;
+  }
   return (
     [...turns]
       .reverse()
@@ -82,6 +149,15 @@ function questionAnsweredBy(turns: QaTurn[], seeker: QaTurn): QaTurn | null {
 }
 
 function primaryFor(turns: QaTurn[], consultant: QaTurn): QaTurn {
+  const pinnedId = replyToTurnIdFromAnalysis(consultant.analysisJson);
+  if (pinnedId && pinnedId !== consultant.id) {
+    const pinned = turns.find((turn) => turn.id === pinnedId);
+    if (pinned) {
+      return isPrimaryHarperQuestion(pinned)
+        ? pinned
+        : primaryFor(turns, pinned);
+    }
+  }
   if (isPrimaryHarperQuestion(consultant)) return consultant;
   const sameKey = [...turns]
     .reverse()
@@ -105,20 +181,24 @@ function primaryFor(turns: QaTurn[], consultant: QaTurn): QaTurn {
 }
 
 function seekerAnsweredThis(turns: QaTurn[], consultant: QaTurn): boolean {
-  return turns.some(
-    (turn) =>
-      turn.speaker === "SEEKER" &&
-      turn.sequence > consultant.sequence &&
-      questionAnsweredBy(turns, turn)?.id === consultant.id,
-  );
+  const primaryId = primaryFor(turns, consultant).id;
+  return turns.some((turn) => {
+    if (turn.speaker !== "SEEKER" || turn.sequence <= consultant.sequence) {
+      return false;
+    }
+    const answered = questionAnsweredBy(turns, turn);
+    if (answered?.id === consultant.id) return true;
+    return (
+      replyToTurnIdFromAnalysis(turn.analysisJson) === primaryId &&
+      (consultant.followUp || isGenericFollowUpText(consultant.body))
+    );
+  });
 }
 
 export function consultationHasUnansweredQuestions(
   view: ConsultationQaView,
 ): boolean {
-  return view.questions.some(
-    (item) => item.followUp != null || (!item.resumeBullet && !item.talkingPoint),
-  );
+  return view.questions.some(consultationQuestionAcceptsReply);
 }
 
 export function buildConsultationQaView(input: {

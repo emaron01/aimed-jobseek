@@ -230,6 +230,7 @@ export async function ConsultationSection({
       targetKey: turn.targetKey,
       followUp: turn.followUp,
       sequence: turn.sequence,
+      analysisJson: turn.analysisJson,
     })) ?? [];
   const threadStatements = statements.map((statement) => ({
     id: statement.id,

@@ -39,6 +39,10 @@ describe("obsolete workspace failures", () => {
     expect(
       isObsoleteWorkspaceFailure(applicationAssetConfig.labels.verificationFailed),
     ).toBe(true);
+    expect(isObsoleteWorkspaceFailure("That question is not open.")).toBe(true);
+    expect(
+      isObsoleteWorkspaceFailure("There is no open question to answer."),
+    ).toBe(true);
     expect(isObsoleteWorkspaceFailure("The model did not return a usable asset.")).toBe(
       false,
     );

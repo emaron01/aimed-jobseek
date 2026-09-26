@@ -30,6 +30,8 @@ export type ApplicationJobPayload = {
   thankYouAnswers?: Array<{ id: string; answer: string }>;
   answer?: string;
   targetKey?: string;
+  turnId?: string;
+  questionTurnId?: string;
   adjustmentNote?: string | null;
   planType?: "RESUME" | "COVER_LETTER";
 };

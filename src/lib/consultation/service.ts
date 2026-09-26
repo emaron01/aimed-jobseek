@@ -26,6 +26,18 @@ import {
   type QuestionRoundPlan,
 } from "@/lib/consultation/questions";
 import { type GroundingSource } from "@/lib/consultation/output-quality";
+import {
+  buildConsultationQaView,
+  consultationFollowUpCount,
+  consultationHasUnansweredQuestions,
+  consultationQuestionAcceptsReply,
+  parseConsultationReplyTarget,
+  replyToTurnIdFromAnalysis,
+  resolveReplyableQaItem,
+  type ConsultationQaItem,
+  type QaStatement,
+  type QaTurn,
+} from "@/lib/consultation/qa-view";
 import { nextConsultationStatus } from "@/lib/consultation/state";
 import {
   appendConfirmedFact,
@@ -303,6 +315,7 @@ async function addTurn(input: {
   followUp?: boolean;
   skipped?: boolean;
   seekerAuthored?: boolean;
+  analysisJson?: Prisma.InputJsonValue;
   questionContext?: {
     requirementInterpretation: string | null;
     hiringTeamRoleId: string;
@@ -322,6 +335,7 @@ async function addTurn(input: {
       followUp: input.followUp ?? false,
       skipped: input.skipped ?? false,
       seekerAuthored: input.seekerAuthored ?? false,
+      analysisJson: input.analysisJson,
       questionContextJson:
         (input.questionContext as Prisma.InputJsonValue | undefined) ?? undefined,
       intent: input.intent ?? null,
@@ -428,7 +442,21 @@ async function persistWhyThisCompany(input: {
   });
 }
 
+function seekerFacingGenerationError(message: string): string {
+  const trimmed = message.trim();
+  if (
+    /that question is not open/i.test(trimmed) ||
+    /there is no open question/i.test(trimmed) ||
+    /not waiting for an answer/i.test(trimmed) ||
+    /not waiting for a reply/i.test(trimmed)
+  ) {
+    return consultationConversationCopy.generationFailed;
+  }
+  return trimmed || consultationConversationCopy.generationFailed;
+}
+
 async function failGeneration(sessionId: string, message: string): Promise<void> {
+  const shown = seekerFacingGenerationError(message);
   console.error(
     JSON.stringify({
       event: "consultation_generation_failed",
@@ -440,7 +468,7 @@ async function failGeneration(sessionId: string, message: string): Promise<void>
     where: { id: sessionId },
     data: {
       generationStatus: "FAILED",
-      generationError: message,
+      generationError: shown,
     },
   });
 }
@@ -615,27 +643,8 @@ async function finishIfPlanningIsComplete(
     stored.map(storedAssessment),
     new Set(skipped.map((turn) => turn.targetKey).filter((key): key is string => Boolean(key))),
   );
-  const primaries = await prisma.consultationTurn.findMany({
-    where: { sessionId, speaker: "CONSULTANT", followUp: false },
-    select: { targetKey: true, body: true, sequence: true },
-  });
-  const seekerTurns = await prisma.consultationTurn.findMany({
-    where: { sessionId, speaker: "SEEKER" },
-    select: { targetKey: true, sequence: true },
-  });
-  const openPrimary = primaries.some((question) => {
-    if (question.body.trim() === consultationConversationCopy.askForStory.trim()) {
-      return false;
-    }
-    return !seekerTurns.some(
-      (answer) =>
-        answer.sequence > question.sequence &&
-        (question.targetKey == null ||
-          answer.targetKey == null ||
-          answer.targetKey === question.targetKey),
-    );
-  });
-  if (openPrimary) return;
+  const { view } = await loadSessionQaView(sessionId);
+  if (consultationHasUnansweredQuestions(view)) return;
   if (covered && session?.generationStatus === "READY") {
     await prisma.consultationSession.update({
       where: { id: sessionId },
@@ -818,6 +827,7 @@ async function processAnswerGeneration(input: {
   target: EvidenceTarget | null;
   targets: EvidenceTarget[];
   profile: ReturnType<typeof parseCandidateProfile>;
+  replyToTurnId?: string | null;
 }): Promise<
   | {
       ok: true;
@@ -906,6 +916,7 @@ async function processAnswerGeneration(input: {
       data: {
         analysisJson: {
           status: "READY",
+          ...(input.replyToTurnId ? { replyToTurnId: input.replyToTurnId } : {}),
           answerContext: input.answerContext,
           story: storyProposal?.story ?? verified.partialStory ?? extracted.data.story,
           dropped: verified.droppedDetails,
@@ -1011,30 +1022,46 @@ export async function retryConsultationGeneration(input: {
     return (turn.analysisJson as { status?: unknown }).status === "FAILED";
   });
   if (failedAnswer?.targetKey) {
-    const question = [...turns]
-      .reverse()
-      .find(
-        (turn) =>
-          turn.speaker === "CONSULTANT" &&
-          turn.targetKey === failedAnswer.targetKey &&
-          turn.sequence < failedAnswer.sequence,
-      );
+    const replyToTurnId =
+      replyToTurnIdFromAnalysis(failedAnswer.analysisJson) ??
+      [...turns]
+        .reverse()
+        .find(
+          (turn) =>
+            turn.speaker === "CONSULTANT" &&
+            turn.sequence < failedAnswer.sequence &&
+            (turn.targetKey === failedAnswer.targetKey ||
+              turn.id === replyToTurnIdFromAnalysis(failedAnswer.analysisJson)),
+        )?.id;
+    const question = replyToTurnId
+      ? turns.find(
+          (turn) => turn.id === replyToTurnId && turn.speaker === "CONSULTANT",
+        )
+      : [...turns]
+          .reverse()
+          .find(
+            (turn) =>
+              turn.speaker === "CONSULTANT" &&
+              turn.targetKey === failedAnswer.targetKey &&
+              turn.sequence < failedAnswer.sequence,
+          );
     if (!question) {
-      throw new TenantError("The question for the failed answer was not found.");
+      throw new TenantError(consultationConversationCopy.generationFailed);
     }
     const { requirement, profile } = await requireApplication(
       input.organizationId,
       input.campaignId,
     );
     const targets = targetsFromRequirement(requirement);
-    const target = targets.find((item) => item.key === failedAnswer.targetKey);
+    const target = targets.find((item) => item.key === question.targetKey);
     const answerContext = turns
       .filter(
         (turn) =>
           turn.speaker === "SEEKER" &&
-          turn.targetKey === failedAnswer.targetKey &&
           !turn.skipped &&
-          turn.sequence <= failedAnswer.sequence,
+          turn.sequence <= failedAnswer.sequence &&
+          (replyToTurnIdFromAnalysis(turn.analysisJson) === question.id ||
+            turn.targetKey === failedAnswer.targetKey),
       )
       .map((turn) => turn.body)
       .filter(Boolean)
@@ -1049,17 +1076,16 @@ export async function retryConsultationGeneration(input: {
       target: target ?? null,
       targets,
       profile,
+      replyToTurnId: question.id,
     });
     if (!processed.ok) {
       throw new Error(consultationConversationCopy.generationFailed);
     }
     if (processed.followUpQuestion) {
-      const followUpCount = turns.filter(
-        (turn) =>
-          turn.speaker === "CONSULTANT" &&
-          turn.targetKey === failedAnswer.targetKey &&
-          turn.followUp,
-      ).length;
+      const followUpCount = consultationFollowUpCount(
+        toQaTurns(turns),
+        question.id,
+      );
       if (followUpCount < consultationConfig.maxFollowUpsPerTarget) {
         const coaching = processed.coaching?.trim();
         await addTurn({
@@ -1069,8 +1095,9 @@ export async function retryConsultationGeneration(input: {
           body: coaching
             ? `${coaching}\n\n${processed.followUpQuestion}`
             : processed.followUpQuestion,
-          targetKey: failedAnswer.targetKey,
+          targetKey: question.targetKey ?? failedAnswer.targetKey,
           followUp: true,
+          analysisJson: { replyToTurnId: question.id },
         });
         return;
       }
@@ -1157,29 +1184,82 @@ async function loadSessionTurns(sessionId: string) {
   });
 }
 
-function unanswered(
+function toQaTurns(
   turns: Array<{
     id: string;
-    sequence: number;
     speaker: "CONSULTANT" | "SEEKER";
+    body: string;
     targetKey: string | null;
     followUp: boolean;
-    body: string;
+    sequence: number;
+    analysisJson?: unknown;
   }>,
-  targetKey: string,
+): QaTurn[] {
+  return turns.map((turn) => ({
+    id: turn.id,
+    speaker: turn.speaker,
+    body: turn.body,
+    targetKey: turn.targetKey,
+    followUp: turn.followUp,
+    sequence: turn.sequence,
+    analysisJson: turn.analysisJson,
+  }));
+}
+
+function toQaStatements(
+  statements: Array<{
+    id: string;
+    turnId: string;
+    kind: "INTERVIEW_ANSWER" | "RESUME_BULLET";
+    status: string;
+    content: string;
+    strengtheningNote: string | null;
+  }>,
+): QaStatement[] {
+  return statements.map((statement) => ({
+    id: statement.id,
+    turnId: statement.turnId,
+    kind: statement.kind,
+    status: statement.status,
+    content: statement.content,
+    strengtheningNote: statement.strengtheningNote,
+  }));
+}
+
+async function loadSessionQaView(sessionId: string) {
+  const [turns, statements] = await Promise.all([
+    loadSessionTurns(sessionId),
+    prisma.consultationStatement.findMany({
+      where: { sessionId },
+      orderBy: [{ turnId: "asc" }, { kind: "asc" }],
+    }),
+  ]);
+  return {
+    turns,
+    statements,
+    view: buildConsultationQaView({
+      turns: toQaTurns(turns),
+      statements: toQaStatements(statements),
+    }),
+  };
+}
+
+function consultantForQaItem(
+  turns: Awaited<ReturnType<typeof loadSessionTurns>>,
+  item: ConsultationQaItem,
 ) {
-  const questions = turns.filter(
-    (turn) => turn.speaker === "CONSULTANT" && turn.targetKey === targetKey,
+  const followUpId = item.followUp?.turnId;
+  const followUp = followUpId
+    ? turns.find((turn) => turn.id === followUpId && turn.speaker === "CONSULTANT")
+    : null;
+  const primary = turns.find(
+    (turn) => turn.id === item.questionTurnId && turn.speaker === "CONSULTANT",
   );
-  const latest = questions.at(-1);
-  if (!latest) return null;
-  const answered = turns.some(
-    (turn) =>
-      turn.speaker === "SEEKER" &&
-      turn.targetKey === targetKey &&
-      turn.sequence > latest.sequence,
-  );
-  return answered ? null : latest;
+  return followUp ?? primary ?? null;
+}
+
+function replyCouldNotBeRecorded(): never {
+  throw new TenantError(consultationConversationCopy.replyFailed);
 }
 
 function analysisIsComplete(value: unknown): boolean {
@@ -1194,14 +1274,19 @@ export async function recordConsultationReply(input: {
   targetKey?: string | null;
   answer: string;
   intent?: string | null;
-}): Promise<{ sessionId: string; targetKey: string; turnId: string }> {
+}): Promise<{
+  sessionId: string;
+  targetKey: string;
+  turnId: string;
+  questionTurnId: string;
+}> {
   const answer = input.answer.trim();
   if (!answer) throw new TenantError("Write an answer, or skip the question.");
   const session = await prisma.consultationSession.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
   if (!session || session.status === "SKIPPED" || session.status === "PAUSED") {
-    throw new TenantError("The consultation is not waiting for an answer.");
+    throw new TenantError(consultationConversationCopy.notAcceptingReplies);
   }
   if (session.status === "DONE") {
     await prisma.consultationSession.update({
@@ -1209,45 +1294,38 @@ export async function recordConsultationReply(input: {
       data: { status: "IN_PROGRESS" },
     });
   }
-  const turns = await loadSessionTurns(session.id);
+  const { turns, view } = await loadSessionQaView(session.id);
   const requested = input.targetKey?.trim() ?? "";
-  const questionTurnId = requested.startsWith("question:")
-    ? requested.slice("question:".length)
-    : "";
-  const byTurn = questionTurnId
-    ? turns.find(
-        (turn) => turn.id === questionTurnId && turn.speaker === "CONSULTANT",
-      )
-    : null;
+  const item =
+    resolveReplyableQaItem(view, requested) ??
+    (!requested
+      ? view.questions.find(consultationQuestionAcceptsReply) ?? null
+      : null);
+  const question = item ? consultantForQaItem(turns, item) : null;
+  if (!item || !question) replyCouldNotBeRecorded();
   const targetKey =
-    byTurn?.targetKey ||
-    requested ||
-    turns.find(
-      (turn) =>
-        turn.speaker === "CONSULTANT" &&
-        turn.targetKey &&
-        unanswered(turns, turn.targetKey) != null,
-    )?.targetKey;
-  if (!targetKey) throw new TenantError("That question is not open.");
-  const question = byTurn
-    ? unanswered(turns, byTurn.targetKey ?? targetKey) ?? byTurn
-    : unanswered(turns, targetKey);
-  if (!question) throw new TenantError("That question is not open.");
+    question.targetKey ?? `question:${item.questionTurnId}`;
   const existing = [...turns]
     .reverse()
     .find(
       (turn) =>
         turn.speaker === "SEEKER" &&
-        turn.targetKey === targetKey &&
         turn.body === answer &&
-        !analysisIsComplete(turn.analysisJson),
+        !analysisIsComplete(turn.analysisJson) &&
+        (replyToTurnIdFromAnalysis(turn.analysisJson) === item.questionTurnId ||
+          turn.targetKey === targetKey),
     );
   if (existing) {
     await prisma.consultationSession.update({
       where: { id: session.id },
       data: { generationStatus: "GENERATING", generationError: null },
     });
-    return { sessionId: session.id, targetKey, turnId: existing.id };
+    return {
+      sessionId: session.id,
+      targetKey,
+      turnId: existing.id,
+      questionTurnId: item.questionTurnId,
+    };
   }
   const seekerTurn = await addTurn({
     organizationId: input.organizationId,
@@ -1257,12 +1335,21 @@ export async function recordConsultationReply(input: {
     targetKey,
     seekerAuthored: true,
     intent: input.intent ?? "REPLY",
+    analysisJson: {
+      status: "PENDING",
+      replyToTurnId: item.followUp?.turnId ?? item.questionTurnId,
+    },
   });
   await prisma.consultationSession.update({
     where: { id: session.id },
     data: { generationStatus: "GENERATING", generationError: null },
   });
-  return { sessionId: session.id, targetKey, turnId: seekerTurn.id };
+  return {
+    sessionId: session.id,
+    targetKey,
+    turnId: seekerTurn.id,
+    questionTurnId: item.questionTurnId,
+  };
 }
 
 export async function answerConsultationQuestion(input: {
@@ -1279,6 +1366,7 @@ export async function answerConsultationQuestion(input: {
     sessionId: recorded.sessionId,
     turnId: recorded.turnId,
     targetKey: recorded.targetKey,
+    questionTurnId: recorded.questionTurnId,
     answer: input.answer,
     intent: input.intent,
   });
@@ -1290,6 +1378,7 @@ export async function processConsultationReply(input: {
   sessionId?: string;
   turnId?: string;
   targetKey?: string;
+  questionTurnId?: string;
   answer?: string;
   intent?: string | null;
 }): Promise<void> {
@@ -1303,97 +1392,145 @@ export async function processConsultationReply(input: {
     },
   });
   if (!session || session.status === "SKIPPED" || session.status === "PAUSED") {
-    throw new TenantError("The consultation is not waiting for an answer.");
+    throw new TenantError(consultationConversationCopy.notAcceptingReplies);
   }
-  const turns = await loadSessionTurns(session.id);
+  let { turns, view } = await loadSessionQaView(session.id);
   let seekerTurn = input.turnId
     ? turns.find((turn) => turn.id === input.turnId)
     : [...turns].reverse().find(
         (turn) =>
           turn.speaker === "SEEKER" &&
           !turn.skipped &&
-          (!input.targetKey || turn.targetKey === input.targetKey) &&
+          (!input.targetKey ||
+            turn.targetKey === input.targetKey ||
+            replyToTurnIdFromAnalysis(turn.analysisJson) ===
+              parseConsultationReplyTarget(input.targetKey).questionTurnId) &&
           !analysisIsComplete(turn.analysisJson),
       );
   let targetKey = seekerTurn?.targetKey ?? input.targetKey ?? "";
+  let questionTurnId =
+    input.questionTurnId ??
+    replyToTurnIdFromAnalysis(seekerTurn?.analysisJson) ??
+    parseConsultationReplyTarget(input.targetKey ?? "").questionTurnId ??
+    "";
   if (!seekerTurn) {
     if (!answer) throw new TenantError("Write an answer, or skip the question.");
     const recorded = await recordConsultationReply({
       organizationId: input.organizationId,
       campaignId: input.campaignId,
-      targetKey: targetKey || null,
+      targetKey: input.targetKey || input.questionTurnId || null,
       answer,
       intent: input.intent,
     });
     targetKey = recorded.targetKey;
-    seekerTurn = { id: recorded.turnId } as (typeof turns)[number];
+    questionTurnId = recorded.questionTurnId;
+    const reloaded = await loadSessionQaView(session.id);
+    turns = reloaded.turns;
+    view = reloaded.view;
+    seekerTurn = turns.find((turn) => turn.id === recorded.turnId);
   }
-  if (!targetKey) throw new TenantError("That question is not open.");
-  const question = [...turns]
-    .reverse()
-    .find(
-      (turn) =>
-        turn.speaker === "CONSULTANT" &&
-        turn.targetKey === targetKey &&
-        turn.sequence < (turns.find((item) => item.id === seekerTurn!.id)?.sequence ?? Number.MAX_SAFE_INTEGER),
-    ) ?? unanswered(turns, targetKey);
-  if (!question) throw new TenantError("That question is not open.");
+  if (!seekerTurn) replyCouldNotBeRecorded();
+  const item =
+    view.questions.find((question) => question.questionTurnId === questionTurnId) ??
+    resolveReplyableQaItem(
+      view,
+      questionTurnId
+        ? `question:${questionTurnId}`
+        : targetKey || input.targetKey || "",
+    );
+  const question = item
+    ? consultantForQaItem(turns, item)
+    : turns.find((turn) => turn.id === questionTurnId && turn.speaker === "CONSULTANT") ??
+      [...turns]
+        .reverse()
+        .find(
+          (turn) =>
+            turn.speaker === "CONSULTANT" &&
+            turn.sequence < seekerTurn.sequence &&
+            (turn.id === questionTurnId ||
+              turn.targetKey === (seekerTurn.targetKey ?? targetKey)),
+        );
+  if (!question) {
+    await failGeneration(session.id, consultationConversationCopy.generationFailed);
+    throw new Error(consultationConversationCopy.generationFailed);
+  }
+  const resolvedItem =
+    item ??
+    view.questions.find((questionItem) => questionItem.questionTurnId === question.id) ??
+    null;
+  questionTurnId = resolvedItem?.questionTurnId ?? question.id;
+  const assessmentKey =
+    question.targetKey ??
+    resolvedItem?.targetKey ??
+    (targetKey.startsWith("question:") ? "" : targetKey);
   const seekerTurnId = seekerTurn.id;
   const { requirement, profile } = await requireApplication(
     input.organizationId,
     input.campaignId,
   );
   const targets = targetsFromRequirement(requirement);
-  const target = targets.find((item) => item.key === targetKey);
+  const target = assessmentKey
+    ? targets.find((entry) => entry.key === assessmentKey)
+    : undefined;
   const recordedAnswer =
     ("body" in seekerTurn && typeof seekerTurn.body === "string"
       ? seekerTurn.body
       : answer) || answer;
-  const answerContext = [
-    ...turns
+  const priorOnCard =
+    resolvedItem?.seekerAnswers
+      .filter((entry) => entry.id !== seekerTurnId)
+      .map((entry) => entry.body) ??
+    turns
       .filter(
         (turn) =>
           turn.speaker === "SEEKER" &&
-          turn.targetKey === targetKey &&
           !turn.skipped &&
-          turn.id !== seekerTurnId,
+          turn.id !== seekerTurnId &&
+          replyToTurnIdFromAnalysis(turn.analysisJson) === questionTurnId,
       )
-      .map((turn) => turn.body),
-    recordedAnswer,
-  ]
+      .map((turn) => turn.body);
+  const answerContext = [...priorOnCard, recordedAnswer]
     .filter(Boolean)
     .join("\n");
+  const askedTurnId = replyToTurnIdFromAnalysis(seekerTurn.analysisJson);
+  const askedTurn = askedTurnId
+    ? turns.find(
+        (turn) => turn.id === askedTurnId && turn.speaker === "CONSULTANT",
+      )
+    : null;
   const processed = await processAnswerGeneration({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
     sessionId: session.id,
     turnId: seekerTurnId,
     answerContext,
-    question: question.body,
+    question:
+      askedTurn?.body ??
+      resolvedItem?.followUp?.text ??
+      question.body,
     target: target ?? null,
     targets,
     profile,
+    replyToTurnId: questionTurnId,
   });
   if (!processed.ok) {
     throw new Error(consultationConversationCopy.generationFailed);
   }
-  if (targetKey === WHY_THIS_COMPANY_TARGET_KEY) {
+  if (assessmentKey === WHY_THIS_COMPANY_TARGET_KEY) {
     await persistWhyThisCompany({
       organizationId: input.organizationId,
       campaignId: input.campaignId,
       answer: recordedAnswer,
     });
   }
-  const followUpCount = turns.filter(
-    (turn) =>
-      turn.speaker === "CONSULTANT" &&
-      turn.targetKey === targetKey &&
-      turn.followUp,
-  ).length;
+  const followUpCount = consultationFollowUpCount(
+    toQaTurns(turns),
+    questionTurnId,
+  );
   const coaching = processed.coaching?.trim();
   const askFollowUp =
     Boolean(processed.followUpQuestion) &&
-    targetKey !== "chronology" &&
+    assessmentKey !== "chronology" &&
     followUpCount < consultationConfig.maxFollowUpsPerTarget;
   if (askFollowUp && processed.followUpQuestion) {
     await addTurn({
@@ -1403,8 +1540,11 @@ export async function processConsultationReply(input: {
       body: coaching
         ? `${coaching}\n\n${processed.followUpQuestion}`
         : processed.followUpQuestion,
-      targetKey,
+      targetKey: assessmentKey || targetKey,
       followUp: true,
+      analysisJson: {
+        replyToTurnId: questionTurnId,
+      },
     });
   }
 }
@@ -1581,14 +1721,13 @@ export async function skipConsultationQuestion(input: {
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
   if (!session || session.status !== "IN_PROGRESS") {
-    throw new TenantError("The consultation is not waiting for an answer.");
+    throw new TenantError(consultationConversationCopy.notAcceptingReplies);
   }
-  const turns = await loadSessionTurns(session.id);
-  const question = unanswered(turns, input.targetKey);
-  if (!question) {
-    throw new TenantError("That question is not open.");
-  }
-  if (question.followUp) {
+  const { turns, view } = await loadSessionQaView(session.id);
+  const item = resolveReplyableQaItem(view, input.targetKey);
+  const question = item ? consultantForQaItem(turns, item) : null;
+  if (!item || !question) replyCouldNotBeRecorded();
+  if (question.followUp || item.followUp) {
     await declineConsultationFollowUp({
       organizationId: input.organizationId,
       campaignId: input.campaignId,
@@ -1603,18 +1742,16 @@ export async function skipConsultationQuestion(input: {
     sessionId: session.id,
     speaker: "SEEKER",
     body: "",
-    targetKey: input.targetKey,
+    targetKey: question.targetKey ?? input.targetKey,
     skipped: true,
     seekerAuthored: true,
+    analysisJson: {
+      status: "READY",
+      replyToTurnId: item.questionTurnId,
+    },
   });
-  const refreshed = await loadSessionTurns(session.id);
-  const stillOpen = refreshed.some(
-    (turn) =>
-      turn.speaker === "CONSULTANT" &&
-      turn.targetKey &&
-      unanswered(refreshed, turn.targetKey),
-  );
-  if (stillOpen) return;
+  const refreshed = await loadSessionQaView(session.id);
+  if (consultationHasUnansweredQuestions(refreshed.view)) return;
   const { campaign, requirement, profile } = await requireApplication(
     input.organizationId,
     input.campaignId,
@@ -1623,7 +1760,7 @@ export async function skipConsultationQuestion(input: {
     where: { sessionId: session.id },
   });
   const assessments = stored.map(storedAssessment);
-  const { askedKeys, skippedKeys } = askedAndSkipped(refreshed);
+  const { askedKeys, skippedKeys } = askedAndSkipped(refreshed.turns);
   markWhyThisCompanyAsked(askedKeys, {
     campaignId: campaign.id,
     whyThisCompany: campaign.whyThisCompany,
@@ -2277,20 +2414,15 @@ export async function replyConsultation(input: {
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
   if (!session || session.status !== "IN_PROGRESS") {
-    throw new TenantError("The consultation is not waiting for a reply.");
+    throw new TenantError(consultationConversationCopy.notAcceptingReplies);
   }
-  const turns = await loadSessionTurns(session.id);
-  const open = turns.find(
-    (turn) =>
-      turn.speaker === "CONSULTANT" &&
-      turn.targetKey &&
-      unanswered(turns, turn.targetKey) != null,
-  );
-  if (open?.targetKey) {
+  const { view } = await loadSessionQaView(session.id);
+  const open = view.questions.find(consultationQuestionAcceptsReply);
+  if (open) {
     await answerConsultationQuestion({
       organizationId: input.organizationId,
       campaignId: input.campaignId,
-      targetKey: open.targetKey,
+      targetKey: `question:${open.questionTurnId}`,
       answer,
       intent: "REPLY",
     });
@@ -2307,7 +2439,7 @@ export async function replyConsultation(input: {
     });
     return;
   }
-  throw new TenantError("There is no open question to answer.");
+  throw new TenantError(consultationConversationCopy.replyFailed);
 }
 
 export async function dismissConsultationProposal(input: {

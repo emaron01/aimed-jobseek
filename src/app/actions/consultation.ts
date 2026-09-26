@@ -24,6 +24,7 @@ import { requireCurrentUser } from "@/lib/auth/session";
 import {
   applicationAssetConfig,
   consultationConversationCopy,
+  isObsoleteWorkspaceFailure,
   vocab,
 } from "@/lib/product-config";
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
@@ -34,8 +35,29 @@ import { TenantError } from "@/lib/tenant/errors";
 
 export type ConsultationActionResult = { ok: boolean; message: string };
 
+function seekerFacingActionMessage(message: string, fallback: string): string {
+  const trimmed = message.trim();
+  if (
+    !trimmed ||
+    isObsoleteWorkspaceFailure(trimmed) ||
+    /that question is not open/i.test(trimmed) ||
+    /there is no open question/i.test(trimmed) ||
+    /not waiting for an answer/i.test(trimmed) ||
+    /not waiting for a reply/i.test(trimmed) ||
+    /that question was not found/i.test(trimmed)
+  ) {
+    return fallback;
+  }
+  return trimmed;
+}
+
 function fail(error: unknown, fallback: string): ConsultationActionResult {
-  if (error instanceof TenantError) return { ok: false, message: error.message };
+  if (error instanceof TenantError) {
+    return {
+      ok: false,
+      message: seekerFacingActionMessage(error.message, fallback),
+    };
+  }
   console.error(
     JSON.stringify({
       event: "consultation_action_failed",
@@ -187,7 +209,7 @@ export async function answerConsultationAction(
     const targetKey = String(formData.get("targetKey") ?? "").trim();
     const answer = String(formData.get("answer") ?? "");
     if (!campaignId || !targetKey) {
-      return { ok: false, message: "That question was not found." };
+      return { ok: false, message: consultationConversationCopy.replyFailed };
     }
     await enqueueApplicationJob({
       organizationId,
@@ -212,7 +234,7 @@ export async function skipConsultationQuestionAction(
     const campaignId = campaignIdFrom(formData);
     const targetKey = String(formData.get("targetKey") ?? "").trim();
     if (!campaignId || !targetKey) {
-      return { ok: false, message: "That question was not found." };
+      return { ok: false, message: consultationConversationCopy.replyFailed };
     }
     await skipConsultationQuestion({ organizationId, campaignId, targetKey });
     revalidatePath(`/campaigns/${campaignId}`);
@@ -399,12 +421,14 @@ export async function replyConsultationAction(
         operation: "process_reply",
         answer,
         targetKey: recorded.targetKey,
+        turnId: recorded.turnId,
+        questionTurnId: recorded.questionTurnId,
       },
     });
     revalidatePath(`/campaigns/${campaignId}`);
     return { ok: true, message: consultationConversationCopy.thinking };
   } catch (error) {
-    return fail(error, "The reply could not be sent.");
+    return fail(error, consultationConversationCopy.replyFailed);
   }
 }
 

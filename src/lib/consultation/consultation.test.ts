@@ -47,6 +47,10 @@ import {
   continueConsultationPlanning,
 } from "@/lib/consultation/service";
 import {
+  buildConsultationQaView,
+  consultationQuestionAcceptsReply,
+} from "@/lib/consultation/qa-view";
+import {
   looksLikeInternalId,
   profileItemDisplayLabel,
   resolveEvidenceLabels,
@@ -1828,5 +1832,147 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
           !firstTurnIds.includes(turn.id),
       ),
     ).toBe(true);
+  });
+
+  it("accepts a reply on every Reply-box question even when target keys are shared", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Shared key reply ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(
+      NORMAL_JOB_MODEL,
+      NORMAL_JOB_POSTING,
+    );
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        reportingLine: parsed.reportingLine,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaign.id);
+    await startConsultation({ organizationId, campaignId: campaign.id });
+    const session = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: { turns: { orderBy: { sequence: "asc" } } },
+    });
+    const primaries =
+      session?.turns.filter(
+        (turn) => turn.speaker === "CONSULTANT" && !turn.followUp,
+      ) ?? [];
+    expect(primaries.length).toBeGreaterThanOrEqual(3);
+    const earlier = primaries[0]!;
+    const later = primaries[1]!;
+    const other = primaries[2]!;
+    await prisma.consultationTurn.update({
+      where: { id: later.id },
+      data: { targetKey: earlier.targetKey },
+    });
+
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey: `question:${later.id}`,
+      answer: "I used Python for 5 years and cut failed jobs by 40%.",
+    });
+
+    const afterLater = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: {
+        turns: { orderBy: { sequence: "asc" } },
+        statements: true,
+      },
+    });
+    expect(afterLater?.generationError).toBeNull();
+    const laterView = buildConsultationQaView({
+      turns: afterLater!.turns.map((turn) => ({
+        id: turn.id,
+        speaker: turn.speaker,
+        body: turn.body,
+        targetKey: turn.targetKey,
+        followUp: turn.followUp,
+        sequence: turn.sequence,
+        analysisJson: turn.analysisJson,
+      })),
+      statements: afterLater!.statements.map((statement) => ({
+        id: statement.id,
+        turnId: statement.turnId,
+        kind: statement.kind,
+        status: statement.status,
+        content: statement.content,
+        strengtheningNote: statement.strengtheningNote,
+      })),
+    });
+    const earlierCard = laterView.questions.find(
+      (item) => item.questionTurnId === earlier.id,
+    );
+    const laterCard = laterView.questions.find(
+      (item) => item.questionTurnId === later.id,
+    );
+    expect(consultationQuestionAcceptsReply(earlierCard!)).toBe(true);
+    expect(consultationQuestionAcceptsReply(laterCard!)).toBe(false);
+
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey: `question:${earlier.id}`,
+      answer: "I have used Python on backend services.",
+    });
+
+    const afterEarlier = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: {
+        turns: { orderBy: { sequence: "asc" } },
+        statements: true,
+      },
+    });
+    expect(afterEarlier?.generationError).toBeNull();
+    expect(afterEarlier?.generationError ?? "").not.toMatch(/not open/i);
+    const earlierFollowUps = afterEarlier!.turns.filter(
+      (turn) =>
+        turn.speaker === "CONSULTANT" &&
+        turn.followUp &&
+        (turn.targetKey === earlier.targetKey ||
+          (turn.analysisJson &&
+            typeof turn.analysisJson === "object" &&
+            (turn.analysisJson as { replyToTurnId?: unknown }).replyToTurnId ===
+              earlier.id)),
+    );
+    expect(earlierFollowUps).toHaveLength(1);
+
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey: `question:${other.id}`,
+      answer: "I have used Python on backend services.",
+    });
+    const afterOther = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: { turns: { orderBy: { sequence: "asc" } } },
+    });
+    expect(afterOther?.generationError).toBeNull();
+    const otherFollowUps = afterOther!.turns.filter(
+      (turn) =>
+        turn.speaker === "CONSULTANT" &&
+        turn.followUp &&
+        (turn.analysisJson &&
+        typeof turn.analysisJson === "object" &&
+        (turn.analysisJson as { replyToTurnId?: unknown }).replyToTurnId ===
+          other.id),
+    );
+    expect(otherFollowUps).toHaveLength(1);
   });
 });

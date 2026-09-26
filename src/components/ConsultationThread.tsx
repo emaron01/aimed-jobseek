@@ -15,6 +15,8 @@ import {
 } from "@/lib/product-config";
 import {
   buildConsultationQaView,
+  consultationQuestionAcceptsReply,
+  consultationReplyTargetKey,
   type ConsultationQaItem,
   type QaStatement,
   type QaTurn,
@@ -120,8 +122,8 @@ function QuestionCard({
   onSubmitStart: (answer: string) => void;
 }) {
   const hasResult = Boolean(item.resumeBullet || item.talkingPoint) && !item.followUp;
-  const canAnswer = showReply && !hasResult;
-  const replyKey = item.targetKey || `question:${item.questionTurnId}`;
+  const canAnswer = showReply && consultationQuestionAcceptsReply(item);
+  const replyKey = consultationReplyTargetKey(item.questionTurnId);
   return (
     <details
       className="min-w-0 overflow-hidden rounded-md border border-edge bg-canvas p-4"
@@ -245,11 +247,11 @@ export function ConsultationThread({
           item={item}
           showReply={showReply}
           pending={
-            pendingTarget === (item.targetKey || `question:${item.questionTurnId}`) &&
+            pendingTarget === consultationReplyTargetKey(item.questionTurnId) &&
             jobsActive
           }
           onSubmitStart={(answer) => {
-            setPendingTarget(item.targetKey || `question:${item.questionTurnId}`);
+            setPendingTarget(consultationReplyTargetKey(item.questionTurnId));
             void answer;
           }}
         />

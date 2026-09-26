@@ -89,6 +89,8 @@ export async function processApplicationJob(
               operation: payload.operation,
               answer: payload.answer,
               targetKey: payload.targetKey,
+              turnId: payload.turnId,
+              questionTurnId: payload.questionTurnId,
               contactId: payload.contactId ?? job.targetId,
             });
             break;
@@ -219,6 +221,8 @@ async function processConsultationJob(input: {
   operation?: string;
   answer?: string;
   targetKey?: string;
+  turnId?: string;
+  questionTurnId?: string;
   contactId?: string | null;
 }): Promise<void> {
   if (input.operation === "retry") {
@@ -278,6 +282,8 @@ async function processConsultationJob(input: {
       organizationId: input.organizationId,
       campaignId: input.campaignId,
       targetKey: input.targetKey,
+      turnId: input.turnId,
+      questionTurnId: input.questionTurnId,
       answer: input.answer,
     });
     return;

@@ -18,6 +18,10 @@ export const obsoleteWorkspaceFailurePhrases = Object.freeze([
   "could not be grounded",
   "Clarifying questions could not be written.",
   "Thank-you questions could not be written.",
+  "That question is not open",
+  "There is no open question to answer",
+  "The consultation is not waiting for an answer",
+  "The consultation is not waiting for a reply",
 ]);
 
 export function isObsoleteWorkspaceFailure(
