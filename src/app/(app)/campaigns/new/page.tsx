@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { NewCampaignForm } from "@/components/NewCampaignForm";
 import {PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
-import { listIcps, listPersonas } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { getHomeWorkflow } from "@/lib/workflow/home";
 import { vocab } from "@/lib/product-config";
@@ -21,11 +20,7 @@ export default async function NewCampaignPage() {
     );
   }
 
-  const [icps, personas, workflow] = await Promise.all([
-    listIcps(),
-    listPersonas(),
-    getHomeWorkflow(organization.id),
-  ]);
+  const workflow = await getHomeWorkflow(organization.id);
 
   const campaignProducts = workflow.campaignProducts;
   const readyProducts = campaignProducts.filter((product) => product.ready);
@@ -36,7 +31,7 @@ export default async function NewCampaignPage() {
     <div>
       <PageHeader
         title={`New ${vocab.campaign.singular}`}
-        description={`Paste a job posting. ${vocab.product.Singular} and ${vocab.icp.singular} are selected for you when you have exactly one; otherwise you choose.`}
+        description={`Paste a job posting and choose ${vocab.product.aSingular}.`}
         actions={
           <AppActionLink
             href="/campaigns"
@@ -56,16 +51,6 @@ export default async function NewCampaignPage() {
               ready: product.ready,
               omissionReason: product.omissionReason,
             }))}
-            icps={icps.map((icp) => ({
-              id: icp.id,
-              name: icp.name,
-              productId: icp.productId,
-            }))}
-            personas={personas.map((persona) => ({
-              id: persona.id,
-              name: persona.name,
-              productId: persona.productId,
-            }))}
           />
         ) : (
           <p className="text-sm text-muted">
@@ -82,7 +67,7 @@ export default async function NewCampaignPage() {
             data-testid="campaign-product-setup-required"
           >
             No {vocab.product.plural} are ready for {vocab.campaign.plural} yet. Each {vocab.product.singular} needs
-            approval and {vocab.icp.aSingular} with criteria.
+            approval.
           </p>
         ) : null}
         {unavailableProducts.length > 0 && readyProducts.length > 0 ? (

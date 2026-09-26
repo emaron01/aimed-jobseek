@@ -483,7 +483,7 @@ describe("Harper ten-question coach", () => {
       actions.indexOf("export async function regenerateConsultationQaResultAction"),
     );
     expect(approveAction).toContain("approveConsultationQaResult");
-    expect(approveAction).not.toContain("enqueueApplicationJob");
+    expect(approveAction).toContain('operation: "continue"');
     expect(consultationConversationCopy.confirmed).toBe("Approved.");
     const live = readFileSync("src/components/ApplicationWorkspaceLive.tsx", "utf8");
     expect(live).toContain("export function WorkspaceJobRefresh");

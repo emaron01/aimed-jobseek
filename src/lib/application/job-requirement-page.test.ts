@@ -168,16 +168,6 @@ describe.skipIf(!hasTestDatabase())("job requirement learned notes and regenerat
       saveApplicationJobPosting,
       regenerateApplicationJobRequirement,
     } = await import("@/lib/application/service");
-    await saveApplicationJobLearnedNotes({
-      organizationId,
-      campaignId,
-      notes: "The interviewer said the team wants security sales more than general sales.",
-    });
-    const stored = await prisma.jobRequirement.findUniqueOrThrow({
-      where: { campaignId },
-    });
-    expect(stored.seekerLearnedNotes).toContain("security sales");
-
     const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
     let parseCount = 0;
     interpretJobPosting.mockImplementation(
@@ -186,11 +176,26 @@ describe.skipIf(!hasTestDatabase())("job requirement learned notes and regenerat
         parseCount += 1;
         return {
           ...parsed,
-          title: parseCount === 1 ? "Replaced title" : "Regenerated title",
+          title:
+            parseCount === 1
+              ? parsed.title
+              : parseCount === 2
+                ? "Replaced title"
+                : "Regenerated title",
           requiredItems: [...parsed.requiredItems, "Security sales experience"],
         };
       },
     );
+    await saveApplicationJobLearnedNotes({
+      organizationId,
+      campaignId,
+      userId,
+      notes: "The interviewer said the team wants security sales more than general sales.",
+    });
+    const stored = await prisma.jobRequirement.findUniqueOrThrow({
+      where: { campaignId },
+    });
+    expect(stored.seekerLearnedNotes).toContain("security sales");
 
     await saveApplicationJobPosting({
       organizationId,
@@ -216,7 +221,7 @@ describe.skipIf(!hasTestDatabase())("job requirement learned notes and regenerat
       where: { campaignId },
     });
     expect(afterRegen.title).toBe("Regenerated title");
-    expect(interpretJobPosting).toHaveBeenCalledTimes(2);
+    expect(interpretJobPosting).toHaveBeenCalledTimes(3);
     const fit = await prisma.applicationFit.findUnique({
       where: { campaignId },
     });

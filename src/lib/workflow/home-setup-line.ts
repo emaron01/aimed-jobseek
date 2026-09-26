@@ -11,9 +11,6 @@ export function formatProductSetupClause(
   if (readiness.ready) return `${productName} ready`;
 
   const blocker = readiness.blockers[0] ?? "needs setup";
-  if (blocker === PRODUCT_READINESS_BLOCKERS.needsIcp) {
-    return `${productName} needs ${vocab.icp.aSingular}`;
-  }
   if (
     blocker === PRODUCT_READINESS_BLOCKERS.needsReview ||
     blocker === PRODUCT_READINESS_BLOCKERS.draft ||

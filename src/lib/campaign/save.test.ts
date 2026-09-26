@@ -43,7 +43,7 @@ describe("parseCampaignFormData", () => {
     const parsed = parseCampaignFormData(
       formFrom({ name: "X", productId: "prod_1" }),
     );
-    expect(parsed.fieldErrors.icpId).toBe("Target Employer profile is required.");
+    expect(parsed.fieldErrors.icpId).toBeUndefined();
     expect(parsed.fieldErrors.postingText).toBe("Paste the job posting.");
     expect(parsed.fieldErrors.personaId).toBeUndefined();
     expect(parsed.fields.personaId).toBeNull();
@@ -136,15 +136,15 @@ describe("campaign save UI seam", () => {
     expect(formSrc).toContain('data-testid="campaign-action-status"');
     expect(scoreReport).toContain("useActionState");
     expect(scoreReport).toContain('data-testid="campaign-action-status"');
-    expect(formSrc).toContain("{vocab.persona.Plural} in play");
-    expect(formSrc).toContain('name="personaIds"');
-    expect(formSrc).toContain('name="allPersonas"');
+    expect(formSrc).not.toContain("{vocab.persona.Plural} in play");
+    expect(formSrc).not.toContain('name="personaIds"');
+    expect(formSrc).not.toContain('name="allPersonas"');
+    expect(formSrc).not.toContain('name="icpId"');
+    expect(formSrc).not.toContain('name="emailLength"');
     expect(scoreReport).toContain('name="allPersonas"');
     expect(scoreReport).not.toContain("Select persona for this campaign");
     expect(formSrc).toContain('name="emailGuidance"');
     expect(formSrc).toContain("Paste a job posting");
-    expect(formSrc).toContain("writes outreach for");
-    expect(formSrc).not.toContain("will email");
     expect(scoreReport).toContain('name="emailLength"');
     expect(scoreReport).toContain('name="emailGuidance"');
     expect(settingsForm).toContain("updateCampaignEmailSettingsAction");

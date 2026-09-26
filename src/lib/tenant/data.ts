@@ -807,7 +807,7 @@ export async function listContacts(options?: {
 export type CampaignWithRelations = Campaign & {
   owner: { id: string; name: string | null; email: string };
   product: { id: string; name: string };
-  icp: { id: string; name: string };
+  icp: { id: string; name: string } | null;
   persona: { id: string; name: string } | null;
   personasInPlay: Array<{ persona: { id: string; name: string } }>;
   offer: { id: string; name: string } | null;
@@ -876,7 +876,7 @@ export async function listCampaigns(options?: {
 export async function createCampaign(input: {
   name: string;
   productId: string;
-  icpId: string;
+  icpId?: string | null;
   personaId?: string | null;
   personaIds?: string[];
   offerName?: string | null;
@@ -902,10 +902,12 @@ export async function createCampaign(input: {
       where: { id: input.productId, organizationId },
       select: { id: true, organizationId: true },
     }),
-    prisma.icp.findFirst({
-      where: { id: input.icpId, organizationId },
-      select: { id: true, organizationId: true, productId: true },
-    }),
+    input.icpId
+      ? prisma.icp.findFirst({
+          where: { id: input.icpId, organizationId },
+          select: { id: true, organizationId: true, productId: true },
+        })
+      : Promise.resolve(null),
     input.personaId
       ? prisma.persona.findFirst({
           where: { id: input.personaId, organizationId, archivedAt: null },
@@ -927,13 +929,13 @@ export async function createCampaign(input: {
   if (!product) {
     throw new TenantError(`${vocab.product.Singular} does not belong to the active organization.`);
   }
-  if (!icp) {
+  if (input.icpId && !icp) {
     throw new TenantError(`${vocab.icp.singular} does not belong to the active organization.`);
   }
   if (input.personaId && !fallbackPersona) {
     throw new TenantError(`${vocab.persona.Singular} does not belong to the active organization.`);
   }
-  if (icp.productId !== product.id) {
+  if (icp && icp.productId !== product.id) {
     throw new TenantError(`${vocab.icp.singular} does not belong to the selected ${vocab.product.singular}.`);
   }
   if (fallbackPersona && fallbackPersona.productId !== product.id) {
@@ -1024,7 +1026,7 @@ export async function createCampaign(input: {
         visibility: "PERSONAL",
         name: input.name,
         productId: product.id,
-        icpId: icp.id,
+        icpId: icp?.id ?? null,
         personaId: fallbackPersonaId,
         offerId: null,
         offerName: input.offerName?.trim() || null,
@@ -1116,7 +1118,7 @@ export async function getCampaignForListWorkflow(campaignId: string): Promise<{
   id: string;
   name: string;
   productId: string;
-  icpId: string;
+  icpId: string | null;
   personaId: string | null;
 } | null> {
   const actor = await getWorkActor();

@@ -78,7 +78,11 @@ import { applicationResearchCopy, applicationSummaryConfig, applicationWorkspace
 import {
   parseIdentityVerification,
 } from "@/lib/job-requirement/identity-verification";
-import { ensureHiringTeamAfterResearch, ensureIdentityVerification } from "@/lib/application/service";
+import {
+  ensureHiringTeamAfterResearch,
+  ensureIdentityVerification,
+  ensureNamedEmployerResearch,
+} from "@/lib/application/service";
 import { AppActionLink } from "@/components/ui";
 import { parseStringArray } from "@/lib/research";
 import type { ResearchSource } from "@/lib/research/types";
@@ -303,6 +307,7 @@ export async function ApplicationWorkspace({
   focus?: ApplicationWorkspaceFocus;
 }) {
   await ensureIdentityVerification({ organizationId, campaignId });
+  await ensureNamedEmployerResearch({ organizationId, campaignId });
   await ensureHiringTeamAfterResearch({ organizationId, campaignId });
   await mergeExistingHiringTeamRoles({ organizationId, campaignId });
   const requirement = await prisma.jobRequirement.findFirst({
@@ -384,9 +389,9 @@ export async function ApplicationWorkspace({
         icpUpdatedAt: fit.icpUpdatedAt,
         companyResearchUpdatedAt: fit.companyResearchUpdatedAt,
         interpretationPromptVersion: fit.interpretationPromptVersion,
-        currentIcpUpdatedAt: icp.updatedAt,
+        currentIcpUpdatedAt: icp?.updatedAt ?? null,
         currentResearchUpdatedAt: research?.updatedAt ?? null,
-        currentPromptVersion: icp.interpretationPromptVersion,
+        currentPromptVersion: icp?.interpretationPromptVersion ?? null,
       })
     : null;
   const outcomes = fit ? readOutcomes(fit.outcomesJson) : [];
@@ -696,6 +701,7 @@ export async function ApplicationWorkspace({
     </section>
       </div>
     </details>
+    {icp ? (
     <details
       className="space-y-4 rounded-lg border border-edge bg-surface p-5"
       data-testid="employer-fit"
@@ -779,6 +785,7 @@ export async function ApplicationWorkspace({
         ) : null}
       </div>
     </details>
+    ) : null}
     </>
     ) : null}
     {showFocus(focus, ["hiring-team"]) ? (

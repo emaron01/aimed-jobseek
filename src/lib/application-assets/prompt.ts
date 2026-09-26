@@ -145,6 +145,7 @@ export function buildResumeAssetMessages(input: {
         companyResearch: companyResearchPrefix(input.context),
         approvedStatements: input.context.approvedStatements,
         approvedStories: input.context.stories,
+        voiceSamples: input.context.voiceSamples,
         seekerSources: seekerSources(input.context),
         sources: input.context.sources.filter((source) =>
           [

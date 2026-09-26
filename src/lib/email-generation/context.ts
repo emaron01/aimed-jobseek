@@ -157,7 +157,7 @@ export type EmailGenerationContext = {
     name: string;
     definition: string | null;
     description: string | null;
-  };
+  } | null;
   contactResearch: {
     id: string;
     currentTitle: string | null;
@@ -295,7 +295,8 @@ export async function loadEmailGenerationContext(
     campaign.product.organizationId !== organizationId ||
     (campaign.persona &&
       campaign.persona.organizationId !== organizationId) ||
-    campaign.icp.organizationId !== organizationId
+    (campaign.icp != null &&
+      campaign.icp.organizationId !== organizationId)
   ) {
     throw new TenantError(
       `${vocab.campaign.Singular} ${vocab.contact.singular} relationships do not belong to the active organization.`,
@@ -341,7 +342,9 @@ export async function loadEmailGenerationContext(
           scoringRun: {
             organizationId,
             productId: campaign.productId,
-            icpId: campaign.icpId,
+            ...(campaign.icpId
+              ? { icpId: campaign.icpId }
+              : { id: { in: [] } }),
             status: { in: ["COMPLETED", "PARTIAL"] },
           },
         },
@@ -507,7 +510,7 @@ export async function loadEmailGenerationContext(
         decisionInfluence: stringList(personaProfile.decisionInfluence),
       },
     },
-    icp: icpForGeneration(campaign.icp),
+    icp: campaign.icp ? icpForGeneration(campaign.icp) : null,
     contactResearch: freshContactResearch?.researchedAt
       ? {
           id: freshContactResearch.id,
@@ -568,7 +571,7 @@ export async function loadEmailGenerationContext(
 export async function loadEmailDraftScreenStates(input: {
   organizationId: string;
   productId: string;
-  icpId: string;
+  icpId: string | null;
   campaignPersonaId: string | null;
   campaignPersonaName: string | null;
   inPlay: Array<{ personaId: string; name: string }>;
@@ -608,7 +611,7 @@ export async function loadEmailDraftScreenStates(input: {
             scoringRun: {
               organizationId: input.organizationId,
               productId: input.productId,
-              icpId: input.icpId,
+              ...(input.icpId ? { icpId: input.icpId } : { id: { in: [] } }),
               status: { in: ["COMPLETED", "PARTIAL"] },
             },
           },

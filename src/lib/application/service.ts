@@ -84,13 +84,101 @@ async function queueApplicationResearch(input: {
   });
 }
 
+export async function ensureNamedEmployerResearch(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const requirement = await prisma.jobRequirement.findFirst({
+    where: {
+      campaignId: input.campaignId,
+      organizationId: input.organizationId,
+    },
+    include: {
+      company: {
+        include: { research: { orderBy: { updatedAt: "desc" }, take: 1 } },
+      },
+    },
+  });
+  if (!requirement) return;
+  const name = (
+    requirement.suppliedEmployerName ??
+    requirement.companyName ??
+    ""
+  ).trim();
+  if (!name) return;
+  const matches = await companyMatches(input.organizationId, name);
+  const decision = decideEmployerResearch({
+    rawText: requirement.rawText,
+    matches,
+  });
+  if (decision.disposition !== "IDENTIFIED" || !decision.runResearch) return;
+  let companyId = requirement.companyId ?? decision.companyId;
+  if (!companyId) {
+    const created = await resolveOrCreateCompany({ name });
+    if (!created) {
+      throw new TenantError(
+        "The employer could not be saved, so research did not run.",
+      );
+    }
+    companyId = created.id;
+    await prisma.jobRequirement.update({
+      where: { id: requirement.id },
+      data: { companyId, employerDisposition: "IDENTIFIED" },
+    });
+  }
+  const latest = requirement.company?.research[0];
+  if (latest && (latest.status === "COMPLETED" || latest.status === "PARTIAL")) {
+    return;
+  }
+  await queueApplicationResearch({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    companyId,
+  });
+}
+
+export async function queueMissingNamedEmployerResearch(): Promise<number> {
+  const rows = await prisma.jobRequirement.findMany({
+    where: {
+      OR: [
+        { companyName: { not: null } },
+        { suppliedEmployerName: { not: null } },
+      ],
+    },
+    select: { organizationId: true, campaignId: true },
+  });
+  let queued = 0;
+  for (const row of rows) {
+    const before = await prisma.researchRun.count({
+      where: {
+        organizationId: row.organizationId,
+        campaignId: row.campaignId,
+        status: { in: ["PENDING", "IN_PROGRESS"] },
+      },
+    });
+    await ensureNamedEmployerResearch({
+      organizationId: row.organizationId,
+      campaignId: row.campaignId,
+    });
+    const after = await prisma.researchRun.count({
+      where: {
+        organizationId: row.organizationId,
+        campaignId: row.campaignId,
+        status: { in: ["PENDING", "IN_PROGRESS"] },
+      },
+    });
+    if (after > before) queued += 1;
+  }
+  return queued;
+}
+
 export async function attachParsedPosting(input: {
   organizationId: string;
   campaignId: string;
   rawText: string;
   postingUrl: string | null;
   parsed: ParsedJobRequirement;
-  icpId: string;
+  icpId: string | null;
 }): Promise<void> {
   const matches = await companyMatches(
     input.organizationId,
@@ -274,7 +362,11 @@ export async function rescoreApplicationFit(input: {
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
     include: { campaign: { select: { icpId: true } } },
   });
-  if (!requirement?.companyId || requirement.employerDisposition !== "IDENTIFIED") {
+  if (
+    !requirement?.companyId ||
+    requirement.employerDisposition !== "IDENTIFIED" ||
+    !requirement.campaign.icpId
+  ) {
     throw new TenantError(
       "Employer fit can be rescored after the employer is confirmed.",
     );
@@ -535,7 +627,7 @@ export function readApplicationFitStale(input: {
   icpUpdatedAt: Date;
   companyResearchUpdatedAt: Date | null;
   interpretationPromptVersion: string | null;
-  currentIcpUpdatedAt: Date;
+  currentIcpUpdatedAt: Date | null;
   currentResearchUpdatedAt: Date | null;
   currentPromptVersion: string | null;
 }): { stale: boolean; reason: string | null } {
@@ -705,7 +797,7 @@ async function persistInterpretedJobRequirement(input: {
     organizationId: string;
     companyId: string | null;
     employerDisposition: string;
-    campaign: { icpId: string };
+    campaign: { icpId: string | null };
   };
   rawText: string;
   parsed: ParsedJobRequirement;
@@ -733,7 +825,8 @@ async function persistInterpretedJobRequirement(input: {
   });
   if (
     input.requirement.companyId &&
-    input.requirement.employerDisposition === "IDENTIFIED"
+    input.requirement.employerDisposition === "IDENTIFIED" &&
+    input.requirement.campaign.icpId
   ) {
     await scoreFit({
       organizationId: input.requirement.organizationId,
@@ -742,6 +835,10 @@ async function persistInterpretedJobRequirement(input: {
       companyId: input.requirement.companyId,
     });
   }
+  await ensureNamedEmployerResearch({
+    organizationId: input.requirement.organizationId,
+    campaignId: input.requirement.campaignId,
+  });
 }
 
 export async function saveApplicationJobPosting(input: {
@@ -800,6 +897,7 @@ export async function regenerateApplicationJobRequirement(input: {
 export async function saveApplicationJobLearnedNotes(input: {
   organizationId: string;
   campaignId: string;
+  userId: string;
   notes: string;
 }): Promise<void> {
   const requirement = await loadJobRequirementForEdit(input);
@@ -810,6 +908,29 @@ export async function saveApplicationJobLearnedNotes(input: {
   await prisma.jobRequirement.update({
     where: { id: requirement.id },
     data: { seekerLearnedNotes: notes.length > 0 ? notes : null },
+  });
+  const parsed = await interpretJobPosting(
+    requirement.rawText,
+    {
+      organizationId: input.organizationId,
+      userId: input.userId,
+      campaignId: input.campaignId,
+      category: "INTERPRETATION",
+      operation: "JOB_REQUIREMENT_PARSE",
+    },
+    notes.length > 0 ? notes : null,
+  );
+  await persistInterpretedJobRequirement({
+    requirement,
+    rawText: requirement.rawText,
+    parsed,
+  });
+  const { enqueueApplicationJob } = await import("@/lib/application-jobs/service");
+  await enqueueApplicationJob({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    type: "CONSULTATION",
+    payload: { operation: "reassess" },
   });
 }
 

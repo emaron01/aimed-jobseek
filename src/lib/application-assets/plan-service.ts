@@ -186,3 +186,29 @@ export function earlierExperienceHeadingFromPlan(
 ): string | null {
   return plan?.type === "RESUME" ? plan.earlierExperienceHeading : null;
 }
+
+export async function enqueueAssetsAfterConsultation(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+}): Promise<void> {
+  const existing = await prisma.applicationAsset.findMany({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      type: { in: ["RESUME", "COVER_LETTER"] },
+    },
+    select: { type: true },
+  });
+  const { enqueueApplicationJob } = await import("@/lib/application-jobs/service");
+  for (const type of ["RESUME", "COVER_LETTER"] as const) {
+    if (existing.some((asset) => asset.type === type)) continue;
+    await enqueueApplicationJob({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      type,
+      initiatedByUserId: input.userId,
+      payload: { operation: "plan_accept_generate", userId: input.userId },
+    });
+  }
+}

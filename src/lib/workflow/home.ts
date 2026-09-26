@@ -217,7 +217,7 @@ export async function getHomeWorkflow(
     totalPersonas,
   });
 
-  // Same rule as New campaign / setupComplete: approved + ICP with criteria + persona.
+  // Same rule as New campaign / setupComplete: approved Personal Profile.
   const productIncompleteForRail = products
     .filter((product) => !isCampaignReadyProduct(product))
     .map((product) => getProductCampaignReadiness(product));
@@ -328,7 +328,7 @@ export async function getHomeWorkflow(
         name: campaign.name,
         archived: campaign.archivedAt != null,
         context: [
-          campaign.icp.name,
+          campaign.icp?.name,
           campaignPersonasDisplayName({
             fallbackPersonaName: campaign.persona?.name,
             inPlayNames: campaign.personasInPlay.map((row) => row.persona.name),

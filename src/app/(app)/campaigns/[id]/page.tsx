@@ -351,7 +351,7 @@ export default async function CampaignDetailPage({
   });
   // Product + ICP are set at create time. Offer is optional — saving an empty
   // offer succeeds, and List must unlock without one.
-  const setupComplete = Boolean(campaign.productId && campaign.icpId);
+  const setupComplete = Boolean(campaign.productId);
   const stages = buildCampaignStages({
     setupComplete,
     hasListData: campaign.contacts.length > 0,
@@ -644,7 +644,11 @@ export default async function CampaignDetailPage({
               </label>
               {[
                 [vocab.product.Singular, campaign.product.id, campaign.product.name],
-                [vocab.icp.singular, campaign.icp.id, campaign.icp.name],
+                [
+                  vocab.icp.singular,
+                  campaign.icp?.id ?? "",
+                  campaign.icp?.name ?? "Not set",
+                ],
                 [vocab.persona.Plural, "personas-in-play", personasLabel],
                 [
                   "Offer",
@@ -669,7 +673,10 @@ export default async function CampaignDetailPage({
             <dl className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               <Meta label="Status" value={campaign.status} />
               <Meta label={vocab.product.Singular} value={campaign.product.name} />
-              <Meta label={vocab.icp.singular} value={campaign.icp.name} />
+              <Meta
+                label={vocab.icp.singular}
+                value={campaign.icp?.name ?? "Not set"}
+              />
               <Meta label={`${vocab.persona.Plural} in play`} value={personasLabel} />
               <Meta label="Offer" value={offerName ?? "None (optional)"} />
               <Meta label="Call to action" value={offerCta} />
@@ -984,7 +991,7 @@ export default async function CampaignDetailPage({
         <CampaignStageShell next={companiesNext}>
           <Panel
             title="6 Companies"
-            description={`Qualification against ${campaign.icp.name}, the ${vocab.campaign.singular} ${vocab.icp.singular} only.`}
+            description={`Qualification against ${campaign.icp?.name ?? "the application"}, the ${vocab.campaign.singular} ${vocab.icp.singular} only.`}
           >
             <QualificationBuckets
               campaignId={campaign.id}

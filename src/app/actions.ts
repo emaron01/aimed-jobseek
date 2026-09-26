@@ -546,7 +546,7 @@ export async function createCampaignAction(
         rawText: parsed.fields.postingText,
         postingUrl: parsed.fields.postingUrl,
         parsed: parsedJob,
-        icpId: parsed.fields.icpId,
+        icpId: parsed.fields.icpId || null,
       });
     } catch (attachError) {
       const { prisma } = await import("@/lib/prisma");

@@ -212,7 +212,7 @@ export function applicationFitStaleReason(input: {
   recordedIcpUpdatedAt: Date;
   recordedResearchUpdatedAt: Date | null;
   recordedPromptVersion: string | null;
-  currentIcpUpdatedAt: Date;
+  currentIcpUpdatedAt: Date | null;
   currentResearchUpdatedAt: Date | null;
   currentPromptVersion: string | null;
 }): string | null {
@@ -225,8 +225,9 @@ export function applicationFitStaleReason(input: {
     return researchRefreshStaleReason();
   }
   if (
-    input.currentIcpUpdatedAt.getTime() > input.recordedIcpUpdatedAt.getTime() ||
-    (input.currentPromptVersion ?? null) !== (input.recordedPromptVersion ?? null)
+    input.currentIcpUpdatedAt &&
+    (input.currentIcpUpdatedAt.getTime() > input.recordedIcpUpdatedAt.getTime() ||
+      (input.currentPromptVersion ?? null) !== (input.recordedPromptVersion ?? null))
   ) {
     return targetEmployerStaleReason();
   }

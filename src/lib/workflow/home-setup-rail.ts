@@ -13,7 +13,6 @@ import { countedNoun, features, vocab } from "@/lib/product-config";
 export const HOME_SETUP_STEP_KEYS = [
   "products",
   "voice",
-  "icps",
   "email",
 ] as const;
 
@@ -36,7 +35,6 @@ function plural(count: number, singular: string): string {
 
 function shortProductGap(readiness: ProductCampaignReadiness): string {
   const blocker = readiness.blockers[0] ?? "needs setup";
-  if (blocker === PRODUCT_READINESS_BLOCKERS.needsIcp) return `needs ${vocab.icp.aSingular}`;
   if (
     blocker === PRODUCT_READINESS_BLOCKERS.needsReview ||
     blocker === PRODUCT_READINESS_BLOCKERS.draft ||
@@ -137,21 +135,10 @@ export function buildHomeSetupRail(input: {
       detail: input.voice.ready ? voiceDetail : `${voiceDetail} · Optional`,
       optional: true,
     },
-    {
-      number: 3,
-      key: "icps",
-      label: vocab.icp.nav,
-      href: "/icps",
-      completed: input.icpCount > 0,
-      detail:
-        input.icpCount === 0
-          ? `No ${vocab.icp.plural} yet`
-          : countedNoun(input.icpCount, vocab.icp),
-    },
     ...(features.emailConnection
       ? [
           {
-            number: 4,
+            number: 3,
             key: "email" as const,
             label: "Email connection",
             href: "/settings/email",

@@ -297,8 +297,10 @@ export function buildEmailPrompt(
         }
       : null,
     audienceFit: {
-      icpName: context.icp.name,
-      icpDefinition: context.icp.definition ?? context.icp.description,
+      icpName: context.icp?.name ?? null,
+      icpDefinition: context.icp
+        ? context.icp.definition ?? context.icp.description
+        : null,
       personaBuyingRole: context.persona.profile.buyingRole,
       personaDecisionInfluence: context.persona.profile.decisionInfluence,
     },

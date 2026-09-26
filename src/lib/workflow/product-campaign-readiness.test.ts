@@ -29,13 +29,13 @@ describe("getProductCampaignReadiness", () => {
     expect(result.blockers).toContain(PRODUCT_READINESS_BLOCKERS.needsReview);
   });
 
-  it("requires an ICP with criteria rows", () => {
+  it("does not require a Target Employer profile", () => {
     const result = getProductCampaignReadiness({
       ...complete,
       icps: [{ criteria: [] }],
     });
-    expect(result.ready).toBe(false);
-    expect(result.blockers).toContain(PRODUCT_READINESS_BLOCKERS.needsIcp);
+    expect(result.ready).toBe(true);
+    expect(result.blockers).toEqual([]);
   });
 
   it("does not require a saved persona", () => {
@@ -54,9 +54,9 @@ describe("getProductCampaignReadiness", () => {
       personas: [],
     });
     expect(result.ready).toBe(false);
-    expect(result.blockers).toHaveLength(2);
+    expect(result.blockers).toHaveLength(1);
     expect(result.omissionReason).toContain("draft");
-    expect(result.omissionReason).toContain(vocab.icp.singular);
+    expect(result.omissionReason).not.toContain(vocab.icp.singular);
     expect(result.omissionReason).not.toContain(vocab.persona.singular);
   });
 });

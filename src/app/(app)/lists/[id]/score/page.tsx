@@ -126,7 +126,7 @@ export default async function ScoreListPage({ params, searchParams }: PageProps)
               productId: persona.productId,
             }))}
             defaultProductId={campaign?.productId}
-            defaultIcpId={campaign?.icpId}
+            defaultIcpId={campaign?.icpId ?? undefined}
             defaultPersonaId={campaign?.personaId}
             campaignId={campaign?.id}
           />

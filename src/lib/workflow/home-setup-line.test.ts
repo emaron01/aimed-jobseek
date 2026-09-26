@@ -21,7 +21,7 @@ describe("home setup line", () => {
         {
           name: "Mathew Sales Forecaster",
           readiness: getProductCampaignReadiness({
-            approvalStatus: "APPROVED",
+            approvalStatus: "DRAFT",
             icps: [],
             personas: [{}],
           }),
@@ -30,9 +30,7 @@ describe("home setup line", () => {
       totalIcps: 1,
       totalPersonas: 5,
     });
-    expect(line.text).toBe(
-      `OT NOM ready · Mathew Sales Forecaster needs ${vocab.icp.aSingular}`,
-    );
+    expect(line.text).toBe("OT NOM ready · Mathew Sales Forecaster needs approval");
     expect(line.href).toBe("/products");
   });
 

@@ -23,11 +23,7 @@ export function ProductCatalogPanel({
             <p className="font-medium text-ink">{product.name}</p>
             <p className="mt-1 text-sm text-muted">
               {product.approvalStatus.replaceAll("_", " ")} ·{" "}
-              {countedNoun(product._count.icps, vocab.icp)} ·{" "}
-              {product._count.personas}{" "}
-              {product._count.personas === 1
-                ? vocab.persona.Singular
-                : vocab.persona.Plural}
+              {countedNoun(product._count.icps, vocab.icp)}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

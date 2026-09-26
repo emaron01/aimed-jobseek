@@ -57,26 +57,3 @@ export function seekerPrepInstructionViolations(text: string): string[] {
     : [];
 }
 
-export function rewriteHarperCoachingVoice(
-  text: string,
-  firstName: string | null,
-): string {
-  let next = text.replace(/[’]/g, "'");
-  const name = firstName?.trim();
-  if (name && name.length > 1) {
-    const escaped = escapedName(name);
-    next = next.replace(new RegExp(`\\b${escaped}'s\\b`, "gi"), "your");
-    next = next.replace(new RegExp(`\\b${escaped} is\\b`, "gi"), "You are");
-    next = next.replace(new RegExp(`\\b${escaped} has\\b`, "gi"), "You have");
-    next = next.replace(new RegExp(`\\b${escaped} was\\b`, "gi"), "You were");
-    next = next.replace(new RegExp(`\\b${escaped}\\b`, "gi"), "you");
-  }
-  next = next.replace(/\bthe seeker(?:'s)?\b/gi, (match) =>
-    match.toLowerCase().endsWith("'s") ? "your" : "you",
-  );
-  next = next.replace(/\bthe candidate(?:'s)?\b/gi, (match) =>
-    match.toLowerCase().endsWith("'s") ? "your" : "you",
-  );
-  next = next.replace(/\byou's\b/gi, "your");
-  return next;
-}

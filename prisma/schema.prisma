@@ -2327,7 +2327,7 @@ model Campaign {
   visibility          CampaignVisibility @default(PERSONAL)
   name                String
   productId           String
-  icpId               String
+  icpId               String?
   personaId           String?
   /// Legacy optional link to Offer table. New campaigns use offer* fields below.
   offerId             String?
@@ -2352,7 +2352,7 @@ model Campaign {
   organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   owner               User                 @relation("CampaignOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
   product             Product              @relation(fields: [productId], references: [id])
-  icp                 Icp                  @relation(fields: [icpId], references: [id])
+  icp                 Icp?                 @relation(fields: [icpId], references: [id], onDelete: Restrict)
   persona             Persona?             @relation(fields: [personaId], references: [id])
   offer               Offer?               @relation(fields: [offerId], references: [id])
   contacts            CampaignContact[]

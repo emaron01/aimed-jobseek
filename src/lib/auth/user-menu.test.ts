@@ -157,7 +157,7 @@ describe("buildSidebarNavItems", () => {
       items.some((i) => i.href === "/products" && i.label === vocab.product.nav),
     ).toBe(true);
     expect(items.some((i) => i.href === "/icps" && i.label === vocab.icp.nav)).toBe(
-      true,
+      false,
     );
     expect(items.some((i) => i.href === "/personas")).toBe(false);
     expect(items.map((i) => i.href)).toEqual([
@@ -165,7 +165,6 @@ describe("buildSidebarNavItems", () => {
       "/campaigns",
       "/contacts",
       "/products",
-      "/icps",
       "/settings/voice",
       "/settings",
       "/settings/account",

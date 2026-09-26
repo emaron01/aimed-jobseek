@@ -51,7 +51,7 @@ const STEP_JOBS: Record<ApplicationStepKey, Array<ApplicationJobType | "RESEARCH
   assets: ["RESUME", "COVER_LETTER"],
   "hiring-team": ["HIRING_TEAM_IDENTIFY", "HIRING_TEAM_BUILD", "CONTACT_PROFILE"],
   outreach: ["OUTREACH"],
-  interviews: ["INTERVIEW_GUIDE"],
+  interviews: [],
   summary: ["APPLICATION_SUMMARY"],
   applied: [],
 };

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
+import { regenerateApplicationJobRequirement } from "@/lib/application/service";
 import { startConsultation } from "@/lib/consultation/service";
 import { requireCurrentUser } from "@/lib/auth/authz";
 import { refreshConsultationOffer } from "@/lib/interview/guide";
@@ -123,11 +124,26 @@ export async function updateInterviewStageAction(
         ? String(formData.get("outcome") ?? "").trim() || null
         : undefined,
     });
+    const notesChanged =
+      formData.has("notesBefore") || formData.has("notesAfter");
     if (formData.has("notesAfter")) {
       await refreshConsultationOffer({
         organizationId,
         campaignId: id,
         stageId,
+      });
+    }
+    if (notesChanged) {
+      await regenerateApplicationJobRequirement({
+        organizationId,
+        campaignId: id,
+        userId: user.id,
+      });
+      await enqueueApplicationJob({
+        organizationId,
+        campaignId: id,
+        type: "CONSULTATION",
+        payload: { operation: "reassess" },
       });
     }
     revalidate(id, stageId);

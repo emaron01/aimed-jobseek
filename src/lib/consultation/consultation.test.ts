@@ -1991,7 +1991,80 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { sessionId: session!.id, speaker: "CONSULTANT" },
       orderBy: { sequence: "asc" },
     });
-    expect(laterQuestions.length).toBe(beforeContinue);
+    const afterContinue = await prisma.consultationSession.findUnique({
+      where: { campaignId },
+    });
+    expect(laterQuestions.length).toBeGreaterThanOrEqual(beforeContinue);
+    if (laterQuestions.length === beforeContinue) {
+      expect(["DONE", "IN_PROGRESS"]).toContain(afterContinue?.status);
+    }
+  });
+
+  it("asks the next Harper question after every current result is used", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Continue after use ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        companyName: parsed.companyName,
+        seniority: parsed.seniority,
+        reportingLine: parsed.reportingLine,
+        responsibilities: parsed.responsibilities,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaign.id);
+    await startConsultation({ organizationId, campaignId: campaign.id });
+    const session = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+    });
+    expect(session?.status).toBe("IN_PROGRESS");
+    const questions = await prisma.consultationTurn.findMany({
+      where: { sessionId: session!.id, speaker: "CONSULTANT" },
+      orderBy: { sequence: "asc" },
+    });
+    expect(questions.length).toBeGreaterThan(0);
+    for (const question of questions) {
+      await answerConsultationQuestion({
+        organizationId,
+        campaignId: campaign.id,
+        targetKey: `question:${question.id}`,
+        answer: "I used Python for 5 years and cut failed jobs by 40%.",
+      });
+    }
+    await confirmConsultationResult({
+      organizationId,
+      campaignId: campaign.id,
+    });
+    const before = await prisma.consultationTurn.count({
+      where: { sessionId: session!.id, speaker: "CONSULTANT" },
+    });
+    await continueConsultationPlanning({
+      organizationId,
+      campaignId: campaign.id,
+    });
+    const after = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+    });
+    const later = await prisma.consultationTurn.count({
+      where: { sessionId: session!.id, speaker: "CONSULTANT" },
+    });
+    expect(later > before || after?.status === "DONE").toBe(true);
   });
 
   it("repairs a raw joined interview and fragment bullet into Harper-written results", async () => {

@@ -85,9 +85,9 @@ export async function loadApplicationStepFacts(input: {
         icpUpdatedAt: fit.icpUpdatedAt,
         companyResearchUpdatedAt: fit.companyResearchUpdatedAt,
         interpretationPromptVersion: fit.interpretationPromptVersion,
-        currentIcpUpdatedAt: campaign.icp.updatedAt,
+        currentIcpUpdatedAt: campaign.icp?.updatedAt ?? null,
         currentResearchUpdatedAt: researchRow?.updatedAt ?? null,
-        currentPromptVersion: campaign.icp.interpretationPromptVersion,
+        currentPromptVersion: campaign.icp?.interpretationPromptVersion ?? null,
       })
     : null;
   return {
@@ -96,7 +96,7 @@ export async function loadApplicationStepFacts(input: {
     researchInProgress:
       research.phase === "queued" || research.phase === "researching",
     hasJobTitle: Boolean(campaign.jobRequirement?.title?.trim()),
-    fitNeedsRescore: Boolean(stale?.stale),
+    fitNeedsRescore: Boolean(campaign.icp && stale?.stale),
     hiringTeamRoleCount: campaign.hiringTeamRoles.length,
     hasApprovedResume: campaign.applicationAssets.some((asset) => asset.type === "RESUME"),
     hasApprovedCoverLetter: campaign.applicationAssets.some(

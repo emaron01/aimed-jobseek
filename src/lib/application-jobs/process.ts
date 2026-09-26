@@ -6,6 +6,10 @@ import {
 import type { ApplicationJobResult } from "@/lib/application-jobs/types";
 import { processApplicationNextStep } from "@/lib/application/next-step";
 import { generateApplicationAsset } from "@/lib/application-assets/service";
+import {
+  acceptPresentationPlan,
+  writePresentationPlan,
+} from "@/lib/application-assets/plan-service";
 import { generateOutreachAsset } from "@/lib/application-assets/outreach";
 import { generateApplicationSummary } from "@/lib/application-summary/service";
 import { buildContactIndividualProfile } from "@/lib/contact-profile/service";
@@ -31,7 +35,6 @@ import {
   retryConsultationGeneration,
   startConsultation,
 } from "@/lib/consultation/service";
-import { writePresentationPlan } from "@/lib/application-assets/plan-service";
 import type { ApplicationAssetType, EmailLength } from "@prisma/client";
 
 export async function processApplicationJob(
@@ -98,7 +101,10 @@ export async function processApplicationJob(
             break;
           case "RESUME":
           case "COVER_LETTER":
-            if (payload.operation === "plan") {
+            if (
+              payload.operation === "plan" ||
+              payload.operation === "plan_accept_generate"
+            ) {
               const planned = await writePresentationPlan({
                 organizationId: job.organizationId,
                 campaignId: job.campaignId,
@@ -106,6 +112,26 @@ export async function processApplicationJob(
                 adjustmentNote: payload.adjustmentNote ?? null,
               });
               if (!planned.ok) throw new Error(planned.message);
+              if (payload.operation === "plan") break;
+              await acceptPresentationPlan({
+                organizationId: job.organizationId,
+                campaignId: job.campaignId,
+                type: job.type,
+              });
+              const generated = await generateApplicationAsset({
+                organizationId: job.organizationId,
+                campaignId: job.campaignId,
+                userId: payload.userId ?? job.initiatedByUserId ?? "",
+                type: job.type,
+                hiddenRoleIds: payload.hiddenRoleIds ?? [],
+                regenerationInstruction: payload.regenerationInstruction ?? null,
+              });
+              if (!generated.ok) {
+                const detail = [generated.message, ...generated.violations]
+                  .map((item) => item.trim())
+                  .filter(Boolean);
+                throw new Error([...new Set(detail)].join("\n"));
+              }
               break;
             }
             {

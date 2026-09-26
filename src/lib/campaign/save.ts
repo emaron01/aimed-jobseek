@@ -175,9 +175,6 @@ export function parseCampaignFormData(formData: FormData): {
   if (!values.productId) {
     fieldErrors.productId = `${vocab.product.Singular} is required.`;
   }
-  if (!values.icpId) {
-    fieldErrors.icpId = `${vocab.icp.Singular} is required.`;
-  }
   const personas: CampaignPersonaSelection =
     parseCampaignPersonaSelection(formData);
   const emailSettings = parseCampaignEmailSettingsFormData(formData);

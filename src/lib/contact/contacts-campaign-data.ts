@@ -130,7 +130,7 @@ async function qualifyContactsForCampaign(
   campaign: {
     id: string;
     productId: string;
-    icpId: string;
+    icpId: string | null;
     personaId: string | null;
     ownerUserId: string;
   },
@@ -219,7 +219,7 @@ async function compatibleScoringRunWhere(
   campaign: {
     id: string;
     productId: string;
-    icpId: string;
+    icpId: string | null;
     personaId: string | null;
     ownerUserId: string;
   },
@@ -242,7 +242,7 @@ async function compatibleScoringRunWhere(
   return {
     organizationId,
     productId: campaign.productId,
-    icpId: campaign.icpId,
+    ...(campaign.icpId ? { icpId: campaign.icpId } : { id: { in: [] } }),
     status: { in: ["COMPLETED", "PARTIAL"] },
     contactList: {
       archivedAt: null,

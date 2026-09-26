@@ -108,6 +108,33 @@ describe("application step done states", () => {
         ],
       ),
     ).toBe("needs_attention");
+    expect(
+      resolveApplicationStepState(
+        "interviews",
+        idle,
+        [
+          {
+            id: "guide_1",
+            type: "INTERVIEW_GUIDE",
+            status: "IN_PROGRESS",
+            targetId: "stage_1",
+            error: null,
+            canRetry: false,
+            progressText: "Writing",
+            waitKind: "longer",
+            sectionId: "interviews",
+            readyText: "Guide is ready.",
+          },
+        ],
+      ),
+    ).toBe("not_started");
+    expect(
+      resolveApplicationStepState(
+        "interviews",
+        { ...idle, interviewStageCount: 2 },
+        [],
+      ),
+    ).toBe("done");
   });
 
   it("shows one new marker per latest result and clears it after view", () => {

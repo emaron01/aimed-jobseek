@@ -149,6 +149,7 @@ export async function polishAnswerWithModel(input: {
   confirmedGap?: boolean;
   strengtheningNeeds: string[];
   qualityFeedback?: string[];
+  voiceSamples?: Array<{ label: string; sampleText: string }>;
   usage?: AiCallUsageContext;
 }): Promise<
   | { ok: true; data: ConsultationPolishResult }

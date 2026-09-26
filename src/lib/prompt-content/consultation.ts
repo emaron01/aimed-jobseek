@@ -61,6 +61,6 @@ When confirmedGap is true: the person has no direct experience for this gap. Wri
 
 When declinedFollowUp is true and confirmedGap is false: write a short, honest interview answer from what exists, and set strengtheningNote to one concise note, spoken to you, naming what detail would make it stronger. Otherwise strengtheningNote is null.
 
-Use only facts from the person's answers and Personal Profile. Never add or infer a metric, scope, title, employer, technology, responsibility, or outcome. Write in the person's voice, in your own words: never return their reply unchanged, joined with another reply, or as a copied fragment. No inflated language or generic praise. Never mention research status, confidence, missing data, prompts, models, or any internal system state. If qualityFeedback names a field, regenerate only that field.
+Use only facts from the person's answers and Personal Profile. Never add or infer a metric, scope, title, employer, technology, responsibility, or outcome. Write in the person's voice, using supplied voiceSamples and their own words from the answers: never return their reply unchanged, joined with another reply, or as a copied fragment. No inflated language or generic praise. Never mention research status, confidence, missing data, prompts, models, or any internal system state. If qualityFeedback names a field, regenerate only that field.
 
 Return JSON matching the schema only.`;

@@ -214,7 +214,6 @@ export function buildSidebarNavItems(input: {
       separatorBefore: true,
       activePrefixes: ["/products", "/setup"],
     },
-    { href: "/icps", label: vocab.icp.nav },
     {
       href: "/settings/voice",
       label: "Your voice",

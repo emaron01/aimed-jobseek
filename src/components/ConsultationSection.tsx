@@ -29,10 +29,7 @@ import {
   buildStandingGaps,
   shouldEnqueueConsultationStandingRegen,
 } from "@/lib/consultation/standing";
-import {
-  rewriteHarperCoachingVoice,
-  seekerFirstName,
-} from "@/lib/consultation/voice";
+import { seekerFirstName } from "@/lib/consultation/voice";
 import { listPersonPreps } from "@/lib/interview/person-prep";
 import { ConsultationKnowAboutMe } from "@/components/ConsultationKnowAboutMe";
 import { ConsultationStanding } from "@/components/ConsultationStanding";
@@ -232,9 +229,7 @@ export async function ConsultationSection({
         id: item.id,
         text: item.text,
         strength: item.strength,
-        explanation: item.explanation
-          ? rewriteHarperCoachingVoice(item.explanation, firstName)
-          : item.explanation,
+        explanation: item.explanation,
         facts: facts.map((fact) => ({
           id: fact.id,
           label: fact.label,
@@ -536,7 +531,7 @@ export async function ConsultationSection({
                   <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
                     {briefing.data.strongestAngles.map((item) => (
                       <li key={item}>
-                        {rewriteHarperCoachingVoice(item, firstName)}
+                        {item}
                       </li>
                     ))}
                   </ul>
@@ -544,14 +539,7 @@ export async function ConsultationSection({
               ) : null}
               {session && session.assessments.length > 0 ? (
                 <ConsultationStanding
-                  overall={
-                    briefing?.success
-                      ? rewriteHarperCoachingVoice(
-                          briefing.data.overall,
-                          firstName,
-                        )
-                      : null
-                  }
+                  overall={briefing?.success ? briefing.data.overall : null}
                   gaps={buildStandingGaps({
                     assessments: session.assessments.map((item) => ({
                       key: item.targetKey,

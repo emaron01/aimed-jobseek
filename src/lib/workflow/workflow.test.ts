@@ -82,17 +82,18 @@ describe("home workflow", () => {
     prismaMock.contact.count.mockResolvedValue(0);
   });
 
-  it.each([
-    ["Product", []],
-    ["ICP", [productFixture({ icps: [] })]],
-  ])(
-    "renders pre-setup state when %s is missing",
-    async (_missing, products) => {
-      prismaMock.product.findMany.mockResolvedValue(products);
-      const result = await getHomeWorkflow("org_1");
-      expect(result.setupComplete).toBe(false);
-    },
-  );
+  it("renders pre-setup state when a Personal Profile is missing", async () => {
+    prismaMock.product.findMany.mockResolvedValue([]);
+    const result = await getHomeWorkflow("org_1");
+    expect(result.setupComplete).toBe(false);
+  });
+
+  it("treats an approved Personal Profile as campaign-ready without a Target Employer", async () => {
+    prismaMock.product.findMany.mockResolvedValue([productFixture({ icps: [] })]);
+    const result = await getHomeWorkflow("org_1");
+    expect(result.setupComplete).toBe(true);
+    expect(result.campaignProducts[0]?.ready).toBe(true);
+  });
 
   it("enables campaigns when ICP has criteria even if lastInterpretedAt is null", async () => {
     prismaMock.product.findMany.mockResolvedValue([productFixture()]);
@@ -186,13 +187,11 @@ describe("home workflow", () => {
       }),
     ]);
     const result = await getHomeWorkflow("org_1");
-    expect(result.setupComplete).toBe(false);
+    expect(result.setupComplete).toBe(true);
     expect(result.campaignProducts[0]).toMatchObject({
       id: "product_1",
-      ready: false,
-      blockers: expect.arrayContaining([
-        `Needs ${vocab.icp.aSingular} with criteria`,
-      ]),
+      ready: true,
+      blockers: [],
     });
     expect(result.icp.done).toBe(false);
     expect(result.icp.label).toBe("Not started");
@@ -201,7 +200,7 @@ describe("home workflow", () => {
 
   it("still returns existing campaigns when setup is incomplete", async () => {
     prismaMock.product.findMany.mockResolvedValue([
-      productFixture({ icps: [] }),
+      productFixture({ approvalStatus: "DRAFT", icps: [] }),
     ]);
     prismaMock.campaign.findMany.mockResolvedValue([
       {
@@ -392,7 +391,7 @@ describe("workflow view contracts", () => {
     expect(stages.map((stage) => stage.key)).not.toContain("send");
   });
 
-  it("renders Target Employers on the Home setup rail; lists stay in nav only", () => {
+  it("hides Target Employers on the Home setup rail; lists stay in nav only", () => {
     const steps = buildHomeSetupRail({
       voice: voiceReadiness(0),
       productTotal: 0,
@@ -402,10 +401,7 @@ describe("workflow view contracts", () => {
       emailConnected: false,
       emailReconnectRequired: false,
     });
-    expect(steps.find((step) => step.key === "icps")).toMatchObject({
-      label: vocab.icp.nav,
-      href: "/icps",
-    });
+    expect(steps.some((step) => step.href === "/icps")).toBe(false);
     expect(steps.map((step) => step.key)).not.toContain("lists");
     expect(steps.map((step) => step.key)).not.toContain("contacts");
 
@@ -415,8 +411,8 @@ describe("workflow view contracts", () => {
         focusKey: resolveHomeSetupFocus(steps),
       }),
     );
-    expect(railHtml).toContain('href="/icps"');
-    expect(railHtml).toContain(`>${vocab.icp.nav}<`);
+    expect(railHtml).not.toContain('href="/icps"');
+    expect(railHtml).not.toContain(`>${vocab.icp.nav}<`);
     expect(railHtml).not.toContain('href="/lists"');
     expect(railHtml).toContain('aria-label="Setup"');
 

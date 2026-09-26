@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   harperCoachingVoiceViolations,
-  rewriteHarperCoachingVoice,
   seekerFirstName,
   seekerPrepInstructionViolations,
   talkTrackVoiceViolations,
@@ -56,25 +55,13 @@ describe("Harper voice", () => {
     ).toEqual([]);
   });
 
-  it("rewrites stored Harper coaching into you", () => {
-    expect(
-      rewriteHarperCoachingVoice(
-        "Jordan is a strong match. The seeker's Harborline work is the closest evidence.",
-        "Jordan",
-      ),
-    ).toContain("You are a strong match");
-    expect(
-      rewriteHarperCoachingVoice(
-        "Jordan is a strong match. The seeker's Harborline work is the closest evidence.",
-        "Jordan",
-      ),
-    ).toContain("your Harborline work");
-    expect(
-      rewriteHarperCoachingVoice(
-        "Make Jordan’s personal decisions and the result clear.",
-        "Jordan",
-      ),
-    ).toContain("Make your personal decisions");
+  it("does not rewrite Harper text after the model call", () => {
+    const voice = readFileSync("src/lib/consultation/voice.ts", "utf8");
+    const service = readFileSync("src/lib/consultation/service.ts", "utf8");
+    const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
+    expect(voice).not.toContain("function rewriteHarperCoachingVoice");
+    expect(service).not.toContain("rewriteHarperCoachingVoice");
+    expect(section).not.toContain("rewriteHarperCoachingVoice");
     const coach = readFileSync("src/lib/prompt-content/consultation.ts", "utf8");
     expect(coach).toContain('speak to the person as "you"');
     expect(coach).toContain("Ask one question per remaining important gap");

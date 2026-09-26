@@ -1681,6 +1681,9 @@ describe.skipIf(!hasDatabase)(
         where: { id: campaignId },
         select: { productId: true, icpId: true },
       });
+      if (!campaign.icpId) {
+        throw new Error("This test campaign needs a Target Employer.");
+      }
       const matchedPersona = await prisma.persona.create({
         data: {
           organizationId,

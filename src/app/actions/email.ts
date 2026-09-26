@@ -296,7 +296,9 @@ export async function lookaheadGenerateEmailDraftAction(
         scoringRun: {
           organizationId: row.campaign.organizationId,
           productId: row.campaign.productId,
-          icpId: row.campaign.icpId,
+          ...(row.campaign.icpId
+            ? { icpId: row.campaign.icpId }
+            : { id: { in: [] } }),
           status: { in: ["COMPLETED", "PARTIAL"] },
         },
       },

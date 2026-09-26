@@ -339,7 +339,7 @@ export async function saveApplicationJobLearnedNotesAction(
 ): Promise<ApplicationActionResult> {
   try {
     const organizationId = await requireOrganizationId();
-    await requireCurrentUser();
+    const user = await requireCurrentUser();
     const campaignId = readTrimmedField(formData, "campaignId");
     if (!campaignId) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
@@ -347,6 +347,7 @@ export async function saveApplicationJobLearnedNotesAction(
     await saveApplicationJobLearnedNotes({
       organizationId,
       campaignId,
+      userId: user.id,
       notes: String(formData.get("notes") ?? ""),
     });
     revalidatePath(`/campaigns/${campaignId}`);

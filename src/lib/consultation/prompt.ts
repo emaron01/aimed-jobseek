@@ -125,6 +125,7 @@ export function buildConsultationPolishMessages(input: {
   confirmedGap?: boolean;
   strengtheningNeeds: string[];
   qualityFeedback?: string[];
+  voiceSamples?: Array<{ label: string; sampleText: string }>;
 }): AiMessage[] {
   return [
     { role: "system", content: polishSystem() },
@@ -135,6 +136,7 @@ export function buildConsultationPolishMessages(input: {
         interviewAnswerMetaLanguage:
           consultationConfig.interviewAnswerMetaLanguage,
         interviewAnswerMaxWords: consultationConfig.interviewAnswerMaxWords,
+        voiceSamples: input.voiceSamples ?? [],
       }),
     },
     {

@@ -53,7 +53,7 @@ describe("home setup rail", () => {
     expect(steps.find((step) => step.key === "email")).toBeUndefined();
     expect(steps.map((step) => step.key)).not.toContain("lists");
     expect(steps.map((step) => step.key)).not.toContain("contacts");
-    expect(steps.map((step) => step.key)).toEqual(["products", "voice", "icps"]);
+    expect(steps.map((step) => step.key)).toEqual(["products", "voice"]);
     expect(steps.find((step) => step.key === "voice")?.optional).toBe(true);
     expect(resolveHomeSetupFocus(steps)).toBe("voice");
   });
@@ -82,7 +82,7 @@ describe("home setup rail", () => {
     expect(resolveHomeSetupFocus(steps)).toBe("products");
   });
 
-  it("lists Target Employers as a rail step and omits Lists and Contacts", () => {
+  it("hides Target Employers from the rail and omits Lists and Contacts", () => {
     const steps = buildHomeSetupRail({
       voice: voiceReadiness(3),
       productTotal: 1,
@@ -92,17 +92,9 @@ describe("home setup rail", () => {
       emailConnected: true,
       emailReconnectRequired: false,
     });
-    expect(steps.map((step) => step.key)).toEqual([
-      "products",
-      "voice",
-      "icps",
-    ]);
-    expect(steps.find((step) => step.key === "icps")).toMatchObject({
-      label: vocab.icp.nav,
-      href: "/icps",
-      completed: false,
-    });
-    expect(resolveHomeSetupFocus(steps)).toBe("icps");
+    expect(steps.map((step) => step.key)).toEqual(["products", "voice"]);
+    expect(steps.some((step) => step.href === "/icps")).toBe(false);
+    expect(resolveHomeSetupFocus(steps)).toBe("voice");
   });
 
   it("stays visible and focused on the last step when everything is green", () => {
@@ -116,11 +108,10 @@ describe("home setup rail", () => {
       emailReconnectRequired: false,
     });
     expect(steps.every((step) => step.completed)).toBe(true);
-    expect(resolveHomeSetupFocus(steps)).toBe("icps");
+    expect(resolveHomeSetupFocus(steps)).toBe("voice");
     expect(steps.map((step) => step.href)).toEqual([
       "/products",
       "/settings/voice",
-      "/icps",
     ]);
   });
 });

@@ -1,12 +1,10 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createCampaignAction } from "@/app/actions";
 import {
-  DEFAULT_EMAIL_LENGTH,
   EMAIL_GUIDANCE_MAX_CHARS,
-  EMAIL_LENGTH_OPTIONS,
   type CampaignActionResult,
 } from "@/lib/campaign/save";
 import { formatProductCampaignOmission } from "@/lib/workflow/product-campaign-readiness";
@@ -14,7 +12,6 @@ import { EmailGuidancePromptExamples } from "@/components/EmailGuidancePromptExa
 import { Field, SubmitButton } from "@/components/ui";
 import { vocab } from "@/lib/product-config";
 
-type Option = { id: string; name: string; productId: string };
 type ProductOption = {
   id: string;
   name: string;
@@ -26,25 +23,14 @@ const initial: CampaignActionResult | null = null;
 
 export function NewCampaignForm({
   products,
-  icps,
-  personas,
 }: {
   products: ProductOption[];
-  icps: Option[];
-  personas: Option[];
 }) {
   const router = useRouter();
   const readyProducts = products.filter((product) => product.ready);
   const [productId, setProductId] = useState(
     readyProducts.length === 1 ? readyProducts[0]!.id : "",
   );
-  const [icpId, setIcpId] = useState("");
-  const [personaIds, setPersonaIds] = useState<string[]>(() => {
-    if (readyProducts.length !== 1) return [];
-    return personas
-      .filter((persona) => persona.productId === readyProducts[0]!.id)
-      .map((persona) => persona.id);
-  });
   const [postingText, setPostingText] = useState("");
   const [state, formAction, pending] = useActionState(
     createCampaignAction,
@@ -57,50 +43,16 @@ export function NewCampaignForm({
       ? `campaign-fail-${state.message}-${restored?.name?.slice(0, 24) ?? ""}`
       : "campaign-new";
 
-  const productIcps = useMemo(
-    () => icps.filter((icp) => icp.productId === productId),
-    [icps, productId],
-  );
-  const productPersonas = useMemo(
-    () => personas.filter((persona) => persona.productId === productId),
-    [personas, productId],
-  );
-
   const selectedProduct = products.find((product) => product.id === productId);
   const productReady = selectedProduct?.ready ?? false;
-  const allProductPersonasSelected =
-    productPersonas.length > 0 &&
-    productPersonas.every((persona) => personaIds.includes(persona.id));
   const canSubmit =
-    Boolean(postingText.trim()) &&
-    Boolean(productId) &&
-    productReady &&
-    Boolean(icpId) &&
-    productIcps.some((icp) => icp.id === icpId);
+    Boolean(postingText.trim()) && Boolean(productId) && productReady;
 
-  if (productIcps.length === 1 && icpId !== productIcps[0]!.id) {
-    setIcpId(productIcps[0]!.id);
-  }
-
-  const restoreKey = restored
-    ? `${restored.productId ?? ""}:${restored.icpId ?? ""}:${restored.allPersonas ? "all" : restored.personaIds.join(",")}:${restored.personaId ?? ""}`
-    : "";
+  const restoreKey = restored ? restored.productId ?? "" : "";
   const [appliedRestoreKey, setAppliedRestoreKey] = useState("");
   if (restoreKey && restoreKey !== appliedRestoreKey) {
     setAppliedRestoreKey(restoreKey);
     if (restored?.productId) setProductId(restored.productId);
-    if (restored?.icpId) setIcpId(restored.icpId);
-    if (restored?.allPersonas) {
-      setPersonaIds(
-        personas
-          .filter((persona) => persona.productId === restored.productId)
-          .map((persona) => persona.id),
-      );
-    } else if (restored && restored.personaIds.length > 0) {
-      setPersonaIds(restored.personaIds);
-    } else if (restored?.personaId) {
-      setPersonaIds([restored.personaId]);
-    }
   }
 
   useEffect(() => {
@@ -168,12 +120,6 @@ export function NewCampaignForm({
           value={productId}
           onChange={(event) => {
             setProductId(event.target.value);
-            setIcpId("");
-            setPersonaIds(
-              personas
-                .filter((persona) => persona.productId === event.target.value)
-                .map((persona) => persona.id),
-            );
           }}
           className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm outline-none ring-focus focus:ring-2"
         >
@@ -204,97 +150,7 @@ export function NewCampaignForm({
         ) : null}
       </label>
 
-      <label className="block text-sm">
-        <span className="font-medium text-ink">{vocab.icp.singular}</span>
-        <select
-          name="icpId"
-          required
-          value={icpId}
-          disabled={!productId}
-          onChange={(event) => setIcpId(event.target.value)}
-          className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm outline-none ring-focus focus:ring-2 disabled:bg-canvas"
-        >
-          <option value="" disabled>
-            {productId ? `Select ${vocab.icp.singular}` : `Select ${vocab.product.aSingular} first`}
-          </option>
-          {productIcps.map((icp) => (
-            <option key={icp.id} value={icp.id}>
-              {icp.name}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <fieldset className="block text-sm md:col-span-2">
-        <legend className="font-medium text-ink">{vocab.persona.Plural} in play</legend>
-        <p className="mt-1 text-xs text-subtle">
-          Defaults to every {vocab.persona.singular} for this {vocab.product.singular}. {vocab.persona.Singular} is a property of
-          the {vocab.contact.singular}; this only limits which roles this{" "}
-          {vocab.campaign.singular} writes outreach for.
-        </p>
-        {allProductPersonasSelected ? (
-          <input type="hidden" name="allPersonas" value="1" />
-        ) : null}
-        <div className="mt-2 space-y-2">
-          {!productId ? (
-            <p className="text-sm text-subtle">Select {vocab.product.aSingular} first</p>
-          ) : productPersonas.length === 0 ? (
-            <p className="text-sm text-subtle">
-              This {vocab.product.singular} has no {vocab.persona.plural} yet.
-            </p>
-          ) : (
-            productPersonas.map((persona) => (
-              <label
-                key={persona.id}
-                className="flex items-center gap-2 text-sm text-ink"
-              >
-                <input
-                  type="checkbox"
-                  name="personaIds"
-                  value={persona.id}
-                  checked={personaIds.includes(persona.id)}
-                  onChange={(event) => {
-                    setPersonaIds((current) =>
-                      event.target.checked
-                        ? [...current, persona.id]
-                        : current.filter((id) => id !== persona.id),
-                    );
-                  }}
-                />
-                {persona.name}
-              </label>
-            ))
-          )}
-        </div>
-      </fieldset>
-
       <div className="space-y-4 border-t border-edge pt-4 md:col-span-2">
-        <div>
-          <p className="text-sm font-medium text-ink">Email length</p>
-          <div className="mt-2 flex flex-wrap gap-3">
-            {EMAIL_LENGTH_OPTIONS.map((value) => (
-              <label
-                key={value}
-                className="flex items-center gap-2 rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink"
-              >
-                <input
-                  type="radio"
-                  name="emailLength"
-                  value={value}
-                  defaultChecked={
-                    (restored?.emailLength ?? DEFAULT_EMAIL_LENGTH) === value
-                  }
-                />
-                {value === "SHORT"
-                  ? "Short"
-                  : value === "MEDIUM"
-                    ? "Medium"
-                    : "Long"}
-              </label>
-            ))}
-          </div>
-        </div>
-
         <div>
           <label className="block text-sm">
             <span className="font-medium text-ink">
@@ -327,7 +183,7 @@ export function NewCampaignForm({
                 ? "Paste a job posting"
                 : productId && !productReady
                   ? `Finish ${vocab.product.singular} setup first`
-                  : `Select ${vocab.product.singular} and ${vocab.icp.singular}`}
+                  : `Select ${vocab.product.aSingular}`}
         </SubmitButton>
       </div>
     </form>

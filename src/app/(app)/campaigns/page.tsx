@@ -239,7 +239,7 @@ export default async function CampaignsPage({
                       {campaign.product.name}
                     </td>
                     <td className="px-4 py-3 text-muted">
-                      {campaign.icp.name}
+                      {campaign.icp?.name ?? "—"}
                     </td>
                     <td className="px-4 py-3 text-muted">
                       {campaign._count.contacts}

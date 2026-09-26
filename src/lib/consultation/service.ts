@@ -53,7 +53,6 @@ import {
 import { nextConsultationStatus } from "@/lib/consultation/state";
 import {
   harperCoachingVoiceViolations,
-  rewriteHarperCoachingVoice,
   seekerFirstName,
   seekerPrepInstructionViolations,
   talkTrackVoiceViolations,
@@ -161,6 +160,26 @@ function consultationUsage(
     category: "CONSULTATION",
     operation,
   };
+}
+
+async function voiceSamplesForUsage(
+  usage?: AiCallUsageContext,
+): Promise<Array<{ label: string; sampleText: string }>> {
+  if (!usage?.organizationId || !usage.campaignId) return [];
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: usage.campaignId, organizationId: usage.organizationId },
+    select: { ownerUserId: true },
+  });
+  if (!campaign) return [];
+  return prisma.voiceSample.findMany({
+    where: {
+      organizationId: usage.organizationId,
+      userId: campaign.ownerUserId,
+      active: true,
+    },
+    select: { label: true, sampleText: true },
+    orderBy: { createdAt: "asc" },
+  });
 }
 
 function whyThisCompanyTarget(): EvidenceTarget {
@@ -419,6 +438,7 @@ export async function polishAnswerWithQuality(input: {
       .map((answer) => answer.trim())
       .filter(Boolean);
   const confirmedGap = input.confirmedGap === true;
+  const voiceSamples = await voiceSamplesForUsage(input.usage);
   let lastFailure: string = consultationConversationCopy.generationFailed;
   let qualityFeedback: string[] = [];
   for (
@@ -433,6 +453,7 @@ export async function polishAnswerWithQuality(input: {
       confirmedGap,
       strengtheningNeeds: input.strengtheningNeeds,
       qualityFeedback,
+      voiceSamples,
       usage: input.usage,
     });
     if (!polished.ok) {
@@ -666,57 +687,6 @@ function consultationPlanQualityIssues(input: {
   return [...new Set(issues)];
 }
 
-function applyHarperVoiceToText(
-  text: string,
-  firstName: string | null,
-): string {
-  return rewriteHarperCoachingVoice(text, firstName);
-}
-
-async function rewriteStoredHarperVoice(
-  sessionId: string,
-  firstName: string | null,
-): Promise<void> {
-  const [turns, assessments] = await Promise.all([
-    prisma.consultationTurn.findMany({
-      where: { sessionId, speaker: "CONSULTANT" },
-      select: { id: true, body: true },
-    }),
-    prisma.consultationAssessment.findMany({
-      where: { sessionId },
-      select: { id: true, explanation: true, strategyText: true },
-    }),
-  ]);
-  for (const turn of turns) {
-    const body = applyHarperVoiceToText(turn.body, firstName);
-    if (body !== turn.body) {
-      await prisma.consultationTurn.update({
-        where: { id: turn.id },
-        data: { body },
-      });
-    }
-  }
-  for (const assessment of assessments) {
-    const explanation = applyHarperVoiceToText(
-      assessment.explanation ?? "",
-      firstName,
-    );
-    const strategyText = applyHarperVoiceToText(
-      assessment.strategyText ?? "",
-      firstName,
-    );
-    if (
-      explanation !== assessment.explanation ||
-      strategyText !== assessment.strategyText
-    ) {
-      await prisma.consultationAssessment.update({
-        where: { id: assessment.id },
-        data: { explanation, strategyText },
-      });
-    }
-  }
-}
-
 async function planAndStoreRound(input: {
   organizationId: string;
   campaignId: string;
@@ -854,20 +824,13 @@ async function planAndStoreRound(input: {
   const { plan, assessments, questions } = accepted;
   const voicedAssessments = assessments.map((assessment) => ({
     ...assessment,
-    explanation: applyHarperVoiceToText(assessment.explanation, firstName),
-    strategyText: applyHarperVoiceToText(assessment.strategyText, firstName),
   }));
   const voicedQuestions = questions
     .filter((question) => !questionDuplicatesAsked(question.text, askedQuestions))
     .slice(
       0,
       Math.max(0, consultationConfig.applicationQuestionLimit - askedQuestions.length),
-    )
-    .map((question) => ({
-      ...question,
-      text: applyHarperVoiceToText(question.text, firstName),
-      whoCaresNote: applyHarperVoiceToText(question.whoCaresNote, firstName),
-    }));
+    );
   const gapLabels = voicedQuestions
     .filter(
       (question) =>
@@ -879,23 +842,18 @@ async function planAndStoreRound(input: {
       const assessment = voicedAssessments.find(
         (item) => item.key === question.targetKey,
       );
-      return applyHarperVoiceToText(
-        assessment?.text ?? question.text,
-        firstName,
-      );
+      return assessment?.text ?? question.text;
     })
     .filter((label) => !seekerPrepInstructionViolations(label).length);
   const briefing = {
-    overall: applyHarperVoiceToText(plan.data.briefing.overall, firstName),
-    strongestAngles: plan.data.briefing.strongestAngles.map((item) =>
-      applyHarperVoiceToText(item, firstName),
-    ),
+    overall: plan.data.briefing.overall,
+    strongestAngles: plan.data.briefing.strongestAngles,
     importantGaps:
       gapLabels.length > 0
         ? gapLabels
-        : plan.data.briefing.importantGaps
-            .map((item) => applyHarperVoiceToText(item, firstName))
-            .filter((item) => !seekerPrepInstructionViolations(item).length),
+        : plan.data.briefing.importantGaps.filter(
+            (item) => !seekerPrepInstructionViolations(item).length,
+          ),
     storyPlan: [],
   };
   if (briefing.importantGaps.length === 0) {
@@ -928,14 +886,13 @@ async function planAndStoreRound(input: {
   await prisma.consultationSession.update({
     where: { id: input.sessionId },
     data: {
-      coachNote: applyHarperVoiceToText(plan.data.commentary, firstName).trim() || null,
+      coachNote: plan.data.commentary.trim() || null,
       briefingJson: briefing as Prisma.InputJsonValue,
       promptVersion: CONSULTATION_PROMPT_VERSION,
       generationStatus: "READY",
       generationError: null,
     },
   });
-  await rewriteStoredHarperVoice(input.sessionId, firstName);
   if (voicedQuestions.length === 0 && plan.data.closingNote?.trim()) {
     await addTurn({
       organizationId: input.organizationId,
@@ -978,7 +935,49 @@ async function finishIfPlanningIsComplete(
       where: { id: sessionId },
       data: { status: "DONE" },
     });
+    await queueAssetsWhenConsultationEnds(sessionId);
   }
+}
+
+async function queueAssetsWhenConsultationEnds(
+  sessionId: string,
+): Promise<void> {
+  const session = await prisma.consultationSession.findUnique({
+    where: { id: sessionId },
+    select: {
+      organizationId: true,
+      campaignId: true,
+      campaign: { select: { ownerUserId: true } },
+    },
+  });
+  if (!session) return;
+  const { enqueueAssetsAfterConsultation } = await import(
+    "@/lib/application-assets/plan-service"
+  );
+  await enqueueAssetsAfterConsultation({
+    organizationId: session.organizationId,
+    campaignId: session.campaignId,
+    userId: session.campaign.ownerUserId,
+  });
+}
+
+async function queueAssetsForCampaign(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: { ownerUserId: true },
+  });
+  if (!campaign) return;
+  const { enqueueAssetsAfterConsultation } = await import(
+    "@/lib/application-assets/plan-service"
+  );
+  await enqueueAssetsAfterConsultation({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    userId: campaign.ownerUserId,
+  });
 }
 
 function askedAndSkipped(
@@ -1191,10 +1190,7 @@ async function processAnswerGeneration(input: {
       await failGeneration(input.sessionId, consultationConversationCopy.generationFailed);
       return { ok: false };
     }
-    const revisedQuestion = applyHarperVoiceToText(
-      extracted.data.revisedQuestion,
-      profileFirstName(input.profile),
-    ).trim();
+    const revisedQuestion = extracted.data.revisedQuestion.trim();
     if (!revisedQuestion) {
       await failGeneration(input.sessionId, consultationConversationCopy.generationFailed);
       return { ok: false };
@@ -1619,9 +1615,11 @@ export async function skipConsultation(input: {
         promptVersion: CONSULTATION_PROMPT_VERSION,
       },
     });
+    await queueAssetsForCampaign(input);
     return;
   }
   await setStatus({ ...input, command: "skip" });
+  await queueAssetsForCampaign(input);
 }
 
 export async function completeConsultation(input: {
@@ -1629,6 +1627,7 @@ export async function completeConsultation(input: {
   campaignId: string;
 }) {
   await setStatus({ ...input, command: "done" });
+  await queueAssetsForCampaign(input);
 }
 
 async function loadSessionTurns(sessionId: string) {
@@ -2014,12 +2013,9 @@ export async function processConsultationReply(input: {
       organizationId: input.organizationId,
       sessionId: session.id,
       speaker: "CONSULTANT",
-      body: applyHarperVoiceToText(
-        coaching
-          ? `${coaching}\n\n${processed.followUpQuestion}`
-          : processed.followUpQuestion,
-        profileFirstName(profile),
-      ),
+      body: coaching
+        ? `${coaching}\n\n${processed.followUpQuestion}`
+        : processed.followUpQuestion,
       targetKey: assessmentKey || targetKey,
       followUp: true,
       analysisJson: {
@@ -2273,6 +2269,7 @@ export async function skipConsultationQuestion(input: {
       where: { id: session.id },
       data: { status: "DONE" },
     });
+    await queueAssetsWhenConsultationEnds(session.id);
     return;
   }
   const roles = await hiringTeam(input.organizationId, input.campaignId);
@@ -2783,6 +2780,7 @@ export async function confirmConsultationProposal(input: {
       where: { id: proposal.sessionId },
       data: { status: "DONE" },
     });
+    await queueAssetsWhenConsultationEnds(proposal.sessionId);
   }
 }
 
@@ -2842,6 +2840,48 @@ export async function continueConsultationPlanning(input: {
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
   if (!session) throw new TenantError("The consultation has not started.");
+  if (session.status === "SKIPPED" || session.status === "PAUSED") return;
+  if (session.status === "DONE") {
+    await queueAssetsWhenConsultationEnds(session.id);
+    return;
+  }
+  const { turns, view } = await loadSessionQaView(session.id);
+  if (consultationHasUnansweredQuestions(view)) return;
+  const { campaign, requirement, profile } = await requireApplication(
+    input.organizationId,
+    input.campaignId,
+  );
+  const stored = await prisma.consultationAssessment.findMany({
+    where: { sessionId: session.id },
+  });
+  const assessments = stored.map(storedAssessment);
+  const { askedKeys, skippedKeys } = askedAndSkipped(turns);
+  markWhyThisCompanyAsked(askedKeys, {
+    campaignId: campaign.id,
+    whyThisCompany: campaign.whyThisCompany,
+    profile,
+  });
+  if (gapsAreCovered(assessments, skippedKeys)) {
+    await prisma.consultationSession.update({
+      where: { id: session.id },
+      data: { status: "DONE" },
+    });
+    await queueAssetsWhenConsultationEnds(session.id);
+    return;
+  }
+  const roles = await hiringTeam(input.organizationId, input.campaignId);
+  const next = await planAndStoreRound({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    sessionId: session.id,
+    askedKeys,
+    skippedKeys,
+    profile,
+    requirement,
+    targets: targetsFromRequirement(requirement),
+    roles,
+  });
+  await finishIfPlanningIsComplete(session.id, next);
 }
 
 export async function reviseConsultationResult(input: {

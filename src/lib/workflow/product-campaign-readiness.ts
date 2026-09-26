@@ -1,7 +1,7 @@
 /**
  * Client-safe campaign readiness for a Product.
- * A product is selectable in New Campaign when approved and has an ICP with
- * criteria rows. Hiring Team roles are created later, per application.
+ * A product is selectable in New Campaign when it is approved.
+ * Hiring Team roles are created later, per application.
  */
 
 import { vocab } from "@/lib/product-config";
@@ -12,7 +12,6 @@ export const PRODUCT_READINESS_BLOCKERS = Object.freeze({
   needsReview: `${vocab.product.Singular} needs review and approval`,
   draft: `${vocab.product.Singular} is still a draft`,
   notApproved: `${vocab.product.Singular} is not approved`,
-  needsIcp: `Needs ${vocab.icp.aSingular} with criteria`,
 });
 
 export type ProductCampaignReadinessInput = {
@@ -27,10 +26,6 @@ export type ProductCampaignReadiness = {
   /** Single line for disabled <option> labels. */
   omissionReason: string | null;
 };
-
-function hasInterpretedCriteria(icp: { criteria: unknown[] }): boolean {
-  return icp.criteria.length > 0;
-}
 
 export function getProductCampaignReadiness(
   product: ProductCampaignReadinessInput,
@@ -47,11 +42,6 @@ export function getProductCampaignReadiness(
     } else {
       blockers.push(PRODUCT_READINESS_BLOCKERS.notApproved);
     }
-  }
-
-  const icpsWithCriteria = product.icps.filter(hasInterpretedCriteria);
-  if (icpsWithCriteria.length === 0) {
-    blockers.push(PRODUCT_READINESS_BLOCKERS.needsIcp);
   }
 
   return {

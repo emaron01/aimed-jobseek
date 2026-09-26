@@ -141,9 +141,10 @@ export async function loadCriteria(
 export async function scoreFit(input: {
   organizationId: string;
   campaignId: string;
-  icpId: string;
+  icpId: string | null;
   companyId: string;
 }): Promise<void> {
+  if (!input.icpId) return;
   const profile = await loadCriteria(input.organizationId, input.icpId);
   const research = await prisma.companyResearch.findFirst({
     where: {
@@ -254,7 +255,7 @@ export function researchFailureReason(result: {
 export async function finishApplicationAfterResearch(input: {
   organizationId: string;
   campaignId: string;
-  icpId: string;
+  icpId: string | null;
   companyId: string;
   result: ResearchCompanyResult;
 }): Promise<void> {
