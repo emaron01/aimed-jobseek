@@ -31,6 +31,8 @@ import {
   consultationFollowUpCount,
   consultationHasUnansweredQuestions,
   consultationQuestionAcceptsReply,
+  consultationReplyTargetKey,
+  findConsultationQaItem,
   parseConsultationReplyTarget,
   replyToTurnIdFromAnalysis,
   resolveReplyableQaItem,
@@ -38,6 +40,11 @@ import {
   type QaStatement,
   type QaTurn,
 } from "@/lib/consultation/qa-view";
+import {
+  consultationItemNeedsResultRepair,
+  isRawSeekerResult,
+  resultIgnoresLatestAnswer,
+} from "@/lib/consultation/results";
 import { nextConsultationStatus } from "@/lib/consultation/state";
 import {
   appendConfirmedFact,
@@ -346,14 +353,8 @@ async function addTurn(input: {
 function polishingSources(input: {
   answer: string;
   turnId: string;
-  profile: ReturnType<typeof parseCandidateProfile>;
 }): GroundingSource[] {
-  return [
-    { id: `answer:${input.turnId}`, text: input.answer },
-    ...profileEvidenceItems(input.profile)
-      .filter((item) => item.kind === "FACT")
-      .map((item) => ({ id: item.id, text: item.text })),
-  ];
+  return [{ id: `answer:${input.turnId}`, text: input.answer }];
 }
 
 async function extractAnswerWithQuality(input: {
@@ -394,9 +395,17 @@ export async function polishAnswerWithQuality(input: {
   sources: GroundingSource[];
   declinedFollowUp: boolean;
   strengtheningNeeds: string[];
+  seekerAnswers?: string[];
   usage?: AiCallUsageContext;
 }) {
+  const seekerAnswers =
+    input.seekerAnswers?.map((answer) => answer.trim()).filter(Boolean) ??
+    input.answer
+      .split("\n")
+      .map((answer) => answer.trim())
+      .filter(Boolean);
   let lastFailure: string = consultationConversationCopy.generationFailed;
+  let qualityFeedback: string[] = [];
   for (
     let attempt = 0;
     attempt <= consultationConfig.qualityRegenerationAttempts;
@@ -404,11 +413,29 @@ export async function polishAnswerWithQuality(input: {
   ) {
     const polished = await polishAnswerWithModel({
       ...input,
-      qualityFeedback: [],
+      qualityFeedback,
       usage: input.usage,
     });
-    if (polished.ok) return polished;
-    lastFailure = polished.message;
+    if (!polished.ok) {
+      lastFailure = polished.message;
+      continue;
+    }
+    const interviewText = polished.data.interviewAnswer.text.trim();
+    const bulletText = polished.data.resumeBullet.text.trim();
+    if (
+      !interviewText ||
+      !bulletText ||
+      isRawSeekerResult(interviewText, seekerAnswers) ||
+      isRawSeekerResult(bulletText, seekerAnswers) ||
+      resultIgnoresLatestAnswer(interviewText, seekerAnswers)
+    ) {
+      lastFailure = consultationConversationCopy.generationFailed;
+      qualityFeedback = [
+        "The last interview answer or resume bullet copied the seeker's wording, ignored the latest reply, or used facts that were not in the supplied answer. Write polished statements from every supplied reply. Do not paste the seeker's wording.",
+      ];
+      continue;
+    }
+    return polished;
   }
   return {
     ok: false as const,
@@ -822,6 +849,8 @@ async function processAnswerGeneration(input: {
   campaignId: string;
   sessionId: string;
   turnId: string;
+  resultTurnId?: string;
+  supersedeTurnIds?: string[];
   answerContext: string;
   question: string;
   target: EvidenceTarget | null;
@@ -863,30 +892,34 @@ async function processAnswerGeneration(input: {
   const storyProposal = verified.proposals.find(
     (proposal) => proposal.kind === "STORY" && proposal.story,
   );
-  let polished: Awaited<ReturnType<typeof polishAnswerWithQuality>> | null =
+  const story =
+    storyProposal?.story ??
+    verified.partialStory ??
+    extracted.data.story ??
     null;
-  if (storyProposal?.story && verified.missingStarElements.length === 0) {
-    polished = await polishAnswerWithQuality({
+  const polished = await polishAnswerWithQuality({
+    answer: input.answerContext,
+    story: {
+      situation: story?.situation ?? null,
+      task: story?.task ?? null,
+      action: story?.action ?? null,
+      result: story?.result ?? null,
+    },
+    sources: polishingSources({
       answer: input.answerContext,
-      story: {
-        situation: storyProposal.story.situation,
-        task: storyProposal.story.task,
-        action: storyProposal.story.action,
-        result: storyProposal.story.result,
-      },
-      sources: polishingSources({
-        answer: input.answerContext,
-        turnId: input.turnId,
-        profile: input.profile,
-      }),
-      declinedFollowUp: false,
-      strengtheningNeeds: [],
-      usage: replyUsage,
-    });
-    if (!polished.ok) {
-      await failGeneration(input.sessionId, polished.message);
-      return { ok: false };
-    }
+      turnId: input.turnId,
+    }),
+    declinedFollowUp: false,
+    strengtheningNeeds: verified.missingStarElements,
+    seekerAnswers: input.answerContext
+      .split("\n")
+      .map((answer) => answer.trim())
+      .filter(Boolean),
+    usage: replyUsage,
+  });
+  if (!polished.ok) {
+    await failGeneration(input.sessionId, polished.message);
+    return { ok: false };
   }
   const followUpQuestion =
     verified.followUpQuestion ??
@@ -899,14 +932,12 @@ async function processAnswerGeneration(input: {
     extracted.data.coaching?.trim() ||
     followUpQuestion ||
     consultationConversationCopy.keepCoaching;
-  const interviewText =
-    polished?.ok && polished.data.interviewAnswer.text.trim()
-      ? polished.data.interviewAnswer.text.trim()
-      : input.answerContext.trim();
-  const bulletText =
-    polished?.ok && polished.data.resumeBullet.text.trim()
-      ? polished.data.resumeBullet.text.trim()
-      : (storyProposal?.story?.result ?? verified.partialStory?.result ?? "").trim();
+  const interviewText = polished.data.interviewAnswer.text.trim();
+  const bulletText = polished.data.resumeBullet.text.trim();
+  if (!interviewText || !bulletText) {
+    await failGeneration(input.sessionId, consultationConversationCopy.generationFailed);
+    return { ok: false };
+  }
   const operations: Prisma.PrismaPromise<unknown>[] = [
     prisma.consultationProposal.deleteMany({
       where: { turnId: input.turnId, status: "PENDING" },
@@ -948,33 +979,44 @@ async function processAnswerGeneration(input: {
     ),
   ];
   const statements = [
-    interviewText
-      ? {
-          kind: "INTERVIEW_ANSWER" as const,
-          content: interviewText,
-          claims: polished?.ok ? polished.data.interviewAnswer.claims : [],
-          note: polished?.ok ? polished.data.strengtheningNote?.trim() || null : null,
-        }
-      : null,
-    bulletText
-      ? {
-          kind: "RESUME_BULLET" as const,
-          content: bulletText,
-          claims: polished?.ok ? polished.data.resumeBullet.claims : [],
-          note: null,
-        }
-      : null,
-  ].filter((statement) => statement != null);
+    {
+      kind: "INTERVIEW_ANSWER" as const,
+      content: interviewText,
+      claims: polished.data.interviewAnswer.claims,
+      note: polished.data.strengtheningNote?.trim() || null,
+    },
+    {
+      kind: "RESUME_BULLET" as const,
+      content: bulletText,
+      claims: polished.data.resumeBullet.claims,
+      note: null,
+    },
+  ];
+  const resultTurnId = input.resultTurnId ?? input.turnId;
+  const supersedeTurnIds = (input.supersedeTurnIds ?? []).filter(
+    (turnId) => turnId && turnId !== resultTurnId,
+  );
+  if (supersedeTurnIds.length > 0) {
+    operations.push(
+      prisma.consultationStatement.deleteMany({
+        where: {
+          sessionId: input.sessionId,
+          turnId: { in: supersedeTurnIds },
+          kind: { in: ["INTERVIEW_ANSWER", "RESUME_BULLET"] },
+        },
+      }),
+    );
+  }
   operations.push(
     ...statements.map((statement) =>
       prisma.consultationStatement.upsert({
         where: {
-          turnId_kind: { turnId: input.turnId, kind: statement.kind },
+          turnId_kind: { turnId: resultTurnId, kind: statement.kind },
         },
         create: {
           organizationId: input.organizationId,
           sessionId: input.sessionId,
-          turnId: input.turnId,
+          turnId: resultTurnId,
           kind: statement.kind,
           content: statement.content,
           strengtheningNote: statement.note,
@@ -1214,6 +1256,7 @@ function toQaStatements(
     status: string;
     content: string;
     strengtheningNote: string | null;
+    createdAt?: Date;
   }>,
 ): QaStatement[] {
   return statements.map((statement) => ({
@@ -1223,6 +1266,7 @@ function toQaStatements(
     status: statement.status,
     content: statement.content,
     strengtheningNote: statement.strengtheningNote,
+    createdAt: statement.createdAt ?? null,
   }));
 }
 
@@ -1296,11 +1340,12 @@ export async function recordConsultationReply(input: {
   }
   const { turns, view } = await loadSessionQaView(session.id);
   const requested = input.targetKey?.trim() ?? "";
-  const item =
-    resolveReplyableQaItem(view, requested) ??
-    (!requested
-      ? view.questions.find(consultationQuestionAcceptsReply) ?? null
-      : null);
+  const item = requested.startsWith("question:")
+    ? findConsultationQaItem(view, requested)
+    : resolveReplyableQaItem(view, requested) ??
+      (!requested
+        ? view.questions.find(consultationQuestionAcceptsReply) ?? null
+        : null);
   const question = item ? consultantForQaItem(turns, item) : null;
   if (!item || !question) replyCouldNotBeRecorded();
   const targetKey =
@@ -1498,11 +1543,19 @@ export async function processConsultationReply(input: {
         (turn) => turn.id === askedTurnId && turn.speaker === "CONSULTANT",
       )
     : null;
+  const resultTurnId =
+    resolvedItem?.seekerAnswers.at(-1)?.id ?? seekerTurnId;
+  const supersedeTurnIds =
+    resolvedItem?.seekerAnswers
+      .map((entry) => entry.id)
+      .filter((turnId) => turnId !== resultTurnId) ?? [];
   const processed = await processAnswerGeneration({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
     sessionId: session.id,
     turnId: seekerTurnId,
+    resultTurnId,
+    supersedeTurnIds,
     answerContext,
     question:
       askedTurn?.body ??
@@ -1617,7 +1670,7 @@ async function declineConsultationFollowUp(input: {
       "The answer behind this follow-up could not be prepared. Answer the follow-up or retry.",
     );
   }
-  const { profile } = await requireApplication(
+  await requireApplication(
     input.organizationId,
     input.campaignId,
   );
@@ -1627,8 +1680,11 @@ async function declineConsultationFollowUp(input: {
     sources: polishingSources({
       answer: analyzed.answerContext,
       turnId: priorAnswer.id,
-      profile,
     }),
+    seekerAnswers: analyzed.answerContext
+      .split("\n")
+      .map((answer) => answer.trim())
+      .filter(Boolean),
     declinedFollowUp: true,
     strengtheningNeeds: analyzed.missingStarElements,
     usage: consultationUsage(
@@ -1847,9 +1903,11 @@ export async function regenerateConsultationStatement(input: {
   const analyzed = completeStoryFromAnalysis(statement.turn.analysisJson);
   const answer =
     analyzed?.answerContext.trim() ||
-    statement.turn.body.trim() ||
-    statement.content.trim();
-  const { profile } = await requireApplication(
+    statement.turn.body.trim();
+  if (!answer) {
+    throw new TenantError(consultationConversationCopy.generationFailed);
+  }
+  await requireApplication(
     input.organizationId,
     statement.session.campaignId,
   );
@@ -1864,8 +1922,11 @@ export async function regenerateConsultationStatement(input: {
     sources: polishingSources({
       answer,
       turnId: statement.turnId,
-      profile,
     }),
+    seekerAnswers: answer
+      .split("\n")
+      .map((entry) => entry.trim())
+      .filter(Boolean),
     declinedFollowUp: analyzed?.followUpDeclined ?? false,
     strengtheningNeeds: analyzed?.missingStarElements ?? [],
     usage: consultationUsage(
@@ -1874,13 +1935,14 @@ export async function regenerateConsultationStatement(input: {
       "CONSULTATION_REPLY",
     ),
   });
-  const fallbackText =
-    statement.kind === "INTERVIEW_ANSWER" ? answer : statement.content.trim();
-  const value = polished.ok
-    ? statement.kind === "INTERVIEW_ANSWER"
+  if (!polished.ok) throw new TenantError(polished.message);
+  const value =
+    statement.kind === "INTERVIEW_ANSWER"
       ? polished.data.interviewAnswer
-      : polished.data.resumeBullet
-    : { text: fallbackText, claims: [] };
+      : polished.data.resumeBullet;
+  if (!value.text.trim()) {
+    throw new TenantError(consultationConversationCopy.generationFailed);
+  }
   const story = await prisma.profileStory.findFirst({
     where: {
       organizationId: input.organizationId,
@@ -1895,7 +1957,7 @@ export async function regenerateConsultationStatement(input: {
         status: "DRAFT",
         content: value.text.trim(),
         strengtheningNote:
-          statement.kind === "INTERVIEW_ANSWER" && polished.ok
+          statement.kind === "INTERVIEW_ANSWER"
             ? polished.data.strengtheningNote?.trim() || null
             : null,
         groundingJson: value.claims,
@@ -1970,14 +2032,13 @@ export async function approveConsultationStatement(input: {
   });
   if (!statement) throw new TenantError("That polished statement was not found.");
   const analyzed = completeStoryFromAnalysis(statement.turn.analysisJson);
-  const { product, profile } = await requireApplication(
+  const { product } = await requireApplication(
     input.organizationId,
     statement.session.campaignId,
   );
   const sources = polishingSources({
     answer: analyzed?.answerContext ?? statement.content,
     turnId: statement.turnId,
-    profile,
   });
   const contentUnchanged = statement.content.trim() === content;
   let groundingJson: Prisma.InputJsonValue = statement.groundingJson as Prisma.InputJsonValue;
@@ -2088,6 +2149,89 @@ export async function saveEditedConsultationStatement(input: {
       content,
     },
   });
+}
+
+export async function editConsultationAnswer(input: {
+  organizationId: string;
+  campaignId: string;
+  turnId: string;
+  answer: string;
+}): Promise<void> {
+  const body = input.answer.trim();
+  if (!body) throw new TenantError("Write an answer, or skip the question.");
+  const turn = await prisma.consultationTurn.findFirst({
+    where: {
+      id: input.turnId,
+      organizationId: input.organizationId,
+      speaker: "SEEKER",
+      skipped: false,
+    },
+    include: { session: true },
+  });
+  if (!turn || turn.session.campaignId !== input.campaignId) {
+    throw new TenantError(consultationConversationCopy.replyFailed);
+  }
+  if (turn.session.status === "SKIPPED" || turn.session.status === "PAUSED") {
+    throw new TenantError(consultationConversationCopy.notAcceptingReplies);
+  }
+  await prisma.consultationTurn.update({
+    where: { id: turn.id },
+    data: { body },
+  });
+  await processConsultationReply({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    sessionId: turn.sessionId,
+    turnId: turn.id,
+    questionTurnId: replyToTurnIdFromAnalysis(turn.analysisJson) ?? undefined,
+    targetKey: turn.targetKey ?? consultationReplyTargetKey(
+      replyToTurnIdFromAnalysis(turn.analysisJson) ?? "",
+    ),
+    answer: body,
+  });
+}
+
+export async function repairConsultationResults(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const session = await prisma.consultationSession.findFirst({
+    where: {
+      campaignId: input.campaignId,
+      organizationId: input.organizationId,
+    },
+  });
+  if (!session) return;
+  const { view } = await loadSessionQaView(session.id);
+  const broken = view.questions.filter(consultationItemNeedsResultRepair);
+  for (const item of broken) {
+    const latest = item.seekerAnswers.at(-1);
+    if (!latest) continue;
+    await processConsultationReply({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      sessionId: session.id,
+      turnId: latest.id,
+      questionTurnId: item.questionTurnId,
+      targetKey: consultationReplyTargetKey(item.questionTurnId),
+    });
+  }
+  const { view: refreshed } = await loadSessionQaView(session.id);
+  for (const item of refreshed.questions) {
+    const latest = item.seekerAnswers.at(-1);
+    if (!latest) continue;
+    const staleTurnIds = item.seekerAnswers
+      .map((answer) => answer.id)
+      .filter((turnId) => turnId !== latest.id);
+    if (staleTurnIds.length === 0) continue;
+    await prisma.consultationStatement.deleteMany({
+      where: {
+        sessionId: session.id,
+        turnId: { in: staleTurnIds },
+        kind: { in: ["INTERVIEW_ANSWER", "RESUME_BULLET"] },
+      },
+    });
+  }
 }
 
 export async function confirmConsultationProposal(input: {

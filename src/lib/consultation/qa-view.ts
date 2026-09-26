@@ -17,6 +17,7 @@ export type QaStatement = {
   status: string;
   content: string;
   strengtheningNote: string | null;
+  createdAt?: Date | string | null;
 };
 
 export type ConsultationQaItem = {
@@ -46,12 +47,24 @@ export function isPrimaryHarperQuestion(turn: QaTurn): boolean {
   );
 }
 
+function statementTime(statement: QaStatement): number {
+  if (!statement.createdAt) return 0;
+  const value = new Date(statement.createdAt).getTime();
+  return Number.isFinite(value) ? value : 0;
+}
+
 function latestOfKind(
   statements: QaStatement[],
   kind: QaStatement["kind"],
+  preferredTurnId?: string | null,
 ): QaStatement | null {
   const matches = statements.filter((statement) => statement.kind === kind);
-  return matches.at(-1) ?? null;
+  if (matches.length === 0) return null;
+  const preferred = preferredTurnId
+    ? matches.filter((statement) => statement.turnId === preferredTurnId)
+    : [];
+  const pool = preferred.length > 0 ? preferred : matches;
+  return [...pool].sort((left, right) => statementTime(left) - statementTime(right)).at(-1) ?? null;
 }
 
 function emptyItem(turn: QaTurn): ConsultationQaItem {
@@ -93,6 +106,26 @@ export function consultationQuestionAcceptsReply(
   item: ConsultationQaItem,
 ): boolean {
   return item.followUp != null || (!item.resumeBullet && !item.talkingPoint);
+}
+
+export function findConsultationQaItem(
+  view: ConsultationQaView,
+  requested: string,
+): ConsultationQaItem | null {
+  const { questionTurnId, raw } = parseConsultationReplyTarget(requested);
+  if (questionTurnId) {
+    return (
+      view.questions.find(
+        (question) => question.questionTurnId === questionTurnId,
+      ) ?? null
+    );
+  }
+  if (!raw) return null;
+  return (
+    view.questions.find(
+      (item) => item.targetKey === raw || item.questionTurnId === raw,
+    ) ?? null
+  );
 }
 
 export function resolveReplyableQaItem(
@@ -272,8 +305,16 @@ export function buildConsultationQaView(input: {
       }
       return {
         ...item,
-        resumeBullet: latestOfKind(item.statements, "RESUME_BULLET"),
-        talkingPoint: latestOfKind(item.statements, "INTERVIEW_ANSWER"),
+        resumeBullet: latestOfKind(
+          item.statements,
+          "RESUME_BULLET",
+          item.seekerAnswers.at(-1)?.id,
+        ),
+        talkingPoint: latestOfKind(
+          item.statements,
+          "INTERVIEW_ANSWER",
+          item.seekerAnswers.at(-1)?.id,
+        ),
       };
     })
     .sort(

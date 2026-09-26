@@ -432,6 +432,36 @@ export async function replyConsultationAction(
   }
 }
 
+export async function editConsultationAnswerAction(
+  _prev: ConsultationActionResult | null,
+  formData: FormData,
+): Promise<ConsultationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = campaignIdFrom(formData);
+    const turnId = String(formData.get("turnId") ?? "").trim();
+    const answer = String(formData.get("answer") ?? "").trim();
+    if (!campaignId || !turnId) {
+      return { ok: false, message: consultationConversationCopy.replyFailed };
+    }
+    if (!answer) {
+      return { ok: false, message: consultationConversationCopy.threadReply };
+    }
+    await enqueueApplicationJob({
+      organizationId,
+      campaignId,
+      type: "CONSULTATION",
+      payload: { operation: "edit_answer", turnId, answer },
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/campaigns/${campaignId}/consultation`);
+    return { ok: true, message: consultationConversationCopy.thinking };
+  } catch (error) {
+    return fail(error, consultationConversationCopy.replyFailed);
+  }
+}
+
 function statementIdsFrom(formData: FormData): string[] {
   return formData
     .getAll("statementId")

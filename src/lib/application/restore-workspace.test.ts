@@ -71,7 +71,7 @@ describe("restored workspace editing and Harper", () => {
     expect(thread).toContain("approveConsultationQaResultAction");
     expect(thread).toContain("regenerateConsultationQaResultAction");
     expect(thread).toContain("consultationConversationCopy.approve");
-    expect(thread).toContain("consultation-seeker-answer");
+    expect(thread).toContain("consultation-seeker-answers");
     expect(thread).toContain("<details");
     expect(section).not.toContain("HarperSuggestionList");
   });

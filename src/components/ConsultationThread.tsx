@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   approveConsultationQaResultAction,
+  editConsultationAnswerAction,
   regenerateConsultationQaResultAction,
   replyConsultationAction,
 } from "@/app/actions/consultation";
@@ -106,6 +107,56 @@ function ResultBody({ statement }: { statement: QaStatement }) {
   );
 }
 
+function SeekerAnswerEntry({
+  campaignId,
+  canEdit,
+  answer,
+}: {
+  campaignId: string;
+  canEdit: boolean;
+  answer: { id: string; body: string };
+}) {
+  return (
+    <article
+      className="min-w-0 overflow-hidden rounded-md border border-edge bg-surface p-3"
+      data-testid="consultation-seeker-turn"
+    >
+      <p className="text-xs font-medium uppercase tracking-wide text-subtle">
+        {consultationConversationCopy.yourReply}
+      </p>
+      <p className={`mt-1 text-sm text-ink ${wrapClass}`}>{answer.body}</p>
+      {canEdit ? (
+        <details className="mt-2" data-testid={`consultation-edit-answer-${answer.id}`}>
+          <summary className="cursor-pointer text-sm font-medium text-ink">
+            {consultationConversationCopy.editAnswer}
+          </summary>
+          <ApplicationActionForm
+            action={editConsultationAnswerAction}
+            submitLabel={consultationConversationCopy.saveAnswer}
+            pendingLabel={consultationConversationCopy.thinking}
+            testId={`consultation-save-answer-${answer.id}`}
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+            <input type="hidden" name="turnId" value={answer.id} />
+            <label className="mt-2 block text-sm">
+              <span className="font-medium text-ink">
+                {consultationConversationCopy.editAnswer}
+              </span>
+              <textarea
+                name="answer"
+                required
+                rows={4}
+                defaultValue={answer.body}
+                className={fieldClass}
+              />
+            </label>
+          </ApplicationActionForm>
+        </details>
+      ) : null}
+    </article>
+  );
+}
+
 function QuestionCard({
   campaignId,
   canEdit,
@@ -121,8 +172,10 @@ function QuestionCard({
   pending: boolean;
   onSubmitStart: (answer: string) => void;
 }) {
-  const hasResult = Boolean(item.resumeBullet || item.talkingPoint) && !item.followUp;
-  const canAnswer = showReply && consultationQuestionAcceptsReply(item);
+  const hasResult = Boolean(item.resumeBullet || item.talkingPoint);
+  const canAnswer =
+    showReply &&
+    (consultationQuestionAcceptsReply(item) || Boolean(item.seekerAnswers.length));
   const replyKey = consultationReplyTargetKey(item.questionTurnId);
   return (
     <details
@@ -141,6 +194,18 @@ function QuestionCard({
             {item.followUp.text}
           </p>
         ) : null}
+        {item.seekerAnswers.length > 0 ? (
+          <div className="space-y-2" data-testid="consultation-seeker-answers">
+            {item.seekerAnswers.map((answer) => (
+              <SeekerAnswerEntry
+                key={answer.id}
+                campaignId={campaignId}
+                canEdit={canEdit && showReply}
+                answer={answer}
+              />
+            ))}
+          </div>
+        ) : null}
         {hasResult ? (
           <>
             {item.resumeBullet ? <ResultBody statement={item.resumeBullet} /> : null}
@@ -152,29 +217,16 @@ function QuestionCard({
                 testId={`consultation-result-${item.questionTurnId}`}
               />
             ) : null}
-            {item.seekerAnswers.length > 0 ? (
-              <details className="mt-1" data-testid="consultation-seeker-answer">
-                <summary className="cursor-pointer text-sm font-medium text-ink">
-                  {consultationConversationCopy.yourAnswer}
-                </summary>
-                <div className="mt-2 space-y-2">
-                  {item.seekerAnswers.map((answer) => (
-                    <p
-                      key={answer.id}
-                      className={`text-sm text-ink ${wrapClass}`}
-                      data-testid="consultation-seeker-turn"
-                    >
-                      {answer.body}
-                    </p>
-                  ))}
-                </div>
-              </details>
-            ) : null}
           </>
-        ) : canAnswer ? (
+        ) : null}
+        {canAnswer ? (
           <ApplicationActionForm
             action={replyConsultationAction}
-            submitLabel={consultationConversationCopy.threadReply}
+            submitLabel={
+              item.seekerAnswers.length > 0
+                ? consultationConversationCopy.addAnotherReply
+                : consultationConversationCopy.threadReply
+            }
             pendingLabel={consultationConversationCopy.thinking}
             testId="consultation-reply"
             onSubmitStart={(formData) => {
@@ -187,7 +239,9 @@ function QuestionCard({
             <input type="hidden" name="targetKey" value={replyKey} />
             <label className="block text-sm">
               <span className="font-medium text-ink">
-                {consultationConversationCopy.threadReply}
+                {item.seekerAnswers.length > 0
+                  ? consultationConversationCopy.addAnotherReply
+                  : consultationConversationCopy.threadReply}
               </span>
               <textarea name="answer" required rows={4} className={fieldClass} />
             </label>

@@ -46,6 +46,8 @@ import {
   startConsultation,
   confirmConsultationResult,
   continueConsultationPlanning,
+  editConsultationAnswer,
+  repairConsultationResults,
 } from "@/lib/consultation/service";
 import {
   buildConsultationQaView,
@@ -218,6 +220,34 @@ function installConsultationModelFixture() {
         text: payload.answer ?? "",
       };
       if (
+        payload.answer === "copy me exactly" &&
+        (payload.qualityFeedback?.length ?? 0) === 0
+      ) {
+        return {
+          data: {
+            interviewAnswer: {
+              text: "copy me exactly",
+              claims: [
+                {
+                  text: "copy me exactly",
+                  supports: [{ sourceId: source.id, quote: "copy me exactly" }],
+                },
+              ],
+            },
+            resumeBullet: {
+              text: "copy me exactly",
+              claims: [
+                {
+                  text: "copy me exactly",
+                  supports: [{ sourceId: source.id, quote: "copy me exactly" }],
+                },
+              ],
+            },
+            strengtheningNote: null,
+          },
+        };
+      }
+      if (
         payload.answer === "quality retry" &&
         (payload.qualityFeedback?.length ?? 0) === 0
       ) {
@@ -271,21 +301,23 @@ function installConsultationModelFixture() {
           .map((item) => item.trim())
           .filter(Boolean)
           .at(-1) ?? source.text;
+      const interviewText = `In my words, ${text}`;
+      const bulletText = `Result: ${text}`;
       const support = [{ sourceId: source.id, quote: text }];
-      const interviewClaims = text
+      const interviewClaims = interviewText
         .split(/(?<=[.!?])\s+/)
         .filter(Boolean)
         .map((claimText) => ({
           text: claimText,
-          supports: [{ sourceId: source.id, quote: claimText }],
+          supports: [{ sourceId: source.id, quote: text }],
         }));
       const interview = {
-        text,
+        text: interviewText,
         claims: interviewClaims,
       };
       const bullet = {
-        text,
-        claims: [{ text, supports: support }],
+        text: bulletText,
+        claims: [{ text: bulletText, supports: support }],
       };
       return {
         data: {
@@ -1219,7 +1251,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("14");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("15");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("coach, not an interrogator");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("Never inflate fit");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -1368,6 +1400,26 @@ describe("consultation evidence and questions", () => {
         field: "briefing.importantGaps.0",
       }),
     ).toEqual([]);
+
+    const copied = await polishAnswerWithQuality({
+      answer: "copy me exactly",
+      story: {
+        situation: null,
+        task: null,
+        action: null,
+        result: null,
+      },
+      sources: [{ id: "answer:copy", text: "copy me exactly" }],
+      declinedFollowUp: false,
+      strengtheningNeeds: [],
+      seekerAnswers: ["copy me exactly"],
+    });
+    expect(copied.ok).toBe(true);
+    if (copied.ok) {
+      expect(copied.data.interviewAnswer.text).not.toBe("copy me exactly");
+      expect(copied.data.resumeBullet.text).not.toBe("copy me exactly");
+    }
+    generateStructured.mockClear();
 
     const polished = await polishAnswerWithQuality({
       answer: "quality retry",
@@ -1524,7 +1576,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("14");
+    expect(session?.promptVersion).toBe("15");
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
     expect(session?.briefingJson).toMatchObject({
@@ -1614,6 +1666,26 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     const interviewStatement = statements.find(
       (statement) => statement.kind === "INTERVIEW_ANSWER",
     );
+    const priorAnswer = "I have used Python on backend services.";
+    const latestAnswer = "I used Python for 5 years and cut failed jobs by 40%.";
+    expect(interviewStatement?.content).not.toBe(
+      `${priorAnswer}\n${latestAnswer}`,
+    );
+    expect(interviewStatement?.content).not.toBe(priorAnswer);
+    expect(interviewStatement?.content).toContain("40%");
+    const firstSeeker = await prisma.consultationTurn.findFirst({
+      where: {
+        sessionId: session!.id,
+        speaker: "SEEKER",
+        skipped: false,
+        body: priorAnswer,
+      },
+    });
+    expect(
+      await prisma.consultationStatement.count({
+        where: { turnId: firstSeeker!.id },
+      }),
+    ).toBe(0);
     const interviewWordCount =
       interviewStatement?.content.trim().split(/\s+/).filter(Boolean).length ??
       0;
@@ -1675,6 +1747,23 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       expect(bank?.seekerAuthored).toBe(true);
       expect(JSON.stringify(bank?.competencyLinks).toLowerCase()).toContain("python");
     }
+    await editConsultationAnswer({
+      organizationId,
+      campaignId,
+      turnId: seeker!.id,
+      answer: "I used Python for 6 years and cut failed jobs by 55%.",
+    });
+    const edited = await prisma.consultationTurn.findUnique({
+      where: { id: seeker!.id },
+    });
+    expect(edited?.body).toBe("I used Python for 6 years and cut failed jobs by 55%.");
+    const editedInterview = await prisma.consultationStatement.findFirst({
+      where: { turnId: seeker!.id, kind: "INTERVIEW_ANSWER" },
+    });
+    expect(editedInterview?.content).toContain("55%");
+    expect(editedInterview?.content).not.toBe(
+      `${priorAnswer}\nI used Python for 6 years and cut failed jobs by 55%.`,
+    );
     const beforeContinue = await prisma.consultationTurn.count({
       where: { sessionId: session!.id, speaker: "CONSULTANT" },
     });
@@ -1694,6 +1783,128 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       orderBy: { sequence: "asc" },
     });
     expect(laterQuestions.length).toBe(beforeContinue);
+  });
+
+  it("repairs a raw joined interview and fragment bullet into Harper-written results", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Repair results ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        companyName: parsed.companyName,
+        seniority: parsed.seniority,
+        reportingLine: parsed.reportingLine,
+        responsibilities: parsed.responsibilities,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaign.id);
+    await startConsultation({ organizationId, campaignId: campaign.id });
+    const session = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: { turns: { orderBy: { sequence: "asc" } } },
+    });
+    const question = session?.turns.find(
+      (turn) => turn.speaker === "CONSULTANT" && !turn.followUp,
+    );
+    expect(question).toBeTruthy();
+    const firstAnswer =
+      "I coached a manager who was not inspecting deals. The manager later became an RVP of North America Channels running a team.";
+    const secondAnswer =
+      "I sat with that manager on the weekly forecast, set an inspection cadence, and stayed with it until the team ran it without me.";
+    const joined = `${firstAnswer}\n${secondAnswer}`;
+    const fragment =
+      "The manager later became an RVP of North America Channels running a team.";
+    const nextSequence =
+      (session?.turns.reduce((maximum, turn) => Math.max(maximum, turn.sequence), 0) ??
+        0) + 1;
+    const first = await prisma.consultationTurn.create({
+      data: {
+        organizationId,
+        sessionId: session!.id,
+        sequence: nextSequence,
+        speaker: "SEEKER",
+        body: firstAnswer,
+        targetKey: question!.targetKey,
+        seekerAuthored: true,
+        analysisJson: {
+          status: "READY",
+          replyToTurnId: question!.id,
+          answerContext: firstAnswer,
+        },
+      },
+    });
+    const second = await prisma.consultationTurn.create({
+      data: {
+        organizationId,
+        sessionId: session!.id,
+        sequence: nextSequence + 1,
+        speaker: "SEEKER",
+        body: secondAnswer,
+        targetKey: question!.targetKey,
+        seekerAuthored: true,
+        analysisJson: {
+          status: "READY",
+          replyToTurnId: question!.id,
+          answerContext: joined,
+        },
+      },
+    });
+    await prisma.consultationStatement.create({
+      data: {
+        organizationId,
+        sessionId: session!.id,
+        turnId: first.id,
+        kind: "INTERVIEW_ANSWER",
+        content: joined,
+        groundingJson: [],
+        promptVersion: CONSULTATION_PROMPT_VERSION,
+      },
+    });
+    await prisma.consultationStatement.create({
+      data: {
+        organizationId,
+        sessionId: session!.id,
+        turnId: first.id,
+        kind: "RESUME_BULLET",
+        content: fragment,
+        groundingJson: [],
+        promptVersion: CONSULTATION_PROMPT_VERSION,
+      },
+    });
+    await repairConsultationResults({
+      organizationId,
+      campaignId: campaign.id,
+    });
+    const repaired = await prisma.consultationStatement.findMany({
+      where: { sessionId: session!.id, turnId: second.id },
+    });
+    const interview = repaired.find((row) => row.kind === "INTERVIEW_ANSWER");
+    const bullet = repaired.find((row) => row.kind === "RESUME_BULLET");
+    expect(interview?.content).toBeTruthy();
+    expect(interview?.content).not.toBe(joined);
+    expect(bullet?.content).toBeTruthy();
+    expect(bullet?.content).not.toBe(fragment);
+    expect(
+      await prisma.consultationStatement.count({
+        where: { turnId: first.id },
+      }),
+    ).toBe(0);
   });
 
   it("records an unparseable plan as failed so the seeker can retry", async () => {

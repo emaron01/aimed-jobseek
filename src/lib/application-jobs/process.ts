@@ -23,7 +23,9 @@ import { runWithTenantContext } from "@/lib/tenant/request-context";
 import {
   answerConsultationQuestion,
   continueConsultationPlanning,
+  editConsultationAnswer,
   processConsultationReply,
+  repairConsultationResults,
   replyConsultation,
   reassessConsultationStanding,
   retryConsultationGeneration,
@@ -286,6 +288,25 @@ async function processConsultationJob(input: {
       turnId: input.turnId,
       questionTurnId: input.questionTurnId,
       answer: input.answer,
+    });
+    return;
+  }
+  if (input.operation === "edit_answer") {
+    if (!input.turnId) {
+      throw new Error("An edited reply needs the original answer.");
+    }
+    await editConsultationAnswer({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      turnId: input.turnId,
+      answer: input.answer ?? "",
+    });
+    return;
+  }
+  if (input.operation === "repair_results") {
+    await repairConsultationResults({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
     });
     return;
   }

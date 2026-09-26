@@ -4,6 +4,7 @@ import {
   buildConsultationQaView,
   consultationQuestionAcceptsReply,
   consultationReplyTargetKey,
+  findConsultationQaItem,
   resolveReplyableQaItem,
 } from "@/lib/consultation/qa-view";
 import {
@@ -150,12 +151,63 @@ describe("Harper ten-question coach", () => {
       "I like the mission.",
       "We grew the region 40%.",
     ]);
+    const leftover = buildConsultationQaView({
+      turns: [
+        question,
+        seeker("s1", "I like the mission.", 2, "why"),
+        seeker("s2", "We grew the region 40%.", 3, "why"),
+      ],
+      statements: [
+        {
+          id: "old-raw",
+          turnId: "s1",
+          kind: "INTERVIEW_ANSWER",
+          status: "DRAFT",
+          content: "I like the mission.",
+          strengtheningNote: null,
+          createdAt: "2026-09-26T18:00:00.000Z",
+        },
+        {
+          id: "old-frag",
+          turnId: "s1",
+          kind: "RESUME_BULLET",
+          status: "DRAFT",
+          content: "the mission.",
+          strengtheningNote: null,
+          createdAt: "2026-09-26T18:00:00.000Z",
+        },
+        {
+          id: "new-interview",
+          turnId: "s2",
+          kind: "INTERVIEW_ANSWER",
+          status: "DRAFT",
+          content: "I grew the region 40%.",
+          strengtheningNote: null,
+          createdAt: "2026-09-26T17:00:00.000Z",
+        },
+        {
+          id: "new-bullet",
+          turnId: "s2",
+          kind: "RESUME_BULLET",
+          status: "DRAFT",
+          content: "Grew the region 40%.",
+          strengtheningNote: null,
+          createdAt: "2026-09-26T17:00:00.000Z",
+        },
+      ],
+    });
+    expect(leftover.questions[0]?.talkingPoint?.content).toBe("I grew the region 40%.");
+    expect(leftover.questions[0]?.resumeBullet?.content).toBe("Grew the region 40%.");
     expect(done.questions[1]?.question).toBe(second.body);
 
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
     expect(thread).toContain("consultation-answered");
     expect(thread).toContain("consultation-statement-${statement.kind}");
-    expect(thread).toContain("consultation-seeker-answer");
+    expect(thread).toContain("consultation-seeker-answers");
+    expect(thread).toContain("consultation-seeker-turn");
+    expect(thread).toContain("editConsultationAnswerAction");
+    expect(thread).toContain("consultationConversationCopy.yourReply");
+    expect(thread).toContain("consultationConversationCopy.addAnotherReply");
     expect(thread).toContain("approveConsultationQaResultAction");
     expect(thread).toContain("regenerateConsultationQaResultAction");
     expect(thread).toContain("consultationConversationCopy.approve");
@@ -207,6 +259,10 @@ describe("Harper ten-question coach", () => {
     expect(view.questions[1]?.seekerAnswers).toEqual([]);
     expect(consultationQuestionAcceptsReply(view.questions[0]!)).toBe(false);
     expect(consultationQuestionAcceptsReply(view.questions[1]!)).toBe(true);
+    expect(
+      findConsultationQaItem(view, consultationReplyTargetKey(opentext.id))
+        ?.questionTurnId,
+    ).toBe(opentext.id);
     expect(
       resolveReplyableQaItem(view, consultationReplyTargetKey(csc.id))
         ?.questionTurnId,

@@ -49,7 +49,7 @@ When declinedFollowUp is true, the seeker chose not to add the details listed in
 
 Return claim-level grounding for both statements. For the interview answer, each complete sentence must be one claim.text. For the resume bullet, the entire bullet must be one claim.text. Every claim needs at least one support with a supplied sourceId and an exact verbatim quote from that source. Do not cite an INFERENCE because only allowed FACT sources are supplied.
 
-Write in the seeker's own words. Do not name STAR structure. Do not use inflated language, generic praise, or a voice unlike the seeker's answer. Do not invent a number, employer, title, date, credential, or outcome the seeker did not state. Paraphrase is allowed when the facts stay the same. Never mention research status, confidence, missing data, prompt behavior, model behavior, or any other internal system state. If qualityFeedback names a field, regenerate only that field.
+Write in the seeker's voice, not their unedited wording. Never return the seeker's reply unchanged, joined with another reply, or as a copied fragment of a reply. The interview answer and resume bullet must be statements you wrote. Use only the supplied answer and extracted story. Do not add facts from other profile items. Do not name STAR structure. Do not use inflated language, generic praise, or a voice unlike the seeker's answer. Do not invent a number, employer, title, date, credential, or outcome the seeker did not state. Paraphrase is required when the facts stay the same. Never mention research status, confidence, missing data, prompt behavior, model behavior, or any other internal system state. If qualityFeedback names a field, regenerate only that field.
 
 Return JSON matching the schema only.`;
 

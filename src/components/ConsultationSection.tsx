@@ -13,9 +13,17 @@ import {
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
 import {
+  enqueueApplicationJob,
+  readJobPayload,
+} from "@/lib/application-jobs/service";
+import {
   buildConsultationQaView,
   consultationHasUnansweredQuestions,
 } from "@/lib/consultation/qa-view";
+import {
+  consultationItemNeedsResultRepair,
+  shouldEnqueueConsultationResultRepair,
+} from "@/lib/consultation/results";
 import { listPersonPreps } from "@/lib/interview/person-prep";
 import { ConsultationKnowAboutMe } from "@/components/ConsultationKnowAboutMe";
 import { ConsultationStanding } from "@/components/ConsultationStanding";
@@ -26,7 +34,10 @@ import {
   WORKSPACE_CARD_WRAP_CLASS,
   WORKSPACE_MESSAGE_WRAP_CLASS,
 } from "@/lib/application/workspace-links";
-import { consultationBriefingSchema } from "@/lib/consultation/contract";
+import {
+  CONSULTATION_PROMPT_VERSION,
+  consultationBriefingSchema,
+} from "@/lib/consultation/contract";
 import {
   profileEvidenceItems,
 } from "@/lib/consultation/assess";
@@ -239,11 +250,70 @@ export async function ConsultationSection({
     status: statement.status,
     content: statement.content,
     strengtheningNote: statement.strengtheningNote,
+    createdAt: statement.createdAt,
   }));
   const qaView = buildConsultationQaView({
     turns: threadTurns,
     statements: threadStatements,
   });
+  const latestSeekerAnswerAt =
+    session?.turns
+      .filter((turn) => turn.speaker === "SEEKER" && !turn.skipped)
+      .reduce<Date | null>((latest, turn) => {
+        const at = turn.createdAt;
+        if (!latest || at > latest) return at;
+        return latest;
+      }, null) ?? null;
+  const recentConsultationJobs = canEdit
+    ? await prisma.applicationJob.findMany({
+        where: {
+          organizationId,
+          campaignId,
+          type: "CONSULTATION",
+          status: { in: ["COMPLETED", "FAILED"] },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 40,
+        select: { createdAt: true, completedAt: true, payload: true, status: true },
+      })
+    : [];
+  const lastRepairJob = recentConsultationJobs.find(
+    (job) => readJobPayload(job.payload).operation === "repair_results",
+  );
+  const lastRepairAttemptAt = lastRepairJob
+    ? lastRepairJob.completedAt ?? lastRepairJob.createdAt
+    : null;
+  if (
+    shouldEnqueueConsultationResultRepair({
+      needsRepair:
+        canEdit && qaView.questions.some(consultationItemNeedsResultRepair),
+      busy: consultationBusy,
+      latestSeekerAnswerAt,
+      lastRepairAttemptAt,
+      lastRepairSucceeded: lastRepairJob?.status === "COMPLETED",
+      stalePromptVersion: qaView.questions.some((item) => {
+        if (!consultationItemNeedsResultRepair(item)) return false;
+        const versions = [item.talkingPoint, item.resumeBullet]
+          .map((statement) =>
+            statement
+              ? statements.find((row) => row.id === statement.id)?.promptVersion
+              : null,
+          )
+          .filter((version): version is string => Boolean(version));
+        if (versions.length < 2) return true;
+        return versions.some(
+          (version) => version !== CONSULTATION_PROMPT_VERSION,
+        );
+      }),
+    })
+  ) {
+    await enqueueApplicationJob({
+      organizationId,
+      campaignId,
+      type: "CONSULTATION",
+      payload: { operation: "repair_results" },
+    });
+  }
   const unanswered = consultationHasUnansweredQuestions(qaView);
   const threadStatus =
     session?.status === "DONE" && unanswered ? "IN_PROGRESS" : session?.status ?? "";
