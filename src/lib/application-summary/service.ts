@@ -27,6 +27,7 @@ import {
 import { appendConfirmedFact } from "@/lib/consultation/write-back";
 import { polishAnswerWithQuality } from "@/lib/consultation/service";
 import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
+import { individualProfileRecordSchema } from "@/lib/contact-profile/contract";
 import { profileEvidenceItems } from "@/lib/consultation/assess";
 import {
   mentionsInternalSystemState,
@@ -61,6 +62,35 @@ export type SummarySource = {
   category: string;
 };
 
+/** Sources that belong to one person and never reach another person's section. */
+const PER_PERSON_SOURCE_CATEGORIES = new Set([
+  "LINKEDIN",
+  "INTERVIEW_INTEL",
+  "INTERVIEWER_PATTERN",
+]);
+
+export function sourcesForPersonSection(input: {
+  sources: SummarySource[];
+  contactId: string | null;
+  noteIds: string[];
+}): SummarySource[] {
+  return input.sources.filter((source) => {
+    if (source.category === "LINKEDIN") {
+      return input.contactId != null && source.id === `linkedin:${input.contactId}`;
+    }
+    if (source.category === "INTERVIEW_INTEL") {
+      return input.noteIds.some((noteId) => source.id === `intel:${noteId}`);
+    }
+    if (source.category === "INTERVIEWER_PATTERN") {
+      return (
+        input.contactId != null &&
+        source.id.startsWith(`interviewer-pattern:${input.contactId}:`)
+      );
+    }
+    return !PER_PERSON_SOURCE_CATEGORIES.has(source.category);
+  });
+}
+
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object"
     ? (value as Record<string, unknown>)
@@ -92,6 +122,13 @@ function personaNarrative(profileJson: unknown) {
     talkingPoints: strings(narrative?.talkingPoints),
     impact: one(narrative?.impact),
   } as const;
+}
+
+/** Their own experience synthesized into what they value. Empty when too thin to read. */
+function interviewerPatterns(individualProfileJson: unknown): string[] {
+  const parsed = individualProfileRecordSchema.safeParse(individualProfileJson);
+  if (!parsed.success) return [];
+  return parsed.data.likelyToValue.map((item) => item.text);
 }
 
 function appendSource(
@@ -360,6 +397,16 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
     }
     for (const note of notes) {
       appendSource(sources, `intel:${note.id}`, note.text, "INTERVIEW_INTEL");
+    }
+    for (const [index, item] of interviewerPatterns(
+      row.individualProfileJson,
+    ).entries()) {
+      appendSource(
+        sources,
+        `interviewer-pattern:${row.contactId}:${index}`,
+        item,
+        "INTERVIEWER_PATTERN",
+      );
     }
   }
   return {
@@ -705,17 +752,13 @@ export async function generateApplicationSummary(input: {
         promptVersion: APPLICATION_SUMMARY_PROMPT_VERSION,
       },
     });
-    const personSources = data.sources.filter((source) => {
-      if (source.category === "LINKEDIN") {
-        return person.contactId != null && source.id === `linkedin:${person.contactId}`;
-      }
-      if (source.category === "INTERVIEW_INTEL") {
-        const notes = person.contactId
-          ? data.notesByContactId.get(person.contactId) ?? []
-          : [];
-        return notes.some((note) => source.id === `intel:${note.id}`);
-      }
-      return source.category !== "LINKEDIN" && source.category !== "INTERVIEW_INTEL";
+    const personSources = sourcesForPersonSection({
+      sources: data.sources,
+      contactId: person.contactId,
+      noteIds: (person.contactId
+        ? data.notesByContactId.get(person.contactId) ?? []
+        : []
+      ).map((note) => note.id),
     });
     let qualityFeedback: string[] = [];
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -799,7 +842,7 @@ export async function generateApplicationSummary(input: {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const generated = await generateApplicationSummaryShell({
       sources: data.sources.filter(
-        (source) => source.category !== "LINKEDIN" && source.category !== "INTERVIEW_INTEL",
+        (source) => !PER_PERSON_SOURCE_CATEGORIES.has(source.category),
       ),
       qualityFeedback,
       usage,

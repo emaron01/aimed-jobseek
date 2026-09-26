@@ -167,6 +167,7 @@ export async function buildContactIndividualProfile(input: {
       .filter(Boolean)
       .join(" "),
     extracted,
+    profileText: membership.linkedInProfileText,
     roleName: role?.name ?? null,
     roleNarrative: narrative,
     usage: {

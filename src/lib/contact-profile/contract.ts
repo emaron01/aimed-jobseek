@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONTACT_PROFILE_PROMPT_VERSION = "1";
+export const CONTACT_PROFILE_PROMPT_VERSION = "2";
 export const LINKEDIN_PASTE_SOURCE = "linkedin-paste";
 
 const factItem = z.object({
@@ -47,6 +47,8 @@ export type CommonGroundItem = z.infer<typeof commonGroundItemSchema>;
 export const individualProfileSchema = z.object({
   caresAbout: z.array(inferenceItem),
   talkingPoints: z.array(inferenceItem),
+  /** What their work experience suggests they value and emphasize. Empty when too thin. */
+  likelyToValue: z.array(inferenceItem),
 });
 
 export type IndividualProfileDraft = z.infer<typeof individualProfileSchema>;
@@ -54,6 +56,7 @@ export type IndividualProfileDraft = z.infer<typeof individualProfileSchema>;
 export const individualProfileRecordSchema = z.object({
   caresAbout: z.array(inferenceItem),
   talkingPoints: z.array(inferenceItem),
+  likelyToValue: z.array(inferenceItem).default([]),
   commonGround: z.array(commonGroundItemSchema),
   promptVersion: z.string(),
 });

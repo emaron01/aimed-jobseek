@@ -13,6 +13,7 @@ import { CONTACT_INDIVIDUAL_PROFILE_INSTRUCTIONS } from "@/lib/prompt-content/co
 export async function generateIndividualProfileWithModel(input: {
   contactName: string;
   extracted: LinkedInExtracted;
+  profileText: string;
   roleName: string | null;
   roleNarrative: unknown;
   usage?: AiCallUsageContext;
@@ -42,6 +43,7 @@ export async function generateIndividualProfileWithModel(input: {
             extracted: input.extracted,
             hiringTeamRole: input.roleName,
             rolePersona: input.roleNarrative,
+            pastedProfileText: input.profileText,
           }),
         },
       ],

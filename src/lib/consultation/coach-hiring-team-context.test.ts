@@ -44,6 +44,9 @@ function roleWithPerson(): CoachHiringTeamRole {
         persona: {
           caresAbout: ["Territory design that survives a reorg"],
           talkingPoints: ["Ask about their Clari rollout"],
+          likelyToValue: [
+            "Dana is big on MEDDPICC: she implemented it at two companies and led enterprise teams on it.",
+          ],
           commonGround: [
             {
               text: "Both ran a CRM migration",
@@ -132,6 +135,7 @@ describe("Coach Hiring Team context", () => {
     const person = role.people[0];
     expect(person.contactId).toBe("contact_1");
     expect(person.persona.caresAbout[0]).toContain("Territory design");
+    expect(person.persona.likelyToValue[0]).toContain("MEDDPICC");
     expect(person.linkedIn.headline).toContain("Northline");
     expect(person.linkedIn.about).toContain("forecasts");
     expect(person.linkedIn.priorRoles[0]).toEqual({
@@ -388,6 +392,12 @@ describe.skipIf(!hasTestDatabase())("Coach Hiring Team context from the database
             { text: "Territory design that survives a reorg", kind: "INFERENCE" },
           ],
           talkingPoints: [{ text: "Ask about their Clari rollout", kind: "INFERENCE" }],
+          likelyToValue: [
+            {
+              text: "Dana is big on MEDDPICC: she implemented it at two companies and led enterprise teams on it.",
+              kind: "INFERENCE",
+            },
+          ],
           commonGround: [
             {
               text: "Both ran a CRM migration",
@@ -493,6 +503,9 @@ describe.skipIf(!hasTestDatabase())("Coach Hiring Team context from the database
       "Territory design that survives a reorg",
     ]);
     expect(person?.persona?.commonGround[0]?.text).toBe("Both ran a CRM migration");
+    expect(person?.persona?.likelyToValue).toEqual([
+      "Dana is big on MEDDPICC: she implemented it at two companies and led enterprise teams on it.",
+    ]);
     expect(person?.linkedIn?.profileText).toContain("Dana Reyes");
     expect(person?.linkedIn?.currentEmployer).toBe("Northline");
     expect(person?.linkedIn?.priorRoles).toEqual([

@@ -146,6 +146,8 @@ export type CoachGeneralPersona = {
 export type CoachPersonPersona = {
   caresAbout: string[];
   talkingPoints: string[];
+  /** Their own experience synthesized into what they value. Empty when too thin. */
+  likelyToValue: string[];
   commonGround: Array<{
     text: string;
     seekerSource: string;

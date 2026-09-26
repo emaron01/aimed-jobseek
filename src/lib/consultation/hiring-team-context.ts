@@ -80,6 +80,7 @@ function personPersona(value: unknown): CoachPersonPersona | null {
   return {
     caresAbout: parsed.data.caresAbout.map((item) => item.text),
     talkingPoints: parsed.data.talkingPoints.map((item) => item.text),
+    likelyToValue: parsed.data.likelyToValue.map((item) => item.text),
     commonGround: parsed.data.commonGround.map((item) => ({
       text: item.text,
       seekerSource: item.seekerSource,
