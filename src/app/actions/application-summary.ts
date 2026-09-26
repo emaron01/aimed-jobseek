@@ -8,9 +8,11 @@ import {
   answerCheatSheetCoachItem,
   resolveApplicationSummaryFlag,
 } from "@/lib/application-summary/service";
+import { queueHiringTeamBuild } from "@/lib/hiring-team/build";
 import {
   applicationSummaryConfig,
   consultationConversationCopy,
+  vocab,
   workspaceProgressText,
 } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
@@ -19,6 +21,45 @@ export type ApplicationSummaryActionResult = {
   ok: boolean;
   message: string;
 };
+
+export async function buildCheatSheetPersonaAction(
+  _previous: ApplicationSummaryActionResult | null,
+  formData: FormData,
+): Promise<ApplicationSummaryActionResult> {
+  const campaignId = String(formData.get("campaignId") ?? "").trim();
+  const personaId = String(formData.get("personaId") ?? "").trim();
+  if (!campaignId || !personaId) {
+    return { ok: false, message: `${vocab.persona.Singular} was not found.` };
+  }
+  try {
+    const organizationId = await requireOrganizationId();
+    const user = await requireCurrentUser();
+    await queueHiringTeamBuild({
+      organizationId,
+      campaignId,
+      personaId,
+      initiatedByUserId: user.id,
+    });
+    revalidatePath(`/campaigns/${campaignId}/summary`);
+    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/campaigns/${campaignId}/interviews`);
+    return { ok: true, message: workspaceProgressText("HIRING_TEAM_BUILD") };
+  } catch (error) {
+    if (error instanceof TenantError) {
+      return { ok: false, message: error.message };
+    }
+    console.error(
+      JSON.stringify({
+        event: "cheat_sheet_persona_build_failed",
+        message: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+    return {
+      ok: false,
+      message: `${vocab.persona.Singular} could not be built.`,
+    };
+  }
+}
 
 export async function generateApplicationSummaryAction(
   _previous: ApplicationSummaryActionResult | null,

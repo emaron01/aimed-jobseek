@@ -7,19 +7,20 @@ import {
   buildCheatSheetPeople,
   cheatSheetSectionKind,
 } from "@/lib/application-summary/people";
-import { storyTextsRepeatVerbatim } from "@/lib/application-summary/service";
+import { validateApplicationSummaryGuidance } from "@/lib/application-summary/service";
 import { applicationSummaryConfig } from "@/lib/product-config";
 
-const support = [{ sourceId: "story:1", quote: "I rebuilt the forecast cadence." }];
+const spoken = "I rebuilt the forecast cadence.";
+const item = { text: spoken, supports: [] };
 
 describe("Interview Cheat Sheet", () => {
   it("renames the surface through the vocabulary module", () => {
     expect(applicationSummaryConfig.title).toBe("Interview cheat sheet");
-    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("9");
+    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("10");
     expect(JSON.stringify(applicationSummaryConfig)).not.toContain("Application Summary");
   });
 
-  it("builds one section per Direct role or linked contact and tailors by type", () => {
+  it("builds one section per interviewer and none for personas without an interviewer", () => {
     const people = buildCheatSheetPeople({
       roles: [
         {
@@ -52,78 +53,74 @@ describe("Interview Cheat Sheet", () => {
           lastName: "Ng",
           title: "Talent Acquisition Partner",
         },
+        {
+          contactId: "c-outreach",
+          personaId: "role-hm",
+          firstName: "Pat",
+          lastName: "Lee",
+          title: "VP Sales",
+        },
       ],
+      interviewerContactIds: ["c-recruiter"],
     });
-    expect(people.map((person) => person.sectionKey)).toEqual([
-      "contact:c-recruiter",
-      "role:role-hm",
-      "role:role-cs",
-    ]);
+    expect(people.map((person) => person.sectionKey)).toEqual(["contact:c-recruiter"]);
+    expect(people.some((person) => person.sectionKey.startsWith("role:"))).toBe(false);
     expect(cheatSheetSectionKind(people[0]!)).toBe("RECRUITER");
-    expect(cheatSheetSectionKind(people[1]!)).toBe("HIRING_MANAGER");
-    expect(cheatSheetSectionKind(people[2]!)).toBe("CROSS_FUNCTIONAL");
   });
 
-  it("rejects verbatim story repetition and keeps one story with variations", () => {
+  it("parses a person section with coaching fields and does not gate on source quotes", () => {
     const guidance = applicationSummaryGuidanceSchema.parse({
       overview: {
-        thirtySecondFit: { text: "Fit.", supports: support },
-        careerRecap: { text: "Recap.", supports: support },
-        gapsToPrepare: [
+        companyBackground: { text: "Acme sells warehouse software." },
+        jobRequirements: [{ text: "Build a repeatable enterprise motion." }],
+        whereSeekerShines: [{ text: spoken }],
+      },
+      people: [
+        {
+          sectionKey: "contact:christina",
+          roleId: "role-hm",
+          contactId: "christina",
+          heading: "Christina Schivley",
+          sectionKind: "HIRING_MANAGER",
+          caresAbout: [
+            {
+              text: "Repeatable enterprise execution.",
+              seekerConnection: "I rebuilt the forecast cadence, which is how I would run this motion.",
+            },
+          ],
+          positioningStatements: [item],
+          keyStatements: [item],
+          likelyQuestions: [
+            {
+              prompt: "Tell me how you run a weekly forecast?",
+              sampleAnswer: spoken,
+              harperQuestion: null,
+            },
+          ],
+          questionsToAsk: [
+            {
+              text: "What does a strong first 90 days look like for this hire?",
+              followUps: ["What would make you worry in month one?"],
+            },
+          ],
+        },
+      ],
+    });
+    expect(guidance.people[0]?.positioningStatements[0]?.text).toBe(spoken);
+    expect(
+      validateApplicationSummaryGuidance({
+        guidance,
+        sources: [],
+        people: [
           {
-            id: "overview:gap:1",
-            prompt: "Enterprise motion still needs a local example",
-            sampleAnswer: "I have not run this motion in this market yet, so I would start with two customer visits in the first two weeks.",
-            harperQuestion: null,
-            supports: support,
+            sectionKey: "contact:christina",
+            heading: "Wrong heading",
+            sectionKind: "RECRUITER",
           },
         ],
-      },
-      stories: [
-        {
-          storyId: "story-1",
-          headline: "Forecast cadence",
-          situation: "I rebuilt the forecast cadence.",
-          answers: [
-            { requirement: "Forecast discipline", question: "How do you run forecast?" },
-          ],
-          variations: [
-            {
-              angle: "Forecast discipline",
-              text: "I rebuilt the forecast cadence.",
-              supports: support,
-            },
-            {
-              angle: "Manager coaching",
-              text: "I rebuilt the forecast cadence.",
-              supports: support,
-            },
-          ],
-        },
-      ],
-      people: [],
-    });
-    expect(storyTextsRepeatVerbatim(guidance)).toBe(true);
-    const unique = applicationSummaryGuidanceSchema.parse({
-      ...guidance,
-      stories: [
-        {
-          ...guidance.stories[0]!,
-          variations: [
-            {
-              angle: "Forecast discipline",
-              text: "I held managers to a weekly commit against pipeline quality.",
-              supports: support,
-            },
-            {
-              angle: "Manager coaching",
-              text: "I coached two first-line managers to inspect deals before the call.",
-              supports: support,
-            },
-          ],
-        },
-      ],
-    });
-    expect(storyTextsRepeatVerbatim(unique)).toBe(false);
+        firstName: "Alex",
+        checkGrounding: true,
+      }),
+    ).toEqual([]);
   });
 });

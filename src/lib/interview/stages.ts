@@ -5,7 +5,7 @@ import type {
   InterviewStageType,
 } from "@prisma/client";
 import { addApplicationContact } from "@/lib/application/contacts";
-import { enqueueApplicationJob } from "@/lib/application-jobs/service";
+import { enqueueInterviewerCheatSheetSection } from "@/lib/application-summary/enqueue";
 import { saveLinkedInPaste } from "@/lib/contact-profile/service";
 import { prisma } from "@/lib/prisma-client";
 import {
@@ -156,7 +156,7 @@ export async function updateInterviewStage(input: {
   if (input.outcome && !isInterviewStageOutcome(input.outcome)) {
     throw new TenantError("Interview outcome is invalid.");
   }
-  return prisma.interviewStage.update({
+  const updated = await prisma.interviewStage.update({
     where: { id: stage.id },
     data: {
       ...(input.scheduledAt ? { scheduledAt: input.scheduledAt } : {}),
@@ -178,7 +178,22 @@ export async function updateInterviewStage(input: {
           }
         : {}),
     },
+    include: { interviewers: { select: { contactId: true } } },
   });
+  if (input.notesBefore !== undefined || input.notesAfter !== undefined) {
+    const { enqueueInterviewerCheatSheetSection } = await import(
+      "@/lib/application-summary/enqueue"
+    );
+    for (const interviewer of updated.interviewers) {
+      await enqueueInterviewerCheatSheetSection({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        userId: input.userId,
+        contactId: interviewer.contactId,
+      });
+    }
+  }
+  return updated;
 }
 
 export async function setApplicationProgress(input: {
@@ -248,39 +263,7 @@ async function replaceStageInterviewer(input: {
   });
 }
 
-export async function enqueueInterviewerCheatSheetSection(input: {
-  organizationId: string;
-  campaignId: string;
-  userId: string;
-  contactId: string;
-}) {
-  const sectionKey = `contact:${input.contactId}`;
-  const summary = await prisma.applicationSummary.findFirst({
-    where: {
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-    },
-    select: { guidanceJson: true },
-  });
-  const people = Array.isArray(
-    summary?.guidanceJson && typeof summary.guidanceJson === "object"
-      ? (summary.guidanceJson as { people?: unknown }).people
-      : null,
-  )
-    ? (summary!.guidanceJson as { people: Array<{ sectionKey?: string }> }).people
-    : [];
-  if (people.some((person) => person.sectionKey === sectionKey)) {
-    return;
-  }
-  await enqueueApplicationJob({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    type: "APPLICATION_SUMMARY",
-    targetId: sectionKey,
-    initiatedByUserId: input.userId,
-    payload: { userId: input.userId, sectionKey },
-  });
-}
+export { enqueueInterviewerCheatSheetSection } from "@/lib/application-summary/enqueue";
 
 export async function assignExistingInterviewStageInterviewer(input: {
   organizationId: string;

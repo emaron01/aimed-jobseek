@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const APPLICATION_SUMMARY_PROMPT_VERSION = "9";
+export const APPLICATION_SUMMARY_PROMPT_VERSION = "10";
 
 export const CHEAT_SHEET_SECTION_KINDS = [
   "RECRUITER",
@@ -18,7 +18,7 @@ const supportSchema = z.object({
 
 const guidanceItemSchema = z.object({
   text: z.string(),
-  supports: z.array(supportSchema),
+  supports: z.array(supportSchema).optional().default([]),
 });
 
 export const cheatSheetCoachItemSchema = z.object({
@@ -26,13 +26,25 @@ export const cheatSheetCoachItemSchema = z.object({
   prompt: z.string().trim().min(1),
   sampleAnswer: z.string().nullable().optional(),
   harperQuestion: z.string().nullable().optional(),
-  supports: z.array(supportSchema),
+  supports: z.array(supportSchema).optional().default([]),
+});
+
+const caresAboutItemSchema = z.object({
+  text: z.string(),
+  seekerConnection: z.string().optional().default(""),
+  supports: z.array(supportSchema).optional().default([]),
+});
+
+const questionToAskSchema = z.object({
+  text: z.string(),
+  followUps: z.array(z.string()).optional().default([]),
+  supports: z.array(supportSchema).optional().default([]),
 });
 
 const storyVariationSchema = z.object({
   angle: z.string(),
   text: z.string(),
-  supports: z.array(supportSchema),
+  supports: z.array(supportSchema).optional().default([]),
 });
 
 export const cheatSheetStorySchema = z.object({
@@ -46,84 +58,138 @@ export const cheatSheetStorySchema = z.object({
         question: z.string(),
       }),
     )
-    .max(6),
-  variations: z.array(storyVariationSchema).min(1).max(4),
+    .max(6)
+    .optional()
+    .default([]),
+  variations: z.array(storyVariationSchema).max(4).optional().default([]),
 });
 
-export const cheatSheetPersonSectionSchema = z.object({
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function coercePersonSection(value: unknown): unknown {
+  const row = record(value);
+  if (!row) return value;
+  const bestMaterial = Array.isArray(row.bestMaterial) ? row.bestMaterial : [];
+  const caresAbout = Array.isArray(row.caresAbout)
+    ? row.caresAbout.map((item) => {
+        const entry = record(item);
+        if (!entry) return item;
+        return {
+          ...entry,
+          seekerConnection:
+            typeof entry.seekerConnection === "string"
+              ? entry.seekerConnection
+              : "",
+        };
+      })
+    : row.caresAbout;
+  const questionsToAsk = Array.isArray(row.questionsToAsk)
+    ? row.questionsToAsk.map((item) => {
+        const entry = record(item);
+        if (!entry) return item;
+        return {
+          ...entry,
+          followUps: Array.isArray(entry.followUps) ? entry.followUps : [],
+        };
+      })
+    : row.questionsToAsk;
+  const positioning =
+    Array.isArray(row.positioningStatements) && row.positioningStatements.length > 0
+      ? row.positioningStatements
+      : bestMaterial;
+  const keyStatements =
+    Array.isArray(row.keyStatements) && row.keyStatements.length > 0
+      ? row.keyStatements
+      : bestMaterial;
+  return {
+    ...row,
+    caresAbout,
+    questionsToAsk,
+    positioningStatements: positioning,
+    keyStatements,
+  };
+}
+
+function coerceOverview(value: unknown): unknown {
+  const row = record(value);
+  if (!row) return value;
+  const thirty = record(row.thirtySecondFit);
+  const recap = record(row.careerRecap);
+  const fallback = thirty ?? recap;
+  return {
+    ...row,
+    companyBackground: row.companyBackground ?? recap ?? fallback,
+    jobRequirements: Array.isArray(row.jobRequirements)
+      ? row.jobRequirements
+      : Array.isArray(row.gapsToPrepare)
+        ? row.gapsToPrepare.map((item) => {
+            const entry = record(item);
+            return { text: typeof entry?.prompt === "string" ? entry.prompt : "", supports: [] };
+          })
+        : [],
+    whereSeekerShines: Array.isArray(row.whereSeekerShines)
+      ? row.whereSeekerShines
+      : thirty
+        ? [thirty]
+        : [],
+  };
+}
+
+export const cheatSheetPersonSectionGenerateSchema = z.object({
   sectionKey: z.string(),
   roleId: z.string(),
   contactId: z.string().nullable(),
   heading: z.string(),
   sectionKind: z.enum(CHEAT_SHEET_SECTION_KINDS),
-  caresAbout: z.array(guidanceItemSchema).min(1).max(4),
-  bestMaterial: z.array(guidanceItemSchema).min(1).max(4),
-  likelyQuestions: z.array(cheatSheetCoachItemSchema).min(1).max(4),
-  questionsToAsk: z.array(guidanceItemSchema).min(1).max(4),
-  storyIds: z.array(z.string()).max(4),
-  recruiter: z
-    .object({
-      sixtySecondSummary: guidanceItemSchema,
-      whyThisCompany: guidanceItemSchema,
-      whyThisRole: guidanceItemSchema,
-      logistics: guidanceItemSchema,
-      compensationReadiness: guidanceItemSchema,
-      flagAnswers: z.array(cheatSheetCoachItemSchema).max(3),
-    })
-    .nullable(),
-  hiringManager: z
-    .object({
-      scorecardOutcomes: z
-        .array(
-          z.object({
-            outcome: z.string(),
-            storyId: z.string().nullable(),
-            note: z.string(),
-          }),
-        )
-        .max(5),
-      firstNinetyDays: guidanceItemSchema,
-      drillDowns: z.array(cheatSheetCoachItemSchema).max(4),
-      gaps: z.array(cheatSheetCoachItemSchema).max(3),
-    })
-    .nullable(),
-  executive: z
-    .object({
-      strategy: guidanceItemSchema,
-      judgment: guidanceItemSchema,
-      businessImpact: guidanceItemSchema,
-    })
-    .nullable(),
-  crossFunctional: z
-    .object({
-      howWorkedAcross: guidanceItemSchema,
-      dayToDay: guidanceItemSchema,
-    })
-    .nullable(),
-  linkedinAddendum: z
-    .object({
-      background: guidanceItemSchema,
-      focus: guidanceItemSchema,
-      seekerConnection: guidanceItemSchema,
-    })
-    .nullable()
-    .optional(),
+  caresAbout: z.array(caresAboutItemSchema).min(1).max(6),
+  positioningStatements: z.array(guidanceItemSchema).min(1).max(6),
+  keyStatements: z.array(guidanceItemSchema).min(1).max(6),
+  likelyQuestions: z.array(cheatSheetCoachItemSchema).min(1).max(6),
+  questionsToAsk: z.array(questionToAskSchema).min(1).max(6),
 });
 
-export const applicationSummaryOverviewSchema = z.object({
-  thirtySecondFit: guidanceItemSchema,
-  careerRecap: guidanceItemSchema,
-  gapsToPrepare: z.array(cheatSheetCoachItemSchema).min(1).max(3),
+export const cheatSheetPersonSectionSchema = z.preprocess(
+  coercePersonSection,
+  cheatSheetPersonSectionGenerateSchema.extend({
+    bestMaterial: z.array(guidanceItemSchema).optional().default([]),
+    storyIds: z.array(z.string()).optional().default([]),
+    recruiter: z.unknown().nullable().optional(),
+    hiringManager: z.unknown().nullable().optional(),
+    executive: z.unknown().nullable().optional(),
+    crossFunctional: z.unknown().nullable().optional(),
+    linkedinAddendum: z.unknown().nullable().optional(),
+  }),
+);
+
+export const applicationSummaryOverviewGenerateSchema = z.object({
+  companyBackground: guidanceItemSchema,
+  jobRequirements: z.array(guidanceItemSchema).min(1).max(8),
+  whereSeekerShines: z.array(guidanceItemSchema).min(1).max(6),
 });
+
+export const applicationSummaryOverviewSchema = z.preprocess(
+  coerceOverview,
+  applicationSummaryOverviewGenerateSchema.extend({
+    thirtySecondFit: guidanceItemSchema.optional(),
+    careerRecap: guidanceItemSchema.optional(),
+    gapsToPrepare: z.array(cheatSheetCoachItemSchema).optional().default([]),
+  }),
+);
 
 export const applicationSummaryShellSchema = z.object({
-  overview: applicationSummaryOverviewSchema,
-  stories: z.array(cheatSheetStorySchema),
+  overview: applicationSummaryOverviewGenerateSchema,
+});
+
+export const applicationSummaryGuidanceGenerateSchema = z.object({
+  overview: applicationSummaryOverviewGenerateSchema.optional(),
+  people: z.array(cheatSheetPersonSectionGenerateSchema),
 });
 
 export const applicationSummaryGuidanceSchema = z.object({
   overview: applicationSummaryOverviewSchema.optional(),
-  stories: z.array(cheatSheetStorySchema).default([]),
+  stories: z.array(cheatSheetStorySchema).optional().default([]),
   people: z.array(cheatSheetPersonSectionSchema),
 });
 
@@ -133,3 +199,5 @@ export type ApplicationSummaryGuidance = z.infer<
 export type CheatSheetPersonSection = z.infer<typeof cheatSheetPersonSectionSchema>;
 export type CheatSheetStory = z.infer<typeof cheatSheetStorySchema>;
 export type CheatSheetCoachItem = z.infer<typeof cheatSheetCoachItemSchema>;
+export type CheatSheetCaresAboutItem = z.infer<typeof caresAboutItemSchema>;
+export type CheatSheetQuestionToAsk = z.infer<typeof questionToAskSchema>;

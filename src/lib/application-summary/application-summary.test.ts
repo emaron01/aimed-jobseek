@@ -36,102 +36,40 @@ function mockCheatSheetGuidance(
     harperQuestion: null,
     supports,
   });
-  const needed = (id: string, prompt: string, question: string) => ({
-    id,
-    prompt,
-    sampleAnswer: null,
-    harperQuestion: question,
-    supports,
-  });
   return {
     overview: {
-      thirtySecondFit: item,
-      careerRecap: item,
-      gapsToPrepare: [
-        answered("overview:gap:1", "Enterprise motion still needs a local example"),
-        needed(
-          "overview:gap:2",
-          "Front-line manager development",
-          "Have you developed a front-line manager? Tell me what wasn't working and what changed?",
-        ),
-      ],
+      companyBackground: { text: "Acme sells warehouse operations software.", supports },
+      jobRequirements: [{ text: "Build a repeatable enterprise motion.", supports }],
+      whereSeekerShines: [item],
     },
-    stories: [
-      {
-        storyId: "story-1",
-        headline: "Operating cadence",
-        situation: body,
-        answers: [
-          {
-            requirement: "Build a repeatable enterprise motion",
-            question: "How do you run a weekly operating cadence?",
-          },
-        ],
-        variations: [
-          { angle: "Forecast discipline", text: `${body} I inspect commits weekly.`, supports },
-          { angle: "Manager coaching", text: `${body} I coach managers on deal inspection.`, supports },
-        ],
-      },
-    ],
     people: payload.people.map((person) => ({
       sectionKey: person.sectionKey,
       roleId: person.roleId,
       contactId: person.contactId,
       heading: person.heading,
       sectionKind: person.sectionKind,
-      caresAbout: [item],
-      bestMaterial: [item],
+      caresAbout: [
+        {
+          text: "Repeatable enterprise execution.",
+          seekerConnection: body,
+          supports,
+        },
+      ],
+      positioningStatements: [item],
+      keyStatements: [item],
       likelyQuestions: [
         answered(
           `${person.sectionKey}:likely:1`,
-          "How do you run a weekly operating cadence?",
+          "Tell me how you run a weekly operating cadence?",
         ),
       ],
-      questionsToAsk: [askThem],
-      storyIds: ["story-1"],
-      recruiter:
-        person.sectionKind === "RECRUITER"
-          ? {
-              sixtySecondSummary: item,
-              whyThisCompany: item,
-              whyThisRole: item,
-              logistics: item,
-              compensationReadiness: item,
-              flagAnswers: [
-                answered(`${person.sectionKey}:flag:1`, "Recent job change"),
-              ],
-            }
-          : null,
-      hiringManager:
-        person.sectionKind === "HIRING_MANAGER"
-          ? {
-              scorecardOutcomes: [
-                { outcome: source.text, storyId: "story-1", note: body },
-              ],
-              firstNinetyDays: item,
-              drillDowns: [
-                answered(
-                  `${person.sectionKey}:drill:1`,
-                  "Which KPIs moved after you changed the cadence?",
-                ),
-              ],
-              gaps: [
-                needed(
-                  `${person.sectionKey}:gap:1`,
-                  "Front-line manager development",
-                  "Have you developed a front-line manager? Tell me what wasn't working and what changed?",
-                ),
-              ],
-            }
-          : null,
-      executive:
-        person.sectionKind === "EXECUTIVE"
-          ? { strategy: item, judgment: item, businessImpact: item }
-          : null,
-      crossFunctional:
-        person.sectionKind === "CROSS_FUNCTIONAL"
-          ? { howWorkedAcross: item, dayToDay: item }
-          : null,
+      questionsToAsk: [
+        {
+          text: askThem.text,
+          followUps: ["What would make you worry in month one?"],
+          supports,
+        },
+      ],
     })),
   };
 }
@@ -393,7 +331,7 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
       if (payload.mode === "person" || (payload.people?.length ?? 0) === 1) {
         return { data: full.people[0] };
       }
-      return { data: { overview: full.overview, stories: full.stories } };
+      return { data: { overview: full.overview } };
     });
   });
 
@@ -563,7 +501,7 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
     ).toBe("READY");
   });
 
-  it("generates overview without person sections, then one section on demand", async () => {
+  it("generates overview without person sections, then one interviewer section on demand", async () => {
     await generateApplicationSummary({ organizationId, campaignId, userId });
     expect(capturedMode).toBe("shell");
     expect(capturedPeopleCount).toBe(0);
@@ -571,7 +509,27 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
     expect(shell.guidance?.overview).toBeTruthy();
     expect(shell.guidance?.people).toEqual([]);
 
-    const sectionKey = `role:${roleId}`;
+    const contact = await prisma.contact.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        createdByUserId: userId,
+        firstName: "Christina",
+        lastName: "Schivley",
+        title: "VP Sales",
+      },
+    });
+    await prisma.campaignContact.create({
+      data: {
+        organizationId,
+        campaignId,
+        contactId: contact.id,
+        chosenPersonaId: roleId,
+        roleConfirmed: true,
+        personPrepOfferedAt: new Date(),
+      },
+    });
+    const sectionKey = `contact:${contact.id}`;
     await generateApplicationSummary({
       organizationId,
       campaignId,
@@ -581,10 +539,48 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
     expect(capturedMode).toBe("person");
     expect(capturedPeopleCount).toBe(1);
     const withPerson = await getApplicationSummaryView({ organizationId, campaignId });
-    expect(withPerson.guidance?.people.map((person) => person.sectionKey)).toEqual([
-      sectionKey,
-    ]);
+    const person = withPerson.guidance?.people.find((item) => item.sectionKey === sectionKey);
+    expect(person?.caresAbout[0]?.seekerConnection).toBeTruthy();
+    expect(person?.positioningStatements.length).toBeGreaterThan(0);
+    expect(person?.keyStatements.length).toBeGreaterThan(0);
+    expect(person?.likelyQuestions[0]?.prompt).toMatch(/^Tell me how you/i);
+    expect(person?.questionsToAsk[0]?.followUps.length).toBeGreaterThan(0);
     expect(withPerson.guidance?.overview).toEqual(shell.guidance?.overview);
+    expect(
+      capturedSources.some((source) => source.id.startsWith(`persona:${roleId}:`)),
+    ).toBe(true);
+
+    await prisma.campaignContact.update({
+      where: {
+        organizationId_campaignId_contactId: {
+          organizationId,
+          campaignId,
+          contactId: contact.id,
+        },
+      },
+      data: {
+        individualProfileJson: {
+          caresAbout: [{ text: "Forecast discipline", kind: "INFERENCE" }],
+          talkingPoints: [{ text: "Weekly commit", kind: "INFERENCE" }],
+          likelyToValue: [{ text: "Likely to value a Monday operating cadence.", kind: "INFERENCE" }],
+          commonGround: [],
+          promptVersion: "3",
+        },
+      },
+    });
+    await generateApplicationSummary({
+      organizationId,
+      campaignId,
+      userId,
+      sectionKey,
+    });
+    expect(
+      capturedSources.some((source) => source.category === "INTERVIEWER_PATTERN"),
+    ).toBe(true);
+    const regenerated = await getApplicationSummaryView({ organizationId, campaignId });
+    expect(regenerated.guidance?.people.filter((item) => item.sectionKey === sectionKey)).toHaveLength(
+      1,
+    );
   });
 
   it("keeps Direct before Indirect and includes dedicated print rules", () => {

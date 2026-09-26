@@ -102,6 +102,12 @@ export default async function InterviewStagePage({ params }: PageProps) {
         sectionKey={sectionKey}
         section={section}
         notes={notes}
+        personaBuilt={person?.personaBuilt ?? false}
+        personaId={
+          person?.roleId
+          ?? memberships.find((row) => row.contactId === interviewer?.contactId)?.chosenPersonaId
+          ?? ""
+        }
       />
     </main>
   );

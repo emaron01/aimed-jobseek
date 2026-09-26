@@ -4,7 +4,6 @@ import { generateApplicationPageMetadata } from "@/lib/application/page-metadata
 import { generateApplicationSummaryAction } from "@/app/actions/application-summary";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { AppActionLink } from "@/components/AppButton";
-import { CheatSheetCoachItems } from "@/components/CheatSheetCoachItems";
 import { CheatSheetPersonBody } from "@/components/CheatSheetPersonBody";
 import {
   CheatSheetFilterProvider,
@@ -51,27 +50,6 @@ function scorecard(value: unknown): JobScorecard {
 
 function lines(value: unknown): string[] {
   return parseStringArray(value);
-}
-
-function competencyRefs(value: unknown): Array<{ id: string; text: string }> {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) => {
-    if (typeof entry === "string" && entry.trim()) {
-      return [{ id: entry.trim(), text: entry.trim() }];
-    }
-    if (!entry || typeof entry !== "object") return [];
-    const row = entry as Record<string, unknown>;
-    const id =
-      typeof row.id === "string"
-        ? row.id
-        : typeof row.targetKey === "string"
-          ? row.targetKey
-          : null;
-    const text = typeof row.text === "string" ? row.text : id;
-    return id?.trim() && text?.trim()
-      ? [{ id: id.trim(), text: text.trim() }]
-      : [];
-  });
 }
 
 function TextList({ items }: { items: readonly string[] }) {
@@ -137,11 +115,6 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
 
   const canGenerate = view.campaign.ownerUserId === user.id;
   const requirementScorecard = scorecard(view.requirement.scorecardJson);
-  const approvedStories = view.stories.filter(
-    (story) =>
-      (story.interviewAnswer && story.interviewAnswerApprovedAt) ||
-      (story.resumeBullet && story.resumeBulletApprovedAt),
-  );
   const summaryStatus = view.summary?.status ?? null;
   const actionLabel =
     summaryStatus === "FAILED"
@@ -186,15 +159,9 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
             <CheatSheetPeopleFilter />
           </div>
         ) : null}
-        {view.summary?.generatedAt ? (
-          <p className="text-sm text-muted">
-            Generated {view.summary.generatedAt.toLocaleString()}
-            {view.stale ? " · Stale because source information changed" : ""}
-          </p>
-        ) : null}
         {summaryStatus === "FAILED" ? (
           <p role="alert" className="mt-2 rounded-md border border-danger bg-danger-tint p-3 text-sm text-danger">
-            {view.summary?.generationError ?? "Cheat sheet synthesis failed. Retry."}
+            {view.summary?.generationError ?? `${applicationSummaryConfig.title} could not be generated. Retry.`}
           </p>
         ) : null}
         {canGenerate ? (
@@ -215,32 +182,30 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
         {!guidance?.overview ? (
           <p className="text-sm text-muted">
             {summaryStatus === "FAILED"
-              ? "Guidance generation failed. Use Retry above."
-              : `Generate the ${applicationSummaryConfig.title} to create the 30-second fit, career recap, and gaps.`}
+              ? `${applicationSummaryConfig.title} could not be generated. Use Retry above.`
+              : `Generate the ${applicationSummaryConfig.title} to create the company background, job requirements, and where you shine.`}
           </p>
         ) : (
           <>
             <div>
               <h3 className="font-medium text-ink">
-                {applicationSummaryConfig.sections.thirtySecondFit}
+                {applicationSummaryConfig.sections.companyBackground}
               </h3>
-              <p className="mt-1 text-sm text-ink">{guidance.overview.thirtySecondFit.text}</p>
+              <p className="mt-1 text-sm text-ink">
+                {guidance.overview.companyBackground.text}
+              </p>
             </div>
             <div>
               <h3 className="font-medium text-ink">
-                {applicationSummaryConfig.sections.careerRecap}
+                {applicationSummaryConfig.sections.jobRequirements}
               </h3>
-              <p className="mt-1 text-sm text-ink">{guidance.overview.careerRecap.text}</p>
+              <TextList items={guidance.overview.jobRequirements.map((item) => item.text)} />
             </div>
             <div>
               <h3 className="font-medium text-ink">
-                {applicationSummaryConfig.sections.gapsToPrepare}
+                {applicationSummaryConfig.sections.whereSeekerShines}
               </h3>
-              <CheatSheetCoachItems
-                campaignId={id}
-                canEdit={canGenerate}
-                items={guidance.overview.gapsToPrepare}
-              />
+              <TextList items={guidance.overview.whereSeekerShines.map((item) => item.text)} />
             </div>
           </>
         )}
@@ -262,6 +227,8 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
               sectionKey={person.sectionKey}
               section={section}
               notes={notes}
+              personaBuilt={person.personaBuilt}
+              personaId={person.roleId}
             />
           </SummarySection>
           </CheatSheetPersonSection>
@@ -269,54 +236,6 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
       })}
 
       <CheatSheetSharedSection>
-      <SummarySection id="stories" title={applicationSummaryConfig.sections.stories}>
-        {guidance && guidance.stories.length > 0 ? (
-          guidance.stories.map((story) => (
-            <article key={story.storyId} className="break-inside-avoid rounded-md bg-canvas p-4">
-              <h3 className="font-medium text-ink">{story.headline}</h3>
-              <p className="mt-2 text-sm text-ink">{story.situation}</p>
-              <p className="mt-3 text-sm font-medium text-ink">
-                {applicationSummaryConfig.sections.thisStoryAnswers}
-              </p>
-              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink">
-                {story.answers.map((item) => (
-                  <li key={`${item.requirement}:${item.question}`}>
-                    {item.requirement}: {item.question}
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-3 space-y-2">
-                {story.variations.map((variation) => (
-                  <p key={variation.angle} className="text-sm text-ink">
-                    <span className="font-medium">{variation.angle}: </span>
-                    {variation.text}
-                  </p>
-                ))}
-              </div>
-            </article>
-          ))
-        ) : approvedStories.length === 0 ? (
-          <p className="text-sm text-subtle">No approved STAR statements yet.</p>
-        ) : (
-          approvedStories.map((story) => (
-            <article key={story.id} className="break-inside-avoid rounded-md bg-canvas p-4 text-sm text-ink">
-              {story.interviewAnswerApprovedAt && story.interviewAnswer ? (
-                <p>{story.interviewAnswer}</p>
-              ) : null}
-              {story.resumeBulletApprovedAt && story.resumeBullet ? (
-                <p className="mt-2 font-medium">{story.resumeBullet}</p>
-              ) : null}
-              <p className="mt-2 text-xs text-subtle">
-                {applicationSummaryConfig.sections.thisStoryAnswers}{" "}
-                {competencyRefs(story.competencyLinks)
-                  .map((ref) => ref.text)
-                  .join("; ") || "Not linked yet."}
-              </p>
-            </article>
-          ))
-        )}
-      </SummarySection>
-
       <SummarySection id="company" title={applicationSummaryConfig.sections.company}>
         <div>
           <h3 className="font-medium text-ink">What they do</h3>

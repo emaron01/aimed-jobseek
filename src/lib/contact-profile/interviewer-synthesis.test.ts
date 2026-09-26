@@ -59,6 +59,7 @@ describe("interviewer experience synthesis", () => {
     const dana = sourcesForPersonSection({
       sources,
       contactId: "contact_1",
+      roleId: "role_1",
       noteIds: [],
     }).map((source) => source.id);
     expect(dana).toContain("interviewer-pattern:contact_1:0");
@@ -68,6 +69,7 @@ describe("interviewer experience synthesis", () => {
     const noContact = sourcesForPersonSection({
       sources,
       contactId: null,
+      roleId: "role_1",
       noteIds: [],
     }).map((source) => source.id);
     expect(noContact).toEqual(["persona:role_1:impact"]);
@@ -76,8 +78,6 @@ describe("interviewer experience synthesis", () => {
   it("tells the cheat sheet to connect the seeker's material to what the interviewer built", () => {
     expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain("INTERVIEWER_PATTERN");
     expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain("seekerConnection");
-    expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain(
-      "never mention that it is missing",
-    );
+    expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain("Never merge");
   });
 });

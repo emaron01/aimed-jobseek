@@ -29,6 +29,8 @@ export function InterviewStagePanel({
   sectionKey,
   section,
   notes,
+  personaBuilt,
+  personaId,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -40,6 +42,8 @@ export function InterviewStagePanel({
   sectionKey: string | null;
   section: CheatSheetPersonSection | null;
   notes: CheatSheetNote[];
+  personaBuilt: boolean;
+  personaId: string;
 }) {
   const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
   const interviewer = people.find((person) => person.contactId === interviewerContactId);
@@ -161,6 +165,8 @@ export function InterviewStagePanel({
               sectionKey={sectionKey}
               section={section}
               notes={notes}
+              personaBuilt={personaBuilt}
+              personaId={personaId}
             />
           </div>
         </section>

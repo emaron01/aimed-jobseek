@@ -23,6 +23,37 @@ export function coachItemIsComplete(item: CheatSheetCoachItem): boolean {
   return Boolean(answer) !== Boolean(question);
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function asCoachItems(value: unknown): CheatSheetCoachItem[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    const row = asRecord(item);
+    if (!row || typeof row.prompt !== "string") return [];
+    return [
+      {
+        id: typeof row.id === "string" ? row.id : undefined,
+        prompt: row.prompt,
+        sampleAnswer: typeof row.sampleAnswer === "string" ? row.sampleAnswer : null,
+        harperQuestion: typeof row.harperQuestion === "string" ? row.harperQuestion : null,
+        supports: Array.isArray(row.supports)
+          ? row.supports.filter(
+              (support): support is { sourceId: string; quote: string } =>
+                Boolean(
+                  support &&
+                    typeof support === "object" &&
+                    typeof (support as { sourceId?: unknown }).sourceId === "string" &&
+                    typeof (support as { quote?: unknown }).quote === "string",
+                ),
+            )
+          : [],
+      },
+    ];
+  });
+}
+
 export function collectCoachItems(
   guidance: ApplicationSummaryGuidance,
 ): CheatSheetCoachItem[] {
@@ -30,9 +61,9 @@ export function collectCoachItems(
     ...(guidance.overview?.gapsToPrepare ?? []),
     ...guidance.people.flatMap((person) => [
       ...person.likelyQuestions,
-      ...(person.recruiter?.flagAnswers ?? []),
-      ...(person.hiringManager?.drillDowns ?? []),
-      ...(person.hiringManager?.gaps ?? []),
+      ...asCoachItems(asRecord(person.recruiter)?.flagAnswers),
+      ...asCoachItems(asRecord(person.hiringManager)?.drillDowns),
+      ...asCoachItems(asRecord(person.hiringManager)?.gaps),
     ]),
   ];
 }
@@ -42,12 +73,21 @@ export function assignCoachItemIds(
 ): ApplicationSummaryGuidance {
   const nextId = (prefix: string, index: number, current?: string) =>
     current?.trim() || `${prefix}:${index + 1}`;
+  const mapKind = (value: unknown, prefix: string, field: string) => {
+    const row = asRecord(value);
+    if (!row) return value ?? null;
+    const items = asCoachItems(row[field]).map((item, index) => ({
+      ...item,
+      id: nextId(`${prefix}:${field}`, index, item.id),
+    }));
+    return { ...row, [field]: items };
+  };
   return {
     ...guidance,
     overview: guidance.overview
       ? {
           ...guidance.overview,
-          gapsToPrepare: guidance.overview.gapsToPrepare.map((item, index) => ({
+          gapsToPrepare: (guidance.overview.gapsToPrepare ?? []).map((item, index) => ({
             ...item,
             id: nextId("overview:gap", index, item.id),
           })),
@@ -59,28 +99,22 @@ export function assignCoachItemIds(
         ...item,
         id: nextId(`${person.sectionKey}:likely`, index, item.id),
       })),
-      recruiter: person.recruiter
-        ? {
-            ...person.recruiter,
-            flagAnswers: person.recruiter.flagAnswers.map((item, index) => ({
-              ...item,
-              id: nextId(`${person.sectionKey}:flag`, index, item.id),
-            })),
-          }
-        : null,
-      hiringManager: person.hiringManager
-        ? {
-            ...person.hiringManager,
-            drillDowns: person.hiringManager.drillDowns.map((item, index) => ({
-              ...item,
-              id: nextId(`${person.sectionKey}:drill`, index, item.id),
-            })),
-            gaps: person.hiringManager.gaps.map((item, index) => ({
-              ...item,
-              id: nextId(`${person.sectionKey}:gap`, index, item.id),
-            })),
-          }
-        : null,
+      recruiter: mapKind(person.recruiter, person.sectionKey, "flagAnswers"),
+      hiringManager: (() => {
+        const row = asRecord(person.hiringManager);
+        if (!row) return person.hiringManager ?? null;
+        return {
+          ...row,
+          drillDowns: asCoachItems(row.drillDowns).map((item, index) => ({
+            ...item,
+            id: nextId(`${person.sectionKey}:drill`, index, item.id),
+          })),
+          gaps: asCoachItems(row.gaps).map((item, index) => ({
+            ...item,
+            id: nextId(`${person.sectionKey}:gap`, index, item.id),
+          })),
+        };
+      })(),
     })),
   };
 }
@@ -104,26 +138,27 @@ export function replaceCoachItem(
     overview: guidance.overview
       ? {
           ...guidance.overview,
-          gapsToPrepare: mapItems(guidance.overview.gapsToPrepare),
+          gapsToPrepare: mapItems(guidance.overview.gapsToPrepare ?? []),
         }
       : undefined,
-    people: guidance.people.map((person) => ({
-      ...person,
-      likelyQuestions: mapItems(person.likelyQuestions),
-      recruiter: person.recruiter
-        ? {
-            ...person.recruiter,
-            flagAnswers: mapItems(person.recruiter.flagAnswers),
-          }
-        : null,
-      hiringManager: person.hiringManager
-        ? {
-            ...person.hiringManager,
-            drillDowns: mapItems(person.hiringManager.drillDowns),
-            gaps: mapItems(person.hiringManager.gaps),
-          }
-        : null,
-    })),
+    people: guidance.people.map((person) => {
+      const hiringManager = asRecord(person.hiringManager);
+      const recruiter = asRecord(person.recruiter);
+      return {
+        ...person,
+        likelyQuestions: mapItems(person.likelyQuestions),
+        recruiter: recruiter
+          ? { ...recruiter, flagAnswers: mapItems(asCoachItems(recruiter.flagAnswers)) }
+          : person.recruiter ?? null,
+        hiringManager: hiringManager
+          ? {
+              ...hiringManager,
+              drillDowns: mapItems(asCoachItems(hiringManager.drillDowns)),
+              gaps: mapItems(asCoachItems(hiringManager.gaps)),
+            }
+          : person.hiringManager ?? null,
+      };
+    }),
   };
 }
 

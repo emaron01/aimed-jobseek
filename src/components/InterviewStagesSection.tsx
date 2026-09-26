@@ -205,6 +205,8 @@ export async function InterviewStagesSection({
                   sectionKey={sectionKey}
                   section={section}
                   notes={notes}
+                  personaBuilt={person?.personaBuilt ?? false}
+                  personaId={person?.roleId ?? interviewerPersona(interviewer?.contactId ?? "")}
                 />
 
                 {canEdit ? (

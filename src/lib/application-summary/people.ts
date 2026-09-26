@@ -37,6 +37,34 @@ export function cheatSheetSectionKind(
   return "CROSS_FUNCTIONAL";
 }
 
+export function interviewerContactIdsFrom(input: {
+  stageInterviewerIds: string[];
+  contacts: Array<{ contactId: string; personPrepOfferedAt?: Date | null }>;
+}): string[] {
+  const ids = new Set(input.stageInterviewerIds);
+  for (const contact of input.contacts) {
+    if (contact.personPrepOfferedAt) ids.add(contact.contactId);
+  }
+  return [...ids];
+}
+
+export function personSectionNeedsGeneration(section: {
+  positioningStatements?: Array<unknown>;
+  keyStatements?: Array<unknown>;
+  caresAbout?: Array<unknown>;
+  likelyQuestions?: Array<unknown>;
+  questionsToAsk?: Array<unknown>;
+} | null): boolean {
+  if (!section) return true;
+  return (
+    !section.positioningStatements?.length ||
+    !section.keyStatements?.length ||
+    !section.caresAbout?.length ||
+    !section.likelyQuestions?.length ||
+    !section.questionsToAsk?.length
+  );
+}
+
 export function buildCheatSheetPeople(input: {
   roles: Array<{
     id: string;
@@ -52,10 +80,12 @@ export function buildCheatSheetPeople(input: {
     lastName: string | null;
     title: string | null;
   }>;
+  interviewerContactIds: string[];
 }): CheatSheetPersonInput[] {
+  const interviewerIds = new Set(input.interviewerContactIds);
   const people: CheatSheetPersonInput[] = [];
-  const usedRoles = new Set<string>();
   for (const contact of input.contacts) {
+    if (!interviewerIds.has(contact.contactId)) continue;
     const role = input.roles.find((item) => item.id === contact.personaId);
     if (!role) continue;
     const heading = [contact.firstName, contact.lastName].filter(Boolean).join(" ").trim();
@@ -69,26 +99,6 @@ export function buildCheatSheetPeople(input: {
       involvement: role.involvement,
       suggestionKey: role.suggestionKey,
     });
-    usedRoles.add(role.id);
   }
-  for (const role of input.roles) {
-    if (role.involvement !== "DIRECT" && usedRoles.has(role.id)) continue;
-    if (usedRoles.has(role.id) && role.involvement === "DIRECT") continue;
-    people.push({
-      sectionKey: `role:${role.id}`,
-      roleId: role.id,
-      contactId: null,
-      heading: role.name,
-      roleName: role.name,
-      titles: role.titles,
-      involvement: role.involvement,
-      suggestionKey: role.suggestionKey,
-    });
-  }
-  return people.filter(
-    (person) =>
-      person.involvement === "DIRECT" ||
-      person.contactId != null ||
-      person.involvement === "INDIRECT",
-  );
+  return people;
 }

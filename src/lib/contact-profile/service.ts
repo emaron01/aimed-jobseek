@@ -73,6 +73,21 @@ export async function saveLinkedInPaste(input: {
     type: "CONTACT_PROFILE",
     targetId: membership.contactId,
   });
+  const { enqueueInterviewerCheatSheetSection } = await import(
+    "@/lib/application-summary/enqueue"
+  );
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: { ownerUserId: true },
+  });
+  if (campaign) {
+    await enqueueInterviewerCheatSheetSection({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      userId: campaign.ownerUserId,
+      contactId: input.contactId,
+    });
+  }
   return { suggestedPersonaId: nextPersonaId };
 }
 

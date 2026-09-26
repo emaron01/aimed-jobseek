@@ -137,11 +137,11 @@ describe("Interview cheat sheet coach", () => {
     const personBody = readFileSync("src/components/CheatSheetPersonBody.tsx", "utf8");
     const widget = readFileSync("src/components/CheatSheetCoachItems.tsx", "utf8");
     const prompt = readFileSync("src/lib/prompt-content/application-summary.ts", "utf8");
-    expect(page).toContain("CheatSheetCoachItems");
+    expect(page).not.toContain("CheatSheetCoachItems");
     expect(personBody).toContain("section.likelyQuestions");
-    expect(personBody).toContain("section.hiringManager.drillDowns");
-    expect(personBody).toContain("section.hiringManager.gaps");
-    expect(personBody).toContain("section.recruiter.flagAnswers");
+    expect(personBody).toContain("section.positioningStatements");
+    expect(personBody).toContain("section.keyStatements");
+    expect(personBody).toContain("questionsToAsk");
     expect(widget).toContain("sampleAnswer");
     expect(widget).toContain("harperQuestion");
     expect(widget).toContain("name=\"answer\"");
@@ -273,7 +273,7 @@ describe.skipIf(!hasTestDatabase())("cheat sheet Harper reply persistence", () =
         campaignId,
         status: "READY",
         promptVersion: "6",
-        guidanceJson: coachGuidance(),
+        guidanceJson: coachGuidance() as object,
       },
     });
   });
@@ -326,9 +326,12 @@ describe.skipIf(!hasTestDatabase())("cheat sheet Harper reply persistence", () =
     expect(story?.verbatimAnswer).toContain("I had a manager who was not inspecting deals");
     expect(story?.interviewAnswer).toBe(sample);
     expect(story?.interviewAnswerApprovedAt).not.toBeNull();
-    expect(replaceCoachItem(next, item!.id!, updated!).people[0]?.hiringManager?.gaps[0]?.sampleAnswer).toBe(
-      sample,
-    );
+    const replaced = replaceCoachItem(next, item!.id!, updated!);
+    const hiringManager = replaced.people[0]?.hiringManager as
+      | { gaps?: Array<{ sampleAnswer?: string | null }> }
+      | null
+      | undefined;
+    expect(hiringManager?.gaps?.[0]?.sampleAnswer).toBe(sample);
     expect(consultationConversationCopy.threadReply).toBe("Reply");
   });
 });

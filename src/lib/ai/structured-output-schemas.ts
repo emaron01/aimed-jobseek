@@ -23,9 +23,9 @@ import {
 } from "@/lib/consultation/contract";
 import { hiringTeamIdentificationSchema } from "@/lib/hiring-team/contract";
 import {
-  applicationSummaryGuidanceSchema,
+  applicationSummaryGuidanceGenerateSchema,
   applicationSummaryShellSchema,
-  cheatSheetPersonSectionSchema,
+  cheatSheetPersonSectionGenerateSchema,
 } from "@/lib/application-summary/contract";
 import {
   assetClaimValidationSchema,
@@ -178,7 +178,7 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   },
   applicationSummaryGuidance: {
     schemaName: "application_summary_guidance",
-    schema: applicationSummaryGuidanceSchema,
+    schema: applicationSummaryGuidanceGenerateSchema,
     usageOperations: ["APPLICATION_SUMMARY"],
   },
   applicationSummaryShell: {
@@ -188,7 +188,7 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   },
   cheatSheetPersonSection: {
     schemaName: "cheat_sheet_person_section",
-    schema: cheatSheetPersonSectionSchema,
+    schema: cheatSheetPersonSectionGenerateSchema,
     usageOperations: ["APPLICATION_SUMMARY"],
   },
   resumePresentationPlan: {

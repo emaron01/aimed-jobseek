@@ -362,6 +362,15 @@ export async function addHiringTeamPersonAction(
       contactId: added.contactId,
       personaId,
     });
+    const { enqueueInterviewerCheatSheetSection } = await import(
+      "@/lib/application-summary/enqueue"
+    );
+    await enqueueInterviewerCheatSheetSection({
+      organizationId,
+      campaignId,
+      userId: user.id,
+      contactId: added.contactId,
+    });
     revalidatePath(`/campaigns/${campaignId}`);
     return {
       ok: true,

@@ -35,6 +35,7 @@ function optionsFromPeople(): CheatSheetFilterOption[] {
         title: "Director of Sales",
       },
     ],
+    interviewerContactIds: ["c-alex"],
   }).map((person) => ({
     sectionKey: person.sectionKey,
     heading: person.heading,
@@ -44,7 +45,7 @@ function optionsFromPeople(): CheatSheetFilterOption[] {
   }));
 }
 
-const sharedSectionKeys = ["overview", "stories", "company", "position", "stages"];
+const sharedSectionKeys = ["overview", "company", "position", "stages"];
 
 describe("Interview cheat sheet people filter", () => {
   it("names the filter through the product configuration module", () => {
@@ -65,7 +66,7 @@ describe("Interview cheat sheet people filter", () => {
       matchCheatSheetFilterOptions(options, "talent acquisition").map(
         (item) => item.sectionKey,
       ),
-    ).toEqual(["role:role-ta"]);
+    ).toEqual([]);
     expect(
       matchCheatSheetFilterOptions(options, "director of sales").map(
         (item) => item.sectionKey,

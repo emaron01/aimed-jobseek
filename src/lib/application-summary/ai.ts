@@ -7,9 +7,7 @@ import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import { aiCallTracking } from "@/lib/usage/ai-call";
 import {
   applicationSummaryShellSchema,
-  cheatSheetPersonSectionSchema,
-  type ApplicationSummaryGuidance,
-  type CheatSheetPersonSection,
+  cheatSheetPersonSectionGenerateSchema,
 } from "@/lib/application-summary/contract";
 import { buildApplicationSummaryGuidanceMessages } from "@/lib/application-summary/prompt";
 import { applicationSummaryConfig } from "@/lib/product-config";
@@ -36,7 +34,7 @@ export async function generateApplicationSummaryShell(input: {
   qualityFeedback?: string[];
   usage?: AiCallUsageContext;
 }): Promise<
-  | { ok: true; data: Pick<ApplicationSummaryGuidance, "overview" | "stories"> }
+  | { ok: true; data: ReturnType<typeof applicationSummaryShellSchema.parse> }
   | { ok: false; message: string }
 > {
   if (!isConsultationAiConfigured()) return unavailable();
@@ -76,7 +74,7 @@ export async function generateCheatSheetPersonSectionGuidance(input: {
   qualityFeedback?: string[];
   usage?: AiCallUsageContext;
 }): Promise<
-  | { ok: true; data: CheatSheetPersonSection }
+  | { ok: true; data: ReturnType<typeof cheatSheetPersonSectionGenerateSchema.parse> }
   | { ok: false; message: string }
 > {
   if (!isConsultationAiConfigured()) return unavailable();
@@ -91,7 +89,7 @@ export async function generateCheatSheetPersonSectionGuidance(input: {
         qualityFeedback: input.qualityFeedback,
       }),
       parseOutput: (raw) => ({
-        data: cheatSheetPersonSectionSchema.parse(raw),
+        data: cheatSheetPersonSectionGenerateSchema.parse(raw),
         coercedFields: [],
       }),
     });
