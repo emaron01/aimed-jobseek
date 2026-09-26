@@ -336,6 +336,15 @@ export async function ApplicationWorkspace({
           applicationAssets: {
             orderBy: [{ type: "asc" }, { version: "desc" }],
           },
+          interviewStages: {
+            orderBy: { sortOrder: "asc" },
+            select: {
+              id: true,
+              type: true,
+              format: true,
+              scheduledAt: true,
+            },
+          },
           presentationPlans: true,
         },
       },
@@ -853,6 +862,12 @@ export async function ApplicationWorkspace({
       }
       roles={requirement.campaign.hiringTeamRoles}
       contacts={requirement.campaign.contacts.map(toContactRow)}
+      interviewStages={requirement.campaign.interviewStages.map((stage) => ({
+        id: stage.id,
+        type: stage.type,
+        format: stage.format,
+        scheduledAt: stage.scheduledAt.toISOString(),
+      }))}
       assets={requirement.campaign.applicationAssets
         .filter((asset): asset is typeof asset & {
           type: "EMAIL" | "LINKEDIN_CONNECTION_NOTE" | "LINKEDIN_INMAIL";

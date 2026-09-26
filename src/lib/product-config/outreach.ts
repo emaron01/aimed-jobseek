@@ -11,7 +11,7 @@ export const outreachConfig = Object.freeze({
   labels: {
     sectionTitle: "Outreach",
     sectionHelp:
-      "Add the people you will write to. Open a contact to see every message in order, then add the next one. Open email in your own client, or copy LinkedIn text. Nothing is sent from this product.",
+      "Add the people you will write to. Sent messages appear under each name. Open one to send it, or generate the next message for the selected person. Open email in your own client, or copy LinkedIn text. Nothing is sent from this product.",
     contactsTitle: applicationWorkspaceCopy.contactsTitle,
     contactsHelp:
       "Add one person at a time. Assign the Hiring Team role this person will play.",
@@ -22,6 +22,16 @@ export const outreachConfig = Object.freeze({
     generate: "Generate",
     regenerate: "Regenerate",
     addNextMessage: "Add the next message",
+    generatorTitle: "Write the next message",
+    generatorPrompt: "Instructions for this message",
+    generatorPromptHelp:
+      "Tell the generator what this message should cover, for example thanking them for a call or naming a topic to mention.",
+    kindEmail: "Email",
+    kindLinkedInNote: "LinkedIn connection note",
+    kindLinkedInInMail: "LinkedIn InMail",
+    kindThankYou: "Interview thank-you / follow-up",
+    interviewStage: "Interview stage",
+    needInterviewStage: "Choose the interview this thank-you or follow-up is for.",
     assignRole: "Hiring Team role",
     sequenceTitle: "Sequence",
     contactStatusNone: "No messages",

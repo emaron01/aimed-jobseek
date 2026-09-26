@@ -1,7 +1,17 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { contactOutreachStatus } from "@/components/ApplicationOutreachSections";
-import { formatOutreachTypeLabel } from "@/lib/application-assets/display";
+import {
+  contactOutreachStatus,
+  latestOutreachMessageId,
+  sentMessagesForContact,
+} from "@/components/ApplicationOutreachSections";
+import {
+  formatOutreachGeneratorKindLabel,
+  formatOutreachHistoryLine,
+  formatOutreachTypeLabel,
+  resolveOutreachGeneratorKind,
+} from "@/lib/application-assets/display";
+import { resolveInterviewThankYouNotes } from "@/lib/application-assets/display";
 import { hiringTeamConfig, outreachConfig } from "@/lib/product-config";
 
 const emptyAsset = {
@@ -46,24 +56,132 @@ describe("application outreach workspace", () => {
     ).toContain(outreachConfig.labels.sentStatus);
   });
 
-  it("lists each contact sequence with type and sent date", () => {
+  it("lists sent messages under each name with type and date and opens on click", () => {
     const section = readFileSync(
       "src/components/ApplicationOutreachSections.tsx",
       "utf8",
     );
-    expect(section).toContain("outreach-sequence");
-    expect(section).toContain("formatOutreachTypeLabel(asset.type)");
-    expect(section).toContain("asset.sentAt");
-    expect(section).toContain("add-next-outreach");
-    expect(section).not.toContain("generate-outreach");
-    expect(section).toContain('option value="EMAIL"');
-    expect(section).toContain('option value="LINKEDIN_CONNECTION_NOTE"');
-    expect(section).toContain('option value="LINKEDIN_INMAIL"');
-    expect(formatOutreachTypeLabel("EMAIL")).toBe("Email");
-    expect(formatOutreachTypeLabel("LINKEDIN_CONNECTION_NOTE")).toBe(
-      "LinkedIn connection note",
+    const action = readFileSync("src/app/actions/application-outreach.ts", "utf8");
+    const email = {
+      ...emptyAsset,
+      id: "asset_email",
+      sentAt: "2026-09-26T12:00:00.000Z",
+    };
+    const note = {
+      ...emptyAsset,
+      id: "asset_note",
+      type: "LINKEDIN_CONNECTION_NOTE" as const,
+      sentAt: "2026-09-27T12:00:00.000Z",
+      createdAt: "2026-09-27T12:00:00.000Z",
+    };
+    const draft = {
+      ...emptyAsset,
+      id: "asset_draft",
+      sentAt: null,
+      createdAt: "2026-09-28T12:00:00.000Z",
+    };
+    expect(sentMessagesForContact([email, note, draft], "contact_1")).toEqual([
+      email,
+      note,
+    ]);
+    expect(sentMessagesForContact([email, note], "contact_other")).toEqual([]);
+    expect(formatOutreachHistoryLine(email.type, email.sentAt)).toBe(
+      `${outreachConfig.labels.kindEmail} · ${outreachConfig.labels.sentStatus} Sep 26`,
     );
-    expect(formatOutreachTypeLabel("LINKEDIN_INMAIL")).toBe("LinkedIn InMail");
+    expect(formatOutreachHistoryLine(note.type, note.sentAt)).toBe(
+      `${outreachConfig.labels.kindLinkedInNote} · ${outreachConfig.labels.sentStatus} Sep 27`,
+    );
+    expect(latestOutreachMessageId([email, note, draft], "contact_1")).toBe(
+      "asset_draft",
+    );
+    expect(section).toContain("outreach-contact-history-");
+    expect(section).toContain("outreach-history-");
+    expect(section).toContain("formatOutreachHistoryLine");
+    expect(section).toContain("openContact(contact.contactId, asset.id)");
+    expect(section).toContain("openedMessage");
+    expect(section).not.toContain("selectedMessages.map");
+    expect(action).toContain("markOutreachSent");
+    expect(action).toContain("sentAt:");
+  });
+
+  it("uses one generator for the four message kinds and the prompt instructions", () => {
+    const section = readFileSync(
+      "src/components/ApplicationOutreachSections.tsx",
+      "utf8",
+    );
+    const action = readFileSync("src/app/actions/application-outreach.ts", "utf8");
+    const outreach = readFileSync(
+      "src/lib/application-assets/outreach.ts",
+      "utf8",
+    );
+    expect(section).toContain("add-next-outreach");
+    expect(section).toContain("outreach-generator-kind");
+    expect(section).toContain("outreach-generator-prompt");
+    expect(section).toContain("GENERATOR_KINDS");
+    expect(section).toContain('"INTERVIEW_THANK_YOU"');
+    expect(section).toContain("name=\"kind\"");
+    expect(section).toContain("name=\"regenerationInstruction\"");
+    expect(section).toContain("outreachConfig.labels.generatorPrompt");
+    expect(section).toContain("email-handoff");
+    expect(section).toContain("linkedin-handoff");
+    expect(section).toContain("openOutlookWeb");
+    expect(section).toContain("openOutlookDesktop");
+    expect(section).toContain("openGmail");
+    expect(section).toContain("copyBody");
+    expect(section).toContain("downloadResume");
+    expect(formatOutreachTypeLabel("EMAIL")).toBe(outreachConfig.labels.kindEmail);
+    expect(formatOutreachTypeLabel("LINKEDIN_CONNECTION_NOTE")).toBe(
+      outreachConfig.labels.kindLinkedInNote,
+    );
+    expect(formatOutreachTypeLabel("LINKEDIN_INMAIL")).toBe(
+      outreachConfig.labels.kindLinkedInInMail,
+    );
+    expect(formatOutreachGeneratorKindLabel("INTERVIEW_THANK_YOU")).toBe(
+      outreachConfig.labels.kindThankYou,
+    );
+    expect(resolveOutreachGeneratorKind("EMAIL")).toEqual({
+      type: "EMAIL",
+      purpose: null,
+    });
+    expect(resolveOutreachGeneratorKind("LINKEDIN_CONNECTION_NOTE")).toEqual({
+      type: "LINKEDIN_CONNECTION_NOTE",
+      purpose: null,
+    });
+    expect(resolveOutreachGeneratorKind("LINKEDIN_INMAIL")).toEqual({
+      type: "LINKEDIN_INMAIL",
+      purpose: null,
+    });
+    expect(resolveOutreachGeneratorKind("INTERVIEW_THANK_YOU")).toEqual({
+      type: "EMAIL",
+      purpose: "THANK_YOU",
+    });
+    expect(() => resolveOutreachGeneratorKind("SMS")).toThrow(
+      "Outreach message type is invalid.",
+    );
+    expect(action).toContain("resolveOutreachGeneratorKind");
+    expect(action).toContain("regenerationInstruction");
+    expect(action).toContain("assetType: type");
+    expect(action).toContain("purpose,");
+    expect(action).toContain("contactId:");
+    expect(
+      resolveInterviewThankYouNotes({
+        notesAfter: null,
+        regenerationInstruction:
+          "thank her for the call and mention the forecast discussion",
+      }),
+    ).toEqual({
+      notes: "thank her for the call and mention the forecast discussion",
+      usedInstruction: true,
+    });
+    expect(
+      resolveInterviewThankYouNotes({
+        notesAfter: "We covered the forecast.",
+        regenerationInstruction: "keep it short",
+      }),
+    ).toEqual({ notes: "We covered the forecast.", usedInstruction: false });
+    expect(outreach).toContain("resolveInterviewThankYouNotes");
+    expect(outreach).toContain("regenerationInstruction: input.regenerationInstruction");
+    expect(outreach).toContain("guidance: input.regenerationInstruction");
   });
 
   it("reuses the gated contact-list and selected-sequence layout", () => {

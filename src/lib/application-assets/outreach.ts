@@ -43,6 +43,7 @@ import {
   type ApplicationAssetContent,
   type AssetClaim,
 } from "./contract";
+import { resolveInterviewThankYouNotes } from "./display";
 import type { OutreachGenerationResult } from "./outreach-types";
 
 function outreachPromptVersion(type: ApplicationAssetType): string {
@@ -856,7 +857,11 @@ export async function generateOutreachAsset(input: {
     if (!stage) {
       return { ok: false, message: "Interview stage was not found.", violations: [] };
     }
-    interviewStageNotes = stage.notesAfter?.trim() || null;
+    const resolvedNotes = resolveInterviewThankYouNotes({
+      notesAfter: stage.notesAfter,
+      regenerationInstruction: input.regenerationInstruction,
+    });
+    interviewStageNotes = resolvedNotes.notes;
     if (!interviewStageNotes) {
       return {
         ok: false,
@@ -868,7 +873,10 @@ export async function generateOutreachAsset(input: {
       const stored = parseThankYouClarify(stage.thankYouClarifyJson);
       const answers =
         input.thankYouAnswers?.filter((row) => row.answer.trim()) ?? stored.answers;
-      const skipped = Boolean(input.skipThankYouQuestions) || stored.skipped;
+      const skipped =
+        Boolean(input.skipThankYouQuestions) ||
+        stored.skipped ||
+        resolvedNotes.usedInstruction;
       if (!notesDescribeConversation(interviewStageNotes) && !skipped && answers.length === 0) {
         let questions: Array<{ id: string; text: string }> = [];
         let lastFailure: string | null = null;

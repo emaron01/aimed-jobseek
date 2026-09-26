@@ -16,7 +16,12 @@ import {
   composeOutreachText,
   type ApplicationAssetContent,
 } from "@/lib/application-assets/contract";
-import { formatOutreachTypeLabel } from "@/lib/application-assets/display";
+import {
+  formatOutreachGeneratorKindLabel,
+  formatOutreachHistoryLine,
+  formatOutreachTypeLabel,
+  type OutreachGeneratorKind,
+} from "@/lib/application-assets/display";
 import { outreachEmailHandoff } from "@/lib/application-assets/handoff";
 import { openEmailClientHref } from "@/lib/email-generation/email-body";
 import {
@@ -66,6 +71,20 @@ type OutreachRow = {
   content: unknown;
 };
 
+type InterviewStageRow = {
+  id: string;
+  type: keyof typeof interviewConfig.types;
+  format: keyof typeof interviewConfig.formats;
+  scheduledAt: string;
+};
+
+const GENERATOR_KINDS: OutreachGeneratorKind[] = [
+  "EMAIL",
+  "LINKEDIN_CONNECTION_NOTE",
+  "LINKEDIN_INMAIL",
+  "INTERVIEW_THANK_YOU",
+];
+
 function Status({ result }: { result: ApplicationOutreachActionResult | null }) {
   if (!result) return null;
   return (
@@ -104,6 +123,33 @@ function messagesForContact(assets: OutreachRow[], contactId: string): OutreachR
       const time = left.createdAt.localeCompare(right.createdAt);
       return time !== 0 ? time : left.version - right.version;
     });
+}
+
+export function sentMessagesForContact(
+  assets: OutreachRow[],
+  contactId: string,
+): OutreachRow[] {
+  return messagesForContact(assets, contactId).filter((asset) => asset.sentAt);
+}
+
+export function latestOutreachMessageId(
+  assets: OutreachRow[],
+  contactId: string,
+): string {
+  const messages = messagesForContact(assets, contactId);
+  return messages[messages.length - 1]?.id ?? "";
+}
+
+function interviewStageLabel(stage: InterviewStageRow): string {
+  const date = new Date(stage.scheduledAt);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Interview stage date is invalid.");
+  }
+  const stamped = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(date);
+  return `${interviewConfig.types[stage.type]} · ${stamped}`;
 }
 
 export function contactOutreachStatus(
@@ -203,12 +249,14 @@ export function ApplicationContactsSection({
   roles,
   contacts,
   assets = [],
+  interviewStages = [],
 }: {
   campaignId: string;
   canEdit: boolean;
   roles: RoleOption[];
   contacts: ContactRow[];
   assets?: OutreachRow[];
+  interviewStages?: InterviewStageRow[];
 }) {
   return (
     <ApplicationOutreachSection
@@ -217,6 +265,7 @@ export function ApplicationContactsSection({
       roles={roles}
       contacts={contacts}
       assets={assets}
+      interviewStages={interviewStages}
       approvedResumeId={null}
     />
   );
@@ -228,6 +277,7 @@ export function ApplicationOutreachSection({
   roles,
   contacts,
   assets,
+  interviewStages = [],
   approvedResumeId,
 }: {
   campaignId: string;
@@ -235,6 +285,7 @@ export function ApplicationOutreachSection({
   roles: RoleOption[];
   contacts: ContactRow[];
   assets: OutreachRow[];
+  interviewStages?: InterviewStageRow[];
   approvedResumeId: string | null;
 }) {
   const [addState, addAction] = useActionState(addApplicationContactAction, initial);
@@ -248,6 +299,8 @@ export function ApplicationOutreachSection({
   );
   const [sentState, sentAction] = useActionState(markOutreachSentAction, initial);
   const [selectedId, setSelectedId] = useState(contacts[0]?.contactId ?? "");
+  const [explicitAssetId, setExplicitAssetId] = useState<string | null>(null);
+  const [generatorKind, setGeneratorKind] = useState<OutreachGeneratorKind>("EMAIL");
   const selected =
     contacts.find((contact) => contact.contactId === selectedId) ??
     contacts[0] ??
@@ -255,8 +308,19 @@ export function ApplicationOutreachSection({
   const selectedMessages = selected
     ? messagesForContact(assets, selected.contactId)
     : [];
+  const openedMessage =
+    selectedMessages.find((asset) => asset.id === explicitAssetId) ??
+    selectedMessages.find((asset) => asset.id === generateState?.assetId) ??
+    selectedMessages[selectedMessages.length - 1] ??
+    null;
   const lastSent = [...selectedMessages].reverse().find((asset) => asset.sentAt);
+  const thankYouSelected = generatorKind === "INTERVIEW_THANK_YOU";
   const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
+
+  function openContact(contactId: string, assetId?: string) {
+    setSelectedId(contactId);
+    setExplicitAssetId(assetId ?? null);
+  }
 
   return (
     <section
@@ -336,34 +400,71 @@ export function ApplicationOutreachSection({
             <ul className="mt-1 space-y-1">
               {contacts.map((contact) => {
                 const active = contact.contactId === selected?.contactId;
+                const sent = sentMessagesForContact(assets, contact.contactId);
                 const status = contactOutreachStatus(assets, contact.contactId);
                 return (
                   <li key={contact.contactId}>
-                    <AppButton
-                      type="button"
-                      variant="secondary"
-                      data-testid={`outreach-contact-${contact.contactId}`}
-                      onClick={() => setSelectedId(contact.contactId)}
-                      className={`w-full !justify-start ${
+                    <div
+                      className={`rounded-md ${
                         active ? "ring-1 ring-edge-strong" : ""
                       }`}
+                      data-testid={`outreach-contact-${contact.contactId}`}
                     >
-                      <span className="block min-w-0 text-left">
-                        <span className="block truncate font-medium">{contactName(contact)}</span>
-                        <span className="mt-0.5 block truncate text-xs text-subtle">
-                          {contact.title ?? "—"}
+                      <AppButton
+                        type="button"
+                        variant="secondary"
+                        onClick={() => openContact(contact.contactId)}
+                        className="w-full !justify-start"
+                      >
+                        <span className="block min-w-0 text-left">
+                          <span className="block truncate font-medium">{contactName(contact)}</span>
+                          <span className="mt-0.5 block truncate text-xs text-subtle">
+                            {contact.title ?? "—"}
+                          </span>
+                          <span className="mt-0.5 block truncate text-xs text-ink">
+                            {contact.personaName ?? outreachConfig.labels.assignRole}
+                          </span>
                         </span>
-                        <span className="mt-0.5 block truncate text-xs text-ink">
-                          {contact.personaName ?? outreachConfig.labels.assignRole}
-                        </span>
-                        <span
-                          className="mt-1 block text-xs text-subtle"
+                      </AppButton>
+                      {sent.length === 0 ? (
+                        <p
+                          className="px-3 pb-2 text-xs text-subtle"
                           data-testid={`outreach-contact-status-${contact.contactId}`}
                         >
                           {status}
-                        </span>
-                      </span>
-                    </AppButton>
+                        </p>
+                      ) : (
+                        <ul
+                          className="space-y-0.5 px-2 pb-2"
+                          data-testid={`outreach-contact-history-${contact.contactId}`}
+                        >
+                          {sent.map((asset) => (
+                            <li key={asset.id}>
+                              <AppButton
+                                type="button"
+                                variant="secondary"
+                                data-testid={`outreach-history-${asset.id}`}
+                                onClick={() =>
+                                  openContact(contact.contactId, asset.id)
+                                }
+                                className={`w-full !justify-start !px-2 !py-1 text-xs ${
+                                  openedMessage?.id === asset.id
+                                    ? "ring-1 ring-edge-strong"
+                                    : ""
+                                }`}
+                              >
+                                {asset.sentAt
+                                  ? formatOutreachHistoryLine(
+                                      asset.type,
+                                      asset.sentAt,
+                                    )
+                                  : outreachConfig.labels.contactStatusDraft}
+                              </AppButton>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </li>
                 );
               })}
@@ -409,36 +510,26 @@ export function ApplicationOutreachSection({
             ) : null}
             <Status result={roleState} />
 
-            <div>
-              <h4 className="text-sm font-semibold text-ink">
-                {outreachConfig.labels.sequenceTitle}
-              </h4>
-              {selectedMessages.length === 0 ? (
-                <p className="mt-2 text-sm text-muted">
-                  {outreachConfig.labels.contactStatusNone}
-                </p>
-              ) : (
-                <ol className="mt-2 space-y-3">
-                  {selectedMessages.map((asset) => (
-                    <li key={asset.id}>
-                      <OutreachMessageCard
-                        campaignId={campaignId}
-                        canEdit={canEdit}
-                        asset={asset}
-                        contacts={contacts}
-                        approvedResumeId={approvedResumeId}
-                        sentAction={sentAction}
-                      />
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </div>
+            {openedMessage ? (
+              <OutreachMessageCard
+                campaignId={campaignId}
+                canEdit={canEdit}
+                asset={openedMessage}
+                contacts={contacts}
+                approvedResumeId={approvedResumeId}
+                sentAction={sentAction}
+              />
+            ) : (
+              <p className="text-sm text-muted">
+                {outreachConfig.labels.contactStatusNone}
+              </p>
+            )}
             <Status result={sentState} />
 
             {canEdit ? (
               <form
                 action={generateAction}
+                onSubmit={() => setExplicitAssetId(null)}
                 className="grid gap-3 md:grid-cols-2"
                 data-testid="add-next-outreach"
               >
@@ -452,36 +543,95 @@ export function ApplicationOutreachSection({
                 <input
                   type="hidden"
                   name="purpose"
-                  value={lastSent ? "FOLLOW_UP" : "PROACTIVE"}
+                  value={
+                    thankYouSelected
+                      ? "THANK_YOU"
+                      : lastSent
+                        ? "FOLLOW_UP"
+                        : "PROACTIVE"
+                  }
                 />
-                {lastSent ? (
+                {lastSent && !thankYouSelected ? (
                   <input type="hidden" name="followUpToAssetId" value={lastSent.id} />
                 ) : null}
+                {thankYouSelected ? (
+                  <input type="hidden" name="skipThankYouQuestions" value="1" />
+                ) : null}
+                <div className="md:col-span-2">
+                  <h4 className="text-sm font-semibold text-ink">
+                    {outreachConfig.labels.generatorTitle}
+                  </h4>
+                </div>
                 <label className="text-sm">
                   <span className="font-medium text-ink">
                     {outreachConfig.labels.addNextMessage}
                   </span>
                   <select
-                    name="type"
-                    defaultValue="EMAIL"
+                    name="kind"
+                    value={generatorKind}
+                    onChange={(event) => {
+                      const next = event.target.value;
+                      if (
+                        next === "EMAIL" ||
+                        next === "LINKEDIN_CONNECTION_NOTE" ||
+                        next === "LINKEDIN_INMAIL" ||
+                        next === "INTERVIEW_THANK_YOU"
+                      ) {
+                        setGeneratorKind(next);
+                      }
+                    }}
                     className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
+                    data-testid="outreach-generator-kind"
                   >
-                    <option value="EMAIL">{formatOutreachTypeLabel("EMAIL")}</option>
-                    <option value="LINKEDIN_CONNECTION_NOTE">
-                      {formatOutreachTypeLabel("LINKEDIN_CONNECTION_NOTE")}
-                    </option>
-                    <option value="LINKEDIN_INMAIL">
-                      {formatOutreachTypeLabel("LINKEDIN_INMAIL")}
-                    </option>
+                    {GENERATOR_KINDS.map((kind) => (
+                      <option key={kind} value={kind}>
+                        {formatOutreachGeneratorKindLabel(kind)}
+                      </option>
+                    ))}
                   </select>
                 </label>
-                <label className="text-sm">
-                  <span className="font-medium text-ink">{outreachConfig.labels.changeInstruction}</span>
+                {thankYouSelected ? (
+                  <label className="text-sm">
+                    <span className="font-medium text-ink">
+                      {outreachConfig.labels.interviewStage}
+                    </span>
+                    <select
+                      name="interviewStageId"
+                      required
+                      defaultValue=""
+                      className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
+                      data-testid="outreach-generator-stage"
+                    >
+                      <option value="" disabled>
+                        {interviewStages.length === 0
+                          ? outreachConfig.labels.needInterviewStage
+                          : outreachConfig.labels.interviewStage}
+                      </option>
+                      {interviewStages.map((stage) => (
+                        <option key={stage.id} value={stage.id}>
+                          {interviewStageLabel(stage)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+                <label className={`text-sm ${thankYouSelected ? "md:col-span-2" : ""}`}>
+                  <span className="font-medium text-ink">
+                    {outreachConfig.labels.generatorPrompt}
+                  </span>
                   <textarea
                     name="regenerationInstruction"
-                    rows={2}
+                    rows={3}
                     className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
+                    data-testid="outreach-generator-prompt"
+                    aria-describedby="outreach-generator-prompt-help"
                   />
+                  <span
+                    id="outreach-generator-prompt-help"
+                    className="mt-1 block text-xs text-muted"
+                  >
+                    {outreachConfig.labels.generatorPromptHelp}
+                  </span>
                 </label>
                 <SubmitButton>{outreachConfig.labels.generate}</SubmitButton>
               </form>

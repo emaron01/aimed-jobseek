@@ -3,8 +3,10 @@ import { hasVisibleText } from "@/lib/grounding/fact-tokens";
 import {
   applicationAssetConfig,
   consultationConfig,
+  outreachConfig,
   vocab,
 } from "@/lib/product-config";
+import type { OutreachAssetType } from "@/lib/product-config";
 
 export { hasVisibleText };
 
@@ -94,12 +96,79 @@ export function formatClaimSupportLabel(
 export function formatOutreachTypeLabel(type: string): string {
   switch (type) {
     case "EMAIL":
-      return "Email";
+      return outreachConfig.labels.kindEmail;
     case "LINKEDIN_CONNECTION_NOTE":
-      return "LinkedIn connection note";
+      return outreachConfig.labels.kindLinkedInNote;
     case "LINKEDIN_INMAIL":
-      return "LinkedIn InMail";
+      return outreachConfig.labels.kindLinkedInInMail;
     default:
-      return "Outreach";
+      return vocab.outreach.Singular;
   }
+}
+
+export function formatOutreachSentStamp(sentAt: string): string {
+  const date = new Date(sentAt);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Outreach sent date is invalid.");
+  }
+  const formatted = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(date);
+  return `${outreachConfig.labels.sentStatus} ${formatted}`;
+}
+
+export function formatOutreachHistoryLine(
+  type: string,
+  sentAt: string,
+): string {
+  return `${formatOutreachTypeLabel(type)} · ${formatOutreachSentStamp(sentAt)}`;
+}
+
+export type OutreachGeneratorKind =
+  | OutreachAssetType
+  | "INTERVIEW_THANK_YOU";
+
+export function isOutreachGeneratorKind(
+  value: string,
+): value is OutreachGeneratorKind {
+  return (
+    value === "EMAIL" ||
+    value === "LINKEDIN_CONNECTION_NOTE" ||
+    value === "LINKEDIN_INMAIL" ||
+    value === "INTERVIEW_THANK_YOU"
+  );
+}
+
+export function formatOutreachGeneratorKindLabel(
+  kind: OutreachGeneratorKind,
+): string {
+  if (kind === "INTERVIEW_THANK_YOU") {
+    return outreachConfig.labels.kindThankYou;
+  }
+  return formatOutreachTypeLabel(kind);
+}
+
+export function resolveOutreachGeneratorKind(kind: string): {
+  type: OutreachAssetType;
+  purpose: "THANK_YOU" | null;
+} {
+  if (!isOutreachGeneratorKind(kind)) {
+    throw new Error("Outreach message type is invalid.");
+  }
+  if (kind === "INTERVIEW_THANK_YOU") {
+    return { type: "EMAIL", purpose: "THANK_YOU" };
+  }
+  return { type: kind, purpose: null };
+}
+
+export function resolveInterviewThankYouNotes(input: {
+  notesAfter: string | null | undefined;
+  regenerationInstruction: string | null | undefined;
+}): { notes: string | null; usedInstruction: boolean } {
+  const notes = input.notesAfter?.trim() || null;
+  const instruction = input.regenerationInstruction?.trim() || "";
+  if (notes) return { notes, usedInstruction: false };
+  if (instruction) return { notes: instruction, usedInstruction: true };
+  return { notes: null, usedInstruction: false };
 }
