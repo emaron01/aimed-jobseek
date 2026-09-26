@@ -20,7 +20,7 @@ import {
   cheatSheetSectionKind,
 } from "@/lib/application-summary/people";
 import { listPersonPreps } from "@/lib/interview/person-prep";
-import { sanitizeWorkspaceFailure, vocab } from "@/lib/product-config";
+import { applicationSummaryConfig, sanitizeWorkspaceFailure, vocab } from "@/lib/product-config";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
@@ -557,7 +557,7 @@ export async function generateApplicationSummary(input: {
     where: { campaignId: input.campaignId },
     data: {
       status: "FAILED",
-      generationError: "The model did not return usable Interview Cheat Sheet guidance.",
+      generationError: `${applicationSummaryConfig.title} could not be generated. Retry.`,
     },
   });
 }
@@ -656,7 +656,7 @@ export async function resolveApplicationSummaryFlag(input: {
   const summary = await prisma.applicationSummary.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
-  if (!summary) throw new TenantError("Interview Cheat Sheet was not found.");
+  if (!summary) throw new TenantError(`${applicationSummaryConfig.title} was not found.`);
   const nextFlags = resolveClaimFlag(
     claimFlagsFromJson(summary.claimFlagsJson),
     input.claimId,

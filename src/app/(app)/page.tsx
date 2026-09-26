@@ -11,7 +11,7 @@ import { ApplicationRemindersPanel } from "@/components/ApplicationRemindersPane
 import { DueContactsPanel } from "@/components/DueContactsPanel";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
 import { canViewAllRepWork } from "@/lib/work/ownership";
-import { anyListFeatureEnabled, vocab } from "@/lib/product-config";
+import { anyListFeatureEnabled, polishCopy, vocab } from "@/lib/product-config";
 
 function HomeNavLink({ href, label }: { href: string; label: string }) {
   return (
@@ -46,8 +46,8 @@ export default async function DashboardPage({
     return (
       <div>
         <PageHeader
-          title="Home"
-          description={`Organization-scoped overview of ${vocab.contact.plural} and ${vocab.campaign.plural}.`}
+          title={polishCopy.homeTitle}
+          description={polishCopy.homeHelp}
         />
         <TenantMissing />
       </div>
@@ -64,7 +64,7 @@ export default async function DashboardPage({
   return (
     <div className="mx-auto w-full max-w-6xl">
       <PageHeader
-        title="Home"
+        title={polishCopy.homeTitle}
         description={`Track ${vocab.campaign.plural} for ${organization.name}: apply through the employer portal, then write outreach when you find people on the Hiring Team.`}
         actions={
           <>

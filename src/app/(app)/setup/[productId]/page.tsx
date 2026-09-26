@@ -22,7 +22,7 @@ import {
   productCompletionState,
   truncateText,
 } from "@/lib/setup/product-overview";
-import { candidateProfileEditCopy, vocab } from "@/lib/product-config";
+import { candidateProfileEditCopy, polishCopy, vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ productId: string }>;
@@ -186,7 +186,7 @@ export default async function SetupProductPage({ params }: PageProps) {
                 href={`/setup/${product.id}/research`}
                 className={PRIMARY_BUTTON_CLASS}
               >
-                Research & Build
+                {polishCopy.researchAndGenerate}
               </Link>
               <Link
                 href="/setup"

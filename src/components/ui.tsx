@@ -10,9 +10,9 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight text-ink">
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">
           {title}
-        </h2>
+        </h1>
         {description ? (
           <p className="mt-1 max-w-2xl text-sm text-muted">{description}</p>
         ) : null}
@@ -236,14 +236,14 @@ export function TenantMissing() {
   return (
     <EmptyState
       title="No workspace is associated with this account."
-      description="You are signed in, but this account is not a member of a customer workspace. Open Account Settings, or contact support if you need access."
+      description="You are signed in, but this account is not a member of a customer workspace. Open Account settings, or contact support if you need access."
       actions={
         <>
           <a
             href="/settings/account"
             className="font-medium text-primary underline"
           >
-            Account Settings
+            Account settings
           </a>
           <a href="/login" className="text-muted underline">
             Switch account

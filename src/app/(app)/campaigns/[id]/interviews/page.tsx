@@ -1,6 +1,17 @@
+import type { Metadata } from "next";
 import { ApplicationWorkspace } from "@/components/ApplicationWorkspace";
 import { TenantMissing } from "@/components/ui";
+import { generateApplicationPageMetadata } from "@/lib/application/page-metadata";
 import { requireApplicationWorkspace } from "@/lib/application/workspace-access";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  return generateApplicationPageMetadata(id, "interviews");
+}
 
 export default async function ApplicationInterviewsPage({
   params,

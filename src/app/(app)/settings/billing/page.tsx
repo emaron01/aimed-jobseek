@@ -52,7 +52,10 @@ import {
 } from "@/lib/usage/policy";
 import { buildSeatSnapshot } from "@/lib/org/seat-limits";
 import { defaultMaxSeatsForPlan } from "@/lib/org/seat-limits";
-import { features, vocab } from "@/lib/product-config";
+import { PageHeader } from "@/components/ui";
+import { features, polishCopy, vocab } from "@/lib/product-config";
+
+export const metadata = { title: polishCopy.billingTitle };
 
 /** Always read live billing state — never serve a pre-checkout RSC snapshot. */
 export const dynamic = "force-dynamic";
@@ -110,9 +113,7 @@ export default async function OrganizationBillingSettingsPage({
     if (paymentLocked || spendBlocked) {
       return (
         <div className="mx-auto max-w-lg space-y-4" data-testid="billing-member-lock">
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">
-            Billing
-          </h1>
+          <PageHeader title={polishCopy.billingTitle} />
           <p className="rounded-md border border-warning bg-warning-tint px-4 py-3 text-sm text-warning">
             Your workspace billing needs attention. Contact your organization
             owner to update the payment method. Team members cannot manage
@@ -265,14 +266,10 @@ export default async function OrganizationBillingSettingsPage({
             ← Settings
           </Link>
         )}
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink">
-          Billing
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          Plan and status for{" "}
-          <span className="font-medium text-ink">{organization.name}</span>
-          . Signed in as {user.email}.
-        </p>
+        <PageHeader
+          title={polishCopy.billingTitle}
+          description={`Plan and status for ${organization.name}. Signed in as ${user.email}.`}
+        />
       </div>
 
       {spendBlocked && lockState.profile ? (

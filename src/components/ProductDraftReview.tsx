@@ -36,7 +36,7 @@ import {
   buildSourceIndex,
   sourceMarkerNumbers,
 } from "@/lib/research/source-index";
-import { vocab } from "@/lib/product-config";
+import { criterionFlags, vocab } from "@/lib/product-config";
 
 const initialResult: ProductSetupActionResult | null = null;
 
@@ -70,7 +70,7 @@ function KindBadge({ kind }: { kind: "FACT" | "INFERENCE" }) {
       }
       data-testid={`profile-kind-${kind}`}
     >
-      {kind}
+      {kind === "FACT" ? criterionFlags.fact : criterionFlags.inference}
     </span>
   );
 }

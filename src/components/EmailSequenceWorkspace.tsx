@@ -40,7 +40,7 @@ import {
   deeplinkSendDeclinedStorageKey,
   formatDailySendAdvisory,
 } from "@/lib/usage/send-advisory";
-import { features, vocab } from "@/lib/product-config";
+import { features, polishCopy, vocab } from "@/lib/product-config";
 
 type SequenceDraft = {
   id: string;
@@ -843,7 +843,7 @@ export function EmailSequenceWorkspace({
         {displayWarnings.length > 0 ? (
           <div className="rounded-md border border-warning bg-warning-tint p-3">
             <p className="text-sm font-medium text-warning">
-              Offer validation notes
+              {polishCopy.offerNotes}
             </p>
             <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-warning">
               {displayWarnings.map((warning) => (

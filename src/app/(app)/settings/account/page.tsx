@@ -1,4 +1,5 @@
-import { PRIMARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { PRIMARY_BUTTON_CLASS, AppButton, PageHeader } from "@/components/ui";
+import { polishCopy } from "@/lib/product-config";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { requireCurrentUser } from "@/lib/auth/authz";
@@ -8,6 +9,8 @@ import { updateUserDigestPreferencesAction } from "@/app/actions/cadence";
 import { ActionFeedbackForm } from "@/components/ActionFeedbackForm";
 import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
+
+export const metadata = { title: polishCopy.accountTitle };
 
 export default async function AccountSettingsPage() {
   const user = await requireCurrentUser();
@@ -29,9 +32,10 @@ export default async function AccountSettingsPage() {
             ← Settings
           </Link>
         ) : null}
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink">
-          Account Settings
-        </h1>
+        <PageHeader
+          title={polishCopy.accountTitle}
+          description={polishCopy.accountHelp}
+        />
       </div>
 
       <section className="space-y-2 text-sm">

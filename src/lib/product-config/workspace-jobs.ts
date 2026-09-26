@@ -87,10 +87,10 @@ export function workspaceProgressText(
       return `Identifying the ${vocab.persona.nav}…`;
     case "HIRING_TEAM_BUILD":
       return roleName
-        ? `Building the ${roleName} ${vocab.persona.singular}…`
-        : `Building this ${vocab.persona.singular}…`;
+        ? `Generating the ${roleName} ${vocab.persona.singular}…`
+        : `Generating this ${vocab.persona.singular}…`;
     case "CONTACT_PROFILE":
-      return "Building this person's individual profile…";
+      return "Generating this person's individual profile…";
     case "RESUME":
       return operation === "plan"
         ? applicationAssetConfig.labels.writingPlan

@@ -9,7 +9,7 @@ import {
   type ProductSetupActionResult,
 } from "@/app/actions/product-setup";
 import { Field, SECONDARY_BUTTON_CLASS, SecondaryButton, SubmitButton, AppButton } from "@/components/ui";
-import { vocab } from "@/lib/product-config";
+import { polishCopy, vocab } from "@/lib/product-config";
 
 const initial: ProductSetupActionResult | null = null;
 
@@ -178,7 +178,7 @@ export function AssistedProductIntake({
 
         <div className="md:col-span-2 flex flex-wrap gap-2">
           <SubmitButton disabled={pending || savePending || retryPending}>
-            {pending ? "Researching…" : `Research & Build ${vocab.product.Singular}`}
+            {pending ? "Researching…" : `${polishCopy.researchAndGenerate} ${vocab.product.singular}`}
           </SubmitButton>
           {!productId ? (
             <AppButton

@@ -3,8 +3,8 @@ import { consultationConfig } from "./consultation";
 export const applicationAssetConfig = Object.freeze({
   labels: {
     resume: "Resume",
-    coverLetter: "Cover Letter",
-    sectionTitle: "Resume and Cover Letter",
+    coverLetter: "Cover letter",
+    sectionTitle: "Resume and cover letter",
     sectionHelp: "Generate, review, approve, and download every version.",
     generate: "Generate",
     regenerate: "Regenerate",
@@ -22,7 +22,7 @@ export const applicationAssetConfig = Object.freeze({
     adjustManually: "Adjust manually",
     acceptPlanFirst: `Accept ${consultationConfig.displayName}'s plan before generating this version.`,
     planFailed: `${consultationConfig.displayName} could not write this plan. Retry.`,
-    planModelUnavailable: `${consultationConfig.displayName} could not reach the consultation model for this plan. Retry when it is available.`,
+    planModelUnavailable: `${consultationConfig.displayName} could not write this plan. Retry when you are ready.`,
     emptyHistory: "No versions generated yet.",
     emptySection: "Nothing here yet.",
     verificationFailed:
@@ -44,7 +44,7 @@ export const applicationAssetConfig = Object.freeze({
       remove: "Remove",
     },
     saveNewVersion: "Save as new version",
-    seekerEditedGuidance: "Seeker-edited version",
+    seekerEditedGuidance: "Edited by you",
     partialRemoved:
       "One part of this version could not be verified and was removed. Retry that part if you want it rewritten.",
   },
@@ -54,7 +54,7 @@ export const applicationAssetConfig = Object.freeze({
     "APPROVED_STORY",
   ],
   resumeHeadings: {
-    summary: "Professional Summary",
+    summary: "Professional summary",
     experience: "Experience",
     skills: "Skills",
     education: "Education",
@@ -66,7 +66,7 @@ export const applicationAssetConfig = Object.freeze({
     mixedTopic:
       "Each paragraph must have one purpose. Do not combine an acknowledged gap with unrelated experience, or two unrelated experiences.",
     missingStorySubstance:
-      "A body paragraph must include what the seeker personally did and the result, using the strongest story for this role's outcomes.",
+      "A body paragraph must include what you personally did and the result, using the strongest story for this role's outcomes.",
     omittedApprovedStatement:
       "The letter omitted approved consultation statements that already cover this role's most important outcomes.",
     thinEvidence:

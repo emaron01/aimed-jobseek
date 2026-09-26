@@ -15,6 +15,7 @@ export type ApplicationWorkspaceAccess =
       kind: "ok";
       organizationId: string;
       campaignId: string;
+      campaignName: string;
       canEdit: boolean;
     };
 
@@ -26,6 +27,7 @@ export async function requireApplicationWorkspace(
   if (!organization) return { kind: "missing-tenant" };
   let campaign: {
     id: string;
+    name: string;
     ownerUserId: string;
     visibility: "PERSONAL" | "SHARED";
     archivedAt: Date | null;
@@ -35,6 +37,7 @@ export async function requireApplicationWorkspace(
       where: { id: campaignId, organizationId: organization.id },
       select: {
         id: true,
+        name: true,
         ownerUserId: true,
         visibility: true,
         archivedAt: true,
@@ -59,6 +62,7 @@ export async function requireApplicationWorkspace(
     kind: "ok",
     organizationId: organization.id,
     campaignId: campaign.id,
+    campaignName: campaign.name,
     canEdit:
       canEditCampaignTemplate({
         userId: user.id,

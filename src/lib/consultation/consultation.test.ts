@@ -587,7 +587,7 @@ describe("consultation evidence and questions", () => {
         {
           key: "why-this-company",
           kind: "MISSION",
-          text: "Why the seeker wants to work at this company",
+          text: "Why you want to work at this company",
         },
       ],
     });

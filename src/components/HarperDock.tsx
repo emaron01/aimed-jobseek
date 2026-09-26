@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getHarperSuggestionsAction } from "@/app/actions/application-jobs";
+import { ErrorState } from "@/components/design";
 import { AppActionLink, AppButton } from "@/components/ui";
 import { openWorkspaceSection } from "@/lib/application/workspace-links";
 import {
   applicationStepCopy,
   consultationConfig,
+  polishCopy,
   workspaceSectionId,
 } from "@/lib/product-config";
 import { cn } from "@/lib/utils";
@@ -28,6 +30,7 @@ export function HarperSuggestionList({
     Array<{ type: string; label: string; href: string }>
   >([]);
   const [step, setStep] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,8 +39,11 @@ export function HarperSuggestionList({
         if (cancelled || !result) return;
         setItems(result.suggestions);
         setStep(result.step);
+        setFailed(false);
       })
       .catch((error) => {
+        if (cancelled) return;
+        setFailed(true);
         console.error(
           JSON.stringify({
             event: "harper_suggestions_client_failed",
@@ -50,6 +56,17 @@ export function HarperSuggestionList({
     };
   }, [campaignId, pathname]);
 
+  if (failed) {
+    return (
+      <ErrorState
+        description={polishCopy.harperSuggestionsFailed}
+        onRetry={() => {
+          setFailed(false);
+          window.location.reload();
+        }}
+      />
+    );
+  }
   if (items.length === 0) return null;
   return (
     <div
@@ -137,7 +154,7 @@ export function HarperDock({
         id={workspaceSectionId("CONSULTATION")}
         data-testid="harper-dock"
         className={cn(
-          "relative flex h-full shrink-0 flex-col border-l border-edge bg-surface",
+          "relative flex h-full shrink-0 flex-col border-l border-edge bg-surface transition-[width] duration-200 ease-out motion-reduce:transition-none",
           mobileOpen
             ? "fixed inset-0 z-50"
             : open

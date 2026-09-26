@@ -50,5 +50,5 @@ export const candidateProfileEditCopy = Object.freeze({
   differentiators: "Differentiators",
   domainVocabulary: "Domain vocabulary",
   emptyBlurb: "No headline yet.",
-  seekerEditSource: "Seeker-edited profile",
+  seekerEditSource: "Edited by you",
 });

@@ -60,7 +60,7 @@ const ROUTE_EXPECTATIONS: Record<string, SmokeExpectation> = {
   "/products": { mustInclude: vocab.product.Plural },
   "/products/new": { mustInclude: "data-testid=\"assisted-product-intake\"" },
   "/settings": { mustInclude: "Settings" },
-  "/settings/account": { mustInclude: "Account Settings" },
+  "/settings/account": { mustInclude: "Account settings" },
   "/settings/billing": { mustInclude: "billing-stripe-hook" },
   // Comped smoke fixture redirects away; unpaid would render the pitch page.
   "/onboarding/subscribe": {

@@ -16,7 +16,9 @@ import { listCampaigns } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { cn, formatDate } from "@/lib/utils";
 import { getHomeWorkflow } from "@/lib/workflow/home";
-import { vocab } from "@/lib/product-config";
+import { polishCopy, vocab } from "@/lib/product-config";
+
+export const metadata = { title: vocab.campaign.Plural };
 
 function viewHref(
   view: string,
@@ -78,7 +80,7 @@ export default async function CampaignsPage({
     <div>
       <PageHeader
         title={vocab.campaign.Plural}
-        description={`Each ${vocab.campaign.singular} is a job you are pursuing: ${vocab.product.aSingular}, ${vocab.icp.aSingular}, and the ${vocab.persona.plural} for that employer.`}
+        description={polishCopy.applicationsHelp}
         actions={
           <>
             <ShowArchivedToggle

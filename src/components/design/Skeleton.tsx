@@ -9,7 +9,7 @@ export function Skeleton({
 }) {
   return (
     <div
-      className={cn("animate-pulse space-y-2", className)}
+      className={cn("animate-pulse space-y-2 motion-reduce:animate-none", className)}
       role="status"
       aria-live="polite"
     >

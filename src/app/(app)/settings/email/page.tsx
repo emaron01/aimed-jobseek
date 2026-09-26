@@ -2,7 +2,7 @@ import { EmailSignatureForm } from "@/components/EmailSignatureForm";
 import { MailboxConnectionPanel } from "@/components/MailboxConnectionPanel";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { getMailboxConnectionView } from "@/lib/mailbox/data";
-import { features } from "@/lib/product-config";
+import { features, polishCopy } from "@/lib/product-config";
 import { getEmailSignatureForUser } from "@/lib/signature/signature";
 import type { EmailSignatureView } from "@/lib/signature/types";
 import { requireOrganization } from "@/lib/tenant/getCurrentOrganization";
@@ -63,7 +63,7 @@ export default async function EmailSettingsPage({ searchParams }: PageProps) {
   } catch (error) {
     console.error("Failed to load email signature for settings/email.", error);
     signatureLoadError =
-      "Signature storage is not available yet. Apply the latest database migrations, then reload this page.";
+      polishCopy.signatureUnavailable;
   }
 
   return (

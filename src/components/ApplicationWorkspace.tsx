@@ -73,12 +73,12 @@ import {
 } from "@/lib/application-assets/service";
 import { presentationPlanSchema } from "@/lib/application-assets/plan-contract";
 import { ensureApplicationNextStep } from "@/lib/application/next-step";
-import { applicationResearchCopy, applicationSummaryConfig, applicationWorkspaceCopy, consultationConversationCopy, criterionFlags, employerIdentityCopy, hiringTeamConfig, outreachConfig, vocab } from "@/lib/product-config";
+import { applicationResearchCopy, applicationSummaryConfig, applicationWorkspaceCopy, consultationConversationCopy, criterionFlags, employerIdentityCopy, hiringTeamConfig, outreachConfig, polishCopy, vocab } from "@/lib/product-config";
 import {
   parseIdentityVerification,
 } from "@/lib/job-requirement/identity-verification";
 import { ensureHiringTeamAfterResearch, ensureIdentityVerification } from "@/lib/application/service";
-import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { AppActionLink, SECONDARY_BUTTON_CLASS } from "@/components/ui";
 import { parseStringArray } from "@/lib/research";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { persistExtractedExperienceDates } from "@/lib/product-research/restore-role-dates";
@@ -405,6 +405,11 @@ export async function ApplicationWorkspace({
       <EmptyState
         title={step?.title ?? applicationStepCopy.overviewTitle}
         description={step?.emptyGuidance ?? applicationStepCopy.factMissing}
+        actions={
+          <AppActionLink href="/campaigns" variant="secondary">
+            {polishCopy.backToApplications}
+          </AppActionLink>
+        }
       />
     );
   }
@@ -594,25 +599,25 @@ export async function ApplicationWorkspace({
             {applicationWorkspaceCopy.jobRequirementTitle}
           </h2>
           <p className="mt-1 text-sm text-muted">
-            Parsed from the pasted posting. Empty fields were not in the posting.
+            {applicationWorkspaceCopy.jobPostingHelp}
           </p>
         </div>
       </div>
       <dl className="grid gap-3 md:grid-cols-2">
-        <Field label="Title" value={requirement.title} />
-        <Field label="Employer as stated" value={requirement.companyName} />
-        <Field label="Location" value={requirement.location} />
-        <Field label="Work arrangement" value={requirement.workArrangement} />
-        <Field label="Employment type" value={requirement.employmentType} />
-        <Field label="Seniority" value={requirement.seniority} />
-        <Field label="Compensation" value={requirement.compensationRange} />
-        <Field label="Reports to" value={requirement.reportingLine} />
+        <Field label={applicationWorkspaceCopy.fieldTitle} value={requirement.title} />
+        <Field label={applicationWorkspaceCopy.fieldEmployer} value={requirement.companyName} />
+        <Field label={applicationWorkspaceCopy.fieldLocation} value={requirement.location} />
+        <Field label={applicationWorkspaceCopy.fieldWorkArrangement} value={requirement.workArrangement} />
+        <Field label={applicationWorkspaceCopy.fieldEmploymentType} value={requirement.employmentType} />
+        <Field label={applicationWorkspaceCopy.fieldSeniority} value={requirement.seniority} />
+        <Field label={applicationWorkspaceCopy.fieldCompensation} value={requirement.compensationRange} />
+        <Field label={applicationWorkspaceCopy.fieldReportsTo} value={requirement.reportingLine} />
       </dl>
-      <BulletList title="Responsibilities" items={textList(requirement.responsibilities)} />
-      <BulletList title="Required" items={textList(requirement.requiredItems)} />
-      <BulletList title="Preferred" items={textList(requirement.preferredItems)} />
+      <BulletList title={applicationWorkspaceCopy.responsibilitiesTitle} items={textList(requirement.responsibilities)} />
+      <BulletList title={applicationWorkspaceCopy.requiredTitle} items={textList(requirement.requiredItems)} />
+      <BulletList title={applicationWorkspaceCopy.preferredTitle} items={textList(requirement.preferredItems)} />
       <div className="space-y-3 border-t border-edge pt-4">
-        <h3 className="text-sm font-semibold text-ink">Scorecard</h3>
+        <h3 className="text-sm font-semibold text-ink">{applicationWorkspaceCopy.scorecardTitle}</h3>
         {scorecard.mission ? (
           <p className="text-sm text-ink">
             {scorecard.mission.text}
@@ -623,10 +628,10 @@ export async function ApplicationWorkspace({
             ) : null}
           </p>
         ) : (
-          <p className="text-sm text-subtle">No mission was stated.</p>
+          <p className="text-sm text-subtle">{applicationWorkspaceCopy.noMission}</p>
         )}
-        <ScorecardList title="Outcomes" items={scorecard.outcomes} />
-        <ScorecardList title="Competencies" items={scorecard.competencies} />
+        <ScorecardList title={applicationWorkspaceCopy.outcomesTitle} items={scorecard.outcomes} />
+        <ScorecardList title={applicationWorkspaceCopy.competenciesTitle} items={scorecard.competencies} />
       </div>
 
       {requirement.employerSkipReason ? (
@@ -673,7 +678,7 @@ export async function ApplicationWorkspace({
       </summary>
       <div className="mt-4 space-y-3">
         <p className="text-sm text-muted">
-          Scored against {icp.name}. A mismatch is a signal. It does not block contacts or outreach.
+          {applicationWorkspaceCopy.fitHelp.replace("{name}", icp.name)}
         </p>
         {shownBucket ? (
           <p className="text-sm font-medium text-ink" data-testid="employer-fit-bucket">
@@ -682,7 +687,7 @@ export async function ApplicationWorkspace({
               : `Scored result: ${formatFitBucketLabel(shownBucket)}`}
           </p>
         ) : (
-          <p className="text-sm text-muted">Fit has not been scored.</p>
+          <p className="text-sm text-muted">{applicationWorkspaceCopy.fitMissing}</p>
         )}
         {stale?.stale ? (
           <p className="text-sm text-warning" data-testid="employer-fit-stale">

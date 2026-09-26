@@ -114,7 +114,7 @@ describe("why this company", () => {
         {
           key: WHY_THIS_COMPANY_TARGET_KEY,
           kind: "MISSION",
-          text: "Why the seeker wants to work at this company",
+          text: "Why you want to work at this company",
           strength: "NONE",
           supportingFactIds: [],
           strategy: "ACKNOWLEDGE",

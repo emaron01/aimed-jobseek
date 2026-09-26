@@ -109,7 +109,7 @@ export function buildUserMenuModel(
     links.push({
       id: "account_settings",
       href: "/settings/account",
-      label: "Account Settings",
+      label: "Account settings",
     });
   }
 
@@ -217,7 +217,7 @@ export function buildSidebarNavItems(input: {
     { href: "/icps", label: vocab.icp.nav },
     {
       href: "/settings/voice",
-      label: "Your Voice",
+      label: "Your voice",
       separatorBefore: true,
     },
     ...(features.emailConnection

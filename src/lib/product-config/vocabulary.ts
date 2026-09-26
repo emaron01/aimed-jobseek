@@ -150,7 +150,8 @@ export const vocab = Object.freeze({
 export const criterionFlags = Object.freeze({
   required: "Must-have",
   disqualifier: "Deal-breaker",
-  inference: "INFERENCE",
+  fact: "Stated",
+  inference: "Inferred",
   limitedPublicEvidence:
     "Assessed from limited public evidence. Never presented as verified.",
 });
@@ -188,7 +189,7 @@ export const applicationResearchCopy = Object.freeze({
   failed: "Failed",
   notStarted: "Research has not started",
   notStartedDetail:
-    "A background worker has not picked up this research yet. Retry after the worker is running, or contact support if this continues.",
+    "Research has not started yet. Retry, or contact support if this continues.",
   queuedDetail: "Research is starting. This usually takes a minute or two.",
   researchingDetail: "Research is in progress.",
   doneDetail: "Research finished.",
@@ -201,14 +202,34 @@ export const applicationResearchCopy = Object.freeze({
 });
 
 export const applicationWorkspaceCopy = Object.freeze({
-  nextStepTitle: "Let's Walk Through The Application Process",
-  jobRequirementTitle: "Review and Edit The Job Requirements",
-  hiringTeamTitle: "Review/ Edit The Assumed Hiring Personas",
-  appliedTitle: "Update Application Date and Status",
-  contactsTitle: "Add/ Review Interview Contacts",
+  nextStepTitle: "Let's walk through this application",
+  jobRequirementTitle: "Review and edit the job requirements",
+  hiringTeamTitle: "Review the hiring team",
+  appliedTitle: "Update application date and status",
+  contactsTitle: "Add and review interview contacts",
   companyTitle: "Company",
   employerFitTitle: "Employer fit",
   interviewsTitle: "Interviews",
+  jobPostingHelp:
+    "Taken from the pasted posting. Empty fields were not in the posting.",
+  fieldTitle: "Title",
+  fieldEmployer: "Employer as stated",
+  fieldLocation: "Location",
+  fieldWorkArrangement: "Work arrangement",
+  fieldEmploymentType: "Employment type",
+  fieldSeniority: "Seniority",
+  fieldCompensation: "Compensation",
+  fieldReportsTo: "Reports to",
+  responsibilitiesTitle: "Responsibilities",
+  requiredTitle: "Required",
+  preferredTitle: "Preferred",
+  scorecardTitle: "Scorecard",
+  outcomesTitle: "Outcomes",
+  competenciesTitle: "Competencies",
+  noMission: "No mission was stated.",
+  fitHelp:
+    "Scored against {name}. A mismatch is a signal. It does not block contacts or outreach.",
+  fitMissing: "Fit has not been scored.",
   keepWorking:
     "This usually takes a minute or two. You can keep working; it will appear here when it's ready.",
   readyNotice: "Ready",

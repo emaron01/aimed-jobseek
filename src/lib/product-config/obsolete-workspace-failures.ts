@@ -9,6 +9,7 @@ export const obsoleteWorkspaceFailurePhrases = Object.freeze([
   "The asset was not saved because its claims did not pass verification",
   "Retry after reviewing the violations.",
   applicationAssetConfig.labels.verificationFailed,
+  "Consultation planning did not return a usable plan. Retry consultation.",
   consultationConversationCopy.planUnusable,
   "Consultation answer analysis did not return a fully grounded story.",
   "did not pass checks",

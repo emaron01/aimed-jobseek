@@ -22,7 +22,7 @@ export default async function NewPersonaPage({ params }: PageProps) {
   if (!organization) {
     return (
       <div>
-        <PageHeader title={`Build ${vocab.persona.Singular}`} />
+        <PageHeader title={`Generate ${vocab.persona.singular}`} />
         <TenantMissing />
       </div>
     );
@@ -39,7 +39,7 @@ export default async function NewPersonaPage({ params }: PageProps) {
   if (product.approvalStatus !== "APPROVED") {
     return (
       <div className="space-y-4">
-        <PageHeader title={`Build ${vocab.persona.Singular}`} />
+        <PageHeader title={`Generate ${vocab.persona.singular}`} />
         <p className="text-sm text-muted">
           Approve the {vocab.product.Singular} before building {vocab.persona.Plural}.
         </p>

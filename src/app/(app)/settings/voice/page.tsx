@@ -1,8 +1,12 @@
 import Link from "next/link";
+import { PageHeader } from "@/components/ui";
+import { polishCopy } from "@/lib/product-config";
 import { VoiceSamplesForm } from "@/components/VoiceSamplesForm";
 import { requireCurrentUser } from "@/lib/auth/authz";
 import { requireOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { listVoiceSamplesForUser } from "@/lib/voice/samples";
+
+export const metadata = { title: polishCopy.voiceTitle };
 
 export default async function VoiceSettingsPage() {
   const user = await requireCurrentUser();
@@ -21,9 +25,10 @@ export default async function VoiceSettingsPage() {
         >
           ← Settings
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink">
-          Your Voice
-        </h1>
+        <PageHeader
+          title={polishCopy.voiceTitle}
+          description={polishCopy.voiceHelp}
+        />
         <p className="mt-1 text-sm text-muted">
           Writing samples are used for email generation. The more samples you
           provide, the more the application incorporates your voice into emails

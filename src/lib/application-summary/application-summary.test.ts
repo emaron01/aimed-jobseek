@@ -585,7 +585,7 @@ describe("application summary seeker-facing labels", () => {
   });
 
   it("never shows Application Summary to the seeker", () => {
-    expect(applicationSummaryConfig.title).toBe("Interview Cheat Sheet");
+    expect(applicationSummaryConfig.title).toBe("Interview cheat sheet");
     expect(JSON.stringify(applicationSummaryConfig)).not.toContain("Application Summary");
     const page = readFileSync(
       "src/app/(app)/campaigns/[id]/summary/page.tsx",

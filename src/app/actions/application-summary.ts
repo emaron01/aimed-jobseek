@@ -5,7 +5,7 @@ import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { resolveApplicationSummaryFlag } from "@/lib/application-summary/service";
-import { applicationAssetConfig, workspaceProgressText } from "@/lib/product-config";
+import { applicationAssetConfig, applicationSummaryConfig, workspaceProgressText } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 
 export type ApplicationSummaryActionResult = {
@@ -43,7 +43,7 @@ export async function generateApplicationSummaryAction(
     );
     return {
       ok: false,
-      message: "Interview Cheat Sheet could not be generated. Retry.",
+      message: `${applicationSummaryConfig.title} could not be generated. Retry.`,
     };
   }
 }

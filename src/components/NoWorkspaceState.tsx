@@ -19,14 +19,14 @@ export async function NoWorkspaceState() {
   return (
     <EmptyState
       title="No workspace is associated with this account."
-      description="You are signed in, but this account is not a member of a customer workspace. Open Account Settings, or contact support if you need access."
+      description="You are signed in, but this account is not a member of a customer workspace. Open Account settings, or contact support if you need access."
       actions={
         <>
           <Link
             href="/settings/account"
             className="font-medium text-ink underline"
           >
-            Account Settings
+            Account settings
           </Link>
           <Link href="/login" className="text-muted underline">
             Switch account

@@ -67,8 +67,7 @@ export const consultationConversationCopy = Object.freeze({
   changePrompt: "What should change?",
   generationFailed: `${consultationConfig.displayName} could not finish this coaching. Retry.`,
   generationQualityFailed: `${consultationConfig.displayName} could not keep one part of this coaching after checks. The rest is below. Retry the missing part.`,
-  planUnusable:
-    "Consultation planning did not return a usable plan. Retry consultation.",
+  planUnusable: `${consultationConfig.displayName} could not plan this conversation. Retry.`,
   askForStory:
     "Tell me what happened, what you did, and what the result was.",
   keepCoaching:
@@ -80,18 +79,18 @@ export const consultationConversationCopy = Object.freeze({
     RESULT: "Tell me what the result was.",
     METRIC: "Tell me the number or outcome.",
   },
-  modelUnavailable: `${consultationConfig.displayName} could not reach the consultation model. Retry when it is available.`,
+  modelUnavailable: `${consultationConfig.displayName} could not start this coaching. Retry when you are ready.`,
   retry: `Retry ${consultationConfig.displayName}`,
   start: `Start with ${consultationConfig.displayName}`,
   planComplete: "The plan for this conversation is complete.",
   starting: `${consultationConfig.displayName} is reading your ${vocab.product.singular} and the job…`,
   typing: `${consultationConfig.displayName} is thinking…`,
   thinking: `${consultationConfig.displayName} is thinking…`,
-  whyThisCompanyTarget: "Why the seeker wants to work at this company",
+  whyThisCompanyTarget: "Why you want to work at this company",
   whyThisCompanyQuestion:
     "Why do you want to work at this company? Say what specifically draws you to it for this role.",
   nextStepTitle: applicationWorkspaceCopy.nextStepTitle,
   nextStepFailed: `${consultationConfig.displayName} could not write the next step. Retry.`,
-  nextStepModelUnavailable: `${consultationConfig.displayName} could not reach the consultation model for the next step. Retry when it is available.`,
+  nextStepModelUnavailable: `${consultationConfig.displayName} could not write the next step. Retry when you are ready.`,
   nextStepRetry: "Retry next step",
 });

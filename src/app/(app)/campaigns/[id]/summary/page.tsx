@@ -1,4 +1,6 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { generateApplicationPageMetadata } from "@/lib/application/page-metadata";
 import { generateApplicationSummaryAction } from "@/app/actions/application-summary";
 import { ClaimFlagBanner } from "@/components/ClaimFlagBanner";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
@@ -20,6 +22,11 @@ import { TenantError } from "@/lib/tenant/errors";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 
 type PageProps = { params: Promise<{ id: string }> };
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  return generateApplicationPageMetadata(id, "summary");
+}
 
 function scorecard(value: unknown): JobScorecard {
   if (!value || typeof value !== "object") {

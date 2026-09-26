@@ -29,7 +29,7 @@ export const interviewConfig = Object.freeze({
     skipThankYouQuestions: "Skip and generate the thank-you",
     answerThankYouQuestions: "Save answers and generate the thank-you",
     openGuide: "Open guide",
-    printGuide: "Print or Save as PDF",
+    printGuide: "Print or save as PDF",
     thankYouEmail: "Thank-you email",
     thankYouLinkedIn: "Thank-you LinkedIn message",
     checkIn: "Check-in message",

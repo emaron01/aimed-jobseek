@@ -6,12 +6,13 @@ import { usePathname } from "next/navigation";
 import {
   getApplicationTrackerAction,
 } from "@/app/actions/application-jobs";
-import { AppPendingIndicator } from "@/components/AppButton";
+import { AppIcon, ErrorState, Skeleton } from "@/components/design";
 import { AppButton } from "@/components/ui";
 import type { ApplicationTrackerView } from "@/lib/application/tracker";
 import type { ApplicationStepState } from "@/lib/application/step-progress";
 import {
   applicationStepCopy,
+  polishCopy,
 } from "@/lib/product-config";
 import { cn } from "@/lib/utils";
 
@@ -66,11 +67,11 @@ export function ApplicationStepMarker({
       aria-label={stateLabel(state)}
     >
       {state === "done" ? (
-        <span aria-hidden>✓</span>
+        <AppIcon name="check" className="h-3.5 w-3.5" />
       ) : state === "in_progress" ? (
-        <AppPendingIndicator />
+        <AppIcon name="spinner" className="h-3.5 w-3.5" />
       ) : (
-        <span aria-hidden>•</span>
+        <AppIcon name="dot" className="h-3.5 w-3.5" />
       )}
     </span>
   );
@@ -96,7 +97,7 @@ export function ApplicationTrackerList({
             data-testid={`tracker-step-${step.key}`}
             aria-current={step.isCurrent ? "page" : undefined}
             className={cn(
-              "flex items-start gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+              "flex items-start gap-2 rounded-md px-2 py-1.5 text-sm transition-colors duration-200 motion-reduce:transition-none",
               step.isCurrent
                 ? ink
                   ? "bg-primary text-on-primary"
@@ -135,6 +136,7 @@ export function ApplicationSidebarTracker({
   const pathname = usePathname() || "";
   const [tracker, setTracker] = useState<ApplicationTrackerView | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,9 +145,14 @@ export function ApplicationSidebarTracker({
       if (!cancelled) {
         setTracker(next);
         setLoaded(true);
+        setFailed(false);
       }
     };
     void load().catch((error) => {
+      if (!cancelled) {
+        setLoaded(true);
+        setFailed(true);
+      }
       console.error(
         JSON.stringify({
           event: "application_tracker_poll_failed",
@@ -155,6 +162,7 @@ export function ApplicationSidebarTracker({
     });
     const interval = window.setInterval(() => {
       void load().catch((error) => {
+        if (!cancelled) setFailed(true);
         console.error(
           JSON.stringify({
             event: "application_tracker_poll_failed",
@@ -175,7 +183,17 @@ export function ApplicationSidebarTracker({
         <p className="text-xs font-medium uppercase tracking-[0.14em] text-on-ink/70">
           {applicationStepCopy.trackerLabel}
         </p>
-        <AppPendingIndicator />
+        <Skeleton className="mt-2" lines={4} />
+      </div>
+    );
+  }
+  if (failed && !tracker) {
+    return (
+      <div className="px-3 py-3">
+        <ErrorState
+          description={polishCopy.trackerLoadFailed}
+          onRetry={() => window.location.reload()}
+        />
       </div>
     );
   }
@@ -204,14 +222,19 @@ export function ApplicationCompactTracker({
   const pathname = usePathname() || "";
   const [tracker, setTracker] = useState<ApplicationTrackerView | null>(null);
   const [open, setOpen] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       const next = await getApplicationTrackerAction(campaignId, pathname);
-      if (!cancelled) setTracker(next);
+      if (!cancelled) {
+        setTracker(next);
+        setFailed(false);
+      }
     };
     void load().catch((error) => {
+      if (!cancelled) setFailed(true);
       console.error(
         JSON.stringify({
           event: "application_tracker_poll_failed",
@@ -251,9 +274,9 @@ export function ApplicationCompactTracker({
               ? `${current.number}. ${current.title}`
               : applicationStepCopy.trackerLabel}
           </p>
-          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-edge">
+          <div           className="mt-1 h-1.5 overflow-hidden rounded-full bg-edge">
             <div
-              className="h-full bg-primary"
+              className="h-full bg-primary transition-[width] duration-200 motion-reduce:transition-none"
               style={{ width: total ? `${(doneCount / total) * 100}%` : "0%" }}
             />
           </div>
@@ -268,6 +291,14 @@ export function ApplicationCompactTracker({
           {open ? applicationStepCopy.collapseTracker : applicationStepCopy.expandTracker}
         </AppButton>
       </div>
+      {failed && !tracker ? (
+        <div className="mt-2">
+          <ErrorState
+            description={polishCopy.trackerLoadFailed}
+            onRetry={() => window.location.reload()}
+          />
+        </div>
+      ) : null}
       {open && tracker ? (
         <div className="mt-2">
           <ApplicationTrackerList tracker={tracker} variant="overlay" />

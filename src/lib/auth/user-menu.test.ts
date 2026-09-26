@@ -173,7 +173,7 @@ describe("buildSidebarNavItems", () => {
     expect(items.some((i) => i.href === "/setup")).toBe(false);
     expect(
       items.some(
-        (i) => i.href === "/settings/voice" && i.label === "Your Voice",
+        (i) => i.href === "/settings/voice" && i.label === "Your voice",
       ),
     ).toBe(true);
     expect(items.some((i) => i.href === "/platform")).toBe(false);

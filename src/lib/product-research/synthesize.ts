@@ -10,6 +10,7 @@ import {
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import { AiValidationError } from "@/lib/ai/errors";
 import { prisma } from "@/lib/prisma";
+import { polishCopy } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 import { recordUsageEvent } from "@/lib/usage/events";
 import {
@@ -294,7 +295,7 @@ export async function resynthesizeFromBundle(input: {
 
   if (excerpts.length === 0) {
     throw new TenantError(
-      "Evidence bundle has no usable excerpts. Re-run Research & Build with sources.",
+      `Nothing usable was found in the uploaded materials. ${polishCopy.researchAndGenerate} again with sources.`,
     );
   }
 

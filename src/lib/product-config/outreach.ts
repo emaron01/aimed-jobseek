@@ -41,8 +41,8 @@ export const outreachConfig = Object.freeze({
     pasteLinkedInHelp:
       "Paste the text of this person's LinkedIn profile. Nothing is fetched or scraped.",
     saveLinkedIn: "Save pasted profile",
-    buildIndividual: "Build individual profile",
-    rebuildIndividual: "Rebuild individual profile",
+    buildIndividual: "Generate individual profile",
+    rebuildIndividual: "Regenerate individual profile",
     commonGround: "Common ground",
     individualProfile: "Individual profile",
     remindersTitle: "Follow-up reminders",

@@ -8,7 +8,7 @@ import {
 } from "@/app/actions/persona-setup";
 import { Field, SubmitButton } from "@/components/ui";
 import type { SuggestedBuyerRole } from "@/lib/product-research/contract";
-import { vocab } from "@/lib/product-config";
+import { polishCopy, vocab } from "@/lib/product-config";
 
 const initial: PersonaSetupActionResult | null = null;
 
@@ -69,10 +69,10 @@ export function BuildPersonaForm({
         label={`Optional ${vocab.persona.Singular} notes`}
         name="notes"
         as="textarea"
-        hint={`Optional context. You can Build ${vocab.persona.Singular} with only the selected role.`}
+        hint={`Optional context. You can generate ${vocab.persona.aSingular} with only the selected role.`}
       />
       <SubmitButton disabled={pending}>
-        {pending ? `Researching ${vocab.persona.Singular}…` : `Build ${vocab.persona.Singular}`}
+        {pending ? `Researching ${vocab.persona.singular}…` : `${polishCopy.generate} ${vocab.persona.singular}`}
       </SubmitButton>
       {state ? (
         <p

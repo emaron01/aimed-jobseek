@@ -298,7 +298,7 @@ export async function getHomeWorkflow(
       detail: personasDone
         ? `${activeProduct!.personas.length} saved`
         : `Build at least one ${vocab.persona.singular}`,
-      actionLabel: personasDone ? `Manage ${vocab.persona.plural}` : `Build ${vocab.persona.singular}`,
+      actionLabel: personasDone ? `Manage ${vocab.persona.plural}` : `Generate ${vocab.persona.singular}`,
       href: activeProduct
         ? `/setup/${activeProduct.id}#personas`
         : "/setup/new",

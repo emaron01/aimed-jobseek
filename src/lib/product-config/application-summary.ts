@@ -1,11 +1,11 @@
 export const applicationSummaryConfig = Object.freeze({
-  title: "Interview Cheat Sheet",
+  title: "Interview cheat sheet",
   description: "Prep organized by the people you will meet",
   actions: {
     generate: "Generate cheat sheet",
     regenerate: "Regenerate cheat sheet",
     retry: "Retry cheat sheet",
-    print: "Print or Save as PDF",
+    print: "Print or save as PDF",
     printSection: "Print this section",
   },
   sections: {

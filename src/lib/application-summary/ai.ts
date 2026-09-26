@@ -8,6 +8,7 @@ import {
   type ApplicationSummaryGuidance,
 } from "@/lib/application-summary/contract";
 import { buildApplicationSummaryGuidanceMessages } from "@/lib/application-summary/prompt";
+import { applicationSummaryConfig } from "@/lib/product-config";
 
 export async function generateApplicationSummaryGuidance(input: {
   sources: Array<{ id: string; text: string; category: string }>;
@@ -29,7 +30,7 @@ export async function generateApplicationSummaryGuidance(input: {
     return {
       ok: false,
       message:
-        "Interview Cheat Sheet AI is not configured. Configure it, then retry.",
+        `${applicationSummaryConfig.title} is not available. Retry.`,
     };
   }
   try {
@@ -51,7 +52,7 @@ export async function generateApplicationSummaryGuidance(input: {
     );
     return {
       ok: false,
-      message: "Interview Cheat Sheet guidance could not be generated. Retry.",
+      message: `${applicationSummaryConfig.title} could not be generated. Retry.`,
     };
   }
 }

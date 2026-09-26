@@ -21,7 +21,7 @@ export default async function NewPersonaPage({
       <div>
         <PageHeader
           title={`New ${vocab.persona.singular}`}
-          description={`Build ${vocab.persona.aSingular}.`}
+          description={`Generate ${vocab.persona.aSingular}.`}
         />
         <TenantMissing />
       </div>

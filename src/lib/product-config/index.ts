@@ -81,6 +81,12 @@ export {
   WCAG_AA_NORMAL_TEXT,
 } from "./design-tokens";
 export {
+  applicationPageTitle,
+  polishCopy,
+  productPageTitle,
+  seekerFacingForbiddenPatterns,
+} from "./polish";
+export {
   interviewConfig,
   isApplicationInterviewingOrLater,
   isApplicationProgress,

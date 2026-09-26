@@ -1,6 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ApplicationOverview } from "@/components/ApplicationOverview";
 import { ApplicationWorkspace } from "@/components/ApplicationWorkspace";
+import { generateApplicationPageMetadata } from "@/lib/application/page-metadata";
 import { getApplicationOverview } from "@/lib/application/overview";
 import { notFound } from "next/navigation";
 import { deleteCampaignAction, archiveCampaignAction, unarchiveCampaignAction } from "@/app/actions";
@@ -56,7 +58,7 @@ import {
   listIndexHref,
 } from "@/lib/lists/campaign-query";
 import { prisma } from "@/lib/prisma";
-import { anyListFeatureEnabled, nounForCount, vocab } from "@/lib/product-config";
+import { anyListFeatureEnabled, nounForCount, polishCopy, vocab } from "@/lib/product-config";
 import { requireGatedPage } from "@/lib/product-config/feature-access";
 import { mergeExistingHiringTeamRoles } from "@/lib/hiring-team/merge-existing";
 
@@ -76,6 +78,15 @@ function asPersonalizationTier(
 ): "BEST" | "COMPANY" | "THIN" | null {
   if (value === "BEST" || value === "COMPANY" || value === "THIN") return value;
   return null;
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  return generateApplicationPageMetadata(id, "overview");
 }
 
 function Meta({ label, value }: { label: string; value: string | null }) {
@@ -491,13 +502,10 @@ export default async function CampaignDetailPage({
         canEdit={canEditTemplate && !campaignArchived}
         focus="overview"
       />
+      {anyListFeatureEnabled() ? (
       <PageHeader
         title={campaign.name}
-        description={
-          anyListFeatureEnabled()
-            ? `Stage ${stages.find((stage) => stage.key === currentStage)?.number}: ${stages.find((stage) => stage.key === currentStage)?.label}`
-            : undefined
-        }
+        description={`Stage ${stages.find((stage) => stage.key === currentStage)?.number}: ${stages.find((stage) => stage.key === currentStage)?.label}`}
         actions={
           <>
             {canShare && canEditTemplate && !campaignArchived ? (
@@ -552,6 +560,46 @@ export default async function CampaignDetailPage({
           </>
         }
       />
+      ) : (
+      <div className="flex flex-wrap items-center gap-2">
+        <Link href="/campaigns" className={SECONDARY_BUTTON_CLASS}>
+          {polishCopy.backToApplications}
+        </Link>
+        {canEditTemplate && campaignArchived ? (
+          <UnarchiveForm
+            action={unarchiveCampaignAction}
+            id={campaign.id}
+            label={`Unarchive ${vocab.campaign.singular}`}
+          />
+        ) : canEditTemplate ? (
+          <ConfirmDeleteForm
+            action={archiveCampaignAction}
+            hiddenFields={{ id: campaign.id }}
+            triggerLabel={`Archive ${vocab.campaign.singular}`}
+            confirmTitle={`Archive ${vocab.campaign.singular} "${campaign.name}"?`}
+            confirmBody={campaignArchiveConfirmBody()}
+            confirmButtonLabel={`Archive ${vocab.campaign.singular}`}
+            tone="warning"
+            pendingLabel="Archiving…"
+          />
+        ) : null}
+        {canEditTemplate ? (
+          <ConfirmDeleteForm
+            action={deleteCampaignAction}
+            hiddenFields={{ id: campaign.id }}
+            triggerLabel={`Delete ${vocab.campaign.singular}`}
+            confirmTitle={`Delete ${vocab.campaign.singular} "${campaign.name}"?`}
+            confirmBody={campaignDeleteConfirmBody({
+              contactCount: campaign.contacts.length,
+              draftCount: generatedEmailCount,
+              sentCount: sentEmailCount,
+            })}
+            confirmButtonLabel={`Delete ${vocab.campaign.singular}`}
+            onSuccessNavigate="/campaigns"
+          />
+        ) : null}
+      </div>
+      )}
       {campaignArchived ? (
         <div className="rounded-md border border-warning bg-warning-tint px-4 py-3 text-sm text-warning">
           This {vocab.campaign.singular} is archived. History is intact. Unarchive it to generate

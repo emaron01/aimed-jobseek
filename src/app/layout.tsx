@@ -14,7 +14,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: brand.defaultPageTitle,
+  title: {
+    default: brand.defaultPageTitle,
+    template: `%s · ${brand.appName}`,
+  },
   description: brand.metaDescription,
   icons: { icon: brand.faviconPath },
   openGraph: {

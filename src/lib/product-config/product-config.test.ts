@@ -74,7 +74,7 @@ describe("vocabulary", () => {
     );
     expect(applicationAssetConfig.coverLetter.thinEvidence).toContain("{consultant}");
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(consultationConversationCopy.planUnusable).toMatch(/usable plan/i);
+    expect(consultationConversationCopy.planUnusable).toMatch(/could not plan/i);
     expect(obsoleteWorkspaceFailurePhrases).toContain(
       consultationConversationCopy.planUnusable,
     );
@@ -85,22 +85,22 @@ describe("vocabulary", () => {
     expect(obsoleteWorkspaceFailurePhrases).toContain("not enough to save");
     expect(obsoleteWorkspaceFailurePhrases).toContain("could not be grounded");
     expect(applicationWorkspaceCopy.nextStepTitle).toBe(
-      "Let's Walk Through The Application Process",
+      "Let's walk through this application",
     );
     expect(consultationConversationCopy.nextStepTitle).toBe(
       applicationWorkspaceCopy.nextStepTitle,
     );
     expect(applicationWorkspaceCopy.jobRequirementTitle).toBe(
-      "Review and Edit The Job Requirements",
+      "Review and edit the job requirements",
     );
     expect(hiringTeamConfig.workspaceTitle).toBe(
-      "Review/ Edit The Assumed Hiring Personas",
+      "Review the hiring team",
     );
     expect(outreachConfig.labels.appliedTitle).toBe(
-      "Update Application Date and Status",
+      "Update application date and status",
     );
     expect(outreachConfig.labels.contactsTitle).toBe(
-      "Add/ Review Interview Contacts",
+      "Add and review interview contacts",
     );
   });
 });

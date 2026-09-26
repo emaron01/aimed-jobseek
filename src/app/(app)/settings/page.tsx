@@ -5,7 +5,10 @@ import {
   canManageOrganizationPolicy,
 } from "@/lib/org/authz";
 import { ensureOrganizationPolicies } from "@/lib/usage/policy";
-import { vocab } from "@/lib/product-config";
+import { PageHeader } from "@/components/ui";
+import { polishCopy, vocab } from "@/lib/product-config";
+
+export const metadata = { title: polishCopy.settingsTitle };
 
 export default async function SettingsIndexPage() {
   const organization = await requireOrganization();
@@ -15,14 +18,10 @@ export default async function SettingsIndexPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">
-          Settings
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          Workspace configuration for {organization.name}.
-        </p>
-      </div>
+      <PageHeader
+        title={polishCopy.settingsTitle}
+        description={`${polishCopy.settingsHelp} ${organization.name}.`}
+      />
 
       <ul className="space-y-3 text-sm">
         <li>
@@ -52,7 +51,7 @@ export default async function SettingsIndexPage() {
             href="/settings/voice"
             className="font-medium text-ink underline-offset-2 hover:underline"
           >
-            Your Voice
+            Your voice
           </Link>
           <p className="text-muted">
             Writing samples for generated emails.
