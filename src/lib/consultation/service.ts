@@ -445,6 +445,22 @@ async function failGeneration(sessionId: string, message: string): Promise<void>
   });
 }
 
+function learnedNotesEvidence(
+  campaignId: string,
+  notes: string | null | undefined,
+): ReturnType<typeof profileEvidenceItems> {
+  const text = notes?.trim();
+  if (!text) return [];
+  return [
+    {
+      id: `learned-notes:${campaignId}`,
+      kind: "FACT",
+      text,
+      itemType: "ITEM",
+    },
+  ];
+}
+
 async function planAndStoreRound(input: {
   organizationId: string;
   campaignId: string;
@@ -452,7 +468,11 @@ async function planAndStoreRound(input: {
   askedKeys: Set<string>;
   skippedKeys: Set<string>;
   profile: ReturnType<typeof parseCandidateProfile>;
-  requirement: { seniority: string | null; title: string | null };
+  requirement: {
+    seniority: string | null;
+    title: string | null;
+    seekerLearnedNotes?: string | null;
+  };
   targets: EvidenceTarget[];
   roles: Awaited<ReturnType<typeof hiringTeam>>;
   focusTargetKey?: string | null;
@@ -462,7 +482,10 @@ async function planAndStoreRound(input: {
     where: { id: input.sessionId },
     data: { generationStatus: "GENERATING", generationError: null },
   });
-  const profileItems = profileEvidenceItems(input.profile);
+  const profileItems = [
+    ...profileEvidenceItems(input.profile),
+    ...learnedNotesEvidence(input.campaignId, input.requirement.seekerLearnedNotes),
+  ];
   const chronologyRequested = seniorityWarrantsChronology({
     seniority: input.requirement.seniority,
     title: input.requirement.title,
@@ -486,6 +509,7 @@ async function planAndStoreRound(input: {
     const plan = await planConsultationWithModel({
       targets: input.targets,
       profileItems,
+      seekerLearnedNotes: input.requirement.seekerLearnedNotes ?? null,
       hiringTeam: input.roles,
       usage: consultationUsage(
         input.organizationId,
@@ -704,6 +728,7 @@ export async function startConsultation(input: {
   campaignId: string;
   focusNote?: string | null;
   focusTargetKey?: string | null;
+  forceReassess?: boolean;
 }): Promise<void> {
   const { campaign, requirement, profile } = await requireApplication(
     input.organizationId,
@@ -720,8 +745,8 @@ export async function startConsultation(input: {
   const existing = await prisma.consultationSession.findUnique({
     where: { campaignId: input.campaignId },
   });
-  if (existing?.status === "DONE" && !hasFocus) return;
-  if (existing?.status === "DONE" && hasFocus) {
+  if (existing?.status === "DONE" && !hasFocus && !input.forceReassess) return;
+  if (existing?.status === "DONE" && (hasFocus || input.forceReassess)) {
     await prisma.consultationSession.update({
       where: { id: existing.id },
       data: { status: "IN_PROGRESS", generationStatus: "READY" },
@@ -731,7 +756,7 @@ export async function startConsultation(input: {
     existing?.briefingJson != null &&
     existing.generationStatus === "READY" &&
     existing.status === "IN_PROGRESS";
-  if (hasBriefing && !hasFocus) return;
+  if (hasBriefing && !hasFocus && !input.forceReassess) return;
   const session =
     existing ??
     (await prisma.consultationSession.create({
@@ -770,6 +795,17 @@ export async function startConsultation(input: {
     await failGeneration(session.id, message);
     throw error;
   }
+}
+
+export async function reassessConsultationStanding(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  await startConsultation({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    forceReassess: true,
+  });
 }
 
 async function processAnswerGeneration(input: {

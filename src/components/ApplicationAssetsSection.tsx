@@ -46,6 +46,7 @@ type AssetRow = {
   content: ApplicationAssetContent;
   guidance: string | null;
   promptVersion: string;
+  staleReason: string | null;
   createdAt: string;
 };
 
@@ -572,6 +573,14 @@ function AssetTypePanel({
             ? applicationAssetConfig.labels.resume
             : applicationAssetConfig.labels.coverLetter}
         </h3>
+        {rows[0]?.staleReason ? (
+          <p
+            className={`text-sm text-warning ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
+            data-testid={`${type.toLowerCase()}-new-information`}
+          >
+            {rows[0].staleReason}
+          </p>
+        ) : null}
         {type === "RESUME" && missingContacts.length > 0 ? (
           <p className={`text-sm text-warning ${WORKSPACE_MESSAGE_WRAP_CLASS}`} data-testid="resume-missing-contact">
             {applicationAssetConfig.missingContact.heading}: {missingContacts.join(", ")}.{" "}

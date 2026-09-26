@@ -3,6 +3,7 @@
 import { overrideApplicationFitAction } from "@/app/actions/application";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { formatFitBucketLabel } from "@/lib/application/fit";
+import { applicationWorkspaceCopy } from "@/lib/product-config";
 
 export function ApplicationFitOverride({
   campaignId,
@@ -14,12 +15,15 @@ export function ApplicationFitOverride({
   return (
     <ApplicationActionForm
       action={overrideApplicationFitAction}
-      submitLabel="Save"
+      submitLabel={applicationWorkspaceCopy.fitOverrideLabel}
+      hideSubmit
       testId="employer-fit-override-form"
     >
       <input type="hidden" name="campaignId" value={campaignId} />
       <label className="block text-sm">
-        <span className="font-medium text-ink">Your result</span>
+        <span className="font-medium text-ink">
+          {applicationWorkspaceCopy.fitOverrideLabel}
+        </span>
         <select
           name="bucket"
           className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"

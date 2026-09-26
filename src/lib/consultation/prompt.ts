@@ -51,6 +51,7 @@ export function buildConsultationCoachMessages(input: {
     likelyTitles: string[];
     whyThisRoleMatters: string | null;
   }>;
+  seekerLearnedNotes?: string | null;
   chronologyRequested: boolean;
   coveredTargetKeys: string[];
   focusTargetKey?: string | null;
@@ -63,6 +64,7 @@ export function buildConsultationCoachMessages(input: {
       content: JSON.stringify({
         consultantName: consultationConfig.displayName,
         personalProfileItems: input.profileItems,
+        seekerLearnedNotes: input.seekerLearnedNotes?.trim() || null,
         targets: input.targets,
         hiringTeam: input.hiringTeam.map((role) => ({
           id: role.id,

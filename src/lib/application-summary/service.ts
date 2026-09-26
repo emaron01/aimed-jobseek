@@ -232,6 +232,12 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
   appendSource(sources, "job:location", requirement.location, "JOB");
   appendSource(sources, "job:work-arrangement", requirement.workArrangement, "JOB");
   appendSource(sources, "job:posting", requirement.rawText, "JOB");
+  appendSource(
+    sources,
+    "job:learned-notes",
+    requirement.seekerLearnedNotes,
+    "SEEKER",
+  );
   for (const assessment of campaign.consultationSession?.assessments ?? []) {
     appendSource(
       sources,

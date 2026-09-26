@@ -17,6 +17,7 @@ import {
   consultationHasUnansweredQuestions,
 } from "@/lib/consultation/qa-view";
 import { listPersonPreps } from "@/lib/interview/person-prep";
+import { ConsultationKnowAboutMe } from "@/components/ConsultationKnowAboutMe";
 import { ConsultationStanding } from "@/components/ConsultationStanding";
 import { ConsultationThread } from "@/components/ConsultationThread";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
@@ -46,6 +47,7 @@ import {
   emptyCandidateProfile,
   parseCandidateProfileSafe,
 } from "@/lib/product-research/candidate-profile";
+import { seekerBackgroundText } from "@/lib/product-research/seeker-background";
 import { parseStringArray } from "@/lib/research";
 
 function experienceCalculation(value: unknown): {
@@ -261,6 +263,12 @@ export async function ConsultationSection({
           {vocab.product.singular} and draws out the stories behind the gaps.
           Nothing is added to the {vocab.product.singular} until you confirm it.
         </p>
+        {canEdit ? (
+          <ConsultationKnowAboutMe
+            campaignId={campaignId}
+            initialText={parsed.ok ? seekerBackgroundText(parsed.profile) : ""}
+          />
+        ) : null}
         <WorkspaceJobRefresh campaignId={campaignId} />
         <WorkspaceProgress jobs={jobs} type="CONSULTATION" stayAndWatch />
         {consultationBusy ? (

@@ -23,6 +23,7 @@ export const applicationAssetConfig = Object.freeze({
     acceptPlanFirst: `Accept ${consultationConfig.displayName}'s plan before generating this version.`,
     planFailed: `${consultationConfig.displayName} could not write this plan. Retry.`,
     planModelUnavailable: `${consultationConfig.displayName} could not write this plan. Retry when you are ready.`,
+    newInformationAvailable: "New information is available.",
     emptyHistory: "No versions generated yet.",
     emptySection: "Nothing here yet.",
     verificationFailed:

@@ -37,6 +37,7 @@ export function ApplicationActionForm({
   testId,
   onSubmitStart,
   variant = "primary",
+  hideSubmit = false,
   children,
 }: {
   action: (
@@ -48,6 +49,7 @@ export function ApplicationActionForm({
   testId: string;
   onSubmitStart?: (formData: FormData) => void;
   variant?: AppButtonVariant;
+  hideSubmit?: boolean;
   children: ReactNode;
 }) {
   const [state, setState] = useState<ActionResult | null>(null);
@@ -76,7 +78,13 @@ export function ApplicationActionForm({
           {state.message}
         </p>
       ) : null}
-      <AppButton type="submit" variant={variant} pending={pending} pendingLabel={pendingLabel}>
+      <AppButton
+        type="submit"
+        variant={variant}
+        pending={pending}
+        pendingLabel={pendingLabel}
+        className={hideSubmit ? "sr-only" : undefined}
+      >
         {submitLabel}
       </AppButton>
     </form>

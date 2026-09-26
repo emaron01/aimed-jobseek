@@ -60,6 +60,7 @@ export async function planConsultationWithModel(input: {
   coveredTargetKeys: string[];
   focusTargetKey?: string | null;
   qualityFeedback?: string[];
+  seekerLearnedNotes?: string | null;
   usage?: AiCallUsageContext;
 }): Promise<ConsultationPlanAiResult> {
   if (!isConsultationAiConfigured()) {

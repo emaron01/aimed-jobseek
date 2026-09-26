@@ -99,6 +99,7 @@ export function applySeekerEditProvenance(
     credentials: confirmFacts(profile.credentials, sourceId),
     awards: confirmFacts(profile.awards, sourceId),
     domainVocabulary: confirmFacts(profile.domainVocabulary, sourceId),
+    seekerStatedFacts: confirmFacts(profile.seekerStatedFacts, sourceId),
     compensation: profile.compensation
       ? {
           ...profile.compensation,

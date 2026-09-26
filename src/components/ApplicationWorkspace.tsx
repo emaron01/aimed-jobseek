@@ -43,7 +43,7 @@ import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { InterviewStagesSection } from "@/components/InterviewStagesSection";
 import { ApplicationAssetsSection } from "@/components/ApplicationAssetsSection";
 import { ApplicationCompanyBriefing } from "@/components/ApplicationCompanyBriefing";
-import { ApplicationJobRequirementForm } from "@/components/ApplicationJobRequirementForm";
+import { ApplicationJobRequirementActions } from "@/components/ApplicationJobRequirementActions";
 import { EmptyState } from "@/components/design";
 import { OpenDetailsOnMount } from "@/components/OpenDetailsOnMount";
 import {
@@ -60,6 +60,7 @@ import { HiringTeamDisclosureGroup } from "@/components/HiringTeamDisclosureGrou
 import { HiringTeamRoleActions } from "@/components/HiringTeamRoleActions";
 import {
   displayedFitBucket,
+  fitCriterionReason,
   fitSignalLabels,
   formatFitBucketLabel,
 } from "@/lib/application/fit";
@@ -73,7 +74,7 @@ import {
 } from "@/lib/application-assets/service";
 import { presentationPlanSchema } from "@/lib/application-assets/plan-contract";
 import { ensureApplicationNextStep } from "@/lib/application/next-step";
-import { applicationResearchCopy, applicationSummaryConfig, applicationWorkspaceCopy, consultationConversationCopy, criterionFlags, employerIdentityCopy, hiringTeamConfig, hiringTeamDetailsTitle, outreachConfig, polishCopy, vocab } from "@/lib/product-config";
+import { applicationResearchCopy, applicationSummaryConfig, applicationWorkspaceCopy, consultationConfig, consultationConversationCopy, employerIdentityCopy, hiringTeamConfig, hiringTeamDetailsTitle, outreachConfig, polishCopy, vocab } from "@/lib/product-config";
 import {
   parseIdentityVerification,
 } from "@/lib/job-requirement/identity-verification";
@@ -143,11 +144,6 @@ function ScorecardList({
         {items.map((item) => (
           <li key={item.id} className="text-sm text-ink" data-scorecard-id={item.id}>
             {item.text}
-            {item.inferred ? (
-              <span className="ml-2 rounded bg-warning-tint px-1.5 py-0.5 text-xs font-medium text-warning">
-                {criterionFlags.inference}
-              </span>
-            ) : null}
           </li>
         ))}
       </ul>
@@ -619,17 +615,10 @@ export async function ApplicationWorkspace({
       </summary>
       <div className="mt-4 space-y-4">
     <section className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-ink">
-            {applicationWorkspaceCopy.jobRequirementTitle}
-          </h2>
-          <p className="mt-1 text-sm text-muted">
-            {applicationWorkspaceCopy.jobPostingHelp}
-          </p>
-        </div>
-      </div>
-      <dl className="grid gap-3 md:grid-cols-2">
+      <p className="text-sm text-muted">
+        {applicationWorkspaceCopy.jobPostingHelp}
+      </p>
+      <dl className="grid gap-3 md:grid-cols-2" data-testid="job-requirement-view">
         <Field label={applicationWorkspaceCopy.fieldTitle} value={requirement.title} />
         <Field label={applicationWorkspaceCopy.fieldEmployer} value={requirement.companyName} />
         <Field label={applicationWorkspaceCopy.fieldLocation} value={requirement.location} />
@@ -642,40 +631,28 @@ export async function ApplicationWorkspace({
       <BulletList title={applicationWorkspaceCopy.responsibilitiesTitle} items={textList(requirement.responsibilities)} />
       <BulletList title={applicationWorkspaceCopy.requiredTitle} items={textList(requirement.requiredItems)} />
       <BulletList title={applicationWorkspaceCopy.preferredTitle} items={textList(requirement.preferredItems)} />
-      {canEdit ? (
-        <ApplicationJobRequirementForm
-          campaignId={requirement.campaignId}
-          title={requirement.title}
-          companyName={requirement.companyName}
-          location={requirement.location}
-          workArrangement={requirement.workArrangement}
-          employmentType={requirement.employmentType}
-          seniority={requirement.seniority}
-          compensationRange={requirement.compensationRange}
-          reportingLine={requirement.reportingLine}
-          responsibilities={requirement.responsibilities}
-          requiredItems={requirement.requiredItems}
-          preferredItems={requirement.preferredItems}
-          scorecard={scorecard}
-        />
-      ) : null}
       <div className="space-y-3 border-t border-edge pt-4">
         <h3 className="text-sm font-semibold text-ink">{applicationWorkspaceCopy.scorecardTitle}</h3>
         {scorecard.mission ? (
-          <p className="text-sm text-ink">
-            {scorecard.mission.text}
-            {scorecard.mission.inferred ? (
-              <span className="ml-2 rounded bg-warning-tint px-1.5 py-0.5 text-xs font-medium text-warning">
-                {criterionFlags.inference}
-              </span>
-            ) : null}
-          </p>
+          <p className="text-sm text-ink">{scorecard.mission.text}</p>
         ) : (
           <p className="text-sm text-subtle">{applicationWorkspaceCopy.noMission}</p>
         )}
         <ScorecardList title={applicationWorkspaceCopy.outcomesTitle} items={scorecard.outcomes} />
         <ScorecardList title={applicationWorkspaceCopy.competenciesTitle} items={scorecard.competencies} />
+        <p className="text-sm text-muted" data-testid="scorecard-note">
+          {applicationWorkspaceCopy.scorecardNote
+            .replaceAll("{product}", vocab.product.Singular)
+            .replaceAll("{consultant}", consultationConfig.displayName)}
+        </p>
       </div>
+      {canEdit ? (
+        <ApplicationJobRequirementActions
+          campaignId={requirement.campaignId}
+          rawText={requirement.rawText}
+          learnedNotes={requirement.seekerLearnedNotes ?? ""}
+        />
+      ) : null}
 
       {requirement.employerSkipReason ? (
         <p className="rounded-md border border-warning bg-warning-tint px-3 py-2 text-sm text-warning" data-testid="employer-skip-reason">
@@ -725,9 +702,7 @@ export async function ApplicationWorkspace({
         </p>
         {shownBucket ? (
           <p className="text-sm font-medium text-ink" data-testid="employer-fit-bucket">
-            {fit?.overrideBucket
-              ? `Your result: ${formatFitBucketLabel(shownBucket)} (scored ${formatFitBucketLabel(fit.bucket)})`
-              : `Scored result: ${formatFitBucketLabel(shownBucket)}`}
+            {applicationWorkspaceCopy.fitScoredLabel}: {formatFitBucketLabel(shownBucket)}
           </p>
         ) : (
           <p className="text-sm text-muted">{applicationWorkspaceCopy.fitMissing}</p>
@@ -737,12 +712,21 @@ export async function ApplicationWorkspace({
             {stale.reason}
           </p>
         ) : null}
-        <ul className="space-y-2">
+        <ul className="space-y-2" data-testid="employer-fit-criteria">
           {outcomes.map((outcome) => {
             const labels = fitSignalLabels(outcome);
+            const result = fitCriterionReason(outcome);
             return (
-              <li key={outcome.criterionId ?? outcome.name} className="text-sm text-ink">
+              <li
+                key={outcome.criterionId ?? outcome.name}
+                className="text-sm text-ink"
+                data-testid="employer-fit-criterion"
+                data-fit-status={result.status}
+              >
                 <span className="font-medium">{outcome.name}</span>
+                <span className="ml-2 rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink">
+                  {result.label}
+                </span>
                 {labels.map((label) => (
                   <span
                     key={label}
@@ -758,6 +742,7 @@ export async function ApplicationWorkspace({
                     {label}
                   </span>
                 ))}
+                <span className="mt-1 block text-muted">{result.reason}</span>
                 {outcome.evidence ? (
                   <span className="mt-1 block text-muted">{outcome.evidence}</span>
                 ) : null}
@@ -848,6 +833,7 @@ export async function ApplicationWorkspace({
           content: asset.contentJson,
           guidance: asset.guidance,
           promptVersion: asset.promptVersion,
+          staleReason: asset.staleReason,
           createdAt: asset.createdAt.toISOString(),
         }))}
     />

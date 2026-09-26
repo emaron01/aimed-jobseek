@@ -35,19 +35,24 @@ describe("restored workspace editing and Harper", () => {
       "utf8",
     );
     const job = readFileSync(
-      "src/components/ApplicationJobRequirementForm.tsx",
+      "src/components/ApplicationJobRequirementActions.tsx",
       "utf8",
     );
     const actions = readFileSync("src/app/actions/application.ts", "utf8");
     expect(workspace).toContain("ApplicationCompanyBriefing");
     expect(workspace).not.toContain("ApplicationCompanyUpdateForm");
-    expect(workspace).toContain("ApplicationJobRequirementForm");
+    expect(workspace).toContain("ApplicationJobRequirementActions");
+    expect(workspace).not.toContain("ApplicationJobRequirementForm");
     expect(briefing).toContain("regenerate-company-research");
     expect(briefing).toContain("company-research-notes");
-    expect(job).toContain("job-requirement-edit-form");
-    expect(job).toContain("updateApplicationJobRequirementAction");
+    expect(job).toContain("edit-job-posting");
+    expect(job).toContain("saveApplicationJobPostingAction");
+    expect(job).toContain("regenerateApplicationJobRequirementAction");
+    expect(job).toContain("saveApplicationJobLearnedNotesAction");
     expect(actions).toContain("saveApplicationCompanyResearchNotes");
-    expect(actions).toContain("updateApplicationJobRequirement");
+    expect(actions).toContain("saveApplicationJobPosting");
+    expect(actions).toContain("regenerateApplicationJobRequirement");
+    expect(actions).toContain("saveApplicationJobLearnedNotes");
     const empty = new FormData();
     expect(readLineList(empty, "missing")).toEqual([]);
     const data = new FormData();

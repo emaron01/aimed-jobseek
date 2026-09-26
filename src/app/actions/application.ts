@@ -8,10 +8,12 @@ import {
   overrideApplicationFit,
   rejectApplicationEmployerIdentity,
   rescoreApplicationFit,
+  regenerateApplicationJobRequirement,
   retryApplicationResearch,
   saveApplicationCompanyResearchNotes,
+  saveApplicationJobLearnedNotes,
+  saveApplicationJobPosting,
   updateApplicationCompanyInformation,
-  updateApplicationJobRequirement,
 } from "@/lib/application/service";
 import { consultationConversationCopy } from "@/lib/product-config";
 import { requireCurrentUser } from "@/lib/auth/session";
@@ -194,9 +196,10 @@ export async function rescoreApplicationFitAction(
     }
     await rescoreApplicationFit({ organizationId, campaignId });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: "Employer fit was rescored." };
+    revalidatePath(`/campaigns/${campaignId}/job`);
+    return { ok: true, message: applicationWorkspaceCopy.fitRescored };
   } catch (error) {
-    return fail(error, "Employer fit could not be rescored.");
+    return fail(error, applicationWorkspaceCopy.fitRescoreFailed);
   }
 }
 
@@ -219,9 +222,10 @@ export async function overrideApplicationFitAction(
       bucket,
     });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: "Employer-fit override saved." };
+    revalidatePath(`/campaigns/${campaignId}/job`);
+    return { ok: true, message: applicationWorkspaceCopy.fitOverrideSaved };
   } catch (error) {
-    return fail(error, "The employer-fit override could not be saved.");
+    return fail(error, applicationWorkspaceCopy.fitOverrideFailed);
   }
 }
 
@@ -280,7 +284,56 @@ export async function updateApplicationCompanyInformationAction(
   }
 }
 
-export async function updateApplicationJobRequirementAction(
+export async function saveApplicationJobPostingAction(
+  _prev: ApplicationActionResult | null,
+  formData: FormData,
+): Promise<ApplicationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    const user = await requireCurrentUser();
+    const campaignId = readTrimmedField(formData, "campaignId");
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    await saveApplicationJobPosting({
+      organizationId,
+      campaignId,
+      userId: user.id,
+      rawText: String(formData.get("postingText") ?? ""),
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/campaigns/${campaignId}/job`);
+    return { ok: true, message: applicationWorkspaceCopy.jobPostingSaved };
+  } catch (error) {
+    return fail(error, applicationWorkspaceCopy.jobEditFailed);
+  }
+}
+
+export async function regenerateApplicationJobRequirementAction(
+  _prev: ApplicationActionResult | null,
+  formData: FormData,
+): Promise<ApplicationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    const user = await requireCurrentUser();
+    const campaignId = readTrimmedField(formData, "campaignId");
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    await regenerateApplicationJobRequirement({
+      organizationId,
+      campaignId,
+      userId: user.id,
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/campaigns/${campaignId}/job`);
+    return { ok: true, message: applicationWorkspaceCopy.jobRegenerated };
+  } catch (error) {
+    return fail(error, applicationWorkspaceCopy.jobRegenerateFailed);
+  }
+}
+
+export async function saveApplicationJobLearnedNotesAction(
   _prev: ApplicationActionResult | null,
   formData: FormData,
 ): Promise<ApplicationActionResult> {
@@ -291,28 +344,16 @@ export async function updateApplicationJobRequirementAction(
     if (!campaignId) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }
-    await updateApplicationJobRequirement({
+    await saveApplicationJobLearnedNotes({
       organizationId,
       campaignId,
-      title: readTrimmedField(formData, "title"),
-      companyName: readTrimmedField(formData, "companyName"),
-      location: readTrimmedField(formData, "location"),
-      workArrangement: readTrimmedField(formData, "workArrangement"),
-      employmentType: readTrimmedField(formData, "employmentType"),
-      seniority: readTrimmedField(formData, "seniority"),
-      compensationRange: readTrimmedField(formData, "compensationRange"),
-      reportingLine: readTrimmedField(formData, "reportingLine"),
-      responsibilities: readLineList(formData, "responsibilities"),
-      requiredItems: readLineList(formData, "requiredItems"),
-      preferredItems: readLineList(formData, "preferredItems"),
-      mission: readTrimmedField(formData, "mission"),
-      outcomes: readLineList(formData, "outcomes"),
-      competencies: readLineList(formData, "competencies"),
+      notes: String(formData.get("notes") ?? ""),
     });
     revalidatePath(`/campaigns/${campaignId}`);
     revalidatePath(`/campaigns/${campaignId}/job`);
-    return { ok: true, message: applicationWorkspaceCopy.jobEditSave };
+    revalidatePath(`/campaigns/${campaignId}/consultation`);
+    return { ok: true, message: applicationWorkspaceCopy.jobLearnedSaved };
   } catch (error) {
-    return fail(error, applicationWorkspaceCopy.jobEditFailed);
+    return fail(error, applicationWorkspaceCopy.jobLearnedFailed);
   }
 }

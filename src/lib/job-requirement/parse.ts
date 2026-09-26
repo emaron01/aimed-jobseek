@@ -13,6 +13,7 @@ import { TenantError } from "@/lib/tenant/errors";
 export async function interpretJobPosting(
   rawText: string,
   usage?: AiCallUsageContext,
+  seekerLearnedNotes?: string | null,
 ): Promise<ParsedJobRequirement> {
   const posting = rawText.trim();
   if (!posting) {
@@ -32,7 +33,7 @@ export async function interpretJobPosting(
     const response = await ai.generateStructured({
       ...structuredOutputRequest("jobRequirement"),
       ...(usage ? aiCallTracking(usage) : {}),
-      messages: buildJobRequirementMessages(posting),
+      messages: buildJobRequirementMessages(posting, seekerLearnedNotes),
     });
     data = response.data;
   } catch (error) {

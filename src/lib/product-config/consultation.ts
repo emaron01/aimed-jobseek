@@ -94,6 +94,19 @@ export const consultationConversationCopy = Object.freeze({
   whyThisCompanyTarget: "Why you want to work at this company",
   whyThisCompanyQuestion:
     "Why do you want to work at this company? Say what specifically draws you to it for this role.",
+  unseenExperienceGapQuestion:
+    `Do you have experience with {requirement} that ${consultationConfig.displayName} does not see?`,
+  unseenExperienceFollowOn:
+    `Do you have experience ${consultationConfig.displayName} does not see?`,
+  knowAboutMe: "What You Should Know About Me",
+  knowAboutMeHelp:
+    `Tell ${consultationConfig.displayName} background that is not already in your ${vocab.product.singular}, for example experience that was left off the resume. This is saved as a seeker-stated fact and applies to every application.`,
+  knowAboutMeSave: "Save",
+  knowAboutMeSaved: `${consultationConfig.displayName} saved this to your ${vocab.product.singular} and is reassessing where you stand.`,
+  knowAboutMeFailed: `This could not be saved to your ${vocab.product.singular}.`,
+  knowAboutMeEmpty: `Write what ${consultationConfig.displayName} should know before saving.`,
+  knowAboutMeTooLong: "This is too long. Shorten it and save again.",
+  knowAboutMeMaxChars: 20_000,
   nextStepTitle: applicationWorkspaceCopy.nextStepTitle,
   nextStepFailed: `${consultationConfig.displayName} could not write the next step. Retry.`,
   nextStepModelUnavailable: `${consultationConfig.displayName} could not write the next step. Retry when you are ready.`,

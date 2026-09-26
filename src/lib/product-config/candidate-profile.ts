@@ -51,4 +51,5 @@ export const candidateProfileEditCopy = Object.freeze({
   domainVocabulary: "Domain vocabulary",
   emptyBlurb: "No headline yet.",
   seekerEditSource: "Edited by you",
+  seekerBackgroundSource: "Told by you",
 });

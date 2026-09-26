@@ -104,6 +104,9 @@ function filterCandidateProfile(
     domainVocabulary: profile.domainVocabulary.map((item) =>
       filterFactItem(item, allowed),
     ),
+    seekerStatedFacts: profile.seekerStatedFacts.map((item) =>
+      filterFactItem(item, allowed),
+    ),
     compensation: profile.compensation
       ? {
           ...profile.compensation,

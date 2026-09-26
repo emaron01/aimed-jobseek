@@ -7,11 +7,18 @@ export const SEEKER_SUPPLIED_RESEARCH_SOURCE_URL =
   "https://notes.invalid/seeker-supplied-research";
 
 export const COMPANY_RESEARCH_NOTES_MAX_CHARS = 20_000;
+export const JOB_LEARNED_NOTES_MAX_CHARS = 20_000;
 
 export function normalizeCompanyResearchNotes(
   value: string | null | undefined,
 ): string {
   return (value ?? "").replace(/\r\n/g, "\n").trim();
+}
+
+export function normalizeJobLearnedNotes(
+  value: string | null | undefined,
+): string {
+  return normalizeCompanyResearchNotes(value);
 }
 
 export function seekerSuppliedResearchSource(

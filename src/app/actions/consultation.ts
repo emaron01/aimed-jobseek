@@ -27,6 +27,8 @@ import {
   vocab,
 } from "@/lib/product-config";
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
+import { prisma } from "@/lib/prisma";
+import { saveSeekerStatedBackground } from "@/lib/product-research/seeker-background";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
 
@@ -527,5 +529,45 @@ export async function flagConsultationInaccuracyAction(
     return { ok: true, message: consultationConversationCopy.notAccurate };
   } catch (error) {
     return fail(error, "The inaccuracy could not be recorded.");
+  }
+}
+
+export async function saveWhatYouShouldKnowAboutMeAction(
+  _prev: ConsultationActionResult | null,
+  formData: FormData,
+): Promise<ConsultationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    const user = await requireCurrentUser();
+    const campaignId = campaignIdFrom(formData);
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    const campaign = await prisma.campaign.findFirst({
+      where: { id: campaignId, organizationId },
+      select: { productId: true },
+    });
+    if (!campaign) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    await saveSeekerStatedBackground({
+      organizationId,
+      productId: campaign.productId,
+      userId: user.id,
+      campaignId,
+      text: String(formData.get("background") ?? ""),
+    });
+    await enqueueApplicationJob({
+      organizationId,
+      campaignId,
+      type: "CONSULTATION",
+      payload: { operation: "reassess" },
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/campaigns/${campaignId}/consultation`);
+    revalidatePath(`/campaigns/${campaignId}/assets`);
+    return { ok: true, message: consultationConversationCopy.knowAboutMeSaved };
+  } catch (error) {
+    return fail(error, consultationConversationCopy.knowAboutMeFailed);
   }
 }

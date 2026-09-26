@@ -99,6 +99,7 @@ export const candidateProfileSchema = z.object({
   credentials: z.array(profileFactItemSchema).default([]),
   awards: z.array(profileFactItemSchema).default([]),
   domainVocabulary: z.array(profileFactItemSchema).default([]),
+  seekerStatedFacts: z.array(profileFactItemSchema).default([]),
   compensation: z
     .object({
       id: z.string().trim().min(1),
@@ -249,6 +250,7 @@ export function flattenProfileTextsForEvidence(
   profile.credentials.forEach(pushFact);
   profile.awards.forEach(pushFact);
   profile.domainVocabulary.forEach(pushFact);
+  profile.seekerStatedFacts.forEach(pushFact);
   return texts;
 }
 

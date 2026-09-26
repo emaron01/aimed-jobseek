@@ -4,10 +4,12 @@ import {
   applicationFitStaleReason,
   applyFitOverride,
   computeApplicationEmployerFit,
+  fitCriterionReason,
   formatFitBucketLabel,
   researchRefreshStaleReason,
   targetEmployerStaleReason,
 } from "@/lib/application/fit";
+import { applicationWorkspaceCopy } from "@/lib/product-config";
 import {
   decideEmployerResearch,
   decisionAfterResearchIdentity,
@@ -211,6 +213,38 @@ describe("application employer fit", () => {
     expect(result.outcomes[0]?.dealBreakerHit).toBe(true);
     expect(result.blocksDownstream).toBe(false);
     expect(result.outcomes[0]?.evidence).toMatch(/defense/i);
+  });
+
+  it("states a one-line reason for met, missed, and not-stated criteria", () => {
+    expect(
+      fitCriterionReason({
+        assessment: "FIT",
+        evidenceOutcome: "SUPPORTED",
+        reasoning: "Research shows the company is remote-first.",
+      }),
+    ).toEqual({
+      status: "met",
+      label: applicationWorkspaceCopy.fitCriterionMet,
+      reason: "Research shows the company is remote-first.",
+    });
+    expect(
+      fitCriterionReason({
+        assessment: "NO_FIT",
+        evidenceOutcome: "CONTRADICTED",
+        reasoning: "The company is Series A, not Series B.",
+      }).status,
+    ).toBe("missed");
+    expect(
+      fitCriterionReason({
+        assessment: "UNKNOWN",
+        evidenceOutcome: null,
+        reasoning: "",
+      }),
+    ).toEqual({
+      status: "not_stated",
+      label: applicationWorkspaceCopy.fitCriterionNotStated,
+      reason: applicationWorkspaceCopy.fitReasonNotStated,
+    });
   });
 
   it("keeps an override on the fit record", () => {

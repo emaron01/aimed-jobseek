@@ -91,7 +91,7 @@ describe("vocabulary", () => {
       applicationWorkspaceCopy.nextStepTitle,
     );
     expect(applicationWorkspaceCopy.jobRequirementTitle).toBe(
-      "Review and edit the job requirements",
+      "Job requirements",
     );
     expect(hiringTeamConfig.workspaceTitle).toBe(
       "Review Hiring Personas – Add Who Will Be Interviewing",

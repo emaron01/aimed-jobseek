@@ -25,8 +25,10 @@ import {
 import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
 import {
   matchConsultationFocus,
+  asksAboutUnseenExperience,
   planQuestionRound,
   seniorityWarrantsChronology,
+  unseenExperienceGapQuestion,
 } from "@/lib/consultation/questions";
 import { nextConsultationStatus } from "@/lib/consultation/state";
 import {
@@ -534,6 +536,45 @@ describe("consultation evidence and questions", () => {
     ).toBe(false);
   });
 
+  it("asks whether the seeker has unseen experience before treating a gap as closed", () => {
+    const gapText = "9 years of security sales";
+    expect(unseenExperienceGapQuestion(gapText)).toContain(gapText);
+    expect(
+      asksAboutUnseenExperience(unseenExperienceGapQuestion(gapText)),
+    ).toBe(true);
+    const hiringTeam = [{ id: "hm", name: "Hiring manager" }];
+    const round = planQuestionRound({
+      assessments: [
+        {
+          key: "required:security-sales",
+          kind: "REQUIRED",
+          text: gapText,
+          strength: "NONE",
+          supportingFactIds: [],
+          strategy: "ACKNOWLEDGE",
+          explanation: "No evidence yet.",
+          strategyText: "Ask for unseen experience.",
+          verification: {
+            originalStrength: "NONE",
+            invalidSupportingFactIds: [],
+            invalidRoleIds: [],
+            downgradeReasons: [],
+          },
+          experienceCalculation: null,
+        },
+      ],
+      modelQuestions: [],
+      hiringTeam,
+      askedKeys: new Set(),
+      skippedKeys: new Set(),
+      includeChronology: false,
+      chronologyAsked: false,
+    });
+    expect(round.questions).toHaveLength(1);
+    expect(asksAboutUnseenExperience(round.questions[0]!.text)).toBe(true);
+    expect(round.questions[0]!.text).toContain(gapText);
+  });
+
   it("drops unsupported extraction and keeps semantic links pending confirmation", () => {
     const { profile, targets } = sample();
     const before = JSON.stringify(profile);
@@ -892,13 +933,16 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("12");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("13");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("coach, not an interrogator");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("Never inflate fit");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
       "Never mention research status",
     );
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("focusTargetKey");
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
+      "experience you do not see",
+    );
     const workspace = readFileSync("src/components/ConsultationSection.tsx", "utf8");
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
     expect(workspace).toContain("consultationConfig.displayName");
@@ -1185,7 +1229,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("12");
+    expect(session?.promptVersion).toBe("13");
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
     expect(session?.briefingJson).toMatchObject({
@@ -1206,6 +1250,15 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       [];
     expect(draftedQuestions.length).toBeGreaterThan(1);
     expect(draftedQuestions.length).toBeLessThanOrEqual(10);
+    expect(
+      draftedQuestions
+        .filter(
+          (turn) =>
+            turn.targetKey !== "chronology" &&
+            turn.targetKey !== "why-this-company",
+        )
+        .every((turn) => asksAboutUnseenExperience(turn.body)),
+    ).toBe(true);
 
     const storedBefore = await prisma.product.findUnique({ where: { id: productId } });
     await answerConsultationQuestion({

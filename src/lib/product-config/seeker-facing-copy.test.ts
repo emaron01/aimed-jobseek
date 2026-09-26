@@ -79,9 +79,7 @@ describe("seeker-facing copy", () => {
         ? applicationWorkspaceCopy.nextStepTitle
         : applicationWorkspaceCopy.nextStepTitle,
     );
-    expect(applicationWorkspaceCopy.jobRequirementTitle.startsWith("Review and edit")).toBe(
-      true,
-    );
+    expect(applicationWorkspaceCopy.jobRequirementTitle).toBe("Job requirements");
     expect(applicationWorkspaceCopy.hiringTeamTitle).toBe(
       "Review Hiring Personas – Add Who Will Be Interviewing",
     );

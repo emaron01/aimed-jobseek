@@ -25,6 +25,7 @@ import {
   continueConsultationPlanning,
   processConsultationReply,
   replyConsultation,
+  reassessConsultationStanding,
   retryConsultationGeneration,
   startConsultation,
 } from "@/lib/consultation/service";
@@ -222,6 +223,13 @@ async function processConsultationJob(input: {
 }): Promise<void> {
   if (input.operation === "retry") {
     await retryConsultationGeneration(input);
+    return;
+  }
+  if (input.operation === "reassess") {
+    await reassessConsultationStanding({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+    });
     return;
   }
   if (input.operation === "continue") {

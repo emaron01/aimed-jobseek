@@ -12,7 +12,7 @@ import {
   compensationSignalMiss,
   type EmployerCompensationProfile,
 } from "@/lib/application/compensation-fit";
-import { criterionFlags, vocab } from "@/lib/product-config";
+import { applicationWorkspaceCopy, criterionFlags, vocab } from "@/lib/product-config";
 import type { QualificationBucket } from "@prisma/client";
 
 export type ApplicationFitOutcome = {
@@ -135,6 +135,53 @@ export function displayedFitBucket(fit: {
   overrideBucket: QualificationBucket | null;
 }): QualificationBucket {
   return fit.overrideBucket ?? fit.bucket;
+}
+
+export type FitCriterionStatus = "met" | "missed" | "not_stated";
+
+export function fitCriterionStatus(outcome: {
+  assessment: string;
+  evidenceOutcome: string | null;
+}): FitCriterionStatus {
+  if (outcome.assessment === "FIT") return "met";
+  if (
+    outcome.assessment === "NO_FIT" ||
+    outcome.evidenceOutcome === "CONTRADICTED"
+  ) {
+    return "missed";
+  }
+  return "not_stated";
+}
+
+export function fitCriterionStatusLabel(status: FitCriterionStatus): string {
+  switch (status) {
+    case "met":
+      return applicationWorkspaceCopy.fitCriterionMet;
+    case "missed":
+      return applicationWorkspaceCopy.fitCriterionMissed;
+    default:
+      return applicationWorkspaceCopy.fitCriterionNotStated;
+  }
+}
+
+export function fitCriterionReason(outcome: {
+  assessment: string;
+  evidenceOutcome: string | null;
+  reasoning: string;
+}): { status: FitCriterionStatus; label: string; reason: string } {
+  const status = fitCriterionStatus(outcome);
+  const reason = outcome.reasoning.trim();
+  return {
+    status,
+    label: fitCriterionStatusLabel(status),
+    reason:
+      reason ||
+      (status === "met"
+        ? applicationWorkspaceCopy.fitReasonMet
+        : status === "missed"
+          ? applicationWorkspaceCopy.fitReasonMissed
+          : applicationWorkspaceCopy.fitReasonNotStated),
+  };
 }
 
 export function formatFitBucketLabel(bucket: QualificationBucket): string {

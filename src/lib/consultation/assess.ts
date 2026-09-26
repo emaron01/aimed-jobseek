@@ -173,6 +173,7 @@ export function profileEvidenceItems(profile: CandidateProfile): ProfileFactRef[
   profile.education.forEach((item) => pushItem(facts, item));
   profile.credentials.forEach((item) => pushItem(facts, item));
   profile.domainVocabulary.forEach((item) => pushItem(facts, item));
+  profile.seekerStatedFacts.forEach((item) => pushItem(facts, item));
   return facts;
 }
 
