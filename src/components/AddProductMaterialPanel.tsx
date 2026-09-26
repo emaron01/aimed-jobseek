@@ -31,8 +31,8 @@ export function AddProductMaterialPanel({ productId }: { productId: string }) {
   return (
     <div className="space-y-4" data-testid="add-product-material">
       <div>
-        <h3 className="text-lg font-semibold text-slate-900">Add material</h3>
-        <p className="mt-1 text-sm text-slate-600">
+        <h3 className="text-lg font-semibold text-ink">Add material</h3>
+        <p className="mt-1 text-sm text-muted">
           Upload a resume or other documents, paste LinkedIn or resume text, or
           add notes about goals and context. We will rebuild a draft for
           review — your approved {vocab.product.singular} stays in place until you confirm.
@@ -58,8 +58,8 @@ export function AddProductMaterialPanel({ productId }: { productId: string }) {
           hint="Resume text, LinkedIn profile text, or notes. LinkedIn URLs cannot be read automatically."
         />
         <label className="block text-sm">
-          <span className="font-medium text-slate-700">Upload documents</span>
-          <span className="mt-0.5 block text-xs font-normal text-slate-500">
+          <span className="font-medium text-ink">Upload documents</span>
+          <span className="mt-0.5 block text-xs font-normal text-subtle">
             PDF, Word, or plain text. You can select multiple files.
           </span>
           <input
@@ -77,7 +77,7 @@ export function AddProductMaterialPanel({ productId }: { productId: string }) {
           <p
             role="status"
             className={
-              state.ok ? "text-sm text-emerald-700" : "text-sm text-red-600"
+              state.ok ? "text-sm text-success" : "text-sm text-danger"
             }
           >
             {state.message}

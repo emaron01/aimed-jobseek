@@ -196,7 +196,7 @@ export default async function OnboardingSubscribePage({
   return (
     <div className="space-y-8" data-testid="onboarding-subscribe-page">
       <div className="space-y-2 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+        <h1 className="text-3xl font-semibold tracking-tight text-ink">
           {lockSelection
             ? anyTrialOn
               ? "Start Your Free Trial"
@@ -205,7 +205,7 @@ export default async function OnboardingSubscribePage({
               ? "Start Your Free Trial"
               : "Choose a plan"}
         </h1>
-        <p className="text-base text-slate-600">
+        <p className="text-base text-muted">
           {anyTrialOn
             ? "No charge until your trial ends. Cancel anytime."
             : "Billing starts when Checkout completes. Cancel anytime."}
@@ -213,7 +213,7 @@ export default async function OnboardingSubscribePage({
       </div>
 
       {checkoutState === "canceled" ? (
-        <p className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+        <p className="rounded-md border border-edge bg-surface px-3 py-2 text-sm text-ink">
           Checkout canceled — no charge was made. You can start again below.
         </p>
       ) : null}

@@ -55,8 +55,8 @@ export function ManualCompanyResearchForm({
           data-testid="manual-research-status"
           className={
             state.ok
-              ? "md:col-span-2 text-sm text-emerald-700"
-              : "md:col-span-2 text-sm text-red-600"
+              ? "md:col-span-2 text-sm text-success"
+              : "md:col-span-2 text-sm text-danger"
           }
         >
           {state.message}
@@ -140,7 +140,7 @@ export function ManualCompanyResearchForm({
         <SubmitButton disabled={pending}>
           {pending ? "Saving…" : "Save Manual Research"}
         </SubmitButton>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-subtle">
           Manual edits are marked MANUAL (or HYBRID if automated research
           existed). Do not invent facts without sources.
         </p>

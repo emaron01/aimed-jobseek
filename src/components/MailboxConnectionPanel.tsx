@@ -26,15 +26,15 @@ export function MailboxConnectionPanel({
   const connected = connection?.status === "CONNECTED";
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5">
-      <h2 className="text-lg font-semibold text-slate-900">Microsoft 365</h2>
-      <p className="mt-1 text-sm text-slate-600">
+    <section className="rounded-lg border border-edge bg-surface p-5">
+      <h2 className="text-lg font-semibold text-ink">Microsoft 365</h2>
+      <p className="mt-1 text-sm text-muted">
         Sends from your own authenticated mailbox and saves accepted messages
         to your Sent items. The app does not relay mail.
       </p>
 
       {notice ? (
-        <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p className="mt-4 rounded-md border border-warning bg-warning-tint px-3 py-2 text-sm text-warning">
           {notice}
         </p>
       ) : null}
@@ -42,8 +42,8 @@ export function MailboxConnectionPanel({
         <p
           className={`mt-4 rounded-md px-3 py-2 text-sm ${
             result.ok
-              ? "border border-emerald-200 bg-emerald-50 text-emerald-900"
-              : "border border-red-200 bg-red-50 text-red-800"
+              ? "border border-success bg-success-tint text-success"
+              : "border border-danger bg-danger-tint text-danger"
           }`}
         >
           {result.message}
@@ -53,19 +53,19 @@ export function MailboxConnectionPanel({
       <div className="mt-5">
         {connected ? (
           <>
-            <p className="text-sm font-medium text-emerald-800">
+            <p className="text-sm font-medium text-success">
               Connected as {connection.mailboxAddress}
             </p>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-subtle">
               Connected {new Date(connection.connectedAt).toLocaleString()}
             </p>
           </>
         ) : connection?.status === "RECONNECT_REQUIRED" ? (
-          <p className="text-sm font-medium text-amber-800">
+          <p className="text-sm font-medium text-warning">
             Reconnect required for {connection.mailboxAddress}
           </p>
         ) : (
-          <p className="text-sm text-slate-700">Not connected.</p>
+          <p className="text-sm text-ink">Not connected.</p>
         )}
       </div>
 
@@ -83,7 +83,7 @@ export function MailboxConnectionPanel({
             <AppButton
               type="submit"
               disabled={pending}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 disabled:cursor-not-allowed disabled:text-slate-400"
+              className="rounded-md border border-edge-strong px-4 py-2 text-sm font-medium text-ink disabled:cursor-not-allowed disabled:text-subtle"
             >
               {pending ? "Disconnecting…" : "Disconnect"}
             </AppButton>

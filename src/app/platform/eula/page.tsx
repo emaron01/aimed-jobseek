@@ -19,7 +19,7 @@ export default async function PlatformEulaPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-subtle">
           <Link href="/platform" className="underline">
             Platform
           </Link>
@@ -27,7 +27,7 @@ export default async function PlatformEulaPage() {
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">
           End User License Agreement
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Manage published terms users must accept before using the {vocab.product.singular}.
           SUPER_ADMIN only.
         </p>

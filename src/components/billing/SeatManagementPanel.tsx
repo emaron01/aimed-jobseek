@@ -82,7 +82,7 @@ export function SeatManagementPanel({
 
   if (!canManage) {
     return (
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-muted">
         Only the organization owner can add or remove seats.
       </p>
     );
@@ -90,7 +90,7 @@ export function SeatManagementPanel({
 
   return (
     <div className="space-y-3" data-testid="billing-seat-management">
-      <p className="text-sm text-slate-700">{seatLabel}</p>
+      <p className="text-sm text-ink">{seatLabel}</p>
       <div className="flex flex-wrap gap-2">
         <AppButton
           type="button"
@@ -114,14 +114,14 @@ export function SeatManagementPanel({
         </AppButton>
       </div>
       {!canAdd && addDisabledReason ? (
-        <p className="text-xs text-slate-500">{addDisabledReason}</p>
+        <p className="text-xs text-subtle">{addDisabledReason}</p>
       ) : null}
       {!canRemove && removeDisabledReason ? (
-        <p className="text-xs text-slate-500">{removeDisabledReason}</p>
+        <p className="text-xs text-subtle">{removeDisabledReason}</p>
       ) : null}
 
       {preview ? (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-950">
+        <div className="rounded-md border border-warning bg-warning-tint px-3 py-3 text-sm text-warning">
           <p className="font-semibold">
             Confirm {preview.direction === "add" ? "adding" : "removing"} a seat
             ({preview.currentSeats} → {preview.nextSeats})
@@ -152,7 +152,7 @@ export function SeatManagementPanel({
         </div>
       ) : null}
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
     </div>
   );
 }

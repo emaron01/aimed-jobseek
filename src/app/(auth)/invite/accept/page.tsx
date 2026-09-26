@@ -20,11 +20,11 @@ import { AcceptInviteClient } from "./AcceptInviteClient";
 async function AcceptInviteBody({ token }: { token: string | null }) {
   if (!token) {
     return (
-      <div className="mx-auto w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+      <div className="mx-auto w-full max-w-md rounded-xl border border-edge bg-surface p-8 shadow-sm">
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">
           Invalid invitation
         </h1>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-muted">
           This invitation link is missing a token. Ask your workspace admin to
           resend the invite.
         </p>
@@ -40,11 +40,11 @@ async function AcceptInviteBody({ token }: { token: string | null }) {
   const preview = await getInvitationPreviewByRawToken(token);
   if (!preview) {
     return (
-      <div className="mx-auto w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+      <div className="mx-auto w-full max-w-md rounded-xl border border-edge bg-surface p-8 shadow-sm">
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">
           Invitation not found
         </h1>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-muted">
           This invitation link is invalid or no longer exists. Ask your
           workspace admin to send a new invite.
         </p>
@@ -58,15 +58,15 @@ async function AcceptInviteBody({ token }: { token: string | null }) {
 
   if (!user) {
     return (
-      <div className="mx-auto w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+      <div className="mx-auto w-full max-w-md rounded-xl border border-edge bg-surface p-8 shadow-sm">
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">
           Join {preview.organizationName}
         </h1>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-muted">
           You were invited as{" "}
-          <span className="font-medium text-slate-900">{preview.email}</span>.
+          <span className="font-medium text-ink">{preview.email}</span>.
           Create a password and you will join{" "}
-          <span className="font-medium text-slate-900">
+          <span className="font-medium text-ink">
             {preview.organizationName}
           </span>
           .
@@ -96,8 +96,8 @@ async function AcceptInviteBody({ token }: { token: string | null }) {
   const emailMatches = signedInEmail === invitedEmail;
 
   return (
-    <div className="mx-auto w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+    <div className="mx-auto w-full max-w-md rounded-xl border border-edge bg-surface p-8 shadow-sm">
+      <h1 className="text-2xl font-semibold tracking-tight text-ink">
         Join {preview.organizationName}
       </h1>
       <div className="mt-4">

@@ -70,7 +70,7 @@ export function DeleteSuccessNotice() {
     <p
       role="status"
       data-testid="delete-success-notice"
-      className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900"
+      className="mb-4 rounded-md border border-success bg-success-tint px-3 py-2 text-sm text-success"
     >
       {message}
     </p>

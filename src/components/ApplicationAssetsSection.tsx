@@ -93,7 +93,7 @@ function Status({
     <div
       role="status"
       className={`${WORKSPACE_CARD_WRAP_CLASS} ${WORKSPACE_MESSAGE_WRAP_CLASS} ${
-        result.ok ? "text-sm text-emerald-700" : "text-sm text-red-700"
+        result.ok ? "text-sm text-success" : "text-sm text-danger"
       }`}
       data-testid="asset-verification-status"
     >
@@ -113,7 +113,7 @@ function Status({
       ) : null}
       {!result.ok ? (
         <p
-          className={`mt-2 flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-slate-700 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
+          className={`mt-2 flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-ink ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
         >
           {applicationAssetConfig.labels.violationFix
             .replace("{consultant}", consultationConfig.displayName)
@@ -203,7 +203,7 @@ function AssetPreview({
   if (content.type === "COVER_LETTER") {
     const paragraphs = visibleItems(content.paragraphs, (claim) => claim.text);
     return (
-      <article className="space-y-4 text-sm leading-6 text-slate-800">
+      <article className="space-y-4 text-sm leading-6 text-ink">
         {hasVisibleText(content.salutation) ? <p>{content.salutation}</p> : null}
         {paragraphs.length ? (
           paragraphs.map((claim) => (
@@ -217,7 +217,7 @@ function AssetPreview({
             </p>
           ))
         ) : (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             {applicationAssetConfig.labels.emptySection}
           </p>
         )}
@@ -233,7 +233,7 @@ function AssetPreview({
   const featured = content.experience.filter((role) => !role.hidden && !role.condensed);
   const condensed = content.experience.filter((role) => !role.hidden && role.condensed);
   return (
-    <article className="space-y-4 text-sm text-slate-800">
+    <article className="space-y-4 text-sm text-ink">
       <header className="text-center">
         <h4 className="text-xl font-semibold">
           <ClaimText
@@ -270,14 +270,14 @@ function AssetPreview({
             </p>
           ))
         ) : (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             {applicationAssetConfig.labels.emptySection}
           </p>
         )}
       </AssetSection>
       <AssetSection title={applicationAssetConfig.resumeHeadings.experience}>
         {featured.length === 0 ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             {applicationAssetConfig.labels.emptySection}
           </p>
         ) : null}
@@ -286,7 +286,7 @@ function AssetPreview({
             <p className="font-medium">
               {role.title}, {role.employer}
             </p>
-            <p className="text-xs text-slate-600">
+            <p className="text-xs text-muted">
               {formatResumeRoleMeta(role)}
             </p>
             {visibleItems(role.bullets, (claim) => claim.text).length ? (
@@ -303,7 +303,7 @@ function AssetPreview({
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-muted">
                 {applicationAssetConfig.labels.emptySection}
               </p>
             )}
@@ -357,7 +357,7 @@ function AssetSection({
 }) {
   return (
     <section>
-      <h5 className="mb-2 border-b border-slate-300 text-xs font-semibold uppercase tracking-wide">
+      <h5 className="mb-2 border-b border-edge-strong text-xs font-semibold uppercase tracking-wide">
         {title}
       </h5>
       <div className="space-y-2">{children}</div>
@@ -418,13 +418,13 @@ function AssetEditor({
     return visibleItems(raw, (claim) => claim.text);
   }, [content]);
   return (
-    <form action={action} className="mt-4 space-y-3 border-t border-slate-200 pt-4">
+    <form action={action} className="mt-4 space-y-3 border-t border-edge pt-4">
       <input type="hidden" name="campaignId" value={campaignId} />
       <input type="hidden" name="assetId" value={asset.id} />
       <input type="hidden" name="contentJson" value={JSON.stringify(content)} />
       {claims.map((claim) => (
         <label key={claim.id} className="block text-sm">
-          <span className="font-medium text-slate-700">
+          <span className="font-medium text-ink">
             {formatClaimEditorLabel(claim.text)}
           </span>
           <textarea
@@ -436,7 +436,7 @@ function AssetEditor({
                 mapClaimText(current, claim.id, event.target.value),
               )
             }
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
           />
           {flagFor(asset.claimFlags, claim.id) ? (
             <ClaimFlagActions
@@ -476,7 +476,7 @@ function AssetHistory({
         <details
           key={asset.id}
           open={index === 0}
-          className="rounded-md border border-slate-200 p-4"
+          className="rounded-md border border-edge p-4"
         >
           <summary className="cursor-pointer text-sm font-medium">
             Version {asset.version} · {formatAssetStatusLabel(asset.status)} ·{" "}
@@ -491,7 +491,7 @@ function AssetHistory({
               assetId={asset.id}
             />
             {asset.guidance ? (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-subtle">
                 {applicationAssetConfig.labels.changeInstruction} {asset.guidance}
               </p>
             ) : null}
@@ -536,11 +536,11 @@ function PlanPanel({
   return (
     <div className="space-y-3" data-testid={`${type.toLowerCase()}-plan`}>
       {plan ? (
-        <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+        <div className="space-y-2 rounded-md border border-edge bg-canvas p-3">
           {plan.plan.type === "RESUME" ? (
             <>
-              <p className="text-sm text-slate-800">{plan.plan.summaryAngle}</p>
-              <ul className="list-disc space-y-1 pl-5 text-sm text-slate-800">
+              <p className="text-sm text-ink">{plan.plan.summaryAngle}</p>
+              <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
                 {visibleItems(
                   plan.plan.recommendations,
                   (item) => `${item.text} ${item.reason}`,
@@ -553,9 +553,9 @@ function PlanPanel({
             </>
           ) : (
             <>
-              <p className="text-sm text-slate-800">{plan.plan.angle}</p>
-              <p className="text-sm text-slate-800">{plan.plan.gapHandling}</p>
-              <ul className="list-disc space-y-1 pl-5 text-sm text-slate-800">
+              <p className="text-sm text-ink">{plan.plan.angle}</p>
+              <p className="text-sm text-ink">{plan.plan.gapHandling}</p>
+              <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
                 {visibleItems(
                   plan.plan.recommendations,
                   (item) => `${item.text} ${item.reason}`,
@@ -588,14 +588,14 @@ function PlanPanel({
             <input type="hidden" name="campaignId" value={campaignId} />
             <input type="hidden" name="type" value={type} />
             <label className="block text-sm">
-              <span className="font-medium text-slate-700">
+              <span className="font-medium text-ink">
                 {applicationAssetConfig.labels.adjustPlanPrompt}
               </span>
               <textarea
                 name="adjustmentNote"
                 required
                 rows={2}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <SubmitButton>{applicationAssetConfig.labels.adjustPlan}</SubmitButton>
@@ -642,14 +642,14 @@ function AssetTypePanel({
   const earlierExperienceHeading =
     plan?.plan.type === "RESUME" ? plan.plan.earlierExperienceHeading : null;
   return (
-    <section className={`space-y-4 rounded-md border border-slate-200 p-4 ${WORKSPACE_CARD_WRAP_CLASS}`}>
-        <h3 className="font-semibold text-slate-900">
+    <section className={`space-y-4 rounded-md border border-edge p-4 ${WORKSPACE_CARD_WRAP_CLASS}`}>
+        <h3 className="font-semibold text-ink">
           {type === "RESUME"
             ? applicationAssetConfig.labels.resume
             : applicationAssetConfig.labels.coverLetter}
         </h3>
         {type === "RESUME" && missingContacts.length > 0 ? (
-          <p className={`text-sm text-amber-900 ${WORKSPACE_MESSAGE_WRAP_CLASS}`} data-testid="resume-missing-contact">
+          <p className={`text-sm text-warning ${WORKSPACE_MESSAGE_WRAP_CLASS}`} data-testid="resume-missing-contact">
             {applicationAssetConfig.missingContact.heading}: {missingContacts.join(", ")}.{" "}
             {profileEditHref ? (
               <AppActionLink href={profileEditHref} variant="chip">
@@ -660,12 +660,12 @@ function AssetTypePanel({
           </p>
         ) : null}
         {type === "COVER_LETTER" && thinNotice ? (
-          <p className="text-sm text-slate-600" data-testid="cover-letter-thin-evidence">
+          <p className="text-sm text-muted" data-testid="cover-letter-thin-evidence">
             {thinNotice}
           </p>
         ) : null}
       {planError ? (
-        <p className="text-sm text-red-700" role="status">
+        <p className="text-sm text-danger" role="status">
           {planError}
         </p>
       ) : null}
@@ -705,13 +705,13 @@ function AssetTypePanel({
         ) : null}
         {rows.length ? (
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">
+            <span className="font-medium text-ink">
               {applicationAssetConfig.labels.changeInstruction}
             </span>
             <textarea
               name="regenerationInstruction"
               rows={2}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
             />
           </label>
         ) : null}
@@ -735,7 +735,7 @@ function AssetTypePanel({
           profileHref={profileHref}
         />
       ) : (
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           {applicationAssetConfig.labels.emptyHistory}
         </p>
       )}
@@ -816,14 +816,14 @@ export function ApplicationAssetsSection({
   return (
     <details
       open={defaultOpen}
-      className={`space-y-4 rounded-lg border border-slate-200 bg-white p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
+      className={`space-y-4 rounded-lg border border-edge bg-surface p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
       data-testid="application-assets"
     >
-      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+      <summary className="cursor-pointer text-base font-semibold text-ink">
         {applicationAssetConfig.labels.sectionTitle}
       </summary>
       <div className="mt-4 space-y-4">
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-muted">
         {applicationAssetConfig.labels.sectionHelp}
       </p>
       <div className="grid gap-5 xl:grid-cols-2">

@@ -82,10 +82,10 @@ export default async function SignupPlanPage() {
   return (
     <div className="mx-auto w-full space-y-6" data-testid="signup-plan-page">
       <div className="space-y-2 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+        <h1 className="text-3xl font-semibold tracking-tight text-ink">
           Choose your plan
         </h1>
-        <p className="text-base text-slate-600">
+        <p className="text-base text-muted">
           Choose a plan first. Next you&apos;ll create your account and verify
           your email.
         </p>
@@ -113,7 +113,7 @@ export default async function SignupPlanPage() {
         supportEmail={supportEmail}
       />
 
-      <p className="text-center text-sm text-slate-500">
+      <p className="text-center text-sm text-subtle">
         Joining a teammate? Use the invite link they sent you instead of this
         page.{" "}
         <Link href="/login" className="underline">

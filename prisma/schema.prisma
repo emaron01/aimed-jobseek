@@ -2359,6 +2359,8 @@ model Campaign {
   nextStepStateKey    String?
   /// Seeker FACT: why they want to work at this company.
   whyThisCompany      String?
+  /// Latest viewed result key per application step. Missing keys mean unseen.
+  workspaceSeenJson   Json?
 
   @@index([organizationId])
   @@index([organizationId, createdAt])

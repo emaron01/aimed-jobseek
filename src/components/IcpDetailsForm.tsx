@@ -59,8 +59,8 @@ function StatusBanner({
       data-testid={testId}
       className={
         result.ok
-          ? "mb-3 text-sm text-emerald-700"
-          : "mb-3 text-sm text-red-600"
+          ? "mb-3 text-sm text-success"
+          : "mb-3 text-sm text-danger"
       }
     >
       {result.message}
@@ -81,10 +81,10 @@ function EmployerCompensationFields({
   return (
     <div className="md:col-span-2 space-y-3" data-testid="employer-compensation-fields">
       <div>
-        <p className="text-sm font-medium text-slate-900">
+        <p className="text-sm font-medium text-ink">
           {compensationCopy.annualEarningsLabel}
         </p>
-        <p className="text-sm text-slate-600">{compensationCopy.annualEarningsHint}</p>
+        <p className="text-sm text-muted">{compensationCopy.annualEarningsHint}</p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <Field
@@ -101,7 +101,7 @@ function EmployerCompensationFields({
           defaultValue={defaults.targetAnnualEarningsTarget}
           hint={fieldHint("targetAnnualEarningsTarget")}
         />
-        <label className="flex items-center gap-2 text-sm text-slate-800">
+        <label className="flex items-center gap-2 text-sm text-ink">
           <input
             type="checkbox"
             name="annualEarningsMinimumRequired"
@@ -111,7 +111,7 @@ function EmployerCompensationFields({
           {criterionFlags.required}
         </label>
       </div>
-      <p className="text-sm font-medium text-slate-900">{compensationCopy.hourlyRateLabel}</p>
+      <p className="text-sm font-medium text-ink">{compensationCopy.hourlyRateLabel}</p>
       <div className="grid gap-4 md:grid-cols-2">
         <Field
           label={compensationCopy.hourlyMinimumLabel}
@@ -127,7 +127,7 @@ function EmployerCompensationFields({
           defaultValue={defaults.targetHourlyRateTarget}
           hint={fieldHint("targetHourlyRateTarget")}
         />
-        <label className="flex items-center gap-2 text-sm text-slate-800">
+        <label className="flex items-center gap-2 text-sm text-ink">
           <input
             type="checkbox"
             name="hourlyRateMinimumRequired"
@@ -146,11 +146,11 @@ function EmployerCompensationFields({
         hint={fieldHint("compensationCurrency")}
       />
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium text-slate-900">
+        <legend className="text-sm font-medium text-ink">
           {compensationCopy.employmentTypeLabel}
         </legend>
         {EMPLOYMENT_TYPES.map((code) => (
-          <label key={code} className="flex items-center gap-2 text-sm text-slate-800">
+          <label key={code} className="flex items-center gap-2 text-sm text-ink">
             <input
               type="checkbox"
               name="employmentTypes"
@@ -160,7 +160,7 @@ function EmployerCompensationFields({
             {employmentTypeLabel(code)}
           </label>
         ))}
-        <label className="flex items-center gap-2 text-sm text-slate-800">
+        <label className="flex items-center gap-2 text-sm text-ink">
           <input
             type="checkbox"
             name="employmentTypeRequired"
@@ -170,7 +170,7 @@ function EmployerCompensationFields({
           {criterionFlags.required}
         </label>
         {fieldHint("employmentTypeRequired") ? (
-          <p className="text-sm text-red-600">{fieldHint("employmentTypeRequired")}</p>
+          <p className="text-sm text-danger">{fieldHint("employmentTypeRequired")}</p>
         ) : null}
       </fieldset>
     </div>
@@ -281,11 +281,11 @@ function NewIcpForm({
   if (profileApproved && mode === "choose") {
     return (
       <div
-        className="rounded-md border border-slate-200 p-4 space-y-4"
+        className="rounded-md border border-edge p-4 space-y-4"
         data-testid="icp-starter-offer"
       >
         <StatusBanner result={previewState} testId="icp-starter-preview-status" />
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-ink">
           Draft {vocab.icp.aSingular} from the direction and career goals on
           your approved {vocab.product.singular}, or write one from scratch.
         </p>
@@ -310,13 +310,13 @@ function NewIcpForm({
   const saveAction = mode === "draft" ? approveAction : formAction;
 
   return (
-    <div className="rounded-md border border-slate-200 p-4" data-testid="icp-form">
+    <div className="rounded-md border border-edge p-4" data-testid="icp-form">
       <StatusBanner result={activeState} />
       <StatusBanner result={interpretState} testId="icp-interpret-status" />
       <StatusBanner result={previewState} testId="icp-starter-preview-status" />
       {mode === "draft" && starterDraft ? (
         <p
-          className="mb-3 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900"
+          className="mb-3 inline-flex rounded-full border border-warning bg-warning-tint px-2 py-0.5 text-[11px] font-medium text-warning"
           data-testid="starter-draft-inference"
         >
           {criterionFlags.inference}
@@ -616,7 +616,7 @@ export function IcpDetailsForm({
 
       {editing ? (
         <div
-          className="rounded-md border border-slate-200 p-4"
+          className="rounded-md border border-edge p-4"
           data-print-hide
           data-testid="icp-form"
         >
@@ -765,7 +765,7 @@ export function IcpDetailsForm({
         </div>
       ) : null}
 
-      <div className="space-y-3 border-t border-slate-200 pt-4" data-print-hide>
+      <div className="space-y-3 border-t border-edge pt-4" data-print-hide>
         <StatusBanner
           result={interpretState}
           testId="icp-interpret-status"

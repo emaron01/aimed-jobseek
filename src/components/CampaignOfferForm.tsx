@@ -40,7 +40,7 @@ export function CampaignOfferForm({
           role="status"
           data-testid="campaign-offer-status"
           className={
-            state.ok ? "text-sm text-emerald-700" : "text-sm text-red-600"
+            state.ok ? "text-sm text-success" : "text-sm text-danger"
           }
         >
           {state.message}
@@ -49,13 +49,13 @@ export function CampaignOfferForm({
 
       {state?.ok ? (
         <div
-          className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-3"
+          className="rounded-md border border-success bg-success-tint px-3 py-3"
           data-testid="campaign-offer-next-step"
         >
-          <p className="text-sm font-medium text-emerald-950">
+          <p className="text-sm font-medium text-success">
             Setup saved. Next: attach {vocab.list.aSingular}.
           </p>
-          <p className="mt-1 text-sm text-emerald-900">
+          <p className="mt-1 text-sm text-success">
             An offer is optional. Continue to the {vocab.list.Singular} stage to research, score,
             and add {vocab.contact.plural}.
           </p>

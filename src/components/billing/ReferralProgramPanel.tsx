@@ -20,13 +20,13 @@ export function ReferralProgramPanel() {
 
   return (
     <section
-      className="space-y-3 rounded-lg border border-slate-200 bg-white p-5"
+      className="space-y-3 rounded-lg border border-edge bg-surface p-5"
       data-testid="billing-referral-panel"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-medium text-slate-900">Referrals</h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <h2 className="text-lg font-medium text-ink">Referrals</h2>
+          <p className="mt-1 text-sm text-muted">
             Share your code. Friends get 10% off Standard at Checkout. You earn
             10% off per successful referral, up to 50%.
           </p>

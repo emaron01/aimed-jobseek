@@ -21,9 +21,9 @@ describe("home setup rail", () => {
     expect(home).toContain("Outreach to write");
     expect(home).toContain("vocab.account.Plural");
     expect(home).toContain("workflow.setupRail");
-    expect(rail).toContain('bg-emerald-600 text-white');
+    expect(rail).toContain("bg-success text-on-ink");
     expect(rail).toContain("{step.completed ? \"✓\" : step.number}");
-    expect(campaignRail).toContain('bg-emerald-600 text-white');
+    expect(campaignRail).toContain("bg-success text-on-ink");
   });
 
   it("explains profile approval gaps instead of a bare count", () => {

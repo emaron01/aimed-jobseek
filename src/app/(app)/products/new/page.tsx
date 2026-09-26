@@ -33,7 +33,7 @@ export default async function NewProductPage() {
           </Link>
         }
       />
-      <div className="rounded-lg border border-slate-200 bg-white p-5">
+      <div className="rounded-lg border border-edge bg-surface p-5">
         <AssistedProductIntake />
       </div>
     </div>

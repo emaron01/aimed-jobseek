@@ -70,7 +70,7 @@ export default async function ListIcpsPage({ params }: PageProps) {
         }
       />
       {icps.length === 0 ? (
-        <p className="text-sm text-slate-500">No {vocab.icp.plural} yet.</p>
+        <p className="text-sm text-subtle">No {vocab.icp.plural} yet.</p>
       ) : (
         icps.map((icp) => (
           <IcpDetailsForm

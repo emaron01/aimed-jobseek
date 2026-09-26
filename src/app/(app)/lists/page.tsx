@@ -95,7 +95,7 @@ export default async function ListsPage({
           usage={researchAllowance}
           billing={researchBilling}
         />
-        <p className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900">
+        <p className="rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm font-semibold text-ink">
           {campaign
             ? `Select ${vocab.list.aSingular} to research and score for ${campaign.name}. After scoring, save and return to the ${vocab.campaign.singular} to attach Ready to include ${vocab.contact.plural}.`
             : `Select ${vocab.list.aSingular} below to research and score your ${vocab.contact.plural} before adding them to ${vocab.campaign.aSingular}.`}
@@ -107,9 +107,9 @@ export default async function ListsPage({
           description={`Click Add ${vocab.contact.Plural} to paste spreadsheet data or upload a CSV/XLSX file.`}
         />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-slate-500">
+        <div className="overflow-hidden rounded-lg border border-edge bg-surface">
+          <table className="min-w-full divide-y divide-edge text-sm">
+            <thead className="bg-canvas text-left text-subtle">
               <tr>
                 <th className="px-4 py-3 font-medium">{vocab.list.Singular} Name</th>
                 {showOwners ? (
@@ -124,7 +124,7 @@ export default async function ListsPage({
             <tbody className="divide-y divide-slate-100">
               {lists.map((list) => (
                 <tr key={list.id}>
-                  <td className="px-4 py-3 font-medium text-slate-900">
+                  <td className="px-4 py-3 font-medium text-ink">
                     <Link
                       href={listDetailHref(list.id, {
                         campaignId: workflowCampaignId,
@@ -134,24 +134,24 @@ export default async function ListsPage({
                       {list.name}
                     </Link>
                     {list.archivedAt ? (
-                      <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                      <span className="ml-2 rounded-full bg-canvas px-2 py-0.5 text-xs font-medium text-muted">
                         Archived
                       </span>
                     ) : null}
                   </td>
                   {showOwners ? (
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="px-4 py-3 text-muted">
                       {list.owner.name?.trim() || list.owner.email}
                     </td>
                   ) : null}
-                  <td className="px-4 py-3 text-slate-600">{list.sourceType}</td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-4 py-3 text-muted">{list.sourceType}</td>
+                  <td className="px-4 py-3 text-muted">
                     {list.originalFilename ?? "—"}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-4 py-3 text-muted">
                     {formatNumber(list.totalContacts)}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-4 py-3 text-muted">
                     {formatDate(list.createdAt)}
                   </td>
                 </tr>

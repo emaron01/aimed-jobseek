@@ -46,7 +46,7 @@ export function CampaignEmailSettingsForm({
           role="status"
           data-testid="campaign-email-settings-status"
           className={
-            state.ok ? "text-sm text-emerald-700" : "text-sm text-red-600"
+            state.ok ? "text-sm text-success" : "text-sm text-danger"
           }
         >
           {state.message}
@@ -54,17 +54,17 @@ export function CampaignEmailSettingsForm({
       ) : null}
 
       <fieldset>
-        <legend className="text-sm font-medium text-slate-700">
+        <legend className="text-sm font-medium text-ink">
           Default email length
         </legend>
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-xs text-subtle">
           Used for new drafts. Override length on each email.
         </p>
         <div className="mt-2 flex flex-wrap gap-3">
           {EMAIL_LENGTH_OPTIONS.map((value) => (
             <label
               key={value}
-              className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+              className="flex items-center gap-2 rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink"
             >
               <input
                 type="radio"
@@ -80,8 +80,8 @@ export function CampaignEmailSettingsForm({
 
       <div>
         <label className="block text-sm">
-          <span className="font-medium text-slate-700">Email guidance</span>
-          <span className="mt-1 block text-xs text-slate-500">
+          <span className="font-medium text-ink">Email guidance</span>
+          <span className="mt-1 block text-xs text-subtle">
             Steers every generated email in this {vocab.campaign.singular}, up to{" "}
             {EMAIL_GUIDANCE_MAX_CHARS} characters.
           </span>
@@ -91,7 +91,7 @@ export function CampaignEmailSettingsForm({
             maxLength={EMAIL_GUIDANCE_MAX_CHARS}
             defaultValue={displayedGuidance}
             placeholder="Focus on the feature that removes the most manual work"
-            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 placeholder:text-slate-400 focus:ring-2"
+            className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-focus placeholder:text-subtle focus:ring-2"
           />
         </label>
         <EmailGuidancePromptExamples />

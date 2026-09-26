@@ -9,7 +9,7 @@ import { vocab } from "@/lib/product-config";
 import { parseStringArray } from "@/lib/research";
 import { requireOrganization } from "@/lib/tenant/getCurrentOrganization";
 
-const fieldClass = "mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm";
+const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
 
 export default async function HiringTeamTemplatesPage() {
   const organization = await requireOrganization();
@@ -21,20 +21,20 @@ export default async function HiringTeamTemplatesPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div>
-        <Link href="/settings" className="text-sm text-slate-600 hover:text-slate-900">
+        <Link href="/settings" className="text-sm text-muted hover:text-ink">
           ← Settings
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink">
           {vocab.persona.nav} templates
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Save a {vocab.persona.singular} you built, then add it to an {vocab.campaign.singular} yourself. Templates are not added automatically. Editing a template does not change roles already on an {vocab.campaign.singular}.
         </p>
       </div>
 
       <ul className="space-y-6">
         {templates.map((template) => (
-          <li key={template.id} className="space-y-3 rounded-md border border-slate-200 p-4">
+          <li key={template.id} className="space-y-3 rounded-md border border-edge p-4">
             <ApplicationActionForm
               action={savePersonaTemplateAction}
               submitLabel="Save template"
@@ -42,11 +42,11 @@ export default async function HiringTeamTemplatesPage() {
             >
               <input type="hidden" name="templateId" value={template.id} />
               <label className="block text-sm">
-                <span className="font-medium text-slate-700">Name</span>
+                <span className="font-medium text-ink">Name</span>
                 <input name="name" required defaultValue={template.name} className={fieldClass} />
               </label>
               <label className="block text-sm">
-                <span className="font-medium text-slate-700">Likely titles</span>
+                <span className="font-medium text-ink">Likely titles</span>
                 <textarea
                   name="likelyTitles"
                   rows={3}
@@ -55,11 +55,11 @@ export default async function HiringTeamTemplatesPage() {
                 />
               </label>
               <label className="block text-sm">
-                <span className="font-medium text-slate-700">Department</span>
+                <span className="font-medium text-ink">Department</span>
                 <input name="department" defaultValue={template.department ?? ""} className={fieldClass} />
               </label>
               <label className="block text-sm">
-                <span className="font-medium text-slate-700">Why this role matters</span>
+                <span className="font-medium text-ink">Why this role matters</span>
                 <textarea
                   name="whyThisRoleMatters"
                   rows={2}
@@ -68,7 +68,7 @@ export default async function HiringTeamTemplatesPage() {
                 />
               </label>
               <label className="block text-sm">
-                <span className="font-medium text-slate-700">Notes</span>
+                <span className="font-medium text-ink">Notes</span>
                 <textarea name="notes" rows={2} defaultValue={template.notes ?? ""} className={fieldClass} />
               </label>
             </ApplicationActionForm>
@@ -83,31 +83,31 @@ export default async function HiringTeamTemplatesPage() {
         ))}
       </ul>
 
-      <section className="space-y-3 border-t border-slate-200 pt-6">
-        <h2 className="text-base font-semibold text-slate-900">Add a template</h2>
+      <section className="space-y-3 border-t border-edge pt-6">
+        <h2 className="text-base font-semibold text-ink">Add a template</h2>
         <ApplicationActionForm
           action={savePersonaTemplateAction}
           submitLabel="Add template"
           testId="add-template"
         >
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Name</span>
+            <span className="font-medium text-ink">Name</span>
             <input name="name" required className={fieldClass} />
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Likely titles</span>
+            <span className="font-medium text-ink">Likely titles</span>
             <textarea name="likelyTitles" rows={3} className={fieldClass} />
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Department</span>
+            <span className="font-medium text-ink">Department</span>
             <input name="department" className={fieldClass} />
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Why this role matters</span>
+            <span className="font-medium text-ink">Why this role matters</span>
             <textarea name="whyThisRoleMatters" rows={2} className={fieldClass} />
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Notes</span>
+            <span className="font-medium text-ink">Notes</span>
             <textarea name="notes" rows={2} className={fieldClass} />
           </label>
         </ApplicationActionForm>

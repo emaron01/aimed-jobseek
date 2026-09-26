@@ -10,11 +10,11 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
+        <h2 className="text-2xl font-semibold tracking-tight text-ink">
           {title}
         </h2>
         {description ? (
-          <p className="mt-1 max-w-2xl text-sm text-slate-600">{description}</p>
+          <p className="mt-1 max-w-2xl text-sm text-muted">{description}</p>
         ) : null}
       </div>
       {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
@@ -32,11 +32,11 @@ export function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-5 py-4">
-        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+    <section className="rounded-lg border border-edge bg-surface">
+      <div className="border-b border-edge px-5 py-4">
+        <h3 className="text-base font-semibold text-ink">{title}</h3>
         {description ? (
-          <p className="mt-1 text-sm text-slate-600">{description}</p>
+          <p className="mt-1 text-sm text-muted">{description}</p>
         ) : null}
       </div>
       <div className="p-5">{children}</div>
@@ -54,9 +54,9 @@ export function EmptyState({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-      <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-      <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">
+    <div className="rounded-lg border border-dashed border-edge-strong bg-surface px-6 py-16 text-center">
+      <h3 className="text-base font-semibold text-ink">{title}</h3>
+      <p className="mx-auto mt-2 max-w-md text-sm text-muted">
         {description}
       </p>
       {actions ? (
@@ -102,13 +102,13 @@ export function Field({
   rows?: number;
 }) {
   const shared =
-    "mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 placeholder:text-slate-400 focus:ring-2";
+    "mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-focus placeholder:text-subtle focus:ring-2";
 
   return (
     <label className="block text-sm">
-      <span className="font-medium text-slate-700">{label}</span>
+      <span className="font-medium text-ink">{label}</span>
       {hint ? (
-        <span className="mt-0.5 block text-xs font-normal text-slate-500">
+        <span className="mt-0.5 block text-xs font-normal text-subtle">
           {hint}
         </span>
       ) : null}
@@ -241,11 +241,11 @@ export function TenantMissing() {
         <>
           <a
             href="/settings/account"
-            className="font-medium text-slate-900 underline"
+            className="font-medium text-primary underline"
           >
             Account Settings
           </a>
-          <a href="/login" className="text-slate-600 underline">
+          <a href="/login" className="text-muted underline">
             Switch account
           </a>
         </>

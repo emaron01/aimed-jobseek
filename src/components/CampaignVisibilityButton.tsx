@@ -60,7 +60,7 @@ export function CampaignVisibilityButton({
             : "Make personal"}
       </AppButton>
       {state && !state.ok ? (
-        <span role="alert" className="ml-2 self-center text-sm text-red-600">
+        <span role="alert" className="ml-2 self-center text-sm text-danger">
           {state.message}
         </span>
       ) : null}

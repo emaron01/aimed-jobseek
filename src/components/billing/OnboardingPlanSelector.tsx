@@ -121,15 +121,15 @@ export function OnboardingPlanSelector({
               className={cn(
                 "rounded-lg border px-4 py-4 text-left transition",
                 planCode === plan.code
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-200 bg-white text-slate-900 hover:border-slate-400",
+                  ? "border-ink bg-ink text-on-ink"
+                  : "border-edge bg-surface text-ink hover:border-edge-strong",
               )}
             >
               <p className="text-base font-semibold">{plan.label}</p>
               <p
                 className={cn(
                   "mt-1 text-sm",
-                  planCode === plan.code ? "text-slate-200" : "text-slate-600",
+                  planCode === plan.code ? "text-on-ink/80" : "text-muted",
                 )}
               >
                 {plan.blurb}
@@ -139,37 +139,37 @@ export function OnboardingPlanSelector({
         </div>
       )}
 
-      <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
+      <section className="space-y-4 rounded-lg border border-edge bg-surface p-6">
         <div>
-          <p className="text-lg font-medium text-slate-900">
+          <p className="text-lg font-medium text-ink">
             {selected.displayName}
           </p>
           {planCode === BILLING_PLAN_TEAM ? (
             <p
-              className="mt-2 text-xl font-extrabold tracking-tight text-emerald-600 sm:text-2xl"
+              className="mt-2 text-xl font-extrabold tracking-tight text-success sm:text-2xl"
               data-testid="onboarding-team-seats-selected"
             >
               You Have Selected {seatQuantity} Users For Your Team Account
             </p>
           ) : null}
           {selected.priceLabel ? (
-            <p className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+            <p className="mt-1 text-2xl font-semibold tracking-tight text-ink">
               {selected.priceLabel}
               {planCode === BILLING_PLAN_TEAM ? " / user / month" : null}
             </p>
           ) : null}
           {selected.tagline ? (
-            <p className="mt-1 text-sm text-slate-600">{selected.tagline}</p>
+            <p className="mt-1 text-sm text-muted">{selected.tagline}</p>
           ) : null}
         </div>
 
         {features.teamSeats && planCode === BILLING_PLAN_TEAM && !lockSelection ? (
           <label className="block max-w-xs text-sm">
-            <span className="font-medium text-slate-700">
+            <span className="font-medium text-ink">
               How many users? (minimum 2)
             </span>
             <select
-              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2"
+              className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2"
               value={seatQuantity}
               onChange={(event) =>
                 setSeatQuantity(Number.parseInt(event.target.value, 10))
@@ -183,23 +183,23 @@ export function OnboardingPlanSelector({
                 ),
               )}
             </select>
-            <span className="mt-1 block text-xs text-slate-500">
+            <span className="mt-1 block text-xs text-subtle">
               You can add users anytime after signup.
             </span>
           </label>
         ) : null}
 
         {planCode === BILLING_PLAN_TEAM && lockSelection ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             You can add users anytime from organization settings.
           </p>
         ) : null}
 
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <p className="text-xs font-medium uppercase tracking-wide text-subtle">
             What&apos;s included
           </p>
-          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-700">
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-ink">
             {selected.featureBullets.map((bullet) => (
               <li key={bullet}>{bullet}</li>
             ))}
@@ -212,14 +212,14 @@ export function OnboardingPlanSelector({
           </ul>
           {!trialOff && planCode !== BILLING_PLAN_ENTERPRISE ? (
             <div
-              className="mt-4 rounded-md border-2 border-emerald-500 bg-emerald-50 px-4 py-3"
+              className="mt-4 rounded-md border-2 border-success bg-success-tint px-4 py-3"
               data-testid="onboarding-free-trial-banner"
             >
-              <p className="text-lg font-extrabold tracking-wide text-emerald-700 sm:text-xl">
+              <p className="text-lg font-extrabold tracking-wide text-success sm:text-xl">
                 FREE TRIAL — {selectedTrialDays} days
               </p>
               {selected.trialNote ? (
-                <p className="mt-1 text-base font-semibold text-emerald-800">
+                <p className="mt-1 text-base font-semibold text-success">
                   {selected.trialNote}
                 </p>
               ) : null}
@@ -227,7 +227,7 @@ export function OnboardingPlanSelector({
           ) : null}
         </div>
 
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           {planCode === BILLING_PLAN_ENTERPRISE
             ? "Contact us to get started."
             : trialOff

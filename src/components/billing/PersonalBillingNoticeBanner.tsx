@@ -33,7 +33,7 @@ export function PersonalBillingNoticeBanner({
   return (
     <div
       role="status"
-      className="border-b border-sky-300 bg-sky-50 px-4 py-3 text-sm text-sky-950"
+      className="border-b border-primary bg-canvas px-4 py-3 text-sm text-primary"
       data-testid="personal-billing-notice"
     >
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
@@ -58,7 +58,7 @@ function PersonalBillingNoticeRow({ org }: { org: PersonalBillingNoticeOrg }) {
 
   if (cancelState?.ok) {
     return (
-      <p className="text-sm text-sky-950" data-testid="personal-billing-canceled">
+      <p className="text-sm text-primary" data-testid="personal-billing-canceled">
         {cancelState.message}
       </p>
     );
@@ -92,7 +92,7 @@ function PersonalBillingNoticeRow({ org }: { org: PersonalBillingNoticeOrg }) {
           <input type="hidden" name="organizationId" value={org.organizationId} />
           <AppButton
             type="submit"
-            className="text-sm font-medium text-sky-900 underline underline-offset-2"
+            className="text-sm font-medium text-primary underline underline-offset-2"
           >
             Keep for now
           </AppButton>
@@ -100,9 +100,9 @@ function PersonalBillingNoticeRow({ org }: { org: PersonalBillingNoticeOrg }) {
       </div>
 
       {confirmOpen ? (
-        <form action={cancelAction} className="space-y-2 rounded-md border border-sky-200 bg-white/70 p-3">
+        <form action={cancelAction} className="space-y-2 rounded-md border border-primary bg-surface/70 p-3">
           <input type="hidden" name="organizationId" value={org.organizationId} />
-          <label htmlFor={confirmId} className="block text-sm text-slate-700">
+          <label htmlFor={confirmId} className="block text-sm text-ink">
             Type <span className="font-mono font-semibold">CANCEL</span> to cancel
             the {planLabel} subscription for {org.name}. This stops billing; it
             does not delete your workspace data.
@@ -113,7 +113,7 @@ function PersonalBillingNoticeRow({ org }: { org: PersonalBillingNoticeOrg }) {
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             autoComplete="off"
-            className="w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+            className="w-full max-w-xs rounded-md border border-edge-strong px-3 py-1.5 text-sm"
             data-testid="personal-billing-cancel-confirm"
           />
           <AppButton
@@ -121,13 +121,13 @@ function PersonalBillingNoticeRow({ org }: { org: PersonalBillingNoticeOrg }) {
             disabled={cancelPending || confirmText !== "CANCEL"}
             className={cn(
               PRIMARY_BUTTON_CLASS,
-              "!bg-red-700 !px-3 !py-1.5 !text-sm hover:!bg-red-800 disabled:opacity-50",
+              "!bg-danger !px-3 !py-1.5 !text-sm hover:!bg-danger disabled:opacity-50",
             )}
           >
             {cancelPending ? "Canceling…" : "Cancel subscription"}
           </AppButton>
           {cancelState && !cancelState.ok ? (
-            <p className="text-sm text-red-700">{cancelState.message}</p>
+            <p className="text-sm text-danger">{cancelState.message}</p>
           ) : null}
         </form>
       ) : null}

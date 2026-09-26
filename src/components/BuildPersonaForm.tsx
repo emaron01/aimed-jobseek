@@ -78,7 +78,7 @@ export function BuildPersonaForm({
         <p
           role="status"
           className={
-            state.ok ? "text-sm text-emerald-700" : "text-sm text-red-600"
+            state.ok ? "text-sm text-success" : "text-sm text-danger"
           }
         >
           {state.message}

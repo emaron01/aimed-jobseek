@@ -19,10 +19,10 @@ export function ApplicationFitOverride({
     >
       <input type="hidden" name="campaignId" value={campaignId} />
       <label className="block text-sm">
-        <span className="font-medium text-slate-700">Your result</span>
+        <span className="font-medium text-ink">Your result</span>
         <select
           name="bucket"
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
           defaultValue={bucket}
           onChange={(event) => {
             event.currentTarget.form?.requestSubmit();

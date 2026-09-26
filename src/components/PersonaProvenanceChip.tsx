@@ -54,19 +54,19 @@ export function PersonaProvenanceChip({
       >
         {label}
       </AppButton>
-      <span className="research-source-chip-print hidden rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600 print:inline">
+      <span className="research-source-chip-print hidden rounded-full border border-edge bg-surface px-2 py-0.5 text-[11px] font-medium text-muted print:inline">
         {label}
       </span>
       {open ? (
-        <span className="research-source-chip-popup absolute left-0 z-10 mt-1 w-72 rounded-md border border-slate-200 bg-white p-3 text-left text-xs text-slate-700 shadow-sm print:hidden">
-          <span className="block font-medium text-slate-900">Provenance</span>
+        <span className="research-source-chip-popup absolute left-0 z-10 mt-1 w-72 rounded-md border border-edge bg-surface p-3 text-left text-xs text-ink shadow-sm print:hidden">
+          <span className="block font-medium text-ink">Provenance</span>
           <ul className="mt-1 list-disc pl-4">
             {classes.map((c) => (
               <li key={c}>{PERSONA_PROVENANCE_LABELS[c]}</li>
             ))}
           </ul>
           {note ? (
-            <span className="mt-2 block text-slate-500">{note}</span>
+            <span className="mt-2 block text-subtle">{note}</span>
           ) : null}
           {linkedSources.length > 0 ? (
             <ul className="mt-2 space-y-1">

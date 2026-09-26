@@ -114,13 +114,13 @@ export function SignupForm({
 
   return (
     <div
-      className="mx-auto w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm"
+      className="mx-auto w-full max-w-md rounded-xl border border-edge bg-surface p-8 shadow-sm"
       data-testid="signup-form"
     >
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+      <h1 className="text-2xl font-semibold tracking-tight text-ink">
         {inviteMode ? "Join the workspace" : "Create your account"}
       </h1>
-      <p className="mt-1 text-sm text-slate-600">
+      <p className="mt-1 text-sm text-muted">
         {inviteMode && workspaceName
           ? `Create a password and you will join ${workspaceName}.`
           : planSummary
@@ -135,7 +135,7 @@ export function SignupForm({
               name="firstName"
               required
               autoComplete="given-name"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
             />
           </label>
           <label className="block text-sm">
@@ -144,7 +144,7 @@ export function SignupForm({
               name="lastName"
               required
               autoComplete="family-name"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
             />
           </label>
         </div>
@@ -160,8 +160,8 @@ export function SignupForm({
               defaultValue={defaultCompanyName}
               readOnly={lockedCompany}
               className={cn(
-                "mt-1 w-full rounded-md border border-slate-300 px-3 py-2",
-                lockedCompany ? "bg-slate-50 text-slate-700" : "",
+                "mt-1 w-full rounded-md border border-edge-strong px-3 py-2",
+                lockedCompany ? "bg-canvas text-ink" : "",
               )}
             />
           </label>
@@ -176,8 +176,8 @@ export function SignupForm({
             readOnly={lockedEmail}
             autoComplete="email"
             className={cn(
-              "mt-1 w-full rounded-md border border-slate-300 px-3 py-2",
-              lockedEmail ? "bg-slate-50 text-slate-700" : "",
+              "mt-1 w-full rounded-md border border-edge-strong px-3 py-2",
+              lockedEmail ? "bg-canvas text-ink" : "",
             )}
           />
         </label>
@@ -189,7 +189,7 @@ export function SignupForm({
             required
             autoComplete="new-password"
             minLength={10}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
           />
         </label>
         <label className="block text-sm">
@@ -200,11 +200,11 @@ export function SignupForm({
             required
             autoComplete="new-password"
             minLength={10}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
           />
         </label>
         {error ? (
-          <p className="text-sm text-red-600" role="alert">
+          <p className="text-sm text-danger" role="alert">
             {error}
           </p>
         ) : null}
@@ -220,7 +220,7 @@ export function SignupForm({
               : "Create account"}
         </AppButton>
       </form>
-      <p className="mt-4 text-sm text-slate-600">
+      <p className="mt-4 text-sm text-muted">
         Already have an account?{" "}
         <Link
           href={
@@ -234,7 +234,7 @@ export function SignupForm({
         </Link>
       </p>
       {!next && !inviteMode ? (
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-muted">
           Want a different plan?{" "}
           <Link href="/signup/plan" className="font-medium underline">
             Change plan

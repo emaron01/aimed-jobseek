@@ -8,7 +8,6 @@ import { retryApplicationJobAction } from "@/app/actions/application-jobs";
 import {
   workspaceJobCopy,
   workspaceSectionId,
-  workspaceWaitKind,
 } from "@/lib/product-config";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
 import { AppPendingIndicator } from "@/components/AppButton";
@@ -41,12 +40,12 @@ function JobErrorDetail({
     /claim|source|verif/i.test(error ?? "") || violations.length > 0;
   return (
     <div className={`space-y-2 ${WORKSPACE_CARD_WRAP_CLASS}`}>
-      <p className={`text-sm text-amber-950 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
+      <p className={`text-sm text-warning ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
         {message}
       </p>
       {violations.length ? (
         <ul
-          className={`list-disc pl-5 text-sm text-amber-950 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
+          className={`list-disc pl-5 text-sm text-warning ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
         >
           {violations.map((line) => (
             <li key={line} className={WORKSPACE_MESSAGE_WRAP_CLASS}>
@@ -57,7 +56,7 @@ function JobErrorDetail({
       ) : null}
       {showFix ? (
         <p
-          className={`flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-slate-700 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
+          className={`flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-ink ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
         >
           {applicationAssetConfig.labels.violationFix
             .replace("{consultant}", consultationConfig.displayName)
@@ -102,11 +101,11 @@ export function WorkspaceProgress({
   if (live) {
     return (
       <div className="space-y-1" data-testid={`workspace-progress-${type}`}>
-        <div className="text-sm text-slate-700" role="status">
+        <div className="text-sm text-ink" role="status">
           <AppPendingIndicator label={live.progressText} />
         </div>
         {live.waitKind === "longer" ? (
-          <p className="text-sm text-slate-600">{workspaceJobCopy.keepWorking}</p>
+          <p className="text-sm text-muted">{workspaceJobCopy.keepWorking}</p>
         ) : null}
       </div>
     );
@@ -114,7 +113,7 @@ export function WorkspaceProgress({
   if (failed) {
     return (
       <div
-        className={`space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 ${WORKSPACE_CARD_WRAP_CLASS}`}
+        className={`space-y-2 rounded-md border border-warning bg-warning-tint p-3 ${WORKSPACE_CARD_WRAP_CLASS}`}
         data-testid={`workspace-failed-${type}`}
       >
         <JobErrorDetail error={failed.error} profileHref={profileHref} />
@@ -136,7 +135,6 @@ export function ApplicationWorkspaceLive({
 }) {
   const router = useRouter();
   const [jobs, setJobs] = useState(initialJobs);
-  const [notices, setNotices] = useState<WorkspaceJobStatusView[]>([]);
   const seen = useRef(new Set(initialJobs.map((job) => `${job.id}:${job.status}`)));
   const signature = useRef(
     initialJobs.map((job) => `${job.id}:${job.status}:${job.error ?? ""}`).join("|"),
@@ -156,15 +154,7 @@ export function ApplicationWorkspaceLive({
       const latest = await getApplicationWorkspaceLiveAction(campaignId);
       if (!latest) return;
       for (const job of latest.jobs) {
-        const key = `${job.id}:${job.status}`;
-        if (
-          job.status === "COMPLETED" &&
-          workspaceWaitKind(job.type) === "longer" &&
-          !seen.current.has(key)
-        ) {
-          setNotices((current) => [job, ...current.filter((item) => item.id !== job.id)]);
-        }
-        seen.current.add(key);
+        seen.current.add(`${job.id}:${job.status}`);
       }
       if (latest.signature !== signature.current) {
         signature.current = latest.signature;
@@ -187,22 +177,10 @@ export function ApplicationWorkspaceLive({
       className={`space-y-3 ${WORKSPACE_CARD_WRAP_CLASS}`}
       data-testid="application-workspace-live"
     >
-      {notices.map((job) => (
-        <p
-          key={job.id}
-          className={`rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
-          data-testid="workspace-ready-notice"
-        >
-          {job.readyText}{" "}
-          <a className="underline" href={`#${workspaceSectionId(job.type)}`}>
-            {workspaceJobCopy.readyLink}
-          </a>
-        </p>
-      ))}
       {failed.map((job) => (
         <div
           key={job.id}
-          className={`space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 ${WORKSPACE_CARD_WRAP_CLASS}`}
+          className={`space-y-2 rounded-md border border-warning bg-warning-tint p-3 ${WORKSPACE_CARD_WRAP_CLASS}`}
         >
           <JobErrorDetail error={job.error} profileHref={profileHref} />
           <ApplicationActionForm

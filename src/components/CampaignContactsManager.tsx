@@ -96,13 +96,13 @@ export function CampaignContactsManager({
         >
           <input type="hidden" name="campaignId" value={campaignId} />
           <label className="block min-w-72 text-sm">
-            <span className="font-medium text-slate-700">Scoring run</span>
+            <span className="font-medium text-ink">Scoring run</span>
             <select
               name="scoringRunId"
               required
               key={preselectedRunId || "none"}
               defaultValue={preselectedRunId}
-              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm"
             >
               <option value="" disabled>
                 Select a scored run
@@ -115,7 +115,7 @@ export function CampaignContactsManager({
               ))}
             </select>
           </label>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             Only completed scores from runs matching this {vocab.campaign.singular}&apos;s
             {vocab.product.Singular}, {vocab.icp.singular}, and {vocab.persona.Singular} are available.
           </p>
@@ -124,7 +124,7 @@ export function CampaignContactsManager({
               role="status"
               data-testid="campaign-scoring-run-status"
               className={
-                runState.ok ? "text-sm text-emerald-700" : "text-sm text-red-600"
+                runState.ok ? "text-sm text-success" : "text-sm text-danger"
               }
             >
               {runState.message}
@@ -133,7 +133,7 @@ export function CampaignContactsManager({
         </form>
       ) : (
         <div
-          className="rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-950"
+          className="rounded-md border border-warning bg-warning-tint px-3 py-3 text-sm text-warning"
           data-testid="campaign-list-score-hint"
         >
           <p className="font-medium">No scored runs for this {vocab.campaign.singular} yet</p>
@@ -151,18 +151,18 @@ export function CampaignContactsManager({
         </div>
       )}
 
-      <section className="border-t border-slate-200 pt-5">
-        <h3 className="text-sm font-semibold text-slate-900">
+      <section className="border-t border-edge pt-5">
+        <h3 className="text-sm font-semibold text-ink">
           Search existing {vocab.contact.plural}
         </h3>
         <form method="get" className="mt-3 flex flex-wrap items-end gap-3">
           <label className="min-w-64 flex-1 text-sm">
-            <span className="font-medium text-slate-700">Search</span>
+            <span className="font-medium text-ink">Search</span>
             <input
               name="q"
               defaultValue={search}
               placeholder="Name, email, company, or title"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
             />
           </label>
           <AppButton
@@ -174,7 +174,7 @@ export function CampaignContactsManager({
           {search ? (
             <Link
               href={`/campaigns/${campaignId}`}
-              className="px-2 py-2 text-sm text-slate-600 underline"
+              className="px-2 py-2 text-sm text-muted underline"
             >
               Clear
             </Link>
@@ -189,8 +189,8 @@ export function CampaignContactsManager({
               data-testid="campaign-contacts-status"
               className={
                 contactState.ok
-                  ? "text-sm text-emerald-700"
-                  : "text-sm text-red-600"
+                  ? "text-sm text-success"
+                  : "text-sm text-danger"
               }
             >
               {contactState.message}
@@ -199,11 +199,11 @@ export function CampaignContactsManager({
 
           {contacts.length > 0 ? (
             <>
-              <div className="max-h-80 divide-y divide-slate-100 overflow-y-auto rounded-md border border-slate-200">
+              <div className="max-h-80 divide-y divide-slate-100 overflow-y-auto rounded-md border border-edge">
                 {contacts.map((contact) => (
                   <label
                     key={contact.id}
-                    className="flex cursor-pointer items-start gap-3 px-3 py-3 hover:bg-slate-50"
+                    className="flex cursor-pointer items-start gap-3 px-3 py-3 hover:bg-canvas"
                   >
                     <input
                       type="checkbox"
@@ -212,15 +212,15 @@ export function CampaignContactsManager({
                       className="mt-1"
                     />
                     <span className="min-w-0 text-sm">
-                      <span className="block font-medium text-slate-900">
+                      <span className="block font-medium text-ink">
                         {contact.name}
                       </span>
-                      <span className="block text-slate-600">
+                      <span className="block text-muted">
                         {[contact.title, contact.company]
                           .filter(Boolean)
                           .join(" · ") || contact.email || "No role details"}
                       </span>
-                      <span className="block text-xs text-slate-500">
+                      <span className="block text-xs text-subtle">
                         {contact.email ?? "No email"} · {contact.listName}
                       </span>
                     </span>
@@ -236,7 +236,7 @@ export function CampaignContactsManager({
               </AppButton>
             </>
           ) : (
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted">
               {search
                 ? `No unattached ${vocab.contact.plural} match this search.`
                 : `No unattached ${vocab.contact.plural} are available.`}

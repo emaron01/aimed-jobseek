@@ -22,7 +22,7 @@ export function SharedCampaignActions({ campaignId }: { campaignId: string }) {
           Use this {vocab.campaign.singular}
         </AppButton>
       </form>
-      <p className="text-[11px] leading-snug text-slate-500">
+      <p className="text-[11px] leading-snug text-subtle">
         Creates a personal copy you own and can edit. Setup is copied; {vocab.list.plural},
         {vocab.contact.plural}, drafts, and sends are not.
       </p>

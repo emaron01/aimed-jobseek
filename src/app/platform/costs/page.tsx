@@ -62,7 +62,7 @@ export default async function PlatformCostsPage({
     <div className="mx-auto max-w-6xl space-y-10">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-subtle">
             <Link href="/platform" className="underline">
               Platform
             </Link>
@@ -70,7 +70,7 @@ export default async function PlatformCostsPage({
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">
             Costs &amp; margin
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-muted">
             Estimated COGS from UsageEvents × DB model rates. No Stripe / billing
             PII.
           </p>
@@ -82,8 +82,8 @@ export default async function PlatformCostsPage({
               href={`/platform/costs?window=${w}`}
               className={
                 w === window
-                  ? "font-medium text-slate-900 underline"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "font-medium text-ink underline"
+                  : "text-muted hover:text-ink"
               }
             >
               {w}
@@ -98,7 +98,7 @@ export default async function PlatformCostsPage({
         <p className="text-3xl font-semibold tabular-nums">
           {formatUsd(report.costPerCompanyUsd)}
         </p>
-        <p className="max-w-2xl text-sm text-slate-600">
+        <p className="max-w-2xl text-sm text-muted">
           Non-email estimated spend ÷ distinct companies with RESEARCH
           SUCCESS/PARTIAL in the window ({report.companiesResearched}{" "}
           companies). Falls back to active researched company count when the
@@ -114,7 +114,7 @@ export default async function PlatformCostsPage({
           {formatRatio(report.contactsPerCompany)}
           {report.contactsPerCompany != null ? "×" : ""}
         </p>
-        <p className="max-w-2xl text-sm text-slate-600">
+        <p className="max-w-2xl text-sm text-muted">
           {report.contactsWithCompany} {vocab.contact.plural} across{" "}
           {report.distinctCompaniesWithContacts} companies ({vocab.contact.plural} with a
           companyId).
@@ -136,15 +136,15 @@ export default async function PlatformCostsPage({
         <h2 className="text-lg font-medium">
           Projected monthly cost (observed ratio)
         </h2>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           Assumptions: one email ≈ one {vocab.contact.singular}; companiesNeeded = emails ÷
           {vocab.contact.plural}/company (1.0 if unknown); cost = companies × cost/company +
           emails × cost/email ({formatUsd(report.costPerEmailUsd)}/email from{" "}
           {report.emailDraftCount} drafts).
         </p>
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-edge bg-surface">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-edge bg-canvas text-xs uppercase tracking-wide text-subtle">
               <tr>
                 <th className="px-3 py-2 font-medium">Emails / month</th>
                 <th className="px-3 py-2 font-medium">Companies needed</th>
@@ -155,7 +155,7 @@ export default async function PlatformCostsPage({
               {report.projections.map((p) => (
                 <tr
                   key={p.emails}
-                  className="border-b border-slate-100 last:border-0"
+                  className="border-b border-edge last:border-0"
                 >
                   <td className="px-3 py-2 tabular-nums">{p.emails}</td>
                   <td className="px-3 py-2 tabular-nums">
@@ -174,12 +174,12 @@ export default async function PlatformCostsPage({
       {/* 4. Spend by category */}
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Spend by category</h2>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           Unrated events (no matching model rate): {report.unratedEventCount}
         </p>
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-edge bg-surface">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-edge bg-canvas text-xs uppercase tracking-wide text-subtle">
               <tr>
                 <th className="px-3 py-2 font-medium">Category</th>
                 <th className="px-3 py-2 font-medium">Estimated USD</th>
@@ -191,7 +191,7 @@ export default async function PlatformCostsPage({
                 .map(([cat, usd]) => (
                   <tr
                     key={cat}
-                    className="border-b border-slate-100 last:border-0"
+                    className="border-b border-edge last:border-0"
                   >
                     <td className="px-3 py-2">{cat}</td>
                     <td className="px-3 py-2 tabular-nums">{formatUsd(usd)}</td>
@@ -199,7 +199,7 @@ export default async function PlatformCostsPage({
                 ))}
               {Object.keys(report.byCategory).length === 0 ? (
                 <tr>
-                  <td colSpan={2} className="px-3 py-6 text-center text-slate-500">
+                  <td colSpan={2} className="px-3 py-6 text-center text-subtle">
                     No usage in this window.
                   </td>
                 </tr>
@@ -212,9 +212,9 @@ export default async function PlatformCostsPage({
       {/* 5. Per-org table */}
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Per organization</h2>
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-edge bg-surface">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-edge bg-canvas text-xs uppercase tracking-wide text-subtle">
               <tr>
                 <th className="px-3 py-2 font-medium">Organization</th>
                 <th className="px-3 py-2 font-medium">Cost / company</th>
@@ -226,7 +226,7 @@ export default async function PlatformCostsPage({
               {orgSummaries.map((row) => (
                 <tr
                   key={row.organizationId}
-                  className="border-b border-slate-100 last:border-0"
+                  className="border-b border-edge last:border-0"
                 >
                   <td className="px-3 py-2">
                     <Link
@@ -249,7 +249,7 @@ export default async function PlatformCostsPage({
               ))}
               {orgSummaries.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-slate-500">
+                  <td colSpan={4} className="px-3 py-6 text-center text-subtle">
                     No organizations.
                   </td>
                 </tr>
@@ -262,13 +262,13 @@ export default async function PlatformCostsPage({
       {/* 6. Model rates */}
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Model rates</h2>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           Versioned by effectiveFrom. Cost math always reads the latest rate ≤
           event time from the database.
         </p>
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-edge bg-surface">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-edge bg-canvas text-xs uppercase tracking-wide text-subtle">
               <tr>
                 <th className="px-3 py-2 font-medium">Provider</th>
                 <th className="px-3 py-2 font-medium">Model</th>
@@ -283,7 +283,7 @@ export default async function PlatformCostsPage({
               {rates.map((r) => (
                 <tr
                   key={r.id ?? `${r.provider}-${r.model}-${r.effectiveFrom.toISOString()}`}
-                  className="border-b border-slate-100 last:border-0"
+                  className="border-b border-edge last:border-0"
                 >
                   <td className="px-3 py-2">{r.provider}</td>
                   <td className="px-3 py-2 font-mono text-xs">{r.model}</td>
@@ -299,7 +299,7 @@ export default async function PlatformCostsPage({
                   <td className="px-3 py-2 tabular-nums">
                     {r.effectiveFrom.toISOString().slice(0, 10)}
                   </td>
-                  <td className="px-3 py-2 text-slate-500">{r.note ?? "—"}</td>
+                  <td className="px-3 py-2 text-subtle">{r.note ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -318,7 +318,7 @@ export default async function PlatformCostsPage({
                 name="provider"
                 required
                 defaultValue="openai"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <label className="block text-sm">
@@ -327,7 +327,7 @@ export default async function PlatformCostsPage({
                 name="model"
                 required
                 placeholder="gpt-5 or *"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <label className="block text-sm">
@@ -338,7 +338,7 @@ export default async function PlatformCostsPage({
                 step="0.000001"
                 min={0}
                 required
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <label className="block text-sm">
@@ -349,7 +349,7 @@ export default async function PlatformCostsPage({
                 step="0.000001"
                 min={0}
                 required
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <label className="block text-sm">
@@ -361,7 +361,7 @@ export default async function PlatformCostsPage({
                 min={0}
                 required
                 defaultValue="0.01"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <label className="block text-sm">
@@ -369,14 +369,14 @@ export default async function PlatformCostsPage({
               <input
                 name="effectiveFrom"
                 type="datetime-local"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <label className="block text-sm sm:col-span-2">
               Note
               <input
                 name="note"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <button
@@ -387,7 +387,7 @@ export default async function PlatformCostsPage({
             </button>
           </ActionFeedbackForm>
         ) : (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-subtle">
             Rate edits require SUPER_ADMIN.
           </p>
         )}
@@ -396,7 +396,7 @@ export default async function PlatformCostsPage({
       {/* 7. Reconciliation */}
       <section id="reconciliation" className="space-y-3">
         <h2 className="text-lg font-medium">Spend reconciliation</h2>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           Compare provider-dashboard reported USD to our estimated UsageEvent
           spend. Drift flag when |Δ|/actual &gt; 15%.
         </p>
@@ -412,7 +412,7 @@ export default async function PlatformCostsPage({
               <input
                 name="provider"
                 defaultValue="openai"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <label className="block text-sm">
@@ -423,7 +423,7 @@ export default async function PlatformCostsPage({
                 step="0.01"
                 min={0}
                 required
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <label className="block text-sm">
@@ -432,7 +432,7 @@ export default async function PlatformCostsPage({
                 name="periodStart"
                 type="datetime-local"
                 required
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <label className="block text-sm">
@@ -441,14 +441,14 @@ export default async function PlatformCostsPage({
                 name="periodEnd"
                 type="datetime-local"
                 required
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <label className="block text-sm sm:col-span-2">
               Notes
               <input
                 name="notes"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <button
@@ -459,14 +459,14 @@ export default async function PlatformCostsPage({
             </button>
           </ActionFeedbackForm>
         ) : (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-subtle">
             Recording reconciliations requires SUPER_ADMIN.
           </p>
         )}
 
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-edge bg-surface">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-edge bg-canvas text-xs uppercase tracking-wide text-subtle">
               <tr>
                 <th className="px-3 py-2 font-medium">When</th>
                 <th className="px-3 py-2 font-medium">Provider</th>
@@ -480,7 +480,7 @@ export default async function PlatformCostsPage({
               {reconciliations.map((r) => (
                 <tr
                   key={r.id}
-                  className="border-b border-slate-100 last:border-0"
+                  className="border-b border-edge last:border-0"
                 >
                   <td className="px-3 py-2 tabular-nums">
                     {r.createdAt.toISOString().slice(0, 10)}
@@ -498,7 +498,7 @@ export default async function PlatformCostsPage({
                   </td>
                   <td
                     className={`px-3 py-2 tabular-nums ${
-                      r.hasDrift ? "font-medium text-amber-800" : ""
+                      r.hasDrift ? "font-medium text-warning" : ""
                     }`}
                   >
                     {r.driftPercent.toFixed(1)}%
@@ -507,7 +507,7 @@ export default async function PlatformCostsPage({
               ))}
               {reconciliations.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
+                  <td colSpan={6} className="px-3 py-6 text-center text-subtle">
                     No reconciliations yet.
                   </td>
                 </tr>

@@ -19,7 +19,7 @@ export function SuppressContactForm({
 }) {
   if (!email) {
     return (
-      <p className="text-xs text-slate-500">Add an email to opt out.</p>
+      <p className="text-xs text-subtle">Add an email to opt out.</p>
     );
   }
 

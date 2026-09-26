@@ -52,26 +52,26 @@ function FieldCompare({
 }) {
   const changed = before.trim() !== after.trim();
   return (
-    <div className="rounded-lg border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-4 py-2">
-        <h3 className="text-sm font-semibold text-slate-900">{label}</h3>
+    <div className="rounded-lg border border-edge bg-surface">
+      <div className="border-b border-edge px-4 py-2">
+        <h3 className="text-sm font-semibold text-ink">{label}</h3>
         {changed ? (
-          <p className="mt-0.5 text-xs text-amber-800">Will change on confirm</p>
+          <p className="mt-0.5 text-xs text-warning">Will change on confirm</p>
         ) : (
-          <p className="mt-0.5 text-xs text-slate-500">Unchanged</p>
+          <p className="mt-0.5 text-xs text-subtle">Unchanged</p>
         )}
       </div>
       <div className="grid gap-0 md:grid-cols-2">
-        <div className="border-b border-slate-100 p-4 md:border-b-0 md:border-r">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        <div className="border-b border-edge p-4 md:border-b-0 md:border-r">
+          <p className="text-xs font-medium uppercase tracking-wide text-subtle">
             Current
           </p>
-          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
+          <p className="mt-2 whitespace-pre-wrap text-sm text-ink">
             {before.trim() || "—"}
           </p>
         </div>
         <div className="p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <p className="text-xs font-medium uppercase tracking-wide text-subtle">
             Proposed
           </p>
           <AutosizeTextarea
@@ -79,7 +79,7 @@ function FieldCompare({
             value={after}
             minRows={4}
             onChange={(event) => onAfterChange(event.target.value)}
-            className="mt-2 w-full resize-none overflow-hidden rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 focus:ring-2"
+            className="mt-2 w-full resize-none overflow-hidden rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-focus focus:ring-2"
           />
         </div>
       </div>
@@ -99,8 +99,8 @@ function ApplyPlanList({
   if (items.length === 0) return null;
   const toneClass =
     tone === "preserved"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-950"
-      : "border-amber-200 bg-amber-50 text-amber-950";
+      ? "border-success bg-success-tint text-success"
+      : "border-warning bg-warning-tint text-warning";
 
   return (
     <div className={`rounded-lg border px-4 py-3 ${toneClass}`}>
@@ -272,7 +272,7 @@ export function PersonaResynthesisReview({
   if (failed || !draft) {
     return (
       <div className="space-y-3">
-        <p className="text-sm text-amber-900">
+        <p className="text-sm text-warning">
           {errorSafe ||
             `${vocab.persona.Singular} rebuild could not be completed. Your current ${vocab.persona.singular} was not changed.`}
         </p>
@@ -294,7 +294,7 @@ export function PersonaResynthesisReview({
           </Link>
         </form>
         {retry ? (
-          <p className="text-sm text-red-600">{retry.message}</p>
+          <p className="text-sm text-danger">{retry.message}</p>
         ) : null}
       </div>
     );
@@ -326,7 +326,7 @@ export function PersonaResynthesisReview({
 
   return (
     <div className="space-y-6" data-testid="persona-resynthesis-review">
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-muted">
         Review the proposed rebuild for <strong>{personaName}</strong>. Confirm
         only replaces the fields listed below — your {vocab.persona.singular} id, {vocab.campaign.plural}, and
         scoring history stay linked. Cancel leaves the {vocab.persona.singular} untouched.
@@ -360,7 +360,7 @@ export function PersonaResynthesisReview({
         ))}
       </div>
 
-      <form action={action} className="space-y-4 border-t border-slate-200 pt-5">
+      <form action={action} className="space-y-4 border-t border-edge pt-5">
         <input type="hidden" name="productId" value={productId} />
         <input type="hidden" name="personaId" value={personaId} />
         <input type="hidden" name="personaSetupRunId" value={personaSetupRunId} />
@@ -399,7 +399,7 @@ export function PersonaResynthesisReview({
         {state ? (
           <p
             className={
-              state.ok ? "text-sm text-emerald-700" : "text-sm text-red-600"
+              state.ok ? "text-sm text-success" : "text-sm text-danger"
             }
           >
             {state.message}

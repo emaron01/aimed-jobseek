@@ -103,7 +103,7 @@ export async function AppShell({
   }
 
   return (
-    <div className="flex min-h-screen bg-white text-slate-900">
+    <div className="flex min-h-screen bg-surface text-ink">
       <Sidebar items={sidebarItems} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
@@ -115,7 +115,7 @@ export async function AppShell({
         {pastDueReadOnly && !paymentLocked ? (
           <div
             role="status"
-            className="border-b border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-950"
+            className="border-b border-warning bg-warning-tint px-4 py-2.5 text-sm text-warning"
             data-testid="past-due-readonly-banner"
           >
             <p>
@@ -135,7 +135,7 @@ export async function AppShell({
         {personalBillingNoticeOrgs.length > 0 ? (
           <PersonalBillingNoticeBanner orgs={personalBillingNoticeOrgs} />
         ) : null}
-        <main className="flex-1 overflow-auto bg-slate-50/60 p-4 sm:p-6">
+        <main className="flex-1 overflow-auto bg-canvas p-4 sm:p-6">
           <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>
       </div>

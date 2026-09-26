@@ -205,7 +205,7 @@ export default async function ScoringReportPage({
         }
       />
       {readOnly ? (
-        <div className="mb-6 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        <div className="mb-6 rounded-md border border-edge bg-canvas px-4 py-3 text-sm text-ink">
           Manager access is read-only. This scoring run belongs to{" "}
           {run.contactList.owner.name?.trim() || run.contactList.owner.email}.
         </div>
@@ -229,7 +229,7 @@ export default async function ScoringReportPage({
           description={`Qualifies ${vocab.contact.plural} using company ${vocab.icp.singular} criteria and ${vocab.persona.singular} title fit. ${vocab.contact.Singular} role research runs when you generate email, not during scoring.`}
         >
           {readOnly ? (
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted">
               Only the {vocab.list.singular} owner can run or rerun scoring.
             </p>
           ) : (
@@ -247,7 +247,7 @@ export default async function ScoringReportPage({
           description={`Research is company-level and reusable across ${vocab.contact.plural}, ${vocab.list.plural}, and scoring runs in this organization.`}
         >
           {readOnly ? (
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted">
               Only the {vocab.list.singular} owner can start or retry research.
             </p>
           ) : (
@@ -275,7 +275,7 @@ export default async function ScoringReportPage({
 
       {scoringFinished && leftOutCount > 0 ? (
         <div
-          className="mb-6 rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-950"
+          className="mb-6 rounded-md border border-warning bg-warning-tint px-3 py-3 text-sm text-warning"
           data-testid="left-out-review-guidance"
         >
           <p className="font-medium">
@@ -314,7 +314,7 @@ export default async function ScoringReportPage({
           {listUnconfiguredScoringRoles({
             contactResearchEnabled: scoringReadiness.contactResearchEnabled,
           }).length > 0 ? (
-            <p className="mt-3 text-sm text-amber-950">
+            <p className="mt-3 text-sm text-warning">
               Score {vocab.contact.Plural} stays disabled until every required role is
               configured. Set the listed environment variables and restart.
             </p>
@@ -355,11 +355,11 @@ export default async function ScoringReportPage({
             <input type="hidden" name="campaign" value={campaign.id} />
           ) : null}
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Score Label</span>
+            <span className="font-medium text-ink">Score Label</span>
             <select
               name="scoreLabel"
               defaultValue={query.scoreLabel ?? ""}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
             >
               <option value="">All</option>
               <option value="EXCELLENT">EXCELLENT</option>
@@ -370,30 +370,30 @@ export default async function ScoringReportPage({
             </select>
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Min Overall</span>
+            <span className="font-medium text-ink">Min Overall</span>
             <input
               name="minOverallScore"
               type="number"
               min={0}
               max={100}
               defaultValue={query.minOverallScore ?? ""}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
             />
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Company</span>
+            <span className="font-medium text-ink">Company</span>
             <input
               name="company"
               defaultValue={query.company ?? ""}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
             />
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Research Status</span>
+            <span className="font-medium text-ink">Research Status</span>
             <select
               name="researchStatus"
               defaultValue={query.researchStatus ?? ""}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
             >
               <option value="">All</option>
               <option value="NOT_STARTED">NOT_STARTED</option>
@@ -404,11 +404,11 @@ export default async function ScoringReportPage({
             </select>
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Sort</span>
+            <span className="font-medium text-ink">Sort</span>
             <select
               name="sort"
               defaultValue={sort}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
             >
               {SORTS.map((value) => (
                 <option key={value} value={value}>
@@ -418,11 +418,11 @@ export default async function ScoringReportPage({
             </select>
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Direction</span>
+            <span className="font-medium text-ink">Direction</span>
             <select
               name="sortDir"
               defaultValue={sortDir}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
             >
               <option value="asc">Ascending</option>
               <option value="desc">Descending</option>
@@ -521,9 +521,9 @@ export default async function ScoringReportPage({
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 text-sm font-medium text-slate-900">{value}</p>
+    <div className="rounded-lg border border-edge bg-surface px-4 py-3">
+      <p className="text-xs text-subtle">{label}</p>
+      <p className="mt-1 text-sm font-medium text-ink">{value}</p>
     </div>
   );
 }

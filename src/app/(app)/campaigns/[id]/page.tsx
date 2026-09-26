@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { ApplicationOverview } from "@/components/ApplicationOverview";
 import { ApplicationWorkspace } from "@/components/ApplicationWorkspace";
+import { getApplicationOverview } from "@/lib/application/overview";
 import { notFound } from "next/navigation";
 import { deleteCampaignAction, archiveCampaignAction, unarchiveCampaignAction } from "@/app/actions";
 import { CampaignContactsManager } from "@/components/CampaignContactsManager";
@@ -79,10 +81,10 @@ function asPersonalizationTier(
 function Meta({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+      <dt className="text-xs font-medium uppercase tracking-wide text-subtle">
         {label}
       </dt>
-      <dd className="mt-1 whitespace-pre-wrap text-sm text-slate-900">
+      <dd className="mt-1 whitespace-pre-wrap text-sm text-ink">
         {value || "—"}
       </dd>
     </div>
@@ -472,12 +474,22 @@ export default async function CampaignDetailPage({
         }
       : null;
 
+  const overview = await getApplicationOverview({
+    organizationId: organization.id,
+    campaignId: campaign.id,
+  });
+  if (!overview) {
+    throw new Error("Application overview could not be loaded.");
+  }
+
   return (
     <div className="space-y-6">
+      <ApplicationOverview view={overview} />
       <ApplicationWorkspace
         campaignId={campaign.id}
         organizationId={organization.id}
         canEdit={canEditTemplate && !campaignArchived}
+        focus="overview"
       />
       <PageHeader
         title={campaign.name}
@@ -533,7 +545,7 @@ export default async function CampaignDetailPage({
                 onSuccessNavigate="/campaigns"
               />
             ) : (
-              <span className="self-center text-sm font-medium text-slate-600">
+              <span className="self-center text-sm font-medium text-muted">
                 Read-only · owned by {campaign.owner?.name?.trim() || campaign.owner?.email}
               </span>
             )}
@@ -541,7 +553,7 @@ export default async function CampaignDetailPage({
         }
       />
       {campaignArchived ? (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <div className="rounded-md border border-warning bg-warning-tint px-4 py-3 text-sm text-warning">
           This {vocab.campaign.singular} is archived. History is intact. Unarchive it to generate
           emails or change {vocab.contact.plural}.
         </div>
@@ -550,7 +562,7 @@ export default async function CampaignDetailPage({
         <div
           role="status"
           data-testid="scoring-attach-status"
-          className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950"
+          className="rounded-md border border-success bg-success-tint px-4 py-3 text-sm text-success"
         >
           {Number.parseInt(query.attached, 10) > 0
             ? `${query.attached} Ready to include ${nounForCount(Number(query.attached), vocab.contact)} attached from the scoring run.`
@@ -573,13 +585,13 @@ export default async function CampaignDetailPage({
           >
             <div className="grid gap-4 md:grid-cols-2">
               <label className="text-sm">
-                <span className="font-medium text-slate-700">
+                <span className="font-medium text-ink">
                   {vocab.campaign.Singular} name
                 </span>
                 <input
                   value={campaign.name}
                   readOnly
-                  className="mt-1 w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-2"
+                  className="mt-1 w-full rounded-md border border-edge-strong bg-canvas px-3 py-2"
                 />
               </label>
               {[
@@ -593,11 +605,11 @@ export default async function CampaignDetailPage({
                 ],
               ].map(([label, value, display]) => (
                 <label key={label} className="text-sm">
-                  <span className="font-medium text-slate-700">{label}</span>
+                  <span className="font-medium text-ink">{label}</span>
                   <select
                     value={value}
                     disabled
-                    className="mt-1 w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-2"
+                    className="mt-1 w-full rounded-md border border-edge-strong bg-canvas px-3 py-2"
                   >
                     <option value={value}>{display}</option>
                   </select>
@@ -623,12 +635,12 @@ export default async function CampaignDetailPage({
             description={`Optional. Used in email copy when present. Leave blank and continue to ${vocab.list.Singular} if you do not have an offer yet.`}
           >
             {campaignArchived ? (
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-muted">
                 Offer settings are read-only while this {vocab.campaign.singular} is archived.
               </p>
             ) : !canEditTemplate ? (
               <div className="space-y-3">
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-muted">
                   Shared {vocab.campaign.singular} template is read-only. Use this {vocab.campaign.singular}
                   from the {vocab.campaign.singular} list to create a personal copy.
                 </p>
@@ -652,7 +664,7 @@ export default async function CampaignDetailPage({
             description={`Default length and ${vocab.campaign.singular}-specific guidance for generated materials.`}
           >
             {campaignArchived ? (
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-muted">
                 Email settings are read-only while this {vocab.campaign.singular} is archived.
               </p>
             ) : !canEditTemplate ? (
@@ -683,26 +695,26 @@ export default async function CampaignDetailPage({
           title={`Emails (${stageContacts.length} ${vocab.contact.plural})`}
           description={`Generate, edit, and send drafts for every ${vocab.contact.singular} in this ${vocab.campaign.singular}. Use Compare drafts to review several at once.`}
         >
-          <div className="mb-4 space-y-3 rounded-md border border-slate-200 bg-slate-50 p-4">
+          <div className="mb-4 space-y-3 rounded-md border border-edge bg-canvas p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-slate-900">
+                <p className="text-sm font-medium text-ink">
                   {vocab.campaign.Singular} guidance
                 </p>
-                <p className="mt-0.5 text-xs text-slate-600">
+                <p className="mt-0.5 text-xs text-muted">
                   Default length and {vocab.campaign.singular}-specific guidance. Length can be
                   overridden on each draft.
                 </p>
               </div>
               <Link
                 href={`/campaigns/${campaign.id}?stage=setup`}
-                className="text-xs font-medium text-slate-700 underline underline-offset-2"
+                className="text-xs font-medium text-ink underline underline-offset-2"
               >
                 Also on Setup
               </Link>
             </div>
             {campaignArchived ? (
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-muted">
                 Email settings are read-only while this {vocab.campaign.singular} is archived.
               </p>
             ) : !canEditTemplate ? (
@@ -725,13 +737,13 @@ export default async function CampaignDetailPage({
             )}
           </div>
           {voiceSamples.length === 0 ? (
-            <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-4">
-              <p className="text-sm font-medium text-amber-950">
+            <div className="mb-4 rounded-md border border-warning bg-warning-tint p-4">
+              <p className="text-sm font-medium text-warning">
                 Add a voice sample before generating your first email.
               </p>
               <Link
                 href="/settings/voice"
-                className="mt-2 inline-flex text-sm font-medium text-amber-950 underline"
+                className="mt-2 inline-flex text-sm font-medium text-warning underline"
               >
                 Set up your voice
               </Link>
@@ -885,7 +897,7 @@ export default async function CampaignDetailPage({
                   Select an Existing {vocab.list.Singular} To Be Researched and Scored
                 </Link>
               </div>
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-muted">
                 {campaignArchived
                   ? `${vocab.contact.Plural} cannot be changed while this ${vocab.campaign.singular} is archived.`
                   : `Manager access is read-only. Only the ${vocab.campaign.singular} owner can change ${vocab.contact.plural}.`}
@@ -975,18 +987,18 @@ export default async function CampaignDetailPage({
               ].map(([label, value]) => (
                 <div
                   key={String(label)}
-                  className="rounded-lg border border-slate-200 bg-white p-4"
+                  className="rounded-lg border border-edge bg-surface p-4"
                 >
-                  <dt className="text-sm text-slate-500">{label}</dt>
-                  <dd className="mt-1 text-2xl font-semibold text-slate-900">
+                  <dt className="text-sm text-subtle">{label}</dt>
+                  <dd className="mt-1 text-2xl font-semibold text-ink">
                     {value}
                   </dd>
                 </div>
               ))}
             </dl>
             {generatedEmailCount === 0 && sentEmailCount === 0 ? (
-              <div className="mt-5 rounded-md border border-dashed border-slate-300 p-5 text-center">
-                <p className="text-sm text-slate-600">
+              <div className="mt-5 rounded-md border border-dashed border-edge-strong p-5 text-center">
+                <p className="text-sm text-muted">
                   No {vocab.campaign.singular} activity has been recorded yet.
                 </p>
               </div>

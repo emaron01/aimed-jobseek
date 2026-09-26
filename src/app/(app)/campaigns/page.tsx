@@ -96,7 +96,7 @@ export default async function CampaignsPage({
             ) : (
               <span
                 title={`Add ${vocab.product.aSingular} first`}
-                className="inline-flex cursor-not-allowed items-center justify-center rounded-md bg-slate-300 px-3.5 py-2 text-sm font-medium text-slate-500"
+                className="inline-flex cursor-not-allowed items-center justify-center rounded-md bg-edge-strong px-3.5 py-2 text-sm font-medium text-subtle"
               >
                 New {vocab.campaign.singular}
               </span>
@@ -126,8 +126,8 @@ export default async function CampaignsPage({
             className={cn(
               "rounded-md px-3 py-1.5 text-sm font-medium",
               effectiveView === tab.id
-                ? "bg-slate-900 text-white"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200",
+                ? "bg-ink text-on-ink"
+                : "bg-canvas text-ink hover:bg-canvas",
             )}
           >
             {tab.label}
@@ -172,9 +172,9 @@ export default async function CampaignsPage({
           }
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-slate-500">
+        <div className="overflow-x-auto rounded-lg border border-edge bg-surface">
+          <table className="min-w-full divide-y divide-edge text-sm">
+            <thead className="bg-canvas text-left text-subtle">
               <tr>
                 <th className="px-4 py-3 font-medium">{vocab.campaign.Singular}</th>
                 {effectiveView === CAMPAIGN_LIST_VIEW_SHARED_ALL &&
@@ -199,7 +199,7 @@ export default async function CampaignsPage({
                   });
                 return (
                   <tr key={campaign.id}>
-                    <td className="px-4 py-3 font-medium text-slate-900">
+                    <td className="px-4 py-3 font-medium text-ink">
                       {useShared &&
                       effectiveView === CAMPAIGN_LIST_VIEW_SHARED_ALL ? (
                         <span>{campaign.name}</span>
@@ -212,37 +212,37 @@ export default async function CampaignsPage({
                         </Link>
                       )}
                       {campaign.visibility === "SHARED" ? (
-                        <span className="ml-2 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800">
+                        <span className="ml-2 rounded-full bg-canvas px-2 py-0.5 text-xs font-medium text-primary">
                           Shared
                         </span>
                       ) : null}
                       {campaign.archivedAt ? (
-                        <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                        <span className="ml-2 rounded-full bg-canvas px-2 py-0.5 text-xs font-medium text-muted">
                           Archived
                         </span>
                       ) : null}
                     </td>
                     {effectiveView === CAMPAIGN_LIST_VIEW_SHARED_ALL &&
                     canManageCampaigns ? (
-                      <td className="px-4 py-3 text-slate-600">
+                      <td className="px-4 py-3 text-muted">
                         {campaign.owner?.name ||
                           campaign.owner?.email ||
                           `Legacy ${vocab.campaign.singular}`}
                       </td>
                     ) : null}
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="px-4 py-3 text-muted">
                       {campaign.status}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="px-4 py-3 text-muted">
                       {campaign.product.name}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="px-4 py-3 text-muted">
                       {campaign.icp.name}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="px-4 py-3 text-muted">
                       {campaign._count.contacts}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="px-4 py-3 text-muted">
                       {formatDate(campaign.createdAt)}
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -253,7 +253,7 @@ export default async function CampaignsPage({
                       ) : useShared ? null : (
                         <Link
                           href={`/campaigns/${campaign.id}`}
-                          className="text-sm font-medium text-slate-700 underline-offset-2 hover:underline"
+                          className="text-sm font-medium text-ink underline-offset-2 hover:underline"
                         >
                           Edit
                         </Link>

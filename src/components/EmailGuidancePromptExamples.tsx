@@ -9,8 +9,8 @@ const EXAMPLES = [
 
 export function EmailGuidancePromptExamples() {
   return (
-    <details className="mt-1 text-xs text-slate-500">
-      <summary className="w-fit cursor-pointer font-medium text-slate-600">
+    <details className="mt-1 text-xs text-subtle">
+      <summary className="w-fit cursor-pointer font-medium text-muted">
         Prompt examples
       </summary>
       <ul className="mt-1 list-disc space-y-1 pl-5">

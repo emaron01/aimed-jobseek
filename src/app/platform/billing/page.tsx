@@ -55,7 +55,7 @@ export default async function PlatformBillingPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-subtle">
           <Link href="/platform" className="underline">
             Platform
           </Link>
@@ -63,16 +63,16 @@ export default async function PlatformBillingPage() {
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">
           Billing Config
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Trial length, Stripe price IDs, and webhook-related billing IDs only.
           Display copy and entitlement floors live on Plan Catalog. SUPER_ADMIN
           only.
         </p>
       </div>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-5">
-        <h2 className="text-lg font-medium text-slate-900">Free trial</h2>
-        <p className="mt-1 text-sm text-slate-600">
+      <section className="rounded-lg border border-edge bg-surface p-5">
+        <h2 className="text-lg font-medium text-ink">Free trial</h2>
+        <p className="mt-1 text-sm text-muted">
           Independent on/off and duration for Standard and Team. Enterprise has
           no self-serve Checkout trial.
         </p>
@@ -95,9 +95,9 @@ export default async function PlatformBillingPage() {
         </div>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-5">
-        <h2 className="text-lg font-medium text-slate-900">Stripe price IDs</h2>
-        <p className="mt-1 text-sm text-slate-600">
+      <section className="rounded-lg border border-edge bg-surface p-5">
+        <h2 className="text-lg font-medium text-ink">Stripe price IDs</h2>
+        <p className="mt-1 text-sm text-muted">
           Standard, Team, Enterprise, and company-credit Price/Product IDs.
           Team and Enterprise may be left blank until live IDs are ready.
           Validated against Stripe on save when filled.

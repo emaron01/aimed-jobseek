@@ -67,7 +67,7 @@ export function ApplicationActionForm({
     <form onSubmit={onSubmit} className="space-y-3" data-testid={testId}>
       {children}
       {state ? (
-        <p className={state.ok ? "text-sm text-emerald-700" : "text-sm text-red-600"} role="status">
+        <p className={state.ok ? "text-sm text-success" : "text-sm text-danger"} role="status">
           {state.message}
         </p>
       ) : null}

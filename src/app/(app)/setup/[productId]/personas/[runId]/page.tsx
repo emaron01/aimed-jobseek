@@ -83,7 +83,7 @@ export default async function PersonaSetupRunPage({ params }: PageProps) {
           </Link>
         }
       />
-      <section className="rounded-lg border border-slate-200 bg-white p-5">
+      <section className="rounded-lg border border-edge bg-surface p-5">
         <PersonaDraftReview
           productId={product.id}
           personaSetupRunId={run.id}

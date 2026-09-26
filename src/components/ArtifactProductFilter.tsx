@@ -15,10 +15,10 @@ export function ArtifactProductFilter({
   const searchParams = useSearchParams();
 
   return (
-    <label className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
-      <span className="font-medium text-slate-900">{vocab.product.Singular}</span>
+    <label className="flex flex-wrap items-center gap-2 text-sm text-ink">
+      <span className="font-medium text-ink">{vocab.product.Singular}</span>
       <select
-        className="min-w-[12rem] rounded-md border border-slate-300 bg-white px-3 py-2"
+        className="min-w-[12rem] rounded-md border border-edge-strong bg-surface px-3 py-2"
         value={selectedProductId ?? ""}
         onChange={(event) => {
           const next = new URLSearchParams(searchParams.toString());

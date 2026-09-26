@@ -31,7 +31,7 @@ export function StartFreeTrialButton({
 
   if (disabledReason) {
     return (
-      <p className="text-sm text-slate-600" data-testid="onboarding-subscribe-cta">
+      <p className="text-sm text-muted" data-testid="onboarding-subscribe-cta">
         {disabledReason}
       </p>
     );
@@ -48,7 +48,7 @@ export function StartFreeTrialButton({
       <AppButton
         type="button"
         disabled={pending}
-        className="w-full rounded-md bg-green-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-60"
+        className="w-full rounded-md bg-success px-4 py-3 text-sm font-medium text-on-ink disabled:opacity-60"
         onClick={() => {
           setError(null);
           startTransition(async () => {
@@ -82,13 +82,13 @@ export function StartFreeTrialButton({
       >
         {pending ? "Redirecting…" : label}
       </AppButton>
-      <p className="text-center text-base font-bold text-slate-900">
+      <p className="text-center text-base font-bold text-ink">
         {trialOff
           ? "You\u2019ll be charged when Checkout completes."
           : "You won\u2019t be charged until your trial period ends."}
       </p>
       {error ? (
-        <p className="text-center text-sm text-red-700">{error}</p>
+        <p className="text-center text-sm text-danger">{error}</p>
       ) : null}
     </div>
   );

@@ -81,7 +81,7 @@ function Status({ result }: { result: ApplicationOutreachActionResult | null }) 
   return (
     <div
       role="status"
-      className={result.ok ? "text-sm text-emerald-700" : "text-sm text-red-700"}
+      className={result.ok ? "text-sm text-success" : "text-sm text-danger"}
     >
       <p>{result.message}</p>
       {result.violations?.length ? (
@@ -121,16 +121,16 @@ export function ApplicationAppliedSection({
   );
   return (
     <section
-      className={`space-y-3 rounded-lg border border-slate-200 bg-white p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
+      className={`space-y-3 rounded-lg border border-edge bg-surface p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
       data-testid="application-applied"
     >
       <div>
-        <h2 className="text-base font-semibold text-slate-900">
+        <h2 className="text-base font-semibold text-ink">
           {outreachConfig.labels.appliedTitle}
         </h2>
-        <p className="mt-1 text-sm text-slate-600">{outreachConfig.labels.appliedHelp}</p>
+        <p className="mt-1 text-sm text-muted">{outreachConfig.labels.appliedHelp}</p>
       </div>
-      <p className="text-sm font-medium text-slate-900" data-testid="application-status">
+      <p className="text-sm font-medium text-ink" data-testid="application-status">
         {applicationProgress
           ? interviewConfig.progress[applicationProgress]
           : appliedAt
@@ -141,12 +141,12 @@ export function ApplicationAppliedSection({
         <form action={action} className="flex flex-wrap items-end gap-3">
           <input type="hidden" name="campaignId" value={campaignId} />
           <label className="text-sm">
-            <span className="font-medium text-slate-700">Date</span>
+            <span className="font-medium text-ink">Date</span>
             <input
               type="date"
               name="appliedAt"
               defaultValue={todayInputValue(appliedAt)}
-              className="mt-1 block rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 block rounded-md border border-edge-strong px-3 py-2 text-sm"
             />
           </label>
           <SubmitButton>{outreachConfig.labels.appliedStatus}</SubmitButton>
@@ -156,13 +156,13 @@ export function ApplicationAppliedSection({
         <form action={progressAction} className="flex flex-wrap items-end gap-3">
           <input type="hidden" name="campaignId" value={campaignId} />
           <label className="text-sm">
-            <span className="font-medium text-slate-700">
+            <span className="font-medium text-ink">
               {interviewConfig.labels.progressTitle}
             </span>
             <select
               name="progress"
               defaultValue={applicationProgress ?? ""}
-              className="mt-1 block rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 block rounded-md border border-edge-strong px-3 py-2 text-sm"
             >
               <option value="">—</option>
               {Object.entries(interviewConfig.progress).map(([value, label]) => (
@@ -199,25 +199,25 @@ export function ApplicationContactsSection({
   );
   return (
     <section
-      className={`space-y-4 rounded-lg border border-slate-200 bg-white p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
+      className={`space-y-4 rounded-lg border border-edge bg-surface p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
       data-testid="application-contacts"
     >
       <div>
-        <h2 className="text-base font-semibold text-slate-900">
+        <h2 className="text-base font-semibold text-ink">
           {outreachConfig.labels.contactsTitle}
         </h2>
-        <p className="mt-1 text-sm text-slate-600">{outreachConfig.labels.contactsHelp}</p>
+        <p className="mt-1 text-sm text-muted">{outreachConfig.labels.contactsHelp}</p>
       </div>
       {contacts.length === 0 ? (
-        <p className="text-sm text-slate-600">No contacts on this {vocab.campaign.singular} yet.</p>
+        <p className="text-sm text-muted">No contacts on this {vocab.campaign.singular} yet.</p>
       ) : (
         <ul className="divide-y divide-slate-100">
           {contacts.map((contact) => (
             <li key={contact.contactId} className="py-3 text-sm">
-              <p className="font-medium text-slate-900">
+              <p className="font-medium text-ink">
                 {[contact.firstName, contact.lastName].filter(Boolean).join(" ")}
               </p>
-              <p className="text-slate-600">
+              <p className="text-muted">
                 {contact.title ?? "—"}
                 {contact.email ? ` · ${contact.email}` : ""}
               </p>
@@ -226,11 +226,11 @@ export function ApplicationContactsSection({
                   <input type="hidden" name="campaignId" value={campaignId} />
                   <input type="hidden" name="contactId" value={contact.contactId} />
                   <label className="text-sm">
-                    <span className="font-medium text-slate-700">{vocab.persona.Singular}</span>
+                    <span className="font-medium text-ink">{vocab.persona.Singular}</span>
                     <select
                       name="personaId"
                       defaultValue={contact.personaId ?? ""}
-                      className="mt-1 block rounded-md border border-slate-300 px-3 py-2 text-sm"
+                      className="mt-1 block rounded-md border border-edge-strong px-3 py-2 text-sm"
                     >
                       <option value="" disabled>
                         Choose {vocab.persona.aSingular}
@@ -245,15 +245,15 @@ export function ApplicationContactsSection({
                   <SubmitButton>Save role</SubmitButton>
                 </form>
               ) : (
-                <p className="mt-1 text-slate-600">{contact.personaName ?? "No role matched"}</p>
+                <p className="mt-1 text-muted">{contact.personaName ?? "No role matched"}</p>
               )}
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-subtle">
                 {contact.roleConfirmed
                   ? outreachConfig.labels.roleConfirmed
                   : outreachConfig.labels.roleUnconfirmed}
               </p>
               {contact.extractedTitle ? (
-                <p className="mt-1 text-xs text-slate-600">
+                <p className="mt-1 text-xs text-muted">
                   Title from paste: {contact.extractedTitle}
                 </p>
               ) : null}
@@ -269,23 +269,23 @@ export function ApplicationContactsSection({
                     <input type="hidden" name="personaId" value={contact.personaId} />
                   ) : null}
                   <label className="block text-sm">
-                    <span className="font-medium text-slate-700">
+                    <span className="font-medium text-ink">
                       {outreachConfig.labels.pasteLinkedIn}
                     </span>
                     <textarea
                       name="linkedInProfileText"
                       rows={5}
                       defaultValue={contact.linkedInProfileText ?? ""}
-                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                      className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
                     />
                   </label>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-subtle">
                     {outreachConfig.labels.pasteLinkedInHelp}
                   </p>
                 </ApplicationActionForm>
               ) : null}
               {contact.individualStatus ? (
-                <p className="mt-2 text-xs text-slate-600">
+                <p className="mt-2 text-xs text-muted">
                   {outreachConfig.labels.individualProfile}: {contact.individualStatus}
                   {contact.individualError ? ` — ${contact.individualError}` : ""}
                 </p>
@@ -302,10 +302,10 @@ export function ApplicationContactsSection({
               ) : null}
               {contact.commonGround.length > 0 ? (
                 <div className="mt-2">
-                  <p className="text-xs font-medium text-slate-700">
+                  <p className="text-xs font-medium text-ink">
                     {outreachConfig.labels.commonGround}
                   </p>
-                  <ul className="mt-1 list-disc pl-5 text-xs text-slate-600">
+                  <ul className="mt-1 list-disc pl-5 text-xs text-muted">
                     {contact.commonGround.map((item) => (
                       <li key={item.text}>
                         {item.text} ({item.seekerSource}; {item.contactSource})
@@ -315,7 +315,7 @@ export function ApplicationContactsSection({
                 </div>
               ) : null}
               {contact.caresAbout.length > 0 ? (
-                <ul className="mt-2 list-disc pl-5 text-xs text-slate-600">
+                <ul className="mt-2 list-disc pl-5 text-xs text-muted">
                   {contact.caresAbout.map((item) => (
                     <li key={item.text}>{item.text}</li>
                   ))}
@@ -329,28 +329,28 @@ export function ApplicationContactsSection({
         <form action={addAction} className="grid gap-3 md:grid-cols-2" data-testid="add-application-contact">
           <input type="hidden" name="campaignId" value={campaignId} />
           <label className="text-sm">
-            <span className="font-medium text-slate-700">First name</span>
-            <input name="firstName" required className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" />
+            <span className="font-medium text-ink">First name</span>
+            <input name="firstName" required className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2" />
           </label>
           <label className="text-sm">
-            <span className="font-medium text-slate-700">Last name</span>
-            <input name="lastName" required className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" />
+            <span className="font-medium text-ink">Last name</span>
+            <input name="lastName" required className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2" />
           </label>
           <label className="text-sm">
-            <span className="font-medium text-slate-700">Title</span>
-            <input name="title" required className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" />
+            <span className="font-medium text-ink">Title</span>
+            <input name="title" required className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2" />
           </label>
           <label className="text-sm">
-            <span className="font-medium text-slate-700">Email</span>
-            <input name="email" type="email" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" />
+            <span className="font-medium text-ink">Email</span>
+            <input name="email" type="email" className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2" />
           </label>
           <label className="text-sm md:col-span-2">
-            <span className="font-medium text-slate-700">LinkedIn URL</span>
-            <input name="linkedinUrl" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" />
+            <span className="font-medium text-ink">LinkedIn URL</span>
+            <input name="linkedinUrl" className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2" />
           </label>
           <label className="text-sm md:col-span-2">
-            <span className="font-medium text-slate-700">{vocab.persona.Singular} override</span>
-            <select name="personaId" defaultValue="" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2">
+            <span className="font-medium text-ink">{vocab.persona.Singular} override</span>
+            <select name="personaId" defaultValue="" className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2">
               <option value="">Match from title</option>
               {roles.map((role) => (
                 <option key={role.id} value={role.id}>
@@ -406,29 +406,29 @@ export function ApplicationOutreachSection({
 
   return (
     <section
-      className={`space-y-4 rounded-lg border border-slate-200 bg-white p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
+      className={`space-y-4 rounded-lg border border-edge bg-surface p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
       data-testid="application-outreach"
     >
       <div>
-        <h2 className="text-base font-semibold text-slate-900">
+        <h2 className="text-base font-semibold text-ink">
           {outreachConfig.labels.sectionTitle}
         </h2>
-        <p className="mt-1 text-sm text-slate-600">{outreachConfig.labels.sectionHelp}</p>
+        <p className="mt-1 text-sm text-muted">{outreachConfig.labels.sectionHelp}</p>
       </div>
       {canEdit ? (
         <form action={generateAction} className="grid gap-3 md:grid-cols-2" data-testid="generate-outreach">
           <input type="hidden" name="campaignId" value={campaignId} />
           <label className="text-sm">
-            <span className="font-medium text-slate-700">Channel</span>
-            <select name="type" defaultValue="EMAIL" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2">
+            <span className="font-medium text-ink">Channel</span>
+            <select name="type" defaultValue="EMAIL" className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2">
               <option value="EMAIL">Email</option>
               <option value="LINKEDIN_CONNECTION_NOTE">LinkedIn connection note</option>
               <option value="LINKEDIN_INMAIL">LinkedIn InMail</option>
             </select>
           </label>
           <label className="text-sm">
-            <span className="font-medium text-slate-700">{vocab.persona.Singular}</span>
-            <select name="personaId" required defaultValue={roles[0]?.id ?? ""} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2">
+            <span className="font-medium text-ink">{vocab.persona.Singular}</span>
+            <select name="personaId" required defaultValue={roles[0]?.id ?? ""} className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2">
               {roles.map((role) => (
                 <option key={role.id} value={role.id}>
                   {role.name}
@@ -437,8 +437,8 @@ export function ApplicationOutreachSection({
             </select>
           </label>
           <label className="text-sm">
-            <span className="font-medium text-slate-700">{vocab.contact.Singular}</span>
-            <select name="contactId" defaultValue="" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2">
+            <span className="font-medium text-ink">{vocab.contact.Singular}</span>
+            <select name="contactId" defaultValue="" className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2">
               <option value="">{outreachConfig.labels.noContact}</option>
               {contacts.map((contact) => (
                 <option key={contact.contactId} value={contact.contactId}>
@@ -448,15 +448,15 @@ export function ApplicationOutreachSection({
             </select>
           </label>
           <label className="text-sm">
-            <span className="font-medium text-slate-700">Purpose</span>
-            <select name="purpose" defaultValue="PROACTIVE" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2">
+            <span className="font-medium text-ink">Purpose</span>
+            <select name="purpose" defaultValue="PROACTIVE" className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2">
               <option value="PROACTIVE">{outreachConfig.labels.purposeProactive}</option>
               <option value="FOLLOW_UP">{outreachConfig.labels.purposeFollowUp}</option>
             </select>
           </label>
           <label className="text-sm">
-            <span className="font-medium text-slate-700">Follow-up to</span>
-            <select name="followUpToAssetId" defaultValue="" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2">
+            <span className="font-medium text-ink">Follow-up to</span>
+            <select name="followUpToAssetId" defaultValue="" className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2">
               <option value="">None</option>
               {sentAssets.map((asset) => (
                 <option key={asset.id} value={asset.id}>
@@ -466,19 +466,19 @@ export function ApplicationOutreachSection({
             </select>
           </label>
           <label className="text-sm">
-            <span className="font-medium text-slate-700">Email length</span>
-            <select name="emailLength" defaultValue="MEDIUM" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2">
+            <span className="font-medium text-ink">Email length</span>
+            <select name="emailLength" defaultValue="MEDIUM" className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2">
               <option value="SHORT">Short</option>
               <option value="MEDIUM">Medium</option>
               <option value="LONG">Long</option>
             </select>
           </label>
           <label className="text-sm md:col-span-2">
-            <span className="font-medium text-slate-700">{outreachConfig.labels.changeInstruction}</span>
+            <span className="font-medium text-ink">{outreachConfig.labels.changeInstruction}</span>
             <textarea
               name="regenerationInstruction"
               rows={2}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
             />
           </label>
           <SubmitButton>{outreachConfig.labels.generate}</SubmitButton>
@@ -536,13 +536,13 @@ function OutreachMessageCard({
   }
 
   return (
-    <article className={`space-y-3 rounded-md border border-slate-200 p-4 ${WORKSPACE_CARD_WRAP_CLASS}`} data-testid="outreach-message">
-      <p className="text-sm font-medium text-slate-900">
+    <article className={`space-y-3 rounded-md border border-edge p-4 ${WORKSPACE_CARD_WRAP_CLASS}`} data-testid="outreach-message">
+      <p className="text-sm font-medium text-ink">
         {formatOutreachTypeLabel(asset.type)} · v{asset.version}
         {asset.sentAt ? ` · ${outreachConfig.labels.sentStatus} ${todayInputValue(asset.sentAt)}` : ""}
       </p>
       {composed ? (
-        <div className={`space-y-2 text-sm text-slate-800 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
+        <div className={`space-y-2 text-sm text-ink ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
           {composed.subject ? <p><span className="font-medium">Subject:</span> {composed.subject}</p> : null}
           <pre className="whitespace-pre-wrap font-sans">{composed.body}</pre>
           {openClaimFlags(claimFlagsFromJson(asset.claimFlagsJson)).map((flag) => (
@@ -555,7 +555,7 @@ function OutreachMessageCard({
           ))}
         </div>
       ) : (
-        <p className={`text-sm text-red-700 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>This message could not be displayed.</p>
+        <p className={`text-sm text-danger ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>This message could not be displayed.</p>
       )}
       {canEdit && composed && asset.type === "EMAIL" && handoff ? (
         <div className="flex flex-wrap gap-2" data-testid="email-handoff">
@@ -588,7 +588,7 @@ function OutreachMessageCard({
               {outreachConfig.labels.downloadResume}
             </a>
           ) : null}
-          <p className="w-full text-xs text-slate-600">{outreachConfig.labels.attachResumeReminder}</p>
+          <p className="w-full text-xs text-muted">{outreachConfig.labels.attachResumeReminder}</p>
         </div>
       ) : null}
       {canEdit && composed && asset.type !== "EMAIL" ? (
@@ -606,7 +606,7 @@ function OutreachMessageCard({
               {outreachConfig.labels.openLinkedIn}
             </a>
           ) : null}
-          {copied ? <span className="text-xs text-emerald-700">Copied {copied}.</span> : null}
+          {copied ? <span className="text-xs text-success">Copied {copied}.</span> : null}
         </div>
       ) : null}
       {canEdit && !asset.sentAt ? (
@@ -614,12 +614,12 @@ function OutreachMessageCard({
           <input type="hidden" name="campaignId" value={campaignId} />
           <input type="hidden" name="assetId" value={asset.id} />
           <label className="text-sm">
-            <span className="font-medium text-slate-700">Sent date</span>
+            <span className="font-medium text-ink">Sent date</span>
             <input
               type="date"
               name="sentAt"
               defaultValue={todayInputValue()}
-              className="mt-1 block rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 block rounded-md border border-edge-strong px-3 py-2 text-sm"
             />
           </label>
           <SubmitButton>{outreachConfig.labels.markSent}</SubmitButton>

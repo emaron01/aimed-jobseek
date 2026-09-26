@@ -43,8 +43,14 @@ import {
 } from "@/lib/contact-profile/service";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { InterviewStagesSection } from "@/components/InterviewStagesSection";
-import { ConsultationSection } from "@/components/ConsultationSection";
 import { ApplicationAssetsSection } from "@/components/ApplicationAssetsSection";
+import { EmptyState } from "@/components/design";
+import { OpenDetailsOnMount } from "@/components/OpenDetailsOnMount";
+import {
+  applicationStepByKey,
+  applicationStepCopy,
+  type ApplicationStepKey,
+} from "@/lib/product-config";
 import {
   ApplicationAppliedSection,
   ApplicationContactsSection,
@@ -128,13 +134,13 @@ function ScorecardList({
   if (items.length === 0) return null;
   return (
     <div>
-      <h3 className="text-sm font-medium text-slate-900">{title}</h3>
+      <h3 className="text-sm font-medium text-ink">{title}</h3>
       <ul className="mt-2 space-y-2">
         {items.map((item) => (
-          <li key={item.id} className="text-sm text-slate-800" data-scorecard-id={item.id}>
+          <li key={item.id} className="text-sm text-ink" data-scorecard-id={item.id}>
             {item.text}
             {item.inferred ? (
-              <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-950">
+              <span className="ml-2 rounded bg-warning-tint px-1.5 py-0.5 text-xs font-medium text-warning">
                 {criterionFlags.inference}
               </span>
             ) : null}
@@ -192,21 +198,21 @@ function IdentityVerificationPanel({
       verification?.verdict === "MATCHED");
 
   return (
-    <div className="space-y-3 border-t border-slate-200 pt-4" data-testid="employer-identity">
-      <h2 className="text-base font-semibold text-slate-900">{employerIdentityCopy.title}</h2>
+    <div className="space-y-3 border-t border-edge pt-4" data-testid="employer-identity">
+      <h2 className="text-base font-semibold text-ink">{employerIdentityCopy.title}</h2>
       {requirement.identityConfirmation === "CONFIRMED" ? (
-        <p className="text-sm text-slate-700">{employerIdentityCopy.confirmed}</p>
+        <p className="text-sm text-ink">{employerIdentityCopy.confirmed}</p>
       ) : null}
       {requirement.identityConfirmation === "REJECTED" ? (
-        <p className="text-sm text-amber-950">{employerIdentityCopy.rejected}</p>
+        <p className="text-sm text-warning">{employerIdentityCopy.rejected}</p>
       ) : null}
       {showCandidate ? (
         <div
-          className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3"
+          className="space-y-3 rounded-md border border-warning bg-warning-tint p-3"
           data-testid="employer-identity-candidate"
         >
-          <p className="text-sm text-amber-950">{employerIdentityCopy.unmatched}</p>
-          <div className="space-y-1 text-sm text-slate-800">
+          <p className="text-sm text-warning">{employerIdentityCopy.unmatched}</p>
+          <div className="space-y-1 text-sm text-ink">
             <p className="font-medium">
               {verification.candidate.name || employerIdentityCopy.unknownCompany}
             </p>
@@ -234,21 +240,21 @@ function IdentityVerificationPanel({
           </div>
           <ul className="space-y-2" data-testid="employer-identity-checks">
             {verification.checks.map((check) => (
-              <li key={check.key} className="text-sm text-slate-800">
+              <li key={check.key} className="text-sm text-ink">
                 <span className="font-medium">
                   {employerIdentityCopy.checkLabels[check.key]}
                 </span>
-                <span className="ml-2 rounded bg-white px-1.5 py-0.5 text-xs font-medium text-slate-800">
+                <span className="ml-2 rounded bg-surface px-1.5 py-0.5 text-xs font-medium text-ink">
                   {employerIdentityCopy.status[check.status]}
                 </span>
-                <span className="mt-1 block text-slate-700">{check.reason}</span>
+                <span className="mt-1 block text-ink">{check.reason}</span>
                 {check.postingEvidence ? (
-                  <span className="mt-1 block text-slate-600">
+                  <span className="mt-1 block text-muted">
                     {employerIdentityCopy.postingEvidence}: {check.postingEvidence}
                   </span>
                 ) : null}
                 {check.researchEvidence ? (
-                  <span className="block text-slate-600">
+                  <span className="block text-muted">
                     {employerIdentityCopy.researchEvidence}: {check.researchEvidence}
                   </span>
                 ) : null}
@@ -281,17 +287,17 @@ function IdentityVerificationPanel({
             >
               <input type="hidden" name="campaignId" value={requirement.campaignId} />
               <label className="block text-sm">
-                <span className="font-medium text-slate-700">{employerIdentityCopy.supplyName}</span>
+                <span className="font-medium text-ink">{employerIdentityCopy.supplyName}</span>
                 <input
                   name="employerName"
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
                 />
               </label>
               <label className="block text-sm">
-                <span className="font-medium text-slate-700">{employerIdentityCopy.supplyWebsite}</span>
+                <span className="font-medium text-ink">{employerIdentityCopy.supplyWebsite}</span>
                 <input
                   name="website"
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
                 />
               </label>
             </ApplicationActionForm>
@@ -306,7 +312,7 @@ function IdentityVerificationPanel({
           initialStatus={researchStatus}
         />
         {confirmedResearch ? (
-          <div className="space-y-2 text-sm text-slate-800">
+          <div className="space-y-2 text-sm text-ink">
             <p>{research.companySummary || "No summary yet."}</p>
             <p>{research.whatTheySell ? `Products: ${research.whatTheySell}` : null}</p>
             <p>{research.businessModel ? `Business model: ${research.businessModel}` : null}</p>
@@ -314,7 +320,7 @@ function IdentityVerificationPanel({
             <BulletList title="Employer risk" items={textList(research.riskSignals)} />
           </div>
         ) : (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             Employer research has not been confirmed for this {vocab.campaign.singular}.
           </p>
         )}
@@ -332,14 +338,25 @@ function IdentityVerificationPanel({
   );
 }
 
+export type ApplicationWorkspaceFocus = ApplicationStepKey | "overview" | "all";
+
+function showFocus(
+  focus: ApplicationWorkspaceFocus,
+  keys: ApplicationWorkspaceFocus[],
+): boolean {
+  return focus === "all" || keys.includes(focus);
+}
+
 export async function ApplicationWorkspace({
   campaignId,
   organizationId,
   canEdit,
+  focus = "all",
 }: {
   campaignId: string;
   organizationId: string;
   canEdit: boolean;
+  focus?: ApplicationWorkspaceFocus;
 }) {
   await ensureIdentityVerification({ organizationId, campaignId });
   await ensureHiringTeamAfterResearch({ organizationId, campaignId });
@@ -379,7 +396,18 @@ export async function ApplicationWorkspace({
       },
     },
   });
-  if (!requirement) return null;
+  if (!requirement) {
+    const step =
+      focus === "all" || focus === "overview"
+        ? null
+        : applicationStepByKey(focus);
+    return (
+      <EmptyState
+        title={step?.title ?? applicationStepCopy.overviewTitle}
+        description={step?.emptyGuidance ?? applicationStepCopy.factMissing}
+      />
+    );
+  }
 
   const researchStatus = await getApplicationResearchStatus({
     organizationId,
@@ -480,10 +508,6 @@ export async function ApplicationWorkspace({
     nextStep.stateKey === "cover_plan_ready" ||
     nextStep.stateKey === "resume_ready" ||
     nextStep.stateKey === "cover_ready";
-  const consultationOpen =
-    nextStep.stateKey === "consultation_not_started" ||
-    nextStep.stateKey === "consultation_in_progress" ||
-    nextStep.stateKey === "consultation_failed";
   const shownBucket = fit
     ? displayedFitBucket({
         bucket: fit.bucket,
@@ -491,13 +515,16 @@ export async function ApplicationWorkspace({
       })
     : null;
 
+  const asPage = focus !== "all";
+
   return (
     <div className={`space-y-4 ${WORKSPACE_CARD_WRAP_CLASS}`}>
+    {showFocus(focus, ["overview"]) ? (
     <section
-      className={`space-y-3 rounded-lg border border-slate-200 bg-white p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
+      className={`space-y-3 rounded-lg border border-edge bg-surface p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
       data-testid="application-next-step"
     >
-      <h2 id="application-next-step" className="text-base font-semibold text-slate-900">
+      <h2 id="application-next-step" className="text-base font-semibold text-ink">
         {consultationConversationCopy.nextStepTitle}
       </h2>
       <ApplicationWorkspaceLive
@@ -508,7 +535,7 @@ export async function ApplicationWorkspace({
       <WorkspaceProgress jobs={live.jobs} type="NEXT_STEP" />
       {nextStep.failed ? (
         <div className="space-y-2">
-          <p className={`text-sm text-amber-950 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
+          <p className={`text-sm text-warning ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
             {consultationConversationCopy.nextStepFailed}
           </p>
           {canEdit ? (
@@ -522,15 +549,18 @@ export async function ApplicationWorkspace({
           ) : null}
         </div>
       ) : (
-        <p className={`text-sm text-slate-800 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>{nextStep.text}</p>
+        <p className={`text-sm text-ink ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>{nextStep.text}</p>
       )}
     </section>
+    ) : null}
+    {showFocus(focus, ["company"]) ? (
     <details
-      className="space-y-4 rounded-lg border border-slate-200 bg-white p-5"
+      className="space-y-4 rounded-lg border border-edge bg-surface p-5"
       data-testid="application-company"
       id="company"
     >
-      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+      {asPage ? <OpenDetailsOnMount /> : null}
+      <summary className="cursor-pointer text-base font-semibold text-ink">
         {applicationWorkspaceCopy.companyTitle}
       </summary>
       <div className="mt-4 space-y-4">
@@ -548,18 +578,22 @@ export async function ApplicationWorkspace({
         />
       </div>
     </details>
-    <details className="space-y-4 rounded-lg border border-slate-200 bg-white p-5" data-testid="application-workspace">
-      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+    ) : null}
+    {showFocus(focus, ["job"]) ? (
+    <>
+    <details className="space-y-4 rounded-lg border border-edge bg-surface p-5" data-testid="application-workspace">
+      {asPage ? <OpenDetailsOnMount /> : null}
+      <summary className="cursor-pointer text-base font-semibold text-ink">
         {applicationWorkspaceCopy.jobRequirementTitle}
       </summary>
       <div className="mt-4 space-y-4">
     <section className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">
+          <h2 className="text-base font-semibold text-ink">
             {applicationWorkspaceCopy.jobRequirementTitle}
           </h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-muted">
             Parsed from the pasted posting. Empty fields were not in the posting.
           </p>
         </div>
@@ -577,26 +611,26 @@ export async function ApplicationWorkspace({
       <BulletList title="Responsibilities" items={textList(requirement.responsibilities)} />
       <BulletList title="Required" items={textList(requirement.requiredItems)} />
       <BulletList title="Preferred" items={textList(requirement.preferredItems)} />
-      <div className="space-y-3 border-t border-slate-200 pt-4">
-        <h3 className="text-sm font-semibold text-slate-900">Scorecard</h3>
+      <div className="space-y-3 border-t border-edge pt-4">
+        <h3 className="text-sm font-semibold text-ink">Scorecard</h3>
         {scorecard.mission ? (
-          <p className="text-sm text-slate-800">
+          <p className="text-sm text-ink">
             {scorecard.mission.text}
             {scorecard.mission.inferred ? (
-              <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-950">
+              <span className="ml-2 rounded bg-warning-tint px-1.5 py-0.5 text-xs font-medium text-warning">
                 {criterionFlags.inference}
               </span>
             ) : null}
           </p>
         ) : (
-          <p className="text-sm text-slate-500">No mission was stated.</p>
+          <p className="text-sm text-subtle">No mission was stated.</p>
         )}
         <ScorecardList title="Outcomes" items={scorecard.outcomes} />
         <ScorecardList title="Competencies" items={scorecard.competencies} />
       </div>
 
       {requirement.employerSkipReason ? (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950" data-testid="employer-skip-reason">
+        <p className="rounded-md border border-warning bg-warning-tint px-3 py-2 text-sm text-warning" data-testid="employer-skip-reason">
           {requirement.employerSkipReason}
         </p>
       ) : null}
@@ -609,17 +643,17 @@ export async function ApplicationWorkspace({
         >
           <input type="hidden" name="campaignId" value={requirement.campaignId} />
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Employer name</span>
+            <span className="font-medium text-ink">Employer name</span>
             <input
               name="employerName"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
             />
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">{employerIdentityCopy.supplyWebsite}</span>
+            <span className="font-medium text-ink">{employerIdentityCopy.supplyWebsite}</span>
             <input
               name="website"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
             />
           </label>
         </ApplicationActionForm>
@@ -629,28 +663,29 @@ export async function ApplicationWorkspace({
       </div>
     </details>
     <details
-      className="space-y-4 rounded-lg border border-slate-200 bg-white p-5"
+      className="space-y-4 rounded-lg border border-edge bg-surface p-5"
       data-testid="employer-fit"
       id="employer-fit"
     >
-      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+      {asPage ? <OpenDetailsOnMount /> : null}
+      <summary className="cursor-pointer text-base font-semibold text-ink">
         {applicationWorkspaceCopy.employerFitTitle}
       </summary>
       <div className="mt-4 space-y-3">
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           Scored against {icp.name}. A mismatch is a signal. It does not block contacts or outreach.
         </p>
         {shownBucket ? (
-          <p className="text-sm font-medium text-slate-900" data-testid="employer-fit-bucket">
+          <p className="text-sm font-medium text-ink" data-testid="employer-fit-bucket">
             {fit?.overrideBucket
               ? `Your result: ${formatFitBucketLabel(shownBucket)} (scored ${formatFitBucketLabel(fit.bucket)})`
               : `Scored result: ${formatFitBucketLabel(shownBucket)}`}
           </p>
         ) : (
-          <p className="text-sm text-slate-600">Fit has not been scored.</p>
+          <p className="text-sm text-muted">Fit has not been scored.</p>
         )}
         {stale?.stale ? (
-          <p className="text-sm text-amber-900" data-testid="employer-fit-stale">
+          <p className="text-sm text-warning" data-testid="employer-fit-stale">
             {stale.reason}
           </p>
         ) : null}
@@ -658,12 +693,12 @@ export async function ApplicationWorkspace({
           {outcomes.map((outcome) => {
             const labels = fitSignalLabels(outcome);
             return (
-              <li key={outcome.criterionId ?? outcome.name} className="text-sm text-slate-800">
+              <li key={outcome.criterionId ?? outcome.name} className="text-sm text-ink">
                 <span className="font-medium">{outcome.name}</span>
                 {labels.map((label) => (
                   <span
                     key={label}
-                    className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-800"
+                    className="ml-2 rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink"
                     data-testid={
                       outcome.dealBreakerHit
                         ? "deal-breaker-signal"
@@ -676,10 +711,10 @@ export async function ApplicationWorkspace({
                   </span>
                 ))}
                 {outcome.evidence ? (
-                  <span className="mt-1 block text-slate-600">{outcome.evidence}</span>
+                  <span className="mt-1 block text-muted">{outcome.evidence}</span>
                 ) : null}
                 {outcome.source ? (
-                  <span className="block text-xs text-slate-500">{outcome.source}</span>
+                  <span className="block text-xs text-subtle">{outcome.source}</span>
                 ) : null}
               </li>
             );
@@ -702,19 +737,18 @@ export async function ApplicationWorkspace({
         ) : null}
       </div>
     </details>
+    </>
+    ) : null}
+    {showFocus(focus, ["hiring-team"]) ? (
     <HiringTeamSection
       campaignId={requirement.campaignId}
       organizationId={organizationId}
       canEdit={canEdit}
       jobs={live.jobs}
+      asPage={asPage}
     />
-    <ConsultationSection
-      campaignId={requirement.campaignId}
-      organizationId={organizationId}
-      canEdit={canEdit}
-      defaultOpen={consultationOpen}
-      jobs={live.jobs}
-    />
+    ) : null}
+    {showFocus(focus, ["assets"]) ? (
     <div id="assets">
     <WorkspaceProgress
       jobs={live.jobs}
@@ -771,12 +805,16 @@ export async function ApplicationWorkspace({
         }))}
     />
     </div>
+    ) : null}
+    {showFocus(focus, ["outreach"]) ? (
+    <>
     <details
-      className="rounded-lg border border-slate-200 bg-white p-5"
+      className="rounded-lg border border-edge bg-surface p-5"
       data-testid="application-contacts-wrap"
       id="contacts"
     >
-      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+      {asPage ? <OpenDetailsOnMount /> : null}
+      <summary className="cursor-pointer text-base font-semibold text-ink">
         {applicationWorkspaceCopy.contactsTitle}
       </summary>
       <div className="mt-4">
@@ -819,11 +857,16 @@ export async function ApplicationWorkspace({
         }))}
     />
     </div>
+    </>
+    ) : null}
+    {showFocus(focus, ["overview", "applied"]) ? (
     <details
-      className="rounded-lg border border-slate-200 bg-white p-5"
+      className="rounded-lg border border-edge bg-surface p-5"
       data-testid="application-applied-wrap"
+      id="applied"
     >
-      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+      {asPage ? <OpenDetailsOnMount /> : null}
+      <summary className="cursor-pointer text-base font-semibold text-ink">
         {applicationWorkspaceCopy.appliedTitle}
       </summary>
       <div className="mt-4">
@@ -835,6 +878,8 @@ export async function ApplicationWorkspace({
     />
       </div>
     </details>
+    ) : null}
+    {showFocus(focus, ["interviews"]) ? (
     <div id="interviews">
     <WorkspaceProgress jobs={live.jobs} type="INTERVIEW_GUIDE" />
     <InterviewStagesSection
@@ -848,22 +893,26 @@ export async function ApplicationWorkspace({
       }))}
     />
     </div>
+    ) : null}
+    {showFocus(focus, ["summary"]) ? (
     <details
-      className="rounded-lg border border-slate-200 bg-white p-5"
+      className="rounded-lg border border-edge bg-surface p-5"
       data-testid="application-summary-wrap"
       id="application-summary"
     >
-      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+      {asPage ? <OpenDetailsOnMount /> : null}
+      <summary className="cursor-pointer text-base font-semibold text-ink">
         {applicationSummaryConfig.title}
       </summary>
       <div className="mt-4 space-y-3">
         <WorkspaceProgress jobs={live.jobs} type="APPLICATION_SUMMARY" />
-        <p className="text-sm text-slate-600">{applicationSummaryConfig.description}</p>
+        <p className="text-sm text-muted">{applicationSummaryConfig.description}</p>
         <Link href={workspaceCampaignSummaryHref(campaignId)} className={SECONDARY_BUTTON_CLASS}>
           {applicationSummaryConfig.title}
         </Link>
       </div>
     </details>
+    ) : null}
     </div>
   );
 }
@@ -990,7 +1039,7 @@ function hiringTeamStatusLabel(
 
 function KindMark({ kind }: { kind: string }) {
   return (
-    <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">
+    <span className="ml-2 rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink">
       {kind === "FACT" ? "Fact" : "Inference"}
     </span>
   );
@@ -1001,11 +1050,13 @@ async function HiringTeamSection({
   organizationId,
   canEdit,
   jobs = [],
+  asPage = false,
 }: {
   campaignId: string;
   organizationId: string;
   canEdit: boolean;
   jobs?: import("@/lib/application-jobs/workspace-status").WorkspaceJobStatusView[];
+  asPage?: boolean;
 }) {
   const [roles, templates] = await Promise.all([
     prisma.persona.findMany({
@@ -1018,7 +1069,7 @@ async function HiringTeamSection({
       select: { id: true, name: true },
     }),
   ]);
-  const fieldClass = "mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm";
+  const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
   const organizedRoles = roles.map((role) => ({
     role,
     narrative: readNarrative(role.profileJson),
@@ -1036,34 +1087,34 @@ async function HiringTeamSection({
   }: (typeof organizedRoles)[number]) => (
     <details
       key={role.id}
-      className="rounded-md border border-slate-200 p-4"
+      className="rounded-md border border-edge p-4"
       data-testid="hiring-team-role"
     >
       <summary className="cursor-pointer list-none space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h4 className="text-sm font-semibold text-slate-900">{role.name}</h4>
-          <span className="text-xs text-slate-500">
+          <h4 className="text-sm font-semibold text-ink">{role.name}</h4>
+          <span className="text-xs text-subtle">
             {hiringTeamStatusLabel(role.setupStatus, role.approvalStatus, role.staleAt)}
           </span>
         </div>
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-ink">
           {textList(role.targetTitles).join(", ") || "No likely titles."}
         </p>
         {role.whyThisPersonaMatters ? (
-          <p className="text-sm text-slate-800">{role.whyThisPersonaMatters}</p>
+          <p className="text-sm text-ink">{role.whyThisPersonaMatters}</p>
         ) : null}
       </summary>
-      <div className="mt-4 space-y-3 border-t border-slate-200 pt-4">
+      <div className="mt-4 space-y-3 border-t border-edge pt-4">
         {role.department ? (
-          <p className="text-sm text-slate-700">{role.department}</p>
+          <p className="text-sm text-ink">{role.department}</p>
         ) : null}
         {narrative?.overview ? (
-          <p className="text-sm text-slate-800">{narrative.overview}</p>
+          <p className="text-sm text-ink">{narrative.overview}</p>
         ) : role.definition ? (
-          <p className="text-sm text-slate-800">{role.definition}</p>
+          <p className="text-sm text-ink">{role.definition}</p>
         ) : null}
         {narrative?.impact ? (
-          <p className="text-sm text-slate-800">
+          <p className="text-sm text-ink">
             {narrative.impact.text}
             <KindMark kind={narrative.impact.kind} />
           </p>
@@ -1074,7 +1125,7 @@ async function HiringTeamSection({
             <AnnotatedBlock title="What they need" items={narrative.needs} />
             <AnnotatedBlock title="Concerns" items={narrative.concerns} />
             {narrative.interviewStage ? (
-              <p className="text-sm text-slate-800">
+              <p className="text-sm text-ink">
                 Interview stage: {narrative.interviewStage.text}
                 <KindMark kind={narrative.interviewStage.kind} />
               </p>
@@ -1089,15 +1140,15 @@ async function HiringTeamSection({
           </>
         ) : null}
         {narrative?.modelNote ? (
-          <p className="text-sm text-amber-900">{narrative.modelNote}</p>
+          <p className="text-sm text-warning">{narrative.modelNote}</p>
         ) : null}
         {role.additionalContext ? (
-          <p className="text-sm text-slate-700">{role.additionalContext}</p>
+          <p className="text-sm text-ink">{role.additionalContext}</p>
         ) : null}
         {canEdit ? (
           <div className="space-y-3 print:hidden">
             <details>
-              <summary className="cursor-pointer text-sm font-semibold text-slate-900">
+              <summary className="cursor-pointer text-sm font-semibold text-ink">
                 {hiringTeamConfig.actions.edit}
               </summary>
             <ApplicationActionForm
@@ -1108,11 +1159,11 @@ async function HiringTeamSection({
               <input type="hidden" name="campaignId" value={campaignId} />
               <input type="hidden" name="personaId" value={role.id} />
               <label className="block text-sm">
-                <span className="font-medium text-slate-700">Name</span>
+                <span className="font-medium text-ink">Name</span>
                 <input name="name" required defaultValue={role.name} className={fieldClass} />
               </label>
               <label className="block text-sm">
-                <span className="font-medium text-slate-700">Likely titles</span>
+                <span className="font-medium text-ink">Likely titles</span>
                 <textarea
                   name="likelyTitles"
                   rows={2}
@@ -1121,11 +1172,11 @@ async function HiringTeamSection({
                 />
               </label>
               <label className="block text-sm">
-                <span className="font-medium text-slate-700">Department</span>
+                <span className="font-medium text-ink">Department</span>
                 <input name="department" defaultValue={role.department ?? ""} className={fieldClass} />
               </label>
               <label className="block text-sm">
-                <span className="font-medium text-slate-700">Why this role matters</span>
+                <span className="font-medium text-ink">Why this role matters</span>
                 <textarea
                   name="whyThisRoleMatters"
                   rows={2}
@@ -1134,7 +1185,7 @@ async function HiringTeamSection({
                 />
               </label>
               <label className="block text-sm">
-                <span className="font-medium text-slate-700">Notes</span>
+                <span className="font-medium text-ink">Notes</span>
                 <textarea
                   name="notes"
                   rows={2}
@@ -1145,7 +1196,7 @@ async function HiringTeamSection({
             </ApplicationActionForm>
             </details>
             <details>
-              <summary className="cursor-pointer text-sm font-semibold text-slate-900">
+              <summary className="cursor-pointer text-sm font-semibold text-ink">
                 {hiringTeamConfig.actions.addPerson}
               </summary>
               <ApplicationActionForm
@@ -1156,23 +1207,23 @@ async function HiringTeamSection({
                 <input type="hidden" name="campaignId" value={campaignId} />
                 <input type="hidden" name="personaId" value={role.id} />
                 <label className="block text-sm">
-                  <span className="font-medium text-slate-700">First name</span>
+                  <span className="font-medium text-ink">First name</span>
                   <input name="firstName" required className={fieldClass} />
                 </label>
                 <label className="block text-sm">
-                  <span className="font-medium text-slate-700">Last name</span>
+                  <span className="font-medium text-ink">Last name</span>
                   <input name="lastName" required className={fieldClass} />
                 </label>
                 <label className="block text-sm">
-                  <span className="font-medium text-slate-700">Title</span>
+                  <span className="font-medium text-ink">Title</span>
                   <input name="title" required className={fieldClass} />
                 </label>
                 <label className="block text-sm">
-                  <span className="font-medium text-slate-700">Email</span>
+                  <span className="font-medium text-ink">Email</span>
                   <input name="email" type="email" className={fieldClass} />
                 </label>
                 <label className="block text-sm">
-                  <span className="font-medium text-slate-700">
+                  <span className="font-medium text-ink">
                     {outreachConfig.labels.pasteLinkedIn}
                   </span>
                   <textarea name="linkedInProfileText" rows={6} className={fieldClass} />
@@ -1229,24 +1280,25 @@ async function HiringTeamSection({
     </details>
   );
   return (
-    <details id="hiring-team" className="space-y-4 rounded-lg border border-slate-200 bg-white p-5" data-testid="hiring-team">
-      <summary className="cursor-pointer text-base font-semibold text-slate-900">
+    <details id="hiring-team" className="space-y-4 rounded-lg border border-edge bg-surface p-5" data-testid="hiring-team">
+      {asPage ? <OpenDetailsOnMount /> : null}
+      <summary className="cursor-pointer text-base font-semibold text-ink">
         {hiringTeamConfig.workspaceTitle}
       </summary>
       <div className="mt-4 space-y-4">
-      <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+      <p className="rounded-md border border-edge bg-canvas px-3 py-2 text-sm text-ink">
         {hiringTeamConfig.addPersonNote}
       </p>
       <WorkspaceProgress jobs={jobs} type="HIRING_TEAM_IDENTIFY" />
       <WorkspaceProgress jobs={jobs} type="HIRING_TEAM_BUILD" />
       <WorkspaceProgress jobs={jobs} type="CONTACT_PROFILE" />
       <div>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Roles for this {vocab.campaign.singular} are identified from the job and employer research. Review each draft before you rely on it. Saved templates are added only when you choose one.
         </p>
       </div>
       {roles.length === 0 ? (
-        <p className="text-sm text-slate-600">No {vocab.persona.plural} yet.</p>
+        <p className="text-sm text-muted">No {vocab.persona.plural} yet.</p>
       ) : (
         <div className="space-y-5">
           <HiringTeamDisclosureGroup
@@ -1262,7 +1314,7 @@ async function HiringTeamSection({
             {indirectRoles.length > 0 ? (
               indirectRoles.map(roleCard)
             ) : (
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-subtle">
                 No indirect {vocab.persona.plural.toLowerCase()}.
               </p>
             )}
@@ -1282,23 +1334,23 @@ async function HiringTeamSection({
         <ApplicationActionForm action={addApplicationRoleAction} submitLabel={`Add ${vocab.persona.singular}`} testId="add-hiring-team-role">
           <input type="hidden" name="campaignId" value={campaignId} />
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Name</span>
+            <span className="font-medium text-ink">Name</span>
             <input name="name" required className={fieldClass} />
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Likely titles</span>
+            <span className="font-medium text-ink">Likely titles</span>
             <textarea name="likelyTitles" rows={3} className={fieldClass} />
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Department</span>
+            <span className="font-medium text-ink">Department</span>
             <input name="department" className={fieldClass} />
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Why this role matters</span>
+            <span className="font-medium text-ink">Why this role matters</span>
             <textarea name="whyThisRoleMatters" rows={2} className={fieldClass} />
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Notes</span>
+            <span className="font-medium text-ink">Notes</span>
             <textarea name="notes" rows={2} className={fieldClass} />
           </label>
         </ApplicationActionForm>
@@ -1307,7 +1359,7 @@ async function HiringTeamSection({
         <ApplicationActionForm action={addTemplateRoleAction} submitLabel="Add saved template" testId="add-template-role">
           <input type="hidden" name="campaignId" value={campaignId} />
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">Saved template</span>
+            <span className="font-medium text-ink">Saved template</span>
             <select name="templateId" required className={fieldClass} defaultValue="">
               <option value="" disabled>
                 Choose a template
@@ -1337,8 +1389,8 @@ function AnnotatedBlock({
   if (visible.length === 0) return null;
   return (
     <div>
-      <h4 className="text-sm font-medium text-slate-900">{title}</h4>
-      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-800">
+      <h4 className="text-sm font-medium text-ink">{title}</h4>
+      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink">
         {visible.map((item) => (
           <li key={item.text}>
             {item.text}
@@ -1353,8 +1405,8 @@ function AnnotatedBlock({
 function Field({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-1 text-sm text-slate-900">{value?.trim() ? value : "—"}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide text-subtle">{label}</dt>
+      <dd className="mt-1 text-sm text-ink">{value?.trim() ? value : "—"}</dd>
     </div>
   );
 }
@@ -1364,8 +1416,8 @@ function BulletList({ title, items }: { title: string; items: string[] }) {
   if (visible.length === 0) return null;
   return (
     <div>
-      <h3 className="text-sm font-medium text-slate-900">{title}</h3>
-      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-800">
+      <h3 className="text-sm font-medium text-ink">{title}</h3>
+      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink">
         {visible.map((item) => (
           <li key={item}>{item}</li>
         ))}

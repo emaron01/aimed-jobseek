@@ -27,11 +27,11 @@ export function HiringTeamDisclosureGroup({
       data-testid={`hiring-team-${groupKey}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        <h3 className="text-sm font-semibold text-ink">{title}</h3>
         <div className="flex gap-2 print:hidden">
           <AppButton
             type="button"
-            className="text-xs font-medium text-slate-700 underline"
+            className="text-xs font-medium text-ink underline"
             onClick={() => setAll(true)}
             data-testid={`expand-all-${groupKey}`}
           >
@@ -39,7 +39,7 @@ export function HiringTeamDisclosureGroup({
           </AppButton>
           <AppButton
             type="button"
-            className="text-xs font-medium text-slate-700 underline"
+            className="text-xs font-medium text-ink underline"
             onClick={() => setAll(false)}
             data-testid={`collapse-all-${groupKey}`}
           >

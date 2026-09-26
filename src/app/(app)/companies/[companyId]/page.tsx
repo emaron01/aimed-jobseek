@@ -62,7 +62,7 @@ export default async function CompanyResearchPage({ params }: PageProps) {
         />
       </div>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-8">
+      <section className="rounded-lg border border-edge bg-surface p-5 sm:p-8">
         <CompanyResearchBriefing
           companyId={company.id}
           companyName={company.name}

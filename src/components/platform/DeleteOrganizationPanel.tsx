@@ -35,16 +35,16 @@ export function DeleteOrganizationPanel({
 
   return (
     <div
-      className="max-w-md space-y-3 rounded-md border border-red-200 bg-red-50/60 p-4"
+      className="max-w-md space-y-3 rounded-md border border-danger bg-danger-tint/60 p-4"
       data-testid="platform-delete-organization"
     >
       <div>
-        <h3 className="text-sm font-medium text-slate-900">
+        <h3 className="text-sm font-medium text-ink">
           Delete organization
         </h3>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Permanently remove{" "}
-          <span className="font-medium text-slate-800">{organizationName}</span>{" "}
+          <span className="font-medium text-ink">{organizationName}</span>{" "}
           and all associated data. Any linked Stripe subscription is canceled
           first (already-canceled subscriptions are fine). This cannot be
           undone.
@@ -55,23 +55,23 @@ export function DeleteOrganizationPanel({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-50"
+          className="rounded-md border border-danger bg-surface px-3 py-2 text-sm font-medium text-danger hover:bg-danger-tint"
           data-testid="platform-delete-organization-open"
         >
           Delete Organization
         </button>
       ) : (
         <div
-          className="space-y-3 rounded-md border border-red-300 bg-white p-3"
+          className="space-y-3 rounded-md border border-danger bg-surface p-3"
           role="alertdialog"
           aria-modal="true"
           aria-labelledby={titleId}
           data-testid="platform-delete-organization-modal"
         >
-          <p id={titleId} className="text-sm font-semibold text-slate-900">
+          <p id={titleId} className="text-sm font-semibold text-ink">
             Confirm permanent deletion
           </p>
-          <p className="text-sm text-slate-700">
+          <p className="text-sm text-ink">
             This will cancel any Stripe subscription for this organization,
             then permanently delete the organization and all associated data.
             Already-canceled Stripe subscriptions are skipped. If Stripe is not
@@ -80,7 +80,7 @@ export function DeleteOrganizationPanel({
           </p>
           <form action={formAction} className="space-y-3">
             <input type="hidden" name="organizationId" value={organizationId} />
-            <label htmlFor={inputId} className="block text-sm text-slate-700">
+            <label htmlFor={inputId} className="block text-sm text-ink">
               Type <span className="font-mono font-semibold">{CONFIRM_PHRASE}</span>{" "}
               to confirm
               <input
@@ -90,7 +90,7 @@ export function DeleteOrganizationPanel({
                 onChange={(e) => setConfirmation(e.target.value)}
                 autoComplete="off"
                 spellCheck={false}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 font-mono text-sm"
                 data-testid="platform-delete-organization-confirm-input"
               />
             </label>
@@ -98,7 +98,7 @@ export function DeleteOrganizationPanel({
               <button
                 type="submit"
                 disabled={!matches || pending}
-                className="rounded-md bg-red-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-md bg-danger px-3 py-2 text-sm font-medium text-on-ink disabled:cursor-not-allowed disabled:opacity-50"
                 data-testid="platform-delete-organization-submit"
               >
                 {pending ? "Deleting…" : "Permanently Delete"}
@@ -116,7 +116,7 @@ export function DeleteOrganizationPanel({
           </form>
           {state && !state.ok ? (
             <p
-              className="text-sm text-red-600"
+              className="text-sm text-danger"
               role="alert"
               data-testid="platform-delete-organization-error"
             >

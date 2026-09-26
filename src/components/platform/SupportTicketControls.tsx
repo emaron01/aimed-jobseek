@@ -23,11 +23,11 @@ export function SupportTicketStatusForm({
     >
       <input type="hidden" name="ticketId" value={ticketId} />
       <label className="text-sm">
-        <span className="block font-medium text-slate-700">Status</span>
+        <span className="block font-medium text-ink">Status</span>
         <select
           name="status"
           defaultValue={status}
-          className="mt-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+          className="mt-1 rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm"
         >
           <option value="OPEN">Open</option>
           <option value="IN_PROGRESS">In progress</option>
@@ -48,15 +48,15 @@ export function SupportTicketNoteForm({ ticketId }: { ticketId: string }) {
     >
       <input type="hidden" name="ticketId" value={ticketId} />
       <label className="block text-sm">
-        <span className="font-medium text-slate-700">Internal note</span>
+        <span className="font-medium text-ink">Internal note</span>
         <textarea
           name="body"
           required
           maxLength={5000}
           rows={4}
-          className="mt-1 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 focus:ring-2"
+          className="mt-1 w-full resize-y rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-focus focus:ring-2"
         />
-        <span className="mt-1 block text-xs text-slate-500">
+        <span className="mt-1 block text-xs text-subtle">
           Internal notes are never visible to the user.
         </span>
       </label>

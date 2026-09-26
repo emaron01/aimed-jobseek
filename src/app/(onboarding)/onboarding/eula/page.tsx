@@ -20,13 +20,13 @@ export default async function OnboardingEulaPage({
         <h1 className="text-2xl font-semibold tracking-tight">
           Terms of Service
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           {updated
             ? "Our terms have been updated. Please review and accept to continue."
             : "Please review and accept the terms to continue."}
         </p>
         {version ? (
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-subtle">
             Version {version.versionNumber}
             {version.publishedAt
               ? ` · Published ${version.publishedAt.toLocaleDateString()}`
@@ -38,7 +38,7 @@ export default async function OnboardingEulaPage({
       {version ? (
         <>
           <div
-            className="max-h-[50vh] overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800"
+            className="max-h-[50vh] overflow-y-auto rounded-lg border border-edge bg-surface p-4 text-sm leading-relaxed text-ink"
             data-testid="eula-content"
           >
             <pre className="whitespace-pre-wrap font-sans">{version.content}</pre>
@@ -46,7 +46,7 @@ export default async function OnboardingEulaPage({
           <AcceptEulaForm versionNumber={version.versionNumber} />
         </>
       ) : (
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           No published terms are available. Please contact support.
         </p>
       )}

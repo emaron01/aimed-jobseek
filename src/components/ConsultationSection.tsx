@@ -136,12 +136,14 @@ export async function ConsultationSection({
   canEdit,
   defaultOpen = true,
   jobs = [],
+  layout = "page",
 }: {
   campaignId: string;
   organizationId: string;
   canEdit: boolean;
   defaultOpen?: boolean;
   jobs?: WorkspaceJobStatusView[];
+  layout?: "page" | "dock";
 }) {
   const [session, campaign] = await Promise.all([
     prisma.consultationSession.findFirst({
@@ -182,30 +184,19 @@ export async function ConsultationSection({
   const statements = session?.statements ?? [];
   const latestDraftTurnId = draftStatements.at(-1)?.turnId ?? null;
 
-  return (
-    <>
-    <OpenWorkspaceHashSection sectionId={workspaceSectionId("CONSULTATION")} />
-    <details
-      open={defaultOpen}
-      id={workspaceSectionId("CONSULTATION")}
-      className={`space-y-4 rounded-lg border border-slate-200 bg-white p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
-      data-testid="consultation"
-    >
-      <summary className="cursor-pointer text-base font-semibold text-slate-900">
-        Consultation with {consultationConfig.displayName}
-      </summary>
-      <div className="mt-4 space-y-4">
+  const body = (
+      <div className={layout === "dock" ? "space-y-4" : "mt-4 space-y-4"}>
       <WorkspaceProgress jobs={jobs} type="CONSULTATION" stayAndWatch />
       {jobs.some(
         (job) =>
           job.type === "CONSULTATION" &&
           (job.status === "PENDING" || job.status === "IN_PROGRESS"),
       ) || session?.generationStatus === "GENERATING" ? (
-        <p className="text-sm text-slate-600" data-testid="harper-typing">
+        <p className="text-sm text-muted" data-testid="harper-typing">
           <AppPendingIndicator label={workspaceJobCopy.typing} />
         </p>
       ) : null}
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-muted">
         {consultationConfig.displayName} compares this job with the {vocab.product.singular} and draws out the stories behind the gaps. Nothing is added to the {vocab.product.singular} until you confirm it.
       </p>
       {personPreps.length > 0 ? (
@@ -213,20 +204,20 @@ export async function ConsultationSection({
           {personPreps.map((prep) => (
             <article
               key={prep.contactId}
-              className="rounded-md border border-slate-200 bg-slate-50 p-4"
+              className="rounded-md border border-edge bg-canvas p-4"
             >
-              <h4 className="text-sm font-semibold text-slate-900">
+              <h4 className="text-sm font-semibold text-ink">
                 {interviewConfig.labels.personPrepOffer}: {prep.name || prep.roleName}
               </h4>
               {prep.openingText ? (
-                <p className="mt-2 text-sm text-slate-800">{prep.openingText}</p>
+                <p className="mt-2 text-sm text-ink">{prep.openingText}</p>
               ) : (
-                <p className="mt-2 text-sm text-slate-600">
+                <p className="mt-2 text-sm text-muted">
                   <AppPendingIndicator label={workspaceJobCopy.typing} />
                 </p>
               )}
               {prep.confirmedAnswers.length > 0 ? (
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-800">
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-ink">
                   {prep.confirmedAnswers.map((answer) => (
                     <li key={answer.turnId}>{answer.text}</li>
                   ))}
@@ -239,21 +230,21 @@ export async function ConsultationSection({
 
       {briefing?.success ? (
         <div
-          className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-4"
+          className="space-y-2 rounded-md border border-edge bg-canvas p-4"
           data-testid="consultation-briefing"
         >
-          <p className="text-sm text-slate-900">{briefing.data.overall}</p>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-slate-800">
+          <p className="text-sm text-ink">{briefing.data.overall}</p>
+          <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
             {briefing.data.strongestAngles.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-slate-800">
+          <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
             {briefing.data.importantGaps.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
-          <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-800">
+          <ol className="list-decimal space-y-1 pl-5 text-sm text-ink">
             {briefing.data.storyPlan.map((item) => (
               <li key={item}>{item}</li>
             ))}
@@ -306,15 +297,15 @@ export async function ConsultationSection({
           })}
         />
       ) : (
-        <p className="text-sm text-slate-600">Evidence has not been assessed yet.</p>
+        <p className="text-sm text-muted">Evidence has not been assessed yet.</p>
       )}
 
       {qualityNote ? (
         <div
-          className={`space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 ${WORKSPACE_CARD_WRAP_CLASS}`}
+          className={`space-y-2 rounded-md border border-warning bg-warning-tint p-3 ${WORKSPACE_CARD_WRAP_CLASS}`}
           data-testid="consultation-failed"
         >
-          <p className={`text-sm text-amber-950 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>{qualityNote}</p>
+          <p className={`text-sm text-warning ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>{qualityNote}</p>
           {canEdit ? (
             <ApplicationActionForm
               action={retryConsultationAction}
@@ -328,15 +319,15 @@ export async function ConsultationSection({
       ) : null}
 
       {session?.status === "SKIPPED" ? (
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-ink">
           Consultation is skipped. Materials can still be generated from the {vocab.product.singular} alone.
         </p>
       ) : null}
       {session?.status === "PAUSED" ? (
-        <p className="text-sm text-slate-700">Paused. Resume when you want to continue.</p>
+        <p className="text-sm text-ink">Paused. Resume when you want to continue.</p>
       ) : null}
       {session?.status === "DONE" ? (
-        <p className="text-sm text-slate-700">{consultationConversationCopy.planComplete}</p>
+        <p className="text-sm text-ink">{consultationConversationCopy.planComplete}</p>
       ) : null}
 
       {canEdit &&
@@ -409,6 +400,29 @@ export async function ConsultationSection({
         </ApplicationActionForm>
       ) : null}
       </div>
+  );
+
+  if (layout === "dock") {
+    return (
+      <div className={WORKSPACE_CARD_WRAP_CLASS} data-testid="consultation">
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <>
+    <OpenWorkspaceHashSection sectionId={workspaceSectionId("CONSULTATION")} />
+    <details
+      open={defaultOpen}
+      id={workspaceSectionId("CONSULTATION")}
+      className={`space-y-4 rounded-lg border border-edge bg-surface p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
+      data-testid="consultation"
+    >
+      <summary className="cursor-pointer text-base font-semibold text-ink">
+        Consultation with {consultationConfig.displayName}
+      </summary>
+      {body}
     </details>
     </>
   );

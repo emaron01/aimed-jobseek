@@ -58,7 +58,7 @@ export function PlatformConsoleNav({
   return (
     <nav
       aria-label="Platform console"
-      className="mb-6 flex flex-wrap gap-1 border-b border-slate-200 pb-3 text-sm"
+      className="mb-6 flex flex-wrap gap-1 border-b border-edge pb-3 text-sm"
       data-testid="platform-console-nav"
     >
       {items.map((item) => {
@@ -72,8 +72,8 @@ export function PlatformConsoleNav({
             href={item.href}
             className={`rounded-md px-3 py-1.5 font-medium ${
               active
-                ? "bg-slate-900 text-white"
-                : "text-slate-700 hover:bg-slate-100"
+                ? "bg-ink text-on-ink"
+                : "text-ink hover:bg-canvas"
             }`}
           >
             {item.label}

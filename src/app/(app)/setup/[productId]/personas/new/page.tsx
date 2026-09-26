@@ -40,7 +40,7 @@ export default async function NewPersonaPage({ params }: PageProps) {
     return (
       <div className="space-y-4">
         <PageHeader title={`Build ${vocab.persona.Singular}`} />
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           Approve the {vocab.product.Singular} before building {vocab.persona.Plural}.
         </p>
         <Link href={`/setup/${product.id}/research`} className="underline">
@@ -64,7 +64,7 @@ export default async function NewPersonaPage({ params }: PageProps) {
           </Link>
         }
       />
-      <section className="rounded-lg border border-slate-200 bg-white p-5">
+      <section className="rounded-lg border border-edge bg-surface p-5">
         <BuildPersonaForm productId={product.id} role={null} />
       </section>
     </div>

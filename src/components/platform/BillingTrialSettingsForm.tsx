@@ -36,7 +36,7 @@ export function BillingTrialSettingsForm({
 
   return (
     <div className="space-y-4" data-testid="billing-trial-settings">
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-subtle">
         Changes apply only to new Checkout sessions. Orgs already on a trial
         keep their Stripe trial end date.
       </p>
@@ -69,7 +69,7 @@ export function BillingTrialSettingsForm({
             role="status"
             data-testid="billing-trial-settings-status"
             className={
-              state.ok ? "text-sm text-emerald-700" : "text-sm text-red-600"
+              state.ok ? "text-sm text-success" : "text-sm text-danger"
             }
           >
             {state.message}
@@ -118,21 +118,21 @@ function PlanTrialFields({
       : `${effectiveDays}-day trial on new ${planLabel} Checkout`;
 
   return (
-    <fieldset className="space-y-3 rounded-md border border-slate-200 p-3">
-      <legend className="px-1 text-sm font-medium text-slate-900">
+    <fieldset className="space-y-3 rounded-md border border-edge p-3">
+      <legend className="px-1 text-sm font-medium text-ink">
         {planLabel} free trial
       </legend>
 
-      <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+      <div className="rounded-md border border-edge bg-canvas px-3 py-2 text-sm text-ink">
         <p className="font-medium">{effectiveLabel}</p>
-        <p className="mt-0.5 text-slate-600">
+        <p className="mt-0.5 text-muted">
           Source: {sourceLabel}
           {hasConsoleRow ? "" : " (no console override)"}
         </p>
       </div>
 
       <div className="space-y-2">
-        <label className="flex items-center gap-2 text-sm text-slate-700">
+        <label className="flex items-center gap-2 text-sm text-ink">
           <input
             type="radio"
             name={`${namePrefix}Enabled`}
@@ -141,7 +141,7 @@ function PlanTrialFields({
           />
           On
         </label>
-        <label className="flex items-center gap-2 text-sm text-slate-700">
+        <label className="flex items-center gap-2 text-sm text-ink">
           <input
             type="radio"
             name={`${namePrefix}Enabled`}
@@ -153,16 +153,16 @@ function PlanTrialFields({
       </div>
 
       <label className="block text-sm">
-        <span className="font-medium text-slate-800">Duration (days)</span>
+        <span className="font-medium text-ink">Duration (days)</span>
         <input
           type="number"
           name={`${namePrefix}Days`}
           min={MIN_TRIAL_PERIOD_DAYS}
           max={MAX_TRIAL_PERIOD_DAYS}
           defaultValue={defaultDays}
-          className="mt-1 w-32 rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="mt-1 w-32 rounded-md border border-edge-strong px-3 py-2 text-sm"
         />
-        <span className="mt-1 block text-xs text-slate-500">
+        <span className="mt-1 block text-xs text-subtle">
           Required when trial is on ({MIN_TRIAL_PERIOD_DAYS}–
           {MAX_TRIAL_PERIOD_DAYS}).
         </span>

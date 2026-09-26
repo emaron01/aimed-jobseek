@@ -38,10 +38,10 @@ export function ProductContinuePicker({
 
   return (
     <div className="space-y-4">
-      <label className="block text-sm text-slate-700">
-        <span className="mb-2 block font-medium text-slate-900">{vocab.product.Singular}</span>
+      <label className="block text-sm text-ink">
+        <span className="mb-2 block font-medium text-ink">{vocab.product.Singular}</span>
         <select
-          className="w-full max-w-md rounded-md border border-slate-300 bg-white px-3 py-2"
+          className="w-full max-w-md rounded-md border border-edge-strong bg-surface px-3 py-2"
           value={productId}
           onChange={(event) => setProductId(event.target.value)}
         >

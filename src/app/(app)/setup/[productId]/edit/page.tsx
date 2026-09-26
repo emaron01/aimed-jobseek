@@ -48,7 +48,7 @@ export default async function EditProductPage({ params }: PageProps) {
           </Link>
         }
       />
-      <div className="rounded-lg border border-slate-200 bg-white p-5">
+      <div className="rounded-lg border border-edge bg-surface p-5">
         <CandidateProfileEditForm
           productId={product.id}
           profileJson={product.profileJson}

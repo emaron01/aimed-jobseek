@@ -32,7 +32,7 @@ function ReadCriterionRow({ criterion }: { criterion: IcpCriterionReviewRow }) {
   const tier = normalizeIcpCriterionTier(criterion.tier) ?? "PRIMARY";
 
   return (
-    <li className="text-[17px] leading-relaxed text-slate-800">
+    <li className="text-[17px] leading-relaxed text-ink">
       {formatCriterionDisplay({
         ...criterion,
         dataType: criterion.dataType as never,
@@ -44,8 +44,8 @@ function ReadCriterionRow({ criterion }: { criterion: IcpCriterionReviewRow }) {
       <span
         className={`research-source-chip-print ml-2 inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${
           availability.tone === "warning"
-            ? "border-amber-200 bg-amber-50 text-amber-900"
-            : "border-slate-200 bg-white text-slate-600"
+            ? "border-warning bg-warning-tint text-warning"
+            : "border-edge bg-surface text-muted"
         }`}
         title={availability.label}
       >
@@ -54,14 +54,14 @@ function ReadCriterionRow({ criterion }: { criterion: IcpCriterionReviewRow }) {
       {criterionFlagLabels(criterion).map((label) => (
         <span
           key={label}
-          className="ml-2 inline-block rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700"
+          className="ml-2 inline-block rounded-full border border-edge bg-canvas px-2 py-0.5 text-[11px] font-medium text-ink"
         >
           {label}
         </span>
       ))}
       {tier === "PRIMARY" && criterion.isMandatory ? (
         <span
-          className="ml-2 text-xs font-medium text-red-800"
+          className="ml-2 text-xs font-medium text-danger"
           title={ICP_MANDATORY_EXPLANATION}
         >
           Mandatory
@@ -69,14 +69,14 @@ function ReadCriterionRow({ criterion }: { criterion: IcpCriterionReviewRow }) {
       ) : null}
       {isLimitedPublicEvidenceClass(evidenceClass) ? (
         <p
-          className="mt-1 text-sm text-amber-950"
+          className="mt-1 text-sm text-warning"
           data-testid="limited-public-evidence-warning"
         >
           {LIMITED_PUBLIC_EVIDENCE_CRITERION_WARNING}
         </p>
       ) : null}
       {criterion.strengthAdjustment ? (
-        <p className="mt-1 text-sm text-slate-600" data-testid="criterion-strength-adjustment">
+        <p className="mt-1 text-sm text-muted" data-testid="criterion-strength-adjustment">
           {criterion.strengthAdjustment}
         </p>
       ) : null}
@@ -120,16 +120,16 @@ export function IcpCriteriaBriefing({
           empty={!interpretationSummary?.trim()}
         >
           {interpretationSummary?.trim() ? (
-            <p className="text-[17px] leading-7 text-slate-800">
+            <p className="text-[17px] leading-7 text-ink">
               {interpretationSummary.trim()}
             </p>
           ) : null}
           {interpretationUndetermined?.trim() ? (
             <div className="mt-3" data-testid="icp-interpretation-undetermined">
-              <p className="text-sm font-medium text-amber-900">
+              <p className="text-sm font-medium text-warning">
                 Could not be determined from available data
               </p>
-              <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px] text-amber-950">
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px] text-warning">
                 {interpretationUndetermined
                   .split("\n")
                   .map((item) => item.trim())
@@ -145,7 +145,7 @@ export function IcpCriteriaBriefing({
 
       {criteria.length > 0 ? (
       <ResearchReadSection title={icpLabels.scoringCriteria} empty={false}>
-        <p className="text-sm text-slate-600" data-testid="icp-role-summary">
+        <p className="text-sm text-muted" data-testid="icp-role-summary">
           {buildIcpRoleSummary({
             primaryCount: primary.length,
             secondaryCount: secondary.length,
@@ -153,7 +153,7 @@ export function IcpCriteriaBriefing({
         </p>
         {primary.length > 0 ? (
           <div className="mt-4" data-testid="icp-primary-tier">
-            <p className="text-sm font-semibold text-slate-900">
+            <p className="text-sm font-semibold text-ink">
               {ICP_PRIMARY_TIER_HEADER}
             </p>
             <ul className="mt-2 list-disc space-y-2 pl-5">
@@ -168,7 +168,7 @@ export function IcpCriteriaBriefing({
         ) : null}
         {secondary.length > 0 ? (
           <div className="mt-4" data-testid="icp-secondary-tier">
-            <p className="text-sm font-semibold text-slate-900">
+            <p className="text-sm font-semibold text-ink">
               {ICP_SECONDARY_TIER_HEADER}
             </p>
             <ul className="mt-2 list-disc space-y-2 pl-5">
@@ -259,20 +259,20 @@ export function IcpBriefingDocument({
 
   return (
     <article className="space-y-8">
-      <header className="space-y-1 border-b border-slate-200 pb-4">
-        <h2 className="text-xl font-semibold text-slate-900">{name}</h2>
-        {metaLine ? <p className="text-sm text-slate-600">{metaLine}</p> : null}
+      <header className="space-y-1 border-b border-edge pb-4">
+        <h2 className="text-xl font-semibold text-ink">{name}</h2>
+        {metaLine ? <p className="text-sm text-muted">{metaLine}</p> : null}
       </header>
 
       {showPay && compensation ? (
         <ResearchReadSection title={compensationCopy.annualEarningsLabel} empty={false}>
-          <p className="text-sm text-slate-600">{compensationCopy.annualEarningsHint}</p>
+          <p className="text-sm text-muted">{compensationCopy.annualEarningsHint}</p>
           {compensation.compensationCurrency ? (
-            <p className="mt-2 text-sm text-slate-700">
+            <p className="mt-2 text-sm text-ink">
               {compensationCopy.currencyLabel}: {compensation.compensationCurrency}
             </p>
           ) : null}
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-[17px] text-slate-800">
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-[17px] text-ink">
             {payLines.map((line) => (
               <li key={line}>{line}</li>
             ))}
@@ -290,10 +290,10 @@ export function IcpBriefingDocument({
 
       <ResearchReadSection title={`${vocab.idealCustomer.Singular} definition`} empty={!definition?.trim()}>
         {definition?.trim() ? (
-          <p className="text-[17px] leading-7 text-slate-800">{definition.trim()}</p>
+          <p className="text-[17px] leading-7 text-ink">{definition.trim()}</p>
         ) : null}
         {description?.trim() ? (
-          <p className="mt-2 text-sm text-slate-600">{description.trim()}</p>
+          <p className="mt-2 text-sm text-muted">{description.trim()}</p>
         ) : null}
       </ResearchReadSection>
 

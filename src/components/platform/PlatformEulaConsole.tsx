@@ -36,15 +36,15 @@ export function PlatformEulaConsole({
 
   return (
     <div className="space-y-8">
-      <section className="rounded-lg border border-slate-200 bg-white p-5">
+      <section className="rounded-lg border border-edge bg-surface p-5">
         <h2 className="text-lg font-semibold tracking-tight">Versions</h2>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Only one version is published at a time. Published text cannot be
           edited — create a new draft and publish it to require re-acceptance.
         </p>
         {publishState ? (
           <p
-            className={`mt-3 text-sm ${publishState.ok ? "text-emerald-800" : "text-red-700"}`}
+            className={`mt-3 text-sm ${publishState.ok ? "text-success" : "text-danger"}`}
             role="status"
           >
             {publishState.message}
@@ -57,19 +57,19 @@ export function PlatformEulaConsole({
               <li key={v.id} className="py-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium text-slate-900">
+                    <p className="text-sm font-medium text-ink">
                       Version {v.versionNumber}
                       {isPublished ? (
-                        <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-900">
+                        <span className="ml-2 rounded bg-success-tint px-1.5 py-0.5 text-xs font-medium text-success">
                           Published
                         </span>
                       ) : (
-                        <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">
+                        <span className="ml-2 rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink">
                           Draft
                         </span>
                       )}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-subtle">
                       Created {new Date(v.createdAt).toLocaleString()}
                       {v.publishedAt
                         ? ` · Published ${new Date(v.publishedAt).toLocaleString()}`
@@ -90,7 +90,7 @@ export function PlatformEulaConsole({
                     </form>
                   ) : null}
                 </div>
-                <pre className="mt-3 max-h-40 overflow-y-auto whitespace-pre-wrap rounded border border-slate-100 bg-slate-50 p-3 font-sans text-xs text-slate-700">
+                <pre className="mt-3 max-h-40 overflow-y-auto whitespace-pre-wrap rounded border border-edge bg-canvas p-3 font-sans text-xs text-ink">
                   {v.content}
                 </pre>
               </li>
@@ -98,25 +98,25 @@ export function PlatformEulaConsole({
           })}
         </ul>
         {versions.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-600">No versions yet.</p>
+          <p className="mt-2 text-sm text-muted">No versions yet.</p>
         ) : null}
         {published ? (
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-subtle">
             Current published: version {published.versionNumber}
           </p>
         ) : (
-          <p className="mt-2 text-sm text-amber-800">
+          <p className="mt-2 text-sm text-warning">
             No version is published. Users will not be gated until you publish
             one.
           </p>
         )}
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-5">
+      <section className="rounded-lg border border-edge bg-surface p-5">
         <h2 className="text-lg font-semibold tracking-tight">
           Create draft version
         </h2>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Paste the full legal text. Publishing later will unpublish the current
           live version.
         </p>
@@ -127,12 +127,12 @@ export function PlatformEulaConsole({
             rows={16}
             value={draftContent}
             onChange={(e) => setDraftContent(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs text-slate-800"
+            className="w-full rounded-md border border-edge-strong px-3 py-2 font-mono text-xs text-ink"
             placeholder="Paste EULA / Terms of Service text…"
           />
           {createState ? (
             <p
-              className={`text-sm ${createState.ok ? "text-emerald-800" : "text-red-700"}`}
+              className={`text-sm ${createState.ok ? "text-success" : "text-danger"}`}
               role="status"
             >
               {createState.message}

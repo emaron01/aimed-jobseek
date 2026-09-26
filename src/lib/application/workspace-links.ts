@@ -1,4 +1,9 @@
-import { WORKSPACE_JOB_TYPES, workspaceSectionId } from "@/lib/product-config";
+import {
+  applicationStepHref,
+  applicationStepList,
+  WORKSPACE_JOB_TYPES,
+  workspaceSectionId,
+} from "@/lib/product-config";
 
 export const WORKSPACE_CARD_WRAP_CLASS =
   "min-w-0 max-w-full overflow-x-hidden";
@@ -72,6 +77,9 @@ export function listWorkspaceHrefs(input: {
     workspaceCampaignSummaryHref(input.campaignId),
     workspaceInterviewStageHref(input.campaignId, input.interviewStageId),
     workspaceAssetDocxHref(input.assetId),
+    ...applicationStepList
+      .filter((step) => step.hrefSegment)
+      .map((step) => applicationStepHref(input.campaignId, step.key)),
     ...WORKSPACE_JOB_TYPES.map((type) => workspaceSectionHref(type)),
     workspaceSectionHref("RESEARCH"),
   ];
@@ -81,8 +89,12 @@ export function openWorkspaceSection(sectionId: string): void {
   if (typeof document === "undefined") {
     throw new Error("Workspace sections can only be opened in the browser.");
   }
+  if (sectionId === workspaceSectionId("CONSULTATION")) {
+    window.dispatchEvent(new Event("harper-open"));
+  }
   const el = document.getElementById(sectionId);
   if (!el) {
+    if (sectionId === workspaceSectionId("CONSULTATION")) return;
     throw new Error(`Workspace section #${sectionId} was not found.`);
   }
   if (el instanceof HTMLDetailsElement) el.open = true;

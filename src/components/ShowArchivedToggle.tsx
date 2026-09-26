@@ -14,7 +14,7 @@ export function ShowArchivedToggle({
   return (
     <Link
       href={href}
-      className="text-sm font-medium text-slate-700 underline-offset-2 hover:underline"
+      className="text-sm font-medium text-ink underline-offset-2 hover:underline"
       data-testid="show-archived-toggle"
     >
       {includeArchived ? `Hide archived ${label}` : `Show archived ${label}`}

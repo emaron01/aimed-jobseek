@@ -80,7 +80,7 @@ function BoxResearchGuidance({ notes }: { notes: string[] }) {
     <div className="mt-1.5">
       <AppButton
         type="button"
-        className="text-xs font-medium text-slate-600 underline"
+        className="text-xs font-medium text-muted underline"
         onClick={() => setOpen((v) => !v)}
       >
         {open
@@ -88,7 +88,7 @@ function BoxResearchGuidance({ notes }: { notes: string[] }) {
           : `Research notes (${notes.length})`}
       </AppButton>
       {open ? (
-        <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-slate-500">
+        <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-subtle">
           {notes.map((note) => (
             <li key={note}>{note}</li>
           ))}
@@ -166,23 +166,23 @@ function PersonaCriteriaEditor({
   );
 
   return (
-    <div className="md:col-span-2 space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+    <div className="md:col-span-2 space-y-3 rounded-md border border-edge bg-canvas p-3">
       <div>
-        <h3 className="text-sm font-semibold text-slate-900">
+        <h3 className="text-sm font-semibold text-ink">
           Scoring criteria & role signals
         </h3>
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-xs text-subtle">
           One criterion per line in each box. Type and disqualifier role come
           from which box a line is in. Manual edits in a box are preserved on
           later reinterpretation.
         </p>
       </div>
       {heldForReview.length > 0 ? (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+        <div className="rounded-md border border-warning bg-warning-tint px-3 py-2 text-sm text-warning">
           <p className="font-medium">
             Needs review — unrecognized criterion types (not scored as fit)
           </p>
-          <p className="mt-1 text-xs text-amber-900/80">
+          <p className="mt-1 text-xs text-warning/80">
             Classify each item into a scoring box, or dismiss it. Until then
             it is held out of scoring.
           </p>
@@ -190,16 +190,16 @@ function PersonaCriteriaEditor({
             {heldForReview.map((row) => (
               <li
                 key={row.name}
-                className="rounded border border-amber-200 bg-white px-2 py-2"
+                className="rounded border border-warning bg-surface px-2 py-2"
                 data-testid="needs-review-row"
               >
-                <p className="text-xs font-medium text-amber-950">{row.name}</p>
+                <p className="text-xs font-medium text-warning">{row.name}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {NEEDS_REVIEW_CLASSIFY_TARGETS.map((target) => (
                     <AppButton
                       key={target.role}
                       type="button"
-                      className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-950 hover:bg-amber-100"
+                      className="rounded border border-warning bg-warning-tint px-2 py-1 text-[11px] font-medium text-warning hover:bg-warning-tint"
                       onClick={() => classifyNeedsReview(row.name, target.box)}
                     >
                       {target.label}
@@ -228,8 +228,8 @@ function PersonaCriteriaEditor({
           return (
             <div key={meta.key}>
               <label className="block text-sm">
-                <span className="font-medium text-slate-700">{meta.label}</span>
-                <span className="mt-0.5 block text-xs font-normal text-slate-500">
+                <span className="font-medium text-ink">{meta.label}</span>
+                <span className="mt-0.5 block text-xs font-normal text-subtle">
                   {meta.hint}
                 </span>
                 <AutosizeTextarea
@@ -237,12 +237,12 @@ function PersonaCriteriaEditor({
                   onChange={(e) => updateBox(meta.key, e.target.value)}
                   minRows={3}
                   placeholder={meta.placeholder}
-                  className="mt-1 w-full resize-none overflow-hidden rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 placeholder:text-slate-400 focus:ring-2"
+                  className="mt-1 w-full resize-none overflow-hidden rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-focus placeholder:text-subtle focus:ring-2"
                 />
               </label>
               <BoxResearchGuidance notes={guidance} />
               {meta.key === "exclusions" && exclusionsEmpty ? (
-                <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <p className="mt-2 rounded-md border border-warning bg-warning-tint px-3 py-2 text-sm text-warning">
                   This {vocab.persona.singular} has no exclusion criteria — no {vocab.contact.singular} will be
                   disqualified.
                 </p>
@@ -287,12 +287,12 @@ function DraftEditField({
   hint?: string;
 }) {
   const shared =
-    "mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 placeholder:text-slate-400 focus:ring-2";
+    "mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-focus placeholder:text-subtle focus:ring-2";
   return (
     <label className="block text-sm">
-      <span className="font-medium text-slate-700">{label}</span>
+      <span className="font-medium text-ink">{label}</span>
       {hint ? (
-        <span className="mt-0.5 block text-xs font-normal text-slate-500">
+        <span className="mt-0.5 block text-xs font-normal text-subtle">
           {hint}
         </span>
       ) : null}
@@ -448,7 +448,7 @@ export function PersonaDraftReview({
   if (failed || !draft) {
     return (
       <div className="space-y-3">
-        <p className="text-sm text-amber-900">
+        <p className="text-sm text-warning">
           {errorSafe ||
             `${vocab.persona.Singular} synthesis could not be completed. Research evidence was preserved.`}
         </p>
@@ -464,7 +464,7 @@ export function PersonaDraftReview({
           </SecondaryButton>
         </form>
         {retry ? (
-          <p className="text-sm text-red-600">{retry.message}</p>
+          <p className="text-sm text-danger">{retry.message}</p>
         ) : null}
       </div>
     );
@@ -629,7 +629,7 @@ export function PersonaDraftReview({
               onChange={handleCriteriaChange}
             />
             {reviewResult.unmappedCriterionTypes.length > 0 ? (
-              <p className="md:col-span-2 text-xs text-slate-500">
+              <p className="md:col-span-2 text-xs text-subtle">
                 Unrecognized AI criterion types logged for review:{" "}
                 {reviewResult.unmappedCriterionTypes.join(", ")}
               </p>
@@ -637,7 +637,7 @@ export function PersonaDraftReview({
           </div>
         ) : null}
 
-        <div className="border-t border-slate-200 pt-5" data-print-hide>
+        <div className="border-t border-edge pt-5" data-print-hide>
           <SubmitButton disabled={pending}>
             {pending ? "Saving…" : `Review & Save ${vocab.persona.Singular}`}
           </SubmitButton>
@@ -645,8 +645,8 @@ export function PersonaDraftReview({
             <p
               className={
                 state.ok
-                  ? "mt-3 text-sm text-emerald-700"
-                  : "mt-3 text-sm text-red-600"
+                  ? "mt-3 text-sm text-success"
+                  : "mt-3 text-sm text-danger"
               }
             >
               {state.message}

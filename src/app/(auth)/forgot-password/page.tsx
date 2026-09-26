@@ -59,11 +59,11 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+    <div className="mx-auto w-full max-w-md rounded-xl border border-edge bg-surface p-8 shadow-sm">
+      <h1 className="text-2xl font-semibold tracking-tight text-ink">
         Forgot password
       </h1>
-      <p className="mt-1 text-sm text-slate-600">
+      <p className="mt-1 text-sm text-muted">
         We&apos;ll email reset instructions if an account exists.
       </p>
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -74,16 +74,16 @@ export default function ForgotPasswordPage() {
             type="email"
             required
             autoComplete="email"
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
           />
         </label>
         {message ? (
-          <p className="text-sm text-emerald-700" role="status">
+          <p className="text-sm text-success" role="status">
             {message}
           </p>
         ) : null}
         {error ? (
-          <p className="text-sm text-red-600" role="alert">
+          <p className="text-sm text-danger" role="alert">
             {error}
           </p>
         ) : null}

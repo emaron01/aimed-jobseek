@@ -6,7 +6,7 @@ import {
 
 function Fact({ value }: { value: { text?: string } | null | undefined }) {
   if (!value?.text?.trim()) return null;
-  return <p className="text-sm text-slate-800">{value.text}</p>;
+  return <p className="text-sm text-ink">{value.text}</p>;
 }
 
 function FactList({
@@ -19,10 +19,10 @@ function FactList({
   if (items.length === 0) return null;
   return (
     <div>
-      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+      <h3 className="text-sm font-semibold text-ink">{title}</h3>
       <ul className="mt-2 space-y-1">
         {items.map((item) => (
-          <li key={item.id} className="text-sm text-slate-800">
+          <li key={item.id} className="text-sm text-ink">
             {item.text}
           </li>
         ))}
@@ -40,18 +40,18 @@ function ApprovedProfileBody({ profile }: { profile: CandidateProfile }) {
       <Fact value={profile.positioning} />
       {profile.experience.map((role) => (
         <div key={role.id} className="space-y-1">
-          <p className="text-sm font-medium text-slate-900">
+          <p className="text-sm font-medium text-ink">
             {[role.title, role.employer].filter(Boolean).join(" · ")}
           </p>
-          <p className="text-xs text-slate-600">
+          <p className="text-xs text-muted">
             {[role.startDate, role.endDate ?? "Present"].filter(Boolean).join(" – ")}
             {role.location ? ` · ${role.location}` : ""}
           </p>
-          {role.summary ? <p className="text-sm text-slate-800">{role.summary}</p> : null}
+          {role.summary ? <p className="text-sm text-ink">{role.summary}</p> : null}
           {role.achievements.length > 0 ? (
             <ul className="list-disc space-y-1 pl-5">
               {role.achievements.map((item) => (
-                <li key={item.id} className="text-sm text-slate-800">
+                <li key={item.id} className="text-sm text-ink">
                   {item.text}
                 </li>
               ))}
@@ -70,7 +70,7 @@ export function ApprovedProductProfile({ profileJson }: { profileJson: unknown }
   const parsed = parseCandidateProfileSafe(profileJson);
   if (!parsed.ok) {
     return (
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-muted">
         The approved {vocab.product.singular} could not be displayed.
       </p>
     );

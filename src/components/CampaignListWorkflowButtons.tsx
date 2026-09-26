@@ -59,7 +59,7 @@ export function CampaignListWorkflowButtons({
           researchComplete
             ? cn(
                 PRIMARY_BUTTON_CLASS,
-                "gap-1.5 whitespace-nowrap !bg-emerald-600 hover:!bg-emerald-500",
+                "gap-1.5 whitespace-nowrap !bg-success hover:!bg-success",
               )
             : PRIMARY_BUTTON_CLASS
         }
@@ -68,7 +68,7 @@ export function CampaignListWorkflowButtons({
           <>
             <span
               aria-hidden="true"
-              className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-semibold text-emerald-600"
+              className="flex h-5 w-5 items-center justify-center rounded-full bg-surface text-xs font-semibold text-success"
             >
               ✓
             </span>
@@ -94,7 +94,7 @@ export function CampaignListWorkflowButtons({
           title={`Research companies on this ${vocab.list.singular} first`}
           className={cn(
             SECONDARY_BUTTON_CLASS,
-            "cursor-not-allowed border-slate-300 bg-slate-100 text-slate-500 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-500",
+            "cursor-not-allowed border-edge-strong bg-canvas text-subtle hover:border-edge-strong hover:bg-canvas hover:text-subtle",
           )}
         >
           {scoreLabel}

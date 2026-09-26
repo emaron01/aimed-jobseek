@@ -46,11 +46,11 @@ export function ResubscribeCheckoutButton() {
       >
         {pending ? "Redirecting…" : "Resubscribe"}
       </AppButton>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-subtle">
         Opens Stripe Checkout. Within 30 days of cancel you keep {vocab.contact.plural},
         {vocab.campaign.plural}, and your opt-out list; after that only your setup remains.
       </p>
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
     </div>
   );
 }

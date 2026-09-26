@@ -60,9 +60,9 @@ function competencyRefs(value: unknown): Array<{ id: string; text: string }> {
 }
 
 function TextList({ items }: { items: readonly string[] }) {
-  if (items.length === 0) return <p className="text-sm text-slate-500">Not stated.</p>;
+  if (items.length === 0) return <p className="text-sm text-subtle">Not stated.</p>;
   return (
-    <ul className="list-disc space-y-2 pl-5 text-sm text-slate-800">
+    <ul className="list-disc space-y-2 pl-5 text-sm text-ink">
       {items.map((item, index) => (
         <li key={`${index}:${item}`}>{item}</li>
       ))}
@@ -83,10 +83,10 @@ function SummarySection({
     <section
       id={id}
       data-print-id={id}
-      className="application-summary-section break-inside-avoid rounded-lg border border-slate-200 bg-white p-6"
+      className="application-summary-section break-inside-avoid rounded-lg border border-edge bg-surface p-6"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <h2 className="text-xl font-semibold text-slate-950">{title}</h2>
+        <h2 className="text-xl font-semibold text-ink">{title}</h2>
         <PrintApplicationSummaryButton sectionId={id} />
       </div>
       <div className="mt-4 space-y-4">{children}</div>
@@ -159,13 +159,13 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
 
       <div className="print:hidden">
         {view.summary?.generatedAt ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             Generated {view.summary.generatedAt.toLocaleString()}
             {view.stale ? " · Stale because source information changed" : ""}
           </p>
         ) : null}
         {summaryStatus === "FAILED" ? (
-          <p role="alert" className="mt-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <p role="alert" className="mt-2 rounded-md border border-danger bg-danger-tint p-3 text-sm text-danger">
             {view.summary?.generationError ?? "Cheat sheet synthesis failed. Retry."}
           </p>
         ) : null}
@@ -197,7 +197,7 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
 
       <SummarySection id="overview" title={applicationSummaryConfig.sections.overview}>
         {summaryStatus !== "READY" || !guidance ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             {summaryStatus === "FAILED"
               ? "Guidance generation failed. Use Retry above."
               : `Generate the ${applicationSummaryConfig.title} to create the 30-second fit, career recap, and gaps.`}
@@ -205,19 +205,19 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
         ) : (
           <>
             <div>
-              <h3 className="font-medium text-slate-900">
+              <h3 className="font-medium text-ink">
                 {applicationSummaryConfig.sections.thirtySecondFit}
               </h3>
-              <p className="mt-1 text-sm text-slate-800">{guidance.overview.thirtySecondFit.text}</p>
+              <p className="mt-1 text-sm text-ink">{guidance.overview.thirtySecondFit.text}</p>
             </div>
             <div>
-              <h3 className="font-medium text-slate-900">
+              <h3 className="font-medium text-ink">
                 {applicationSummaryConfig.sections.careerRecap}
               </h3>
-              <p className="mt-1 text-sm text-slate-800">{guidance.overview.careerRecap.text}</p>
+              <p className="mt-1 text-sm text-ink">{guidance.overview.careerRecap.text}</p>
             </div>
             <div>
-              <h3 className="font-medium text-slate-900">
+              <h3 className="font-medium text-ink">
                 {applicationSummaryConfig.sections.gapsToPrepare}
               </h3>
               <TextList items={guidance.overview.gapsToPrepare.map((item) => item.text)} />
@@ -233,19 +233,19 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
         return (
           <SummarySection key={sectionKey} id={sectionKey} title={heading}>
             {!section ? (
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-muted">
                 Generate the {applicationSummaryConfig.title} for this person.
               </p>
             ) : (
               <>
                 <div>
-                  <h3 className="font-medium text-slate-900">
+                  <h3 className="font-medium text-ink">
                     {applicationSummaryConfig.sections.caresAbout}
                   </h3>
                   <TextList items={section.caresAbout.map((item) => item.text)} />
                 </div>
                 <div>
-                  <h3 className="font-medium text-slate-900">
+                  <h3 className="font-medium text-ink">
                     {applicationSummaryConfig.sections.bestMaterial}
                   </h3>
                   <TextList items={section.bestMaterial.map((item) => item.text)} />
@@ -253,43 +253,43 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
                 {section.recruiter ? (
                   <>
                     <div>
-                      <h3 className="font-medium text-slate-900">
+                      <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.recruiterSummary}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-800">
+                      <p className="mt-1 text-sm text-ink">
                         {section.recruiter.sixtySecondSummary.text}
                       </p>
                     </div>
                     <div>
-                      <h3 className="font-medium text-slate-900">
+                      <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.whyThisCompany}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-800">
+                      <p className="mt-1 text-sm text-ink">
                         {section.recruiter.whyThisCompany.text}
                       </p>
                     </div>
                     <div>
-                      <h3 className="font-medium text-slate-900">
+                      <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.whyThisRole}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-800">{section.recruiter.whyThisRole.text}</p>
+                      <p className="mt-1 text-sm text-ink">{section.recruiter.whyThisRole.text}</p>
                     </div>
                     <div>
-                      <h3 className="font-medium text-slate-900">
+                      <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.logistics}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-800">{section.recruiter.logistics.text}</p>
+                      <p className="mt-1 text-sm text-ink">{section.recruiter.logistics.text}</p>
                     </div>
                     <div>
-                      <h3 className="font-medium text-slate-900">
+                      <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.compensation}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-800">
+                      <p className="mt-1 text-sm text-ink">
                         {section.recruiter.compensationReadiness.text}
                       </p>
                     </div>
                     <div>
-                      <h3 className="font-medium text-slate-900">
+                      <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.flagAnswers}
                       </h3>
                       <TextList items={section.recruiter.flagAnswers.map((item) => item.text)} />
@@ -299,10 +299,10 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
                 {section.hiringManager ? (
                   <>
                     <div>
-                      <h3 className="font-medium text-slate-900">
+                      <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.scorecard}
                       </h3>
-                      <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-slate-800">
+                      <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-ink">
                         {section.hiringManager.scorecardOutcomes.map((item) => (
                           <li key={item.outcome}>
                             {item.outcome}
@@ -313,15 +313,15 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
                       </ul>
                     </div>
                     <div>
-                      <h3 className="font-medium text-slate-900">
+                      <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.firstNinetyDays}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-800">
+                      <p className="mt-1 text-sm text-ink">
                         {section.hiringManager.firstNinetyDays.text}
                       </p>
                     </div>
                     <div>
-                      <h3 className="font-medium text-slate-900">
+                      <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.drillDowns}
                       </h3>
                       <TextList
@@ -329,7 +329,7 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
                       />
                     </div>
                     <div>
-                      <h3 className="font-medium text-slate-900">
+                      <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.gapsToPrepare}
                       </h3>
                       <TextList items={section.hiringManager.gaps.map((item) => item.text)} />
@@ -339,22 +339,22 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
                 {section.executive ? (
                   <>
                     <div>
-                      <h3 className="font-medium text-slate-900">
+                      <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.strategy}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-800">{section.executive.strategy.text}</p>
+                      <p className="mt-1 text-sm text-ink">{section.executive.strategy.text}</p>
                     </div>
                     <div>
-                      <h3 className="font-medium text-slate-900">
+                      <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.judgment}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-800">{section.executive.judgment.text}</p>
+                      <p className="mt-1 text-sm text-ink">{section.executive.judgment.text}</p>
                     </div>
                     <div>
-                      <h3 className="font-medium text-slate-900">
+                      <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.businessImpact}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-800">
+                      <p className="mt-1 text-sm text-ink">
                         {section.executive.businessImpact.text}
                       </p>
                     </div>
@@ -363,31 +363,31 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
                 {section.crossFunctional ? (
                   <>
                     <div>
-                      <h3 className="font-medium text-slate-900">
+                      <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.howWorkedAcross}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-800">
+                      <p className="mt-1 text-sm text-ink">
                         {section.crossFunctional.howWorkedAcross.text}
                       </p>
                     </div>
                     <div>
-                      <h3 className="font-medium text-slate-900">
+                      <h3 className="font-medium text-ink">
                         {applicationSummaryConfig.sections.dayToDay}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-800">
+                      <p className="mt-1 text-sm text-ink">
                         {section.crossFunctional.dayToDay.text}
                       </p>
                     </div>
                   </>
                 ) : null}
                 <div>
-                  <h3 className="font-medium text-slate-900">
+                  <h3 className="font-medium text-ink">
                     {applicationSummaryConfig.sections.likelyQuestions}
                   </h3>
                   <TextList items={section.likelyQuestions.map((item) => item.text)} />
                 </div>
                 <div>
-                  <h3 className="font-medium text-slate-900">
+                  <h3 className="font-medium text-ink">
                     {applicationSummaryConfig.sections.questionsToAsk}
                   </h3>
                   <TextList items={section.questionsToAsk.map((item) => item.text)} />
@@ -401,13 +401,13 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
       <SummarySection id="stories" title={applicationSummaryConfig.sections.stories}>
         {guidance && guidance.stories.length > 0 ? (
           guidance.stories.map((story) => (
-            <article key={story.storyId} className="break-inside-avoid rounded-md bg-slate-50 p-4">
-              <h3 className="font-medium text-slate-900">{story.headline}</h3>
-              <p className="mt-2 text-sm text-slate-800">{story.situation}</p>
-              <p className="mt-3 text-sm font-medium text-slate-900">
+            <article key={story.storyId} className="break-inside-avoid rounded-md bg-canvas p-4">
+              <h3 className="font-medium text-ink">{story.headline}</h3>
+              <p className="mt-2 text-sm text-ink">{story.situation}</p>
+              <p className="mt-3 text-sm font-medium text-ink">
                 {applicationSummaryConfig.sections.thisStoryAnswers}
               </p>
-              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-800">
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink">
                 {story.answers.map((item) => (
                   <li key={`${item.requirement}:${item.question}`}>
                     {item.requirement}: {item.question}
@@ -416,7 +416,7 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
               </ul>
               <div className="mt-3 space-y-2">
                 {story.variations.map((variation) => (
-                  <p key={variation.angle} className="text-sm text-slate-800">
+                  <p key={variation.angle} className="text-sm text-ink">
                     <span className="font-medium">{variation.angle}: </span>
                     {variation.text}
                   </p>
@@ -425,17 +425,17 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
             </article>
           ))
         ) : approvedStories.length === 0 ? (
-          <p className="text-sm text-slate-500">No approved STAR statements yet.</p>
+          <p className="text-sm text-subtle">No approved STAR statements yet.</p>
         ) : (
           approvedStories.map((story) => (
-            <article key={story.id} className="break-inside-avoid rounded-md bg-slate-50 p-4 text-sm text-slate-800">
+            <article key={story.id} className="break-inside-avoid rounded-md bg-canvas p-4 text-sm text-ink">
               {story.interviewAnswerApprovedAt && story.interviewAnswer ? (
                 <p>{story.interviewAnswer}</p>
               ) : null}
               {story.resumeBulletApprovedAt && story.resumeBullet ? (
                 <p className="mt-2 font-medium">{story.resumeBullet}</p>
               ) : null}
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-subtle">
                 {applicationSummaryConfig.sections.thisStoryAnswers}{" "}
                 {competencyRefs(story.competencyLinks)
                   .map((ref) => ref.text)
@@ -448,13 +448,13 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
 
       <SummarySection id="company" title={applicationSummaryConfig.sections.company}>
         <div>
-          <h3 className="font-medium text-slate-900">What they do</h3>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
+          <h3 className="font-medium text-ink">What they do</h3>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-ink">
             {view.research?.whatTheySell ?? view.research?.companySummary ?? "Not available."}
           </p>
         </div>
         <div>
-          <h3 className="font-medium text-slate-900">Customers</h3>
+          <h3 className="font-medium text-ink">Customers</h3>
           <TextList items={lines(view.research?.customerTypes)} />
         </div>
         <TextList items={lines(view.research?.hiringSignals)} />
@@ -470,29 +470,29 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
             ["Compensation in posting", view.requirement.compensationRange],
           ].map(([label, value]) => (
             <div key={label}>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
-              <dd className="mt-1 text-sm text-slate-900">{value || "Not stated."}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">{label}</dt>
+              <dd className="mt-1 text-sm text-ink">{value || "Not stated."}</dd>
             </div>
           ))}
         </dl>
         <div>
-          <h3 className="font-medium text-slate-900">Mission</h3>
-          <p className="mt-1 text-sm text-slate-800">
+          <h3 className="font-medium text-ink">Mission</h3>
+          <p className="mt-1 text-sm text-ink">
             {requirementScorecard.mission?.text ?? "Not stated."}
           </p>
         </div>
         <div>
-          <h3 className="font-medium text-slate-900">Key outcomes</h3>
+          <h3 className="font-medium text-ink">Key outcomes</h3>
           <TextList items={requirementScorecard.outcomes.map((item) => item.text)} />
         </div>
       </SummarySection>
 
       <SummarySection id="stages" title={applicationSummaryConfig.sections.interviewStages}>
         {view.stages.length === 0 ? (
-          <p className="text-sm text-slate-500">No interview stages yet.</p>
+          <p className="text-sm text-subtle">No interview stages yet.</p>
         ) : (
           <>
-            <ul className="space-y-3 text-sm text-slate-800">
+            <ul className="space-y-3 text-sm text-ink">
               {view.stages.map((stage) => (
                 <li key={stage.id}>
                   <span className="font-medium">{stageTypeLabel(stage.type)}</span>

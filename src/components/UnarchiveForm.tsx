@@ -42,12 +42,12 @@ export function UnarchiveForm({
         </AppButton>
       </form>
       {state && !state.ok ? (
-        <p className="mt-2 text-sm text-red-600" role="alert">
+        <p className="mt-2 text-sm text-danger" role="alert">
           {state.message}
         </p>
       ) : null}
       {state?.ok ? (
-        <p className="mt-2 text-sm text-emerald-700" role="status">
+        <p className="mt-2 text-sm text-success" role="status">
           {state.message}
         </p>
       ) : null}

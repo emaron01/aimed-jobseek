@@ -106,10 +106,10 @@ export function ReferralShareFields({
   return (
     <div className="space-y-3">
       {pending && !code ? (
-        <p className="text-sm text-slate-600">Creating your code…</p>
+        <p className="text-sm text-muted">Creating your code…</p>
       ) : null}
       {error ? (
-        <p className="text-sm text-red-700" role="status">
+        <p className="text-sm text-danger" role="status">
           {error}
         </p>
       ) : null}
@@ -117,7 +117,7 @@ export function ReferralShareFields({
         <>
           <div className="flex flex-wrap items-center gap-2">
             <code
-              className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold tracking-wide text-slate-900"
+              className="rounded-md border border-edge-strong bg-canvas px-3 py-2 text-sm font-semibold tracking-wide text-ink"
               data-testid={`${testIdPrefix}-code`}
             >
               {code}
@@ -133,9 +133,9 @@ export function ReferralShareFields({
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-ink">
               Suggested message
-              <span className="ml-1 font-normal text-slate-500">
+              <span className="ml-1 font-normal text-subtle">
                 — edit before copying if you want
               </span>
             </label>
@@ -144,7 +144,7 @@ export function ReferralShareFields({
               onChange={(e) => onMessageChange(e.target.value)}
               minRows={4}
               data-testid={`${testIdPrefix}-message`}
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 placeholder:text-slate-400 focus:ring-2"
+              className="w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-focus placeholder:text-subtle focus:ring-2"
             />
             <AppButton
               type="button"
@@ -157,7 +157,7 @@ export function ReferralShareFields({
           </div>
 
           <p
-            className="text-sm text-slate-700"
+            className="text-sm text-ink"
             data-testid={`${testIdPrefix}-stats`}
           >
             {count ?? 0} successful referral
@@ -165,7 +165,7 @@ export function ReferralShareFields({
             off
             {(rewardPercent ?? 0) >= 50 ? " (capped)" : ""}
           </p>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-subtle">
             A referral counts when they reach an active paid subscription — not
             at trial start. Your discount stays if they cancel later. Paste into
             Slack, email, or text — there is no in-app send.

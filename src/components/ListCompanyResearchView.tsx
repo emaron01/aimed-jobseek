@@ -85,19 +85,19 @@ export function ListCompanyResearchView({
         return (
           <section
             key={group.companyId || "unlinked"}
-            className="rounded-lg border border-slate-200 bg-white"
+            className="rounded-lg border border-edge bg-surface"
           >
-            <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
+            <div className="border-b border-edge px-4 py-3 sm:px-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-semibold text-slate-900">
+                  <h2 className="text-base font-semibold text-ink">
                     {group.companyName}
                   </h2>
                   {group.website ? (
-                    <p className="mt-0.5 text-sm text-slate-500">{group.website}</p>
+                    <p className="mt-0.5 text-sm text-subtle">{group.website}</p>
                   ) : null}
                   {qualifiers.length > 0 ? (
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-subtle">
                       {qualifiers.join(" · ")}
                     </p>
                   ) : null}
@@ -114,29 +114,29 @@ export function ListCompanyResearchView({
             </div>
 
             {isLinkedCompany ? (
-              <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
+              <div className="border-b border-edge px-4 py-3 sm:px-5">
                 {showSummary && research ? (
                   <dl className="grid gap-2 text-sm sm:grid-cols-2">
                     {research.whatTheySell?.trim() ? (
                       <div className="sm:col-span-2">
-                        <dt className="font-medium text-slate-700">What they make or do</dt>
-                        <dd className="mt-0.5 text-slate-600">
+                        <dt className="font-medium text-ink">What they make or do</dt>
+                        <dd className="mt-0.5 text-muted">
                           {research.whatTheySell.trim()}
                         </dd>
                       </div>
                     ) : null}
                     {formatCustomerAudience(research) ? (
                       <div className="sm:col-span-2">
-                        <dt className="font-medium text-slate-700">Who they serve</dt>
-                        <dd className="mt-0.5 text-slate-600">
+                        <dt className="font-medium text-ink">Who they serve</dt>
+                        <dd className="mt-0.5 text-muted">
                           {formatCustomerAudience(research)}
                         </dd>
                       </div>
                     ) : null}
                     {firstBuyingSignal(research) ? (
                       <div className="sm:col-span-2">
-                        <dt className="font-medium text-slate-700">Buying signal</dt>
-                        <dd className="mt-0.5 text-slate-600">
+                        <dt className="font-medium text-ink">Buying signal</dt>
+                        <dd className="mt-0.5 text-muted">
                           {firstBuyingSignal(research)}
                         </dd>
                       </div>
@@ -144,7 +144,7 @@ export function ListCompanyResearchView({
                   </dl>
                 ) : (
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-muted">
                       {researchAttempted && !hasUsableResearch
                         ? "Research ran, but no usable company details were found. Add context in the company briefing, retry, or continue without it."
                         : hasUsableResearch
@@ -164,8 +164,8 @@ export function ListCompanyResearchView({
                 )}
               </div>
             ) : (
-              <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
-                <p className="text-sm text-slate-600">
+              <div className="border-b border-edge px-4 py-3 sm:px-5">
+                <p className="text-sm text-muted">
                   These {vocab.contact.plural} could not be linked to a company record. Add a
                   company name on import to enable research.
                 </p>
@@ -174,7 +174,7 @@ export function ListCompanyResearchView({
 
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-100 text-sm">
-                <thead className="bg-slate-50 text-left text-slate-500">
+                <thead className="bg-canvas text-left text-subtle">
                   <tr>
                     <th className="px-4 py-2.5 font-medium sm:px-5">{vocab.contact.Singular}</th>
                     <th className="px-4 py-2.5 font-medium sm:px-5">Title</th>
@@ -185,31 +185,31 @@ export function ListCompanyResearchView({
                   {group.contacts.map((contact) => (
                     <tr key={contact.id}>
                       <td className="px-4 py-2.5 sm:px-5">
-                        <p className="font-medium text-slate-900">
+                        <p className="font-medium text-ink">
                           {contactDisplayName(contact.firstName, contact.lastName)}
                         </p>
                         {contact.email ? (
-                          <p className="mt-0.5 text-slate-600">
+                          <p className="mt-0.5 text-muted">
                             {contact.email}
                             {contactMatchesSuppressionSet(
                               contact.email,
                               suppressedEmails,
                             ) ? (
-                              <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-800">
+                              <span className="ml-2 rounded bg-warning-tint px-1.5 py-0.5 text-xs text-warning">
                                 Opted out
                               </span>
                             ) : null}
                           </p>
                         ) : (
                           <span
-                            className="mt-0.5 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700"
+                            className="mt-0.5 inline-block rounded bg-canvas px-1.5 py-0.5 text-xs text-ink"
                             title="No email address — cannot be emailed, scored, or suppressed."
                           >
                             No email — unusable
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-2.5 text-slate-600 sm:px-5">
+                      <td className="px-4 py-2.5 text-muted sm:px-5">
                         {contact.title ?? "—"}
                       </td>
                       <td className="px-4 py-2.5 sm:px-5">
@@ -223,7 +223,7 @@ export function ListCompanyResearchView({
                             )}
                           />
                         ) : (
-                          <span className="text-xs text-slate-400">—</span>
+                          <span className="text-xs text-subtle">—</span>
                         )}
                       </td>
                     </tr>

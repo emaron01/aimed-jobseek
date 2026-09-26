@@ -127,15 +127,15 @@ export type ScoreReportClientRow = {
 function qualificationBadgeClass(bucket: QualificationBucket | null): string {
   switch (bucket) {
     case "GOOD":
-      return "bg-emerald-50 text-emerald-900 ring-emerald-200";
+      return "bg-success-tint text-success ring-success";
     case "NEEDS_REVIEW":
-      return "bg-amber-50 text-amber-900 ring-amber-200";
+      return "bg-warning-tint text-warning ring-warning";
     case "EXCLUDED":
-      return "bg-slate-100 text-slate-800 ring-slate-300";
+      return "bg-canvas text-ink ring-edge-strong";
     case "POOR_FIT":
-      return "bg-amber-50 text-amber-900 ring-amber-200";
+      return "bg-warning-tint text-warning ring-warning";
     default:
-      return "bg-slate-50 text-slate-600 ring-slate-200";
+      return "bg-canvas text-muted ring-edge";
   }
 }
 
@@ -432,7 +432,7 @@ export function ScoreReportClient({
             <form
               key={suggestion.criterionId}
               action={mandatoryAction}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-950"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger bg-danger-tint px-4 py-3 text-sm text-danger"
             >
               <input type="hidden" name="scoringRunId" value={runId} />
               <input
@@ -450,7 +450,7 @@ export function ScoreReportClient({
             </form>
           ))}
           {mandatoryState && !mandatoryState.ok ? (
-            <p role="status" className="text-sm text-rose-800">
+            <p role="status" className="text-sm text-danger">
               {mandatoryState.message}
             </p>
           ) : null}
@@ -459,10 +459,10 @@ export function ScoreReportClient({
       {exclusionGroups.length > 0 ? (
         <div className="space-y-4" data-testid="bulk-exclusion-restore">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">
+            <h2 className="text-base font-semibold text-ink">
               {EXCLUSION_REVIEW_COPY.panelHeading(exclusionContactCount)}
             </h2>
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="mt-1 text-sm text-muted">
               {EXCLUSION_REVIEW_COPY.panelSubheading}
             </p>
           </div>
@@ -473,10 +473,10 @@ export function ScoreReportClient({
             return (
               <div
                 key={group.key}
-                className="space-y-3 rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800"
+                className="space-y-3 rounded-lg border border-edge-strong bg-canvas px-4 py-3 text-sm text-ink"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <p className="font-medium text-slate-900">
+                  <p className="font-medium text-ink">
                     {EXCLUSION_REVIEW_COPY.groupReason(group.criterionName)}
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -496,7 +496,7 @@ export function ScoreReportClient({
                     </SecondaryButton>
                   </div>
                 </div>
-                <ul className="divide-y divide-slate-200 rounded-md border border-slate-200 bg-white">
+                <ul className="divide-y divide-edge rounded-md border border-edge bg-surface">
                   {contacts.map((row) => {
                     const name = contactDisplayName(
                       row.contact.firstName,
@@ -513,8 +513,8 @@ export function ScoreReportClient({
                         className="flex flex-wrap items-start justify-between gap-2 px-3 py-2"
                       >
                         <div>
-                          <p className="font-medium text-slate-900">{name}</p>
-                          <p className="text-xs text-slate-600">
+                          <p className="font-medium text-ink">{name}</p>
+                          <p className="text-xs text-muted">
                             {[title, company].filter(Boolean).join(" · ") || "—"}
                           </p>
                         </div>
@@ -546,13 +546,13 @@ export function ScoreReportClient({
         </div>
       ) : null}
       {overrideMessage ? (
-        <p role="status" className="text-sm text-slate-700">
+        <p role="status" className="text-sm text-ink">
           {overrideMessage}
         </p>
       ) : null}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
-        <p className="text-sm text-slate-600">
-          Selected: <strong className="text-slate-900">{selected.size}</strong>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-edge bg-surface px-4 py-3">
+        <p className="text-sm text-muted">
+          Selected: <strong className="text-ink">{selected.size}</strong>
         </p>
         <div className="flex flex-wrap gap-2">
           <SecondaryButton onClick={selectAllVisible}>
@@ -570,8 +570,8 @@ export function ScoreReportClient({
         </div>
       </div>
 
-      <div className="max-h-[75vh] overflow-auto rounded-lg border border-slate-200 bg-white">
-        <table className="w-[1200px] table-fixed divide-y divide-slate-200 text-sm">
+      <div className="max-h-[75vh] overflow-auto rounded-lg border border-edge bg-surface">
+        <table className="w-[1200px] table-fixed divide-y divide-edge text-sm">
           <colgroup>
             <col className="w-14" />
             <col className="w-48" />
@@ -582,7 +582,7 @@ export function ScoreReportClient({
             <col className="w-80" />
             <col className="w-20" />
           </colgroup>
-          <thead className="sticky top-0 z-10 bg-slate-50 text-left text-slate-500 shadow-[0_1px_0_0_rgb(226_232_240)]">
+          <thead className="sticky top-0 z-10 bg-canvas text-left text-subtle shadow-[0_1px_0_0_rgb(226_232_240)]">
             <tr>
               <th className="px-3 py-3 font-medium">Select</th>
               <th className="px-3 py-3 font-medium">{vocab.contact.Singular}</th>
@@ -634,31 +634,31 @@ export function ScoreReportClient({
                         onChange={() => toggleOne(row.contactId)}
                       />
                     </td>
-                    <td className="px-3 py-2 font-medium text-slate-900">
+                    <td className="px-3 py-2 font-medium text-ink">
                       {contactDisplayName(
                         row.contact.firstName,
                         row.contact.lastName,
                       )}
-                      <div className="text-xs font-normal text-slate-500">
+                      <div className="text-xs font-normal text-subtle">
                         {row.contact.email ?? (
-                          <span className="text-slate-500">No email — unusable</span>
+                          <span className="text-subtle">No email — unusable</span>
                         )}
                         {row.scoringStatus === "UNUSABLE" ? (
-                          <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-slate-700">
+                          <span className="ml-2 rounded bg-canvas px-1.5 py-0.5 text-ink">
                             Unusable
                           </span>
                         ) : null}
                         {row.suppressed || row.scoringStatus === "SUPPRESSED" ? (
-                          <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-amber-800">
+                          <span className="ml-2 rounded bg-warning-tint px-1.5 py-0.5 text-warning">
                             Opted out
                           </span>
                         ) : null}
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-slate-600">
+                    <td className="px-3 py-2 text-muted">
                       {row.contact.title ?? "—"}
                     </td>
-                    <td className="px-3 py-2 text-slate-600">
+                    <td className="px-3 py-2 text-muted">
                       {row.contact.companyId ? (
                         <Link
                           href={`/companies/${row.contact.companyId}`}
@@ -672,7 +672,7 @@ export function ScoreReportClient({
                         (row.contact.company ?? "—")
                       )}
                     </td>
-                    <td className="px-3 py-2 text-slate-600">
+                    <td className="px-3 py-2 text-muted">
                       Research: {researchLabel}
                     </td>
                     <td className="px-3 py-2">
@@ -690,7 +690,7 @@ export function ScoreReportClient({
                             type="button"
                             disabled={overridePending}
                             onClick={() => restoreContact(row.contactId, "GOOD")}
-                            className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-900"
+                            className="rounded-md border border-success bg-success-tint px-2 py-1 text-xs font-medium text-success"
                             data-testid={`restore-contact-${row.contactId}`}
                           >
                             {EXCLUSION_REVIEW_COPY.addBack}
@@ -698,7 +698,7 @@ export function ScoreReportClient({
                         </div>
                       ) : null}
                     </td>
-                    <td className="px-3 py-2 text-slate-600">
+                    <td className="px-3 py-2 text-muted">
                       {isExcluded && exclusionDetails.length > 0 ? (
                         <ExclusionDetailList details={exclusionDetails} compact />
                       ) : (
@@ -715,13 +715,13 @@ export function ScoreReportClient({
                           <span className="line-clamp-2 leading-5">
                             {resolvedQualification.reason ?? "Pending"}
                           </span>
-                          <span className="mt-0.5 block text-xs font-medium text-slate-500">
+                          <span className="mt-0.5 block text-xs font-medium text-subtle">
                             {open ? "Hide details" : "Show details"}
                           </span>
                         </AppButton>
                       )}
                       {personaMatch?.matchedPersonaId ? (
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-subtle">
                           {vocab.persona.Singular} matched
                         </p>
                       ) : null}
@@ -729,7 +729,7 @@ export function ScoreReportClient({
                     <td className="px-3 py-2">
                       <AppButton
                         type="button"
-                        className="text-sm font-medium text-slate-900 underline"
+                        className="text-sm font-medium text-ink underline"
                         onClick={() => setExpandedId(open ? null : row.id)}
                       >
                         {open ? "Hide" : "View"}
@@ -737,9 +737,9 @@ export function ScoreReportClient({
                     </td>
                   </tr>
                   {open ? (
-                    <tr className="bg-slate-50">
+                    <tr className="bg-canvas">
                       <td colSpan={8} className="px-4 py-4">
-                        <div className="space-y-5 text-sm text-slate-700">
+                        <div className="space-y-5 text-sm text-ink">
                           <SuppressContactForm
                             contactId={row.contactId}
                             email={row.contact.email}
@@ -750,7 +750,7 @@ export function ScoreReportClient({
                           />
                           {exclusionDetails.length > 0 ? (
                             <section data-testid="exclusion-detail-panel">
-                              <h4 className="text-xs font-semibold uppercase tracking-wide text-rose-800">
+                              <h4 className="text-xs font-semibold uppercase tracking-wide text-danger">
                                 Exclusion details
                               </h4>
                               <div className="mt-2">
@@ -760,10 +760,10 @@ export function ScoreReportClient({
                           ) : null}
                           {why?.failedLines && why.failedLines !== "None" ? (
                             <section data-testid="icp-confirmed-failures">
-                              <h4 className="text-xs font-semibold uppercase tracking-wide text-rose-800">
+                              <h4 className="text-xs font-semibold uppercase tracking-wide text-danger">
                                 Confirmed misses
                               </h4>
-                              <ul className="mt-2 space-y-1 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-950">
+                              <ul className="mt-2 space-y-1 rounded-md border border-danger bg-danger-tint px-3 py-2 text-sm font-medium text-danger">
                                 {qualification?.primaryFailedLines.map((line) => (
                                   <li key={line}>{line}</li>
                                 ))}
@@ -772,10 +772,10 @@ export function ScoreReportClient({
                           ) : null}
 
                           <section>
-                            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-subtle">
                               Qualification
                             </h4>
-                            <div className="mt-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
+                            <div className="mt-2 rounded-md border border-edge bg-surface px-3 py-2 text-sm text-ink">
                               <p>
                                 Bucket:{" "}
                                 {displayQualificationBucket(
@@ -786,7 +786,7 @@ export function ScoreReportClient({
                                 Reason: {resolvedQualification.reason ?? "—"}
                               </p>
                               {row.overallScore != null ? (
-                                <p className="mt-1 tabular-nums text-slate-500">
+                                <p className="mt-1 tabular-nums text-subtle">
                                   Legacy score: overall {row.overallScore}
                                   {row.icpScore != null
                                     ? ` · ${vocab.icp.singular} ${row.icpScore}`
@@ -797,11 +797,11 @@ export function ScoreReportClient({
                           </section>
 
                           <section>
-                            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-subtle">
                               Score Breakdown
                             </h4>
                             {asDimensions(row.assessmentData).length === 0 ? (
-                              <p className="mt-2 text-slate-400">
+                              <p className="mt-2 text-subtle">
                                 Not scored yet
                               </p>
                             ) : (
@@ -809,21 +809,21 @@ export function ScoreReportClient({
                                 {asDimensions(row.assessmentData).map((dim) => (
                                   <div
                                     key={`${dim.dimension}-${dim.assessment}`}
-                                    className="rounded-md border border-slate-200 bg-white px-3 py-2"
+                                    className="rounded-md border border-edge bg-surface px-3 py-2"
                                   >
-                                    <p className="font-medium text-slate-900">
+                                    <p className="font-medium text-ink">
                                       {scoringDimensionLabel(dim.dimension)}{" "}
-                                      <span className="font-normal text-slate-500">
+                                      <span className="font-normal text-subtle">
                                         · {dim.assessment}
                                       </span>
                                     </p>
                                     {dim.evidence.length > 0 ? (
-                                      <p className="mt-1 text-xs text-slate-600">
+                                      <p className="mt-1 text-xs text-muted">
                                         Evidence: {dim.evidence.join("; ")}
                                       </p>
                                     ) : null}
                                     {dim.concerns.length > 0 ? (
-                                      <p className="mt-1 text-xs text-amber-800">
+                                      <p className="mt-1 text-xs text-warning">
                                         Concerns: {dim.concerns.join("; ")}
                                       </p>
                                     ) : null}
@@ -835,12 +835,12 @@ export function ScoreReportClient({
 
                           {why ? (
                             <section data-testid="icp-qualification-why">
-                              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              <h4 className="text-xs font-semibold uppercase tracking-wide text-subtle">
                                 Why this {vocab.icp.singular} result
                               </h4>
-                              <div className="mt-2 space-y-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
+                              <div className="mt-2 space-y-1 rounded-md border border-edge bg-surface px-3 py-2 text-sm text-ink">
                                 {why.mandatory ? (
-                                  <p className="font-medium text-red-800">
+                                  <p className="font-medium text-danger">
                                     Disqualified by confirmed failure:{" "}
                                     {why.mandatory}
                                   </p>
@@ -855,10 +855,10 @@ export function ScoreReportClient({
 
                           {factsUsed.length > 0 ? (
                             <section data-testid="icp-criterion-provenance">
-                              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              <h4 className="text-xs font-semibold uppercase tracking-wide text-subtle">
                                 Facts used
                               </h4>
-                              <ul className="mt-2 space-y-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
+                              <ul className="mt-2 space-y-1 rounded-md border border-edge bg-surface px-3 py-2 text-sm text-ink">
                                 {factsUsed.map((label) => (
                                   <li key={label}>{label}</li>
                                 ))}
@@ -939,8 +939,8 @@ export function ScoreReportClient({
                             ) : null}
                           </div>
 
-                          <section className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
-                            <p className="font-medium uppercase tracking-wide text-slate-500">
+                          <section className="rounded-md border border-edge bg-surface px-3 py-2 text-xs text-subtle">
+                            <p className="font-medium uppercase tracking-wide text-subtle">
                               Provenance
                             </p>
                             <p className="mt-1">
@@ -957,7 +957,7 @@ export function ScoreReportClient({
                           {row.contact.companyId ? (
                             <Link
                               href={`/companies/${row.contact.companyId}`}
-                              className="text-sm font-medium text-slate-900 underline"
+                              className="text-sm font-medium text-ink underline"
                             >
                               Open company research page
                             </Link>
@@ -974,14 +974,14 @@ export function ScoreReportClient({
       </div>
 
       {showCampaign ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-8">
-          <div className="w-full max-w-2xl rounded-lg border border-slate-200 bg-white shadow-xl">
-            <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 p-4 sm:p-8">
+          <div className="w-full max-w-2xl rounded-lg border border-edge bg-surface shadow-xl">
+            <div className="flex items-start justify-between border-b border-edge px-5 py-4">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">
+                <h3 className="text-lg font-semibold text-ink">
                   Create {vocab.campaign.Singular} From Selected
                 </h3>
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="mt-1 text-sm text-muted">
                   {countedNoun(selected.size, vocab.contact)} · {productName} · {icpName} ·{" "}
                   {personaName}
                 </p>
@@ -995,7 +995,7 @@ export function ScoreReportClient({
                 <p
                   role="status"
                   data-testid="campaign-action-status"
-                  className="text-sm text-red-600"
+                  className="text-sm text-danger"
                 >
                   {campaignState.message}
                 </p>
@@ -1028,14 +1028,14 @@ export function ScoreReportClient({
               />
               <Field label="Offer Notes" name="offerNotes" as="textarea" />
               <fieldset>
-                <legend className="text-sm font-medium text-slate-700">
+                <legend className="text-sm font-medium text-ink">
                   Email length
                 </legend>
                 <div className="mt-2 flex flex-wrap gap-3">
                   {EMAIL_LENGTH_OPTIONS.map((value) => (
                     <label
                       key={value}
-                      className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700"
+                      className="flex items-center gap-2 rounded-md border border-edge-strong px-3 py-2 text-sm text-ink"
                     >
                       <input
                         type="radio"
@@ -1058,10 +1058,10 @@ export function ScoreReportClient({
               </fieldset>
               <div>
                 <label className="block text-sm">
-                  <span className="font-medium text-slate-700">
+                  <span className="font-medium text-ink">
                     Email guidance
                   </span>
-                  <span className="mt-1 block text-xs text-slate-500">
+                  <span className="mt-1 block text-xs text-subtle">
                     Steers every generated email in this {vocab.campaign.singular}, up to{" "}
                     {EMAIL_GUIDANCE_MAX_CHARS} characters.
                   </span>
@@ -1075,7 +1075,7 @@ export function ScoreReportClient({
                         : undefined
                     }
                     placeholder="Focus on the feature that removes the most manual work"
-                    className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 placeholder:text-slate-400 focus:ring-2"
+                    className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-focus placeholder:text-subtle focus:ring-2"
                   />
                 </label>
                 <EmailGuidancePromptExamples />
@@ -1091,7 +1091,7 @@ export function ScoreReportClient({
                   Cancel
                 </SecondaryButton>
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-subtle">
                 Scoring run {runId} context is preserved via {vocab.product.Singular} / {vocab.icp.singular} /
                 {vocab.persona.Singular} selection. Emails are not generated in this phase.
               </p>
@@ -1106,10 +1106,10 @@ export function ScoreReportClient({
 function Detail({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+      <p className="text-xs font-medium uppercase tracking-wide text-subtle">
         {label}
       </p>
-      <p className={cn("mt-1", !value && "text-slate-400")}>
+      <p className={cn("mt-1", !value && "text-subtle")}>
         {value || "Not researched"}
       </p>
     </div>

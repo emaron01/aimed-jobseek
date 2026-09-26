@@ -12,14 +12,14 @@ export function ApplicationRemindersPanel({
   return (
     <section className="mb-8 space-y-3" data-testid="application-reminders">
       <div>
-        <h2 className="text-xl font-semibold text-slate-900">
+        <h2 className="text-xl font-semibold text-ink">
           {outreachConfig.labels.remindersTitle}
         </h2>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           {outreachConfig.labels.remindersHelp}
         </p>
       </div>
-      <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+      <ul className="divide-y divide-slate-100 rounded-xl border border-edge bg-surface">
         {reminders.map((row) => (
           <li
             key={`${row.kind}:${row.campaignId}:${row.stageId ?? row.day}`}
@@ -28,11 +28,11 @@ export function ApplicationRemindersPanel({
             <div>
               <Link
                 href={`/campaigns/${row.campaignId}`}
-                className="font-medium text-slate-900 hover:underline"
+                className="font-medium text-ink hover:underline"
               >
                 {row.campaignName}
               </Link>
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-muted">
                 {applicationReminderLabel(row)}
                 {row.kind === "OUTREACH"
                   ? ` · Day ${row.day} from ${row.appliedAt ? interviewConfig.progress.APPLIED : "first sent message"}`
@@ -45,7 +45,7 @@ export function ApplicationRemindersPanel({
             </div>
             <Link
               href={`/campaigns/${row.campaignId}`}
-              className="text-sm font-medium text-slate-700 underline"
+              className="text-sm font-medium text-ink underline"
             >
               Open {vocab.campaign.singular}
             </Link>

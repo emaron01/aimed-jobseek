@@ -107,8 +107,8 @@ describe("button class boundary", () => {
     expect(ui).toContain("SECONDARY_BUTTON_CLASS");
     expect(ui).toContain("SECONDARY_CHIP_CLASS");
     expect(buttons).toContain("export const PRIMARY_BUTTON_CLASS");
-    expect(buttons).toContain("bg-slate-900");
-    expect(buttons).toContain("border-slate-300");
+    expect(buttons).toContain("bg-primary");
+    expect(buttons).toContain("border-edge-strong");
     expect(buttons).toContain("export const SECONDARY_BUTTON_CLASS");
     expect(buttons).toContain("export const SECONDARY_CHIP_CLASS");
   });

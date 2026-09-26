@@ -90,20 +90,20 @@ export default async function OrganizationSettingsPage() {
       <div>
         <Link
           href="/settings"
-          className="text-sm text-slate-600 hover:text-slate-900"
+          className="text-sm text-muted hover:text-ink"
         >
           ← Settings
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink">
           Organization
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Admin settings for {organization.name}. Signed in as {user.email}.
         </p>
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-medium text-slate-900">Workspace name</h2>
+        <h2 className="text-lg font-medium text-ink">Workspace name</h2>
         <ActionFeedbackForm
           action={renameWorkspaceAction}
           className="flex gap-2"
@@ -112,7 +112,7 @@ export default async function OrganizationSettingsPage() {
           <input
             name="name"
             defaultValue={organization.name}
-            className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="flex-1 rounded-md border border-edge-strong px-3 py-2 text-sm"
           />
           <AppButton
             type="submit"
@@ -124,8 +124,8 @@ export default async function OrganizationSettingsPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-medium text-slate-900">Timezone</h2>
-        <p className="text-sm text-slate-600">
+        <h2 className="text-lg font-medium text-ink">Timezone</h2>
+        <p className="text-sm text-muted">
           Daily email limits and the send advisory use this IANA timezone (not
           server UTC alone).
         </p>
@@ -138,7 +138,7 @@ export default async function OrganizationSettingsPage() {
             name="timezone"
             defaultValue={organization.timezone}
             placeholder="America/New_York"
-            className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="flex-1 rounded-md border border-edge-strong px-3 py-2 text-sm"
           />
           <AppButton
             type="submit"
@@ -156,38 +156,38 @@ export default async function OrganizationSettingsPage() {
       </section>
 
       <section className="space-y-3" data-testid="usage-policy-readonly">
-        <h2 className="text-lg font-medium text-slate-900">Usage limits</h2>
-        <p className="text-sm text-slate-600">
+        <h2 className="text-lg font-medium text-ink">Usage limits</h2>
+        <p className="text-sm text-muted">
           Set by your account administrator. Confirmed sends are advisory only —
           they leave from the {vocab.rep.singular}&apos;s mailbox and protect domain reputation,
           not platform cost. AI email generation is a separate platform ceiling
           and does not count toward the send advisory.
         </p>
-        <dl className="grid gap-3 rounded-md border border-slate-200 bg-white p-4 sm:grid-cols-2">
+        <dl className="grid gap-3 rounded-md border border-edge bg-surface p-4 sm:grid-cols-2">
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-subtle">
               Active researched companies
             </dt>
-            <dd className="mt-1 text-sm text-slate-900">
+            <dd className="mt-1 text-sm text-ink">
               {usagePolicy.activeResearchedCompanyLimit}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-subtle">
               Daily AI email generations
             </dt>
-            <dd className="mt-1 text-sm text-slate-900">
+            <dd className="mt-1 text-sm text-ink">
               {usagePolicy.dailyEmailGenerationLimit}
             </dd>
           </div>
           <div className="sm:col-span-2">
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-subtle">
               Daily send advisory threshold
             </dt>
-            <dd className="mt-1 text-sm text-slate-900">
+            <dd className="mt-1 text-sm text-ink">
               {usagePolicy.dailyEmailSendWarningLimit}
             </dd>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-subtle">
               Warn after this many confirmed sends today. Never blocks sending.
             </p>
           </div>
@@ -196,8 +196,8 @@ export default async function OrganizationSettingsPage() {
 
       {features.teamMemberManagement ? (
       <section className="space-y-3">
-        <h2 className="text-lg font-medium text-slate-900">Members</h2>
-        <p className="text-sm text-slate-600">
+        <h2 className="text-lg font-medium text-ink">Members</h2>
+        <p className="text-sm text-muted">
           OWNER and ADMIN can change roles and remove users
           {canInvite ? ", and invite new members" : ""}. {vocab.product.Singular}, {vocab.icp.singular}, and
           {vocab.persona.Plural} are shared across the org; voice and signature stay per user.
@@ -206,11 +206,11 @@ export default async function OrganizationSettingsPage() {
           {members.map((m) => (
             <li
               key={m.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-edge bg-surface px-3 py-2 text-sm"
             >
               <span>
                 {m.user.name ?? m.user.email}{" "}
-                <span className="text-slate-500">
+                <span className="text-subtle">
                   ({m.user.email}
                   {features.teamRoles ? ` · ${m.role}` : ""})
                 </span>
@@ -226,14 +226,14 @@ export default async function OrganizationSettingsPage() {
                     <select
                       name="role"
                       defaultValue={m.role}
-                      className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+                      className="rounded-md border border-edge-strong px-2 py-1 text-xs"
                     >
                       <option value="ADMIN">ADMIN</option>
                       <option value="MEMBER">MEMBER</option>
                     </select>
                     <AppButton
                       type="submit"
-                      className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+                      className="rounded-md border border-edge-strong px-2 py-1 text-xs"
                     >
                       Save role
                     </AppButton>
@@ -243,7 +243,7 @@ export default async function OrganizationSettingsPage() {
                     <input type="hidden" name="targetUserId" value={m.userId} />
                     <AppButton
                       type="submit"
-                      className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-800"
+                      className="rounded-md border border-danger px-2 py-1 text-xs text-danger"
                     >
                       Remove
                     </AppButton>
@@ -257,8 +257,8 @@ export default async function OrganizationSettingsPage() {
       ) : null}
 
       <section className="space-y-3" data-testid="user-overrides-readonly">
-        <h2 className="text-lg font-medium text-slate-900">User overrides</h2>
-        <p className="text-sm text-slate-600">
+        <h2 className="text-lg font-medium text-ink">User overrides</h2>
+        <p className="text-sm text-muted">
           Per-user ceilings set by your account administrator. Blank means the
           member inherits organization defaults.
         </p>
@@ -268,33 +268,33 @@ export default async function OrganizationSettingsPage() {
             return (
               <li
                 key={m.id}
-                className="rounded-md border border-slate-200 bg-white p-4"
+                className="rounded-md border border-edge bg-surface p-4"
                 data-testid={`user-override-readonly-${m.userId}`}
               >
-                <p className="text-sm font-medium text-slate-900">
+                <p className="text-sm font-medium text-ink">
                   {m.user.name ?? m.user.email}{" "}
-                  <span className="font-normal text-slate-500">
+                  <span className="font-normal text-subtle">
                     ({m.role})
                   </span>
                 </p>
                 <dl className="mt-3 grid gap-2 sm:grid-cols-3">
                   <div>
-                    <dt className="text-xs text-slate-600">Active companies</dt>
-                    <dd className="mt-1 text-sm text-slate-900">
+                    <dt className="text-xs text-muted">Active companies</dt>
+                    <dd className="mt-1 text-sm text-ink">
                       {formatLimit(ov?.activeResearchedCompanyLimit)}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-slate-600">
+                    <dt className="text-xs text-muted">
                       Daily AI generations
                     </dt>
-                    <dd className="mt-1 text-sm text-slate-900">
+                    <dd className="mt-1 text-sm text-ink">
                       {formatLimit(ov?.dailyEmailGenerationLimit)}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-slate-600">Send advisory</dt>
-                    <dd className="mt-1 text-sm text-slate-900">
+                    <dt className="text-xs text-muted">Send advisory</dt>
+                    <dd className="mt-1 text-sm text-ink">
                       {formatLimit(ov?.dailyEmailSendWarningLimit)}
                     </dd>
                   </div>
@@ -307,8 +307,8 @@ export default async function OrganizationSettingsPage() {
 
       {features.teamSeats && showSeats ? (
         <section className="space-y-3" data-testid="org-seats-section">
-          <h2 className="text-lg font-medium text-slate-900">Seats</h2>
-          <p className="text-sm text-slate-600">
+          <h2 className="text-lg font-medium text-ink">Seats</h2>
+          <p className="text-sm text-muted">
             {formatSeatsUsedLabel({
               usedSeats: seatSnap.usedSeats,
               seatQuantity: seatSnap.seatQuantity,
@@ -320,7 +320,7 @@ export default async function OrganizationSettingsPage() {
               : ""}
             .
           </p>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             {seatsAreInvoiceManaged ? (
               "Contact support to change invoice-managed seats."
             ) : (
@@ -328,7 +328,7 @@ export default async function OrganizationSettingsPage() {
                 Add or remove seats from{" "}
                 <Link
                   href="/settings/billing"
-                  className="font-medium text-slate-900 underline"
+                  className="font-medium text-ink underline"
                 >
                   Billing
                 </Link>
@@ -341,7 +341,7 @@ export default async function OrganizationSettingsPage() {
 
       {features.teamInvites ? (
       <section className="space-y-3">
-        <h2 className="text-lg font-medium text-slate-900">Invite user</h2>
+        <h2 className="text-lg font-medium text-ink">Invite user</h2>
         {canInvite ? (
           <>
             <ActionFeedbackForm
@@ -354,12 +354,12 @@ export default async function OrganizationSettingsPage() {
                 type="email"
                 required
                 placeholder="colleague@company.com"
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-2"
+                className="rounded-md border border-edge-strong px-3 py-2 text-sm sm:col-span-2"
               />
               <select
                 name="role"
                 defaultValue="MEMBER"
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-md border border-edge-strong px-3 py-2 text-sm"
               >
                 <option value="MEMBER">MEMBER</option>
                 <option value="ADMIN">ADMIN</option>
@@ -372,11 +372,11 @@ export default async function OrganizationSettingsPage() {
               </AppButton>
             </ActionFeedbackForm>
             {invitations.length > 0 ? (
-              <ul className="space-y-2 text-sm text-slate-600">
+              <ul className="space-y-2 text-sm text-muted">
                 {invitations.map((inv) => (
                   <li
                     key={inv.id}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2"
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-edge bg-surface px-3 py-2"
                   >
                     <span>
                       Pending: {inv.email} as {inv.role} (expires{" "}
@@ -386,7 +386,7 @@ export default async function OrganizationSettingsPage() {
                       <input type="hidden" name="invitationId" value={inv.id} />
                       <AppButton
                         type="submit"
-                        className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+                        className="rounded-md border border-edge-strong px-2 py-1 text-xs"
                       >
                         Revoke
                       </AppButton>
@@ -395,13 +395,13 @@ export default async function OrganizationSettingsPage() {
                 ))}
               </ul>
             ) : null}
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-subtle">
               Invitation tokens are hashed at rest. Accept via the emailed link.
             </p>
           </>
         ) : (
           <p
-            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700"
+            className="rounded-md border border-edge bg-canvas px-3 py-3 text-sm text-ink"
             data-testid="invite-blocked-individual"
           >
             {seatSnap.inviteDenialReason ??

@@ -42,18 +42,18 @@ export async function InterviewStagesSection({
   contacts: Array<{ contactId: string; personaId: string | null }>;
 }) {
   const stages = await listInterviewStages({ organizationId, campaignId });
-  const fieldClass = "mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm";
+  const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
 
   return (
     <section
-      className="space-y-4 rounded-lg border border-slate-200 bg-white p-5"
+      className="space-y-4 rounded-lg border border-edge bg-surface p-5"
       data-testid="interview-stages"
     >
       <div>
-        <h2 className="text-base font-semibold text-slate-900">
+        <h2 className="text-base font-semibold text-ink">
           {interviewConfig.labels.sectionTitle}
         </h2>
-        <p className="mt-1 text-sm text-slate-600">{interviewConfig.labels.sectionHelp}</p>
+        <p className="mt-1 text-sm text-muted">{interviewConfig.labels.sectionHelp}</p>
       </div>
 
       {canEdit ? (
@@ -101,7 +101,7 @@ export async function InterviewStagesSection({
       ) : null}
 
       {stages.length === 0 ? (
-        <p className="text-sm text-slate-500">No stages yet.</p>
+        <p className="text-sm text-subtle">No stages yet.</p>
       ) : (
         <div className="space-y-6">
           {stages.map((stage) => {
@@ -140,11 +140,11 @@ export async function InterviewStagesSection({
             return (
               <article
                 key={stage.id}
-                className="space-y-3 border-t border-slate-100 pt-4"
+                className="space-y-3 border-t border-edge pt-4"
                 data-testid={`interview-stage-${stage.id}`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="font-medium text-slate-900">
+                  <h3 className="font-medium text-ink">
                     {stageTypeLabel(stage.type)} ·{" "}
                     {interviewConfig.formats[stage.format]}
                   </h3>
@@ -155,13 +155,13 @@ export async function InterviewStagesSection({
                     {interviewConfig.labels.openGuide}
                   </Link>
                 </div>
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-muted">
                   {stage.scheduledAt.toLocaleString()}
                   {stage.outcome
                     ? ` · ${interviewConfig.outcomes[stage.outcome]}`
                     : ""}
                 </p>
-                <ul className="text-sm text-slate-800">
+                <ul className="text-sm text-ink">
                   {stage.interviewers.map((row) => (
                     <li key={row.id}>
                       {[row.contact.firstName, row.contact.lastName]
@@ -283,7 +283,7 @@ export async function InterviewStagesSection({
                       >
                         <input type="hidden" name="campaignId" value={campaignId} />
                         <input type="hidden" name="stageId" value={stage.id} />
-                        <p className="text-sm text-slate-600">
+                        <p className="text-sm text-muted">
                           {interviewConfig.labels.clarifyingHelp}
                         </p>
                         {questions.map((question) => (
@@ -342,7 +342,7 @@ export async function InterviewStagesSection({
                             />
                             <input type="hidden" name="type" value="EMAIL" />
                             <input type="hidden" name="purpose" value="THANK_YOU" />
-                            <p className="text-sm text-slate-600">
+                            <p className="text-sm text-muted">
                               {interviewConfig.labels.thankYouClarifyHelp}
                             </p>
                             {thankYouQuestions.map((question) => (
@@ -456,7 +456,7 @@ export async function InterviewStagesSection({
                             value={offer.targetKey}
                           />
                         ) : null}
-                        <p className="text-sm text-slate-700">
+                        <p className="text-sm text-ink">
                           {interviewConfig.labels.consultationOffer} {offer.text}
                         </p>
                       </ApplicationActionForm>

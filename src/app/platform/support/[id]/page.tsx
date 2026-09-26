@@ -69,7 +69,7 @@ export default async function PlatformSupportTicketPage({
             <h1 className="text-2xl font-semibold tracking-tight">
               {ticket.subject}
             </h1>
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="mt-1 text-sm text-muted">
               Submitted {formatDate(ticket.createdAt)}
             </p>
           </div>
@@ -81,7 +81,7 @@ export default async function PlatformSupportTicketPage({
       </div>
 
       <Panel title="Message">
-        <p className="whitespace-pre-wrap text-sm text-slate-800">
+        <p className="whitespace-pre-wrap text-sm text-ink">
           {ticket.description}
         </p>
       </Panel>
@@ -89,8 +89,8 @@ export default async function PlatformSupportTicketPage({
       <Panel title="Captured context">
         <dl className="grid gap-x-8 gap-y-4 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-slate-500">Organization</dt>
-            <dd className="font-medium text-slate-900">
+            <dt className="text-subtle">Organization</dt>
+            <dd className="font-medium text-ink">
               {ticket.organizationId ? (
                 <Link
                   href={`/platform/orgs/${ticket.organizationId}`}
@@ -104,30 +104,30 @@ export default async function PlatformSupportTicketPage({
             </dd>
           </div>
           <div>
-            <dt className="text-slate-500">User</dt>
-            <dd className="text-slate-900">
+            <dt className="text-subtle">User</dt>
+            <dd className="text-ink">
               {ticket.submittedByName || "Name unavailable"}
-              <span className="block break-all text-xs text-slate-600">
+              <span className="block break-all text-xs text-muted">
                 {ticket.submittedByEmail}
               </span>
             </dd>
           </div>
           <div>
-            <dt className="text-slate-500">Source page</dt>
-            <dd className="break-all font-mono text-xs text-slate-900">
+            <dt className="text-subtle">Source page</dt>
+            <dd className="break-all font-mono text-xs text-ink">
               {ticket.sourcePath}
             </dd>
           </div>
           <div>
-            <dt className="text-slate-500">Plan / billing at submission</dt>
-            <dd className="text-slate-900">
+            <dt className="text-subtle">Plan / billing at submission</dt>
+            <dd className="text-ink">
               {ticket.planCode ?? "Unknown"} /{" "}
               {ticket.billingStatus ?? "Unknown"}
             </dd>
           </div>
           <div className="sm:col-span-2">
-            <dt className="text-slate-500">Browser user agent</dt>
-            <dd className="break-all font-mono text-xs text-slate-900">
+            <dt className="text-subtle">Browser user agent</dt>
+            <dd className="break-all font-mono text-xs text-ink">
               {ticket.userAgent ?? "Unavailable"}
             </dd>
           </div>
@@ -144,19 +144,19 @@ export default async function PlatformSupportTicketPage({
               {ticket.notes.map((note) => (
                 <li
                   key={note.id}
-                  className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
+                  className="rounded-md border border-edge bg-canvas px-4 py-3"
                 >
-                  <p className="whitespace-pre-wrap text-sm text-slate-800">
+                  <p className="whitespace-pre-wrap text-sm text-ink">
                     {note.body}
                   </p>
-                  <p className="mt-2 text-xs text-slate-500">
+                  <p className="mt-2 text-xs text-subtle">
                     {authorName(note)} · {formatDate(note.createdAt)}
                   </p>
                 </li>
               ))}
             </ol>
           ) : (
-            <p className="text-sm text-slate-500">No internal notes yet.</p>
+            <p className="text-sm text-subtle">No internal notes yet.</p>
           )}
           <SupportTicketNoteForm ticketId={ticket.id} />
         </div>

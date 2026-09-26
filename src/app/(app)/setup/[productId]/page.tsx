@@ -32,10 +32,10 @@ function PrintList({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null;
   return (
     <section className="space-y-1">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-subtle">
         {title}
       </h3>
-      <ul className="list-disc space-y-1 pl-5 text-sm text-slate-800">
+      <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
         {items.map((item) => (
           <li key={item}>{item}</li>
         ))}
@@ -48,22 +48,22 @@ function PrintProse({ title, text }: { title: string; text: string | null | unde
   if (!text?.trim()) return null;
   return (
     <section className="space-y-1">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-subtle">
         {title}
       </h3>
-      <p className="whitespace-pre-wrap text-sm text-slate-800">{text}</p>
+      <p className="whitespace-pre-wrap text-sm text-ink">{text}</p>
     </section>
   );
 }
 
 function statusBadgeClass(state: ReturnType<typeof productCompletionState>) {
   if (state === "approved") {
-    return "bg-emerald-50 text-emerald-800 ring-emerald-200";
+    return "bg-success-tint text-success ring-success";
   }
   if (state === "needs_review") {
-    return "bg-amber-50 text-amber-900 ring-amber-200";
+    return "bg-warning-tint text-warning ring-warning";
   }
-  return "bg-slate-100 text-slate-700 ring-slate-200";
+  return "bg-canvas text-ink ring-edge";
 }
 
 function ActionLink({
@@ -211,7 +211,7 @@ export default async function SetupProductPage({ params }: PageProps) {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-base font-semibold text-slate-900 print:text-2xl">
+                  <p className="text-base font-semibold text-ink print:text-2xl">
                     {product.name}
                   </p>
                   <span
@@ -221,11 +221,11 @@ export default async function SetupProductPage({ params }: PageProps) {
                   </span>
                 </div>
                 {productBlurb ? (
-                  <p className="mt-2 text-sm text-slate-600 print:hidden">
+                  <p className="mt-2 text-sm text-muted print:hidden">
                     {productBlurb}
                   </p>
                 ) : (
-                  <p className="mt-2 text-sm text-slate-500 print:hidden">
+                  <p className="mt-2 text-sm text-subtle print:hidden">
                     {candidateProfileEditCopy.emptyBlurb}
                   </p>
                 )}
@@ -285,7 +285,7 @@ export default async function SetupProductPage({ params }: PageProps) {
             </div>
 
             <div
-              className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3"
+              className="mt-4 flex flex-wrap items-center gap-2 border-t border-edge pt-3"
               data-print-hide
             >
               <ExportPdfButton />
@@ -310,14 +310,14 @@ export default async function SetupProductPage({ params }: PageProps) {
           {primaryIcp ? (
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <p className="font-medium text-slate-900">{primaryIcp.name}</p>
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="font-medium text-ink">{primaryIcp.name}</p>
+                <p className="mt-1 text-sm text-muted">
                   {truncateText(
                     primaryIcp.definition || primaryIcp.description,
                     140,
                   ) || "No definition yet."}
                 </p>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-subtle">
                   {primaryIcpCriteria.length} criteria
                   {icps.length > 1 ? ` · ${icps.length} ${vocab.icp.plural} total` : ""}
                 </p>
@@ -338,11 +338,11 @@ export default async function SetupProductPage({ params }: PageProps) {
               </div>
             </div>
           ) : (
-            <div className="rounded-md border border-dashed border-amber-300 bg-amber-50 px-4 py-4">
-              <p className="text-sm font-semibold text-amber-950">
+            <div className="rounded-md border border-dashed border-warning bg-warning-tint px-4 py-4">
+              <p className="text-sm font-semibold text-warning">
                 {vocab.icp.singular} not set up yet
               </p>
-              <p className="mt-1 text-sm text-amber-900/80">
+              <p className="mt-1 text-sm text-warning/80">
                 {completion === "approved"
                   ? `Draft ${vocab.idealCustomer.aSingular} profile from your approved ${vocab.product.singular}, or write one from scratch.`
                   : `Add ${vocab.idealCustomer.aSingular} profile so later ${vocab.campaign.plural} can be scored against the kind of company you want.`}

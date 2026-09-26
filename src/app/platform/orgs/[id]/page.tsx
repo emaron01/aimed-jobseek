@@ -79,7 +79,7 @@ export default async function PlatformOrgDetailPage({
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-subtle">
             <Link href="/platform/orgs" className="underline">
               Organizations
             </Link>
@@ -87,7 +87,7 @@ export default async function PlatformOrgDetailPage({
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">
             {org.name}
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-muted">
             {org.accountType} · {org.status}
             {org.suspendedAt
               ? ` · suspended ${org.suspendedAt.toISOString().slice(0, 10)}`
@@ -106,16 +106,16 @@ export default async function PlatformOrgDetailPage({
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Billing</h2>
         <ul className="grid gap-2 text-sm sm:grid-cols-2">
-          <li className="rounded-md border border-slate-200 bg-white p-3">
+          <li className="rounded-md border border-edge bg-surface p-3">
             Plan: {billingPlanLabel(billing.planCode)}
-            <span className="mt-1 block font-mono text-xs text-slate-500">
+            <span className="mt-1 block font-mono text-xs text-subtle">
               {billing.planCode}
             </span>
           </li>
-          <li className="rounded-md border border-slate-200 bg-white p-3">
+          <li className="rounded-md border border-edge bg-surface p-3">
             Status: {billingStatusLabel(billing.billingStatus)}
           </li>
-          <li className="rounded-md border border-slate-200 bg-white p-3 sm:col-span-2">
+          <li className="rounded-md border border-edge bg-surface p-3 sm:col-span-2">
             Seats: {billing.seatQuantity} purchased · cap {billing.maxSeats}
             {canMutate ? (
               <ActionFeedbackForm
@@ -124,14 +124,14 @@ export default async function PlatformOrgDetailPage({
                 testId="platform-org-max-seats-form"
               >
                 <input type="hidden" name="organizationId" value={id} />
-                <label className="text-xs text-slate-600">
+                <label className="text-xs text-muted">
                   Seat cap (Enterprise override)
                   <input
                     name="maxSeats"
                     type="number"
                     min={billing.seatQuantity}
                     defaultValue={billing.maxSeats}
-                    className="mt-1 block w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                    className="mt-1 block w-28 rounded-md border border-edge-strong px-2 py-1.5 text-sm"
                   />
                 </label>
                 <button
@@ -142,20 +142,20 @@ export default async function PlatformOrgDetailPage({
                 </button>
               </ActionFeedbackForm>
             ) : null}
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-subtle">
               Changing the cap does not change the Stripe subscription — it only
               unlocks the invite gate.
             </p>
           </li>
-          <li className="rounded-md border border-slate-200 bg-white p-3 sm:col-span-2">
+          <li className="rounded-md border border-edge bg-surface p-3 sm:col-span-2">
             Ops {vocab.contact.singular}:{" "}
             {billing.billingEmail ?? "— (no address/tax stored)"}
           </li>
-          <li className="rounded-md border border-slate-200 bg-white p-3">
-            <span className="text-xs uppercase tracking-wide text-slate-500">
+          <li className="rounded-md border border-edge bg-surface p-3">
+            <span className="text-xs uppercase tracking-wide text-subtle">
               Price ID
             </span>
-            <p className="mt-1 break-all font-mono text-xs text-slate-800">
+            <p className="mt-1 break-all font-mono text-xs text-ink">
               {billing.stripePriceId ?? "—"}
             </p>
             {(() => {
@@ -166,7 +166,7 @@ export default async function PlatformOrgDetailPage({
               );
               if (onCatalog == null) return null;
               return (
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-subtle">
                   {onCatalog
                     ? "Matches current catalog price"
                     : "Grandfathered — differs from current catalog price"}
@@ -174,11 +174,11 @@ export default async function PlatformOrgDetailPage({
               );
             })()}
           </li>
-          <li className="rounded-md border border-slate-200 bg-white p-3">
-            <span className="text-xs uppercase tracking-wide text-slate-500">
+          <li className="rounded-md border border-edge bg-surface p-3">
+            <span className="text-xs uppercase tracking-wide text-subtle">
               Amount / interval
             </span>
-            <p className="mt-1 font-medium text-slate-900">
+            <p className="mt-1 font-medium text-ink">
               {formatCustomerPayingAmount({
                 effectiveUnitAmountCents:
                   billing.stripeEffectiveUnitAmountCents,
@@ -191,7 +191,7 @@ export default async function PlatformOrgDetailPage({
             billing.stripeEffectiveUnitAmountCents != null &&
             billing.stripeEffectiveUnitAmountCents <
               billing.stripePriceUnitAmountCents ? (
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-subtle">
                 {vocab.list.Singular}:{" "}
                 {formatStripeMoney(
                   billing.stripePriceUnitAmountCents,
@@ -201,11 +201,11 @@ export default async function PlatformOrgDetailPage({
               </p>
             ) : null}
           </li>
-          <li className="rounded-md border border-slate-200 bg-white p-3 sm:col-span-2">
-            <span className="text-xs uppercase tracking-wide text-slate-500">
+          <li className="rounded-md border border-edge bg-surface p-3 sm:col-span-2">
+            <span className="text-xs uppercase tracking-wide text-subtle">
               Discount
             </span>
-            <p className="mt-1 font-medium text-slate-900">
+            <p className="mt-1 font-medium text-ink">
               {hasActiveDiscount({
                 stripeDiscountPercentOff: billing.stripeDiscountPercentOff,
                 stripeDiscountAmountOffCents:
@@ -223,7 +223,7 @@ export default async function PlatformOrgDetailPage({
                 : "None"}
             </p>
           </li>
-          <li className="rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-500 sm:col-span-2">
+          <li className="rounded-md border border-edge bg-surface p-3 text-xs text-subtle sm:col-span-2">
             Stripe customer: {billing.stripeCustomerId ?? "—"} · subscription:{" "}
             {billing.stripeSubscriptionId ?? "—"}
             {billing.currentPeriodEnd
@@ -240,13 +240,13 @@ export default async function PlatformOrgDetailPage({
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Cost (30d)</h2>
         <ul className="grid gap-2 text-sm sm:grid-cols-3">
-          <li className="rounded-md border border-slate-200 bg-white p-3">
+          <li className="rounded-md border border-edge bg-surface p-3">
             Estimated spend: {formatUsd(cost.estimatedSpendUsd)}
           </li>
-          <li className="rounded-md border border-slate-200 bg-white p-3">
+          <li className="rounded-md border border-edge bg-surface p-3">
             Cost / company: {formatUsd(cost.costPerCompanyUsd)}
           </li>
-          <li className="rounded-md border border-slate-200 bg-white p-3">
+          <li className="rounded-md border border-edge bg-surface p-3">
             <Link href="/platform/costs" className="font-medium underline">
               Full costs report
             </Link>
@@ -257,19 +257,19 @@ export default async function PlatformOrgDetailPage({
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Usage</h2>
         <ul className="grid gap-2 text-sm sm:grid-cols-2">
-          <li className="rounded-md border border-slate-200 bg-white p-3">
+          <li className="rounded-md border border-edge bg-surface p-3">
             Researched companies: {usage.researchedCompaniesUsed}
             {usage.researchedCompaniesLimit != null
               ? ` / ${usage.researchedCompaniesLimit}`
               : ""}
           </li>
-          <li className="rounded-md border border-slate-200 bg-white p-3">
+          <li className="rounded-md border border-edge bg-surface p-3">
             Email gens (today): {usage.today.emailGenerations}
           </li>
-          <li className="rounded-md border border-slate-200 bg-white p-3">
+          <li className="rounded-md border border-edge bg-surface p-3">
             Research ops (7d): {usage.last7d.researchOperations}
           </li>
-          <li className="rounded-md border border-slate-200 bg-white p-3">
+          <li className="rounded-md border border-edge bg-surface p-3">
             Email gens (30d): {usage.last30d.emailGenerations}
           </li>
         </ul>
@@ -278,7 +278,7 @@ export default async function PlatformOrgDetailPage({
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Health (failure rates)</h2>
         <div className="grid gap-3 text-sm sm:grid-cols-2">
-          <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="rounded-md border border-edge bg-surface p-3">
             <p className="font-medium">Last 7 days</p>
             <p>
               Research: {pct(health.last7d.research.failureRate)} (
@@ -291,7 +291,7 @@ export default async function PlatformOrgDetailPage({
               {health.last7d.emailGeneration.total})
             </p>
           </div>
-          <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="rounded-md border border-edge bg-surface p-3">
             <p className="font-medium">Last 30 days</p>
             <p>
               Research: {pct(health.last30d.research.failureRate)} (
@@ -327,7 +327,7 @@ export default async function PlatformOrgDetailPage({
           ).map(([label, ok]) => (
             <li
               key={label}
-              className="rounded-md border border-slate-200 bg-white px-3 py-2"
+              className="rounded-md border border-edge bg-surface px-3 py-2"
             >
               {label}: {ok ? "present" : "missing"}
             </li>
@@ -337,7 +337,7 @@ export default async function PlatformOrgDetailPage({
 
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Members</h2>
-        <ul className="divide-y divide-slate-100 rounded-md border border-slate-200 bg-white text-sm">
+        <ul className="divide-y divide-slate-100 rounded-md border border-edge bg-surface text-sm">
           {detail.members.map((m) => (
             <li
               key={m.membershipId}
@@ -362,14 +362,14 @@ export default async function PlatformOrgDetailPage({
                     <select
                       name="role"
                       defaultValue={m.role}
-                      className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+                      className="rounded-md border border-edge-strong px-2 py-1 text-xs"
                     >
                       <option value="ADMIN">ADMIN</option>
                       <option value="MEMBER">MEMBER</option>
                     </select>
                     <button
                       type="submit"
-                      className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+                      className="rounded-md border border-edge-strong px-2 py-1 text-xs"
                     >
                       Save role
                     </button>
@@ -383,7 +383,7 @@ export default async function PlatformOrgDetailPage({
                     />
                     <button
                       type="submit"
-                      className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-800"
+                      className="rounded-md border border-danger px-2 py-1 text-xs text-danger"
                     >
                       Remove
                     </button>
@@ -406,12 +406,12 @@ export default async function PlatformOrgDetailPage({
               type="email"
               required
               placeholder="user@company.com"
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-md border border-edge-strong px-3 py-2 text-sm"
             />
             <select
               name="role"
               defaultValue="MEMBER"
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-md border border-edge-strong px-3 py-2 text-sm"
             >
               <option value="MEMBER">MEMBER</option>
               <option value="ADMIN">ADMIN</option>
@@ -427,10 +427,10 @@ export default async function PlatformOrgDetailPage({
 
         {detail.pendingInvitations.length > 0 ? (
           <div className="space-y-2">
-            <h3 className="text-sm font-medium text-slate-800">
+            <h3 className="text-sm font-medium text-ink">
               Pending invitations
             </h3>
-            <ul className="divide-y divide-slate-100 rounded-md border border-slate-200 bg-white text-sm">
+            <ul className="divide-y divide-slate-100 rounded-md border border-edge bg-surface text-sm">
               {detail.pendingInvitations.map((inv) => (
                 <li
                   key={inv.id}
@@ -446,7 +446,7 @@ export default async function PlatformOrgDetailPage({
                       <input type="hidden" name="invitationId" value={inv.id} />
                       <button
                         type="submit"
-                        className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+                        className="rounded-md border border-edge-strong px-2 py-1 text-xs"
                       >
                         Revoke
                       </button>
@@ -464,12 +464,12 @@ export default async function PlatformOrgDetailPage({
           <h2 className="text-lg font-medium">
             {vocab.product.Plural} ({detail.products.length})
           </h2>
-          <ul className="mt-2 space-y-1 text-sm text-slate-700">
+          <ul className="mt-2 space-y-1 text-sm text-ink">
             {detail.products.map((p) => (
               <li key={p.id}>{p.name}</li>
             ))}
             {detail.products.length === 0 ? (
-              <li className="text-slate-500">None</li>
+              <li className="text-subtle">None</li>
             ) : null}
           </ul>
         </div>
@@ -477,25 +477,25 @@ export default async function PlatformOrgDetailPage({
           <h2 className="text-lg font-medium">
             {vocab.campaign.Plural} ({detail.campaigns.length})
           </h2>
-          <ul className="mt-2 space-y-1 text-sm text-slate-700">
+          <ul className="mt-2 space-y-1 text-sm text-ink">
             {detail.campaigns.map((c) => (
               <li key={c.id}>
                 {c.name} · {c.status}
               </li>
             ))}
             {detail.campaigns.length === 0 ? (
-              <li className="text-slate-500">None</li>
+              <li className="text-subtle">None</li>
             ) : null}
           </ul>
         </div>
         <div>
           <h2 className="text-lg font-medium">{vocab.icp.plural} ({detail.icps.length})</h2>
-          <ul className="mt-2 space-y-1 text-sm text-slate-700">
+          <ul className="mt-2 space-y-1 text-sm text-ink">
             {detail.icps.map((i) => (
               <li key={i.id}>{i.name}</li>
             ))}
             {detail.icps.length === 0 ? (
-              <li className="text-slate-500">None</li>
+              <li className="text-subtle">None</li>
             ) : null}
           </ul>
         </div>
@@ -503,12 +503,12 @@ export default async function PlatformOrgDetailPage({
           <h2 className="text-lg font-medium">
             {vocab.persona.Plural} ({detail.personas.length})
           </h2>
-          <ul className="mt-2 space-y-1 text-sm text-slate-700">
+          <ul className="mt-2 space-y-1 text-sm text-ink">
             {detail.personas.map((p) => (
               <li key={p.id}>{p.name}</li>
             ))}
             {detail.personas.length === 0 ? (
-              <li className="text-slate-500">None</li>
+              <li className="text-subtle">None</li>
             ) : null}
           </ul>
         </div>
@@ -516,7 +516,7 @@ export default async function PlatformOrgDetailPage({
           <h2 className="text-lg font-medium">
             {vocab.list.Plural} ({detail.contactLists.length})
           </h2>
-          <ul className="mt-2 space-y-1 text-sm text-slate-700">
+          <ul className="mt-2 space-y-1 text-sm text-ink">
             {detail.contactLists.map((list) => (
               <li key={list.id}>
                 {list.name}
@@ -526,7 +526,7 @@ export default async function PlatformOrgDetailPage({
               </li>
             ))}
             {detail.contactLists.length === 0 ? (
-              <li className="text-slate-500">None</li>
+              <li className="text-subtle">None</li>
             ) : null}
           </ul>
         </div>
@@ -534,9 +534,9 @@ export default async function PlatformOrgDetailPage({
 
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Credit grants</h2>
-        <ul className="divide-y divide-slate-100 rounded-md border border-slate-200 bg-white text-sm">
+        <ul className="divide-y divide-slate-100 rounded-md border border-edge bg-surface text-sm">
           {detail.creditGrants.length === 0 ? (
-            <li className="px-3 py-2 text-slate-500">None yet.</li>
+            <li className="px-3 py-2 text-subtle">None yet.</li>
           ) : (
             detail.creditGrants.map((g) => (
               <li key={g.id} className="px-3 py-2">
@@ -550,9 +550,9 @@ export default async function PlatformOrgDetailPage({
 
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Company research credit packs</h2>
-        <ul className="divide-y divide-slate-100 rounded-md border border-slate-200 bg-white text-sm">
+        <ul className="divide-y divide-slate-100 rounded-md border border-edge bg-surface text-sm">
           {detail.companyResearchCredits.length === 0 ? (
-            <li className="px-3 py-2 text-slate-500">None yet.</li>
+            <li className="px-3 py-2 text-subtle">None yet.</li>
           ) : (
             detail.companyResearchCredits.map((pack) => (
               <li key={pack.id} className="px-3 py-2">
@@ -572,7 +572,7 @@ export default async function PlatformOrgDetailPage({
       </section>
 
       {canMutate ? (
-        <section className="space-y-6 border-t border-slate-200 pt-6">
+        <section className="space-y-6 border-t border-edge pt-6">
           <h2 className="text-lg font-medium">SUPER_ADMIN actions</h2>
 
           <ActionFeedbackForm
@@ -590,7 +590,7 @@ export default async function PlatformOrgDetailPage({
                 defaultValue={
                   usagePolicy?.activeResearchedCompanyLimit ?? 50
                 }
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <label className="block text-sm">
@@ -600,7 +600,7 @@ export default async function PlatformOrgDetailPage({
                 type="number"
                 min={0}
                 defaultValue={usagePolicy?.dailyEmailGenerationLimit ?? 500}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <label className="block text-sm">
@@ -610,7 +610,7 @@ export default async function PlatformOrgDetailPage({
                 type="number"
                 min={0}
                 defaultValue={usagePolicy?.dailyEmailSendWarningLimit ?? 150}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <button
@@ -627,10 +627,10 @@ export default async function PlatformOrgDetailPage({
             testId="platform-research-policy-form"
           >
             <input type="hidden" name="organizationId" value={id} />
-            <h3 className="text-sm font-medium text-slate-900">
+            <h3 className="text-sm font-medium text-ink">
               {vocab.contact.Singular} research
             </h3>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted">
               Per-{vocab.contact.singular} AI research during email generation. Carries real
               per-{vocab.contact.singular} cost — platform operator only. Customers cannot enable
               this in organization settings.
@@ -663,7 +663,7 @@ export default async function PlatformOrgDetailPage({
               <input type="hidden" name="organizationId" value={id} />
               <button
                 type="submit"
-                className="rounded-md bg-emerald-700 px-3 py-2 text-sm font-medium text-white"
+                className="rounded-md bg-success px-3 py-2 text-sm font-medium text-on-ink"
               >
                 Unsuspend organization
               </button>
@@ -680,12 +680,12 @@ export default async function PlatformOrgDetailPage({
                 <input
                   name="reason"
                   required
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                  className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
                 />
               </label>
               <button
                 type="submit"
-                className="rounded-md bg-red-700 px-3 py-2 text-sm font-medium text-white"
+                className="rounded-md bg-danger px-3 py-2 text-sm font-medium text-on-ink"
               >
                 Suspend organization
               </button>
@@ -706,7 +706,7 @@ export default async function PlatformOrgDetailPage({
                 min={0.01}
                 step="0.01"
                 required
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <label className="block text-sm">
@@ -714,14 +714,14 @@ export default async function PlatformOrgDetailPage({
               <input
                 name="reason"
                 required
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <label className="block text-sm">
               Note (optional)
               <input
                 name="note"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <button
@@ -738,7 +738,7 @@ export default async function PlatformOrgDetailPage({
             testId="platform-company-research-credits-form"
           >
             <input type="hidden" name="organizationId" value={id} />
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted">
               Company research packs: {COMPANY_CREDIT_BLOCK.units} companies
               per block (same Stripe price as Standard).{" "}
               {perUserCompanyCredits
@@ -751,7 +751,7 @@ export default async function PlatformOrgDetailPage({
                 <select
                   name="userId"
                   required
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                  className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
                   defaultValue=""
                 >
                   <option value="" disabled>
@@ -775,7 +775,7 @@ export default async function PlatformOrgDetailPage({
                 step={1}
                 defaultValue={1}
                 required
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <label className="block text-sm">
@@ -783,7 +783,7 @@ export default async function PlatformOrgDetailPage({
               <input
                 name="reason"
                 required
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <button
@@ -822,7 +822,7 @@ export default async function PlatformOrgDetailPage({
           />
         </section>
       ) : (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-subtle">
           Read-only SUPPORT view — mutations require SUPER_ADMIN.
         </p>
       )}

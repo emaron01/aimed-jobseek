@@ -7,9 +7,9 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-b from-slate-50 to-white">
-      <header className="border-b border-slate-200/80 px-6 py-4">
-        <Link href="/login" className="text-sm font-semibold tracking-tight text-slate-900">
+    <div className="flex min-h-screen flex-col bg-gradient-to-b from-canvas to-surface">
+      <header className="border-b border-edge/80 px-6 py-4">
+        <Link href="/login" className="text-sm font-semibold tracking-tight text-ink">
           {brand.appName}
         </Link>
       </header>

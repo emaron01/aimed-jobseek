@@ -161,7 +161,7 @@ export default async function ProductResearchPage({ params }: PageProps) {
       {showSynthesisFailure || failedRead ? (
         <div
           role="alert"
-          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950"
+          className="rounded-lg border border-warning bg-warning-tint px-4 py-4 text-sm text-warning"
           data-testid="product-failed-read"
           data-print-hide
         >
@@ -182,7 +182,7 @@ export default async function ProductResearchPage({ params }: PageProps) {
             documents. That path works reliably for JavaScript-heavy sites.
           </p>
           {!failedRead ? (
-            <p className="mt-2 text-xs text-amber-800/80">
+            <p className="mt-2 text-xs text-warning">
               Acquired evidence was preserved. Use Try building again if you
               only need to re-run the model — no URL re-fetch or web search.
             </p>
@@ -191,7 +191,7 @@ export default async function ProductResearchPage({ params }: PageProps) {
       ) : null}
 
       {latestRun && draft && !isNearEmptyProductDraft(draft) && !productApproved ? (
-        <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-8">
+        <section className="rounded-lg border border-edge bg-surface p-5 sm:p-8">
           <ProductDraftReview
             productId={product.id}
             setupRunId={latestRun.id}
@@ -206,7 +206,7 @@ export default async function ProductResearchPage({ params }: PageProps) {
       {showPendingResynthesisBanner ? (
         <div
           role="status"
-          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950"
+          className="rounded-lg border border-warning bg-warning-tint px-4 py-4 text-sm text-warning"
           data-testid="product-pending-resynthesis"
           data-print-hide
         >
@@ -217,7 +217,7 @@ export default async function ProductResearchPage({ params }: PageProps) {
           </p>
           <Link
             href={`/setup/${product.id}/research/resynthesis/${pendingResynthesisRun!.id}`}
-            className="mt-3 inline-flex items-center justify-center rounded-md border border-amber-300 bg-white px-3.5 py-2 text-sm font-medium text-amber-950"
+            className="mt-3 inline-flex items-center justify-center rounded-md border border-warning bg-surface px-3.5 py-2 text-sm font-medium text-warning"
           >
             Review changes
           </Link>
@@ -226,11 +226,11 @@ export default async function ProductResearchPage({ params }: PageProps) {
 
       {productApproved ? (
         <>
-          <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-8">
-            <h2 className="text-base font-semibold text-slate-900">
+          <section className="rounded-lg border border-edge bg-surface p-5 sm:p-8">
+            <h2 className="text-base font-semibold text-ink">
               Approved {vocab.product.singular}
             </h2>
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="mt-1 text-sm text-muted">
               This is the approved {vocab.product.singular}. Add material below to rebuild a draft.
             </p>
             <div className="mt-4">
@@ -239,7 +239,7 @@ export default async function ProductResearchPage({ params }: PageProps) {
           </section>
           <section
             id="product-materials"
-            className="rounded-lg border border-slate-200 bg-white p-5"
+            className="rounded-lg border border-edge bg-surface p-5"
             data-print-hide
           >
             <AddProductMaterialPanel productId={product.id} />
@@ -248,7 +248,7 @@ export default async function ProductResearchPage({ params }: PageProps) {
       ) : (
         <section
           id="product-materials"
-          className="rounded-lg border border-slate-200 bg-white p-5"
+          className="rounded-lg border border-edge bg-surface p-5"
           data-print-hide
         >
           <AssistedProductIntake

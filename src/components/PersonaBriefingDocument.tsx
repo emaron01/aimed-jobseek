@@ -35,7 +35,7 @@ function ClaimLine({
   });
   const sourceIds = sourceIdsForClaim({ claim: text, evidenceRefs });
   return (
-    <li className="leading-relaxed text-slate-800">
+    <li className="leading-relaxed text-ink">
       {text}
       <PersonaProvenanceChip
         classes={classes}
@@ -58,16 +58,16 @@ function CriteriaGroup({
 }) {
   return (
     <div>
-      <p className="text-sm font-medium text-slate-600">{title}</p>
+      <p className="text-sm font-medium text-muted">{title}</p>
       {rows.length === 0 ? (
-        <p className="mt-1 text-sm text-slate-500">{emptyLabel}</p>
+        <p className="mt-1 text-sm text-subtle">{emptyLabel}</p>
       ) : (
-        <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px] text-slate-800">
+        <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px] text-ink">
           {rows.map((row) => (
             <li key={row.name}>
               <span className="font-medium">{row.name}</span>
               {row.description ? (
-                <span className="text-slate-600"> — {row.description}</span>
+                <span className="text-muted"> — {row.description}</span>
               ) : null}
             </li>
           ))}
@@ -104,24 +104,24 @@ export function PersonaBriefingDocument({
   return (
     <article className="space-y-8">
       <div>
-        <p className="text-base text-slate-800" data-testid="persona-source-lead">
+        <p className="text-base text-ink" data-testid="persona-source-lead">
           {sourceLead}
         </p>
         {sourceNames.length > 0 ? (
-          <p className="mt-1 text-sm text-slate-500">{sourceNames.join(" · ")}</p>
+          <p className="mt-1 text-sm text-subtle">{sourceNames.join(" · ")}</p>
         ) : null}
       </div>
 
-      <header className="space-y-1 border-b border-slate-200 pb-4">
-        <h2 className="text-xl font-semibold text-slate-900">{briefing.name}</h2>
+      <header className="space-y-1 border-b border-edge pb-4">
+        <h2 className="text-xl font-semibold text-ink">{briefing.name}</h2>
         {metaLine ? (
-          <p className="text-sm text-slate-600">{metaLine}</p>
+          <p className="text-sm text-muted">{metaLine}</p>
         ) : null}
       </header>
 
       <ResearchReadSection title="Who this is" empty={!briefing.whoTheyAre}>
         {briefing.whoTheyAre ? (
-          <p className="text-[17px] leading-7 text-slate-800">
+          <p className="text-[17px] leading-7 text-ink">
             {briefing.whoTheyAre}
             <PersonaProvenanceChip
               classes={provenanceForClaim({
@@ -139,7 +139,7 @@ export function PersonaBriefingDocument({
           </p>
         ) : null}
         {briefing.buyingRole ? (
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-muted">
             {vocab.persona.Singular}: {briefing.buyingRole}
           </p>
         ) : null}
@@ -183,7 +183,7 @@ export function PersonaBriefingDocument({
         ) : null}
         {briefing.organizationalPressures.length > 0 ? (
           <div className="mt-2">
-            <p className="text-sm font-medium text-slate-600">Pressures</p>
+            <p className="text-sm font-medium text-muted">Pressures</p>
             <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px]">
               {briefing.organizationalPressures.map((item) => (
                 <ClaimLine
@@ -224,7 +224,7 @@ export function PersonaBriefingDocument({
         ) : null}
         {briefing.kpisAndAccountabilities.length > 0 ? (
           <div className="mt-2">
-            <p className="text-sm font-medium text-slate-600">KPIs & accountabilities</p>
+            <p className="text-sm font-medium text-muted">KPIs & accountabilities</p>
             <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px]">
               {briefing.kpisAndAccountabilities.map((item) => (
                 <ClaimLine
@@ -241,7 +241,7 @@ export function PersonaBriefingDocument({
         ) : null}
         {briefing.likelyObjections.length > 0 ? (
           <div className="mt-2">
-            <p className="text-sm font-medium text-slate-600">Likely objections</p>
+            <p className="text-sm font-medium text-muted">Likely objections</p>
             <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px]">
               {briefing.likelyObjections.map((item) => (
                 <ClaimLine
@@ -301,7 +301,7 @@ export function PersonaBriefingDocument({
         ) : null}
         {briefing.personaSpecificPositioning.length > 0 ? (
           <div className="mt-2">
-            <p className="text-sm font-medium text-slate-600">Positioning</p>
+            <p className="text-sm font-medium text-muted">Positioning</p>
             <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px]">
               {briefing.personaSpecificPositioning.map((item) => (
                 <ClaimLine
@@ -318,7 +318,7 @@ export function PersonaBriefingDocument({
         ) : null}
         {briefing.proofPointsToEmphasize.length > 0 ? (
           <div className="mt-2">
-            <p className="text-sm font-medium text-slate-600">Proof to emphasize</p>
+            <p className="text-sm font-medium text-muted">Proof to emphasize</p>
             <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px]">
               {briefing.proofPointsToEmphasize.map((item) => (
                 <ClaimLine
@@ -338,7 +338,7 @@ export function PersonaBriefingDocument({
             {briefing.terminology.map((term) => (
               <li
                 key={term}
-                className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-800"
+                className="rounded-md border border-edge bg-surface px-2.5 py-1 text-sm text-ink"
               >
                 {term}
                 <PersonaProvenanceChip
@@ -385,29 +385,29 @@ export function PersonaBriefingDocument({
       </ResearchReadSection>
 
       {sources.length > 0 ? (
-        <section className="research-sources-appendix mt-8 border-t border-slate-200 pt-6">
-          <h3 className="text-sm font-semibold tracking-wide text-slate-500 uppercase">
+        <section className="research-sources-appendix mt-8 border-t border-edge pt-6">
+          <h3 className="text-sm font-semibold tracking-wide text-subtle uppercase">
             Sources
           </h3>
-          <ul className="mt-3 space-y-3 text-sm text-slate-700">
+          <ul className="mt-3 space-y-3 text-sm text-ink">
             {sources.map((source) => {
               const number = sourceIndex.get(source.id) ?? 0;
               return (
               <li key={source.id}>
-                <p className="font-medium text-slate-900">
+                <p className="font-medium text-ink">
                   {number > 0 ? (
-                    <span className="text-slate-500">[{number}] </span>
+                    <span className="text-subtle">[{number}] </span>
                   ) : null}
                   {source.displayName}
                 </p>
-                <p className="text-xs text-slate-500">{source.sourceType}</p>
+                <p className="text-xs text-subtle">{source.sourceType}</p>
                 {source.originalUrl ? (
-                  <p className="break-all text-xs text-slate-600">
+                  <p className="break-all text-xs text-muted">
                     {source.originalUrl}
                   </p>
                 ) : null}
                 {source.filename ? (
-                  <p className="text-xs text-slate-600">{source.filename}</p>
+                  <p className="text-xs text-muted">{source.filename}</p>
                 ) : null}
               </li>
               );

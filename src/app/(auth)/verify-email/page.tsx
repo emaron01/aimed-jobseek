@@ -45,25 +45,25 @@ function VerifyEmailInner() {
 
   return (
     <div
-      className="mx-auto w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm"
+      className="mx-auto w-full max-w-md rounded-xl border border-edge bg-surface p-8 shadow-sm"
       data-testid="verify-email-page"
     >
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+      <h1 className="text-2xl font-semibold tracking-tight text-ink">
         {invalidOrExpired ? "Verification link expired" : "Verify your email"}
       </h1>
-      <p className="mt-2 text-sm text-slate-600">
+      <p className="mt-2 text-sm text-muted">
         {invalidOrExpired
           ? "Verification link is invalid or expired. Request a new link below."
           : "Confirm your email to finish creating your account."}
       </p>
       {message ? (
-        <p className="mt-4 text-sm text-emerald-700" data-testid="verify-email-message">
+        <p className="mt-4 text-sm text-success" data-testid="verify-email-message">
           {message}
         </p>
       ) : null}
       {error ? (
         <p
-          className="mt-4 text-sm text-red-600"
+          className="mt-4 text-sm text-danger"
           role="alert"
           data-testid="verify-email-error"
         >
@@ -78,7 +78,7 @@ function VerifyEmailInner() {
             type="email"
             required
             autoComplete="email"
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
           />
         </label>
         <AppButton

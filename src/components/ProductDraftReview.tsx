@@ -52,7 +52,7 @@ function Status({ result }: { result: ProductSetupActionResult | null }) {
       role="status"
       data-testid="product-draft-review-status"
       className={
-        result.ok ? "mt-3 text-sm text-emerald-700" : "mt-3 text-sm text-red-600"
+        result.ok ? "mt-3 text-sm text-success" : "mt-3 text-sm text-danger"
       }
     >
       {result.message}
@@ -65,8 +65,8 @@ function KindBadge({ kind }: { kind: "FACT" | "INFERENCE" }) {
     <span
       className={
         kind === "FACT"
-          ? "ml-2 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800"
-          : "ml-2 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900"
+          ? "ml-2 inline-flex rounded-full border border-success bg-success-tint px-2 py-0.5 text-[11px] font-medium text-success"
+          : "ml-2 inline-flex rounded-full border border-warning bg-warning-tint px-2 py-0.5 text-[11px] font-medium text-warning"
       }
       data-testid={`profile-kind-${kind}`}
     >
@@ -104,13 +104,13 @@ function ProvenanceChip({
         {label}
         {sourceIds.length > 1 ? ` +${sourceIds.length - 1}` : ""}
       </AppButton>
-      <span className="research-source-chip-print hidden rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600 print:inline">
+      <span className="research-source-chip-print hidden rounded-full border border-edge bg-surface px-2 py-0.5 text-[11px] font-medium text-muted print:inline">
         {label}
       </span>
       {open ? (
-        <span className="research-source-chip-popup absolute left-0 z-10 mt-1 w-72 rounded-md border border-slate-200 bg-white p-3 text-left text-xs text-slate-700 shadow-sm print:hidden">
+        <span className="research-source-chip-popup absolute left-0 z-10 mt-1 w-72 rounded-md border border-edge bg-surface p-3 text-left text-xs text-ink shadow-sm print:hidden">
           {sourceIds.map((id) => (
-            <span key={id} className="block text-slate-500">
+            <span key={id} className="block text-subtle">
               {sourceLabelForId(id, sources)}
             </span>
           ))}
@@ -132,11 +132,11 @@ function ReadSection({
 }) {
   return (
     <section className="space-y-2">
-      <h3 className="text-sm font-semibold tracking-wide text-slate-500 uppercase">
+      <h3 className="text-sm font-semibold tracking-wide text-subtle uppercase">
         {title}
       </h3>
       {empty ? (
-        <p className="text-sm text-slate-500">None recorded from the material.</p>
+        <p className="text-sm text-subtle">None recorded from the material.</p>
       ) : (
         children
       )}
@@ -155,7 +155,7 @@ function FactLine({
 }) {
   if (!item?.text?.trim()) return null;
   return (
-    <p className="text-[17px] leading-7 text-slate-800">
+    <p className="text-[17px] leading-7 text-ink">
       {item.text}
       <KindBadge kind={item.kind} />
       <ProvenanceChip
@@ -179,7 +179,7 @@ function FactList({
   return (
     <ul className="list-disc space-y-2 pl-5 text-[17px]">
       {items.map((item) => (
-        <li key={item.id} className="leading-relaxed text-slate-800">
+        <li key={item.id} className="leading-relaxed text-ink">
           {item.text}
           <KindBadge kind={item.kind} />
           <ProvenanceChip
@@ -211,11 +211,11 @@ function EditField({
   singleLine?: boolean;
 }) {
   const shared =
-    "mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 placeholder:text-slate-400 focus:ring-2";
+    "mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-focus placeholder:text-subtle focus:ring-2";
   return (
     <label className="block text-sm">
-      <span className="font-medium text-slate-800">{label}</span>
-      <span className="mt-0.5 block text-xs font-normal text-slate-500">
+      <span className="font-medium text-ink">{label}</span>
+      <span className="mt-0.5 block text-xs font-normal text-subtle">
         {hint}
       </span>
       {singleLine ? (
@@ -284,7 +284,7 @@ function RoleBlock({
     .join(" – ");
   return (
     <div className="space-y-2">
-      <p className="text-[17px] font-medium text-slate-900">
+      <p className="text-[17px] font-medium text-ink">
         {[role.title, role.employer].filter(Boolean).join(" · ") || "Role"}
         <KindBadge kind={role.kind} />
         <ProvenanceChip
@@ -293,11 +293,11 @@ function RoleBlock({
           sourceIndex={sourceIndex}
         />
       </p>
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-subtle">
         {[dates, role.location].filter(Boolean).join(" · ")}
       </p>
       {role.summary ? (
-        <p className="text-[17px] leading-7 text-slate-800">{role.summary}</p>
+        <p className="text-[17px] leading-7 text-ink">{role.summary}</p>
       ) : null}
       {role.achievements.length > 0 ? (
         <FactList
@@ -371,20 +371,20 @@ export function ProductDraftReview({
         <p
           className={
             sourceLead.kind === "failed_read"
-              ? "text-base text-amber-950"
-              : "text-base text-slate-800"
+              ? "text-base text-warning"
+              : "text-base text-ink"
           }
           data-testid="product-source-lead"
         >
           {sourceLead.sentence}
         </p>
         {sourceLead.detail ? (
-          <p className="mt-2 text-sm text-amber-900" data-testid="product-source-detail">
+          <p className="mt-2 text-sm text-warning" data-testid="product-source-detail">
             {sourceLead.detail}
           </p>
         ) : null}
         {sourceLead.names.length > 0 ? (
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-subtle">
             {sourceLead.names.join(" · ")}
           </p>
         ) : null}
@@ -400,7 +400,7 @@ export function ProductDraftReview({
         />
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-xl font-semibold text-slate-900">
+            <h3 className="text-xl font-semibold text-ink">
               {editing ? (
                 <span className="sr-only">Edit {vocab.product.singular}</span>
               ) : (
@@ -408,7 +408,7 @@ export function ProductDraftReview({
               )}
             </h3>
             {!editing && profile.identity.personalSite?.text ? (
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-subtle">
                 {profile.identity.personalSite.text}
               </p>
             ) : null}
@@ -867,7 +867,7 @@ export function ProductDraftReview({
             >
               {profile.direction.targetTitles.length > 0 ? (
                 <div>
-                  <p className="text-sm font-medium text-slate-600">Target titles</p>
+                  <p className="text-sm font-medium text-muted">Target titles</p>
                   <FactList
                     items={profile.direction.targetTitles}
                     sources={sources}
@@ -882,7 +882,7 @@ export function ProductDraftReview({
               />
               {profile.direction.functions.length > 0 ? (
                 <div>
-                  <p className="text-sm font-medium text-slate-600">Career functions</p>
+                  <p className="text-sm font-medium text-muted">Career functions</p>
                   <FactList
                     items={profile.direction.functions}
                     sources={sources}
@@ -892,7 +892,7 @@ export function ProductDraftReview({
               ) : null}
               {profile.direction.careerGoals.length > 0 ? (
                 <div>
-                  <p className="text-sm font-medium text-slate-600">Career goals</p>
+                  <p className="text-sm font-medium text-muted">Career goals</p>
                   <FactList
                     items={profile.direction.careerGoals}
                     sources={sources}
@@ -977,7 +977,7 @@ export function ProductDraftReview({
                 {profile.domainVocabulary.map((term) => (
                   <li
                     key={term.id}
-                    className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-800"
+                    className="rounded-md border border-edge bg-surface px-2.5 py-1 text-sm text-ink"
                   >
                     {term.text}
                     <KindBadge kind={term.kind} />
@@ -995,16 +995,16 @@ export function ProductDraftReview({
 
         {profile.gaps.length > 0 ? (
           <aside
-            className="rounded-lg border border-slate-200 bg-slate-50 px-5 py-4"
+            className="rounded-lg border border-edge bg-canvas px-5 py-4"
             data-testid="profile-gaps-panel"
           >
-            <h3 className="text-sm font-semibold text-slate-900">
+            <h3 className="text-sm font-semibold text-ink">
               Gaps — no supporting evidence was found.
             </h3>
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="mt-1 text-sm text-muted">
               Listing what was refused rather than invented.
             </p>
-            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-800">
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-ink">
               {profile.gaps.map((gap) => (
                 <li key={gap.id}>
                   <span className="font-medium">{gap.area}:</span> {gap.detail}
@@ -1015,31 +1015,31 @@ export function ProductDraftReview({
         ) : null}
 
         {sources.length > 0 ? (
-          <section className="research-sources-appendix mt-8 border-t border-slate-200 pt-6">
-            <h3 className="text-sm font-semibold tracking-wide text-slate-500 uppercase">
+          <section className="research-sources-appendix mt-8 border-t border-edge pt-6">
+            <h3 className="text-sm font-semibold tracking-wide text-subtle uppercase">
               Sources
             </h3>
-            <ul className="mt-3 space-y-3 text-sm text-slate-700">
+            <ul className="mt-3 space-y-3 text-sm text-ink">
               {sources.map((source) => {
                 const number = sourceIndex.get(source.id) ?? 0;
                 return (
                   <li key={source.id}>
-                    <p className="font-medium text-slate-900">
+                    <p className="font-medium text-ink">
                       {number > 0 ? (
-                        <span className="text-slate-500">[{number}] </span>
+                        <span className="text-subtle">[{number}] </span>
                       ) : null}
                       {source.displayName}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-subtle">
                       {productSourceTypeLabel(source.sourceType)}
                     </p>
                     {source.originalUrl ? (
-                      <p className="break-all text-xs text-slate-600">
+                      <p className="break-all text-xs text-muted">
                         {source.originalUrl}
                       </p>
                     ) : null}
                     {source.filename ? (
-                      <p className="text-xs text-slate-600">{source.filename}</p>
+                      <p className="text-xs text-muted">{source.filename}</p>
                     ) : null}
                   </li>
                 );
@@ -1048,11 +1048,11 @@ export function ProductDraftReview({
           </section>
         ) : null}
 
-        <div className="border-t border-slate-200 pt-5" data-print-hide>
+        <div className="border-t border-edge pt-5" data-print-hide>
           <SubmitButton disabled={pending}>
             {pending ? "Saving…" : "Approve this profile"}
           </SubmitButton>
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm text-subtle">
             This becomes the authoritative {vocab.product.singular} record. Later{" "}
             {vocab.campaign.plural} and generated documents use it.
           </p>

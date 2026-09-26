@@ -42,7 +42,7 @@ export default async function PlatformEmailTemplatesPage({
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-subtle">
           <Link href="/platform" className="underline">
             Platform
           </Link>
@@ -54,7 +54,7 @@ export default async function PlatformEmailTemplatesPage({
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">
           Transactional email templates
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Platform account emails only — not {vocab.seeker.singular} {vocab.outreach.singular}.
           SUPER_ADMIN only.
         </p>
@@ -67,8 +67,8 @@ export default async function PlatformEmailTemplatesPage({
             href={`/platform/email-templates?key=${key}`}
             className={
               key === selected
-                ? "font-medium text-slate-900 underline"
-                : "text-slate-600 hover:text-slate-900"
+                ? "font-medium text-ink underline"
+                : "text-muted hover:text-ink"
             }
           >
             {key}
@@ -76,7 +76,7 @@ export default async function PlatformEmailTemplatesPage({
         ))}
       </div>
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-subtle">
         Allowed variables: {allowlist.map((v) => `{{${v}}}`).join(", ")}
       </p>
 
@@ -93,7 +93,7 @@ export default async function PlatformEmailTemplatesPage({
             defaultValue={
               template?.displayName || baseline?.displayName || selected
             }
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
           />
         </label>
         <label className="block text-sm">
@@ -103,7 +103,7 @@ export default async function PlatformEmailTemplatesPage({
             defaultValue={
               template?.subjectTemplate || baseline?.subjectTemplate || ""
             }
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
           />
         </label>
         <label className="block text-sm">
@@ -114,7 +114,7 @@ export default async function PlatformEmailTemplatesPage({
             defaultValue={
               template?.htmlTemplate || baseline?.htmlTemplate || ""
             }
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 font-mono text-xs"
           />
         </label>
         <label className="block text-sm">
@@ -125,7 +125,7 @@ export default async function PlatformEmailTemplatesPage({
             defaultValue={
               template?.textTemplate || baseline?.textTemplate || ""
             }
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 font-mono text-xs"
           />
         </label>
         <label className="flex items-center gap-2 text-sm">
@@ -147,11 +147,11 @@ export default async function PlatformEmailTemplatesPage({
 
       <ActionFeedbackForm
         action={testSendTransactionalTemplateAction}
-        className="space-y-3 border-t border-slate-200 pt-6"
+        className="space-y-3 border-t border-edge pt-6"
         testId="test-send-template-form"
       >
         <h2 className="text-lg font-medium">Test send</h2>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-subtle">
           Does not mutate verification/reset account state. Uses placeholder
           URLs.
         </p>
@@ -162,12 +162,12 @@ export default async function PlatformEmailTemplatesPage({
             name="to"
             type="email"
             required
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
           />
         </label>
         <button
           type="submit"
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="rounded-md border border-edge-strong px-3 py-2 text-sm"
         >
           Send test
         </button>

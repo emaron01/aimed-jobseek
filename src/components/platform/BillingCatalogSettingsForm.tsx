@@ -32,7 +32,7 @@ export function BillingCatalogSettingsForm({
   const selected = plans.find((p) => p.planCode === selectedCode) ?? plans[0];
 
   if (!selected) {
-    return <p className="text-sm text-slate-600">No catalog plans loaded.</p>;
+    return <p className="text-sm text-muted">No catalog plans loaded.</p>;
   }
 
   const paid = selected.entitlementFloors.paid;
@@ -44,7 +44,7 @@ export function BillingCatalogSettingsForm({
 
   return (
     <div className="space-y-4" data-testid="billing-catalog-form">
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-muted">
         Effective source: <span className="font-medium">{sourceLabel}</span>
         {hasConsoleRow ? " (console row present)" : " (code defaults)"}. Stripe
         Price IDs are edited on Billing Config — not here.
@@ -89,7 +89,7 @@ export function BillingCatalogSettingsForm({
             required
             defaultValue={selected.displayName}
             key={`${selected.planCode}-displayName`}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
           />
         </label>
         <label className="block text-sm">
@@ -98,7 +98,7 @@ export function BillingCatalogSettingsForm({
             name="tagline"
             defaultValue={selected.tagline}
             key={`${selected.planCode}-tagline`}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
           />
         </label>
         <label className="block text-sm">
@@ -108,7 +108,7 @@ export function BillingCatalogSettingsForm({
             rows={6}
             defaultValue={selected.featureBullets.join("\n")}
             key={`${selected.planCode}-bullets`}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 font-mono text-xs"
           />
         </label>
         <label className="block text-sm">
@@ -118,7 +118,7 @@ export function BillingCatalogSettingsForm({
             rows={3}
             defaultValue={selected.trialNote}
             key={`${selected.planCode}-trialNote`}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
           />
         </label>
 
@@ -146,8 +146,8 @@ export function BillingCatalogSettingsForm({
         </div>
 
         {showSeatFields ? (
-          <fieldset className="space-y-2 rounded-md border border-slate-200 p-3">
-            <legend className="px-1 text-sm font-medium text-slate-900">
+          <fieldset className="space-y-2 rounded-md border border-edge p-3">
+            <legend className="px-1 text-sm font-medium text-ink">
               Seat policy
             </legend>
             <div className="grid gap-2 sm:grid-cols-3">
@@ -180,8 +180,8 @@ export function BillingCatalogSettingsForm({
           </>
         )}
 
-        <fieldset className="space-y-2 rounded-md border border-slate-200 p-3">
-          <legend className="px-1 text-sm font-medium text-slate-900">
+        <fieldset className="space-y-2 rounded-md border border-edge p-3">
+          <legend className="px-1 text-sm font-medium text-ink">
             Paid entitlement floors
           </legend>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -223,8 +223,8 @@ export function BillingCatalogSettingsForm({
           </div>
         </fieldset>
 
-        <fieldset className="space-y-2 rounded-md border border-slate-200 p-3">
-          <legend className="px-1 text-sm font-medium text-slate-900">
+        <fieldset className="space-y-2 rounded-md border border-edge p-3">
+          <legend className="px-1 text-sm font-medium text-ink">
             Trial entitlement floors (optional)
           </legend>
           <label className="flex items-center gap-2 text-sm">
@@ -276,8 +276,8 @@ export function BillingCatalogSettingsForm({
           </div>
         </fieldset>
 
-        <fieldset className="space-y-2 rounded-md border border-slate-200 p-3">
-          <legend className="px-1 text-sm font-medium text-slate-900">
+        <fieldset className="space-y-2 rounded-md border border-edge p-3">
+          <legend className="px-1 text-sm font-medium text-ink">
             Company credits
           </legend>
           <label className="flex items-center gap-2 text-sm">
@@ -312,10 +312,10 @@ export function BillingCatalogSettingsForm({
               name="creditsDisplayPriceNote"
               defaultValue={selected.companyCredits?.displayPriceNote ?? ""}
               key={`${selected.planCode}-creditsNote`}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
             />
           </label>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-subtle">
             Credit Price ID is configured on Billing Config.
           </p>
         </fieldset>
@@ -332,7 +332,7 @@ export function BillingCatalogSettingsForm({
         {state?.message ? (
           <p
             className={
-              state.ok ? "text-sm text-emerald-700" : "text-sm text-red-600"
+              state.ok ? "text-sm text-success" : "text-sm text-danger"
             }
             role="status"
           >
@@ -369,7 +369,7 @@ function FloorInput({
   optional?: boolean;
 }) {
   return (
-    <label className="block text-xs text-slate-600">
+    <label className="block text-xs text-muted">
       {label}
       <input
         name={name}
@@ -377,7 +377,7 @@ function FloorInput({
         min={0}
         defaultValue={defaultValue}
         key={`${planCode}-${name}`}
-        className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+        className="mt-1 w-full rounded-md border border-edge-strong px-2 py-1.5 text-sm"
         {...(optional ? {} : { required: true })}
       />
     </label>

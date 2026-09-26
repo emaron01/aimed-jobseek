@@ -121,8 +121,8 @@ export function NewCampaignForm({
           data-testid="campaign-action-status"
           className={
             state.ok
-              ? "md:col-span-2 text-sm text-emerald-700"
-              : "md:col-span-2 text-sm text-red-600"
+              ? "md:col-span-2 text-sm text-success"
+              : "md:col-span-2 text-sm text-danger"
           }
         >
           {state.message}
@@ -130,8 +130,8 @@ export function NewCampaignForm({
       ) : null}
       <div className="md:col-span-2">
         <label className="block text-sm">
-          <span className="font-medium text-slate-700">Job posting</span>
-          <span className="mt-1 block text-xs text-slate-500">
+          <span className="font-medium text-ink">Job posting</span>
+          <span className="mt-1 block text-xs text-subtle">
             Paste the posting. The URL is stored for reference and is not fetched.
           </span>
           <textarea
@@ -140,11 +140,11 @@ export function NewCampaignForm({
             rows={8}
             value={postingText}
             onChange={(event) => setPostingText(event.target.value)}
-            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 focus:ring-2"
+            className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-focus focus:ring-2"
           />
         </label>
         {state?.fieldErrors?.postingText ? (
-          <p className="mt-1 text-sm text-red-600">{state.fieldErrors.postingText}</p>
+          <p className="mt-1 text-sm text-danger">{state.fieldErrors.postingText}</p>
         ) : null}
       </div>
       <Field
@@ -161,7 +161,7 @@ export function NewCampaignForm({
       />
 
       <label className="block text-sm">
-        <span className="font-medium text-slate-700">{vocab.product.Singular}</span>
+        <span className="font-medium text-ink">{vocab.product.Singular}</span>
         <select
           name="productId"
           required
@@ -175,7 +175,7 @@ export function NewCampaignForm({
                 .map((persona) => persona.id),
             );
           }}
-          className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-slate-400 focus:ring-2"
+          className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm outline-none ring-focus focus:ring-2"
         >
           <option value="" disabled>
             Select {vocab.product.singular}
@@ -197,7 +197,7 @@ export function NewCampaignForm({
           ))}
         </select>
         {selectedProduct && !selectedProduct.ready && selectedProduct.omissionReason ? (
-          <p className="mt-2 text-sm text-amber-900">
+          <p className="mt-2 text-sm text-warning">
             {selectedProduct.name} cannot be used yet:{" "}
             {selectedProduct.omissionReason}
           </p>
@@ -205,14 +205,14 @@ export function NewCampaignForm({
       </label>
 
       <label className="block text-sm">
-        <span className="font-medium text-slate-700">{vocab.icp.singular}</span>
+        <span className="font-medium text-ink">{vocab.icp.singular}</span>
         <select
           name="icpId"
           required
           value={icpId}
           disabled={!productId}
           onChange={(event) => setIcpId(event.target.value)}
-          className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-slate-400 focus:ring-2 disabled:bg-slate-50"
+          className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm outline-none ring-focus focus:ring-2 disabled:bg-canvas"
         >
           <option value="" disabled>
             {productId ? `Select ${vocab.icp.singular}` : `Select ${vocab.product.aSingular} first`}
@@ -226,8 +226,8 @@ export function NewCampaignForm({
       </label>
 
       <fieldset className="block text-sm md:col-span-2">
-        <legend className="font-medium text-slate-700">{vocab.persona.Plural} in play</legend>
-        <p className="mt-1 text-xs text-slate-500">
+        <legend className="font-medium text-ink">{vocab.persona.Plural} in play</legend>
+        <p className="mt-1 text-xs text-subtle">
           Defaults to every {vocab.persona.singular} for this {vocab.product.singular}. {vocab.persona.Singular} is a property of
           the {vocab.contact.singular}; this only limits which roles this{" "}
           {vocab.campaign.singular} writes outreach for.
@@ -237,16 +237,16 @@ export function NewCampaignForm({
         ) : null}
         <div className="mt-2 space-y-2">
           {!productId ? (
-            <p className="text-sm text-slate-500">Select {vocab.product.aSingular} first</p>
+            <p className="text-sm text-subtle">Select {vocab.product.aSingular} first</p>
           ) : productPersonas.length === 0 ? (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-subtle">
               This {vocab.product.singular} has no {vocab.persona.plural} yet.
             </p>
           ) : (
             productPersonas.map((persona) => (
               <label
                 key={persona.id}
-                className="flex items-center gap-2 text-sm text-slate-700"
+                className="flex items-center gap-2 text-sm text-ink"
               >
                 <input
                   type="checkbox"
@@ -268,14 +268,14 @@ export function NewCampaignForm({
         </div>
       </fieldset>
 
-      <div className="space-y-4 border-t border-slate-200 pt-4 md:col-span-2">
+      <div className="space-y-4 border-t border-edge pt-4 md:col-span-2">
         <div>
-          <p className="text-sm font-medium text-slate-900">Email length</p>
+          <p className="text-sm font-medium text-ink">Email length</p>
           <div className="mt-2 flex flex-wrap gap-3">
             {EMAIL_LENGTH_OPTIONS.map((value) => (
               <label
                 key={value}
-                className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+                className="flex items-center gap-2 rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink"
               >
                 <input
                   type="radio"
@@ -297,10 +297,10 @@ export function NewCampaignForm({
 
         <div>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">
+            <span className="font-medium text-ink">
               {vocab.campaign.Singular} guidance
             </span>
-            <span className="mt-1 block text-xs text-slate-500">
+            <span className="mt-1 block text-xs text-subtle">
               Steers materials for this {vocab.campaign.singular}, up to{" "}
               {EMAIL_GUIDANCE_MAX_CHARS} characters.
             </span>
@@ -310,7 +310,7 @@ export function NewCampaignForm({
               maxLength={EMAIL_GUIDANCE_MAX_CHARS}
               defaultValue={restored?.emailGuidance}
               placeholder="Emphasize the work that matches this role"
-              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 placeholder:text-slate-400 focus:ring-2"
+              className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-focus placeholder:text-subtle focus:ring-2"
             />
           </label>
           <EmailGuidancePromptExamples />

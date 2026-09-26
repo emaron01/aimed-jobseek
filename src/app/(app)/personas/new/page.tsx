@@ -52,9 +52,9 @@ export default async function NewPersonaPage({
         }
       />
 
-      <section className="rounded-lg border border-slate-200 bg-white p-5">
+      <section className="rounded-lg border border-edge bg-surface p-5">
         {products.length === 0 ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             Add {vocab.product.aSingular} on the{" "}
             <Link href="/products/new" className="underline">
               {vocab.product.Plural} page

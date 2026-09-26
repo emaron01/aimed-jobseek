@@ -50,9 +50,9 @@ export function BillingPricesSettingsForm({
 
   return (
     <div className="space-y-4" data-testid="billing-prices-settings">
-      <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+      <div className="space-y-2 rounded-md border border-edge bg-canvas px-3 py-2 text-sm text-ink">
         <p className="font-medium">Effective Stripe IDs (new Checkout)</p>
-        <ul className="space-y-1 text-slate-700">
+        <ul className="space-y-1 text-ink">
           <EffectiveRow
             label="Standard monthly price"
             field={effective.standardMonthlyPriceId}
@@ -89,7 +89,7 @@ export function BillingPricesSettingsForm({
             hasConsoleRow={hasConsoleRow}
           />
         </ul>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-subtle">
           Changes apply only to new Checkout sessions. Existing subscribers keep
           the Price already stored on their Stripe subscription. Plan copy and
           entitlement floors are edited on Plan Catalog — not here.
@@ -98,7 +98,7 @@ export function BillingPricesSettingsForm({
 
       <form action={formAction} className="space-y-4">
         <input type="hidden" name="intent" value="save" />
-        <fieldset className="space-y-3 rounded-md border border-slate-200 p-3">
+        <fieldset className="space-y-3 rounded-md border border-edge p-3">
           <legend className="px-1 text-sm font-medium">Standard</legend>
           <IdInput
             name="standardMonthlyPriceId"
@@ -133,7 +133,7 @@ export function BillingPricesSettingsForm({
           />
         </fieldset>
 
-        <fieldset className="space-y-3 rounded-md border border-slate-200 p-3">
+        <fieldset className="space-y-3 rounded-md border border-edge p-3">
           <legend className="px-1 text-sm font-medium">Team (placeholders OK)</legend>
           <IdInput
             name="teamMonthlyPriceId"
@@ -153,7 +153,7 @@ export function BillingPricesSettingsForm({
           />
         </fieldset>
 
-        <fieldset className="space-y-3 rounded-md border border-slate-200 p-3">
+        <fieldset className="space-y-3 rounded-md border border-edge p-3">
           <legend className="px-1 text-sm font-medium">
             Enterprise (placeholders OK)
           </legend>
@@ -182,7 +182,7 @@ export function BillingPricesSettingsForm({
             role="status"
             data-testid="billing-prices-settings-status"
             className={
-              state.ok ? "text-sm text-emerald-700" : "text-sm text-red-600"
+              state.ok ? "text-sm text-success" : "text-sm text-danger"
             }
           >
             {state.message}
@@ -221,7 +221,7 @@ function EffectiveRow({
     <li>
       <span className="font-medium">{label}:</span>{" "}
       <code className="break-all text-xs">{field.value ?? "—"}</code>
-      <span className="mt-0.5 block text-xs text-slate-500">
+      <span className="mt-0.5 block text-xs text-subtle">
         Source: {field.sourceLabel}
         {hasConsoleRow ? "" : " (no console override)"}
       </span>
@@ -244,7 +244,7 @@ function IdInput({
 }) {
   return (
     <label className="block text-sm">
-      <span className="font-medium text-slate-800">{label}</span>
+      <span className="font-medium text-ink">{label}</span>
       <input
         type="text"
         name={name}
@@ -252,10 +252,10 @@ function IdInput({
         spellCheck={false}
         defaultValue={defaultValue}
         placeholder="price_… / prod_…"
-        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm"
+        className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 font-mono text-sm"
       />
       {hint ? (
-        <span className="mt-1 block text-xs text-slate-500">{hint}</span>
+        <span className="mt-1 block text-xs text-subtle">{hint}</span>
       ) : null}
     </label>
   );

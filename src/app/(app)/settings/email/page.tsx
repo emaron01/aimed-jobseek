@@ -69,10 +69,10 @@ export default async function EmailSettingsPage({ searchParams }: PageProps) {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">
           {showMailbox ? "Email connection" : "Email signature"}
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           {showMailbox
             ? "Connect a personal mailbox for direct sending. Connections belong to you within this workspace and cannot be used by another member. The signature below is appended on Connected Send and when you open Gmail or Outlook on the web. Outlook Desktop uses your Outlook signature instead."
             : "Appended when you open a draft in Outlook or Gmail. Outlook desktop uses the signature stored in Outlook."}
@@ -95,7 +95,7 @@ export default async function EmailSettingsPage({ searchParams }: PageProps) {
       {signatureLoadError ? (
         <p
           role="alert"
-          className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+          className="rounded-md border border-warning bg-warning-tint px-3 py-2 text-sm text-warning"
         >
           {signatureLoadError}
         </p>

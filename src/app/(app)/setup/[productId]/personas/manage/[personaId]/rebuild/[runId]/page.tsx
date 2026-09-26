@@ -92,7 +92,7 @@ export default async function PersonaResynthesisReviewPage({ params }: PageProps
           </div>
         }
       />
-      <section className="rounded-lg border border-slate-200 bg-white p-5">
+      <section className="rounded-lg border border-edge bg-surface p-5">
         <PersonaResynthesisReview
           productId={product.id}
           personaId={persona.id}

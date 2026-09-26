@@ -14,7 +14,7 @@ export default async function PlatformCreateOrgPage() {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold tracking-tight">Create account</h1>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           SUPPORT can view organizations but cannot create accounts. Ask a
           SUPER_ADMIN.
         </p>
@@ -28,7 +28,7 @@ export default async function PlatformCreateOrgPage() {
   return (
     <div className="mx-auto max-w-xl space-y-6">
       <div>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-subtle">
           <Link href="/platform/orgs" className="underline">
             Organizations
           </Link>
@@ -36,7 +36,7 @@ export default async function PlatformCreateOrgPage() {
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">
           Create account
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Choose billed or comped, set limits, and invite the first OWNER.
           Comped accounts never touch Stripe and do not expire.
         </p>
@@ -44,20 +44,20 @@ export default async function PlatformCreateOrgPage() {
 
       <ActionFeedbackForm
         action={createPlatformOrganizationAction}
-        className="space-y-4 rounded-lg border border-slate-200 bg-white p-5"
+        className="space-y-4 rounded-lg border border-edge bg-surface p-5"
         testId="create-platform-org-form"
       >
         <label className="block text-sm">
-          <span className="font-medium text-slate-800">Organization name</span>
+          <span className="font-medium text-ink">Organization name</span>
           <input
             name="name"
             required
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
             placeholder={vocabExamples.organizationNamePlaceholder}
           />
         </label>
         <fieldset className="space-y-2 text-sm">
-          <legend className="font-medium text-slate-800">Account type</legend>
+          <legend className="font-medium text-ink">Account type</legend>
           <label className="flex items-start gap-2">
             <input
               type="radio"
@@ -85,7 +85,7 @@ export default async function PlatformCreateOrgPage() {
           </label>
         </fieldset>
         <fieldset className="space-y-2 text-sm">
-          <legend className="font-medium text-slate-800">Billing</legend>
+          <legend className="font-medium text-ink">Billing</legend>
           <label className="flex items-start gap-2">
             <input
               type="radio"
@@ -114,36 +114,36 @@ export default async function PlatformCreateOrgPage() {
         </fieldset>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm">
-            <span className="font-medium text-slate-800">Included seats</span>
+            <span className="font-medium text-ink">Included seats</span>
             <input
               name="seatQuantity"
               type="number"
               min={1}
               defaultValue={2}
               required
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
             />
-            <span className="mt-1 block text-xs text-slate-500">
+            <span className="mt-1 block text-xs text-subtle">
               Used for Enterprise. Individual accounts remain one seat.
             </span>
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-800">Seat cap</span>
+            <span className="font-medium text-ink">Seat cap</span>
             <input
               name="maxSeats"
               type="number"
               min={1}
               defaultValue={2}
               required
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
             />
-            <span className="mt-1 block text-xs text-slate-500">
+            <span className="mt-1 block text-xs text-subtle">
               Must be at least the included-seat count.
             </span>
           </label>
         </div>
         <label className="block text-sm">
-          <span className="font-medium text-slate-800">
+          <span className="font-medium text-ink">
             Active researched company limit
           </span>
           <input
@@ -152,11 +152,11 @@ export default async function PlatformCreateOrgPage() {
             min={0}
             defaultValue={50}
             required
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
           />
         </label>
         <label className="block text-sm">
-          <span className="font-medium text-slate-800">
+          <span className="font-medium text-ink">
             Daily send advisory threshold
           </span>
           <input
@@ -165,11 +165,11 @@ export default async function PlatformCreateOrgPage() {
             min={0}
             defaultValue={50}
             required
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
           />
         </label>
         <label className="block text-sm">
-          <span className="font-medium text-slate-800">
+          <span className="font-medium text-ink">
             Monthly email send hard limit
           </span>
           <input
@@ -177,22 +177,22 @@ export default async function PlatformCreateOrgPage() {
             type="number"
             min={0}
             placeholder="Empty = none (typical for comps); 1000 for billed"
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
           />
-          <span className="mt-1 block text-xs text-slate-500">
+          <span className="mt-1 block text-xs text-subtle">
             Leave blank for no monthly hard block. Billed defaults to 1000 when
             blank.
           </span>
         </label>
         <label className="block text-sm">
-          <span className="font-medium text-slate-800">
+          <span className="font-medium text-ink">
             First user email (OWNER)
           </span>
           <input
             name="ownerEmail"
             type="email"
             required
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
             placeholder="friend@example.com"
           />
         </label>

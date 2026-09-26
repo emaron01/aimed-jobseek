@@ -26,7 +26,7 @@ export function CompanyResearchAllowanceBanner({
   if (usage.exhausted) {
     return (
       <div
-        className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-950"
+        className="rounded-md border border-danger bg-danger-tint px-3 py-2 text-sm text-danger"
         data-testid="research-allowance-exhausted"
       >
         <p className="font-medium">
@@ -63,7 +63,7 @@ export function CompanyResearchAllowanceBanner({
   if (usage.warning) {
     return (
       <div
-        className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+        className="rounded-md border border-warning bg-warning-tint px-3 py-2 text-sm text-warning"
         data-testid="research-allowance-warning"
       >
         <p className="font-medium">
@@ -90,12 +90,12 @@ export function CompanyResearchAllowanceBanner({
 
   return (
     <div
-      className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+      className="rounded-md border border-edge bg-canvas px-3 py-2 text-sm text-ink"
       data-testid="research-allowance-ok"
     >
       <p className="font-medium">{formatResearchAllowanceSummary(usage)}</p>
       {!compact ? (
-        <p className="mt-1 text-slate-600">
+        <p className="mt-1 text-muted">
           One slot per distinct company with fresh research. Refreshing an
           already-researched company does not use another slot.
         </p>

@@ -92,16 +92,16 @@ export function ConfirmDeleteForm({
         <div
           className={
             tone === "warning"
-              ? "rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-slate-800"
-              : "rounded-md border border-red-200 bg-red-50 p-3 text-sm text-slate-800"
+              ? "rounded-md border border-warning bg-warning-tint p-3 text-sm text-ink"
+              : "rounded-md border border-danger bg-danger-tint p-3 text-sm text-ink"
           }
           role="alertdialog"
           aria-labelledby="confirm-delete-title"
         >
-          <p id="confirm-delete-title" className="font-semibold text-slate-900">
+          <p id="confirm-delete-title" className="font-semibold text-ink">
             {confirmTitle}
           </p>
-          <p className="mt-2 whitespace-pre-wrap text-slate-700">{confirmBody}</p>
+          <p className="mt-2 whitespace-pre-wrap text-ink">{confirmBody}</p>
           <form action={formAction} className="mt-3 flex flex-wrap gap-2">
             {Object.entries(hiddenFields).map(([name, value]) => (
               <input key={name} type="hidden" name={name} value={value} />
@@ -112,8 +112,8 @@ export function ConfirmDeleteForm({
               disabled={pending}
               className={
                 tone === "warning"
-                  ? "inline-flex items-center justify-center rounded-md bg-amber-700 px-3.5 py-2 text-sm font-medium text-white disabled:opacity-60"
-                  : "inline-flex items-center justify-center rounded-md bg-red-700 px-3.5 py-2 text-sm font-medium text-white disabled:opacity-60"
+                  ? "inline-flex items-center justify-center rounded-md bg-warning px-3.5 py-2 text-sm font-medium text-on-ink disabled:opacity-60"
+                  : "inline-flex items-center justify-center rounded-md bg-danger px-3.5 py-2 text-sm font-medium text-on-ink disabled:opacity-60"
               }
               data-testid="confirm-delete-submit"
             >
@@ -133,7 +133,7 @@ export function ConfirmDeleteForm({
         </div>
       )}
       {state && !state.ok ? (
-        <p className="mt-2 text-sm text-red-600" role="alert" data-testid="delete-error">
+        <p className="mt-2 text-sm text-danger" role="alert" data-testid="delete-error">
           {state.message}
         </p>
       ) : null}

@@ -88,15 +88,15 @@ export function SignupPlanSelector({
             className={cn(
               "rounded-lg border px-4 py-4 text-left transition",
               planCode === plan.code
-                ? "border-slate-900 bg-slate-900 text-white"
-                : "border-slate-200 bg-white text-slate-900 hover:border-slate-400",
+                ? "border-ink bg-ink text-on-ink"
+                : "border-edge bg-surface text-ink hover:border-edge-strong",
             )}
           >
             <p className="text-base font-semibold">{plan.label}</p>
             <p
               className={cn(
                 "mt-1 text-sm",
-                planCode === plan.code ? "text-slate-200" : "text-slate-600",
+                planCode === plan.code ? "text-on-ink/80" : "text-muted",
               )}
             >
               {plan.blurb}
@@ -105,28 +105,28 @@ export function SignupPlanSelector({
         ))}
       </div>
 
-      <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
+      <section className="space-y-4 rounded-lg border border-edge bg-surface p-6">
         <div>
-          <p className="text-lg font-medium text-slate-900">
+          <p className="text-lg font-medium text-ink">
             {selected.displayName}
           </p>
           {selected.priceLabel ? (
-            <p className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+            <p className="mt-1 text-2xl font-semibold tracking-tight text-ink">
               {selected.priceLabel}
             </p>
           ) : null}
           {selected.tagline ? (
-            <p className="mt-1 text-sm text-slate-600">{selected.tagline}</p>
+            <p className="mt-1 text-sm text-muted">{selected.tagline}</p>
           ) : null}
         </div>
 
         {features.teamSeats && planCode === BILLING_PLAN_TEAM ? (
           <label className="block max-w-xs text-sm">
-            <span className="font-medium text-slate-700">
+            <span className="font-medium text-ink">
               How many users? (minimum 2)
             </span>
             <select
-              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2"
+              className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2"
               value={seatQuantity}
               onChange={(event) =>
                 setSeatQuantity(Number.parseInt(event.target.value, 10))
@@ -140,7 +140,7 @@ export function SignupPlanSelector({
                 ),
               )}
             </select>
-            <span className="mt-1 block text-xs text-slate-500">
+            <span className="mt-1 block text-xs text-subtle">
               You can add users anytime after signup.
             </span>
           </label>
@@ -148,28 +148,28 @@ export function SignupPlanSelector({
 
         {selected.trialDays != null &&
         planCode !== BILLING_PLAN_ENTERPRISE ? (
-          <div className="rounded-md border-2 border-emerald-500 bg-emerald-50 px-4 py-3">
-            <p className="text-lg font-extrabold tracking-wide text-emerald-700 sm:text-xl">
+          <div className="rounded-md border-2 border-success bg-success-tint px-4 py-3">
+            <p className="text-lg font-extrabold tracking-wide text-success sm:text-xl">
               FREE TRIAL — {selected.trialDays} days
             </p>
             {selected.trialNote ? (
-              <p className="mt-1 text-base font-semibold text-emerald-800">
+              <p className="mt-1 text-base font-semibold text-success">
                 {selected.trialNote}
               </p>
             ) : null}
           </div>
         ) : null}
 
-        <ul className="list-disc space-y-2 pl-5 text-sm text-slate-700">
+        <ul className="list-disc space-y-2 pl-5 text-sm text-ink">
           {selected.featureBullets.map((bullet) => (
             <li key={bullet}>{bullet}</li>
           ))}
         </ul>
 
         {planCode === BILLING_PLAN_ENTERPRISE ? (
-          <p className="text-sm text-slate-600">Contact us to get started.</p>
+          <p className="text-sm text-muted">Contact us to get started.</p>
         ) : (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             {selected.trialDays != null
               ? "Cancel anytime before your trial ends and you won\u2019t be charged. Once your subscription starts, you may cancel at any time. Active billing ends at the end of the most current billing cycle."
               : "Once your subscription starts, you may cancel at any time. Active billing ends at the end of the most current billing cycle."}
@@ -201,7 +201,7 @@ export function SignupPlanSelector({
               {pending ? "Continuing…" : "Continue to create account"}
             </AppButton>
             {state && !state.ok ? (
-              <p className="text-sm text-red-600" role="alert">
+              <p className="text-sm text-danger" role="alert">
                 {state.message}
               </p>
             ) : null}
@@ -209,7 +209,7 @@ export function SignupPlanSelector({
         )}
       </section>
 
-      <p className="text-center text-sm text-slate-600">
+      <p className="text-center text-sm text-muted">
         Already have an account?{" "}
         <Link href="/login" className="font-medium underline">
           Sign in

@@ -51,8 +51,8 @@ function ResetPasswordInner() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+    <div className="mx-auto w-full max-w-md rounded-xl border border-edge bg-surface p-8 shadow-sm">
+      <h1 className="text-2xl font-semibold tracking-tight text-ink">
         Reset password
       </h1>
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -64,7 +64,7 @@ function ResetPasswordInner() {
             required
             autoComplete="new-password"
             minLength={10}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
           />
         </label>
         <label className="block text-sm">
@@ -74,10 +74,10 @@ function ResetPasswordInner() {
             type="password"
             required
             autoComplete="new-password"
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
           />
         </label>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
         <AppButton
           type="submit"
           disabled={loading}

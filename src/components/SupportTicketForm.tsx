@@ -12,7 +12,7 @@ export function SupportTicketForm({ sourcePath }: { sourcePath: string }) {
       <div
         role="status"
         data-testid="support-ticket-confirmation"
-        className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-900"
+        className="rounded-md border border-success bg-success-tint px-4 py-4 text-sm text-success"
       >
         {state.message}
       </div>
@@ -23,31 +23,31 @@ export function SupportTicketForm({ sourcePath }: { sourcePath: string }) {
     <form action={action} className="space-y-5" data-testid="support-ticket-form">
       <input type="hidden" name="sourcePath" value={sourcePath} />
       {state ? (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-danger">
           {state.message}
         </p>
       ) : null}
       <label className="block text-sm">
-        <span className="font-medium text-slate-700">Subject</span>
+        <span className="font-medium text-ink">Subject</span>
         <input
           name="subject"
           required
           maxLength={120}
           autoComplete="off"
-          className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 focus:ring-2"
+          className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-focus focus:ring-2"
         />
-        <span className="mt-1 block text-xs text-slate-500">
+        <span className="mt-1 block text-xs text-subtle">
           Briefly describe what you need help with.
         </span>
       </label>
       <label className="block text-sm">
-        <span className="font-medium text-slate-700">Description</span>
+        <span className="font-medium text-ink">Description</span>
         <textarea
           name="description"
           required
           maxLength={5000}
           rows={8}
-          className="mt-1 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 focus:ring-2"
+          className="mt-1 w-full resize-y rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-focus focus:ring-2"
         />
       </label>
       <SubmitButton>Send support request</SubmitButton>

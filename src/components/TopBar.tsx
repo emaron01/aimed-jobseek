@@ -11,8 +11,8 @@ export function TopBar({
   showReferrals?: boolean;
 }) {
   return (
-    <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6 print:hidden">
-      <div className="text-sm text-slate-500">
+    <header className="flex h-14 items-center justify-between border-b border-edge bg-surface px-6 print:hidden">
+      <div className="text-sm text-muted">
         {menuModel?.organizationName
           ? "Workspace"
           : menuModel?.platformRoleLabel
@@ -26,7 +26,7 @@ export function TopBar({
             <UserMenu model={menuModel} />
           </>
         ) : (
-          <p className="text-sm text-slate-500">Sign in required</p>
+          <p className="text-sm text-muted">Sign in required</p>
         )}
       </div>
     </header>

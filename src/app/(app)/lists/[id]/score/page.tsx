@@ -88,16 +88,16 @@ export default async function ScoreListPage({ params, searchParams }: PageProps)
         description="No AI scoring runs yet. This creates the report framework with pending/null score fields."
       >
         {readOnly ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             Manager access is read-only. Only{" "}
             {list.owner.name?.trim() || list.owner.email} can score this {vocab.list.singular}.
           </p>
         ) : list.archivedAt ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             This {vocab.list.singular} is archived and cannot be scored until it is unarchived.
           </p>
         ) : readyProducts.length === 0 ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             Add a {vocab.product.Singular} with at least one {vocab.icp.singular} and one {vocab.persona.Singular} on the{" "}
             <Link href="/products" className="underline">
               {vocab.product.Plural} page
@@ -105,7 +105,7 @@ export default async function ScoreListPage({ params, searchParams }: PageProps)
             first.
           </p>
         ) : !features.listBulkScoring ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             Scoring is not available for this {vocab.list.singular}.
           </p>
         ) : (

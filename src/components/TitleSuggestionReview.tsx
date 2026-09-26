@@ -30,7 +30,7 @@ export function TitleSuggestionReview({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-muted">
         These titles did not match any {vocab.persona.singular}&apos;s likely titles. Approve a
         proposal to add the title permanently and score those {vocab.contact.plural}, assign
         a different {vocab.persona.singular}, or dismiss so this {vocab.product.singular} is not asked again.
@@ -88,16 +88,16 @@ function TitleSuggestionRow({
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+    <div className="rounded-md border border-edge bg-canvas px-4 py-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-sm font-semibold text-slate-900">
+        <p className="text-sm font-semibold text-ink">
           {suggestion.unmatchedTitle}
         </p>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-subtle">
           {countedNoun(suggestion.contactCount, vocab.contact)}
         </p>
       </div>
-      <p className="mt-1 text-sm text-slate-700">
+      <p className="mt-1 text-sm text-ink">
         {hasProposal ? (
           <>
             Proposed:{" "}
@@ -106,13 +106,13 @@ function TitleSuggestionRow({
             </span>
           </>
         ) : (
-          <span className="font-medium text-slate-800">
+          <span className="font-medium text-ink">
             No {vocab.persona.singular} match proposed
           </span>
         )}
       </p>
       {suggestion.reasoning ? (
-        <p className="mt-1 text-sm text-slate-600">{suggestion.reasoning}</p>
+        <p className="mt-1 text-sm text-muted">{suggestion.reasoning}</p>
       ) : null}
 
       <div className="mt-3 flex flex-wrap items-end gap-2">
@@ -127,7 +127,7 @@ function TitleSuggestionRow({
           <select
             value={personaId}
             onChange={(event) => setPersonaId(event.target.value)}
-            className="rounded-md border border-slate-300 bg-white px-2 py-2 text-sm"
+            className="rounded-md border border-edge-strong bg-surface px-2 py-2 text-sm"
             disabled={pending}
           >
             <option value="">Assign to a different {vocab.persona.singular}</option>
@@ -149,7 +149,7 @@ function TitleSuggestionRow({
         </SecondaryButton>
       </div>
       {message ? (
-        <p className="mt-2 text-sm text-slate-700">{message}</p>
+        <p className="mt-2 text-sm text-ink">{message}</p>
       ) : null}
     </div>
   );

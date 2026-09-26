@@ -82,7 +82,7 @@ export default async function DashboardPage({
       />
 
       <div className="mb-6">
-        <h2 className="mb-3 text-center text-lg font-semibold text-slate-900">
+        <h2 className="mb-3 text-center text-lg font-semibold text-ink">
           Setup
         </h2>
         <HomeSetupRail
@@ -97,7 +97,7 @@ export default async function DashboardPage({
       ) : null}
 
       <div className="mt-8 mb-4 flex items-center justify-between gap-4">
-        <h2 className="text-xl font-semibold text-slate-900">{vocab.campaign.Plural}</h2>
+        <h2 className="text-xl font-semibold text-ink">{vocab.campaign.Plural}</h2>
         {workflow.setupComplete ? (
           <Link
             href="/campaigns/new"
@@ -110,26 +110,26 @@ export default async function DashboardPage({
             type="button"
             disabled
             title={`Finish ${vocab.product.singular} setup first`}
-            className="cursor-not-allowed rounded-md bg-slate-300 px-3 py-2 text-sm font-medium text-slate-500"
+            className="cursor-not-allowed rounded-md bg-edge-strong px-3 py-2 text-sm font-medium text-subtle"
           >
             New {vocab.campaign.singular}
           </AppButton>
         )}
       </div>
       {!workflow.setupComplete ? (
-        <p className="mb-4 text-sm text-slate-500">
+        <p className="mb-4 text-sm text-subtle">
           {vocab.campaign.Singular} creation unlocks after at least one {vocab.product.singular} is approved with {vocab.icp.aSingular} that has criteria. Voice samples are
           optional. Existing {vocab.campaign.plural} stay available.
         </p>
       ) : null}
       {workflow.campaigns.length === 0 ? (
-        <section className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
-          <h3 className="font-semibold text-slate-900">
+        <section className="rounded-xl border border-dashed border-edge-strong bg-surface p-8 text-center">
+          <h3 className="font-semibold text-ink">
             {workflow.setupComplete
               ? `Start your first ${vocab.campaign.singular}`
               : `No ${vocab.campaign.plural} yet`}
           </h3>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-muted">
             {workflow.setupComplete
               ? `Select the setup you already approved, then paste a job posting.`
               : `Finish ${vocab.product.singular} setup to create ${vocab.campaign.aSingular}.`}
@@ -149,43 +149,43 @@ export default async function DashboardPage({
             <Link
               key={campaign.id}
               href={`/campaigns/${campaign.id}`}
-              className="rounded-xl border border-slate-200 bg-white p-5 transition hover:border-slate-400"
+              className="rounded-xl border border-edge bg-surface p-5 transition hover:border-edge-strong"
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h3 className="font-semibold text-slate-900">
+                  <h3 className="font-semibold text-ink">
                     {campaign.name}
                     {campaign.archived ? (
-                      <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                      <span className="ml-2 rounded-full bg-canvas px-2 py-0.5 text-xs font-medium text-muted">
                         Archived
                       </span>
                     ) : null}
                   </h3>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="mt-1 text-sm text-muted">
                     {campaign.context || `${vocab.campaign.Singular} setup`}
                   </p>
                 </div>
                 {campaign.emailsToWrite > 0 ? (
-                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-sm font-semibold text-amber-800">
+                  <span className="rounded-full bg-warning-tint px-2.5 py-1 text-sm font-semibold text-warning">
                     {campaign.emailsToWrite} outreach to write
                   </span>
                 ) : null}
               </div>
               <dl className="mt-5 grid grid-cols-4 gap-3 text-sm">
                 <div>
-                  <dt className="text-slate-500">{vocab.account.Plural}</dt>
+                  <dt className="text-subtle">{vocab.account.Plural}</dt>
                   <dd className="font-semibold">{campaign.companies}</dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">On the roster</dt>
+                  <dt className="text-subtle">On the roster</dt>
                   <dd className="font-semibold">{campaign.qualified}</dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">{vocab.contact.Plural}</dt>
+                  <dt className="text-subtle">{vocab.contact.Plural}</dt>
                   <dd className="font-semibold">{campaign.contacts}</dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">Outreach to write</dt>
+                  <dt className="text-subtle">Outreach to write</dt>
                   <dd className="font-semibold">{campaign.emailsToWrite}</dd>
                 </div>
               </dl>

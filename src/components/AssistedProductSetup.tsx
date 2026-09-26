@@ -19,7 +19,7 @@ function Status({ result }: { result: ProductSetupActionResult | null }) {
     <p
       role="status"
       className={
-        result.ok ? "mt-3 text-sm text-emerald-700" : "mt-3 text-sm text-red-600"
+        result.ok ? "mt-3 text-sm text-success" : "mt-3 text-sm text-danger"
       }
     >
       {result.message}
@@ -72,10 +72,10 @@ export function AssistedProductIntake({
   return (
     <div className="space-y-6" data-testid="assisted-product-intake">
       <div>
-        <h3 className="text-lg font-semibold text-slate-900">
+        <h3 className="text-lg font-semibold text-ink">
           Tell us about your background
         </h3>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Start with the materials you already have — your resume, a pasted
           LinkedIn profile, notes about goals, and personal site, portfolio, or
           GitHub URLs. {vocab.product.Singular} name is required; everything else is optional.
@@ -97,9 +97,9 @@ export function AssistedProductIntake({
         </div>
 
         <div className="md:col-span-2 space-y-3">
-          <label className="flex cursor-pointer flex-col rounded-lg border border-slate-900 bg-slate-900 p-5 text-white transition hover:bg-slate-800">
+          <label className="flex cursor-pointer flex-col rounded-lg border border-ink bg-ink p-5 text-on-ink transition hover:bg-ink/90">
             <span className="text-base font-semibold">Upload materials</span>
-            <span className="mt-1 text-sm text-white/80">
+            <span className="mt-1 text-sm text-on-ink/80">
               Resume and other documents. PDF, DOCX, TXT, MD · Max 15 MiB each.
             </span>
             <input
@@ -107,17 +107,17 @@ export function AssistedProductIntake({
               name="files"
               multiple
               accept=".pdf,.docx,.txt,.md,.markdown,application/pdf,text/plain,text/markdown"
-              className="mt-4 block w-full text-sm text-white file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-900"
+              className="mt-4 block w-full text-sm text-on-ink file:mr-3 file:rounded-md file:border-0 file:bg-surface file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink"
               data-testid="product-upload-materials"
             />
           </label>
 
-          <div className="rounded-lg border border-slate-300 bg-white p-5">
+          <div className="rounded-lg border border-edge-strong bg-surface p-5">
             <label className="block" htmlFor="pastedContent">
-              <span className="text-base font-semibold text-slate-900">
+              <span className="text-base font-semibold text-ink">
                 Paste resume or LinkedIn profile text
               </span>
-              <span className="mt-1 block text-sm text-slate-500">
+              <span className="mt-1 block text-sm text-subtle">
                 Paste your resume or LinkedIn profile text. LinkedIn blocks
                 automated reading, so a LinkedIn URL will not work.
               </span>
@@ -127,7 +127,7 @@ export function AssistedProductIntake({
               name="pastedContent"
               rows={8}
               placeholder="Paste resume or LinkedIn profile text here…"
-              className="mt-3 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 placeholder:text-slate-400 focus:ring-2"
+              className="mt-3 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-focus placeholder:text-subtle focus:ring-2"
             />
           </div>
         </div>
@@ -141,8 +141,8 @@ export function AssistedProductIntake({
           />
         </div>
 
-        <div className="md:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
-          <p className="text-sm text-slate-600">
+        <div className="md:col-span-2 rounded-lg border border-edge bg-canvas p-4 space-y-3">
+          <p className="text-sm text-muted">
             Many personal sites cannot be read automatically — they load content
             with JavaScript or block automated access. Uploading or pasting the
             materials you already have usually produces a better profile than a
@@ -165,7 +165,7 @@ export function AssistedProductIntake({
             hint="Additional personal site, portfolio, or GitHub pages. Do not add LinkedIn URLs."
           />
           {urlResearchStale ? (
-            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <div className="rounded-md border border-warning bg-warning-tint px-3 py-2 text-sm text-warning">
               Website research is past the freshness window. Check “Refresh
               website research” to reacquire URLs (explicit action).
               <label className="mt-2 flex items-center gap-2">

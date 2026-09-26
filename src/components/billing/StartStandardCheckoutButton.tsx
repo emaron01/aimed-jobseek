@@ -33,7 +33,7 @@ export function StartStandardCheckoutButton({
 
   if (disabledReason) {
     return (
-      <p className="text-sm text-slate-600" data-testid="billing-stripe-hook">
+      <p className="text-sm text-muted" data-testid="billing-stripe-hook">
         {disabledReason}
       </p>
     );
@@ -79,12 +79,12 @@ export function StartStandardCheckoutButton({
       >
         {pending ? "Redirecting…" : buttonLabel}
       </AppButton>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-subtle">
         {trialPeriodDays == null
           ? "Card required. Billing starts when Checkout completes (no free trial). You can enter a promotion code on the Stripe Checkout page. Card details stay in Stripe."
           : `Card required for a ${trialPeriodDays}-day trial (full ${vocab.product.singular} access, 25 companies). You can enter a promotion code on the Stripe Checkout page. Card details stay in Stripe.`}
       </p>
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
     </div>
   );
 }

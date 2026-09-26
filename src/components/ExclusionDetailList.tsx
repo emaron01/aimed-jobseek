@@ -29,8 +29,8 @@ export function ExclusionDetailList({
     <ul
       className={
         compact
-          ? "space-y-2 text-sm text-slate-700"
-          : "space-y-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-950"
+          ? "space-y-2 text-sm text-ink"
+          : "space-y-2 rounded-md border border-danger bg-danger-tint px-3 py-2 text-sm text-danger"
       }
       data-testid="exclusion-details"
     >
@@ -44,8 +44,8 @@ export function ExclusionDetailList({
                   Value: <span className="font-medium">{detail.resolvedValue}</span>
                 </p>
               ) : null}
-              <p className="text-slate-600">{detail.comparison}</p>
-              <p className="text-xs text-slate-500">
+              <p className="text-muted">{detail.comparison}</p>
+              <p className="text-xs text-subtle">
                 Source ({sourceKindLabel(detail.sourceKind)}): {detail.sourceLabel}
               </p>
             </div>
@@ -55,7 +55,7 @@ export function ExclusionDetailList({
               <p>
                 Matched: <span className="font-medium">{detail.matchedText}</span>
               </p>
-              <p className="text-xs text-slate-500">{detail.sourceLabel}</p>
+              <p className="text-xs text-subtle">{detail.sourceLabel}</p>
             </div>
           )}
         </li>

@@ -35,7 +35,7 @@ export function ChangePasswordForm() {
           role="status"
           data-testid="change-password-status"
           className={
-            state.ok ? "text-sm text-emerald-700" : "text-sm text-red-600"
+            state.ok ? "text-sm text-success" : "text-sm text-danger"
           }
         >
           {state.message}
@@ -48,7 +48,7 @@ export function ChangePasswordForm() {
           type="password"
           autoComplete="current-password"
           required
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+          className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
         />
       </label>
       <label className="block text-sm">
@@ -59,7 +59,7 @@ export function ChangePasswordForm() {
           autoComplete="new-password"
           required
           minLength={10}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+          className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
         />
       </label>
       <AppButton

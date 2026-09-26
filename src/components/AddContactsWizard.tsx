@@ -230,14 +230,14 @@ export function AddContactsWizard() {
       <PrimaryButton onClick={openWizard}>Add {vocab.contact.Plural}</PrimaryButton>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-8">
-          <div className="w-full max-w-4xl rounded-lg border border-slate-200 bg-white shadow-xl">
-            <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 p-4 sm:p-8">
+          <div className="w-full max-w-4xl rounded-lg border border-edge bg-surface shadow-xl">
+            <div className="flex items-start justify-between border-b border-edge px-5 py-4">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">
+                <h3 className="text-lg font-semibold text-ink">
                   Add {vocab.contact.Plural}
                 </h3>
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="mt-1 text-sm text-muted">
                   Paste or upload {vocab.contact.plural}, map columns, then import into this
                   organization.
                 </p>
@@ -245,13 +245,13 @@ export function AddContactsWizard() {
               <SecondaryButton onClick={close}>Close</SecondaryButton>
             </div>
 
-            <div className="border-b border-slate-200 px-5 py-3">
+            <div className="border-b border-edge px-5 py-3">
               <StepIndicator step={step} />
             </div>
 
             <div className="space-y-5 px-5 py-5">
               {error ? (
-                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <div className="rounded-md border border-danger bg-danger-tint px-3 py-2 text-sm text-danger">
                   {error}
                 </div>
               ) : null}
@@ -282,7 +282,7 @@ export function AddContactsWizard() {
               {step === "input" && mode === "paste" ? (
                 <div className="space-y-4">
                   <label className="block text-sm">
-                    <span className="font-medium text-slate-700">
+                    <span className="font-medium text-ink">
                       Paste tabular {vocab.contact.plural}
                     </span>
                     <textarea
@@ -290,7 +290,7 @@ export function AddContactsWizard() {
                       onChange={(event) => setPasteText(event.target.value)}
                       rows={12}
                       placeholder={vocabExamples.contactImportPastePlaceholder}
-                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs text-slate-900 outline-none ring-slate-400 focus:ring-2"
+                      className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 font-mono text-xs text-ink outline-none ring-focus focus:ring-2"
                     />
                   </label>
                   <div className="flex gap-2">
@@ -307,7 +307,7 @@ export function AddContactsWizard() {
               {step === "input" && mode === "upload" ? (
                 <div className="space-y-4">
                   <label className="block text-sm">
-                    <span className="font-medium text-slate-700">
+                    <span className="font-medium text-ink">
                       Upload CSV or XLSX
                     </span>
                     <input
@@ -330,23 +330,23 @@ export function AddContactsWizard() {
 
               {step === "preview" && parsed ? (
                 <div className="space-y-4">
-                  <div className="flex flex-wrap gap-4 text-sm text-slate-600">
+                  <div className="flex flex-wrap gap-4 text-sm text-muted">
                     <span>
                       Columns:{" "}
-                      <strong className="text-slate-900">
+                      <strong className="text-ink">
                         {parsed.headers.length}
                       </strong>
                     </span>
                     <span>
                       Rows:{" "}
-                      <strong className="text-slate-900">
+                      <strong className="text-ink">
                         {parsed.totalRows}
                       </strong>
                     </span>
                     {parsed.delimiter ? (
                       <span>
                         Delimiter:{" "}
-                        <strong className="text-slate-900">
+                        <strong className="text-ink">
                           {parsed.delimiter === "\t"
                             ? "tab"
                             : parsed.delimiter}
@@ -357,11 +357,11 @@ export function AddContactsWizard() {
 
                   {parsed.sheetNames && parsed.sheetNames.length > 1 ? (
                     <label className="block text-sm">
-                      <span className="font-medium text-slate-700">
+                      <span className="font-medium text-ink">
                         Worksheet
                       </span>
                       <select
-                        className="mt-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                        className="mt-1 rounded-md border border-edge-strong px-3 py-2 text-sm"
                         value={parsed.activeSheet}
                         onChange={(event) =>
                           handleSheetChange(event.target.value)
@@ -376,9 +376,9 @@ export function AddContactsWizard() {
                     </label>
                   ) : null}
 
-                  <div className="overflow-x-auto rounded-md border border-slate-200">
-                    <table className="min-w-full divide-y divide-slate-200 text-xs">
-                      <thead className="bg-slate-50 text-left text-slate-500">
+                  <div className="overflow-x-auto rounded-md border border-edge">
+                    <table className="min-w-full divide-y divide-edge text-xs">
+                      <thead className="bg-canvas text-left text-subtle">
                         <tr>
                           {parsed.headers.map((header) => (
                             <th key={header} className="px-3 py-2 font-medium">
@@ -393,7 +393,7 @@ export function AddContactsWizard() {
                             {row.map((cell, cellIndex) => (
                               <td
                                 key={`${rowIndex}-${cellIndex}`}
-                                className="px-3 py-2 text-slate-700"
+                                className="px-3 py-2 text-ink"
                               >
                                 {cell || "—"}
                               </td>
@@ -417,13 +417,13 @@ export function AddContactsWizard() {
 
               {step === "map" && parsed ? (
                 <div className="space-y-4">
-                  <p className="text-sm text-slate-600">
+                  <p className="text-sm text-muted">
                     Suggested mappings are editable. Unmapped source columns are
                     preserved in raw data.
                   </p>
-                  <div className="overflow-hidden rounded-md border border-slate-200">
-                    <table className="min-w-full divide-y divide-slate-200 text-sm">
-                      <thead className="bg-slate-50 text-left text-slate-500">
+                  <div className="overflow-hidden rounded-md border border-edge">
+                    <table className="min-w-full divide-y divide-edge text-sm">
+                      <thead className="bg-canvas text-left text-subtle">
                         <tr>
                           <th className="px-4 py-3 font-medium">Source column</th>
                           <th className="px-4 py-3 font-medium">Maps to</th>
@@ -432,10 +432,10 @@ export function AddContactsWizard() {
                       <tbody className="divide-y divide-slate-100">
                         {parsed.headers.map((header) => (
                           <tr key={header}>
-                            <td className="px-4 py-3 text-slate-900">{header}</td>
+                            <td className="px-4 py-3 text-ink">{header}</td>
                             <td className="px-4 py-3">
                               <select
-                                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                                className="w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
                                 value={mapping[header] ?? "ignore"}
                                 onChange={(event) =>
                                   setMapping((current) => ({
@@ -482,11 +482,11 @@ export function AddContactsWizard() {
                   </div>
 
                   {invalidRows.length > 0 ? (
-                    <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
-                      <p className="text-sm font-medium text-amber-900">
+                    <div className="rounded-md border border-warning bg-warning-tint p-3">
+                      <p className="text-sm font-medium text-warning">
                         Invalid rows (will be excluded)
                       </p>
-                      <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto text-sm text-amber-800">
+                      <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto text-sm text-warning">
                         {invalidRows.slice(0, 25).map((row) => (
                           <li key={row.rowNumber}>
                             Row {row.rowNumber}:{" "}
@@ -500,7 +500,7 @@ export function AddContactsWizard() {
                     </div>
                   ) : null}
 
-                  <div className="rounded-md border border-slate-200 p-3 text-sm text-slate-600">
+                  <div className="rounded-md border border-edge p-3 text-sm text-muted">
                     Warning rows (for example missing email) will still import.
                     Duplicate indexes found:{" "}
                     {duplicateIndexes.length > 0
@@ -529,16 +529,16 @@ export function AddContactsWizard() {
               {step === "name" ? (
                 <div className="space-y-4">
                   <label className="block text-sm">
-                    <span className="font-medium text-slate-700">{vocab.list.Singular} name</span>
+                    <span className="font-medium text-ink">{vocab.list.Singular} name</span>
                     <input
                       value={listName}
                       onChange={(event) => setListName(event.target.value)}
-                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-slate-400 focus:ring-2"
+                      className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm outline-none ring-focus focus:ring-2"
                     />
                   </label>
 
                   <fieldset className="space-y-2 text-sm">
-                    <legend className="font-medium text-slate-700">
+                    <legend className="font-medium text-ink">
                       Potential duplicates: {duplicateCount}
                     </legend>
                     <label className="flex items-center gap-2">
@@ -574,7 +574,7 @@ export function AddContactsWizard() {
 
               {step === "done" && importResult ? (
                 <div className="space-y-4">
-                  <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                  <div className="rounded-md border border-success bg-success-tint px-4 py-3 text-sm text-success">
                     Imported {importResult.importedCount} {vocab.contact.plural} into “
                     {listName}”.
                     {importResult.mergedCount > 0 ? (
@@ -649,19 +649,19 @@ function ChoiceCard({
     <AppButton
       type="button"
       onClick={onClick}
-      className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-5 text-left transition hover:border-slate-400 hover:bg-white"
+      className="rounded-lg border border-edge bg-canvas px-4 py-5 text-left transition hover:border-edge-strong hover:bg-surface"
     >
-      <p className="text-base font-semibold text-slate-900">{title}</p>
-      <p className="mt-1 text-sm text-slate-600">{description}</p>
+      <p className="text-base font-semibold text-ink">{title}</p>
+      <p className="mt-1 text-sm text-muted">{description}</p>
     </AppButton>
   );
 }
 
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-slate-900">{value}</p>
+    <div className="rounded-md border border-edge bg-canvas px-3 py-3">
+      <p className="text-xs text-subtle">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-ink">{value}</p>
     </div>
   );
 }
@@ -689,8 +689,8 @@ function StepIndicator({ step }: { step: Step }) {
           className={cn(
             "rounded-full px-2.5 py-1",
             index <= activeIndex || step === "done"
-              ? "bg-slate-900 text-white"
-              : "bg-slate-100 text-slate-500",
+              ? "bg-ink text-on-ink"
+              : "bg-canvas text-subtle",
           )}
         >
           {item.label}

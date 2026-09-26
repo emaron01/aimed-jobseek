@@ -110,15 +110,15 @@ export default async function OrganizationBillingSettingsPage({
     if (paymentLocked || spendBlocked) {
       return (
         <div className="mx-auto max-w-lg space-y-4" data-testid="billing-member-lock">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">
             Billing
           </h1>
-          <p className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p className="rounded-md border border-warning bg-warning-tint px-4 py-3 text-sm text-warning">
             Your workspace billing needs attention. Contact your organization
             owner to update the payment method. Team members cannot manage
             billing.
           </p>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             <Link href="/" className="underline">
               Return home
             </Link>
@@ -260,17 +260,17 @@ export default async function OrganizationBillingSettingsPage({
         {paymentLocked ? null : (
           <Link
             href="/settings"
-            className="text-sm text-slate-600 hover:text-slate-900"
+            className="text-sm text-muted hover:text-ink"
           >
             ← Settings
           </Link>
         )}
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink">
           Billing
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Plan and status for{" "}
-          <span className="font-medium text-slate-900">{organization.name}</span>
+          <span className="font-medium text-ink">{organization.name}</span>
           . Signed in as {user.email}.
         </p>
       </div>
@@ -278,7 +278,7 @@ export default async function OrganizationBillingSettingsPage({
       {spendBlocked && lockState.profile ? (
         <div
           role="alert"
-          className="space-y-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          className="space-y-3 rounded-md border border-warning bg-warning-tint px-4 py-3 text-sm text-warning"
           data-testid="billing-payment-lock-banner"
         >
           <p className="font-medium">
@@ -332,32 +332,32 @@ export default async function OrganizationBillingSettingsPage({
       ) : null}
 
       {checkoutState === "success" ? (
-        <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+        <p className="rounded-md border border-success bg-success-tint px-3 py-2 text-sm text-success">
           Checkout completed. Refreshing subscription status from Stripe…
         </p>
       ) : null}
 
       {creditsState === "success" ? (
-        <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+        <p className="rounded-md border border-success bg-success-tint px-3 py-2 text-sm text-success">
           Credit purchase completed. Capacity updates when Stripe confirms
           (usually a few seconds) — refresh if the balance has not changed.
         </p>
       ) : null}
 
       <section
-        className="space-y-3 rounded-lg border border-slate-200 bg-white p-5"
+        className="space-y-3 rounded-lg border border-edge bg-surface p-5"
         data-testid="billing-stripe-hook"
       >
-        <h2 className="text-lg font-medium text-slate-900">Current plan</h2>
+        <h2 className="text-lg font-medium text-ink">Current plan</h2>
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <dt className="text-xs uppercase tracking-wide text-slate-500">
+            <dt className="text-xs uppercase tracking-wide text-subtle">
               Plan
             </dt>
-            <dd className="mt-1 font-medium text-slate-900">
+            <dd className="mt-1 font-medium text-ink">
               {billingPlanLabel(planCode)}
             </dd>
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="mt-1 text-sm text-muted">
               {billingPlanDescription({
                 planCode,
                 billingStatus,
@@ -375,27 +375,27 @@ export default async function OrganizationBillingSettingsPage({
             </p>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-slate-500">
+            <dt className="text-xs uppercase tracking-wide text-subtle">
               Status
             </dt>
-            <dd className="mt-1 font-medium text-slate-900">
+            <dd className="mt-1 font-medium text-ink">
               {billingStatusLabel(billingStatus)}
             </dd>
           </div>
           {trialSummary ? (
             <div>
-              <dt className="text-xs uppercase tracking-wide text-slate-500">
+              <dt className="text-xs uppercase tracking-wide text-subtle">
                 Trial
               </dt>
-              <dd className="mt-1 font-medium text-slate-900">{trialSummary}</dd>
+              <dd className="mt-1 font-medium text-ink">{trialSummary}</dd>
             </div>
           ) : null}
           {showNextBilling ? (
             <div>
-              <dt className="text-xs uppercase tracking-wide text-slate-500">
+              <dt className="text-xs uppercase tracking-wide text-subtle">
                 Next billing date
               </dt>
-              <dd className="mt-1 font-medium text-slate-900">
+              <dd className="mt-1 font-medium text-ink">
                 {formatBillingDate(billing?.currentPeriodEnd)}
                 {billing?.cancelAtPeriodEnd
                   ? " · cancels at period end"
@@ -404,19 +404,19 @@ export default async function OrganizationBillingSettingsPage({
             </div>
           ) : null}
           <div>
-            <dt className="text-xs uppercase tracking-wide text-slate-500">
+            <dt className="text-xs uppercase tracking-wide text-subtle">
               Billing {vocab.contact.singular}
             </dt>
-            <dd className="mt-1 font-medium text-slate-900">
+            <dd className="mt-1 font-medium text-ink">
               {billing?.billingEmail ?? "—"}
             </dd>
           </div>
           {billing?.stripePriceId ? (
             <div className="sm:col-span-2">
-              <dt className="text-xs uppercase tracking-wide text-slate-500">
+              <dt className="text-xs uppercase tracking-wide text-subtle">
                 Amount
               </dt>
-              <dd className="mt-1 space-y-1 font-medium text-slate-900">
+              <dd className="mt-1 space-y-1 font-medium text-ink">
                 {(() => {
                   const unit =
                     billing.stripeEffectiveUnitAmountCents ??
@@ -434,7 +434,7 @@ export default async function OrganizationBillingSettingsPage({
                           {seats} seats × {formatStripeMoney(unit, currency)} /{" "}
                           {interval} per seat
                         </p>
-                        <p className="text-lg font-semibold text-slate-900">
+                        <p className="text-lg font-semibold text-ink">
                           Total {formatStripeMoney(unit * seats, currency)} /{" "}
                           {interval}
                         </p>
@@ -452,10 +452,10 @@ export default async function OrganizationBillingSettingsPage({
           ) : null}
           {discountActive && billing ? (
             <div>
-              <dt className="text-xs uppercase tracking-wide text-slate-500">
+              <dt className="text-xs uppercase tracking-wide text-subtle">
                 Discount
               </dt>
-              <dd className="mt-1 font-medium text-slate-900">
+              <dd className="mt-1 font-medium text-ink">
                 {formatDiscountSummary({
                   percentOff: billing.stripeDiscountPercentOff,
                   amountOffCents: billing.stripeDiscountAmountOffCents,
@@ -467,7 +467,7 @@ export default async function OrganizationBillingSettingsPage({
           ) : null}
         </dl>
 
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           {isComped
             ? "This account is comped — no payment required. Card details stay in Stripe if you subscribe later."
             : "Card details stay in Stripe — never stored in this app."}
@@ -477,7 +477,7 @@ export default async function OrganizationBillingSettingsPage({
 
         {showPortal && isOwner ? <OpenCustomerPortalButton /> : null}
         {showPortal && !isOwner ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             Only the organization owner can open Stripe to update the card or
             manage the subscription.
           </p>
@@ -485,10 +485,10 @@ export default async function OrganizationBillingSettingsPage({
 
         {canConvertTrialEarly && isOwner ? (
           <div
-            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3"
+            className="rounded-md border border-edge bg-canvas px-3 py-3"
             data-testid="billing-convert-trial"
           >
-            <p className="mb-2 text-sm text-slate-700">
+            <p className="mb-2 text-sm text-ink">
               {capacityIncreasesOnConvert ? (
                 <>
                   Need Full Company Research capacity before{" "}
@@ -526,10 +526,10 @@ export default async function OrganizationBillingSettingsPage({
         ) : null}
 
         {isComped && !hasLiveSubscription && isOwner && !invoiceManaged ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             <Link
               href={ONBOARDING_SUBSCRIBE_PATH}
-              className="font-medium text-slate-900 underline"
+              className="font-medium text-ink underline"
             >
               Subscribe to Standard
             </Link>{" "}
@@ -543,10 +543,10 @@ export default async function OrganizationBillingSettingsPage({
       planUsesSeatBilling(planCode) &&
       hasLiveSubscription ? (
         <section
-          className="space-y-3 rounded-lg border border-slate-200 bg-white p-5"
+          className="space-y-3 rounded-lg border border-edge bg-surface p-5"
           data-testid="billing-seats-section"
         >
-          <h2 className="text-lg font-medium text-slate-900">Seats</h2>
+          <h2 className="text-lg font-medium text-ink">Seats</h2>
           <SeatManagementPanel
             canManage={isOwner}
             canAdd={
@@ -588,13 +588,13 @@ export default async function OrganizationBillingSettingsPage({
 
       {paymentLocked ? null : (
       <section
-        className="space-y-3 rounded-lg border border-slate-200 bg-white p-5"
+        className="space-y-3 rounded-lg border border-edge bg-surface p-5"
         data-testid="billing-research-capacity"
       >
-        <h2 className="text-lg font-medium text-slate-900">
+        <h2 className="text-lg font-medium text-ink">
           Company research capacity
         </h2>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           {activeCompanies} of {effectiveLimit} active researched companies used
           {remaining > 0
             ? ` — ${remaining} remaining.`
@@ -608,7 +608,7 @@ export default async function OrganizationBillingSettingsPage({
             : ""}
         </p>
         {billingStatus === "TRIALING" && trialAllowance != null ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             Trial allowance is {trialAllowance} companies
             {planUsesSeatBilling(planCode) ? " per user" : ""}
             {capacityIncreasesOnConvert && paidCompanyCapacityLabel
@@ -619,7 +619,7 @@ export default async function OrganizationBillingSettingsPage({
             .
           </p>
         ) : (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             One slot per distinct company with fresh research. Refreshing a
             company you already researched does not use another slot. Plan base
             is {policy.activeResearchedCompanyLimit}; credit packs stack on top

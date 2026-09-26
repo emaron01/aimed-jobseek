@@ -16,10 +16,10 @@ export default async function SettingsIndexPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">
           Settings
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Workspace configuration for {organization.name}.
         </p>
       </div>
@@ -28,55 +28,55 @@ export default async function SettingsIndexPage() {
         <li>
           <Link
             href="/settings/account"
-            className="font-medium text-slate-900 underline-offset-2 hover:underline"
+            className="font-medium text-ink underline-offset-2 hover:underline"
           >
             Account
           </Link>
-          <p className="text-slate-600">
+          <p className="text-muted">
             Profile, email verification, password, and logout.
           </p>
         </li>
         <li>
           <Link
             href="/settings/hiring-team"
-            className="font-medium text-slate-900 underline-offset-2 hover:underline"
+            className="font-medium text-ink underline-offset-2 hover:underline"
           >
             {vocab.persona.nav} templates
           </Link>
-          <p className="text-slate-600">
+          <p className="text-muted">
             Starting points for the {vocab.persona.plural} on each {vocab.campaign.singular}.
           </p>
         </li>
         <li>
           <Link
             href="/settings/voice"
-            className="font-medium text-slate-900 underline-offset-2 hover:underline"
+            className="font-medium text-ink underline-offset-2 hover:underline"
           >
             Your Voice
           </Link>
-          <p className="text-slate-600">
+          <p className="text-muted">
             Writing samples for generated emails.
           </p>
         </li>
         <li>
           <Link
             href="/settings/usage"
-            className="font-medium text-slate-900 underline-offset-2 hover:underline"
+            className="font-medium text-ink underline-offset-2 hover:underline"
           >
             Usage & limits
           </Link>
-          <p className="text-slate-600">
+          <p className="text-muted">
             Effective limits, metering, and research depth.
           </p>
         </li>
         <li>
           <Link
             href="/settings/email"
-            className="font-medium text-slate-900 underline-offset-2 hover:underline"
+            className="font-medium text-ink underline-offset-2 hover:underline"
           >
             Email signature
           </Link>
-          <p className="text-slate-600">
+          <p className="text-muted">
             Signature appended when you open a draft in Outlook or Gmail.
           </p>
         </li>
@@ -85,33 +85,33 @@ export default async function SettingsIndexPage() {
             <li>
               <Link
                 href="/settings/organization"
-                className="font-medium text-slate-900 underline-offset-2 hover:underline"
+                className="font-medium text-ink underline-offset-2 hover:underline"
               >
                 Organization
               </Link>
-              <p className="text-slate-600">
+              <p className="text-muted">
                 Name, timezone, policies, members, and invitations.
               </p>
             </li>
             <li>
               <Link
                 href="/settings/billing"
-                className="font-medium text-slate-900 underline-offset-2 hover:underline"
+                className="font-medium text-ink underline-offset-2 hover:underline"
               >
                 Billing
               </Link>
-              <p className="text-slate-600">
+              <p className="text-muted">
                 Plan and status (free until Stripe). Payment management later.
               </p>
             </li>
             <li>
               <Link
                 href="/settings/cadence"
-                className="font-medium text-slate-900 underline-offset-2 hover:underline"
+                className="font-medium text-ink underline-offset-2 hover:underline"
               >
                 Email cadence
               </Link>
-              <p className="text-slate-600">
+              <p className="text-muted">
                 Follow-up intervals and max {vocab.sequence.singular} length.
               </p>
             </li>

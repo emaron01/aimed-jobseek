@@ -89,14 +89,14 @@ function Field({
   optional?: boolean;
 }) {
   const shared =
-    "mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-400 focus:ring-2";
+    "mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-focus focus:ring-2";
   return (
     <label className="block text-sm">
-      <span className="font-medium text-slate-700">
+      <span className="font-medium text-ink">
         {label}
         {optional ? " (optional)" : ""}
       </span>
-      {hint ? <span className="mt-0.5 block text-xs text-slate-500">{hint}</span> : null}
+      {hint ? <span className="mt-0.5 block text-xs text-subtle">{hint}</span> : null}
       {singleLine ? (
         <input
           value={value}
@@ -191,14 +191,14 @@ export function CandidateProfileEditForm({
         <p
           role="status"
           data-testid="candidate-profile-edit-status"
-          className={state.ok ? "text-sm text-emerald-700" : "text-sm text-red-600"}
+          className={state.ok ? "text-sm text-success" : "text-sm text-danger"}
         >
           {state.message}
         </p>
       ) : null}
 
       <section className="space-y-4" data-testid="profile-edit-identity">
-        <h2 className="text-base font-semibold text-slate-900">
+        <h2 className="text-base font-semibold text-ink">
           {candidateProfileEditCopy.identityTitle}
         </h2>
         <div className="grid gap-4 md:grid-cols-2">
@@ -256,7 +256,7 @@ export function CandidateProfileEditForm({
       </section>
 
       <section className="space-y-4" data-testid="profile-edit-direction">
-        <h2 className="text-base font-semibold text-slate-900">
+        <h2 className="text-base font-semibold text-ink">
           {candidateProfileEditCopy.directionTitle}
         </h2>
         <Field
@@ -313,7 +313,7 @@ export function CandidateProfileEditForm({
 
       <section className="space-y-4" data-testid="profile-edit-experience">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold text-slate-900">
+          <h2 className="text-base font-semibold text-ink">
             {candidateProfileEditCopy.experienceTitle}
           </h2>
           <AppButton
@@ -332,7 +332,7 @@ export function CandidateProfileEditForm({
         {profile.experience.map((role, index) => (
           <article
             key={role.id}
-            className="space-y-3 rounded-md border border-slate-200 p-4"
+            className="space-y-3 rounded-md border border-edge p-4"
             data-testid={`profile-edit-role-${index}`}
           >
             <div className="flex flex-wrap gap-2">
@@ -416,7 +416,7 @@ export function CandidateProfileEditForm({
             />
             <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-medium text-slate-700">
+                <p className="text-sm font-medium text-ink">
                   {candidateProfileEditCopy.achievements}
                 </p>
                 <AppButton
@@ -453,7 +453,7 @@ export function CandidateProfileEditForm({
                         ),
                       })
                     }
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
                   />
                   <div className="flex flex-col gap-1">
                     <AppButton
@@ -508,7 +508,7 @@ export function CandidateProfileEditForm({
       </section>
 
       <section className="space-y-4" data-testid="profile-edit-extras">
-        <h2 className="text-base font-semibold text-slate-900">
+        <h2 className="text-base font-semibold text-ink">
           {candidateProfileEditCopy.extrasTitle}
         </h2>
         <Field

@@ -5,9 +5,8 @@ import {
   ReferralShareFields,
   useReferralShare,
 } from "@/components/billing/ReferralShareFields";
-import { SECONDARY_BUTTON_CLASS, AppButton } from "@/components/ui";
+import { AppButton } from "@/components/ui";
 import { features } from "@/lib/product-config";
-import { cn } from "@/lib/utils";
 
 /**
  * Top-bar "Refer a friend" — modal overlay so the rep keeps their page.
@@ -35,7 +34,8 @@ export function ReferAFriendButton() {
     <>
       <AppButton
         type="button"
-        className={cn(SECONDARY_BUTTON_CLASS, "!px-3", "!py-1.5")}
+        variant="secondary"
+        className="!px-3 !py-1.5"
         data-testid="refer-a-friend-open"
         onClick={() => setOpen(true)}
       >
@@ -44,7 +44,7 @@ export function ReferAFriendButton() {
 
       {open ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby={titleId}
@@ -53,16 +53,16 @@ export function ReferAFriendButton() {
             if (event.target === event.currentTarget) setOpen(false);
           }}
         >
-          <div className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-5 shadow-lg">
+          <div className="w-full max-w-lg rounded-lg border border-edge bg-surface p-5 shadow-md">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2
                   id={titleId}
-                  className="text-lg font-medium text-slate-900"
+                  className="text-lg font-medium text-ink"
                 >
                   Refer a friend
                 </h2>
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="mt-1 text-sm text-muted">
                   Friends get 10% off Standard at Checkout. You earn 10% off per
                   successful referral, up to 50%.
                 </p>
@@ -70,7 +70,8 @@ export function ReferAFriendButton() {
               <AppButton
                 ref={closeRef}
                 type="button"
-                className={cn(SECONDARY_BUTTON_CLASS, "!px-3", "!py-1.5")}
+                variant="secondary"
+                className="!px-3 !py-1.5"
                 data-testid="refer-a-friend-close"
                 onClick={() => setOpen(false)}
               >

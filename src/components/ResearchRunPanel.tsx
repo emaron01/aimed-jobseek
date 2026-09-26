@@ -308,7 +308,7 @@ export function ResearchRunPanel({
       </div>
 
       {plan.noUsableResearch > 0 ? (
-        <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+        <p className="rounded-md border border-edge bg-canvas px-3 py-2 text-sm text-ink">
           Research ran but found no usable details for{" "}
           {plan.noUsableResearch === 1
             ? "1 company"
@@ -320,11 +320,11 @@ export function ResearchRunPanel({
 
       {displayRun ? (
         <div
-          className="space-y-2 rounded-md border border-slate-200 bg-white px-3 py-3"
+          className="space-y-2 rounded-md border border-edge bg-surface px-3 py-3"
           data-testid="research-run-progress"
         >
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <p className="font-medium text-slate-900">
+            <p className="font-medium text-ink">
               {runHeading({
                 run: displayRun,
                 runInProgress,
@@ -336,21 +336,21 @@ export function ResearchRunPanel({
             <p
               className={
                 displayHasFailures || displayStalled
-                  ? "font-medium text-rose-800"
+                  ? "font-medium text-danger"
                   : displayHasQuotaHeld
-                    ? "font-medium text-slate-700"
-                    : "text-slate-600"
+                    ? "font-medium text-ink"
+                    : "text-muted"
               }
             >
               {displayStalled ? "STALLED" : displayRun.status.replace("_", " ")}
             </p>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+          <div className="h-2 overflow-hidden rounded-full bg-canvas">
             <div
               className={
                 displayStalled
-                  ? "h-full rounded-full bg-amber-600 transition-all"
-                  : "h-full rounded-full bg-slate-900 transition-all"
+                  ? "h-full rounded-full bg-warning transition-all"
+                  : "h-full rounded-full bg-ink transition-all"
               }
               style={{ width: `${progressPercent(displayRun)}%` }}
             />
@@ -358,25 +358,25 @@ export function ResearchRunPanel({
           <p
             className={
               displayHasFailures || displayStalled
-                ? "text-sm font-medium text-rose-950"
-                : "text-sm text-slate-600"
+                ? "text-sm font-medium text-danger"
+                : "text-sm text-muted"
             }
           >
             {formatRunSummary(displayRun)}
           </p>
           {displayStalled ? (
-            <p className="text-sm text-amber-950">
+            <p className="text-sm text-warning">
               No worker progress for 15+ minutes. Retry the remaining companies,
               or start research again.
             </p>
           ) : null}
           {displayHasFailures ? (
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted">
               Retry will re-run only the companies that failed.
             </p>
           ) : null}
           {displayHasQuotaHeld ? (
-            <div className="space-y-2 text-sm text-slate-900">
+            <div className="space-y-2 text-sm text-ink">
               <p className="font-medium">
                 {formatResearchQuotaBlockedMessage({
                   used: allowance.used,
@@ -407,14 +407,14 @@ export function ResearchRunPanel({
         </div>
       ) : null}
 
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-muted">
         Research runs once per unique company in the background. Results appear
         below as each company finishes. Uses Research AI only (independent from
         Scoring AI).
       </p>
 
       {!researchAiConfigured ? (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p className="rounded-md border border-warning bg-warning-tint px-3 py-2 text-sm text-warning">
           Automated company research is not configured. Set RESEARCH_AI_PROVIDER
           (openai-responses or openai-compatible), RESEARCH_AI_MODEL,
           RESEARCH_AI_MODEL_URL, and RESEARCH_AI_API_KEY. Manual research on
@@ -424,7 +424,7 @@ export function ResearchRunPanel({
 
       {allowance.exhausted && plan.needingResearch > 0 ? (
         <div
-          className="space-y-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-950"
+          className="space-y-2 rounded-md border border-danger bg-danger-tint px-3 py-2 text-sm text-danger"
           data-testid="research-hard-stop"
         >
           <p>{exhaustedMessage}</p>
@@ -443,7 +443,7 @@ export function ResearchRunPanel({
 
       {confirmWarning ? (
         <div
-          className="space-y-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-950"
+          className="space-y-3 rounded-md border border-warning bg-warning-tint px-3 py-3 text-sm text-warning"
           data-testid="research-warning-confirm"
         >
           <p className="font-medium">
@@ -512,7 +512,7 @@ export function ResearchRunPanel({
       )}
 
       {message ? (
-        <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+        <p className="rounded-md border border-edge bg-canvas px-3 py-2 text-sm text-ink">
           {message}
         </p>
       ) : null}
@@ -522,9 +522,9 @@ export function ResearchRunPanel({
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-0.5 text-lg font-semibold text-slate-900">{value}</p>
+    <div className="rounded-md border border-edge bg-canvas px-3 py-2">
+      <p className="text-xs text-subtle">{label}</p>
+      <p className="mt-0.5 text-lg font-semibold text-ink">{value}</p>
     </div>
   );
 }

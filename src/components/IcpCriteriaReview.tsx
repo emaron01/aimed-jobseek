@@ -116,14 +116,14 @@ function DecisionForm({
           <AppButton
             type="submit"
             disabled={pending}
-            className="rounded-md border border-red-300 bg-white px-2.5 py-1.5 text-xs font-medium text-red-800 disabled:opacity-60"
+            className="rounded-md border border-danger bg-surface px-2.5 py-1.5 text-xs font-medium text-danger disabled:opacity-60"
           >
             Remove this criterion
           </AppButton>
         </form>
       </div>
       {state && !state.ok ? (
-        <p role="status" className="text-xs text-red-600">
+        <p role="status" className="text-xs text-danger">
           {state.message}
         </p>
       ) : null}
@@ -159,7 +159,7 @@ function TierAndMandatoryForm({
       <input type="hidden" name="productId" value={productId} />
       <input type="hidden" name="icpId" value={icpId} />
       <input type="hidden" name="criterionId" value={criterion.id} />
-      <label className="text-xs text-slate-600">
+      <label className="text-xs text-muted">
         Scoring role
         <select
           name="tier"
@@ -168,7 +168,7 @@ function TierAndMandatoryForm({
           onChange={(event) =>
             setTier(normalizeIcpCriterionTier(event.target.value) ?? "PRIMARY")
           }
-          className="ml-2 rounded border border-slate-300 bg-white px-2 py-1 text-xs"
+          className="ml-2 rounded border border-edge-strong bg-surface px-2 py-1 text-xs"
         >
           <option value="PRIMARY">{ICP_PRIMARY_ROLE_LABEL}</option>
           <option value="SECONDARY">{ICP_SECONDARY_ROLE_LABEL}</option>
@@ -176,7 +176,7 @@ function TierAndMandatoryForm({
       </label>
       {tier === "PRIMARY" ? (
         <label
-          className="flex items-center gap-1.5 text-xs font-medium text-red-800"
+          className="flex items-center gap-1.5 text-xs font-medium text-danger"
           title={ICP_MANDATORY_EXPLANATION}
           data-testid="icp-mandatory-toggle"
         >
@@ -194,12 +194,12 @@ function TierAndMandatoryForm({
       <AppButton
         type="submit"
         disabled={pending}
-        className="text-xs font-medium text-slate-900 underline disabled:opacity-60"
+        className="text-xs font-medium text-ink underline disabled:opacity-60"
       >
         {pending ? "Saving…" : "Update"}
       </AppButton>
       {state && !state.ok ? (
-        <p className="w-full text-xs text-red-600">{state.message}</p>
+        <p className="w-full text-xs text-danger">{state.message}</p>
       ) : null}
     </form>
   );
@@ -236,7 +236,7 @@ function CriterionCard({
 
   return (
     <li
-      className="rounded-md border border-slate-200 bg-white p-3 text-sm text-slate-800"
+      className="rounded-md border border-edge bg-surface p-3 text-sm text-ink"
       data-testid="icp-criterion-card"
       data-evidence-class={evidenceClass}
       data-tier={normalizeIcpCriterionTier(criterion.tier) ?? "PRIMARY"}
@@ -253,7 +253,7 @@ function CriterionCard({
         {criterionFlagLabels(criterion).map((label) => (
           <span
             key={label}
-            className="ml-2 inline-block rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700"
+            className="ml-2 inline-block rounded-full border border-edge bg-canvas px-2 py-0.5 text-[11px] font-medium text-ink"
             data-testid={
               label === criterionFlags.required
                 ? "criterion-flag-required"
@@ -272,7 +272,7 @@ function CriterionCard({
       />
       {evidenceClass === "TARGETED_SEARCH" ? (
         <p
-          className="mt-2 text-xs text-amber-950"
+          className="mt-2 text-xs text-warning"
           data-testid="targeted-search-warning"
         >
           {TARGETED_SEARCH_CRITERION_WARNING}
@@ -280,7 +280,7 @@ function CriterionCard({
       ) : null}
       {isLimitedPublicEvidenceClass(evidenceClass) ? (
         <p
-          className="mt-2 text-xs text-amber-950"
+          className="mt-2 text-xs text-warning"
           data-testid="limited-public-evidence-warning"
         >
           {LIMITED_PUBLIC_EVIDENCE_CRITERION_WARNING}
@@ -288,7 +288,7 @@ function CriterionCard({
       ) : null}
       {criterion.strengthAdjustment ? (
         <p
-          className="mt-2 text-xs text-slate-600"
+          className="mt-2 text-xs text-muted"
           data-testid="criterion-strength-adjustment"
         >
           {criterion.strengthAdjustment}
@@ -315,7 +315,7 @@ function TierSection({
   if (criteria.length === 0) return null;
   return (
     <section>
-      <h6 className="text-sm font-semibold text-slate-900">{title}</h6>
+      <h6 className="text-sm font-semibold text-ink">{title}</h6>
       <ul className="mt-2 space-y-2">
         {criteria.map((c) => (
           <CriterionCard
@@ -347,7 +347,7 @@ export function IcpCriteriaReview({
 }) {
   if (criteria.length === 0) {
     return (
-      <p className="mt-3 text-sm text-slate-500">
+      <p className="mt-3 text-sm text-subtle">
         No structured criteria yet. Save a natural-language definition, then run
         AI Interpretation.
       </p>
@@ -365,22 +365,22 @@ export function IcpCriteriaReview({
   return (
     <div className="mt-4 space-y-4" data-testid="icp-criteria-review">
       <div>
-        <h5 className="text-sm font-semibold text-slate-900">{title}</h5>
+        <h5 className="text-sm font-semibold text-ink">{title}</h5>
         {interpretationSummary?.trim() ? (
           <div
-            className="mt-2 space-y-2 rounded-md border border-slate-300 bg-white px-3 py-3"
+            className="mt-2 space-y-2 rounded-md border border-edge-strong bg-surface px-3 py-3"
             data-testid="icp-interpretation-prose"
           >
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <p className="text-xs font-semibold uppercase tracking-wide text-subtle">
               What we understood
             </p>
-            <p className="text-sm text-slate-800">{interpretationSummary.trim()}</p>
+            <p className="text-sm text-ink">{interpretationSummary.trim()}</p>
             {interpretationUndetermined?.trim() ? (
               <div data-testid="icp-interpretation-undetermined">
-                <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                <p className="text-xs font-semibold uppercase tracking-wide text-warning">
                   Could not be determined from available data
                 </p>
-                <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-amber-950">
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-warning">
                   {interpretationUndetermined
                     .split("\n")
                     .map((item) => item.trim())
@@ -394,7 +394,7 @@ export function IcpCriteriaReview({
           </div>
         ) : null}
         <p
-          className="mt-2 text-sm text-slate-700"
+          className="mt-2 text-sm text-ink"
           data-testid="icp-role-summary"
         >
           {buildIcpRoleSummary({

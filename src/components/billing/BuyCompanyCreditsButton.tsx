@@ -18,7 +18,7 @@ export function BuyCompanyCreditsButton({
 
   if (disabledReason) {
     return (
-      <p className="text-sm text-slate-600" data-testid="buy-company-credits">
+      <p className="text-sm text-muted" data-testid="buy-company-credits">
         {disabledReason}
       </p>
     );
@@ -59,11 +59,11 @@ export function BuyCompanyCreditsButton({
       >
         {pending ? "Redirecting…" : "Buy company credits"}
       </AppButton>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-subtle">
         Each block adds 100 companies for 12 months. On Checkout you can raise
         the quantity (e.g. 3 blocks = 300 companies) before paying.
       </p>
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
     </div>
   );
 }

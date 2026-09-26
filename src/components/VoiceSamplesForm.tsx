@@ -30,12 +30,12 @@ function DeleteSampleForm({ sample }: { sample: VoiceSampleView }) {
       <AppButton
         type="submit"
         disabled={pending}
-        className="text-xs font-medium text-red-800 underline disabled:opacity-60"
+        className="text-xs font-medium text-danger underline disabled:opacity-60"
       >
         {pending ? "Removing…" : "Delete"}
       </AppButton>
       {state && !state.ok ? (
-        <p role="status" className="mt-1 text-xs text-red-600">
+        <p role="status" className="mt-1 text-xs text-danger">
           {state.message}
         </p>
       ) : null}
@@ -63,13 +63,13 @@ export function VoiceSamplesForm({
     <section className="space-y-4" data-testid="voice-samples">
       <div>
         <h2 className="text-lg font-medium">Writing voice</h2>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Paste emails you have already sent. Voice belongs to you, not the
           workspace. This is optional — without samples, generation uses a
           neutral professional register.
         </p>
         <p
-          className="mt-2 text-sm font-medium text-slate-800"
+          className="mt-2 text-sm font-medium text-ink"
           data-testid="voice-readiness"
         >
           {readiness.message}
@@ -87,23 +87,23 @@ export function VoiceSamplesForm({
             role="status"
             data-testid="voice-action-status"
             className={
-              state.ok ? "text-sm text-emerald-700" : "text-sm text-red-600"
+              state.ok ? "text-sm text-success" : "text-sm text-danger"
             }
           >
             {state.message}
           </p>
         ) : null}
         <label className="block text-sm">
-          <span className="font-medium text-slate-700">Label</span>
+          <span className="font-medium text-ink">Label</span>
           <input
             name="label"
             required
             placeholder="e.g. Cold intro to a CRO"
-            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-slate-400 focus:ring-2"
+            className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm outline-none ring-focus focus:ring-2"
           />
         </label>
         <label className="block text-sm">
-          <span className="font-medium text-slate-700">
+          <span className="font-medium text-ink">
             Sent email (one sample)
           </span>
           <textarea
@@ -112,7 +112,7 @@ export function VoiceSamplesForm({
             minLength={100}
             rows={8}
             placeholder="Paste one sent email — greeting through sign-off."
-            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-slate-400 focus:ring-2"
+            className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm outline-none ring-focus focus:ring-2"
           />
         </label>
         <AppButton
@@ -129,13 +129,13 @@ export function VoiceSamplesForm({
           {samples.map((sample) => (
             <li
               key={sample.id}
-              className="rounded-md border border-slate-200 bg-white px-3 py-3"
+              className="rounded-md border border-edge bg-surface px-3 py-3"
             >
-              <p className="text-sm font-medium text-slate-900">{sample.label}</p>
-              <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs text-slate-600">
+              <p className="text-sm font-medium text-ink">{sample.label}</p>
+              <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs text-muted">
                 {sample.sampleText}
               </p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-subtle">
                 {sample.sampleText.length} characters · pasted
               </p>
               <DeleteSampleForm sample={sample} />

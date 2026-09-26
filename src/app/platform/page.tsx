@@ -99,7 +99,7 @@ export default async function PlatformHomePage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Platform</h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Ops home — cost/margin signals and org administration. Use the nav
           above on every platform page.
         </p>
@@ -108,10 +108,10 @@ export default async function PlatformHomePage() {
       {drift.hasDrift && drift.latest ? (
         <div
           role="status"
-          className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          className="rounded-lg border border-warning bg-warning-tint px-4 py-3 text-sm text-warning"
         >
           <p className="font-medium">Provider spend drift above threshold</p>
-          <p className="mt-1 text-amber-900">
+          <p className="mt-1 text-warning">
             Latest {drift.latest.provider} reconciliation:{" "}
             {drift.latest.driftPercent.toFixed(1)}% drift (threshold{" "}
             {drift.thresholdPercent}%). Reported $
@@ -131,14 +131,14 @@ export default async function PlatformHomePage() {
 
       {purgeEligible.length > 0 ? (
         <section
-          className="space-y-3 rounded-lg border border-amber-300 bg-amber-50/80 p-4"
+          className="space-y-3 rounded-lg border border-warning bg-warning-tint/80 p-4"
           data-testid="platform-purge-eligible"
         >
           <div>
-            <h2 className="text-lg font-medium text-amber-950">
+            <h2 className="text-lg font-medium text-warning">
               {vocab.contact.Singular} data purge due ({purgeEligible.length})
             </h2>
-            <p className="mt-1 text-sm text-amber-900">
+            <p className="mt-1 text-sm text-warning">
               Canceled organizations past the {CONTACT_OUTBOUND_RETENTION_DAYS}
               -day retention window that still have {vocab.contact.plural}, {vocab.campaign.plural}, or
               suppressions. Open the org and run{" "}
@@ -148,7 +148,7 @@ export default async function PlatformHomePage() {
               {canMutate ? "" : " (SUPER_ADMIN only)"}.
             </p>
           </div>
-          <ul className="divide-y divide-amber-200/80 rounded-md border border-amber-200 bg-white text-sm">
+          <ul className="divide-y divide-amber-200/80 rounded-md border border-warning bg-surface text-sm">
             {purgeEligible.map((org) => (
               <li
                 key={org.organizationId}
@@ -157,11 +157,11 @@ export default async function PlatformHomePage() {
                 <div>
                   <Link
                     href={`/platform/orgs/${org.organizationId}`}
-                    className="font-medium text-slate-900 underline"
+                    className="font-medium text-ink underline"
                   >
                     {org.name}
                   </Link>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-subtle">
                     Canceled {formatDate(org.canceledAt)} · Eligible since{" "}
                     {formatDate(org.eligibleAt)} · {org.contactCount} {vocab.contact.plural} ·{" "}
                     {org.campaignCount} {vocab.campaign.plural} · {org.suppressionCount}{" "}
@@ -170,7 +170,7 @@ export default async function PlatformHomePage() {
                 </div>
                 <Link
                   href={`/platform/orgs/${org.organizationId}`}
-                  className="text-xs font-medium text-amber-950 underline"
+                  className="text-xs font-medium text-warning underline"
                 >
                   Open org
                 </Link>
@@ -186,19 +186,19 @@ export default async function PlatformHomePage() {
           {areas.map((area) => (
             <li
               key={area.href}
-              className="rounded-lg border border-slate-200 bg-white p-4"
+              className="rounded-lg border border-edge bg-surface p-4"
             >
               <Link
                 href={area.href}
-                className="text-base font-semibold text-slate-900 underline"
+                className="text-base font-semibold text-ink underline"
               >
                 {area.title}
               </Link>
-              <p className="mt-1 text-sm text-slate-600">{area.body}</p>
+              <p className="mt-1 text-sm text-muted">{area.body}</p>
             </li>
           ))}
         </ul>
-        <p className="text-xs text-slate-500" data-testid="platform-route-audit">
+        <p className="text-xs text-subtle" data-testid="platform-route-audit">
           Linked routes: {PLATFORM_ROUTE_AUDIT.join(", ")}. Org detail and
           scoped view open from Organizations.
         </p>
@@ -207,24 +207,24 @@ export default async function PlatformHomePage() {
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Last 30 days (platform-wide)</h2>
         <div className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-slate-500">
+          <div className="rounded-lg border border-edge bg-surface px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-subtle">
               Cost / company
             </p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">
               {formatUsd(report.costPerCompanyUsd)}
             </p>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-slate-500">
+          <div className="rounded-lg border border-edge bg-surface px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-subtle">
               {vocab.contact.Plural} / company
             </p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">
               {formatRatio(report.contactsPerCompany)}
             </p>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-slate-500">
+          <div className="rounded-lg border border-edge bg-surface px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-subtle">
               Projected 300-email month
             </p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">

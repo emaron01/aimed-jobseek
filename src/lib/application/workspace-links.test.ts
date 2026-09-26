@@ -111,6 +111,12 @@ describe("workspace links", () => {
     expect(workspaceProfileHref("prod_1")).toBe("/setup/prod_1");
     expect(hrefs).toContain("/setup/prod_1/edit");
     expect(workspaceConsultationHref()).toBe("#consultation");
+    expect(workspaceHrefResolves("/campaigns/camp_1/company")).toBe(true);
+    expect(workspaceHrefResolves("/campaigns/camp_1/job")).toBe(true);
+    expect(workspaceHrefResolves("/campaigns/camp_1/hiring-team")).toBe(true);
+    expect(workspaceHrefResolves("/campaigns/camp_1/assets")).toBe(true);
+    expect(workspaceHrefResolves("/campaigns/camp_1/outreach")).toBe(true);
+    expect(workspaceHrefResolves("/campaigns/camp_1/interviews")).toBe(true);
     expect(workspaceHrefResolves("/products/prod_1")).toBe(false);
     expect(workspaceHrefResolves("/campaigns/camp_1/consultation")).toBe(false);
   });
@@ -143,6 +149,7 @@ describe("workspace links", () => {
     expect(outreach).toContain("workspaceAssetDocxHref");
     expect(joined).not.toMatch(/`\/products\/\$\{/);
     expect(joined).not.toMatch(/\/campaigns\/\$\{[^}]+\}#consultation/);
+    expect(live).not.toContain("workspace-ready-notice");
   });
 });
 

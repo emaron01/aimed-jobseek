@@ -342,7 +342,7 @@ export function EmailDraftsStage({
         >
           Compare drafts
         </AppButton>
-        <label className="ml-auto flex items-center gap-2 text-sm text-slate-700">
+        <label className="ml-auto flex items-center gap-2 text-sm text-ink">
           <span className="font-medium">Show</span>
           <select
             data-testid="email-contacts-filter"
@@ -350,7 +350,7 @@ export function EmailDraftsStage({
             onChange={(event) =>
               setContactFilter(event.target.value as ContactListFilter)
             }
-            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+            className="rounded-md border border-edge-strong bg-surface px-2 py-1.5 text-sm"
           >
             <option value="all">All {vocab.contact.plural}</option>
             <option value="ready_to_send">Ready to send</option>
@@ -360,7 +360,7 @@ export function EmailDraftsStage({
 
       {view === "compare" ? (
         visibleContacts.length === 0 ? (
-          <p className="rounded-md border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">
+          <p className="rounded-md border border-dashed border-edge-strong p-6 text-center text-sm text-muted">
             No drafts are ready to send.
           </p>
         ) : (
@@ -377,16 +377,16 @@ export function EmailDraftsStage({
         <div className="grid gap-4 lg:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)]">
           <nav
             aria-label={`${vocab.campaign.Singular} ${vocab.contact.plural}`}
-            className="rounded-md border border-slate-200 bg-slate-50 p-2"
+            className="rounded-md border border-edge bg-canvas p-2"
           >
-            <p className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+            <p className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-subtle">
               {vocab.contact.Plural}
               {contactFilter === "ready_to_send"
                 ? ` (${visibleContacts.length})`
                 : ""}
             </p>
             {visibleContacts.length === 0 ? (
-              <p className="px-2 py-3 text-sm text-slate-600">
+              <p className="px-2 py-3 text-sm text-muted">
                 No drafts are ready to send.
               </p>
             ) : (
@@ -413,26 +413,26 @@ export function EmailDraftsStage({
                         onClick={() => void handleSelectContact(row.campaignContactId)}
                         className={`w-full rounded-md px-2 py-2 text-left text-sm ${
                           active
-                            ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-300"
-                            : "text-slate-700 hover:bg-white"
+                            ? "bg-surface font-medium text-ink shadow-sm ring-1 ring-edge-strong"
+                            : "text-ink hover:bg-surface"
                         }`}
                       >
                         <span className="block truncate">{row.contactName}</span>
-                        <span className="mt-0.5 block truncate text-xs text-slate-500">
+                        <span className="mt-0.5 block truncate text-xs text-subtle">
                           {row.contactDetails}
                         </span>
                         <span
                           className={`mt-1 block text-xs ${
                             statusLabel === "Ready to review"
-                              ? "font-medium text-emerald-700"
+                              ? "font-medium text-success"
                               : statusLabel === "Prepared"
-                                ? "text-sky-700"
+                                ? "text-primary"
                                 : statusLabel === "Needs persona"
-                                  ? "font-medium text-amber-800"
+                                  ? "font-medium text-warning"
                                   : statusLabel.startsWith("Email ") &&
                                       statusLabel.includes(" sent")
-                                    ? "font-medium text-slate-700"
-                                    : "text-slate-500"
+                                    ? "font-medium text-ink"
+                                    : "text-subtle"
                           }`}
                           data-testid={`contact-draft-status-${row.campaignContactId}`}
                         >
@@ -448,16 +448,16 @@ export function EmailDraftsStage({
           {queueComplete ? (
             <section
               data-testid="campaign-queue-complete"
-              className="rounded-md border border-slate-200 bg-slate-50 p-6 text-center"
+              className="rounded-md border border-edge bg-canvas p-6 text-center"
             >
-              <p className="text-sm font-medium text-slate-900">
+              <p className="text-sm font-medium text-ink">
                 {CAMPAIGN_QUEUE_COMPLETE_MESSAGE}
               </p>
             </section>
           ) : selected ? (
             <section
               key={selected.campaignContactId}
-              className="grid gap-4 rounded-md border border-slate-200 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]"
+              className="grid gap-4 rounded-md border border-edge p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]"
             >
               <EmailSequenceWorkspace
                 campaignContactId={selected.campaignContactId}
@@ -553,17 +553,17 @@ function CampaignDraftCompare({
       {rows.map(({ contact, draft }) => (
         <article
           key={contact.campaignContactId}
-          className="rounded-md border border-slate-200 bg-white p-4"
+          className="rounded-md border border-edge bg-surface p-4"
         >
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h3 className="text-sm font-medium text-slate-900">
+              <h3 className="text-sm font-medium text-ink">
                 {contact.contactName}
               </h3>
-              <p className="mt-0.5 text-xs text-slate-500">
+              <p className="mt-0.5 text-xs text-subtle">
                 {contact.contactDetails}
               </p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-subtle">
                 {contactDraftListStatus({
                   isPreparing: preparingIds.has(contact.campaignContactId),
                   drafts: contact.drafts,
@@ -580,27 +580,27 @@ function CampaignDraftCompare({
           </div>
           {draft ? (
             <>
-              <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">
+              <p className="mt-3 text-xs font-medium uppercase tracking-wide text-subtle">
                 Subject
               </p>
-              <p className="mt-1 text-sm font-medium text-slate-900">
+              <p className="mt-1 text-sm font-medium text-ink">
                 {draft.subject}
               </p>
-              <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">
+              <p className="mt-3 text-xs font-medium uppercase tracking-wide text-subtle">
                 Body
               </p>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
+              <p className="mt-1 whitespace-pre-wrap text-sm text-ink">
                 {draft.body}
               </p>
               {draft.personalizationSources || contact.personalizationSources ? (
-                <p className="mt-3 text-xs text-slate-500">
+                <p className="mt-3 text-xs text-subtle">
                   {draft.personalizationSources ??
                     contact.personalizationSources}
                 </p>
               ) : null}
             </>
           ) : (
-            <p className="mt-3 text-sm text-slate-500">No draft yet.</p>
+            <p className="mt-3 text-sm text-subtle">No draft yet.</p>
           )}
         </article>
       ))}

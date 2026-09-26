@@ -65,8 +65,8 @@ function StatusBanner({ result }: { result: PersonaActionResult | null }) {
       data-testid="persona-action-status"
       className={
         result.ok
-          ? "mt-3 text-sm text-emerald-700"
-          : "mt-3 text-sm text-red-600"
+          ? "mt-3 text-sm text-success"
+          : "mt-3 text-sm text-danger"
       }
     >
       {result.message}
@@ -99,15 +99,15 @@ function CriterionActionForm({
     <form action={formAction} className={className}>
       {children}
       {pending ? (
-        <span className="text-xs text-slate-500">Working…</span>
+        <span className="text-xs text-subtle">Working…</span>
       ) : null}
       {state ? (
         <p
           role="status"
           className={
             state.ok
-              ? "basis-full text-xs text-emerald-700"
-              : "basis-full text-xs text-red-600"
+              ? "basis-full text-xs text-success"
+              : "basis-full text-xs text-danger"
           }
         >
           {state.message}
@@ -128,7 +128,7 @@ function CriteriaReview({
 }) {
   if (criteria.length === 0) {
     return (
-      <p className="mt-3 text-sm text-slate-500">
+      <p className="mt-3 text-sm text-subtle">
         No structured criteria yet. Save the {vocab.persona.Singular} definition, then run AI
         Interpretation.
       </p>
@@ -145,16 +145,16 @@ function CriteriaReview({
   return (
     <div className="mt-4 space-y-3">
       {needsReview.length > 0 ? (
-        <div className="rounded-md border border-amber-300 bg-amber-50 p-3">
-          <h5 className="text-sm font-semibold text-amber-950">
+        <div className="rounded-md border border-warning bg-warning-tint p-3">
+          <h5 className="text-sm font-semibold text-warning">
             Needs review — {needsReview.length} unclassified
             {needsReview.length === 1 ? " criterion" : " criteria"}
           </h5>
-          <p className="mt-1 text-xs text-amber-900/80">
+          <p className="mt-1 text-xs text-warning/80">
             Classify each item into a scoring box, or dismiss it. Until then
             it is held out of scoring.
           </p>
-          <ul className="mt-3 space-y-3 text-sm text-amber-950">
+          <ul className="mt-3 space-y-3 text-sm text-warning">
             {needsReview.map((c, i) => (
               <NeedsReviewCriterionRow
                 key={c.id ?? `needs-review-${c.name}-${i}`}
@@ -166,20 +166,20 @@ function CriteriaReview({
           </ul>
         </div>
       ) : null}
-      <div className="rounded-md bg-slate-50 p-3">
-      <h5 className="text-sm font-semibold text-slate-900">
+      <div className="rounded-md bg-canvas p-3">
+      <h5 className="text-sm font-semibold text-ink">
         AI Interpretation — review criteria
       </h5>
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-1 text-xs text-subtle">
         ✓ required / strong · ☆ supporting · ✗ disqualifier. Manual edits are
         preserved on reinterpretation.
       </p>
       {scored.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-500">
+        <p className="mt-3 text-sm text-subtle">
           No scored criteria yet — classify items under Needs review.
         </p>
       ) : null}
-      <ul className="mt-3 space-y-3 text-sm text-slate-700">
+      <ul className="mt-3 space-y-3 text-sm text-ink">
         {scored.map((c, i) => {
           const role = c.isDisqualifier
             ? "disqualifier"
@@ -189,7 +189,7 @@ function CriteriaReview({
           return (
             <li
               key={c.id ?? `${c.name}-${i}`}
-              className="rounded border border-slate-200 bg-white p-2"
+              className="rounded border border-edge bg-surface p-2"
             >
               <div>
                 {c.isDisqualifier ? "✗" : c.isRequired ? "✓" : "☆"}{" "}
@@ -200,7 +200,7 @@ function CriteriaReview({
                   importance: c.importance as never,
                 })}
                 {c.manuallyEdited ? (
-                  <span className="ml-2 text-xs text-amber-700">(manual)</span>
+                  <span className="ml-2 text-xs text-warning">(manual)</span>
                 ) : null}
               </div>
               {c.id ? (
@@ -213,12 +213,12 @@ function CriteriaReview({
                     <input type="hidden" name="personaId" value={personaId} />
                     <input type="hidden" name="productId" value={productId} />
                     <input type="hidden" name="name" value={c.name} />
-                    <label className="text-xs text-slate-600">
+                    <label className="text-xs text-muted">
                       Role
                       <select
                         name="role"
                         defaultValue={role}
-                        className="ml-1 rounded border border-slate-300 px-1 py-0.5 text-xs"
+                        className="ml-1 rounded border border-edge-strong px-1 py-0.5 text-xs"
                       >
                         <option value="required">Required / strong</option>
                         <option value="supporting">Supporting</option>
@@ -254,10 +254,10 @@ function NeedsReviewCriterionRow({
   criterion: CriterionRow;
 }) {
   return (
-    <li className="rounded border border-amber-200 bg-white p-2">
+    <li className="rounded border border-warning bg-surface p-2">
       <div>
         <span className="font-medium">{criterion.name}</span>
-        <span className="ml-2 text-xs text-amber-800/80">needs_review</span>
+        <span className="ml-2 text-xs text-warning">needs_review</span>
       </div>
       {criterion.id ? (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -275,7 +275,7 @@ function NeedsReviewCriterionRow({
                 type="submit"
                 name="role"
                 value={target.role}
-                className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-950 hover:bg-amber-100"
+                className="rounded border border-warning bg-warning-tint px-2 py-1 text-[11px] font-medium text-warning hover:bg-warning-tint"
               >
                 {target.label}
               </AppButton>
@@ -370,10 +370,10 @@ function NewPersonaForm({
 
   return (
     <div
-      className="rounded-md border border-slate-200 p-4"
+      className="rounded-md border border-edge p-4"
       data-testid="persona-form"
     >
-      <p className="mb-3 text-xs text-slate-500">
+      <p className="mb-3 text-xs text-subtle">
         Workflow: {vocab.persona.Singular} definition → Save → AI Interpretation → Review
         criteria. AI is optional for saving.
       </p>
@@ -606,11 +606,11 @@ export function PersonaForm({
 
       {editing ? (
         <div
-          className="rounded-md border border-slate-200 p-4"
+          className="rounded-md border border-edge p-4"
           data-print-hide
           data-testid="persona-form"
         >
-          <p className="mb-3 text-xs text-slate-500">
+          <p className="mb-3 text-xs text-subtle">
             Workflow: {vocab.persona.Singular} definition → Save → AI Interpretation → Review
             criteria. AI is optional for saving.
           </p>
@@ -726,7 +726,7 @@ export function PersonaForm({
         </div>
       ) : null}
 
-      <div className="space-y-3 border-t border-slate-200 pt-4" data-print-hide>
+      <div className="space-y-3 border-t border-edge pt-4" data-print-hide>
         {!editing ? (
           <div className="flex flex-wrap items-center gap-2">
             <form action={interpretAction} className="inline">
@@ -760,7 +760,7 @@ export function PersonaForm({
           </div>
         ) : null}
         {!editing ? (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-subtle">
             Regenerate criteria updates scoring criteria from the text fields
             above. Rebuild from {vocab.product.singular} evidence re-synthesizes role summary,
             pains, outcomes, and messaging from stored {vocab.product.singular} research (review
@@ -782,7 +782,7 @@ export function PersonaForm({
                 ? "Projecting…"
                 : "Project role signals from profile"}
             </SecondaryButton>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-subtle">
               Adds criteria from stored AI role signals (ownership, KPIs,
               positive/negative signals) without rewriting existing rows.
             </p>

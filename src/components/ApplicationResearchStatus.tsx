@@ -54,18 +54,18 @@ export function ApplicationResearchStatus({
   return (
     <div className="space-y-2" data-testid="application-research-status">
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-sm font-semibold text-slate-900">
+        <h3 className="text-sm font-semibold text-ink">
           {applicationResearchCopy.title}
         </h3>
         <span
-          className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-800"
+          className="rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink"
           data-testid="application-research-phase"
           data-phase={status.phase}
         >
           {status.label}
         </span>
       </div>
-      <p className="text-sm text-slate-600" data-testid="application-research-detail">
+      <p className="text-sm text-muted" data-testid="application-research-detail">
         {status.detail}
       </p>
       {canEdit && status.canRetry ? (

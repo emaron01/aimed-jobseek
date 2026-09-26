@@ -13,11 +13,11 @@ export type AppButtonVariant = "primary" | "secondary" | "chip";
 
 const VARIANT_CLASS: Record<AppButtonVariant, string> = {
   primary:
-    "bg-slate-900 text-white hover:bg-slate-800 active:bg-slate-950 focus-visible:outline-slate-900 disabled:bg-slate-400 disabled:text-white",
+    "bg-primary text-on-primary hover:bg-primary-hover active:bg-primary-hover focus-visible:outline-focus disabled:bg-edge-strong disabled:text-on-ink",
   secondary:
-    "border border-slate-300 bg-white text-slate-700 shadow-sm hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 focus-visible:outline-slate-700 disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 disabled:shadow-none",
+    "border border-edge-strong bg-surface text-ink shadow-sm hover:border-edge-strong hover:bg-canvas active:bg-canvas focus-visible:outline-focus disabled:border-edge disabled:bg-canvas disabled:text-subtle disabled:shadow-none",
   chip:
-    "border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700 underline decoration-slate-300 underline-offset-2 shadow-sm hover:border-slate-400 hover:bg-slate-50 hover:decoration-slate-600 active:bg-slate-100 focus-visible:outline-slate-700 disabled:border-slate-200 disabled:text-slate-400 disabled:no-underline",
+    "border border-edge-strong bg-surface px-2 py-0.5 text-[11px] text-ink underline decoration-edge-strong underline-offset-2 shadow-sm hover:bg-canvas active:bg-canvas focus-visible:outline-focus disabled:border-edge disabled:text-subtle disabled:no-underline",
 };
 
 const BASE_CLASS =
@@ -39,8 +39,8 @@ export function AppPendingIndicator({
       <span
         className={
           light
-            ? "inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
-            : "inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-800"
+            ? "inline-block h-4 w-4 animate-spin rounded-full border-2 border-on-primary/40 border-t-on-primary"
+            : "inline-block h-4 w-4 animate-spin rounded-full border-2 border-edge-strong border-t-ink"
         }
         aria-hidden
         data-testid="action-pending-spinner"

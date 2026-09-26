@@ -42,8 +42,8 @@ export function ActionFeedbackForm({
           data-testid="action-feedback-status"
           className={
             state.ok
-              ? "mb-3 text-sm text-emerald-700"
-              : "mb-3 text-sm text-red-600"
+              ? "mb-3 text-sm text-success"
+              : "mb-3 text-sm text-danger"
           }
         >
           {state.message}

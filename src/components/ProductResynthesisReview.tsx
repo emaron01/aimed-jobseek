@@ -30,8 +30,8 @@ function ApplyPlanList({
   if (items.length === 0) return null;
   const toneClass =
     tone === "preserved"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-950"
-      : "border-amber-200 bg-amber-50 text-amber-950";
+      ? "border-success bg-success-tint text-success"
+      : "border-warning bg-warning-tint text-warning";
 
   return (
     <div className={`rounded-lg border px-4 py-3 ${toneClass}`}>
@@ -124,7 +124,7 @@ export function ProductResynthesisReview({
   if (failed || !draft) {
     return (
       <div className="space-y-3">
-        <p className="text-sm text-amber-900">
+        <p className="text-sm text-warning">
           {errorSafe ||
             `Re-synthesis could not be completed. Your approved ${vocab.product.singular} was not changed.`}
         </p>
@@ -143,7 +143,7 @@ export function ProductResynthesisReview({
           </Link>
         </form>
         {retry ? (
-          <p className="text-sm text-red-600">{retry.message}</p>
+          <p className="text-sm text-danger">{retry.message}</p>
         ) : null}
       </div>
     );
@@ -151,7 +151,7 @@ export function ProductResynthesisReview({
 
   return (
     <div className="space-y-6" data-testid="product-resynthesis-review">
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-muted">
         Review the proposed update for <strong>{productName}</strong>. Confirm
         only replaces the fields listed below — your {vocab.product.singular} id,{" "}
         {vocab.campaign.plural}, and {vocab.icp.plural} stay linked. Cancel leaves
@@ -176,30 +176,30 @@ export function ProductResynthesisReview({
           {applyPlan.fieldDiffs.map((diff) => (
             <div
               key={diff.field}
-              className="rounded-lg border border-slate-200 bg-white"
+              className="rounded-lg border border-edge bg-surface"
             >
-              <div className="border-b border-slate-200 px-4 py-2">
-                <h3 className="text-sm font-semibold text-slate-900">
+              <div className="border-b border-edge px-4 py-2">
+                <h3 className="text-sm font-semibold text-ink">
                   {diff.label}
                 </h3>
-                <p className="mt-0.5 text-xs text-amber-800">
+                <p className="mt-0.5 text-xs text-warning">
                   Will change on confirm
                 </p>
               </div>
               <div className="grid gap-0 md:grid-cols-2">
-                <div className="border-b border-slate-100 p-4 md:border-b-0 md:border-r">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                <div className="border-b border-edge p-4 md:border-b-0 md:border-r">
+                  <p className="text-xs font-medium uppercase tracking-wide text-subtle">
                     Current
                   </p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-ink">
                     {diff.before.trim() || "—"}
                   </p>
                 </div>
                 <div className="p-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <p className="text-xs font-medium uppercase tracking-wide text-subtle">
                     Proposed
                   </p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-ink">
                     {diff.after.trim() || "—"}
                   </p>
                 </div>
@@ -209,7 +209,7 @@ export function ProductResynthesisReview({
         </div>
       ) : null}
 
-      <form action={action} className="space-y-4 border-t border-slate-200 pt-5">
+      <form action={action} className="space-y-4 border-t border-edge pt-5">
         <input type="hidden" name="productId" value={productId} />
         <input type="hidden" name="setupRunId" value={setupRunId} />
         <input
@@ -232,7 +232,7 @@ export function ProductResynthesisReview({
         {state ? (
           <p
             className={
-              state.ok ? "text-sm text-emerald-700" : "text-sm text-red-600"
+              state.ok ? "text-sm text-success" : "text-sm text-danger"
             }
           >
             {state.message}

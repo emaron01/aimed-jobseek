@@ -35,8 +35,8 @@ export function ConvertTrialNowButton({
   if (success) {
     return (
       <div className="space-y-1" data-testid="convert-trial-success">
-        <p className="text-sm font-medium text-slate-900">{success}</p>
-        <p className="text-xs text-slate-600">
+        <p className="text-sm font-medium text-ink">{success}</p>
+        <p className="text-xs text-muted">
           Refresh if billing status does not update within a minute.
         </p>
       </div>
@@ -46,13 +46,13 @@ export function ConvertTrialNowButton({
   if (confirming) {
     return (
       <div
-        className="space-y-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-3"
+        className="space-y-2 rounded-md border border-warning bg-warning-tint px-3 py-3"
         data-testid="convert-trial-confirm"
       >
-        <p className="text-sm font-medium text-amber-950">
+        <p className="text-sm font-medium text-warning">
           Convert to {planLabel} now?
         </p>
-        <p className="text-sm text-amber-950">
+        <p className="text-sm text-warning">
           {capacityIncreasesOnConvert ? (
             <>
               This ends your trial immediately, charges your card today, and
@@ -115,7 +115,7 @@ export function ConvertTrialNowButton({
             Cancel
           </AppButton>
         </div>
-        {error ? <p className="text-sm text-red-700">{error}</p> : null}
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
       </div>
     );
   }
@@ -134,14 +134,14 @@ export function ConvertTrialNowButton({
       >
         Convert to {planLabel} now
       </AppButton>
-      <p className="text-xs text-slate-600">
+      <p className="text-xs text-muted">
         {capacityIncreasesOnConvert
           ? `Charges your card today and starts the ${planLabel} billing cycle immediately${
               paidCompanyCapacityLabel ? ` (${paidCompanyCapacityLabel})` : ""
             }.`
           : `Ends the trial and starts ${planLabel} billing today. Research capacity stays the same.`}
       </p>
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
     </div>
   );
 }

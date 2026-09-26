@@ -10,6 +10,7 @@ import { WHY_THIS_COMPANY_TARGET_KEY } from "@/lib/consultation/contract";
 import { planQuestionRound } from "@/lib/consultation/questions";
 import {
   applicationResearchCopy,
+  applicationStepList,
   consultationConversationCopy,
   hiringTeamConfig,
   workspaceJobCopy,
@@ -84,30 +85,22 @@ describe("seeker-facing progress copy", () => {
 
 describe("workspace order and Harper start", () => {
   it("keeps the required workspace order", () => {
+    expect(applicationStepList.map((step) => step.key)).toEqual([
+      "company",
+      "job",
+      "hiring-team",
+      "assets",
+      "outreach",
+      "interviews",
+      "summary",
+      "applied",
+    ]);
     const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
-    const next = workspace.indexOf('data-testid="application-next-step"');
-    const company = workspace.indexOf('id="company"');
-    const job = workspace.indexOf('data-testid="application-workspace"');
-    const fit = workspace.indexOf('id="employer-fit"');
-    const hiring = workspace.indexOf("<HiringTeamSection");
-    const consult = workspace.indexOf("<ConsultationSection");
-    const assets = workspace.indexOf('id="assets"');
-    const contacts = workspace.indexOf('id="contacts"');
-    const outreach = workspace.indexOf('id="outreach"');
-    const applied = workspace.indexOf("application-applied-wrap");
-    const interviews = workspace.indexOf('id="interviews"');
-    const summary = workspace.indexOf('id="application-summary"');
-    expect(next).toBeLessThan(company);
-    expect(company).toBeLessThan(job);
-    expect(job).toBeLessThan(fit);
-    expect(fit).toBeLessThan(hiring);
-    expect(hiring).toBeLessThan(consult);
-    expect(consult).toBeLessThan(assets);
-    expect(assets).toBeLessThan(contacts);
-    expect(contacts).toBeLessThan(outreach);
-    expect(outreach).toBeLessThan(applied);
-    expect(applied).toBeLessThan(interviews);
-    expect(interviews).toBeLessThan(summary);
+    const chrome = readFileSync("src/components/ApplicationWorkspaceChrome.tsx", "utf8");
+    const layout = readFileSync("src/app/(app)/campaigns/[id]/layout.tsx", "utf8");
+    expect(chrome).toContain("HarperDock");
+    expect(layout).toContain('layout="dock"');
+    expect(workspace).not.toContain("<ConsultationSection");
     expect(workspace).toContain("addHiringTeamPersonAction");
     expect(workspace).toContain("hiringTeamConfig.actions.edit");
     expect(workspace).not.toContain('name="reason"');

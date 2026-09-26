@@ -61,7 +61,7 @@ export function ScoreContactsPanel({
       </div>
 
       {!canScore ? (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p className="rounded-md border border-warning bg-warning-tint px-3 py-2 text-sm text-warning">
           Scoring cannot run until required AI roles are configured
           {readiness.unconfiguredRoleLabels.length > 0
             ? `: ${readiness.unconfiguredRoleLabels.join(", ")}`
@@ -71,7 +71,7 @@ export function ScoreContactsPanel({
       ) : null}
 
       {incompleteResearch ? (
-        <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+        <p className="rounded-md border border-edge bg-canvas px-3 py-2 text-sm text-ink">
           Some companies have no usable research. Scoring will mark unsupported
           facts as unknown rather than inventing them.
         </p>
@@ -97,7 +97,7 @@ export function ScoreContactsPanel({
       </div>
 
       {message ? (
-        <p className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+        <p className="rounded-md border border-edge bg-surface px-3 py-2 text-sm text-ink">
           {message}
         </p>
       ) : null}
@@ -107,9 +107,9 @@ export function ScoreContactsPanel({
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-0.5 text-lg font-semibold text-slate-900">{value}</p>
+    <div className="rounded-md border border-edge bg-canvas px-3 py-2">
+      <p className="text-xs text-subtle">{label}</p>
+      <p className="mt-0.5 text-lg font-semibold text-ink">{value}</p>
     </div>
   );
 }

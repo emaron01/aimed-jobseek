@@ -53,7 +53,7 @@ export default async function IcpsPage({
           ) : (
             <span
               title={`Add ${vocab.product.aSingular} first`}
-              className="inline-flex cursor-not-allowed items-center justify-center rounded-md bg-slate-300 px-3.5 py-2 text-sm font-medium text-slate-500"
+              className="inline-flex cursor-not-allowed items-center justify-center rounded-md bg-edge-strong px-3.5 py-2 text-sm font-medium text-subtle"
             >
               New {vocab.icp.singular}
             </span>
@@ -96,9 +96,9 @@ export default async function IcpsPage({
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-slate-500">
+        <div className="overflow-hidden rounded-lg border border-edge bg-surface">
+          <table className="min-w-full divide-y divide-edge text-sm">
+            <thead className="bg-canvas text-left text-subtle">
               <tr>
                 <th className="px-4 py-3 font-medium">{vocab.icp.singular}</th>
                 <th className="px-4 py-3 font-medium">{vocab.product.Singular}</th>
@@ -108,7 +108,7 @@ export default async function IcpsPage({
             <tbody className="divide-y divide-slate-100">
               {icps.map((icp) => (
                 <tr key={icp.id}>
-                  <td className="px-4 py-3 font-medium text-slate-900">
+                  <td className="px-4 py-3 font-medium text-ink">
                     <Link
                       href={`/setup/${icp.productId}/icps/${icp.id}`}
                       className="hover:underline"
@@ -116,13 +116,13 @@ export default async function IcpsPage({
                       {icp.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-4 py-3 text-muted">
                     {productNameById.get(icp.productId) ?? "—"}
                   </td>
                   <td className="px-4 py-3">
                     <Link
                       href={`/setup/${icp.productId}/icps/${icp.id}`}
-                      className="text-slate-700 underline"
+                      className="text-ink underline"
                     >
                       Manage
                     </Link>

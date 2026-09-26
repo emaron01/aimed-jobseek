@@ -33,7 +33,7 @@ export default async function PlatformOrgsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">
             Organizations
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-muted">
             {canMutate
               ? "SUPER_ADMIN — create accounts, policy, suspend, credits, members."
               : "SUPPORT — scoped read-only view. Mutations require SUPER_ADMIN."}
@@ -51,7 +51,7 @@ export default async function PlatformOrgsPage() {
 
       {purgeEligible.length > 0 ? (
         <div
-          className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          className="rounded-lg border border-warning bg-warning-tint px-4 py-3 text-sm text-warning"
           data-testid="platform-orgs-purge-eligible"
         >
           <p className="font-medium">
@@ -59,7 +59,7 @@ export default async function PlatformOrgsPage() {
             {purgeEligible.length === 1 ? "" : "s"} eligible for {vocab.contact.singular} data
             purge
           </p>
-          <p className="mt-1 text-amber-900">
+          <p className="mt-1 text-warning">
             Highlighted below. Open the org detail page to run Delete {vocab.contact.singular} and{" "}
             {vocab.outreach.singular} data. Also listed on{" "}
             <Link href="/platform" className="font-medium underline">
@@ -70,9 +70,9 @@ export default async function PlatformOrgsPage() {
         </div>
       ) : null}
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-edge bg-surface">
         <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+          <thead className="border-b border-edge bg-canvas text-xs uppercase tracking-wide text-subtle">
             <tr>
               <th className="px-3 py-2 font-medium">Name</th>
               <th className="px-3 py-2 font-medium">Type</th>
@@ -93,24 +93,24 @@ export default async function PlatformOrgsPage() {
               return (
                 <tr
                   key={org.id}
-                  className={`border-b border-slate-100 last:border-0 ${
-                    purge ? "bg-amber-50/70" : ""
+                  className={`border-b border-edge last:border-0 ${
+                    purge ? "bg-warning-tint/70" : ""
                   }`}
                 >
                   <td className="px-3 py-2">
                     <Link
                       href={`/platform/orgs/${org.id}`}
-                      className="font-medium text-slate-900 underline"
+                      className="font-medium text-ink underline"
                     >
                       {org.name}
                     </Link>
-                    <div className="text-xs text-slate-500">{org.slug}</div>
+                    <div className="text-xs text-subtle">{org.slug}</div>
                   </td>
                   <td className="px-3 py-2">{org.accountType}</td>
                   <td className="px-3 py-2">{org.status}</td>
                   <td className="px-3 py-2">
                     {billingPlanLabel(org.planCode)}
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-subtle">
                       {billingStatusLabel(org.billingStatus)}
                     </div>
                   </td>
@@ -127,7 +127,7 @@ export default async function PlatformOrgsPage() {
                   <td className="px-3 py-2">{formatDate(org.lastActiveAt)}</td>
                   <td className="px-3 py-2 text-xs">
                     {purge ? (
-                      <span className="font-medium text-amber-950">
+                      <span className="font-medium text-warning">
                         Eligible {formatDate(purge.eligibleAt)}
                       </span>
                     ) : (
@@ -141,7 +141,7 @@ export default async function PlatformOrgsPage() {
               <tr>
                 <td
                   colSpan={11}
-                  className="px-3 py-6 text-center text-slate-500"
+                  className="px-3 py-6 text-center text-subtle"
                 >
                   No organizations yet.
                 </td>

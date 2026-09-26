@@ -37,9 +37,9 @@ export function AcceptInviteClient({
   if (!emailMatches) {
     return (
       <div className="space-y-4" data-testid="invite-accept-email-mismatch">
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-ink">
           This invitation is for{" "}
-          <span className="font-medium text-slate-900">{invitedEmail}</span>
+          <span className="font-medium text-ink">{invitedEmail}</span>
           {organizationName ? (
             <>
               {" "}
@@ -47,9 +47,9 @@ export function AcceptInviteClient({
             </>
           ) : null}
           . You are signed in as{" "}
-          <span className="font-medium text-slate-900">{signedInEmail}</span>.
+          <span className="font-medium text-ink">{signedInEmail}</span>.
         </p>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           Sign out, then create an account (or sign in) as{" "}
           <span className="font-medium">{invitedEmail}</span> to join{" "}
           <span className="font-medium">{organizationName}</span>.
@@ -64,7 +64,7 @@ export function AcceptInviteClient({
             Sign out and continue
           </AppButton>
         </form>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           After sign-out, choose{" "}
           <Link
             href={`/signup?next=${encodeURIComponent(returnTo)}&email=${encodeURIComponent(invitedEmail)}&company=${encodeURIComponent(organizationName)}`}
@@ -80,10 +80,10 @@ export function AcceptInviteClient({
 
   return (
     <div className="space-y-4" data-testid="invite-accept-form">
-      <p className="text-sm text-slate-600">
-        Signed in as <span className="font-medium text-slate-900">{signedInEmail}</span>.
+      <p className="text-sm text-muted">
+        Signed in as <span className="font-medium text-ink">{signedInEmail}</span>.
         Accept to join{" "}
-        <span className="font-medium text-slate-900">{organizationName}</span>.
+        <span className="font-medium text-ink">{organizationName}</span>.
       </p>
       <form action={formAction}>
         <input type="hidden" name="token" value={token} />
@@ -97,7 +97,7 @@ export function AcceptInviteClient({
         </AppButton>
       </form>
       {state && !state.ok ? (
-        <p className="text-sm text-red-600" role="alert">
+        <p className="text-sm text-danger" role="alert">
           {state.message}
         </p>
       ) : null}

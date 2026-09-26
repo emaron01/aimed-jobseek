@@ -705,9 +705,9 @@ export function EmailSequenceWorkspace({
   return (
     <>
       <div className="text-sm">
-        <p className="font-medium text-slate-900">{contactName}</p>
-        <p className="text-slate-600">{contactDetails}</p>
-        <p className="text-slate-500">{contactEmail ?? "No email address"}</p>
+        <p className="font-medium text-ink">{contactName}</p>
+        <p className="text-muted">{contactDetails}</p>
+        <p className="text-subtle">{contactEmail ?? "No email address"}</p>
         <div className="mt-3">
           <SuppressContactForm
             contactId={contactId}
@@ -716,34 +716,34 @@ export function EmailSequenceWorkspace({
           />
         </div>
         {readOnly ? (
-          <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <p className="mt-3 rounded-md border border-warning bg-warning-tint px-3 py-2 text-xs text-warning">
             This {vocab.campaign.singular} is archived and read-only.
           </p>
         ) : null}
         {suppressed ? (
-          <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <p className="mt-3 rounded-md border border-warning bg-warning-tint px-3 py-2 text-xs text-warning">
             This address is opted out organization-wide. Restore it before
             generating or sending email.
           </p>
         ) : null}
         <dl className="mt-3">
-          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <dt className="text-xs font-medium uppercase tracking-wide text-subtle">
             {vocab.contact.Singular} status
           </dt>
-          <dd className="mt-1 text-sm text-slate-900">{contactStatus}</dd>
+          <dd className="mt-1 text-sm text-ink">{contactStatus}</dd>
         </dl>
 
-        <div className="mt-5 border-t border-slate-200 pt-4">
+        <div className="mt-5 border-t border-edge pt-4">
           {drafts.some((draft) => draft.status === "SENT") ? (
             <p
-              className="mb-3 flex gap-2 rounded-md border border-slate-400 bg-slate-200 px-3 py-2 text-xs text-slate-800"
+              className="mb-3 flex gap-2 rounded-md border border-edge-strong bg-edge px-3 py-2 text-xs text-ink"
               data-testid="sequence-reply-guidance"
             >
               <svg
                 aria-hidden="true"
                 viewBox="0 0 20 20"
                 fill="currentColor"
-                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-600"
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted"
               >
                 <path
                   fillRule="evenodd"
@@ -758,7 +758,7 @@ export function EmailSequenceWorkspace({
               </span>
             </p>
           ) : null}
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <p className="text-xs font-medium uppercase tracking-wide text-subtle">
             {vocab.sequence.Singular}
           </p>
           <div className="mt-2 space-y-2">
@@ -778,8 +778,8 @@ export function EmailSequenceWorkspace({
                   }}
                   className={`group flex w-full cursor-pointer items-center justify-between rounded-md border px-3 py-2 text-left text-xs transition ${
                     isSelected
-                      ? "border-slate-900 bg-slate-100 shadow-sm"
-                      : "border-slate-200 bg-white hover:border-slate-400 hover:bg-slate-50 hover:shadow-sm"
+                      ? "border-ink bg-canvas shadow-sm"
+                      : "border-edge bg-surface hover:border-edge-strong hover:bg-canvas hover:shadow-sm"
                   }`}
                 >
                   <span>
@@ -789,8 +789,8 @@ export function EmailSequenceWorkspace({
                     <span
                       className={
                         draft.status === "SENT"
-                          ? "text-emerald-700"
-                          : "text-amber-700"
+                          ? "text-success"
+                          : "text-warning"
                       }
                     >
                       {draft.status}
@@ -801,8 +801,8 @@ export function EmailSequenceWorkspace({
                   <span
                     className={
                       isSelected
-                        ? "font-medium text-slate-700"
-                        : "font-medium text-slate-600 underline decoration-slate-300 underline-offset-2 group-hover:decoration-slate-600"
+                        ? "font-medium text-ink"
+                        : "font-medium text-muted underline decoration-edge-strong underline-offset-2 group-hover:decoration-muted"
                     }
                   >
                     {isSelected
@@ -829,23 +829,23 @@ export function EmailSequenceWorkspace({
                 ),
               )
             }
-            className={cn(SECONDARY_BUTTON_CLASS, "mt-3", "disabled:border-slate-200", "disabled:bg-slate-50", "disabled:text-slate-400", "!px-3")}
+            className={cn(SECONDARY_BUTTON_CLASS, "mt-3", "disabled:border-edge", "disabled:bg-canvas", "disabled:text-subtle", "!px-3")}
           >
             + Add email to {vocab.sequence.singular}
           </AppButton>
           {!canAdd ? (
-            <p className="mt-1 text-xs text-slate-500">{addDisabledReason}</p>
+            <p className="mt-1 text-xs text-subtle">{addDisabledReason}</p>
           ) : null}
         </div>
       </div>
 
       <div className="space-y-3">
         {displayWarnings.length > 0 ? (
-          <div className="rounded-md border border-amber-300 bg-amber-50 p-3">
-            <p className="text-sm font-medium text-amber-900">
+          <div className="rounded-md border border-warning bg-warning-tint p-3">
+            <p className="text-sm font-medium text-warning">
               Offer validation notes
             </p>
-            <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-amber-900">
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-warning">
               {displayWarnings.map((warning) => (
                 <li key={`${warning.code}-${warning.message}`}>
                   {warning.message}
@@ -857,10 +857,10 @@ export function EmailSequenceWorkspace({
 
         {selected?.staleReasons && selected.staleReasons.length > 0 ? (
           <div
-            className="rounded-md border border-amber-300 bg-amber-50 p-3"
+            className="rounded-md border border-warning bg-warning-tint p-3"
             data-testid="email-draft-stale-marker"
           >
-            <p className="text-sm text-amber-950">
+            <p className="text-sm text-warning">
               {formatDraftStalenessMessage(selected.staleReasons)}
             </p>
           </div>
@@ -871,16 +871,16 @@ export function EmailSequenceWorkspace({
             <p
               className={
                 !result.ok
-                  ? "text-sm text-red-600"
+                  ? "text-sm text-danger"
                   : result.claimConflicts && result.claimConflicts.length > 0
-                    ? "text-sm text-amber-800"
-                    : "text-sm text-emerald-700"
+                    ? "text-sm text-warning"
+                    : "text-sm text-success"
               }
             >
               {result.message}
             </p>
             {result.claimConflicts && result.claimConflicts.length > 0 ? (
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-900">
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-warning">
                 {(result.claimConflicts ?? []).map((conflict, index) => (
                   <li key={`${conflict.type}-${index}`}>
                     {conflict.description}
@@ -892,7 +892,7 @@ export function EmailSequenceWorkspace({
               </ul>
             ) : null}
             {result.referralSuggested ? (
-              <p className="mt-1 text-xs font-medium text-amber-700">
+              <p className="mt-1 text-xs font-medium text-warning">
                 Referral detected. A new {vocab.contact.singular} may need to be added; no
                 {vocab.contact.singular} was created automatically.
               </p>
@@ -901,7 +901,7 @@ export function EmailSequenceWorkspace({
             result.recoveryAction === "ASK_ADMIN" ? (
               <a
                 href="/settings/email"
-                className="mt-2 inline-block text-sm font-medium text-slate-900 underline"
+                className="mt-2 inline-block text-sm font-medium text-ink underline"
               >
                 Open email connection settings
               </a>
@@ -909,31 +909,31 @@ export function EmailSequenceWorkspace({
           </div>
         ) : null}
 
-        <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+        <div className="space-y-3 rounded-md border border-edge bg-canvas p-3">
           <div data-testid="personalization-tier">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <p className="text-xs font-medium uppercase tracking-wide text-subtle">
               Personalization inputs
             </p>
-            <p className="mt-1 text-sm font-medium text-slate-900">
+            <p className="mt-1 text-sm font-medium text-ink">
               {personalizationLabel}
             </p>
-            <p className="mt-1 text-xs text-slate-700">
+            <p className="mt-1 text-xs text-ink">
               {selected?.personalizationSources ?? personalizationSources}
             </p>
-            <p className="mt-1 text-xs text-slate-500">{personalizationDetail}</p>
+            <p className="mt-1 text-xs text-subtle">{personalizationDetail}</p>
           </div>
           <fieldset data-testid="email-length">
-            <legend className="text-sm font-medium text-slate-700">
+            <legend className="text-sm font-medium text-ink">
               Length for this email
             </legend>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-subtle">
               {vocab.campaign.Singular} default is {emailLengthLabel(campaignEmailLength)}.
             </p>
             <div className="mt-2 flex flex-wrap gap-3">
               {EMAIL_LENGTH_OPTIONS.map((value) => (
                 <label
                   key={value}
-                  className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+                  className="flex items-center gap-2 rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink"
                 >
                   <input
                     type="radio"
@@ -954,11 +954,11 @@ export function EmailSequenceWorkspace({
           <div data-testid="resolved-persona">
             {needsPersonaConfirmation ? (
               <div
-                className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+                className="mb-3 rounded-md border border-warning bg-warning-tint px-3 py-2 text-sm text-warning"
                 data-testid="persona-confirmation-prompt"
               >
                 <p className="font-medium">This {vocab.contact.singular} needs {vocab.persona.aSingular}</p>
-                <p className="mt-1 text-xs text-amber-900">
+                <p className="mt-1 text-xs text-warning">
                   {personaDecisionReason ??
                     `No ${vocab.persona.singular} was matched during scoring.`}
                   {suggestedPersonaName
@@ -968,15 +968,15 @@ export function EmailSequenceWorkspace({
               </div>
             ) : null}
             <label className="block text-sm">
-              <span className="font-medium text-slate-700">{vocab.persona.Singular} for this email</span>
+              <span className="font-medium text-ink">{vocab.persona.Singular} for this email</span>
               {resolvedPersonaName && !needsPersonaConfirmation ? (
-                <span className="mt-1 block text-xs text-slate-500">
+                <span className="mt-1 block text-xs text-subtle">
                   {hasPersonaDecision && resolvedPersonaId
                     ? `Resolved ${vocab.persona.singular}: ${resolvedPersonaName}. Change before generating if needed.`
                     : null}
                 </span>
               ) : needsPersonaConfirmation ? (
-                <span className="mt-1 block text-xs text-slate-500">
+                <span className="mt-1 block text-xs text-subtle">
                   Confirm which {vocab.persona.singular} applies before generating.
                 </span>
               ) : null}
@@ -984,7 +984,7 @@ export function EmailSequenceWorkspace({
                 value={selectedPersonaId}
                 onChange={(event) => setSelectedPersonaId(event.target.value)}
                 disabled={editorsLocked || personaOptions.length === 0}
-                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink"
               >
                 {personaOptions.length === 0 ? (
                   <option value="">No {vocab.persona.plural} available</option>
@@ -1027,7 +1027,7 @@ export function EmailSequenceWorkspace({
               <AppButton
                 type="button"
                 onClick={() => setSelectedId(latest?.id ?? null)}
-                className="text-sm font-medium text-slate-700 underline"
+                className="text-sm font-medium text-ink underline"
               >
                 Return to current draft
               </AppButton>
@@ -1036,23 +1036,23 @@ export function EmailSequenceWorkspace({
             <article
               className={`rounded-md border p-4 ${
                 selected.status === "SENT"
-                  ? "border-slate-200 bg-slate-50"
-                  : "border-slate-400 bg-white shadow-sm"
+                  ? "border-edge bg-canvas"
+                  : "border-edge-strong bg-surface shadow-sm"
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                <p className="text-xs font-medium uppercase tracking-wide text-subtle">
                   Email {selected.sequenceNumber} · {selected.kind}
                 </p>
-                <span className="text-xs font-medium text-slate-600">
+                <span className="text-xs font-medium text-muted">
                   {selected.status}
                 </span>
               </div>
-              <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">
+              <p className="mt-3 text-xs font-medium uppercase tracking-wide text-subtle">
                 Subject
               </p>
               {selected.status === "SENT" || selected.status === "SENDING" ? (
-                <p className="mt-1 text-sm font-medium text-slate-900">
+                <p className="mt-1 text-sm font-medium text-ink">
                   {selected.subject}
                 </p>
               ) : (
@@ -1064,14 +1064,14 @@ export function EmailSequenceWorkspace({
                   }
                   maxLength={EMAIL_SUBJECT_MAX_CHARS}
                   disabled={editorsLocked}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-900"
+                  className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm font-medium text-ink"
                 />
               )}
-              <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">
+              <p className="mt-3 text-xs font-medium uppercase tracking-wide text-subtle">
                 Body
               </p>
               {selected.status === "SENT" || selected.status === "SENDING" ? (
-                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
+                <p className="mt-1 whitespace-pre-wrap text-sm text-ink">
                   {selected.body}
                 </p>
               ) : (
@@ -1083,35 +1083,35 @@ export function EmailSequenceWorkspace({
                   rows={10}
                   maxLength={EMAIL_BODY_MAX_CHARS}
                   disabled={editorsLocked}
-                  className="mt-1 w-full whitespace-pre-wrap rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-800"
+                  className="mt-1 w-full whitespace-pre-wrap rounded-md border border-edge-strong px-3 py-2 text-sm text-ink"
                 />
               )}
               {selected.claimConflicts.length > 0 ? (
-                <div className="mt-4 space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3">
-                  <p className="text-sm font-medium text-amber-950">
+                <div className="mt-4 space-y-3 rounded-md border border-warning bg-warning-tint p-3">
+                  <p className="text-sm font-medium text-warning">
                     Claim conflicts in this draft
                   </p>
-                  <p className="text-xs text-amber-900">
+                  <p className="text-xs text-warning">
                     Model-invented claims were flagged. Sending is still
                     allowed — review the copy if you want to edit it.
                   </p>
-                  <ul className="space-y-2 text-sm text-amber-950">
+                  <ul className="space-y-2 text-sm text-warning">
                     {selected.claimConflicts.map((conflict, index) => (
                       <li
                         key={`${conflict.type}-${conflict.description}-${index}`}
-                        className="rounded border border-amber-200 bg-white/70 px-3 py-2"
+                        className="rounded border border-warning bg-surface/70 px-3 py-2"
                       >
                         <p className="font-medium">
                           {conflict.type.replaceAll("_", " ")}
                         </p>
                         <p className="mt-1">{conflict.description}</p>
                         {conflict.bodyExcerpt ? (
-                          <p className="mt-1 text-xs text-amber-900">
+                          <p className="mt-1 text-xs text-warning">
                             Offending copy: “{conflict.bodyExcerpt}”
                           </p>
                         ) : null}
                         {conflict.matchedGuard ? (
-                          <p className="mt-1 text-xs text-amber-900">
+                          <p className="mt-1 text-xs text-warning">
                             {vocab.product.Singular} restriction: {conflict.matchedGuard}
                           </p>
                         ) : null}
@@ -1123,19 +1123,19 @@ export function EmailSequenceWorkspace({
             </article>
 
             {selected.status === "SENDING" ? (
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-muted">
                 Microsoft send is in progress. This draft is temporarily
                 read-only.
               </p>
             ) : selected.status !== "SENT" ? (
               <div className="space-y-3">
-                <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+                <div className="space-y-3 rounded-md border border-edge bg-canvas p-3">
                   <div>
                     <label className="block text-sm">
-                      <span className="font-medium text-slate-700">
+                      <span className="font-medium text-ink">
                         What should change?
                       </span>
-                      <span className="mt-0.5 block text-xs text-slate-500">
+                      <span className="mt-0.5 block text-xs text-subtle">
                         Applies only when you regenerate this draft.
                       </span>
                       <input
@@ -1147,7 +1147,7 @@ export function EmailSequenceWorkspace({
                         maxLength={ADDITIONAL_GUIDANCE_MAX_CHARS}
                         disabled={aiBusy}
                         placeholder="Use a more direct tone and ask for a reply"
-                        className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                        className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm"
                       />
                     </label>
                     <EmailGuidancePromptExamples />
@@ -1172,7 +1172,7 @@ export function EmailSequenceWorkspace({
                 </div>
                 {persistFailure ? (
                   <div
-                    className="space-y-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-950"
+                    className="space-y-2 rounded-md border border-warning bg-warning-tint px-3 py-3 text-sm text-warning"
                     data-testid="draft-persist-failure"
                   >
                     <p className="font-medium">
@@ -1185,7 +1185,7 @@ export function EmailSequenceWorkspace({
                       type="button"
                       disabled={saving}
                       onClick={retryFailedPersist}
-                      className="rounded-md border border-amber-400 bg-white px-3 py-1.5 text-sm font-medium text-amber-950"
+                      className="rounded-md border border-warning bg-surface px-3 py-1.5 text-sm font-medium text-warning"
                     >
                       {saving ? "Saving…" : "Retry save"}
                     </AppButton>
@@ -1196,14 +1196,14 @@ export function EmailSequenceWorkspace({
                     type="button"
                     disabled={saving || sendBusy !== null}
                     onClick={saveDraft}
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium"
+                    className="rounded-md border border-edge-strong px-3 py-2 text-sm font-medium"
                   >
                     {saving ? "Saving…" : "Save draft"}
                   </AppButton>
                   {saving ? (
-                    <span className="text-xs text-slate-500">Saving…</span>
+                    <span className="text-xs text-subtle">Saving…</span>
                   ) : dirty ? (
-                    <span className="text-xs text-slate-500">Unsaved edits</span>
+                    <span className="text-xs text-subtle">Unsaved edits</span>
                   ) : null}
                   {EMAIL_CLIENT_OPTIONS.map((option) => (
                     <AppButton
@@ -1216,7 +1216,7 @@ export function EmailSequenceWorkspace({
                           : `Add an email address to this ${vocab.contact.singular} first.`
                       }
                       onClick={() => openInEmailClient(option.client)}
-                      className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:text-slate-400"
+                      className="rounded-md border border-edge-strong px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:text-subtle"
                     >
                       Open in {option.label}
                     </AppButton>
@@ -1234,7 +1234,7 @@ export function EmailSequenceWorkspace({
                         : "Connect Microsoft 365 in Email connection settings first."
                     }
                     onClick={sendConnected}
-                    className="rounded-md bg-blue-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                    className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-on-ink disabled:cursor-not-allowed disabled:bg-edge-strong"
                   >
                     {sendBusy === "connected"
                       ? "Sending…"
@@ -1255,7 +1255,7 @@ export function EmailSequenceWorkspace({
                 {features.emailConnection && mailboxConnection?.status !== "CONNECTED" ? (
                   <a
                     href="/settings/email"
-                    className="text-xs font-medium text-slate-700 underline"
+                    className="text-xs font-medium text-ink underline"
                   >
                     {mailboxConnection?.status === "RECONNECT_REQUIRED"
                       ? "Reconnect Microsoft 365 to send directly"
@@ -1265,18 +1265,18 @@ export function EmailSequenceWorkspace({
                 {features.emailConnection && !emailSignature ? (
                   <a
                     href="/settings/email"
-                    className="text-xs font-medium text-slate-700 underline"
+                    className="text-xs font-medium text-ink underline"
                   >
                     Add a signature — it is appended on send and when you open
                     Outlook or Gmail
                   </a>
                 ) : null}
                 {dailySendUsage.used >= dailySendUsage.warningLimit ? (
-                  <p className="text-xs font-medium text-amber-700">
+                  <p className="text-xs font-medium text-warning">
                     {formatDailySendAdvisory(dailySendUsage.used)}
                   </p>
                 ) : null}
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-subtle">
                   Mark as sent records your assertion that you sent the email.
                   It is not a delivery confirmation. Connected Microsoft 365
                   send is confirmed automatically.
@@ -1284,7 +1284,7 @@ export function EmailSequenceWorkspace({
               </div>
             ) : (
               <div className="space-y-2">
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-subtle">
                   Sent emails are read-only.
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -1299,7 +1299,7 @@ export function EmailSequenceWorkspace({
                           : `Add an email address to this ${vocab.contact.singular} first.`
                       }
                       onClick={() => openInEmailClient(option.client)}
-                      className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:text-slate-400"
+                      className="rounded-md border border-edge-strong px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:text-subtle"
                     >
                       Open in {option.label}
                     </AppButton>
@@ -1313,7 +1313,7 @@ export function EmailSequenceWorkspace({
                         : `Open a sent email in this ${vocab.sequence.singular} to draft a reply.`
                     }
                     onClick={() => setShowReplyBox((value) => !value)}
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:text-slate-400"
+                    className="rounded-md border border-edge-strong px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:text-subtle"
                   >
                     Draft reply
                   </AppButton>
@@ -1334,9 +1334,9 @@ export function EmailSequenceWorkspace({
                     }
                     className={cn(
                       SECONDARY_BUTTON_CLASS,
-                      "disabled:border-slate-200",
-                      "disabled:bg-slate-50",
-                      "disabled:text-slate-400",
+                      "disabled:border-edge",
+                      "disabled:bg-canvas",
+                      "disabled:text-subtle",
                       "!px-3",
                     )}
                   >
@@ -1353,7 +1353,7 @@ export function EmailSequenceWorkspace({
                           router.refresh();
                         })
                       }
-                      className="rounded-md border border-rose-200 px-3 py-2 text-sm font-medium text-rose-800"
+                      className="rounded-md border border-danger px-3 py-2 text-sm font-medium text-danger"
                     >
                       Stop {vocab.sequence.singular}
                     </AppButton>
@@ -1370,7 +1370,7 @@ export function EmailSequenceWorkspace({
                           router.refresh();
                         })
                       }
-                      className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium"
+                      className="rounded-md border border-edge-strong px-3 py-2 text-sm font-medium"
                     >
                       Restore {vocab.sequence.singular}
                     </AppButton>
@@ -1380,13 +1380,13 @@ export function EmailSequenceWorkspace({
             )}
 
             {showReplyBox && selected.status === "SENT" ? (
-              <div className="space-y-2 rounded-md border border-slate-200 p-3">
-                <p className="text-xs text-slate-600">
+              <div className="space-y-2 rounded-md border border-edge p-3">
+                <p className="text-xs text-muted">
                   They replied — cadence stops when you submit. Reply drafts are
                   copy-only; this app does not send replies from your mailbox.
                 </p>
                 <label className="block text-sm">
-                  <span className="font-medium text-slate-700">
+                  <span className="font-medium text-ink">
                     Paste what the {vocab.prospect.singular} wrote
                   </span>
                   <textarea
@@ -1394,7 +1394,7 @@ export function EmailSequenceWorkspace({
                     onChange={(event) => setReplyText(event.target.value)}
                     maxLength={PROSPECT_REPLY_MAX_CHARS}
                     rows={5}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
                   />
                 </label>
                 <AppButton
@@ -1411,7 +1411,7 @@ export function EmailSequenceWorkspace({
             ) : null}
 
             {selected.kind === "REPLY" && selected.status !== "SENT" ? (
-              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+              <p className="rounded-md border border-warning bg-warning-tint px-3 py-2 text-xs text-warning">
                 Copy this reply into your inbox and send it yourself. This app
                 does not send reply emails. Opening in Outlook or Gmail still
                 appends your saved signature.
@@ -1424,19 +1424,19 @@ export function EmailSequenceWorkspace({
       {showSendConfirm ? (
         <div
           data-testid="deeplink-send-confirm"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="deeplink-send-confirm-title"
         >
-          <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-5 shadow-lg">
+          <div className="w-full max-w-sm rounded-lg border border-edge bg-surface p-5 shadow-lg">
             <p
               id="deeplink-send-confirm-title"
-              className="text-center text-base font-semibold text-slate-900"
+              className="text-center text-base font-semibold text-ink"
             >
               Did you send this email?
             </p>
-            <p className="mt-2 text-center text-sm text-slate-600">
+            <p className="mt-2 text-center text-sm text-muted">
               We ask so follow-ups are timed correctly and so you don&apos;t
               email the same person twice.
             </p>

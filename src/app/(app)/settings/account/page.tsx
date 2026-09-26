@@ -24,40 +24,40 @@ export default async function AccountSettingsPage() {
         {organization ? (
           <Link
             href="/settings"
-            className="text-sm text-slate-600 hover:text-slate-900"
+            className="text-sm text-muted hover:text-ink"
           >
             ← Settings
           </Link>
         ) : null}
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink">
           Account Settings
         </h1>
       </div>
 
       <section className="space-y-2 text-sm">
         <p>
-          <span className="text-slate-500">Name:</span> {displayName || "—"}
+          <span className="text-subtle">Name:</span> {displayName || "—"}
         </p>
         <p>
-          <span className="text-slate-500">Email:</span> {user.email}
+          <span className="text-subtle">Email:</span> {user.email}
         </p>
         {user.platformRole === "SUPER_ADMIN" ? (
           <p>
-            <span className="text-slate-500">Platform role:</span> SUPER_ADMIN
+            <span className="text-subtle">Platform role:</span> SUPER_ADMIN
           </p>
         ) : null}
         {organization ? (
           <p>
-            <span className="text-slate-500">Workspace:</span>{" "}
+            <span className="text-subtle">Workspace:</span>{" "}
             {organization.name}
           </p>
         ) : null}
         <p>
-          <span className="text-slate-500">Verification:</span>{" "}
+          <span className="text-subtle">Verification:</span>{" "}
           {verified ? (
-            <span className="text-emerald-700">Verified</span>
+            <span className="text-success">Verified</span>
           ) : (
-            <span className="text-amber-700">
+            <span className="text-warning">
               Unverified —{" "}
               <Link href="/verify-email" className="underline">
                 verify now
@@ -70,7 +70,7 @@ export default async function AccountSettingsPage() {
       {organization ? (
         <section className="space-y-3">
           <h2 className="text-lg font-medium">Daily digest</h2>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             Weekday-morning email when follow-ups are due. Uses your timezone, or
             the organization default ({organization.timezone}).
           </p>
@@ -93,7 +93,7 @@ export default async function AccountSettingsPage() {
                 name="digestSendTimeLocal"
                 defaultValue={user.digestSendTimeLocal}
                 placeholder="08:00"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <label className="text-sm">
@@ -102,7 +102,7 @@ export default async function AccountSettingsPage() {
                 name="timezone"
                 defaultValue={user.timezone ?? ""}
                 placeholder={organization.timezone}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               />
             </label>
             <AppButton
@@ -124,7 +124,7 @@ export default async function AccountSettingsPage() {
         <AppButton
           type="submit"
           data-testid="account-log_out"
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="rounded-md border border-edge-strong px-3 py-2 text-sm"
         >
           Log Out
         </AppButton>

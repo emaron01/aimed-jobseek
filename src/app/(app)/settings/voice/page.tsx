@@ -17,21 +17,21 @@ export default async function VoiceSettingsPage() {
       <div>
         <Link
           href="/settings"
-          className="text-sm text-slate-600 hover:text-slate-900"
+          className="text-sm text-muted hover:text-ink"
         >
           ← Settings
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink">
           Your Voice
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Writing samples are used for email generation. The more samples you
           provide, the more the application incorporates your voice into emails
           so they feel genuine while staying professionally written. Set the
           signature appended on send under{" "}
           <Link
             href="/settings/email"
-            className="font-medium text-slate-900 underline underline-offset-2"
+            className="font-medium text-ink underline underline-offset-2"
           >
             Email signature
           </Link>

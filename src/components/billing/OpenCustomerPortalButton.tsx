@@ -43,11 +43,11 @@ export function OpenCustomerPortalButton() {
       >
         {pending ? "Opening…" : "Manage billing"}
       </AppButton>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-subtle">
         Update your card, cancel, or view invoices in Stripe. You return here
         when finished.
       </p>
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
     </div>
   );
 }

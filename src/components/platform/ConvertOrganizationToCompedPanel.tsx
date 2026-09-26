@@ -41,16 +41,16 @@ export function ConvertOrganizationToCompedPanel({
 
   return (
     <div
-      className="max-w-md space-y-3 rounded-md border border-amber-200 bg-amber-50/60 p-4"
+      className="max-w-md space-y-3 rounded-md border border-warning bg-warning-tint/60 p-4"
       data-testid="platform-convert-to-comped"
     >
       <div>
-        <h3 className="text-sm font-medium text-slate-900">
+        <h3 className="text-sm font-medium text-ink">
           Convert to Comped
         </h3>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Cancel any live Stripe subscription for{" "}
-          <span className="font-medium text-slate-800">{organizationName}</span>,
+          <span className="font-medium text-ink">{organizationName}</span>,
           then set plan to COMPED with durable FREE status and the limits below.
           Conversion is refused if a live subscription would remain.
         </p>
@@ -68,11 +68,11 @@ export function ConvertOrganizationToCompedPanel({
       ) : (
         <form
           action={formAction}
-          className="space-y-3 rounded-md border border-amber-300 bg-white p-3"
+          className="space-y-3 rounded-md border border-warning bg-surface p-3"
           data-testid="platform-convert-to-comped-form"
         >
           <input type="hidden" name="organizationId" value={organizationId} />
-          <p id={titleId} className="text-sm font-semibold text-slate-900">
+          <p id={titleId} className="text-sm font-semibold text-ink">
             Confirm conversion to Comped
           </p>
           <label className="block text-sm">
@@ -83,7 +83,7 @@ export function ConvertOrganizationToCompedPanel({
               min={0}
               required
               defaultValue={defaultCompanyLimit}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
             />
           </label>
           <label className="block text-sm">
@@ -94,7 +94,7 @@ export function ConvertOrganizationToCompedPanel({
               min={0}
               required
               defaultValue={defaultDailySendWarning}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
             />
           </label>
           <label className="block text-sm">
@@ -108,7 +108,7 @@ export function ConvertOrganizationToCompedPanel({
                   ? String(defaultMonthlyEmailLimit)
                   : ""
               }
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
             />
           </label>
           <label className="block text-sm" htmlFor={inputId}>
@@ -120,7 +120,7 @@ export function ConvertOrganizationToCompedPanel({
               value={confirmation}
               onChange={(e) => setConfirmation(e.target.value)}
               autoComplete="off"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
               data-testid="platform-convert-to-comped-confirm"
             />
           </label>
@@ -143,10 +143,10 @@ export function ConvertOrganizationToCompedPanel({
             </button>
           </div>
           {state && !state.ok ? (
-            <p className="text-sm text-red-700">{state.message}</p>
+            <p className="text-sm text-danger">{state.message}</p>
           ) : null}
           {state?.ok ? (
-            <p className="text-sm text-emerald-800">{state.message}</p>
+            <p className="text-sm text-success">{state.message}</p>
           ) : null}
         </form>
       )}

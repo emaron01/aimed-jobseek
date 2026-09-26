@@ -37,7 +37,7 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
     <div className="relative" ref={rootRef}>
       <AppButton
         type="button"
-        className="flex items-center gap-3 rounded-md px-1 py-1 text-left hover:bg-slate-50"
+        className="flex items-center gap-3 rounded-md px-1 py-1 text-left hover:bg-canvas"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
@@ -45,10 +45,10 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
         onClick={() => setOpen((v) => !v)}
       >
         <div className="hidden text-right sm:block">
-          <p className="text-sm font-medium text-slate-900">
+          <p className="text-sm font-medium text-ink">
             {model.displayName || model.email}
           </p>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-subtle">
             {model.organizationName
               ? model.organizationName
               : model.platformRoleLabel
@@ -57,7 +57,7 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
           </p>
         </div>
         <div
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-xs font-semibold text-on-ink"
           aria-hidden
         >
           {model.avatarInitial}
@@ -69,22 +69,22 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
           id={menuId}
           role="menu"
           data-testid="user-menu"
-          className="absolute right-0 z-50 mt-2 w-72 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg"
+          className="absolute right-0 z-50 mt-2 w-72 overflow-hidden rounded-md border border-edge bg-surface shadow-md"
         >
-          <div className="border-b border-slate-100 px-4 py-3">
+          <div className="border-b border-edge px-4 py-3">
             {model.displayName ? (
-              <p className="text-sm font-medium text-slate-900">
+              <p className="text-sm font-medium text-ink">
                 {model.displayName}
               </p>
             ) : null}
-            <p className="truncate text-sm text-slate-600">{model.email}</p>
+            <p className="truncate text-sm text-muted">{model.email}</p>
             {model.organizationName ? (
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-subtle">
                 Workspace: {model.organizationName}
               </p>
             ) : null}
             {model.platformRoleLabel ? (
-              <p className="mt-1 text-xs font-medium text-slate-700">
+              <p className="mt-1 text-xs font-medium text-ink">
                 Role: {model.platformRoleLabel}
               </p>
             ) : null}
@@ -92,10 +92,10 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
 
           {showSwitcher ? (
             <div
-              className="border-b border-slate-100 py-1"
+              className="border-b border-edge py-1"
               data-testid="workspace-switcher"
             >
-              <p className="px-4 py-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
+              <p className="px-4 py-1.5 text-xs font-medium uppercase tracking-wide text-subtle">
                 Workspaces
               </p>
               {model.workspaces.map((ws) =>
@@ -105,10 +105,10 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
                     role="menuitem"
                     aria-current="true"
                     data-testid={`workspace-option-${ws.organizationId}`}
-                    className="flex items-center justify-between px-4 py-2 text-sm text-slate-900"
+                    className="flex items-center justify-between px-4 py-2 text-sm text-ink"
                   >
                     <span className="truncate font-medium">{ws.name}</span>
-                    <span className="ml-2 shrink-0 text-xs text-slate-500">
+                    <span className="ml-2 shrink-0 text-xs text-subtle">
                       Current
                     </span>
                   </div>
@@ -126,7 +126,7 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
                       type="submit"
                       role="menuitem"
                       data-testid={`workspace-option-${ws.organizationId}`}
-                      className="w-full truncate px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                      className="w-full truncate px-4 py-2 text-left text-sm text-ink hover:bg-canvas"
                     >
                       {ws.name}
                     </AppButton>
@@ -149,7 +149,7 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
                   }
                   role="menuitem"
                   data-testid={`user-menu-${link.id}`}
-                  className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  className="block px-4 py-2 text-sm text-ink hover:bg-canvas"
                   onClick={() => setOpen(false)}
                 >
                   {link.label}
@@ -157,13 +157,13 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
               ))}
           </div>
 
-          <div className="border-t border-slate-100 p-1">
+          <div className="border-t border-edge p-1">
             <form action={logoutAction}>
               <AppButton
                 type="submit"
                 role="menuitem"
                 data-testid="user-menu-log_out"
-                className="w-full rounded-sm px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                className="w-full rounded-sm px-3 py-2 text-left text-sm text-ink hover:bg-canvas"
               >
                 Log Out
               </AppButton>

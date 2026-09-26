@@ -14,16 +14,16 @@ export function AiRoleStatusList({
   return (
     <div className="space-y-3">
       {heading ? (
-        <p className="text-sm font-medium text-slate-900">{heading}</p>
+        <p className="text-sm font-medium text-ink">{heading}</p>
       ) : null}
       <ul className="space-y-2">
         {roles.map((role) => {
           const orgDisabled = orgDisabledNotes?.[role.role];
           const tone = orgDisabled
-            ? "border-slate-200 bg-slate-50 text-slate-700"
+            ? "border-edge bg-canvas text-ink"
             : role.configured
-              ? "border-slate-200 bg-slate-50 text-slate-700"
-              : "border-amber-200 bg-amber-50 text-amber-950";
+              ? "border-edge bg-canvas text-ink"
+              : "border-warning bg-warning-tint text-warning";
           const statusLabel = orgDisabled
             ? " — not enabled for this workspace"
             : role.configured

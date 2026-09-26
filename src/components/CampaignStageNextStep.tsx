@@ -21,11 +21,11 @@ export function CampaignStageNextStep({
 
   return (
     <div
-      className="rounded-md border border-slate-300 bg-slate-50 px-4 py-3"
+      className="rounded-md border border-edge-strong bg-canvas px-4 py-3"
       data-testid="campaign-stage-next-step"
     >
-      <p className="text-sm font-semibold text-slate-900">{title}</p>
-      <p className="mt-1 text-sm text-slate-600">{body}</p>
+      <p className="text-sm font-semibold text-ink">{title}</p>
+      <p className="mt-1 text-sm text-muted">{body}</p>
       {isHash ? (
         <a href={href} className={className}>
           {label}

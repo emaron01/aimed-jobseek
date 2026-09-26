@@ -13,7 +13,7 @@ export function SourceMarkers({ numbers }: { numbers: number[] }) {
   const label = formatSourceMarkerLabel(numbers);
   if (!label) return null;
   return (
-    <sup className="research-source-marker ml-0.5 hidden align-super text-[10px] font-medium text-slate-500 print:inline">
+    <sup className="research-source-marker ml-0.5 hidden align-super text-[10px] font-medium text-subtle print:inline">
       {label}
     </sup>
   );
@@ -30,11 +30,11 @@ export function ResearchReadSection({
 }) {
   return (
     <section className="research-read-section space-y-2">
-      <h3 className="text-sm font-semibold tracking-wide text-slate-500 uppercase">
+      <h3 className="text-sm font-semibold tracking-wide text-subtle uppercase">
         {title}
       </h3>
       {empty ? (
-        <p className="text-sm text-slate-500">None recorded from the material.</p>
+        <p className="text-sm text-subtle">None recorded from the material.</p>
       ) : (
         children
       )}
@@ -74,7 +74,7 @@ export function ResearchSourceChip({
         {sources.length > 1 ? ` +${sources.length - 1}` : ""}
       </AppButton>
       <span
-        className={`research-source-chip-print hidden rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600 print:inline ${
+        className={`research-source-chip-print hidden rounded-full border border-edge bg-surface px-2 py-0.5 text-[11px] font-medium text-muted print:inline ${
           open ? "" : ""
         }`}
       >
@@ -84,26 +84,26 @@ export function ResearchSourceChip({
       <span
         className={`research-source-chip-popup ${
           open ? "" : "hidden"
-        } absolute left-0 z-10 mt-1 w-72 rounded-md border border-slate-200 bg-white p-3 text-left text-xs text-slate-700 shadow-sm print:hidden`}
+        } absolute left-0 z-10 mt-1 w-72 rounded-md border border-edge bg-surface p-3 text-left text-xs text-ink shadow-sm print:hidden`}
       >
         {sources.map((source, index) => (
           <span key={source.url} className="block">
             {index > 0 ? (
-              <span className="my-2 block border-t border-slate-100" />
+              <span className="my-2 block border-t border-edge" />
             ) : null}
             <a
               href={source.url}
               target="_blank"
               rel="noreferrer"
-              className="font-medium text-slate-900 underline"
+              className="font-medium text-ink underline"
             >
               {source.title?.trim() || source.url}
             </a>
-            <span className="mt-1 block text-slate-500">
+            <span className="mt-1 block text-subtle">
               {source.sourceType}
               {source.publisher ? ` · ${source.publisher}` : ""}
             </span>
-            <span className="mt-0.5 block break-all text-slate-500">
+            <span className="mt-0.5 block break-all text-subtle">
               {source.url}
             </span>
           </span>
@@ -124,7 +124,7 @@ export function ResearchListItem({
   sourceIndex?: Map<string, number>;
 }) {
   return (
-    <li className="leading-relaxed text-slate-800">
+    <li className="leading-relaxed text-ink">
       {text}
       <ResearchSourceChip sources={sources} sourceIndex={sourceIndex} />
     </li>
@@ -141,7 +141,7 @@ export function ResearchProse({
   sourceIndex?: Map<string, number>;
 }) {
   return (
-    <p className="text-[17px] leading-7 text-slate-800">
+    <p className="text-[17px] leading-7 text-ink">
       {text}
       <ResearchSourceChip sources={sources} sourceIndex={sourceIndex} />
     </p>
@@ -159,31 +159,31 @@ export function ResearchSourcesAppendix({
 }) {
   if (sources.length === 0) return null;
   return (
-    <section className="research-sources-appendix mt-8 border-t border-slate-200 pt-6">
-      <h3 className="text-sm font-semibold tracking-wide text-slate-500 uppercase">
+    <section className="research-sources-appendix mt-8 border-t border-edge pt-6">
+      <h3 className="text-sm font-semibold tracking-wide text-subtle uppercase">
         {title}
       </h3>
-      <ul className="mt-3 space-y-3 text-sm text-slate-700">
+      <ul className="mt-3 space-y-3 text-sm text-ink">
         {sources.map((source) => {
           const number =
             sourceIndex?.get(source.url) ??
             sources.findIndex((row) => row.url === source.url) + 1;
           return (
             <li key={source.url}>
-              <p className="font-medium text-slate-900">
-                <span className="text-slate-500">[{number}]</span>{" "}
+              <p className="font-medium text-ink">
+                <span className="text-subtle">[{number}]</span>{" "}
                 {source.title?.trim() || source.url}
               </p>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-subtle">
                 {source.sourceType}
                 {source.publisher ? ` · ${source.publisher}` : ""}
                 {source.retrievedAt
                   ? ` · Retrieved ${source.retrievedAt.slice(0, 10)}`
                   : ""}
               </p>
-              <p className="break-all text-xs text-slate-600">{source.url}</p>
+              <p className="break-all text-xs text-muted">{source.url}</p>
               {source.supports.length > 0 ? (
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-subtle">
                   Supports: {source.supports.join(", ")}
                 </p>
               ) : null}

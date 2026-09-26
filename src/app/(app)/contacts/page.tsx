@@ -111,15 +111,15 @@ export default async function ContactsPage({ searchParams }: PageProps) {
         }
       />
 
-      <form className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      <form className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-edge bg-surface p-4">
         <label className="block text-sm">
-          <span className="font-medium text-slate-700">
+          <span className="font-medium text-ink">
             {vocab.campaign.Singular}
           </span>
           <select
             name="campaignId"
             defaultValue={campaignId ?? ""}
-            className="mt-1 block min-w-48 rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 block min-w-48 rounded-md border border-edge-strong px-3 py-2 text-sm"
           >
             <option value="">All {vocab.campaign.plural}</option>
             {campaigns.map((campaign) => (
@@ -130,12 +130,12 @@ export default async function ContactsPage({ searchParams }: PageProps) {
           </select>
         </label>
         <label className="block min-w-64 flex-1 text-sm">
-          <span className="font-medium text-slate-700">Search</span>
+          <span className="font-medium text-ink">Search</span>
           <input
             name="q"
             defaultValue={search ?? ""}
             placeholder="Name, email, company, title"
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
           />
         </label>
         <PrimaryButton type="submit">Apply</PrimaryButton>
@@ -154,9 +154,9 @@ export default async function ContactsPage({ searchParams }: PageProps) {
           }
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-slate-500">
+        <div className="overflow-x-auto rounded-lg border border-edge bg-surface">
+          <table className="min-w-full divide-y divide-edge text-sm">
+            <thead className="bg-canvas text-left text-subtle">
               <tr>
                 <th className="px-4 py-3 font-medium">Name</th>
                 {showOwners ? (
@@ -186,7 +186,7 @@ export default async function ContactsPage({ searchParams }: PageProps) {
                 return (
                   <tr key={contact.id}>
                     <td
-                      className="px-4 py-3 font-medium text-slate-900"
+                      className="px-4 py-3 font-medium text-ink"
                       title={emailTitle}
                     >
                       {contactDisplayName(
@@ -194,21 +194,21 @@ export default async function ContactsPage({ searchParams }: PageProps) {
                         contact.lastName,
                       )}
                       {contact.archivedAt ? (
-                        <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                        <span className="ml-2 rounded-full bg-canvas px-2 py-0.5 text-xs font-medium text-muted">
                           Archived
                         </span>
                       ) : null}
                     </td>
                     {showOwners ? (
-                      <td className="px-4 py-3 text-slate-600">
+                      <td className="px-4 py-3 text-muted">
                         {contact.owner.name?.trim() || contact.owner.email}
                       </td>
                     ) : null}
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="px-4 py-3 text-muted">
                       {contact.title ?? "—"}
                       {contact.previousTitle ? (
                         <span
-                          className="mt-1 block text-xs text-slate-400"
+                          className="mt-1 block text-xs text-subtle"
                           title={
                             contact.titleChangedAt
                               ? `Changed ${contact.titleChangedAt.toISOString()}`
@@ -219,31 +219,31 @@ export default async function ContactsPage({ searchParams }: PageProps) {
                         </span>
                       ) : null}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="px-4 py-3 text-muted">
                       {contact.company ?? "—"}
                     </td>
                     {showIndustryColumn ? (
-                      <td className="px-4 py-3 text-slate-600">
+                      <td className="px-4 py-3 text-muted">
                         {contact.industry?.trim() ? contact.industry : "—"}
                       </td>
                     ) : null}
                     {showEmployeesColumn ? (
-                      <td className="px-4 py-3 text-slate-600">
+                      <td className="px-4 py-3 text-muted">
                         {formatNumber(contact.employeeCount)}
                       </td>
                     ) : null}
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="px-4 py-3 text-muted">
                       {campaignLines.length > 0 ? (
                         <ul className="space-y-1">
                           {campaignLines.map((entry) => (
                             <li key={entry.campaignId}>
                               <a
                                 href={`/campaigns/${entry.campaignId}`}
-                                className="font-medium text-slate-800 underline-offset-2 hover:underline"
+                                className="font-medium text-ink underline-offset-2 hover:underline"
                               >
                                 {entry.campaignName}
                               </a>
-                              <span className="block text-xs text-slate-500">
+                              <span className="block text-xs text-subtle">
                                 {entry.line}
                               </span>
                             </li>
@@ -265,7 +265,7 @@ export default async function ContactsPage({ searchParams }: PageProps) {
                           )}
                         />
                       ) : (
-                        <span className="text-xs text-slate-400">—</span>
+                        <span className="text-xs text-subtle">—</span>
                       )}
                     </td>
                   </tr>

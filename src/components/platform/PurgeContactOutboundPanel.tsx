@@ -42,16 +42,16 @@ export function PurgeContactOutboundPanel({
 
   return (
     <div
-      className="max-w-md space-y-3 rounded-md border border-amber-200 bg-amber-50/60 p-4"
+      className="max-w-md space-y-3 rounded-md border border-warning bg-warning-tint/60 p-4"
       data-testid="platform-purge-contact-outbound"
     >
       <div>
-        <h3 className="text-sm font-medium text-slate-900">
+        <h3 className="text-sm font-medium text-ink">
           Delete {vocab.contact.singular} and {vocab.outreach.singular} data
         </h3>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Honour the 30-day cancel retention for{" "}
-          <span className="font-medium text-slate-800">{organizationName}</span>
+          <span className="font-medium text-ink">{organizationName}</span>
           . Removes {vocab.contact.singular}, {vocab.campaign.singular}, and{" "}
           {vocab.outreach.singular} rows; keeps setup and billing.
         </p>
@@ -59,7 +59,7 @@ export function PurgeContactOutboundPanel({
 
       {state?.ok ? (
         <p
-          className="text-sm text-emerald-800"
+          className="text-sm text-success"
           role="status"
           data-testid="platform-purge-contact-outbound-success"
         >
@@ -71,40 +71,40 @@ export function PurgeContactOutboundPanel({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="rounded-md border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-50"
+          className="rounded-md border border-warning bg-surface px-3 py-2 text-sm font-medium text-warning hover:bg-warning-tint"
           data-testid="platform-purge-contact-outbound-open"
         >
           Delete {vocab.contact.singular} and {vocab.outreach.singular} data
         </button>
       ) : (
         <div
-          className="space-y-3 rounded-md border border-amber-400 bg-white p-3"
+          className="space-y-3 rounded-md border border-warning bg-surface p-3"
           role="alertdialog"
           aria-modal="true"
           aria-labelledby={titleId}
           data-testid="platform-purge-contact-outbound-modal"
         >
-          <p id={titleId} className="text-sm font-semibold text-slate-900">
+          <p id={titleId} className="text-sm font-semibold text-ink">
             Confirm {vocab.contact.singular} / {vocab.outbound.singular} purge
           </p>
-          <div className="space-y-2 text-sm text-slate-700">
-            <p className="font-medium text-slate-900">Will be deleted</p>
+          <div className="space-y-2 text-sm text-ink">
+            <p className="font-medium text-ink">Will be deleted</p>
             <ul className="list-disc space-y-0.5 pl-5">
               {summary.deletes.map((line) => (
                 <li key={line}>{line}</li>
               ))}
             </ul>
-            <p className="font-medium text-slate-900">Will be kept</p>
+            <p className="font-medium text-ink">Will be kept</p>
             <ul className="list-disc space-y-0.5 pl-5">
               {summary.keeps.map((line) => (
                 <li key={line}>{line}</li>
               ))}
             </ul>
-            <p className="text-slate-600">This cannot be undone.</p>
+            <p className="text-muted">This cannot be undone.</p>
           </div>
           <form action={formAction} className="space-y-3">
             <input type="hidden" name="organizationId" value={organizationId} />
-            <label htmlFor={inputId} className="block text-sm text-slate-700">
+            <label htmlFor={inputId} className="block text-sm text-ink">
               Type{" "}
               <span className="font-mono font-semibold">
                 {CONTACT_OUTBOUND_PURGE_CONFIRM_PHRASE}
@@ -117,7 +117,7 @@ export function PurgeContactOutboundPanel({
                 onChange={(e) => setConfirmation(e.target.value)}
                 autoComplete="off"
                 spellCheck={false}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm"
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 font-mono text-sm"
                 data-testid="platform-purge-contact-outbound-confirm-input"
               />
             </label>
@@ -125,7 +125,7 @@ export function PurgeContactOutboundPanel({
               <button
                 type="submit"
                 disabled={!matches || pending}
-                className="rounded-md bg-amber-800 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-md bg-warning px-3 py-2 text-sm font-medium text-on-ink disabled:cursor-not-allowed disabled:opacity-50"
                 data-testid="platform-purge-contact-outbound-submit"
               >
                 {pending ? "Purging…" : `Purge ${vocab.contact.singular} data`}
@@ -142,7 +142,7 @@ export function PurgeContactOutboundPanel({
           </form>
           {state && !state.ok ? (
             <p
-              className="text-sm text-red-600"
+              className="text-sm text-danger"
               role="alert"
               data-testid="platform-purge-contact-outbound-error"
             >

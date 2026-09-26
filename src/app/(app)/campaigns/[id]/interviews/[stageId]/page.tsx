@@ -65,10 +65,10 @@ export default async function InterviewGuidePage({ params }: PageProps) {
 
       <div className="print:hidden">
         {view.stale ? (
-          <p className="text-sm text-amber-900">{interviewConfig.labels.staleGuide}</p>
+          <p className="text-sm text-warning">{interviewConfig.labels.staleGuide}</p>
         ) : null}
         {view.stage.guide?.generationError ? (
-          <p role="alert" className="mt-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <p role="alert" className="mt-2 rounded-md border border-danger bg-danger-tint p-3 text-sm text-danger">
             {view.stage.guide.generationError}
           </p>
         ) : null}
@@ -91,35 +91,35 @@ export default async function InterviewGuidePage({ params }: PageProps) {
       </div>
 
       {!content ? (
-        <section className="application-summary-section rounded-lg border border-slate-200 bg-white p-6">
-          <p className="text-sm text-slate-600">
+        <section className="application-summary-section rounded-lg border border-edge bg-surface p-6">
+          <p className="text-sm text-muted">
             Generate the guide after you add interviewers and notes.
           </p>
         </section>
       ) : (
         <>
-          <section className="application-summary-section break-inside-avoid rounded-lg border border-slate-200 bg-white p-6">
-            <h2 className="text-xl font-semibold text-slate-950">Purpose</h2>
-            <p className="mt-3 text-sm text-slate-800">{content.purpose.text}</p>
+          <section className="application-summary-section break-inside-avoid rounded-lg border border-edge bg-surface p-6">
+            <h2 className="text-xl font-semibold text-ink">Purpose</h2>
+            <p className="mt-3 text-sm text-ink">{content.purpose.text}</p>
           </section>
           {content.interviewers.map((interviewer) => (
             <section
               key={interviewer.contactId}
-              className="application-summary-section break-inside-avoid rounded-lg border border-slate-200 bg-white p-6"
+              className="application-summary-section break-inside-avoid rounded-lg border border-edge bg-surface p-6"
             >
-              <h2 className="text-xl font-semibold text-slate-950">
+              <h2 className="text-xl font-semibold text-ink">
                 {interviewer.whoTheyAre.text}
               </h2>
-              <p className="mt-3 text-sm text-slate-800">
+              <p className="mt-3 text-sm text-ink">
                 {interviewer.whatTheyEvaluate.text}
               </p>
-              <h3 className="mt-4 font-medium text-slate-900">Likely questions</h3>
-              <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-slate-800">
+              <h3 className="mt-4 font-medium text-ink">Likely questions</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-ink">
                 {interviewer.likelyQuestions.map((item) => (
                   <li key={item.question.id}>
                     <p>{item.question.text}</p>
-                    <p className="mt-1 text-slate-600">{item.answerMaterial.text}</p>
-                    <p className="mt-2 text-sm text-slate-800">
+                    <p className="mt-1 text-muted">{item.answerMaterial.text}</p>
+                    <p className="mt-2 text-sm text-ink">
                       <span className="font-medium">
                         {interviewConfig.labels.exampleAnswer}:
                       </span>{" "}
@@ -128,39 +128,39 @@ export default async function InterviewGuidePage({ params }: PageProps) {
                   </li>
                 ))}
               </ul>
-              <h3 className="mt-4 font-medium text-slate-900">Questions to ask</h3>
-              <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-slate-800">
+              <h3 className="mt-4 font-medium text-ink">Questions to ask</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-ink">
                 {interviewer.questionsToAsk.map((item) => (
                   <li key={item.id}>{item.text}</li>
                 ))}
               </ul>
             </section>
           ))}
-          <section className="application-summary-section break-inside-avoid rounded-lg border border-slate-200 bg-white p-6">
-            <h2 className="text-xl font-semibold text-slate-950">Talking points</h2>
-            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-800">
+          <section className="application-summary-section break-inside-avoid rounded-lg border border-edge bg-surface p-6">
+            <h2 className="text-xl font-semibold text-ink">Talking points</h2>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-ink">
               {content.talkingPoints.map((item) => (
                 <li key={item.id}>{item.text}</li>
               ))}
             </ul>
           </section>
           {content.chronologicalWalkthrough?.length ? (
-            <section className="application-summary-section break-inside-avoid rounded-lg border border-slate-200 bg-white p-6">
-              <h2 className="text-xl font-semibold text-slate-950">
+            <section className="application-summary-section break-inside-avoid rounded-lg border border-edge bg-surface p-6">
+              <h2 className="text-xl font-semibold text-ink">
                 Chronological walk-through
               </h2>
               <div className="mt-3 space-y-4">
                 {content.chronologicalWalkthrough.map((role) => (
                   <article key={role.roleId}>
-                    <h3 className="font-medium text-slate-900">
+                    <h3 className="font-medium text-ink">
                       {role.title} · {role.employer}
                     </h3>
-                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-800">
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-ink">
                       {role.accomplishments.map((item) => (
                         <li key={item.id}>{item.text}</li>
                       ))}
                     </ul>
-                    <p className="mt-2 text-sm text-slate-700">
+                    <p className="mt-2 text-sm text-ink">
                       {role.reasonUnknown
                         ? interviewConfig.leaveReasonUnknownLabel
                         : role.reasonForLeaving}

@@ -97,14 +97,14 @@ export function CompanyResearchBriefing({
       data-print-document
       data-testid="company-research-briefing"
     >
-      <header className="space-y-2 border-b border-slate-200 pb-4">
-        <h2 className="text-xl font-semibold text-slate-900 print:text-2xl">
+      <header className="space-y-2 border-b border-edge pb-4">
+        <h2 className="text-xl font-semibold text-ink print:text-2xl">
           {companyName}
         </h2>
         {metaLine ? (
-          <p className="text-sm text-slate-600">{metaLine}</p>
+          <p className="text-sm text-muted">{metaLine}</p>
         ) : null}
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-subtle">
           Research status: {researchStatus}
           {researchMethod ? ` · ${researchMethod}` : ""}
         </p>
@@ -112,7 +112,7 @@ export function CompanyResearchBriefing({
 
       {identityAmbiguous ? (
         <div
-          className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"
+          className="rounded-md border border-warning bg-warning-tint p-4 text-sm text-warning"
           role="status"
           data-testid="company-identity-warning"
         >
@@ -135,13 +135,13 @@ export function CompanyResearchBriefing({
 
       <div>
         <p
-          className="text-base text-slate-800"
+          className="text-base text-ink"
           data-testid="company-source-lead"
         >
           {sourceLead.sentence}
         </p>
         {sourceLead.names.length > 0 ? (
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-subtle">
             {sourceLead.names.join(" · ")}
           </p>
         ) : null}
@@ -165,10 +165,10 @@ export function CompanyResearchBriefing({
 
       {editing ? (
         <div
-          className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+          className="rounded-lg border border-edge bg-canvas p-4"
           data-print-hide
         >
-          <h3 className="mb-4 text-sm font-semibold text-slate-900">
+          <h3 className="mb-4 text-sm font-semibold text-ink">
             Edit briefing
           </h3>
           <ManualCompanyResearchForm companyId={companyId} defaults={defaults} />
@@ -207,7 +207,7 @@ export function CompanyResearchBriefing({
           >
             {customerTypes.length > 0 ? (
               <div>
-                <p className="text-sm font-medium text-slate-600">
+                <p className="text-sm font-medium text-muted">
                   Customer types
                 </p>
                 <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px]">
@@ -228,7 +228,7 @@ export function CompanyResearchBriefing({
             ) : null}
             {primaryMarkets.length > 0 ? (
               <div>
-                <p className="text-sm font-medium text-slate-600">
+                <p className="text-sm font-medium text-muted">
                   Primary markets
                 </p>
                 <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px]">
@@ -315,7 +315,7 @@ export function CompanyResearchBriefing({
           >
             {buyingSignals.length > 0 ? (
               <div>
-                <p className="text-sm font-medium text-slate-600">
+                <p className="text-sm font-medium text-muted">
                   Buying signals
                 </p>
                 <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px]">
@@ -336,7 +336,7 @@ export function CompanyResearchBriefing({
             ) : null}
             {riskSignals.length > 0 ? (
               <div>
-                <p className="text-sm font-medium text-slate-600">
+                <p className="text-sm font-medium text-muted">
                   Risk signals
                 </p>
                 <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px]">
@@ -358,7 +358,7 @@ export function CompanyResearchBriefing({
           </ResearchReadSection>
         </article>
       ) : (
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           No company intelligence recorded yet. Run research from a scoring run,
           refresh above, or click Edit to add a manual briefing.
         </p>

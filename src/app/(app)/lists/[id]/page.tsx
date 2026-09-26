@@ -158,7 +158,7 @@ export default async function ListDetailPage({
         actions={
           <div className="flex flex-wrap gap-2">
             {readOnly ? (
-              <span className="self-center text-sm font-medium text-slate-600">
+              <span className="self-center text-sm font-medium text-muted">
                 Read-only · owned by{" "}
                 {list.owner.name?.trim() || list.owner.email}
               </span>
@@ -227,7 +227,7 @@ export default async function ListDetailPage({
       />
 
       {listArchived ? (
-        <div className="mb-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <div className="mb-6 rounded-md border border-warning bg-warning-tint px-4 py-3 text-sm text-warning">
           This {vocab.list.singular} is archived and read-only. Unarchive it to score, research, or
           attach it to {vocab.campaign.aSingular}.
         </div>
@@ -239,7 +239,7 @@ export default async function ListDetailPage({
           description={`Research runs once per unique company on this ${vocab.list.singular}. Results appear below grouped by company — qualification scoring stays on the score report.`}
         >
           {readOnly ? (
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted">
               Manager access is read-only. Research can only be started by the
               {vocab.list.singular} owner.
             </p>
@@ -263,7 +263,7 @@ export default async function ListDetailPage({
             }}
             />
           ) : (
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted">
               Company research for this {vocab.list.singular} is not available.
             </p>
           )}
@@ -276,7 +276,7 @@ export default async function ListDetailPage({
           description={`The same ${vocab.list.singular} can be scored multiple times against different ${vocab.product.Singular} / ${vocab.icp.singular} / ${vocab.persona.Singular} combinations.`}
         >
           {scoringRuns.length === 0 ? (
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted">
               No scoring runs yet.{" "}
               {readOnly
                 ? `Only the ${vocab.list.singular} owner can create a scoring run.`
@@ -291,19 +291,19 @@ export default async function ListDetailPage({
               )}
             </p>
           ) : (
-            <div className="divide-y divide-slate-100 rounded-md border border-slate-200">
+            <div className="divide-y divide-slate-100 rounded-md border border-edge">
               {scoringRuns.map((run) => (
                 <div
                   key={run.id}
                   className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
                 >
                   <div className="text-sm">
-                    <p className="font-medium text-slate-900">
+                    <p className="font-medium text-ink">
                       {run.label?.trim()
                         ? run.label
                         : `${formatDate(run.createdAt)} · ${run.product.name}`}
                     </p>
-                    <p className="mt-1 text-slate-600">
+                    <p className="mt-1 text-muted">
                       {run.label?.trim()
                         ? `${formatDate(run.createdAt)} · ${run.product.name} · `
                         : null}
@@ -342,7 +342,7 @@ export default async function ListDetailPage({
           />
 
           {totalPages > 1 ? (
-            <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+            <div className="mt-4 flex items-center justify-between text-sm text-muted">
               <span>
                 Companies {companyGroups.page} of {totalPages} ·{" "}
                 {formatNumber(companyGroups.totalContacts)} {vocab.contact.plural} total

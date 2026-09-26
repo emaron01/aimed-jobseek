@@ -21,15 +21,15 @@ export default async function OnboardingLayout({
   const organization = await getCurrentOrganization();
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="min-h-screen bg-canvas text-ink">
+      <header className="border-b border-edge bg-surface">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
           <p className="text-sm font-medium tracking-tight">
             {organization?.name ?? brand.appName}
           </p>
           <Link
             href="/settings/billing"
-            className="text-xs text-slate-500 hover:text-slate-800"
+            className="text-xs text-subtle hover:text-ink"
           >
             Billing
           </Link>

@@ -10,10 +10,10 @@ import { generateEmailDraftAction, addFollowUpEmailAction } from "@/app/actions/
 import { countedNoun, vocab } from "@/lib/product-config";
 
 const URGENCY_STYLES = {
-  overdue: "bg-rose-100 text-rose-900",
-  today: "bg-amber-100 text-amber-900",
-  this_week: "bg-sky-100 text-sky-900",
-  later: "bg-slate-100 text-slate-700",
+  overdue: "bg-danger-tint text-danger",
+  today: "bg-warning-tint text-warning",
+  this_week: "bg-canvas text-primary",
+  later: "bg-canvas text-ink",
 } as const;
 
 function urgencyLabel(urgency: keyof typeof URGENCY_STYLES): string {
@@ -46,10 +46,10 @@ export function DueContactsPanel({
     <section className="mb-8 space-y-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">
+          <h2 className="text-xl font-semibold text-ink">
             Follow-ups due
           </h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-muted">
             {countedNoun(totalDue, vocab.contact)} ready for the next
             email. Generate drafts manually — nothing sends automatically.
           </p>
@@ -60,19 +60,19 @@ export function DueContactsPanel({
         {dueByCampaign.map((campaign) => (
           <article
             key={campaign.campaignId}
-            className="rounded-xl border border-slate-200 bg-white p-5"
+            className="rounded-xl border border-edge bg-surface p-5"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <Link
                   href={`/campaigns/${campaign.campaignId}`}
-                  className="font-semibold text-slate-900 hover:underline"
+                  className="font-semibold text-ink hover:underline"
                 >
                   {campaign.campaignName}
                 </Link>
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="mt-1 text-sm text-muted">
                   {campaign.overdue > 0 ? (
-                    <span className="font-medium text-rose-700">
+                    <span className="font-medium text-danger">
                       {campaign.overdue} overdue
                     </span>
                   ) : null}
@@ -110,16 +110,16 @@ export function DueContactsPanel({
                   className="flex flex-wrap items-center justify-between gap-3 py-3"
                 >
                   <div>
-                    <p className="font-medium text-slate-900">
+                    <p className="font-medium text-ink">
                       {contact.contactName}
                       {contact.company ? (
-                        <span className="font-normal text-slate-500">
+                        <span className="font-normal text-subtle">
                           {" "}
                           · {contact.company}
                         </span>
                       ) : null}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-subtle">
                       Email {contact.nextSequenceNumber} · due{" "}
                       {contact.nextDueAt.toLocaleDateString()}
                     </p>
@@ -133,7 +133,7 @@ export function DueContactsPanel({
                     {contact.hasDraft ? (
                       <Link
                         href={`/campaigns/${campaign.campaignId}?stage=emails&contact=${contact.campaignContactId}`}
-                        className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700"
+                        className="rounded-md border border-edge-strong px-2.5 py-1.5 text-xs font-medium text-ink"
                       >
                         Review draft
                       </Link>
@@ -154,7 +154,7 @@ export function DueContactsPanel({
                             }
                           })
                         }
-                        className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-60"
+                        className="rounded-md border border-edge-strong px-2.5 py-1.5 text-xs font-medium text-ink disabled:opacity-60"
                       >
                         Generate
                       </AppButton>

@@ -23,7 +23,7 @@ import {
   consultationStatementLabels,
 } from "@/lib/product-config";
 
-const fieldClass = "mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm";
+const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
 const wrapClass = "min-w-0 overflow-hidden break-words whitespace-pre-wrap";
 
 export type ThreadTurn = {
@@ -100,8 +100,8 @@ export function ConsultationThread({
             key={turn.id}
             className={
               turn.speaker === "CONSULTANT"
-                ? "min-w-0 overflow-hidden rounded-md border border-slate-200 bg-slate-50 p-3"
-                : "min-w-0 overflow-hidden rounded-md border border-slate-200 bg-white p-3"
+                ? "min-w-0 overflow-hidden rounded-md border border-edge bg-canvas p-3"
+                : "min-w-0 overflow-hidden rounded-md border border-edge bg-surface p-3"
             }
             data-testid={
               turn.speaker === "CONSULTANT"
@@ -109,24 +109,24 @@ export function ConsultationThread({
                 : "consultation-reply"
             }
           >
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <p className="text-xs font-medium uppercase tracking-wide text-subtle">
               {turn.speaker === "CONSULTANT"
                 ? consultationConfig.displayName
                 : "You"}
             </p>
-            <p className={`mt-1 text-sm text-slate-900 ${wrapClass}`}>{turn.body}</p>
+            <p className={`mt-1 text-sm text-ink ${wrapClass}`}>{turn.body}</p>
             {turnStatements.map((statement) => (
               <div
                 key={statement.id}
-                className="mt-3 min-w-0 space-y-1 overflow-hidden border-t border-slate-200 pt-3"
+                className="mt-3 min-w-0 space-y-1 overflow-hidden border-t border-edge pt-3"
                 data-testid={`consultation-statement-${statement.kind}`}
               >
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                <p className="text-xs font-medium uppercase tracking-wide text-subtle">
                   {consultationStatementLabels[statement.kind]}
                 </p>
                 {statement.strengtheningNote ? (
                   <p
-                    className={`text-sm text-slate-700 ${wrapClass}`}
+                    className={`text-sm text-ink ${wrapClass}`}
                     data-testid="consultation-strengthening-note"
                   >
                     {statement.strengtheningNote}
@@ -134,7 +134,7 @@ export function ConsultationThread({
                 ) : null}
                 <p
                   id={`claim-edit-${statement.id}`}
-                  className={`text-sm text-slate-800 ${wrapClass}`}
+                  className={`text-sm text-ink ${wrapClass}`}
                 >
                   {statement.content}
                 </p>
@@ -189,7 +189,7 @@ export function ConsultationThread({
                 >
                   <input type="hidden" name="campaignId" value={campaignId} />
                   <label className="block text-sm">
-                    <span className="font-medium text-slate-700">
+                    <span className="font-medium text-ink">
                       {consultationConversationCopy.changePrompt}
                     </span>
                     <textarea name="instruction" required rows={3} className={fieldClass} />
@@ -209,12 +209,12 @@ export function ConsultationThread({
       })}
       {showThinking ? (
         <div
-          className="flex items-center gap-2 text-sm text-slate-600"
+          className="flex items-center gap-2 text-sm text-muted"
           data-testid="harper-thinking"
           role="status"
         >
           <span
-            className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-800"
+            className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-edge-strong border-t-slate-800"
             aria-hidden
           />
           {consultationConversationCopy.thinking}
@@ -237,7 +237,7 @@ export function ConsultationThread({
         >
           <input type="hidden" name="campaignId" value={campaignId} />
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">
+            <span className="font-medium text-ink">
               {consultationConversationCopy.threadReply}
             </span>
             <textarea name="answer" required rows={4} className={fieldClass} />

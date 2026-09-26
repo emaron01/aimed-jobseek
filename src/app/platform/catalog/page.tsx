@@ -20,7 +20,7 @@ export default async function PlatformCatalogPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-subtle">
           <Link href="/platform" className="underline">
             Platform
           </Link>
@@ -28,14 +28,14 @@ export default async function PlatformCatalogPage() {
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">
           Plan Catalog
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-muted">
           Marketing copy, feature bullets, and entitlement floors for new
           Checkout. No Stripe Price IDs here — those live on Billing Config.
           Existing subscribers keep their stored org policies. SUPER_ADMIN only.
         </p>
       </div>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-5">
+      <section className="rounded-lg border border-edge bg-surface p-5">
         <BillingCatalogSettingsForm
           plans={effective.catalog.plans}
           sourceLabel={effective.sourceLabel}

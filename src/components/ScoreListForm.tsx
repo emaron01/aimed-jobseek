@@ -80,14 +80,14 @@ export function ScoreListForm({
         <p
           role="status"
           data-testid="scoring-run-status"
-          className="md:col-span-2 text-sm text-red-600"
+          className="md:col-span-2 text-sm text-danger"
         >
           {state.message}
         </p>
       ) : null}
 
       <label className="block text-sm md:col-span-2">
-        <span className="font-medium text-slate-700">{vocab.product.Singular}</span>
+        <span className="font-medium text-ink">{vocab.product.Singular}</span>
         <select
           name="productId"
           required
@@ -97,7 +97,7 @@ export function ScoreListForm({
             setIcpId("");
             setPersonaId(ALL_PERSONAS_VALUE);
           }}
-          className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-slate-400 focus:ring-2"
+          className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm outline-none ring-focus focus:ring-2"
         >
           <option value="" disabled>
             Select {vocab.product.singular}
@@ -111,14 +111,14 @@ export function ScoreListForm({
       </label>
 
       <label className="block text-sm">
-        <span className="font-medium text-slate-700">{vocab.icp.singular}</span>
+        <span className="font-medium text-ink">{vocab.icp.singular}</span>
         <select
           name="icpId"
           required
           value={icpId}
           disabled={!productId}
           onChange={(event) => setIcpId(event.target.value)}
-          className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-slate-400 focus:ring-2 disabled:bg-slate-50"
+          className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm outline-none ring-focus focus:ring-2 disabled:bg-canvas"
         >
           <option value="" disabled>
             {productId ? `Select ${vocab.icp.singular}` : `Select ${vocab.product.aSingular} first`}
@@ -132,14 +132,14 @@ export function ScoreListForm({
       </label>
 
       <label className="block text-sm">
-        <span className="font-medium text-slate-700">{vocab.persona.Singular}</span>
+        <span className="font-medium text-ink">{vocab.persona.Singular}</span>
         <select
           name="personaId"
           required
           value={personaId}
           disabled={!productId}
           onChange={(event) => setPersonaId(event.target.value)}
-          className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-slate-400 focus:ring-2 disabled:bg-slate-50"
+          className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm outline-none ring-focus focus:ring-2 disabled:bg-canvas"
         >
           <option value={ALL_PERSONAS_VALUE}>
             {productId ? `All ${vocab.persona.plural}` : `Select ${vocab.product.aSingular} first`}

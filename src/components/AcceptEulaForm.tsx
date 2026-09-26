@@ -17,14 +17,14 @@ export function AcceptEulaForm({ versionNumber }: { versionNumber: number }) {
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="versionNumber" value={versionNumber} />
-      <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-800">
+      <label className="flex cursor-pointer items-start gap-3 text-sm text-ink">
         <input
           type="checkbox"
           name="agreed"
           value="1"
           checked={agreed}
           onChange={(e) => setAgreed(e.target.checked)}
-          className="mt-1 h-4 w-4 rounded border-slate-300"
+          className="mt-1 h-4 w-4 rounded border-edge-strong"
           data-testid="eula-agree-checkbox"
         />
         <span>
@@ -33,7 +33,7 @@ export function AcceptEulaForm({ versionNumber }: { versionNumber: number }) {
         </span>
       </label>
       {state && !state.ok ? (
-        <p className="text-sm text-red-700" role="alert">
+        <p className="text-sm text-danger" role="alert">
           {state.message}
         </p>
       ) : null}

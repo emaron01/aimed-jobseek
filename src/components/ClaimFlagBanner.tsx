@@ -40,7 +40,7 @@ export function ClaimFlagBanner({
       : assetAction;
   return (
     <div
-      className="mt-1 space-y-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+      className="mt-1 space-y-2 rounded-md border border-warning bg-warning-tint px-3 py-2 text-sm text-warning"
       data-testid={`claim-flag-${flag.claimId}`}
     >
       <p>{flag.message}</p>
@@ -58,12 +58,12 @@ export function ClaimFlagBanner({
         {editHref ? (
           <a
             href={editHref}
-            className="inline-flex items-center rounded-md border border-amber-300 bg-white px-2.5 py-1 text-xs font-medium text-amber-950"
+            className="inline-flex items-center rounded-md border border-warning bg-surface px-2.5 py-1 text-xs font-medium text-warning"
           >
             {labels.edit}
           </a>
         ) : (
-          <span className="self-center text-xs text-amber-900">{labels.edit}</span>
+          <span className="self-center text-xs text-warning">{labels.edit}</span>
         )}
         <form action={action}>
           <input type="hidden" name="campaignId" value={campaignId} />

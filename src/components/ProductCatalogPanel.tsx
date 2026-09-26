@@ -14,15 +14,15 @@ export function ProductCatalogPanel({
   deleteSuccessNavigate?: string;
 }) {
   return (
-    <div className="divide-y divide-slate-100 rounded-md border border-slate-200 bg-white">
+    <div className="divide-y divide-slate-100 rounded-md border border-edge bg-surface">
       {products.map((product) => (
         <div
           key={product.id}
           className="flex flex-wrap items-center justify-between gap-3 px-4 py-4"
         >
           <div>
-            <p className="font-medium text-slate-900">{product.name}</p>
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="font-medium text-ink">{product.name}</p>
+            <p className="mt-1 text-sm text-muted">
               {product.approvalStatus.replaceAll("_", " ")} ·{" "}
               {countedNoun(product._count.icps, vocab.icp)} ·{" "}
               {product._count.personas}{" "}

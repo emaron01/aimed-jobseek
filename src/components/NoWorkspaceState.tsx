@@ -24,11 +24,11 @@ export async function NoWorkspaceState() {
         <>
           <Link
             href="/settings/account"
-            className="font-medium text-slate-900 underline"
+            className="font-medium text-ink underline"
           >
             Account Settings
           </Link>
-          <Link href="/login" className="text-slate-600 underline">
+          <Link href="/login" className="text-muted underline">
             Switch account
           </Link>
         </>
