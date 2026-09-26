@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { AppButton, type AppButtonVariant } from "@/components/AppButton";
 
 type ActionResult = { ok: boolean; message: string };
@@ -51,6 +52,7 @@ export function ApplicationActionForm({
 }) {
   const [state, setState] = useState<ActionResult | null>(null);
   const [pending, setPending] = useState(false);
+  const router = useRouter();
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,6 +62,7 @@ export function ApplicationActionForm({
     try {
       const result = await runApplicationFormAction(action, state, formData);
       setState(result);
+      if (result.ok) router.refresh();
     } finally {
       setPending(false);
     }

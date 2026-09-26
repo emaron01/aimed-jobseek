@@ -159,6 +159,145 @@ describe("Harper ten-question coach", () => {
     expect(polishCopy.regenerate).toBe("Regenerate");
   });
 
+  it("attaches each existing answer to the question it actually answered", () => {
+    const opentext = {
+      id: "q-old",
+      speaker: "CONSULTANT" as const,
+      body: "Walk me through the OpenText ARM go-to-market rebuild.",
+      targetKey: "why-this-company",
+      followUp: false,
+      sequence: 1,
+    };
+    const csc = {
+      id: "q-new",
+      speaker: "CONSULTANT" as const,
+      body: "What specifically draws you to CSC?",
+      targetKey: "why-this-company",
+      followUp: false,
+      sequence: 8,
+    };
+    const view = buildConsultationQaView({
+      turns: [
+        opentext,
+        seeker("s-old", "I rebuilt ARM GTM at OpenText.", 2, "why-this-company"),
+        csc,
+      ],
+      statements: [
+        {
+          id: "st-old",
+          turnId: "s-old",
+          kind: "RESUME_BULLET",
+          status: "DRAFT",
+          content: "Rebuilt OpenText ARM go-to-market.",
+          strengtheningNote: null,
+        },
+      ],
+    });
+    expect(view.questions[0]?.question).toBe(opentext.body);
+    expect(view.questions[0]?.resumeBullet?.content).toBe(
+      "Rebuilt OpenText ARM go-to-market.",
+    );
+    expect(view.questions[1]?.question).toBe(csc.body);
+    expect(view.questions[1]?.resumeBullet).toBeNull();
+    expect(view.questions[1]?.seekerAnswers).toEqual([]);
+  });
+
+  it("keeps an answer whose original question is gone as its own answered question", () => {
+    const csc = {
+      id: "q-new",
+      speaker: "CONSULTANT" as const,
+      body: "What specifically draws you to CSC?",
+      targetKey: "why-this-company",
+      followUp: false,
+      sequence: 8,
+    };
+    const view = buildConsultationQaView({
+      turns: [
+        seeker("s-old", "I rebuilt ARM GTM at OpenText.", 2, "why-this-company"),
+        csc,
+      ],
+      statements: [
+        {
+          id: "st-old",
+          turnId: "s-old",
+          kind: "RESUME_BULLET",
+          status: "DRAFT",
+          content: "Rebuilt OpenText ARM go-to-market.",
+          strengtheningNote: null,
+        },
+      ],
+    });
+    expect(view.questions[0]?.question).toBe(consultationConversationCopy.yourAnswer);
+    expect(view.questions[0]?.resumeBullet?.content).toBe(
+      "Rebuilt OpenText ARM go-to-market.",
+    );
+    expect(view.questions[0]?.seekerAnswers.map((answer) => answer.body)).toEqual([
+      "I rebuilt ARM GTM at OpenText.",
+    ]);
+    expect(view.questions[1]?.question).toBe(csc.body);
+    expect(view.questions[1]?.resumeBullet).toBeNull();
+  });
+
+  it("shows an answered follow-up with no parent as its own question", () => {
+    const view = buildConsultationQaView({
+      turns: [
+        {
+          id: "generic",
+          speaker: "CONSULTANT" as const,
+          body: consultationConversationCopy.askForStory,
+          targetKey: "why",
+          followUp: false,
+          sequence: 1,
+        },
+        seeker("s1", "I rebuilt ARM GTM at OpenText.", 2, "why"),
+      ],
+      statements: [
+        {
+          id: "st1",
+          turnId: "s1",
+          kind: "INTERVIEW_ANSWER",
+          status: "DRAFT",
+          content: "I rebuilt ARM GTM at OpenText.",
+          strengtheningNote: null,
+        },
+      ],
+    });
+    expect(view.questions).toHaveLength(1);
+    expect(view.questions[0]?.question).toBe(
+      consultationConversationCopy.askForStory,
+    );
+    expect(view.questions[0]?.talkingPoint?.content).toBe(
+      "I rebuilt ARM GTM at OpenText.",
+    );
+  });
+
+  it("nests the generic story ask under the question it follows and keeps an answer box", () => {
+    const view = buildConsultationQaView({
+      turns: [
+        question,
+        second,
+        seeker("s1", "I like the mission.", 3, "why"),
+        {
+          id: "generic",
+          speaker: "CONSULTANT" as const,
+          body: consultationConversationCopy.askForStory,
+          targetKey: "why",
+          followUp: false,
+          sequence: 4,
+        },
+      ],
+      statements: [],
+    });
+    expect(view.questions.map((item) => item.question)).toEqual([
+      question.body,
+      second.body,
+    ]);
+    expect(view.questions[0]?.followUp?.text).toBe(
+      consultationConversationCopy.askForStory,
+    );
+    expect(view.questions[0]?.resumeBullet).toBeNull();
+  });
+
   it("keeps Where you stand below the questions and has no Harper-page navigation", () => {
     const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
     expect(section).not.toContain("HarperSuggestionList");
@@ -169,5 +308,25 @@ describe("Harper ten-question coach", () => {
     expect(section).toContain("consultationConversationCopy.whereYouStand");
     const service = readFileSync("src/lib/consultation/service.ts", "utf8");
     expect(service).not.toContain("async function continueAfterAnsweredRound");
+    const actions = readFileSync("src/app/actions/consultation.ts", "utf8");
+    const approveAction = actions.slice(
+      actions.indexOf("export async function approveConsultationQaResultAction"),
+      actions.indexOf("export async function regenerateConsultationQaResultAction"),
+    );
+    expect(approveAction).toContain("approveConsultationQaResult");
+    expect(approveAction).not.toContain("enqueueApplicationJob");
+    expect(consultationConversationCopy.confirmed).toBe("Approved.");
+    const live = readFileSync("src/components/ApplicationWorkspaceLive.tsx", "utf8");
+    expect(live).toContain("export function WorkspaceJobRefresh");
+    expect(section).toContain("WorkspaceJobRefresh");
+    expect(section).toContain("consultationHasUnansweredQuestions");
+    expect(section).toContain("{consultationBusy ? (");
+    expect(section).not.toContain(
+      "consultationBusy || session?.generationStatus === \"GENERATING\"",
+    );
+    const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
+    expect(thread).toContain("consultation-result-");
+    expect(thread).toContain("-approved");
+    expect(thread).toContain("question:${item.questionTurnId}");
   });
 });

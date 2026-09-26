@@ -426,25 +426,7 @@ export async function approveConsultationQaResultAction(
       return { ok: false, message: "That polished statement was not found." };
     }
     await approveConsultationQaResult({ organizationId, statementIds });
-    if (campaignId) {
-      try {
-        await enqueueApplicationJob({
-          organizationId,
-          campaignId,
-          type: "CONSULTATION",
-          payload: { operation: "continue" },
-        });
-      } catch (error) {
-        console.error(
-          JSON.stringify({
-            event: "consultation_continue_enqueue_failed",
-            campaignId,
-            message: error instanceof Error ? error.message : "unknown",
-          }),
-        );
-      }
-      revalidatePath(`/campaigns/${campaignId}`);
-    }
+    if (campaignId) revalidatePath(`/campaigns/${campaignId}`);
     return { ok: true, message: consultationConversationCopy.confirmed };
   } catch (error) {
     return fail(error, "The result could not be approved.");

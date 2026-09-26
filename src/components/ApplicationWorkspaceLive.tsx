@@ -75,6 +75,33 @@ function JobErrorDetail({
   );
 }
 
+export function WorkspaceJobRefresh({
+  campaignId,
+}: {
+  campaignId: string;
+}) {
+  const router = useRouter();
+  const signature = useRef<string | null>(null);
+
+  useEffect(() => {
+    const interval = window.setInterval(async () => {
+      const latest = await getApplicationWorkspaceLiveAction(campaignId);
+      if (!latest) return;
+      if (signature.current == null) {
+        signature.current = latest.signature;
+        return;
+      }
+      if (latest.signature !== signature.current) {
+        signature.current = latest.signature;
+        router.refresh();
+      }
+    }, POLL_MS);
+    return () => window.clearInterval(interval);
+  }, [campaignId, router]);
+
+  return null;
+}
+
 export function WorkspaceProgress({
   jobs,
   type,

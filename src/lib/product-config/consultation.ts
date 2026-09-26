@@ -66,7 +66,7 @@ export const consultationConversationCopy = Object.freeze({
   hideYourReplies: "Hide your replies",
   approve: "Approve",
   useThis: "Use this",
-  confirmed: "Saved. The next question is on the way.",
+  confirmed: "Approved.",
   changeSomething: "Change something",
   notAccurate: "Not accurate",
   changePrompt: "What should change?",

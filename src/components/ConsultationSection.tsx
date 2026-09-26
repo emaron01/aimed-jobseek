@@ -8,7 +8,14 @@ import {
 } from "@/app/actions/consultation";
 import { AppPendingIndicator } from "@/components/AppButton";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
-import { WorkspaceProgress } from "@/components/ApplicationWorkspaceLive";
+import {
+  WorkspaceJobRefresh,
+  WorkspaceProgress,
+} from "@/components/ApplicationWorkspaceLive";
+import {
+  buildConsultationQaView,
+  consultationHasUnansweredQuestions,
+} from "@/lib/consultation/qa-view";
 import { listPersonPreps } from "@/lib/interview/person-prep";
 import { ConsultationStanding } from "@/components/ConsultationStanding";
 import { ConsultationThread } from "@/components/ConsultationThread";
@@ -213,6 +220,30 @@ export async function ConsultationSection({
     }) ?? [];
   const hasStanding =
     briefing?.success || (session != null && session.assessments.length > 0);
+  const threadTurns =
+    session?.turns.map((turn) => ({
+      id: turn.id,
+      speaker: turn.speaker,
+      body: turn.body,
+      targetKey: turn.targetKey,
+      followUp: turn.followUp,
+      sequence: turn.sequence,
+    })) ?? [];
+  const threadStatements = statements.map((statement) => ({
+    id: statement.id,
+    turnId: statement.turnId,
+    kind: statement.kind,
+    status: statement.status,
+    content: statement.content,
+    strengtheningNote: statement.strengtheningNote,
+  }));
+  const qaView = buildConsultationQaView({
+    turns: threadTurns,
+    statements: threadStatements,
+  });
+  const unanswered = consultationHasUnansweredQuestions(qaView);
+  const threadStatus =
+    session?.status === "DONE" && unanswered ? "IN_PROGRESS" : session?.status ?? "";
 
   return (
     <>
@@ -230,8 +261,9 @@ export async function ConsultationSection({
           {vocab.product.singular} and draws out the stories behind the gaps.
           Nothing is added to the {vocab.product.singular} until you confirm it.
         </p>
+        <WorkspaceJobRefresh campaignId={campaignId} />
         <WorkspaceProgress jobs={jobs} type="CONSULTATION" stayAndWatch />
-        {consultationBusy || session?.generationStatus === "GENERATING" ? (
+        {consultationBusy ? (
           <p className="text-sm text-muted" data-testid="harper-typing">
             <AppPendingIndicator label={workspaceJobCopy.typing} />
           </p>
@@ -292,8 +324,10 @@ export async function ConsultationSection({
         {session?.status === "PAUSED" ? (
           <p className="text-sm text-ink">Paused. Resume when you want to continue.</p>
         ) : null}
-        {session?.status === "DONE" ? (
-          <p className="text-sm text-ink">{consultationConversationCopy.planComplete}</p>
+        {session?.status === "DONE" && !unanswered ? (
+          <p className="text-sm text-ink" data-testid="consultation-complete">
+            {consultationConversationCopy.planComplete}
+          </p>
         ) : null}
         {canEdit && !session && !consultationBusy ? (
           <div className="flex flex-wrap gap-3">
@@ -317,25 +351,10 @@ export async function ConsultationSection({
           <ConsultationThread
             campaignId={campaignId}
             canEdit={canEdit}
-            sessionStatus={session.status}
+            sessionStatus={threadStatus}
             jobsActive={consultationBusy}
-            generating={session.generationStatus === "GENERATING"}
-            turns={session.turns.map((turn) => ({
-              id: turn.id,
-              speaker: turn.speaker,
-              body: turn.body,
-              targetKey: turn.targetKey,
-              followUp: turn.followUp,
-              sequence: turn.sequence,
-            }))}
-            statements={statements.map((statement) => ({
-              id: statement.id,
-              turnId: statement.turnId,
-              kind: statement.kind,
-              status: statement.status,
-              content: statement.content,
-              strengtheningNote: statement.strengtheningNote,
-            }))}
+            turns={threadTurns}
+            statements={threadStatements}
           />
         ) : null}
         {canEdit && session?.status === "IN_PROGRESS" && !failed ? (

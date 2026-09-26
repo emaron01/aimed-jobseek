@@ -36,6 +36,15 @@ function ResultActions({
   testId: string;
 }) {
   if (statements.length === 0) return null;
+  const draft = statements.filter((statement) => statement.status !== "APPROVED");
+  if (draft.length === 0) {
+    return (
+      <p className="mt-3 text-sm text-success" data-testid={`${testId}-approved`}>
+        {consultationStatementLabels.APPROVED}
+      </p>
+    );
+  }
+  statements = draft;
   return (
     <div className="mt-3 flex flex-wrap gap-2" data-testid={testId}>
       <ApplicationActionForm
@@ -70,6 +79,12 @@ function ResultActions({
 }
 
 function ResultBody({ statement }: { statement: QaStatement }) {
+  const statusLabel =
+    statement.status === "APPROVED"
+      ? consultationStatementLabels.APPROVED
+      : statement.status === "DRAFT"
+        ? consultationStatementLabels.DRAFT
+        : null;
   return (
     <div
       className="mt-3 min-w-0 space-y-1 overflow-hidden border-t border-edge pt-3"
@@ -77,6 +92,7 @@ function ResultBody({ statement }: { statement: QaStatement }) {
     >
       <p className="text-xs font-medium uppercase tracking-wide text-subtle">
         {consultationStatementLabels[statement.kind]}
+        {statusLabel ? ` · ${statusLabel}` : ""}
       </p>
       {statement.strengtheningNote ? (
         <p className={`text-sm text-ink ${wrapClass}`} data-testid="consultation-strengthening-note">
@@ -104,7 +120,8 @@ function QuestionCard({
   onSubmitStart: (answer: string) => void;
 }) {
   const hasResult = Boolean(item.resumeBullet || item.talkingPoint) && !item.followUp;
-  const canAnswer = showReply && Boolean(item.targetKey) && !hasResult;
+  const canAnswer = showReply && !hasResult;
+  const replyKey = item.targetKey || `question:${item.questionTurnId}`;
   return (
     <details
       className="min-w-0 overflow-hidden rounded-md border border-edge bg-canvas p-4"
@@ -165,7 +182,7 @@ function QuestionCard({
             }}
           >
             <input type="hidden" name="campaignId" value={campaignId} />
-            <input type="hidden" name="targetKey" value={item.targetKey ?? ""} />
+            <input type="hidden" name="targetKey" value={replyKey} />
             <label className="block text-sm">
               <span className="font-medium text-ink">
                 {consultationConversationCopy.threadReply}
@@ -197,7 +214,6 @@ export function ConsultationThread({
   canEdit,
   sessionStatus,
   jobsActive,
-  generating,
   turns,
   statements,
 }: {
@@ -205,7 +221,6 @@ export function ConsultationThread({
   canEdit: boolean;
   sessionStatus: string;
   jobsActive: boolean;
-  generating: boolean;
   turns: ThreadTurn[];
   statements: ThreadStatement[];
 }) {
@@ -213,9 +228,9 @@ export function ConsultationThread({
   const view = buildConsultationQaView({ turns, statements });
   const showReply =
     canEdit &&
-    sessionStatus === "IN_PROGRESS" &&
-    !jobsActive &&
-    !generating;
+    sessionStatus !== "SKIPPED" &&
+    sessionStatus !== "PAUSED" &&
+    !jobsActive;
 
   return (
     <div className="min-w-0 space-y-3 overflow-hidden" data-testid="consultation-thread">
@@ -229,9 +244,12 @@ export function ConsultationThread({
           canEdit={canEdit}
           item={item}
           showReply={showReply}
-          pending={pendingTarget === item.targetKey && (jobsActive || generating)}
+          pending={
+            pendingTarget === (item.targetKey || `question:${item.questionTurnId}`) &&
+            jobsActive
+          }
           onSubmitStart={(answer) => {
-            setPendingTarget(item.targetKey);
+            setPendingTarget(item.targetKey || `question:${item.questionTurnId}`);
             void answer;
           }}
         />

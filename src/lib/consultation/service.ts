@@ -591,6 +591,27 @@ async function finishIfPlanningIsComplete(
     stored.map(storedAssessment),
     new Set(skipped.map((turn) => turn.targetKey).filter((key): key is string => Boolean(key))),
   );
+  const primaries = await prisma.consultationTurn.findMany({
+    where: { sessionId, speaker: "CONSULTANT", followUp: false },
+    select: { targetKey: true, body: true, sequence: true },
+  });
+  const seekerTurns = await prisma.consultationTurn.findMany({
+    where: { sessionId, speaker: "SEEKER" },
+    select: { targetKey: true, sequence: true },
+  });
+  const openPrimary = primaries.some((question) => {
+    if (question.body.trim() === consultationConversationCopy.askForStory.trim()) {
+      return false;
+    }
+    return !seekerTurns.some(
+      (answer) =>
+        answer.sequence > question.sequence &&
+        (question.targetKey == null ||
+          answer.targetKey == null ||
+          answer.targetKey === question.targetKey),
+    );
+  });
+  if (openPrimary) return;
   if (covered && session?.generationStatus === "READY") {
     await prisma.consultationSession.update({
       where: { id: sessionId },
@@ -1143,12 +1164,28 @@ export async function recordConsultationReply(input: {
   const session = await prisma.consultationSession.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
-  if (!session || session.status !== "IN_PROGRESS") {
+  if (!session || session.status === "SKIPPED" || session.status === "PAUSED") {
     throw new TenantError("The consultation is not waiting for an answer.");
   }
+  if (session.status === "DONE") {
+    await prisma.consultationSession.update({
+      where: { id: session.id },
+      data: { status: "IN_PROGRESS" },
+    });
+  }
   const turns = await loadSessionTurns(session.id);
+  const requested = input.targetKey?.trim() ?? "";
+  const questionTurnId = requested.startsWith("question:")
+    ? requested.slice("question:".length)
+    : "";
+  const byTurn = questionTurnId
+    ? turns.find(
+        (turn) => turn.id === questionTurnId && turn.speaker === "CONSULTANT",
+      )
+    : null;
   const targetKey =
-    input.targetKey?.trim() ||
+    byTurn?.targetKey ||
+    requested ||
     turns.find(
       (turn) =>
         turn.speaker === "CONSULTANT" &&
@@ -1156,7 +1193,9 @@ export async function recordConsultationReply(input: {
         unanswered(turns, turn.targetKey) != null,
     )?.targetKey;
   if (!targetKey) throw new TenantError("That question is not open.");
-  const question = unanswered(turns, targetKey);
+  const question = byTurn
+    ? unanswered(turns, byTurn.targetKey ?? targetKey) ?? byTurn
+    : unanswered(turns, targetKey);
   if (!question) throw new TenantError("That question is not open.");
   const existing = [...turns]
     .reverse()
@@ -1227,7 +1266,7 @@ export async function processConsultationReply(input: {
         : { campaignId: input.campaignId }),
     },
   });
-  if (!session || session.status !== "IN_PROGRESS") {
+  if (!session || session.status === "SKIPPED" || session.status === "PAUSED") {
     throw new TenantError("The consultation is not waiting for an answer.");
   }
   const turns = await loadSessionTurns(session.id);
