@@ -632,7 +632,7 @@ describe("handoff links", () => {
       "utf8",
     );
     expect(section).toContain("downloadResume");
-    expect(section).toContain("/api/application-assets/");
+    expect(section).toContain("workspaceAssetDocxHref");
   });
 });
 

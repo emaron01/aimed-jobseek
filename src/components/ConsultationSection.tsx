@@ -10,11 +10,14 @@ import { AppPendingIndicator } from "@/components/AppButton";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { WorkspaceProgress } from "@/components/ApplicationWorkspaceLive";
 import { listPersonPreps } from "@/lib/interview/person-prep";
-import { interviewConfig } from "@/lib/product-config";
 import { ConsultationStanding } from "@/components/ConsultationStanding";
 import { ConsultationThread } from "@/components/ConsultationThread";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
-import { workspaceJobCopy } from "@/lib/product-config";
+import { OpenWorkspaceHashSection } from "@/components/OpenWorkspaceHashSection";
+import {
+  WORKSPACE_CARD_WRAP_CLASS,
+  WORKSPACE_MESSAGE_WRAP_CLASS,
+} from "@/lib/application/workspace-links";
 import { consultationBriefingSchema } from "@/lib/consultation/contract";
 import {
   profileEvidenceItems,
@@ -26,7 +29,11 @@ import { prisma } from "@/lib/prisma";
 import {
   consultationConfig,
   consultationConversationCopy,
+  interviewConfig,
+  isObsoleteWorkspaceFailure,
   vocab,
+  workspaceJobCopy,
+  workspaceSectionId,
 } from "@/lib/product-config";
 import {
   emptyCandidateProfile,
@@ -158,11 +165,16 @@ export async function ConsultationSection({
   const briefing = session
     ? consultationBriefingSchema.safeParse(session.briefingJson)
     : null;
-  const failed = session?.generationStatus === "FAILED";
+  const failed =
+    session?.generationStatus === "FAILED" &&
+    !isObsoleteWorkspaceFailure(session.generationError);
   const qualityNote =
     session?.generationStatus === "GENERATING"
       ? null
-      : session?.generationError?.trim() ||
+      : (session?.generationError?.trim() &&
+          !isObsoleteWorkspaceFailure(session.generationError)
+          ? session.generationError.trim()
+          : null) ||
         (failed ? consultationConversationCopy.generationFailed : null);
   const draftStatements = (session?.statements ?? []).filter(
     (statement) => statement.status === "DRAFT",
@@ -171,10 +183,12 @@ export async function ConsultationSection({
   const latestDraftTurnId = draftStatements.at(-1)?.turnId ?? null;
 
   return (
+    <>
+    <OpenWorkspaceHashSection sectionId={workspaceSectionId("CONSULTATION")} />
     <details
       open={defaultOpen}
-      id="consultation"
-      className="space-y-4 rounded-lg border border-slate-200 bg-white p-5"
+      id={workspaceSectionId("CONSULTATION")}
+      className={`space-y-4 rounded-lg border border-slate-200 bg-white p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
       data-testid="consultation"
     >
       <summary className="cursor-pointer text-base font-semibold text-slate-900">
@@ -297,10 +311,10 @@ export async function ConsultationSection({
 
       {qualityNote ? (
         <div
-          className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3"
+          className={`space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 ${WORKSPACE_CARD_WRAP_CLASS}`}
           data-testid="consultation-failed"
         >
-          <p className="text-sm text-amber-950">{qualityNote}</p>
+          <p className={`text-sm text-amber-950 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>{qualityNote}</p>
           {canEdit ? (
             <ApplicationActionForm
               action={retryConsultationAction}
@@ -396,5 +410,6 @@ export async function ConsultationSection({
       ) : null}
       </div>
     </details>
+    </>
   );
 }

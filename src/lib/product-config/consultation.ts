@@ -67,6 +67,8 @@ export const consultationConversationCopy = Object.freeze({
   changePrompt: "What should change?",
   generationFailed: `${consultationConfig.displayName} could not finish this coaching. Retry.`,
   generationQualityFailed: `${consultationConfig.displayName} could not keep one part of this coaching after checks. The rest is below. Retry the missing part.`,
+  planUnusable:
+    "Consultation planning did not return a usable plan. Retry consultation.",
   askForStory:
     "Tell me what happened, what you did, and what the result was.",
   keepCoaching:

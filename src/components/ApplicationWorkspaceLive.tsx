@@ -14,17 +14,21 @@ import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-st
 import { AppPendingIndicator } from "@/components/AppButton";
 import { AppActionLink } from "@/components/ui";
 import { hasVisibleText } from "@/lib/grounding/fact-tokens";
+import {
+  openWorkspaceSection,
+  WORKSPACE_CARD_WRAP_CLASS,
+  WORKSPACE_MESSAGE_WRAP_CLASS,
+  workspaceConsultationHref,
+} from "@/lib/application/workspace-links";
 import { applicationAssetConfig, consultationConfig, vocab } from "@/lib/product-config";
 
 const POLL_MS = 3_000;
 
 function JobErrorDetail({
   error,
-  campaignId,
   profileHref,
 }: {
   error: string | null;
-  campaignId: string;
   profileHref?: string | null;
 }) {
   const lines = (error ?? "")
@@ -36,21 +40,35 @@ function JobErrorDetail({
   const showFix =
     /claim|source|verif/i.test(error ?? "") || violations.length > 0;
   return (
-    <div className="space-y-2">
-      <p className="text-sm text-amber-950">{message}</p>
+    <div className={`space-y-2 ${WORKSPACE_CARD_WRAP_CLASS}`}>
+      <p className={`text-sm text-amber-950 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
+        {message}
+      </p>
       {violations.length ? (
-        <ul className="list-disc pl-5 text-sm text-amber-950">
+        <ul
+          className={`list-disc pl-5 text-sm text-amber-950 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
+        >
           {violations.map((line) => (
-            <li key={line}>{line}</li>
+            <li key={line} className={WORKSPACE_MESSAGE_WRAP_CLASS}>
+              {line}
+            </li>
           ))}
         </ul>
       ) : null}
       {showFix ? (
-        <p className="text-sm text-slate-700">
+        <p
+          className={`flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-slate-700 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
+        >
           {applicationAssetConfig.labels.violationFix
             .replace("{consultant}", consultationConfig.displayName)
             .replace("{product}", vocab.product.singular)}{" "}
-          <AppActionLink href={`/campaigns/${campaignId}#consultation`} variant="chip">
+          <AppActionLink
+            href={workspaceConsultationHref()}
+            variant="chip"
+            onClick={() =>
+              openWorkspaceSection(workspaceSectionId("CONSULTATION"))
+            }
+          >
             {consultationConfig.displayName}
           </AppActionLink>{" "}
           {profileHref ? (
@@ -68,13 +86,11 @@ export function WorkspaceProgress({
   jobs,
   type,
   stayAndWatch,
-  campaignId,
   profileHref,
 }: {
   jobs: WorkspaceJobStatusView[];
   type: WorkspaceJobStatusView["type"];
   stayAndWatch?: boolean;
-  campaignId?: string;
   profileHref?: string | null;
 }) {
   const latest = jobs.find((job) => job.type === type);
@@ -98,20 +114,10 @@ export function WorkspaceProgress({
   if (failed) {
     return (
       <div
-        className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3"
+        className={`space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 ${WORKSPACE_CARD_WRAP_CLASS}`}
         data-testid={`workspace-failed-${type}`}
       >
-        {campaignId ? (
-          <JobErrorDetail
-            error={failed.error}
-            campaignId={campaignId}
-            profileHref={profileHref}
-          />
-        ) : (
-          <p className="text-sm text-amber-950">
-            {failed.error?.trim() || workspaceJobCopy.failed}
-          </p>
-        )}
+        <JobErrorDetail error={failed.error} profileHref={profileHref} />
       </div>
     );
   }
@@ -177,11 +183,14 @@ export function ApplicationWorkspaceLive({
   const failed = [...latestByKey.values()].filter((job) => job.status === "FAILED");
 
   return (
-    <div className="space-y-3" data-testid="application-workspace-live">
+    <div
+      className={`space-y-3 ${WORKSPACE_CARD_WRAP_CLASS}`}
+      data-testid="application-workspace-live"
+    >
       {notices.map((job) => (
         <p
           key={job.id}
-          className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900"
+          className={`rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
           data-testid="workspace-ready-notice"
         >
           {job.readyText}{" "}
@@ -193,13 +202,9 @@ export function ApplicationWorkspaceLive({
       {failed.map((job) => (
         <div
           key={job.id}
-          className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3"
+          className={`space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 ${WORKSPACE_CARD_WRAP_CLASS}`}
         >
-          <JobErrorDetail
-            error={job.error}
-            campaignId={campaignId}
-            profileHref={profileHref}
-          />
+          <JobErrorDetail error={job.error} profileHref={profileHref} />
           <ApplicationActionForm
             action={retryApplicationJobAction}
             submitLabel={workspaceJobCopy.retry}

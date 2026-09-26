@@ -168,6 +168,13 @@ export function AppActionLink({
       </span>
     );
   }
+  if (href.startsWith("#")) {
+    return (
+      <a href={href} className={classes} title={title} onClick={onClick}>
+        {children}
+      </a>
+    );
+  }
   return (
     <Link href={href} className={classes} title={title} onClick={onClick}>
       {children}

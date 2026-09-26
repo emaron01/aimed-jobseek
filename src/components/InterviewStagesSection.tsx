@@ -12,6 +12,7 @@ import { listInterviewStages, stageTypeLabel } from "@/lib/interview/stages";
 import { parseClarifyingQuestions } from "@/lib/interview/guide";
 import { interviewConfig, vocab } from "@/lib/product-config";
 import { SECONDARY_BUTTON_CLASS } from "@/components/ui";
+import { workspaceInterviewStageHref } from "@/lib/application/workspace-links";
 
 type RoleOption = { id: string; name: string; suggestionKey: string | null };
 
@@ -148,7 +149,7 @@ export async function InterviewStagesSection({
                     {interviewConfig.formats[stage.format]}
                   </h3>
                   <Link
-                    href={`/campaigns/${campaignId}/interviews/${stage.id}`}
+                    href={workspaceInterviewStageHref(campaignId, stage.id)}
                     className={SECONDARY_BUTTON_CLASS}
                   >
                     {interviewConfig.labels.openGuide}

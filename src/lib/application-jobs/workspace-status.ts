@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma-client";
 import type { ApplicationJobType } from "@prisma/client";
 import { readJobPayload } from "@/lib/application-jobs/service";
 import {
+  isObsoleteWorkspaceFailure,
+  sanitizeWorkspaceFailure,
   workspaceJobCopy,
   workspaceProgressText,
   workspaceReadyText,
@@ -53,13 +55,15 @@ export async function getApplicationWorkspaceLive(input: {
   const views = jobs.map((job) => {
     const roleName = job.targetId ? names.get(job.targetId) ?? null : null;
     const operation = readJobPayload(job.payload).operation ?? null;
+    const obsolete = isObsoleteWorkspaceFailure(job.error);
+    const status = job.status === "FAILED" && obsolete ? "COMPLETED" : job.status;
     return {
       id: job.id,
       type: job.type,
-      status: job.status,
+      status,
       targetId: job.targetId,
-      error: job.error,
-      canRetry: job.status === "FAILED",
+      error: sanitizeWorkspaceFailure(job.error),
+      canRetry: status === "FAILED",
       progressText: workspaceProgressText(job.type, roleName, operation),
       waitKind: workspaceWaitKind(job.type),
       sectionId: workspaceSectionId(job.type),

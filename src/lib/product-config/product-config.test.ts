@@ -12,6 +12,7 @@ import {
   applicationWorkspaceCopy,
   consultationConversationCopy,
   employerIdentityCopy,
+  obsoleteWorkspaceFailurePhrases,
   hiringTeamConfig,
   outreachConfig,
   icpLabels,
@@ -73,6 +74,13 @@ describe("vocabulary", () => {
     );
     expect(applicationAssetConfig.coverLetter.thinEvidence).toContain("{consultant}");
     expect(consultationConfig.displayName).toBe("Harper");
+    expect(consultationConversationCopy.planUnusable).toMatch(/usable plan/i);
+    expect(obsoleteWorkspaceFailurePhrases).toContain(
+      consultationConversationCopy.planUnusable,
+    );
+    expect(obsoleteWorkspaceFailurePhrases).toContain(
+      applicationAssetConfig.labels.verificationFailed,
+    );
     expect(applicationWorkspaceCopy.nextStepTitle).toBe(
       "Let's Walk Through The Application Process",
     );

@@ -75,6 +75,11 @@ export type {
 export { applicationAssetConfig } from "./application-assets";
 export type { ApplicationAssetTypeValue } from "./application-assets";
 export {
+  isObsoleteWorkspaceFailure,
+  obsoleteWorkspaceFailurePhrases,
+  sanitizeWorkspaceFailure,
+} from "./obsolete-workspace-failures";
+export {
   connectionNoteBodyBudget,
   isOutreachAssetType,
   outreachConfig,

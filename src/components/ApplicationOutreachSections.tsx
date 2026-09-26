@@ -34,6 +34,11 @@ import {
   openClaimFlags,
 } from "@/lib/grounding/claim-flags";
 import { SECONDARY_BUTTON_CLASS, SubmitButton, AppButton } from "@/components/ui";
+import {
+  WORKSPACE_CARD_WRAP_CLASS,
+  WORKSPACE_MESSAGE_WRAP_CLASS,
+  workspaceAssetDocxHref,
+} from "@/lib/application/workspace-links";
 
 const initial: ApplicationOutreachActionResult | null = null;
 
@@ -116,7 +121,7 @@ export function ApplicationAppliedSection({
   );
   return (
     <section
-      className="space-y-3 rounded-lg border border-slate-200 bg-white p-5"
+      className={`space-y-3 rounded-lg border border-slate-200 bg-white p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
       data-testid="application-applied"
     >
       <div>
@@ -194,7 +199,7 @@ export function ApplicationContactsSection({
   );
   return (
     <section
-      className="space-y-4 rounded-lg border border-slate-200 bg-white p-5"
+      className={`space-y-4 rounded-lg border border-slate-200 bg-white p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
       data-testid="application-contacts"
     >
       <div>
@@ -401,7 +406,7 @@ export function ApplicationOutreachSection({
 
   return (
     <section
-      className="space-y-4 rounded-lg border border-slate-200 bg-white p-5"
+      className={`space-y-4 rounded-lg border border-slate-200 bg-white p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
       data-testid="application-outreach"
     >
       <div>
@@ -531,13 +536,13 @@ function OutreachMessageCard({
   }
 
   return (
-    <article className="space-y-3 rounded-md border border-slate-200 p-4" data-testid="outreach-message">
+    <article className={`space-y-3 rounded-md border border-slate-200 p-4 ${WORKSPACE_CARD_WRAP_CLASS}`} data-testid="outreach-message">
       <p className="text-sm font-medium text-slate-900">
         {formatOutreachTypeLabel(asset.type)} · v{asset.version}
         {asset.sentAt ? ` · ${outreachConfig.labels.sentStatus} ${todayInputValue(asset.sentAt)}` : ""}
       </p>
       {composed ? (
-        <div className="space-y-2 text-sm text-slate-800">
+        <div className={`space-y-2 text-sm text-slate-800 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
           {composed.subject ? <p><span className="font-medium">Subject:</span> {composed.subject}</p> : null}
           <pre className="whitespace-pre-wrap font-sans">{composed.body}</pre>
           {openClaimFlags(claimFlagsFromJson(asset.claimFlagsJson)).map((flag) => (
@@ -550,7 +555,7 @@ function OutreachMessageCard({
           ))}
         </div>
       ) : (
-        <p className="text-sm text-red-700">This message could not be displayed.</p>
+        <p className={`text-sm text-red-700 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>This message could not be displayed.</p>
       )}
       {canEdit && composed && asset.type === "EMAIL" && handoff ? (
         <div className="flex flex-wrap gap-2" data-testid="email-handoff">
@@ -577,7 +582,7 @@ function OutreachMessageCard({
           </AppButton>
           {approvedResumeId ? (
             <a
-              href={`/api/application-assets/${approvedResumeId}/docx`}
+              href={workspaceAssetDocxHref(approvedResumeId)}
               className={SECONDARY_BUTTON_CLASS}
             >
               {outreachConfig.labels.downloadResume}

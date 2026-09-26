@@ -30,8 +30,20 @@ import {
   sanitizeAssetContent,
   visibleItems,
 } from "@/lib/application-assets/display";
-import { applicationAssetConfig, consultationConfig, vocab } from "@/lib/product-config";
+import {
+  applicationAssetConfig,
+  consultationConfig,
+  vocab,
+  workspaceSectionId,
+} from "@/lib/product-config";
 import { AppActionLink, SubmitButton } from "@/components/ui";
+import {
+  openWorkspaceSection,
+  WORKSPACE_CARD_WRAP_CLASS,
+  WORKSPACE_MESSAGE_WRAP_CLASS,
+  workspaceAssetDocxHref,
+  workspaceConsultationHref,
+} from "@/lib/application/workspace-links";
 
 type AssetRow = {
   id: string;
@@ -64,12 +76,10 @@ const initial: ApplicationAssetActionResult | null = null;
 function Status({
   result,
   errorsOnly = false,
-  campaignId,
   profileHref,
 }: {
   result: ApplicationAssetActionResult | null;
   errorsOnly?: boolean;
-  campaignId?: string;
   profileHref?: string | null;
 }) {
   if (!result) return null;
@@ -82,29 +92,41 @@ function Status({
   return (
     <div
       role="status"
-      className={result.ok ? "text-sm text-emerald-700" : "text-sm text-red-700"}
+      className={`${WORKSPACE_CARD_WRAP_CLASS} ${WORKSPACE_MESSAGE_WRAP_CLASS} ${
+        result.ok ? "text-sm text-emerald-700" : "text-sm text-red-700"
+      }`}
       data-testid="asset-verification-status"
     >
       {messageLines.map((line) => (
-        <p key={line}>{line}</p>
+        <p key={line} className={WORKSPACE_MESSAGE_WRAP_CLASS}>
+          {line}
+        </p>
       ))}
       {violations.length ? (
-        <ul className="mt-1 list-disc pl-5">
+        <ul className={`mt-1 list-disc pl-5 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
           {violations.map((violation) => (
-            <li key={violation}>{violation}</li>
+            <li key={violation} className={WORKSPACE_MESSAGE_WRAP_CLASS}>
+              {violation}
+            </li>
           ))}
         </ul>
       ) : null}
       {!result.ok ? (
-        <p className="mt-2 text-sm text-slate-700">
+        <p
+          className={`mt-2 flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-slate-700 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
+        >
           {applicationAssetConfig.labels.violationFix
             .replace("{consultant}", consultationConfig.displayName)
             .replace("{product}", vocab.product.singular)}{" "}
-          {campaignId ? (
-            <AppActionLink href={`/campaigns/${campaignId}#consultation`} variant="chip">
-              {consultationConfig.displayName}
-            </AppActionLink>
-          ) : null}{" "}
+          <AppActionLink
+            href={workspaceConsultationHref()}
+            variant="chip"
+            onClick={() =>
+              openWorkspaceSection(workspaceSectionId("CONSULTATION"))
+            }
+          >
+            {consultationConfig.displayName}
+          </AppActionLink>{" "}
           {profileHref ? (
             <AppActionLink href={profileHref} variant="chip">
               {vocab.product.Singular}
@@ -426,7 +448,7 @@ function AssetEditor({
         </label>
       ))}
       <SubmitButton>{applicationAssetConfig.labels.saveNewVersion}</SubmitButton>
-      <Status result={result} campaignId={campaignId} />
+      <Status result={result} />
     </form>
   );
 }
@@ -474,7 +496,7 @@ function AssetHistory({
               </p>
             ) : null}
             <div className="flex flex-wrap gap-2">
-              <AppActionLink href={`/api/application-assets/${asset.id}/docx`}>
+              <AppActionLink href={workspaceAssetDocxHref(asset.id)}>
                 {applicationAssetConfig.labels.downloadDocx}
               </AppActionLink>
               {canEdit && asset.status !== "APPROVED" ? (
@@ -493,7 +515,7 @@ function AssetHistory({
           </div>
         </details>
       ))}
-      <Status result={approveResult} campaignId={campaignId} profileHref={profileHref} />
+      <Status result={approveResult} profileHref={profileHref} />
     </div>
   );
 }
@@ -618,14 +640,14 @@ function AssetTypePanel({
   const earlierExperienceHeading =
     plan?.plan.type === "RESUME" ? plan.plan.earlierExperienceHeading : null;
   return (
-    <section className="space-y-4 rounded-md border border-slate-200 p-4">
+    <section className={`space-y-4 rounded-md border border-slate-200 p-4 ${WORKSPACE_CARD_WRAP_CLASS}`}>
         <h3 className="font-semibold text-slate-900">
           {type === "RESUME"
             ? applicationAssetConfig.labels.resume
             : applicationAssetConfig.labels.coverLetter}
         </h3>
         {type === "RESUME" && missingContacts.length > 0 ? (
-          <p className="text-sm text-amber-900" data-testid="resume-missing-contact">
+          <p className={`text-sm text-amber-900 ${WORKSPACE_MESSAGE_WRAP_CLASS}`} data-testid="resume-missing-contact">
             {applicationAssetConfig.missingContact.heading}: {missingContacts.join(", ")}.{" "}
             {profileHref ? (
               <AppActionLink href={profileHref} variant="chip">
@@ -699,7 +721,6 @@ function AssetTypePanel({
         <Status
           result={result}
           errorsOnly
-          campaignId={campaignId}
           profileHref={profileHref}
         />
       </form> : null}
@@ -791,7 +812,7 @@ export function ApplicationAssetsSection({
   return (
     <details
       open={defaultOpen}
-      className="space-y-4 rounded-lg border border-slate-200 bg-white p-5"
+      className={`space-y-4 rounded-lg border border-slate-200 bg-white p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
       data-testid="application-assets"
     >
       <summary className="cursor-pointer text-base font-semibold text-slate-900">

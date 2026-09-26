@@ -14,6 +14,13 @@ import {
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
 import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-status";
+import { supersedeObsoleteWorkspaceFailures } from "@/lib/application-jobs/obsolete-failures";
+import {
+  WORKSPACE_CARD_WRAP_CLASS,
+  WORKSPACE_MESSAGE_WRAP_CLASS,
+  workspaceCampaignSummaryHref,
+  workspaceProfileHref,
+} from "@/lib/application/workspace-links";
 import { mergeExistingHiringTeamRoles } from "@/lib/hiring-team/merge-existing";
 import { getApplicationResearchStatus } from "@/lib/application/research-status";
 import type { ApplicationResearchStatusView } from "@/lib/application/research-status";
@@ -436,6 +443,7 @@ export async function ApplicationWorkspace({
         )
       : [],
   });
+  await supersedeObsoleteWorkspaceFailures({ organizationId, campaignId });
   const [nextStep, live] = await Promise.all([
     ensureApplicationNextStep({
       organizationId,
@@ -443,6 +451,7 @@ export async function ApplicationWorkspace({
     }),
     getApplicationWorkspaceLive({ organizationId, campaignId }),
   ]);
+  const profileHref = workspaceProfileHref(requirement.campaign.product.id);
   const invalidPlanTypes = requirement.campaign.presentationPlans.flatMap(
     (row) =>
       presentationPlanSchema.safeParse(row.planJson).success
@@ -479,9 +488,9 @@ export async function ApplicationWorkspace({
     : null;
 
   return (
-    <>
+    <div className={`space-y-4 ${WORKSPACE_CARD_WRAP_CLASS}`}>
     <section
-      className="space-y-3 rounded-lg border border-slate-200 bg-white p-5"
+      className={`space-y-3 rounded-lg border border-slate-200 bg-white p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
       data-testid="application-next-step"
     >
       <h2 id="application-next-step" className="text-base font-semibold text-slate-900">
@@ -490,12 +499,12 @@ export async function ApplicationWorkspace({
       <ApplicationWorkspaceLive
         campaignId={campaignId}
         initialJobs={live.jobs}
-        profileHref={`/products/${requirement.campaign.product.id}`}
+        profileHref={profileHref}
       />
       <WorkspaceProgress jobs={live.jobs} type="NEXT_STEP" />
       {nextStep.failed ? (
         <div className="space-y-2">
-          <p className="text-sm text-amber-950">
+          <p className={`text-sm text-amber-950 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
             {consultationConversationCopy.nextStepFailed}
           </p>
           {canEdit ? (
@@ -509,7 +518,7 @@ export async function ApplicationWorkspace({
           ) : null}
         </div>
       ) : (
-        <p className="text-sm text-slate-800">{nextStep.text}</p>
+        <p className={`text-sm text-slate-800 ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>{nextStep.text}</p>
       )}
     </section>
     <details
@@ -706,14 +715,12 @@ export async function ApplicationWorkspace({
     <WorkspaceProgress
       jobs={live.jobs}
       type="RESUME"
-      campaignId={campaignId}
-      profileHref={`/products/${requirement.campaign.product.id}`}
+      profileHref={profileHref}
     />
     <WorkspaceProgress
       jobs={live.jobs}
       type="COVER_LETTER"
-      campaignId={campaignId}
-      profileHref={`/products/${requirement.campaign.product.id}`}
+      profileHref={profileHref}
     />
     <ApplicationAssetsSection
       campaignId={requirement.campaignId}
@@ -727,7 +734,7 @@ export async function ApplicationWorkspace({
       missingResumeContacts={
         profile.ok ? missingResumeContactLabels(profile.profile) : []
       }
-      profileHref={`/products/${requirement.campaign.product.id}`}
+      profileHref={profileHref}
       profileRoles={
         profile.ok
           ? profile.profile.experience.map((role) => ({
@@ -847,12 +854,12 @@ export async function ApplicationWorkspace({
       <div className="mt-4 space-y-3">
         <WorkspaceProgress jobs={live.jobs} type="APPLICATION_SUMMARY" />
         <p className="text-sm text-slate-600">{applicationSummaryConfig.description}</p>
-        <Link href={`/campaigns/${campaignId}/summary`} className={SECONDARY_BUTTON_CLASS}>
+        <Link href={workspaceCampaignSummaryHref(campaignId)} className={SECONDARY_BUTTON_CLASS}>
           {applicationSummaryConfig.title}
         </Link>
       </div>
     </details>
-    </>
+    </div>
   );
 }
 
