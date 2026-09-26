@@ -96,10 +96,6 @@ export const consultationConversationCopy = Object.freeze({
   whyThisCompanyTarget: "Why you want to work at this company",
   whyThisCompanyQuestion:
     "Why do you want to work at this company? Say what specifically draws you to it for this role.",
-  unseenExperienceGapQuestion:
-    `Do you have experience with {requirement} that ${consultationConfig.displayName} does not see?`,
-  unseenExperienceFollowOn:
-    `Do you have experience ${consultationConfig.displayName} does not see?`,
   knowAboutMe: "What You Should Know About Me",
   knowAboutMeHelp:
     `Tell ${consultationConfig.displayName} background that is not already in your ${vocab.product.singular}, for example experience that was left off the resume. This is saved as a seeker-stated fact and applies to every application.`,

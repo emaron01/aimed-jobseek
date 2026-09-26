@@ -19,16 +19,17 @@ import {
   calculateExperienceYears,
   evidenceTargets,
   gapsAreCovered,
+  isCompanyMissionOrTagline,
+  looksLikeCompanyPitch,
   profileEvidenceItems,
   verifyModelAssessments,
 } from "@/lib/consultation/assess";
 import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
 import {
   matchConsultationFocus,
-  asksAboutUnseenExperience,
   planQuestionRound,
+  questionTextForGap,
   seniorityWarrantsChronology,
-  unseenExperienceGapQuestion,
 } from "@/lib/consultation/questions";
 import { nextConsultationStatus } from "@/lib/consultation/state";
 import {
@@ -91,6 +92,26 @@ function sample() {
     scorecard: parsed.scorecard,
   });
   return { profile, parsed, targets };
+}
+
+function questionForConsultationTarget(target: {
+  key: string;
+  kind: string;
+  text: string;
+}): string {
+  if (target.key === "why-this-company") {
+    return "Why do you want this role at this company, given the reliability work you have already done at Northwind?";
+  }
+  if (/5 years of Python/i.test(target.text)) {
+    return "Your Northwind and Contoso roles cover more than seven years, but the profile does not say where you used Python. In which roles did you use it, and what were the exact dates?";
+  }
+  if (/incident response/i.test(target.text)) {
+    return "You already have incident response on the profile. Is there a later example at Northwind that shows how you ran the response and what changed afterward?";
+  }
+  if (target.kind === "MISSION") {
+    return "What about this company's work draws you, given the reliability problems you have already owned?";
+  }
+  return "In your Northwind payments work, what was at stake on one hard problem, what did you personally do, and what changed?";
 }
 
 function installConsultationModelFixture() {
@@ -175,9 +196,7 @@ function installConsultationModelFixture() {
           questions: [
             ...targets.map((target) => ({
               targetKey: target.key,
-              text: /5 years of Python/i.test(target.text)
-                ? "Your Northwind and Contoso roles cover more than seven years, but the profile does not say where you used Python. In which roles did you use it, and what were the exact dates?"
-                : `Your Northwind payments work is relevant to ${target.text}. Walk me through one example: what was at stake, what did you do, and what changed?`,
+              text: questionForConsultationTarget(target),
               requirementInterpretation: null,
               hiringTeamRoleId: hiringRole.id,
               whoCaresNote: `${hiringRole.name} needs to hear concrete evidence tied to this requirement.`,
@@ -540,33 +559,42 @@ describe("consultation evidence and questions", () => {
     ).toBe(false);
   });
 
-  it("asks whether the seeker has unseen experience before treating a gap as closed", () => {
+  it("uses Harper's question as written and never pastes requirement text", () => {
     const gapText = "9 years of security sales";
-    expect(unseenExperienceGapQuestion(gapText)).toContain(gapText);
+    expect(questionTextForGap({ key: "required:security-sales", text: gapText })).toBe(
+      "",
+    );
+    expect(questionTextForGap({ key: "required:security-sales", text: gapText }, "  ")).toBe(
+      "",
+    );
+    const harperQuestion =
+      "Your Fabrikam continuity work is the closest on the profile. Have you also sold security or brand-protection services, and if so in which roles?";
     expect(
-      asksAboutUnseenExperience(unseenExperienceGapQuestion(gapText)),
-    ).toBe(true);
+      questionTextForGap(
+        { key: "required:security-sales", text: gapText },
+        harperQuestion,
+      ),
+    ).toBe(harperQuestion);
     const hiringTeam = [{ id: "hm", name: "Hiring manager" }];
-    const round = planQuestionRound({
-      assessments: [
-        {
-          key: "required:security-sales",
-          kind: "REQUIRED",
-          text: gapText,
-          strength: "NONE",
-          supportingFactIds: [],
-          strategy: "ACKNOWLEDGE",
-          explanation: "No evidence yet.",
-          strategyText: "Ask for unseen experience.",
-          verification: {
-            originalStrength: "NONE",
-            invalidSupportingFactIds: [],
-            invalidRoleIds: [],
-            downgradeReasons: [],
-          },
-          experienceCalculation: null,
-        },
-      ],
+    const assessment = {
+      key: "required:security-sales",
+      kind: "REQUIRED" as const,
+      text: gapText,
+      strength: "NONE" as const,
+      supportingFactIds: [],
+      strategy: "ACKNOWLEDGE" as const,
+      explanation: "No evidence yet.",
+      strategyText: "Ask for a concrete sales motion.",
+      verification: {
+        originalStrength: "NONE" as const,
+        invalidSupportingFactIds: [],
+        invalidRoleIds: [],
+        downgradeReasons: [],
+      },
+      experienceCalculation: null,
+    };
+    const withoutModel = planQuestionRound({
+      assessments: [assessment],
       modelQuestions: [],
       hiringTeam,
       askedKeys: new Set(),
@@ -574,9 +602,262 @@ describe("consultation evidence and questions", () => {
       includeChronology: false,
       chronologyAsked: false,
     });
-    expect(round.questions).toHaveLength(1);
-    expect(asksAboutUnseenExperience(round.questions[0]!.text)).toBe(true);
-    expect(round.questions[0]!.text).toContain(gapText);
+    expect(withoutModel.questions).toHaveLength(0);
+    expect(withoutModel.dropped[0]?.reason).toMatch(/did not return a question/i);
+    const withModel = planQuestionRound({
+      assessments: [assessment],
+      modelQuestions: [
+        {
+          targetKey: "required:security-sales",
+          text: harperQuestion,
+          requirementInterpretation: "Security or brand-protection sales motion.",
+          hiringTeamRoleId: "hm",
+          whoCaresNote: "The Hiring manager needs a concrete sales motion, not the posting line.",
+        },
+      ],
+      hiringTeam,
+      askedKeys: new Set(),
+      skippedKeys: new Set(),
+      includeChronology: false,
+      chronologyAsked: false,
+    });
+    expect(withModel.questions).toHaveLength(1);
+    expect(withModel.questions[0]!.text).toBe(harperQuestion);
+    expect(withModel.questions[0]!.text).not.toContain(gapText);
+    expect(withModel.questions[0]!.text).not.toMatch(/does not see/i);
+  });
+
+  it("never treats a mission statement or recruiting pitch as an experience gap", () => {
+    const cscMission =
+      "Join us to help protect the world's most valuable digital brands while building a disciplined, world-class sales organization defined by execution excellence, leadership depth, and sustainable growth.";
+    expect(looksLikeCompanyPitch(cscMission)).toBe(true);
+    expect(
+      isCompanyMissionOrTagline({
+        key: "required:0",
+        kind: "REQUIRED",
+        text: cscMission,
+      }),
+    ).toBe(true);
+    expect(
+      isCompanyMissionOrTagline({
+        key: "mission:csc",
+        kind: "MISSION",
+        text: cscMission,
+      }),
+    ).toBe(true);
+    expect(
+      isCompanyMissionOrTagline({
+        key: "why-this-company",
+        kind: "MISSION",
+        text: consultationConversationCopy.whyThisCompanyTarget,
+      }),
+    ).toBe(false);
+    expect(
+      looksLikeCompanyPitch("9 years of enterprise security sales leadership"),
+    ).toBe(false);
+
+    const emptyVerification = {
+      originalStrength: "NONE" as const,
+      invalidSupportingFactIds: [],
+      invalidRoleIds: [],
+      downgradeReasons: [],
+    };
+    const missionAssessment = {
+      key: "mission:csc",
+      kind: "MISSION" as const,
+      text: cscMission,
+      strength: "NONE" as const,
+      supportingFactIds: [],
+      strategy: "ACKNOWLEDGE" as const,
+      explanation: "Company purpose, not a skill.",
+      strategyText: "Do not ask for experience with the mission.",
+      verification: emptyVerification,
+      experienceCalculation: null,
+    };
+    const pitchAsRequired = {
+      ...missionAssessment,
+      key: "required:pitch",
+      kind: "REQUIRED" as const,
+    };
+    const skillGap = {
+      key: "required:channel",
+      kind: "REQUIRED" as const,
+      text: "Build and lead a partner and channel motion",
+      strength: "NONE" as const,
+      supportingFactIds: [],
+      strategy: "PROVE_WITH_STORY" as const,
+      explanation: "No channel motion on the profile.",
+      strategyText: "Ask about partner-led selling.",
+      verification: emptyVerification,
+      experienceCalculation: null,
+    };
+    const hiringTeam = [{ id: "hm", name: "Hiring Manager" }];
+    const round = planQuestionRound({
+      assessments: [missionAssessment, pitchAsRequired, skillGap],
+      modelQuestions: [
+        {
+          targetKey: "mission:csc",
+          text: `Do you have experience with ${cscMission} that Harper does not see?`,
+          requirementInterpretation: null,
+          hiringTeamRoleId: "hm",
+          whoCaresNote: "Should never be asked.",
+        },
+        {
+          targetKey: "required:pitch",
+          text: `Do you have experience with ${cscMission} that Harper does not see?`,
+          requirementInterpretation: null,
+          hiringTeamRoleId: "hm",
+          whoCaresNote: "Should never be asked.",
+        },
+        {
+          targetKey: "required:channel",
+          text: "At Contoso you opened new logos yourself. Have you also built or run a partner or channel motion, or should we treat that as new for this CSC role?",
+          requirementInterpretation: "Partner and channel leadership, not direct-only selling.",
+          hiringTeamRoleId: "hm",
+          whoCaresNote: "The Hiring Manager needs a partner-motion story.",
+        },
+      ],
+      hiringTeam,
+      askedKeys: new Set(),
+      skippedKeys: new Set(),
+      includeChronology: false,
+      chronologyAsked: false,
+    });
+    expect(round.questions.map((question) => question.targetKey)).toEqual([
+      "required:channel",
+    ]);
+    expect(round.questions[0]!.text).not.toContain(cscMission);
+    expect(round.questions[0]!.text).not.toMatch(/experience with Join us/i);
+    expect(
+      gapsAreCovered(
+        [missionAssessment, pitchAsRequired, { ...skillGap, strength: "STRONG" }],
+        new Set(),
+      ),
+    ).toBe(true);
+  });
+
+  it("writes three CSC gap questions in Harper's words without posting text", () => {
+    const cscMission =
+      "Join us to help protect the world's most valuable digital brands while building a disciplined, world-class sales organization defined by execution excellence, leadership depth, and sustainable growth.";
+    const emptyVerification = {
+      originalStrength: "NONE" as const,
+      invalidSupportingFactIds: [],
+      invalidRoleIds: [],
+      downgradeReasons: [],
+    };
+    const channelQuestion =
+      "At Contoso you opened new logos yourself. Have you also built or run a partner or channel motion, or should we treat that as new for this CSC role?";
+    const domainQuestion =
+      "You sold business continuity and compliance at Fabrikam. What is the closest you have come to selling brand protection, domain, or digital-risk services?";
+    const benchQuestion =
+      "You built a front-line manager bench at Northwind and ran a weekly MEDDIC forecast. Walk me through how you hired or developed those managers, and what changed in the team's execution afterward?";
+    const assessments = [
+      {
+        key: "mission:csc",
+        kind: "MISSION" as const,
+        text: cscMission,
+        strength: "NONE" as const,
+        supportingFactIds: [],
+        strategy: "ACKNOWLEDGE" as const,
+        explanation: "Company purpose.",
+        strategyText: "Not an experience gap.",
+        verification: emptyVerification,
+        experienceCalculation: null,
+      },
+      {
+        key: "required:0",
+        kind: "REQUIRED" as const,
+        text: cscMission,
+        strength: "NONE" as const,
+        supportingFactIds: [],
+        strategy: "ACKNOWLEDGE" as const,
+        explanation: "Recruiting pitch stored as a requirement.",
+        strategyText: "Not an experience gap.",
+        verification: emptyVerification,
+        experienceCalculation: null,
+      },
+      {
+        key: "required:channel",
+        kind: "REQUIRED" as const,
+        text: "Lead and grow a channel and partner sales motion",
+        strength: "NONE" as const,
+        supportingFactIds: [],
+        strategy: "PROVE_WITH_STORY" as const,
+        explanation: "Profile shows direct enterprise selling.",
+        strategyText: "Ask about partner-led selling.",
+        verification: emptyVerification,
+        experienceCalculation: null,
+      },
+      {
+        key: "required:domain",
+        kind: "REQUIRED" as const,
+        text: "Sell digital brand protection and domain services to enterprise buyers",
+        strength: "NONE" as const,
+        supportingFactIds: [],
+        strategy: "REFRAME_ADJACENT" as const,
+        explanation: "Closest evidence is Fabrikam continuity sales.",
+        strategyText: "Ask for the closest adjacent motion.",
+        verification: emptyVerification,
+        experienceCalculation: null,
+      },
+      {
+        key: "competency:bench",
+        kind: "COMPETENCY" as const,
+        text: "Build a front-line sales manager bench and a disciplined forecast cadence",
+        strength: "PARTIAL" as const,
+        supportingFactIds: ["ach_meddic"],
+        strategy: "PROVE_WITH_STORY" as const,
+        explanation: "Northwind has a bench and MEDDIC, without the hiring story.",
+        strategyText: "Ask how the bench was built and what changed.",
+        verification: {
+          ...emptyVerification,
+          originalStrength: "PARTIAL" as const,
+        },
+        experienceCalculation: null,
+      },
+    ];
+    const round = planQuestionRound({
+      assessments,
+      modelQuestions: [
+        {
+          targetKey: "required:channel",
+          text: channelQuestion,
+          requirementInterpretation: "Partner and channel leadership.",
+          hiringTeamRoleId: "hm",
+          whoCaresNote: "The Hiring Manager needs a partner-motion story.",
+        },
+        {
+          targetKey: "required:domain",
+          text: domainQuestion,
+          requirementInterpretation: "Brand-protection or digital-risk selling.",
+          hiringTeamRoleId: "hm",
+          whoCaresNote: "The Hiring Manager needs the closest domain-adjacent sale.",
+        },
+        {
+          targetKey: "competency:bench",
+          text: benchQuestion,
+          requirementInterpretation: "How the manager bench was built and what changed.",
+          hiringTeamRoleId: "hm",
+          whoCaresNote: "The Hiring Manager needs the people-development story behind the forecast.",
+        },
+      ],
+      hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
+      askedKeys: new Set(),
+      skippedKeys: new Set(),
+      includeChronology: false,
+      chronologyAsked: false,
+    });
+    expect(round.questions.map((question) => question.text)).toEqual([
+      channelQuestion,
+      domainQuestion,
+      benchQuestion,
+    ]);
+    for (const question of round.questions) {
+      expect(question.text).not.toContain(cscMission);
+      expect(question.text).not.toMatch(/Join us to help protect/i);
+      expect(question.text).not.toMatch(/does not see/i);
+      expect(question.text).not.toMatch(/^Do you have experience with /i);
+    }
   });
 
   it("drops unsupported extraction and keeps semantic links pending confirmation", () => {
@@ -888,8 +1169,9 @@ describe("consultation evidence and questions", () => {
       includeChronology: false,
       chronologyAsked: false,
     });
-    expect(missingQuestion.questions[0]?.text).toMatch(/progressive leadership/i);
-    expect(missingQuestion.dropped).toEqual([]);
+    expect(missingQuestion.questions).toEqual([]);
+    expect(missingQuestion.dropped[0]?.targetKey).toBe("required:0");
+    expect(missingQuestion.dropped[0]?.reason).toMatch(/did not return a question/i);
   });
 
   it("uses a model-written follow-up for the missing Result and metric", async () => {
@@ -937,7 +1219,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("13");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("14");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("coach, not an interrogator");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("Never inflate fit");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -945,7 +1227,10 @@ describe("consultation evidence and questions", () => {
     );
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("focusTargetKey");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
-      "experience you do not see",
+      "Never paste requirement, responsibility, or posting text",
+    );
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
+      "never ask whether the seeker has experience with a mission",
     );
     const workspace = readFileSync("src/components/ConsultationSection.tsx", "utf8");
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
@@ -997,8 +1282,14 @@ describe("consultation evidence and questions", () => {
     const assessment = readFileSync("src/lib/consultation/assess.ts", "utf8");
     const writeBack = readFileSync("src/lib/consultation/write-back.ts", "utf8");
     expect(questions).not.toMatch(/Tell a story|Walk me through|concrete result/i);
+    expect(questions).not.toMatch(/Do you have experience with/i);
+    expect(questions).not.toContain("{requirement}");
     expect(assessment).not.toMatch(/Relevant evidence|No direct evidence|Strong match/i);
     expect(writeBack).not.toMatch(/split\([^)]*sentence|keyword/i);
+    const copy = readFileSync("src/lib/product-config/consultation.ts", "utf8");
+    expect(copy).not.toContain("unseenExperienceGapQuestion");
+    expect(copy).not.toContain("unseenExperienceFollowOn");
+    expect(copy).not.toContain("{requirement}");
   });
 
   it("does not use grounded-statement checks to reject generated output", () => {
@@ -1233,7 +1524,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("13");
+    expect(session?.promptVersion).toBe("14");
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
     expect(session?.briefingJson).toMatchObject({
@@ -1255,14 +1546,18 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     expect(draftedQuestions.length).toBeGreaterThan(1);
     expect(draftedQuestions.length).toBeLessThanOrEqual(10);
     expect(
-      draftedQuestions
-        .filter(
-          (turn) =>
-            turn.targetKey !== "chronology" &&
-            turn.targetKey !== "why-this-company",
-        )
-        .every((turn) => asksAboutUnseenExperience(turn.body)),
-    ).toBe(true);
+      draftedQuestions.some((turn) => turn.targetKey?.startsWith("mission:")),
+    ).toBe(false);
+    for (const turn of draftedQuestions) {
+      const assessment = session?.assessments.find(
+        (item) => item.targetKey === turn.targetKey,
+      );
+      if (assessment && assessment.text.trim().length >= 24) {
+        expect(turn.body).not.toContain(assessment.text);
+      }
+      expect(turn.body).not.toMatch(/does not see/i);
+      expect(turn.body).not.toMatch(/^Do you have experience with /i);
+    }
 
     const storedBefore = await prisma.product.findUnique({ where: { id: productId } });
     await answerConsultationQuestion({

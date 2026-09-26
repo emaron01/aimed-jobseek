@@ -1,5 +1,6 @@
-import type { CandidateProfile, ProfileFactItem } from "@/lib/product-research/candidate-profile";
+import { WHY_THIS_COMPANY_TARGET_KEY } from "@/lib/consultation/contract";
 import type { JobScorecard } from "@/lib/job-requirement/types";
+import type { CandidateProfile, ProfileFactItem } from "@/lib/product-research/candidate-profile";
 import {
   experienceDateToMaximumMonthIndex,
   experienceDateToMonthIndex,
@@ -513,9 +514,37 @@ const KIND_RANK: Record<EvidenceKind, number> = {
   PREFERRED: 4,
 };
 
+const COMPANY_PITCH_OPENERS =
+  /^(?:join us|come join(?: us)?|help us(?: to)?(?: build| protect| transform| shape| grow)|we(?:'re| are) (?:on a mission|building a|looking for people who))\b/i;
+
+const COMPANY_PITCH_MARKERS = [
+  /\bhelp protect the world\b/i,
+  /\bworld(?:'s)? most valuable digital brands\b/i,
+  /\bdefined by execution excellence\b/i,
+];
+
+/** Recruiting pitches and taglines are not skills the seeker can have experience with. */
+export function looksLikeCompanyPitch(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (COMPANY_PITCH_OPENERS.test(trimmed)) return true;
+  return COMPANY_PITCH_MARKERS.some((pattern) => pattern.test(trimmed));
+}
+
+export function isCompanyMissionOrTagline(item: {
+  key: string;
+  kind: EvidenceKind;
+  text: string;
+}): boolean {
+  if (item.key === WHY_THIS_COMPANY_TARGET_KEY) return false;
+  if (item.kind === "MISSION" || item.key.startsWith("mission:")) return true;
+  return looksLikeCompanyPitch(item.text);
+}
+
 export function openGaps(assessments: EvidenceAssessment[]): EvidenceAssessment[] {
   return assessments
     .filter((item) => item.strength !== "STRONG")
+    .filter((item) => !isCompanyMissionOrTagline(item))
     .sort((a, b) => {
       const byKind = KIND_RANK[a.kind] - KIND_RANK[b.kind];
       if (byKind !== 0) return byKind;
@@ -530,5 +559,6 @@ export function gapsAreCovered(
 ): boolean {
   return assessments
     .filter((item) => item.kind !== "PREFERRED")
+    .filter((item) => !isCompanyMissionOrTagline(item))
     .every((item) => item.strength === "STRONG" || skippedKeys.has(item.key));
 }

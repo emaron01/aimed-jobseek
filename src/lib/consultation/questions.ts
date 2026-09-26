@@ -40,20 +40,6 @@ function targetMeaning(text: string): string {
   return requirementMeaning(text);
 }
 
-const UNSEEN_EXPERIENCE =
-  /does not see|do not see|don't see|has not seen|hasn't seen|unseen experience/i;
-
-export function unseenExperienceGapQuestion(requirement: string): string {
-  return consultationConversationCopy.unseenExperienceGapQuestion.replace(
-    "{requirement}",
-    requirement.trim(),
-  );
-}
-
-export function asksAboutUnseenExperience(text: string): boolean {
-  return UNSEEN_EXPERIENCE.test(text);
-}
-
 export function questionTextForGap(
   gap: Pick<EvidenceAssessment, "key" | "text">,
   modelText?: string | null,
@@ -63,12 +49,7 @@ export function questionTextForGap(
       modelText?.trim() || consultationConversationCopy.whyThisCompanyQuestion
     );
   }
-  const model = modelText?.trim() ?? "";
-  if (model && asksAboutUnseenExperience(model)) return model;
-  if (model) {
-    return `${model} ${consultationConversationCopy.unseenExperienceFollowOn}`;
-  }
-  return unseenExperienceGapQuestion(gap.text);
+  return modelText?.trim() ?? "";
 }
 
 export function matchConsultationFocus(input: {
