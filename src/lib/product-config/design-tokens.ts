@@ -7,6 +7,8 @@ export const designTokens = Object.freeze({
   color: {
     ink: "#0B1220",
     onInk: "#FFFFFF",
+    nav: "#163A7A",
+    onNav: "#FFFFFF",
     primary: "#1D4ED8",
     primaryHover: "#1E40AF",
     onPrimary: "#FFFFFF",
@@ -55,7 +57,9 @@ export const designTokens = Object.freeze({
 });
 
 export const tokenContrastPairs = Object.freeze([
-  { name: "white on ink navigation", fg: designTokens.color.onInk, bg: designTokens.color.ink },
+  { name: "white on ink headings", fg: designTokens.color.onInk, bg: designTokens.color.ink },
+  { name: "white on nav", fg: designTokens.color.onNav, bg: designTokens.color.nav },
+  { name: "ink on selected nav", fg: designTokens.color.ink, bg: designTokens.color.surface },
   { name: "white on primary", fg: designTokens.color.onPrimary, bg: designTokens.color.primary },
   { name: "ink on surface", fg: designTokens.color.ink, bg: designTokens.color.surface },
   { name: "muted on surface", fg: designTokens.color.muted, bg: designTokens.color.surface },

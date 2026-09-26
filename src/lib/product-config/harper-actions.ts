@@ -48,6 +48,8 @@ export function harperActionTypesForStep(
       return ["review_company", "start_consultation"];
     case "job":
       return ["review_job", "review_fit", "start_consultation"];
+    case "consultation":
+      return ["start_consultation"];
     case "hiring-team":
       return ["review_hiring_team", "prepare_person", "start_consultation"];
     case "assets":

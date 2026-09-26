@@ -29,6 +29,7 @@ export type ApplicationStepFactInput = {
   interviewStageCount: number;
   cheatSheetReady: boolean;
   appliedAt: string | null;
+  consultationStarted: boolean;
 };
 
 export type ApplicationStepView = {
@@ -46,8 +47,9 @@ export type ApplicationStepView = {
 const STEP_JOBS: Record<ApplicationStepKey, Array<ApplicationJobType | "RESEARCH">> = {
   company: ["RESEARCH"],
   job: [],
-  "hiring-team": ["HIRING_TEAM_IDENTIFY", "HIRING_TEAM_BUILD", "CONTACT_PROFILE"],
+  consultation: ["CONSULTATION"],
   assets: ["RESUME", "COVER_LETTER"],
+  "hiring-team": ["HIRING_TEAM_IDENTIFY", "HIRING_TEAM_BUILD", "CONTACT_PROFILE"],
   outreach: ["OUTREACH"],
   interviews: ["INTERVIEW_GUIDE"],
   summary: ["APPLICATION_SUMMARY"],
@@ -66,6 +68,8 @@ export function stepResultKey(
       return facts.researchDone ? "research:done" : null;
     case "job":
       return facts.hasJobTitle ? "job:ready" : null;
+    case "consultation":
+      return facts.consultationStarted ? "consultation:started" : null;
     case "hiring-team":
       return facts.hiringTeamRoleCount > 0
         ? `hiring-team:${facts.hiringTeamRoleCount}`
@@ -98,6 +102,8 @@ export function stepIsDone(
       return facts.researchDone;
     case "job":
       return facts.hasJobTitle && !facts.fitNeedsRescore;
+    case "consultation":
+      return facts.consultationStarted;
     case "hiring-team":
       return facts.hiringTeamRoleCount > 0;
     case "assets":

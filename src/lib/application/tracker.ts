@@ -53,6 +53,7 @@ export async function loadApplicationStepFacts(input: {
       contacts: { select: { id: true } },
       interviewStages: { select: { id: true } },
       applicationSummary: { select: { status: true } },
+      consultationSession: { select: { id: true } },
       jobRequirement: {
         select: {
           title: true,
@@ -105,6 +106,7 @@ export async function loadApplicationStepFacts(input: {
     interviewStageCount: campaign.interviewStages.length,
     cheatSheetReady: campaign.applicationSummary?.status === "READY",
     appliedAt: campaign.appliedAt?.toISOString() ?? null,
+    consultationStarted: Boolean(campaign.consultationSession),
   };
 }
 

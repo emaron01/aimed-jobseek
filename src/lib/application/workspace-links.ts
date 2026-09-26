@@ -22,8 +22,13 @@ export function workspaceProfileEditHref(productId: string): string {
   return `${workspaceProfileHref(productId)}/edit`;
 }
 
-export function workspaceConsultationHref(): string {
-  return `#${workspaceSectionId("CONSULTATION")}`;
+export function workspaceConsultationHref(campaignId?: string): string {
+  const id = campaignId?.trim();
+  if (id) return applicationStepHref(id, "consultation");
+  return applicationStepHref("campaign", "consultation").replace(
+    "/campaigns/campaign/consultation",
+    `#${workspaceSectionId("CONSULTATION")}`,
+  );
 }
 
 export function workspaceCampaignHref(campaignId: string): string {

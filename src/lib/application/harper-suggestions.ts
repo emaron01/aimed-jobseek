@@ -51,7 +51,7 @@ function suggestionForType(
       return {
         type,
         label: harperActionLabel(type),
-        href: workspaceConsultationHref(),
+        href: workspaceConsultationHref(input.campaignId),
       };
     case "review_company":
       return { type, label: harperActionLabel(type), href: href("company") };

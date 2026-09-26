@@ -8,14 +8,15 @@ import { applicationSummaryConfig } from "./application-summary";
 import { hiringTeamConfig } from "./hiring-team";
 import { interviewConfig } from "./interview";
 import { outreachConfig } from "./outreach";
-import { consultationConfig } from "./consultation";
+import { consultationConfig, consultationConversationCopy } from "./consultation";
 import { applicationWorkspaceCopy, vocab } from "./vocabulary";
 
 export const APPLICATION_STEP_KEYS = [
   "company",
   "job",
-  "hiring-team",
+  "consultation",
   "assets",
+  "hiring-team",
   "outreach",
   "interviews",
   "summary",
@@ -49,11 +50,11 @@ export const applicationStepList: readonly ApplicationStepDefinition[] =
       emptyGuidance: "Review the posting, location, compensation, and employer fit before you write materials.",
     },
     {
-      key: "hiring-team",
+      key: "consultation",
       number: 3,
-      hrefSegment: "hiring-team",
-      title: hiringTeamConfig.workspaceTitle,
-      emptyGuidance: "Identify who will evaluate you so outreach and interview prep have people to aim at.",
+      hrefSegment: "consultation",
+      title: consultationConfig.displayName,
+      emptyGuidance: consultationConversationCopy.start,
     },
     {
       key: "assets",
@@ -63,29 +64,36 @@ export const applicationStepList: readonly ApplicationStepDefinition[] =
       emptyGuidance: applicationAssetConfig.labels.sectionHelp,
     },
     {
-      key: "outreach",
+      key: "hiring-team",
       number: 5,
+      hrefSegment: "hiring-team",
+      title: hiringTeamConfig.workspaceTitle,
+      emptyGuidance: "Identify who will evaluate you so outreach and interview prep have people to aim at.",
+    },
+    {
+      key: "outreach",
+      number: 6,
       hrefSegment: "outreach",
       title: outreachConfig.labels.sectionTitle,
       emptyGuidance: outreachConfig.labels.sectionHelp,
     },
     {
       key: "interviews",
-      number: 6,
+      number: 7,
       hrefSegment: "interviews",
       title: interviewConfig.labels.sectionTitle,
       emptyGuidance: interviewConfig.labels.sectionHelp,
     },
     {
       key: "summary",
-      number: 7,
+      number: 8,
       hrefSegment: "summary",
       title: applicationSummaryConfig.title,
       emptyGuidance: applicationSummaryConfig.description,
     },
     {
       key: "applied",
-      number: 8,
+      number: 9,
       hrefSegment: null,
       title: applicationWorkspaceCopy.appliedTitle,
       emptyGuidance: outreachConfig.labels.appliedHelp,

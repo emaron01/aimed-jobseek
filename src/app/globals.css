@@ -5,6 +5,8 @@
   --foreground: #0b1220;
   --color-ink: #0b1220;
   --color-on-ink: #ffffff;
+  --color-nav: #163a7a;
+  --color-on-nav: #ffffff;
   --color-primary: #1d4ed8;
   --color-primary-hover: #1e40af;
   --color-on-primary: #ffffff;
@@ -34,6 +36,8 @@
   --color-foreground: var(--foreground);
   --color-ink: var(--color-ink);
   --color-on-ink: var(--color-on-ink);
+  --color-nav: var(--color-nav);
+  --color-on-nav: var(--color-on-nav);
   --color-primary: var(--color-primary);
   --color-primary-hover: var(--color-primary-hover);
   --color-on-primary: var(--color-on-primary);
