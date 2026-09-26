@@ -2373,6 +2373,8 @@ model Campaign {
   nextStepStateKey    String?
   /// Seeker FACT: why they want to work at this company.
   whyThisCompany      String?
+  /// Seeker-pasted employer facts or interests used as a research source.
+  companyResearchNotes String?
   /// Latest viewed result key per application step. Missing keys mean unseen.
   workspaceSeenJson   Json?
 

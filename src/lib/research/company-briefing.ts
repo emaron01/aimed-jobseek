@@ -11,6 +11,7 @@ export const COMPANY_RESEARCH_FIELD_KEYS = [
   "companySizeContext",
   "relevantTechnologies",
   "buyingSignals",
+  "hiringSignals",
   "riskSignals",
 ] as const;
 
@@ -31,6 +32,7 @@ export const COMPANY_RESEARCH_FIELD_LABELS: Record<
   companySizeContext: "Company size",
   relevantTechnologies: "Technologies",
   buyingSignals: "Hiring and growth signals",
+  hiringSignals: "Hiring and growth",
   riskSignals: "Risk signals",
 };
 

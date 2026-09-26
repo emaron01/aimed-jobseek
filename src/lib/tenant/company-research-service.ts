@@ -871,7 +871,11 @@ export type ResearchCompanyResult = {
 
 export async function researchCompany(
   companyId: string,
-  options?: { force?: boolean; evidenceTargets?: string[] },
+  options?: {
+    force?: boolean;
+    evidenceTargets?: string[];
+    seekerSuppliedNotes?: string;
+  },
 ): Promise<ResearchCompanyResult> {
   // Tenant ownership check BEFORE any external API spend.
   const organizationId = await orgId();
@@ -1083,6 +1087,7 @@ export async function researchCompany(
       location: company.location,
       depthPolicy: researchPolicy,
       evidenceTargets: options?.evidenceTargets,
+      seekerSuppliedNotes: options?.seekerSuppliedNotes,
     })) as CompanyResearchResult | AutomatedCompanyResearchResult;
 
     const provenance =

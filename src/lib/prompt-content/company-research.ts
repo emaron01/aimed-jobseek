@@ -22,7 +22,8 @@ CRITICAL RULES:
 13. The application owns the search budget. Do not request unbounded follow-up searches.
 
 What to capture, when public evidence supports it:
-- what the company does, its products, customers, and business model
+- What they do (most important): name the company's services and products in as much detail as public evidence allows. Include named offerings, what each does, who it is for, how it is delivered (SaaS, services, hardware, marketplace), and how the pieces fit together. Prefer concrete product and service lines over a one-sentence category label. Do not invent offerings.
+- customers and business model
 - size, stage, and funding
 - hiring and growth signals
 - employer risk signals

@@ -181,7 +181,16 @@ export function ResearchSourcesAppendix({
                   ? ` · Retrieved ${source.retrievedAt.slice(0, 10)}`
                   : ""}
               </p>
-              <p className="break-all text-xs text-muted">{source.url}</p>
+              <p className="break-all text-xs text-muted">
+                <a
+                  href={source.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  {source.url}
+                </a>
+              </p>
               {source.supports.length > 0 ? (
                 <p className="mt-1 text-xs text-subtle">
                   Supports: {source.supports.join(", ")}

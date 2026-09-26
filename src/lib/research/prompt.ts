@@ -27,12 +27,12 @@ ${input.webSearchEnabled ? "Web search is enabled — use it when needed." : "We
     {
       instruction:
         input.stage === "follow_up"
-          ? "Perform a targeted follow-up search for missing employer-research dimensions. Avoid repeating prior broad searches. Do not estimate deal size."
+          ? "Perform a targeted follow-up search for missing employer-research dimensions, especially named products and services. Avoid repeating prior broad searches. Do not estimate deal size."
           : input.webSearchEnabled
             ? input.firstPartyFetchUnavailable
-              ? "The official website could not be retrieved. Research this employer with web search: what it does, products, customers, business model, size, stage and funding, hiring and growth, employer risk, recent news, leadership, public culture, and work arrangement."
-              : "Research this employer: what it does, products, customers, business model, size, stage and funding, hiring and growth, employer risk, recent news, leadership, public culture, and work arrangement."
-            : "Synthesize employer research from the supplied first-party website evidence only. Do not invent facts absent from that evidence. If the evidence is thin, leave fields null or empty.",
+              ? "The official website could not be retrieved. Research this employer with web search. Prioritize what they do: named services and products in as much detail as public evidence allows, then customers, business model, size, stage and funding, hiring and growth, employer risk, recent news, leadership, public culture, and work arrangement."
+              : "Research this employer. Prioritize what they do: named services and products in as much detail as public evidence allows, then customers, business model, size, stage and funding, hiring and growth, employer risk, recent news, leadership, public culture, and work arrangement."
+            : "Synthesize employer research from the supplied first-party website evidence and any seeker-supplied notes. Prioritize named products and services. Do not invent facts absent from that evidence. If the evidence is thin, leave fields null or empty.",
       searchFocus: input.searchFocus ?? null,
       stage: input.stage ?? "initial",
       searchesRemaining: input.searchesRemaining ?? null,
@@ -45,13 +45,15 @@ ${input.webSearchEnabled ? "Web search is enabled — use it when needed." : "We
         employeeCount: input.company.employeeCount,
         location: input.company.location,
       },
+      seekerSuppliedNotes: input.company.seekerSuppliedNotes?.trim() || null,
       firstPartyEvidenceSources: input.evidence.sources,
       firstPartyEvidenceExcerpts: input.evidence.excerpts,
       webSearchEnabled: input.webSearchEnabled,
       responseSchema: {
         companySummary:
           "string|null — what the company does, stage, funding, recent news, and leadership when evidenced",
-        whatTheySell: "string|null — products",
+        whatTheySell:
+          "string|null — the most important field. Name services and products in as much detail as the evidence allows: each offering, what it does, who it is for, and how it is delivered. Prefer concrete lines over a one-sentence category. Do not invent offerings.",
         customerTypes: ["string"],
         primaryMarkets: ["string"],
         businessModel: "string|null",

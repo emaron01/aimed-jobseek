@@ -4,7 +4,6 @@ import {
   rejectApplicationEmployerIdentityAction,
   rescoreApplicationFitAction,
   retryApplicationNextStepAction,
-  retryApplicationResearchAction,
 } from "@/app/actions/application";
 import { ApplicationResearchStatus } from "@/components/ApplicationResearchStatus";
 import { ApplicationFitOverride } from "@/components/ApplicationFitOverride";
@@ -23,7 +22,6 @@ import {
 } from "@/lib/application/workspace-links";
 import { mergeExistingHiringTeamRoles } from "@/lib/hiring-team/merge-existing";
 import { getApplicationResearchStatus } from "@/lib/application/research-status";
-import type { ApplicationResearchStatusView } from "@/lib/application/research-status";
 import {
   addApplicationRoleAction,
   addHiringTeamPersonAction,
@@ -43,7 +41,7 @@ import {
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { InterviewStagesSection } from "@/components/InterviewStagesSection";
 import { ApplicationAssetsSection } from "@/components/ApplicationAssetsSection";
-import { ApplicationCompanyUpdateForm } from "@/components/ApplicationCompanyUpdateForm";
+import { ApplicationCompanyBriefing } from "@/components/ApplicationCompanyBriefing";
 import { ApplicationJobRequirementForm } from "@/components/ApplicationJobRequirementForm";
 import { EmptyState } from "@/components/design";
 import { OpenDetailsOnMount } from "@/components/OpenDetailsOnMount";
@@ -81,6 +79,10 @@ import {
 import { ensureHiringTeamAfterResearch, ensureIdentityVerification } from "@/lib/application/service";
 import { AppActionLink } from "@/components/ui";
 import { parseStringArray } from "@/lib/research";
+import type { ResearchSource } from "@/lib/research/types";
+import { hasUsableCompanyResearchFields } from "@/lib/research/freshness";
+import { researchStatusLabel } from "@/lib/tenant/companies";
+import { formatDate, formatNumber } from "@/lib/utils";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { persistExtractedExperienceDates } from "@/lib/product-research/restore-role-dates";
 import { persistExtractedContactDetails } from "@/lib/product-research/restore-contact-details";
@@ -156,8 +158,6 @@ function IdentityVerificationPanel({
   campaignId,
   canEdit,
   requirement,
-  research,
-  researchStatus,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -165,38 +165,13 @@ function IdentityVerificationPanel({
     campaignId: string;
     identityConfirmation: "PENDING" | "CONFIRMED" | "REJECTED";
     identityVerificationJson: unknown;
-    employerSkipReason: string | null;
   };
-  research: {
-    status: string;
-    identityAmbiguous: boolean;
-    companySummary: string | null;
-    whatTheySell: string | null;
-    businessModel: string | null;
-    hiringSignals: unknown;
-    riskSignals: unknown;
-  } | null;
-  researchStatus: ApplicationResearchStatusView;
 }) {
   const verification = parseIdentityVerification(requirement.identityVerificationJson);
-  const researchFailed =
-    Boolean(requirement.employerSkipReason) &&
-    (!research || research.status === "FAILED" || research.status === "NOT_STARTED");
-  const showRetry =
-    canEdit &&
-    !researchStatus.canRetry &&
-    researchStatus.phase !== "queued" &&
-    researchStatus.phase !== "researching" &&
-    (researchFailed || !research || research.status === "FAILED" || research.status === "NOT_STARTED");
   const showCandidate =
     verification &&
     requirement.identityConfirmation !== "CONFIRMED" &&
     (verification.verdict === "AMBIGUOUS" || requirement.identityConfirmation === "REJECTED");
-  const confirmedResearch =
-    research &&
-    !research.identityAmbiguous &&
-    (requirement.identityConfirmation === "CONFIRMED" ||
-      verification?.verdict === "MATCHED");
 
   return (
     <div className="space-y-3 border-t border-edge pt-4" data-testid="employer-identity">
@@ -306,30 +281,6 @@ function IdentityVerificationPanel({
         </div>
       ) : null}
 
-      <div className="space-y-2">
-        {confirmedResearch ? (
-          <div className="space-y-2 text-sm text-ink">
-            <p>{research.companySummary || "No summary yet."}</p>
-            <p>{research.whatTheySell ? `Products: ${research.whatTheySell}` : null}</p>
-            <p>{research.businessModel ? `Business model: ${research.businessModel}` : null}</p>
-            <BulletList title="Hiring and growth" items={textList(research.hiringSignals)} />
-            <BulletList title="Employer risk" items={textList(research.riskSignals)} />
-          </div>
-        ) : (
-          <p className="text-sm text-muted">
-            Employer research has not been confirmed for this {vocab.campaign.singular}.
-          </p>
-        )}
-        {showRetry ? (
-          <ApplicationActionForm
-            action={retryApplicationResearchAction}
-            submitLabel={employerIdentityCopy.retry}
-            testId="retry-research"
-          >
-            <input type="hidden" name="campaignId" value={campaignId} />
-          </ApplicationActionForm>
-        ) : null}
-      </div>
     </div>
   );
 }
@@ -363,6 +314,7 @@ export async function ApplicationWorkspace({
       company: { include: { research: { orderBy: { updatedAt: "desc" }, take: 1 } } },
       campaign: {
         select: {
+          companyResearchNotes: true,
           icp: {
             select: { updatedAt: true, interpretationPromptVersion: true, name: true },
           },
@@ -589,34 +541,71 @@ export async function ApplicationWorkspace({
           campaignId={campaignId}
           canEdit={canEdit}
           initialStatus={researchStatus}
+          hideRetry
         />
         <IdentityVerificationPanel
           campaignId={campaignId}
           canEdit={canEdit}
           requirement={requirement}
-          research={research}
-          researchStatus={researchStatus}
         />
-        {canEdit ? (
-          <ApplicationCompanyUpdateForm
-            campaignId={campaignId}
-            companyName={requirement.companyName}
-            defaults={{
-              companySummary: research?.companySummary ?? null,
-              whatTheySell: research?.whatTheySell ?? null,
-              businessModel: research?.businessModel ?? null,
-              companySizeContext: research?.companySizeContext ?? null,
-              estimatedAov: research?.estimatedAov ?? null,
-              aovReasoning: research?.aovReasoning ?? null,
-              customerTypes: research?.customerTypes ?? [],
-              primaryMarkets: research?.primaryMarkets ?? [],
-              relevantTechnologies: research?.relevantTechnologies ?? [],
-              buyingSignals: research?.buyingSignals ?? [],
-              hiringSignals: research?.hiringSignals ?? [],
-              riskSignals: research?.riskSignals ?? [],
-            }}
-          />
-        ) : null}
+        <ApplicationCompanyBriefing
+          campaignId={campaignId}
+          canEdit={canEdit}
+          companyName={
+            requirement.company?.name ??
+            requirement.companyName ??
+            applicationWorkspaceCopy.companyTitle
+          }
+          meta={{
+            domain:
+              requirement.company?.normalizedDomain ??
+              requirement.company?.website ??
+              null,
+            industry: requirement.company?.industry ?? null,
+            location: requirement.company?.location ?? null,
+            employeeCount:
+              requirement.company?.employeeCount != null
+                ? formatNumber(requirement.company.employeeCount)
+                : null,
+            revenue:
+              requirement.company?.revenue != null
+                ? String(requirement.company.revenue)
+                : null,
+            lastResearched: research?.researchedAt
+              ? formatDate(research.researchedAt)
+              : null,
+          }}
+          defaults={{
+            companySummary: research?.companySummary ?? null,
+            whatTheySell: research?.whatTheySell ?? null,
+            customerTypes: research?.customerTypes ?? [],
+            primaryMarkets: research?.primaryMarkets ?? [],
+            businessModel: research?.businessModel ?? null,
+            companySizeContext: research?.companySizeContext ?? null,
+            relevantTechnologies: research?.relevantTechnologies ?? [],
+            hiringSignals: research?.hiringSignals ?? [],
+            riskSignals: research?.riskSignals ?? [],
+          }}
+          sources={
+            Array.isArray(research?.researchSources)
+              ? (research.researchSources as ResearchSource[])
+              : []
+          }
+          researchMethod={research?.researchMethod ?? null}
+          researchStatus={
+            research &&
+            (research.status === "COMPLETED" || research.status === "PARTIAL")
+              ? hasUsableCompanyResearchFields(research)
+                ? "Researched"
+                : "No usable details found"
+              : researchStatusLabel(research?.status)
+          }
+          notes={requirement.campaign.companyResearchNotes ?? ""}
+          researchLive={
+            researchStatus.phase === "queued" ||
+            researchStatus.phase === "researching"
+          }
+        />
       </div>
     </details>
     ) : null}

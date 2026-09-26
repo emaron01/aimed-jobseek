@@ -17,6 +17,7 @@ import {
 } from "@/lib/research/evidence";
 import { finalizeResearchSources } from "@/lib/research/finalize-sources";
 import { buildCompanyResearchMessages } from "@/lib/research/prompt";
+import { appendSeekerSuppliedResearchEvidence } from "@/lib/research/seeker-supplied-notes";
 import {
   getCompanySourceRetriever,
   hasFirstPartyWebsiteEvidence,
@@ -158,7 +159,10 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
         .map((excerpt) => excerpt.text)
         .join("\n");
 
-      let evidence = websiteEvidence;
+      let evidence = appendSeekerSuppliedResearchEvidence(
+        websiteEvidence,
+        input.seekerSuppliedNotes,
+      );
       let lastValidated: CompanyResearchResult | null = null;
       let identityAmbiguous = false;
       let current: CompanyResearchResult | undefined;

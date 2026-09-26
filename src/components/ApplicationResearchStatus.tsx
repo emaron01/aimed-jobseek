@@ -23,10 +23,12 @@ export function ApplicationResearchStatus({
   campaignId,
   canEdit,
   initialStatus,
+  hideRetry = false,
 }: {
   campaignId: string;
   canEdit: boolean;
   initialStatus: ApplicationResearchStatusView;
+  hideRetry?: boolean;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState(initialStatus);
@@ -68,7 +70,7 @@ export function ApplicationResearchStatus({
       <p className="text-sm text-muted" data-testid="application-research-detail">
         {status.detail}
       </p>
-      {canEdit && status.canRetry ? (
+      {canEdit && status.canRetry && !hideRetry ? (
         <ApplicationActionForm
           action={retryApplicationResearchAction}
           submitLabel={employerIdentityCopy.retry}

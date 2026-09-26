@@ -92,6 +92,8 @@ export type CompanyResearchInput = {
   depthPolicy?: CompanyResearchDepthPolicy;
   /** Target Employer researchGuidance lines. They direct evidence search, not fit. */
   evidenceTargets?: string[];
+  /** Application-scoped seeker notes used as an additional research source. */
+  seekerSuppliedNotes?: string;
 };
 
 export interface CompanyResearchProvider {

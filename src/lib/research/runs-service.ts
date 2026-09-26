@@ -615,7 +615,7 @@ async function processApplicationResearchRun(run: ResearchRun): Promise<void> {
 
   const campaign = await prisma.campaign.findFirst({
     where: { id: run.campaignId, organizationId: run.organizationId },
-    select: { icpId: true },
+    select: { icpId: true, companyResearchNotes: true },
   });
   if (!campaign) {
     await failApplicationResearchRun(
@@ -645,6 +645,8 @@ async function processApplicationResearchRun(run: ResearchRun): Promise<void> {
 
         const result = await researchCompany(run.currentCompanyId!, {
           force: run.forceRefresh,
+          seekerSuppliedNotes:
+            campaign.companyResearchNotes?.trim() || undefined,
         });
 
         const { finishApplicationAfterResearch } = await import(

@@ -10,6 +10,10 @@ import {
 } from "@/lib/application/research-finish";
 import { enqueueApplicationResearch } from "@/lib/research/runs-service";
 import {
+  COMPANY_RESEARCH_NOTES_MAX_CHARS,
+  normalizeCompanyResearchNotes,
+} from "@/lib/research/seeker-supplied-notes";
+import {
   decideEmployerResearch,
   type EmployerMatch,
 } from "@/lib/job-requirement/employer";
@@ -20,7 +24,7 @@ import {
   researchIdentityInput,
   verifyEmployerIdentity,
 } from "@/lib/job-requirement/identity-verification";
-import { employerIdentityCopy } from "@/lib/product-config";
+import { applicationWorkspaceCopy, employerIdentityCopy } from "@/lib/product-config";
 import type { JobScorecard, ParsedJobRequirement, ScorecardItem } from "@/lib/job-requirement/types";
 import { JOB_REQUIREMENT_PROMPT_VERSION } from "@/lib/job-requirement/types";
 import { prisma } from "@/lib/prisma";
@@ -447,10 +451,40 @@ export async function rejectApplicationEmployerIdentity(input: {
   });
 }
 
+export async function saveApplicationCompanyResearchNotes(input: {
+  organizationId: string;
+  campaignId: string;
+  notes: string;
+}): Promise<void> {
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: { id: true },
+  });
+  if (!campaign) {
+    throw new TenantError(`${vocab.campaign.Singular} was not found.`);
+  }
+  const notes = normalizeCompanyResearchNotes(input.notes);
+  if (notes.length > COMPANY_RESEARCH_NOTES_MAX_CHARS) {
+    throw new TenantError(applicationWorkspaceCopy.companyNotesTooLong);
+  }
+  await prisma.campaign.update({
+    where: { id: campaign.id },
+    data: { companyResearchNotes: notes.length > 0 ? notes : null },
+  });
+}
+
 export async function retryApplicationResearch(input: {
   organizationId: string;
   campaignId: string;
+  notes?: string;
 }): Promise<void> {
+  if (input.notes !== undefined) {
+    await saveApplicationCompanyResearchNotes({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      notes: input.notes,
+    });
+  }
   const requirement = await prisma.jobRequirement.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });

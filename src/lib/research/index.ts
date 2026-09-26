@@ -10,3 +10,4 @@ export * from "@/lib/research/prompt";
 export * from "@/lib/research/evidence";
 export * from "@/lib/research/telemetry";
 export * from "@/lib/research/sufficiency";
+export * from "@/lib/research/seeker-supplied-notes";

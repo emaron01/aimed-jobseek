@@ -9,6 +9,7 @@ import {
   rejectApplicationEmployerIdentity,
   rescoreApplicationFit,
   retryApplicationResearch,
+  saveApplicationCompanyResearchNotes,
   updateApplicationCompanyInformation,
   updateApplicationJobRequirement,
 } from "@/lib/application/service";
@@ -118,11 +119,42 @@ export async function retryApplicationResearchAction(
     if (!campaignId) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }
-    await retryApplicationResearch({ organizationId, campaignId });
+    await retryApplicationResearch({
+      organizationId,
+      campaignId,
+      ...(formData.has("notes")
+        ? { notes: String(formData.get("notes") ?? "") }
+        : {}),
+    });
     revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/campaigns/${campaignId}/company`);
     return { ok: true, message: applicationResearchCopy.retriedQueued };
   } catch (error) {
     return fail(error, "Employer research could not be retried.");
+  }
+}
+
+export async function saveApplicationCompanyResearchNotesAction(
+  _prev: ApplicationActionResult | null,
+  formData: FormData,
+): Promise<ApplicationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    await saveApplicationCompanyResearchNotes({
+      organizationId,
+      campaignId,
+      notes: String(formData.get("notes") ?? ""),
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/campaigns/${campaignId}/company`);
+    return { ok: true, message: applicationWorkspaceCopy.companyNotesSaved };
+  } catch (error) {
+    return fail(error, applicationWorkspaceCopy.companyNotesFailed);
   }
 }
 

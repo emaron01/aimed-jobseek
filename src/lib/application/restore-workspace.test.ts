@@ -28,10 +28,10 @@ function walk(dir: string, acc: string[] = []): string[] {
 }
 
 describe("restored workspace editing and Harper", () => {
-  it("lets the seeker edit company information and job requirements", () => {
+  it("lets the seeker edit job requirements and regenerate company research", () => {
     const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
-    const company = readFileSync(
-      "src/components/ApplicationCompanyUpdateForm.tsx",
+    const briefing = readFileSync(
+      "src/components/ApplicationCompanyBriefing.tsx",
       "utf8",
     );
     const job = readFileSync(
@@ -39,13 +39,14 @@ describe("restored workspace editing and Harper", () => {
       "utf8",
     );
     const actions = readFileSync("src/app/actions/application.ts", "utf8");
-    expect(workspace).toContain("ApplicationCompanyUpdateForm");
+    expect(workspace).toContain("ApplicationCompanyBriefing");
+    expect(workspace).not.toContain("ApplicationCompanyUpdateForm");
     expect(workspace).toContain("ApplicationJobRequirementForm");
-    expect(company).toContain("company-update-form");
-    expect(company).toContain("updateApplicationCompanyInformationAction");
+    expect(briefing).toContain("regenerate-company-research");
+    expect(briefing).toContain("company-research-notes");
     expect(job).toContain("job-requirement-edit-form");
     expect(job).toContain("updateApplicationJobRequirementAction");
-    expect(actions).toContain("updateApplicationCompanyInformation");
+    expect(actions).toContain("saveApplicationCompanyResearchNotes");
     expect(actions).toContain("updateApplicationJobRequirement");
     const empty = new FormData();
     expect(readLineList(empty, "missing")).toEqual([]);

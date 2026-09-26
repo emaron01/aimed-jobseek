@@ -208,6 +208,19 @@ export const applicationWorkspaceCopy = Object.freeze({
   appliedTitle: "Update application date and status",
   contactsTitle: "Add and review interview contacts",
   companyTitle: "Company",
+  whatTheyDoTitle: "What they do",
+  whoTheyServeTitle: "Who they serve",
+  howTheyOperateTitle: "How they operate",
+  companyNotesTitle: "Add what you know",
+  companyNotesHelp:
+    "Paste information research could not find, or an area you want to understand.",
+  companyNotesSave: "Save notes",
+  companyNotesSaved: "Notes saved.",
+  companyNotesFailed: "The notes could not be saved.",
+  companyNotesTooLong: "These notes are too long. Shorten them and save again.",
+  companyNotesSourceTitle: "Your notes",
+  companyBriefingEmpty:
+    "No employer research is recorded yet. Add what you know below, then regenerate.",
   companyUpdateTitle: "Update company information",
   companyUpdateHelp:
     "Edit what research found, or add what you know about this employer.",
