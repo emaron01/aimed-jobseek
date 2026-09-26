@@ -21,7 +21,7 @@ export type PersonPrepView = {
   confirmedAnswers: PersonPrepAnswer[];
 };
 
-function parseAnswers(value: unknown): PersonPrepAnswer[] {
+export function parsePersonPrepAnswers(value: unknown): PersonPrepAnswer[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
@@ -158,7 +158,7 @@ export async function appendPersonPrepAnswer(input: {
     select: { id: true, personPrepAnswersJson: true },
   });
   if (!membership) return;
-  const answers = parseAnswers(membership.personPrepAnswersJson);
+  const answers = parsePersonPrepAnswers(membership.personPrepAnswersJson);
   if (answers.some((item) => item.turnId === input.turnId && item.text === input.text.trim())) {
     return;
   }
@@ -198,6 +198,6 @@ export async function listPersonPreps(input: {
       ? row.personPrepStatus
       : "OFFERED") as PersonPrepView["status"],
     openingText: row.personPrepOpening,
-    confirmedAnswers: parseAnswers(row.personPrepAnswersJson),
+    confirmedAnswers: parsePersonPrepAnswers(row.personPrepAnswersJson),
   }));
 }

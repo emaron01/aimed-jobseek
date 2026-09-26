@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONSULTATION_PROMPT_VERSION = "17";
+export const CONSULTATION_PROMPT_VERSION = "18";
 
 export const WHY_THIS_COMPANY_TARGET_KEY = "why-this-company";
 export const PERSON_PREP_TARGET_PREFIX = "person-prep:";
@@ -119,4 +119,94 @@ export type SeekerStatedFactPayload = {
   kind: "FACT";
   text: string;
   source: "added_background" | "interview_learning";
+};
+
+/** The built general persona for a Hiring Team role. Null until the role is built. */
+export type CoachGeneralPersona = {
+  definition: string | null;
+  department: string | null;
+  seniority: string | null;
+  responsibilities: string | null;
+  painPoints: string | null;
+  desiredOutcomes: string | null;
+  messagingNotes: string | null;
+  additionalContext: string | null;
+  overview: string | null;
+  impact: string | null;
+  pressures: string[];
+  needs: string[];
+  concerns: string[];
+  evaluates: string[];
+  talkingPoints: string[];
+  communication: string[];
+  interviewStage: string | null;
+};
+
+/** One person's own persona: what this individual cares about, not the role in general. */
+export type CoachPersonPersona = {
+  caresAbout: string[];
+  talkingPoints: string[];
+  commonGround: Array<{
+    text: string;
+    seekerSource: string;
+    contactSource: string;
+  }>;
+};
+
+export type CoachPersonLinkedIn = {
+  profileText: string | null;
+  currentTitle: string | null;
+  currentEmployer: string | null;
+  currentTenure: string | null;
+  priorRoles: Array<{ employer: string; title: string | null }>;
+  education: string[];
+  statedFocus: string[];
+};
+
+/** Invitation details and anything else recorded about this person, newest last. */
+export type CoachPersonNote = {
+  id: string;
+  text: string;
+  stageId: string | null;
+  recordedAt: string | null;
+};
+
+export type CoachPersonInterviewStage = {
+  id: string;
+  type: string;
+  format: string;
+  scheduledAt: string;
+  expectedDecisionAt: string | null;
+  outcome: string | null;
+  notesBefore: string | null;
+  notesAfter: string | null;
+};
+
+export type CoachHiringTeamPerson = {
+  contactId: string;
+  name: string;
+  title: string | null;
+  employer: string | null;
+  linkedInUrl: string | null;
+  roleConfirmed: boolean;
+  persona: CoachPersonPersona | null;
+  linkedIn: CoachPersonLinkedIn | null;
+  recordedNotes: CoachPersonNote[];
+  interviewStages: CoachPersonInterviewStage[];
+  prepOpening: string | null;
+  interviewLearnings: string[];
+};
+
+/**
+ * One Hiring Team role. The general persona and each matched person stay separate
+ * entries: a person's own persona never replaces or merges into the general one.
+ */
+export type CoachHiringTeamRole = {
+  id: string;
+  name: string;
+  likelyTitles: string[];
+  whyThisRoleMatters: string | null;
+  personaBuilt: boolean;
+  persona: CoachGeneralPersona | null;
+  people: CoachHiringTeamPerson[];
 };

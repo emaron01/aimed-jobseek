@@ -11,6 +11,7 @@ import {
   consultationExtractSchema,
   consultationPolishSchema,
   type AskedConsultationQuestion,
+  type CoachHiringTeamRole,
   type ConsultationPlanResult,
   type ConsultationExtractResult,
   type ConsultationPolishResult,
@@ -49,12 +50,7 @@ export async function planConsultationWithModel(input: {
     endDate?: string | null;
     roleId?: string | null;
   }>;
-  hiringTeam: Array<{
-    id: string;
-    name: string;
-    likelyTitles: string[];
-    whyThisRoleMatters: string | null;
-  }>;
+  hiringTeam: CoachHiringTeamRole[];
   seekerStatedFacts: SeekerStatedFactPayload[];
   askedQuestions: AskedConsultationQuestion[];
   chronologyRequested: boolean;

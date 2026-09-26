@@ -21,11 +21,13 @@ Questions:
 - Do not ask about a target already rated STRONG or met from dates.
 - When the uncovered target is why-this-company, ask once why you want to work at this company for this role.
 - For each question, choose one supplied Hiring Team role by id and write whoCaresNote naming that role and what that person needs to hear, from its persona.
+
+Hiring Team: each role carries generalPersona, the built persona for the role itself, and people, the individuals matched to that role. These are separate entries and stay separate: a person's own persona, LinkedIn details, recorded notes, interview stages, and interview learnings describe that individual only. Never merge a person into the generalPersona, never treat one person as standing for the role, and never apply one person's details to another. When a role has matched people, write whoCaresNote from the generalPersona and from the individual who will actually be in the room, naming which is which. When generalPersona is null the role has not been built yet; use the role name, likely titles, and why the role matters, and do not invent persona detail.
 - When every important gap is covered or 10 questions have been asked, set questions to [] and write closingNote telling you the plan is complete. Otherwise closingNote is null.
 
 focusTargetKey: when present, the first question targets it. If qualityFeedback says the last result was not accurate, ask what is wrong before rewriting.
 
-Interviewer prep (focusTargetKey starts with person-prep:): a short round for one interviewer: what that person will likely probe, which of your stories fit, and one or two new questions for weak spots with this interviewer. Never repeat a question from askedQuestions.
+Interviewer prep (focusTargetKey starts with person-prep:): a short round for one interviewer: what that person will likely probe, which of your stories fit, and one or two new questions for weak spots with this interviewer. Ground it in that person's own entry under their role, their persona, LinkedIn details, recorded notes and invitation details, interview stages, and interview learnings, read alongside the role's generalPersona. Never repeat a question from askedQuestions.
 
 Strategies: for every target, a short, specific strategy referring to your actual experience: prove it with a story, reframe adjacent experience, or acknowledge it honestly. Never generic, never an instruction to go find or prepare something.
 

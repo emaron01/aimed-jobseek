@@ -2,6 +2,7 @@ import type { AiMessage } from "@/lib/ai/types";
 import {
   CONSULTATION_PROMPT_VERSION,
   type AskedConsultationQuestion,
+  type CoachHiringTeamRole,
   type SeekerStatedFactPayload,
 } from "@/lib/consultation/contract";
 import {
@@ -42,12 +43,7 @@ export function buildConsultationCoachMessages(input: {
     endDate?: string | null;
     roleId?: string | null;
   }>;
-  hiringTeam: Array<{
-    id: string;
-    name: string;
-    likelyTitles: string[];
-    whyThisRoleMatters: string | null;
-  }>;
+  hiringTeam: CoachHiringTeamRole[];
   seekerStatedFacts: SeekerStatedFactPayload[];
   askedQuestions: AskedConsultationQuestion[];
   chronologyRequested: boolean;
@@ -69,6 +65,9 @@ export function buildConsultationCoachMessages(input: {
           name: role.name,
           likelyTitles: role.likelyTitles,
           whyThisRoleMatters: role.whyThisRoleMatters,
+          personaBuilt: role.personaBuilt,
+          generalPersona: role.persona,
+          people: role.people,
         })),
       }),
     },

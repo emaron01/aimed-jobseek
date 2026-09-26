@@ -18,8 +18,10 @@ import {
   WHY_THIS_COMPANY_TARGET_KEY,
   isConsultationExtractAnswer,
   isConsultationExtractFeedback,
+  type CoachHiringTeamRole,
   type SeekerStatedFactPayload,
 } from "@/lib/consultation/contract";
+import { loadCoachHiringTeam } from "@/lib/consultation/hiring-team-context";
 import type { AiCallUsageContext } from "@/lib/ai/types";
 import {
   askedQuestionsFromTurns,
@@ -235,28 +237,6 @@ function targetsFromRequirement(requirement: {
       scorecard: readScorecard(requirement.scorecardJson),
     }),
   ];
-}
-
-async function hiringTeam(
-  organizationId: string,
-  campaignId: string,
-) {
-  const roles = await prisma.persona.findMany({
-    where: { organizationId, campaignId, archivedAt: null },
-    orderBy: { createdAt: "asc" },
-    select: {
-      id: true,
-      name: true,
-      targetTitles: true,
-      whyThisPersonaMatters: true,
-    },
-  });
-  return roles.map((role) => ({
-    id: role.id,
-    name: role.name,
-    likelyTitles: parseStringArray(role.targetTitles),
-    whyThisRoleMatters: role.whyThisPersonaMatters,
-  }));
 }
 
 async function saveAssessments(
@@ -700,7 +680,7 @@ async function planAndStoreRound(input: {
     seekerLearnedNotes?: string | null;
   };
   targets: EvidenceTarget[];
-  roles: Awaited<ReturnType<typeof hiringTeam>>;
+  roles: CoachHiringTeamRole[];
   focusTargetKey?: string | null;
   focusGuidance?: string[];
 }): Promise<QuestionRoundPlan["questions"]> {
@@ -1111,7 +1091,7 @@ export async function startConsultation(input: {
     whyThisCompany: campaign.whyThisCompany,
     profile,
   });
-  const roles = await hiringTeam(input.organizationId, input.campaignId);
+  const roles = await loadCoachHiringTeam(input.organizationId, input.campaignId);
   try {
     await planAndStoreRound({
       organizationId: input.organizationId,
@@ -2272,7 +2252,7 @@ export async function skipConsultationQuestion(input: {
     await queueAssetsWhenConsultationEnds(session.id);
     return;
   }
-  const roles = await hiringTeam(input.organizationId, input.campaignId);
+  const roles = await loadCoachHiringTeam(input.organizationId, input.campaignId);
   const next = await planAndStoreRound({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
@@ -2869,7 +2849,7 @@ export async function continueConsultationPlanning(input: {
     await queueAssetsWhenConsultationEnds(session.id);
     return;
   }
-  const roles = await hiringTeam(input.organizationId, input.campaignId);
+  const roles = await loadCoachHiringTeam(input.organizationId, input.campaignId);
   const next = await planAndStoreRound({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
@@ -2993,7 +2973,7 @@ export async function flagConsultationInaccuracy(input: {
     profile,
   });
   askedKeys.delete(draft.turn.targetKey);
-  const roles = await hiringTeam(input.organizationId, input.campaignId);
+  const roles = await loadCoachHiringTeam(input.organizationId, input.campaignId);
   const next = await planAndStoreRound({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
