@@ -897,7 +897,7 @@ describe("consultation evidence and questions", () => {
     expect(workspace).not.toContain("Avery");
     expect(workspace).not.toContain("Save answer");
     expect(workspace).toContain("consultationConversationCopy.generationFailed");
-    expect(thread).toContain("consultationConversationCopy.useThis");
+    expect(thread).toContain("consultationConversationCopy.approve");
     expect(thread).toContain("consultationConversationCopy.thinking");
     expect(workspace).not.toContain("supportingFactIds).join");
   });

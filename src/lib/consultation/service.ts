@@ -2052,6 +2052,42 @@ export async function regenerateConsultationStatement(input: {
   ]);
 }
 
+export async function approveConsultationQaResult(input: {
+  organizationId: string;
+  statementIds: string[];
+}): Promise<void> {
+  if (input.statementIds.length === 0) {
+    throw new TenantError("That polished statement was not found.");
+  }
+  for (const statementId of input.statementIds) {
+    const statement = await prisma.consultationStatement.findFirst({
+      where: { id: statementId, organizationId: input.organizationId },
+      select: { content: true },
+    });
+    if (!statement) throw new TenantError("That polished statement was not found.");
+    await approveConsultationStatement({
+      organizationId: input.organizationId,
+      statementId,
+      content: statement.content,
+    });
+  }
+}
+
+export async function regenerateConsultationQaResult(input: {
+  organizationId: string;
+  statementIds: string[];
+}): Promise<void> {
+  if (input.statementIds.length === 0) {
+    throw new TenantError("That polished statement was not found.");
+  }
+  for (const statementId of input.statementIds) {
+    await regenerateConsultationStatement({
+      organizationId: input.organizationId,
+      statementId,
+    });
+  }
+}
+
 export async function approveConsultationStatement(input: {
   organizationId: string;
   statementId: string;

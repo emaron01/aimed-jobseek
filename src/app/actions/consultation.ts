@@ -2,11 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  approveConsultationQaResult,
   approveConsultationStatement,
   completeConsultation,
   confirmConsultationProposal,
   dismissConsultationProposal,
   pauseConsultation,
+  regenerateConsultationQaResult,
   regenerateConsultationStatement,
   resolveConsultationStatementFlag,
   saveEditedConsultationStatement,
@@ -399,6 +401,71 @@ export async function replyConsultationAction(
     return { ok: true, message: consultationConversationCopy.thinking };
   } catch (error) {
     return fail(error, "The reply could not be sent.");
+  }
+}
+
+function statementIdsFrom(formData: FormData): string[] {
+  return formData
+    .getAll("statementId")
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+}
+
+export async function approveConsultationQaResultAction(
+  _prev: ConsultationActionResult | null,
+  formData: FormData,
+): Promise<ConsultationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = campaignIdFrom(formData);
+    const statementIds = statementIdsFrom(formData);
+    if (statementIds.length === 0) {
+      return { ok: false, message: "That polished statement was not found." };
+    }
+    await approveConsultationQaResult({ organizationId, statementIds });
+    if (campaignId) {
+      try {
+        await enqueueApplicationJob({
+          organizationId,
+          campaignId,
+          type: "CONSULTATION",
+          payload: { operation: "continue" },
+        });
+      } catch (error) {
+        console.error(
+          JSON.stringify({
+            event: "consultation_continue_enqueue_failed",
+            campaignId,
+            message: error instanceof Error ? error.message : "unknown",
+          }),
+        );
+      }
+      revalidatePath(`/campaigns/${campaignId}`);
+    }
+    return { ok: true, message: consultationConversationCopy.confirmed };
+  } catch (error) {
+    return fail(error, "The result could not be approved.");
+  }
+}
+
+export async function regenerateConsultationQaResultAction(
+  _prev: ConsultationActionResult | null,
+  formData: FormData,
+): Promise<ConsultationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = campaignIdFrom(formData);
+    const statementIds = statementIdsFrom(formData);
+    if (statementIds.length === 0) {
+      return { ok: false, message: "That polished statement was not found." };
+    }
+    await regenerateConsultationQaResult({ organizationId, statementIds });
+    if (campaignId) revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: "Polished statement regenerated." };
+  } catch (error) {
+    return fail(error, "The result could not be regenerated.");
   }
 }
 

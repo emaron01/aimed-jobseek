@@ -6,7 +6,7 @@ import { applicationWorkspaceCopy, vocab } from "./vocabulary";
 export const consultationConfig = Object.freeze({
   displayName: "Harper",
   roundSize: 1,
-  maxFollowUpsPerTarget: 2,
+  maxFollowUpsPerTarget: 1,
   qualityRegenerationAttempts: 2,
   interviewAnswerMaxWords: 220,
   interviewAnswerMetaLanguage: Object.freeze([
@@ -61,8 +61,10 @@ export const consultationConversationCopy = Object.freeze({
   collapseAllEvidence: "Collapse all",
   threadReply: "Reply",
   seekerSpeaker: "You",
+  yourAnswer: "Your answer",
   showYourReplies: "Show your replies",
   hideYourReplies: "Hide your replies",
+  approve: "Approve",
   useThis: "Use this",
   confirmed: "Saved. The next question is on the way.",
   changeSomething: "Change something",

@@ -107,6 +107,7 @@ describe("workspace order and Harper start", () => {
     expect(chrome).not.toContain("HarperDock");
     expect(layout).not.toContain("ConsultationSection");
     expect(consultationPage).toContain("ConsultationSection");
+    expect(consultation).not.toContain("HarperSuggestionList");
     expect(consultation).toContain("ConsultationThread");
     expect(consultation.indexOf("ConsultationThread")).toBeLessThan(
       consultation.indexOf("consultation-briefing"),

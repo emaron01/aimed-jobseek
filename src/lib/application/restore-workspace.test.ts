@@ -1,7 +1,6 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildHarperSuggestions } from "@/lib/application/harper-suggestions";
 import { readLineList } from "@/lib/application/form-fields";
 import {
   applicationStepList,
@@ -58,49 +57,17 @@ describe("restored workspace editing and Harper", () => {
     ]);
   });
 
-  it("keeps Harper reply, polished-statement actions, and suggestions on the Harper page", () => {
+  it("keeps Harper reply with approve and regenerate on each result", () => {
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
     const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
     expect(thread).toContain("replyConsultationAction");
     expect(thread).toContain("consultation-reply");
-    expect(thread).toContain("useConsultationResultAction");
-    expect(thread).toContain("reviseConsultationResultAction");
-    expect(thread).toContain("flagConsultationInaccuracyAction");
-    expect(thread).toContain("consultationConversationCopy.useThis");
-    expect(thread).toContain("consultationConversationCopy.changeSomething");
-    expect(thread).toContain("consultationConversationCopy.notAccurate");
-    expect(thread).toContain("showYourReplies");
-    expect(thread).toContain("seekerSpeaker");
-    expect(thread).toContain("toggle-seeker-replies");
-    expect(thread).toContain('turn.speaker === "SEEKER"');
-    expect(section).toContain("HarperSuggestionList");
-    const suggestions = buildHarperSuggestions({
-      campaignId: "camp_1",
-      step: "consultation",
-      productId: "prod_1",
-      facts: {
-        researchDone: true,
-        researchFailed: false,
-        researchInProgress: false,
-        hasJobTitle: true,
-        fitNeedsRescore: false,
-        hiringTeamRoleCount: 1,
-        hasApprovedResume: true,
-        hasApprovedCoverLetter: true,
-        contactCount: 1,
-        interviewStageCount: 1,
-        cheatSheetReady: false,
-        appliedAt: null,
-        consultationStarted: true,
-      },
-      people: [],
-    });
-    expect(suggestions.some((item) => item.type === "review_resume")).toBe(true);
-    expect(suggestions.some((item) => item.type === "review_job")).toBe(true);
-    expect(suggestions.some((item) => item.type === "open_profile")).toBe(true);
-    expect(suggestions.some((item) => item.type === "start_consultation")).toBe(
-      false,
-    );
+    expect(thread).toContain("approveConsultationQaResultAction");
+    expect(thread).toContain("regenerateConsultationQaResultAction");
+    expect(thread).toContain("consultationConversationCopy.approve");
+    expect(thread).toContain("consultation-seeker-answer");
+    expect(thread).toContain("<details");
+    expect(section).not.toContain("HarperSuggestionList");
   });
 
   it("renders no claim flags anywhere in source", () => {

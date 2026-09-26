@@ -12,7 +12,6 @@ import { WorkspaceProgress } from "@/components/ApplicationWorkspaceLive";
 import { listPersonPreps } from "@/lib/interview/person-prep";
 import { ConsultationStanding } from "@/components/ConsultationStanding";
 import { ConsultationThread } from "@/components/ConsultationThread";
-import { HarperSuggestionList } from "@/components/HarperSuggestionList";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
 import { OpenWorkspaceHashSection } from "@/components/OpenWorkspaceHashSection";
 import {
@@ -175,11 +174,7 @@ export async function ConsultationSection({
           ? session.generationError.trim()
           : null) ||
         (failed ? consultationConversationCopy.generationFailed : null);
-  const draftStatements = (session?.statements ?? []).filter(
-    (statement) => statement.status === "DRAFT",
-  );
   const statements = session?.statements ?? [];
-  const latestDraftTurnId = draftStatements.at(-1)?.turnId ?? null;
   const consultationBusy = jobs.some(
     (job) =>
       job.type === "CONSULTATION" &&
@@ -235,7 +230,6 @@ export async function ConsultationSection({
           {vocab.product.singular} and draws out the stories behind the gaps.
           Nothing is added to the {vocab.product.singular} until you confirm it.
         </p>
-        <HarperSuggestionList campaignId={campaignId} />
         <WorkspaceProgress jobs={jobs} type="CONSULTATION" stayAndWatch />
         {consultationBusy || session?.generationStatus === "GENERATING" ? (
           <p className="text-sm text-muted" data-testid="harper-typing">
@@ -330,6 +324,9 @@ export async function ConsultationSection({
               id: turn.id,
               speaker: turn.speaker,
               body: turn.body,
+              targetKey: turn.targetKey,
+              followUp: turn.followUp,
+              sequence: turn.sequence,
             }))}
             statements={statements.map((statement) => ({
               id: statement.id,
@@ -339,7 +336,6 @@ export async function ConsultationSection({
               content: statement.content,
               strengtheningNote: statement.strengtheningNote,
             }))}
-            latestDraftTurnId={latestDraftTurnId}
           />
         ) : null}
         {canEdit && session?.status === "IN_PROGRESS" && !failed ? (
