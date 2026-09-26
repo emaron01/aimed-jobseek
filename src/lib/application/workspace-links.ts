@@ -52,6 +52,23 @@ export function workspaceCampaignSummaryHref(campaignId: string): string {
   return `${workspaceCampaignHref(campaignId)}/summary`;
 }
 
+export function workspaceApplicationContactsHref(campaignId: string): string {
+  return `${workspaceCampaignHref(campaignId)}/contacts`;
+}
+
+export function workspaceContactEditHref(
+  contactId: string,
+  campaignId?: string | null,
+): string {
+  const id = contactId.trim();
+  if (!id) {
+    throw new Error("Contact edit link is missing a contact.");
+  }
+  const campaign = campaignId?.trim();
+  const query = campaign ? `?campaignId=${encodeURIComponent(campaign)}` : "";
+  return `/contacts/${id}/edit${query}`;
+}
+
 export function workspaceInterviewStageHref(
   campaignId: string,
   stageId: string,
@@ -89,6 +106,7 @@ export function listWorkspaceHrefs(input: {
     workspaceConsultationHref(input.campaignId),
     workspaceCampaignHref(input.campaignId),
     workspaceCampaignSummaryHref(input.campaignId),
+    workspaceApplicationContactsHref(input.campaignId),
     workspaceInterviewStageHref(input.campaignId, input.interviewStageId),
     workspaceAssetDocxHref(input.assetId),
     ...applicationStepList

@@ -226,6 +226,134 @@ export async function addApplicationContact(input: {
   };
 }
 
+export async function updateApplicationContact(input: {
+  organizationId: string;
+  userId: string;
+  contactId: string;
+  campaignId?: string | null;
+  firstName: string;
+  lastName: string;
+  title: string;
+  email?: string | null;
+  linkedinUrl?: string | null;
+  personaId?: string | null;
+  pastedText?: string | null;
+}): Promise<{ contactId: string; pasteQueued: boolean }> {
+  const firstName = input.firstName.trim();
+  const lastName = input.lastName.trim();
+  const title = input.title.trim();
+  if (!firstName) throw new TenantError("First name is required.");
+  if (!lastName) throw new TenantError("Last name is required.");
+  if (!title) throw new TenantError("Title is required.");
+
+  const contact = await prisma.contact.findFirst({
+    where: { id: input.contactId, organizationId: input.organizationId },
+  });
+  if (!contact) {
+    throw new TenantError(`${vocab.contact.Singular} was not found.`);
+  }
+
+  const campaignId = input.campaignId?.trim() || null;
+  let membership: {
+    id: string;
+    chosenPersonaId: string | null;
+    linkedInProfileText: string | null;
+  } | null = null;
+  if (campaignId) {
+    const campaign = await prisma.campaign.findFirst({
+      where: {
+        id: campaignId,
+        organizationId: input.organizationId,
+        ownerUserId: input.userId,
+      },
+      select: { id: true },
+    });
+    if (!campaign) {
+      throw new TenantError(`${vocab.campaign.Singular} was not found.`);
+    }
+    membership = await prisma.campaignContact.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        campaignId,
+        contactId: contact.id,
+      },
+      select: { id: true, chosenPersonaId: true, linkedInProfileText: true },
+    });
+    if (!membership) {
+      throw new TenantError(
+        `${vocab.contact.Singular} was not found on this ${vocab.campaign.singular}.`,
+      );
+    }
+  }
+
+  const email = input.email?.trim() || null;
+  const normalizedEmail = email ? normalizeContactEmail(email) : null;
+  if (normalizedEmail && normalizedEmail !== contact.normalizedEmail) {
+    const clash = await prisma.contact.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        ownerUserId: contact.ownerUserId,
+        normalizedEmail,
+        NOT: { id: contact.id },
+      },
+      select: { id: true },
+    });
+    if (clash) {
+      throw new TenantError("Another contact already uses that email.");
+    }
+  }
+  const linkedinUrl = input.linkedinUrl?.trim() || null;
+  const titleChanged = title !== (contact.title ?? "");
+
+  await prisma.contact.update({
+    where: { id: contact.id },
+    data: {
+      firstName,
+      lastName,
+      title,
+      email,
+      normalizedEmail,
+      linkedinUrl,
+      ...(titleChanged
+        ? { previousTitle: contact.title, titleChangedAt: new Date() }
+        : {}),
+    },
+  });
+
+  const nextPersonaId = input.personaId?.trim() || null;
+  if (
+    campaignId &&
+    membership &&
+    nextPersonaId &&
+    nextPersonaId !== membership.chosenPersonaId
+  ) {
+    await updateApplicationContactRole({
+      organizationId: input.organizationId,
+      campaignId,
+      userId: input.userId,
+      contactId: contact.id,
+      personaId: nextPersonaId,
+    });
+  }
+
+  const pastedText = input.pastedText?.trim() || "";
+  const existingPaste = membership?.linkedInProfileText?.trim() || "";
+  let pasteQueued = false;
+  if (campaignId && pastedText && pastedText !== existingPaste) {
+    const { saveLinkedInPaste } = await import("@/lib/contact-profile/service");
+    await saveLinkedInPaste({
+      organizationId: input.organizationId,
+      campaignId,
+      contactId: contact.id,
+      pastedText,
+      personaId: nextPersonaId,
+    });
+    pasteQueued = true;
+  }
+
+  return { contactId: contact.id, pasteQueued };
+}
+
 export async function updateApplicationContactRole(input: {
   organizationId: string;
   campaignId: string;

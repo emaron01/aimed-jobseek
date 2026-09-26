@@ -33,6 +33,7 @@ import {
   WORKSPACE_CARD_WRAP_CLASS,
   WORKSPACE_MESSAGE_WRAP_CLASS,
   workspaceAssetDocxHref,
+  workspaceContactEditHref,
 } from "@/lib/application/workspace-links";
 
 const initial: ApplicationOutreachActionResult | null = null;
@@ -439,6 +440,17 @@ export function ApplicationOutreachSection({
                           </span>
                         </span>
                       </AppButton>
+                      {canEdit ? (
+                        <div className="px-2 pb-2">
+                          <AppActionLink
+                            href={workspaceContactEditHref(contact.contactId, campaignId)}
+                            variant="chip"
+                            data-testid={`edit-contact-${contact.contactId}`}
+                          >
+                            {outreachConfig.labels.editContact}
+                          </AppActionLink>
+                        </div>
+                      ) : null}
                       {sent.length === 0 ? (
                         <p
                           className="px-3 pb-2 text-xs text-subtle"
@@ -487,14 +499,25 @@ export function ApplicationOutreachSection({
 
         {selected ? (
           <div className="space-y-4" data-testid="outreach-sequence">
-            <div>
-              <h3 className="text-sm font-semibold text-ink">
-                {contactName(selected)}
-              </h3>
-              <p className="text-sm text-muted">
-                {selected.title ?? "—"}
-                {selected.personaName ? ` · ${selected.personaName}` : ""}
-              </p>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold text-ink">
+                  {contactName(selected)}
+                </h3>
+                <p className="text-sm text-muted">
+                  {selected.title ?? "—"}
+                  {selected.personaName ? ` · ${selected.personaName}` : ""}
+                </p>
+              </div>
+              {canEdit ? (
+                <AppActionLink
+                  href={workspaceContactEditHref(selected.contactId, campaignId)}
+                  variant="chip"
+                  data-testid={`edit-selected-contact-${selected.contactId}`}
+                >
+                  {outreachConfig.labels.editContact}
+                </AppActionLink>
+              ) : null}
             </div>
             {canEdit ? (
               <form action={roleAction} className="flex flex-wrap items-end gap-2">

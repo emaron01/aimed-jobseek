@@ -8,6 +8,8 @@ describe("contacts page filters", () => {
     expect(page).toContain("All {vocab.campaign.plural}");
     expect(page).toContain("listContacts({");
     expect(page).toContain("campaignId");
+    expect(page).toContain("workspaceContactEditHref");
+    expect(page).toContain("edit-contact-");
     expect(page).not.toContain("listContactLists");
     expect(page).not.toMatch(/\blistId\b/);
     expect(page).not.toContain("Show unlisted");

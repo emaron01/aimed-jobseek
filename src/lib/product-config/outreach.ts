@@ -5,7 +5,7 @@
  * documents 200-character subjects and 1,900-character bodies. Article a546814
  * mentions a 2,000-character body; this product uses the stricter 1,900 limit.
  */
-import { applicationWorkspaceCopy } from "./vocabulary";
+import { applicationWorkspaceCopy, vocab } from "./vocabulary";
 
 export const outreachConfig = Object.freeze({
   labels: {
@@ -57,6 +57,9 @@ export const outreachConfig = Object.freeze({
     noContact: "No named contact",
     roleConfirmed: "Role confirmed",
     roleUnconfirmed: "Matched from title. Save a role to confirm it.",
+    editContact: "Edit",
+    saveContact: "Save",
+    editContactTitle: `Edit ${vocab.contact.singular}`,
     pasteInterviewerProfile: "Paste Interviewer Profile",
     pasteInterviewerProfileHelp:
       "Paste anything you have about this person: their LinkedIn page, a bio, a team page, or notes. Nothing is fetched or scraped.",

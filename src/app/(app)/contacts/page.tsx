@@ -1,9 +1,12 @@
+import { AppActionLink } from "@/components/AppButton";
 import {
   EmptyState,
   PageHeader,
   PrimaryButton,
   TenantMissing,
 } from "@/components/ui";
+import { workspaceContactEditHref } from "@/lib/application/workspace-links";
+import { outreachConfig } from "@/lib/product-config";
 import { ShowArchivedToggle } from "@/components/ShowArchivedToggle";
 import { SuppressContactForm } from "@/components/SuppressContactForm";
 import {
@@ -172,6 +175,7 @@ export default async function ContactsPage({ searchParams }: PageProps) {
                 ) : null}
                 <th className="px-4 py-3 font-medium">{vocab.campaign.Plural}</th>
                 <th className="px-4 py-3 font-medium">Suppression</th>
+                <th className="px-4 py-3 font-medium"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -267,6 +271,19 @@ export default async function ContactsPage({ searchParams }: PageProps) {
                       ) : (
                         <span className="text-xs text-subtle">—</span>
                       )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {contact.ownerUserId === membership.user.id ? (
+                        <AppActionLink
+                          href={workspaceContactEditHref(
+                            contact.id,
+                            campaignLines[0]?.campaignId,
+                          )}
+                          data-testid={`edit-contact-${contact.id}`}
+                        >
+                          {outreachConfig.labels.editContact}
+                        </AppActionLink>
+                      ) : null}
                     </td>
                   </tr>
                 );

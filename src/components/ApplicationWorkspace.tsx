@@ -17,9 +17,11 @@ import {
   WORKSPACE_CARD_WRAP_CLASS,
   WORKSPACE_MESSAGE_WRAP_CLASS,
   workspaceCampaignSummaryHref,
+  workspaceContactEditHref,
   workspaceProfileEditHref,
   workspaceProfileHref,
 } from "@/lib/application/workspace-links";
+import { listApplicationContacts } from "@/lib/application/contacts";
 import { mergeExistingHiringTeamRoles } from "@/lib/hiring-team/merge-existing";
 import { getApplicationResearchStatus } from "@/lib/application/research-status";
 import {
@@ -88,7 +90,7 @@ import { parseStringArray } from "@/lib/research";
 import type { ResearchSource } from "@/lib/research/types";
 import { hasUsableCompanyResearchFields } from "@/lib/research/freshness";
 import { researchStatusLabel } from "@/lib/tenant/companies";
-import { formatDate, formatNumber } from "@/lib/utils";
+import { contactDisplayName, formatDate, formatNumber } from "@/lib/utils";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { persistExtractedExperienceDates } from "@/lib/product-research/restore-role-dates";
 import { persistExtractedContactDetails } from "@/lib/product-research/restore-contact-details";
@@ -1074,7 +1076,7 @@ async function HiringTeamSection({
   jobs?: import("@/lib/application-jobs/workspace-status").WorkspaceJobStatusView[];
   asPage?: boolean;
 }) {
-  const [roles, templates] = await Promise.all([
+  const [roles, templates, people] = await Promise.all([
     prisma.persona.findMany({
       where: { organizationId, campaignId, archivedAt: null },
       orderBy: { createdAt: "asc" },
@@ -1084,6 +1086,7 @@ async function HiringTeamSection({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
+    listApplicationContacts({ organizationId, campaignId }),
   ]);
   const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
   const organizedRoles = roles.map((role) => ({
@@ -1221,6 +1224,29 @@ async function HiringTeamSection({
         <p className="text-sm text-ink">
           {textList(role.targetTitles).join(", ") || "No likely titles."}
         </p>
+        {people
+          .filter((person) => person.chosenPersonaId === role.id)
+          .map((person) => (
+            <div
+              key={person.contactId}
+              className="flex flex-wrap items-center justify-between gap-2"
+              data-testid={`hiring-team-person-${person.contactId}`}
+            >
+              <p className="text-sm text-ink">
+                {contactDisplayName(person.contact.firstName, person.contact.lastName)}
+                {person.contact.title ? ` · ${person.contact.title}` : ""}
+              </p>
+              {canEdit ? (
+                <AppActionLink
+                  href={workspaceContactEditHref(person.contactId, campaignId)}
+                  variant="chip"
+                  data-testid={`edit-contact-${person.contactId}`}
+                >
+                  {outreachConfig.labels.editContact}
+                </AppActionLink>
+              ) : null}
+            </div>
+          ))}
         {role.whyThisPersonaMatters ? (
           <p className="text-sm text-ink">{role.whyThisPersonaMatters}</p>
         ) : null}

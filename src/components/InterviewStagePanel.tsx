@@ -3,7 +3,9 @@ import {
   addInterviewInterviewerAction,
   assignExistingInterviewerAction,
 } from "@/app/actions/interview";
+import { AppActionLink } from "@/components/AppButton";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
+import { workspaceContactEditHref } from "@/lib/application/workspace-links";
 import { CheatSheetPersonBody } from "@/components/CheatSheetPersonBody";
 import type { CheatSheetNote } from "@/lib/application-summary/notes";
 import type { CheatSheetPersonSection } from "@/lib/application-summary/contract";
@@ -53,11 +55,22 @@ export function InterviewStagePanel({
       <div>
         <h3 className="font-medium text-ink">{interviewConfig.labels.interviewer}</h3>
         {interviewer ? (
-          <p className="mt-1 text-sm text-ink">
-            {interviewer.name}
-            {interviewer.title ? ` · ${interviewer.title}` : ""}
-            {interviewer.personaName ? ` · ${interviewer.personaName}` : ""}
-          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <p className="text-sm text-ink">
+              {interviewer.name}
+              {interviewer.title ? ` · ${interviewer.title}` : ""}
+              {interviewer.personaName ? ` · ${interviewer.personaName}` : ""}
+            </p>
+            {canEdit ? (
+              <AppActionLink
+                href={workspaceContactEditHref(interviewer.contactId, campaignId)}
+                variant="chip"
+                data-testid={`edit-contact-${interviewer.contactId}`}
+              >
+                {outreachConfig.labels.editContact}
+              </AppActionLink>
+            ) : null}
+          </div>
         ) : (
           <p className="mt-1 text-sm text-muted">{interviewConfig.labels.noInterviewer}</p>
         )}

@@ -122,6 +122,8 @@ describe("workspace links", () => {
     expect(workspaceHrefResolves("/campaigns/camp_1/assets")).toBe(true);
     expect(workspaceHrefResolves("/campaigns/camp_1/outreach")).toBe(true);
     expect(workspaceHrefResolves("/campaigns/camp_1/interviews")).toBe(true);
+    expect(workspaceHrefResolves("/campaigns/camp_1/contacts")).toBe(true);
+    expect(workspaceHrefResolves("/contacts/c1/edit")).toBe(true);
     expect(workspaceHrefResolves("/products/prod_1")).toBe(false);
     expect(workspaceHrefResolves("/campaigns/camp_1/consultation")).toBe(true);
   });

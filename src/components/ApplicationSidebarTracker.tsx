@@ -10,9 +10,11 @@ import { AppIcon, ErrorState, Skeleton } from "@/components/design";
 import { AppButton } from "@/components/ui";
 import type { ApplicationTrackerView } from "@/lib/application/tracker";
 import type { ApplicationStepState } from "@/lib/application/step-progress";
+import { workspaceApplicationContactsHref } from "@/lib/application/workspace-links";
 import {
   applicationStepCopy,
   polishCopy,
+  vocab,
 } from "@/lib/product-config";
 import { cn } from "@/lib/utils";
 
@@ -85,6 +87,8 @@ export function ApplicationTrackerList({
   variant: "sidebar" | "overlay";
 }) {
   const ink = variant === "sidebar";
+  const pathname = usePathname() || "";
+  const contactsCurrent = pathname.includes("/contacts");
   return (
     <ol
       className="space-y-1"
@@ -122,6 +126,21 @@ export function ApplicationTrackerList({
           </Link>
         </li>
       ))}
+      <li>
+        <Link
+          href={workspaceApplicationContactsHref(tracker.campaignId)}
+          data-testid="tracker-application-contacts"
+          aria-current={contactsCurrent ? "page" : undefined}
+          className={cn(
+            "flex items-start gap-2 rounded-md bg-surface px-2 py-1.5 text-sm text-ink transition-colors duration-200 motion-reduce:transition-none",
+            ink ? "hover:bg-surface" : "hover:bg-canvas",
+          )}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium">{vocab.contact.Plural}</span>
+          </span>
+        </Link>
+      </li>
     </ol>
   );
 }
