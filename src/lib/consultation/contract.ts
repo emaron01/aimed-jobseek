@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONSULTATION_PROMPT_VERSION = "16";
+export const CONSULTATION_PROMPT_VERSION = "17";
 
 export const WHY_THIS_COMPANY_TARGET_KEY = "why-this-company";
 export const PERSON_PREP_TARGET_PREFIX = "person-prep:";
@@ -45,20 +45,24 @@ export const consultationPlanSchema = z.object({
   ),
 });
 
+const extractStorySchema = z
+  .object({
+    situation: z.string().nullable(),
+    task: z.string().nullable(),
+    action: z.string().nullable(),
+    result: z.string().nullable(),
+  })
+  .nullable();
+
 export const consultationExtractSchema = z.object({
+  replyType: z.enum(["answer", "feedback"]),
+  revisedQuestion: z.string().nullable(),
   facts: z.array(
     z.object({
       text: z.string(),
     }),
   ),
-  story: z
-    .object({
-      situation: z.string().nullable(),
-      task: z.string().nullable(),
-      action: z.string().nullable(),
-      result: z.string().nullable(),
-    })
-    .nullable(),
+  story: extractStorySchema,
   demonstratedTargets: z.array(
     z.object({
       targetKey: z.string(),
@@ -68,37 +72,51 @@ export const consultationExtractSchema = z.object({
   missingStarElements: z.array(
     z.enum(["SITUATION", "TASK", "ACTION", "RESULT", "METRIC"]),
   ),
-  coaching: z.string().nullable().optional(),
+  coaching: z.string().nullable(),
   followUpQuestion: z.string().nullable(),
-  gapDecision: z.enum(["evidence", "no_evidence", "incomplete"]),
-});
-
-const statementSupportSchema = z.object({
-  sourceId: z.string(),
-  quote: z.string(),
-});
-
-const groundedStatementSchema = z.object({
-  text: z.string(),
-  claims: z.array(
-    z.object({
-      text: z.string(),
-      supports: z.array(statementSupportSchema),
-    }),
-  ),
+  gapDecision: z.enum(["evidence", "no_evidence", "incomplete"]).nullable(),
 });
 
 export const consultationPolishSchema = z.object({
-  interviewAnswer: groundedStatementSchema,
-  resumeBullet: groundedStatementSchema.nullable(),
+  interviewAnswer: z.string(),
+  resumeBullet: z.string().nullable(),
   strengtheningNote: z.string().nullable(),
 });
 
-export const consultationStatementGroundingSchema = groundedStatementSchema;
-
 export type ConsultationPlanResult = z.infer<typeof consultationPlanSchema>;
 export type ConsultationExtractResult = z.infer<typeof consultationExtractSchema>;
+export type ConsultationExtractFeedback = ConsultationExtractResult & {
+  replyType: "feedback";
+  revisedQuestion: string;
+};
+export type ConsultationExtractAnswer = ConsultationExtractResult & {
+  replyType: "answer";
+  gapDecision: "evidence" | "no_evidence" | "incomplete";
+};
 export type ConsultationPolishResult = z.infer<typeof consultationPolishSchema>;
-export type ConsultationStatementGroundingResult = z.infer<
-  typeof consultationStatementGroundingSchema
->;
+
+export function isConsultationExtractAnswer(
+  value: ConsultationExtractResult,
+): value is ConsultationExtractAnswer {
+  return value.replyType === "answer" && value.gapDecision != null;
+}
+
+export function isConsultationExtractFeedback(
+  value: ConsultationExtractResult,
+): value is ConsultationExtractFeedback {
+  return value.replyType === "feedback" && Boolean(value.revisedQuestion?.trim());
+}
+
+export type AskedConsultationQuestion = {
+  text: string;
+  answered: boolean;
+  targetKey: string | null;
+  followUp: boolean;
+};
+
+export type SeekerStatedFactPayload = {
+  id: string;
+  kind: "FACT";
+  text: string;
+  source: "added_background" | "interview_learning";
+};

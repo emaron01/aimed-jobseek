@@ -125,8 +125,10 @@ describe("Harper result quality", () => {
     expect(consultationConversationCopy.editAnswer).toBe("Edit");
     expect(consultationConversationCopy.saveAnswer).toBe("Save");
     const polish = readFileSync("src/lib/prompt-content/consultation.ts", "utf8");
-    expect(polish).toContain("Never return the reply unchanged");
-    expect(polish).toContain("Do not add facts from other profile items");
+    expect(polish).toContain("never return their reply unchanged");
+    expect(polish).toContain(
+      "Use only facts from the person's answers and Personal Profile",
+    );
   });
 
   it("enqueues result repair only when answers changed after the last repair attempt", () => {

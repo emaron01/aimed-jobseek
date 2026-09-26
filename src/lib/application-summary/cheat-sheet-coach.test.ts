@@ -294,11 +294,9 @@ describe.skipIf(!hasTestDatabase())("cheat sheet Harper reply persistence", () =
     polishAnswerWithQuality.mockResolvedValue({
       ok: true,
       data: {
-        interviewAnswer: { text: sample, claims: [] },
-        resumeBullet: {
-          text: "Coached a front-line manager to inspect deals before forecast.",
-          claims: [],
-        },
+        interviewAnswer: sample,
+        resumeBullet:
+          "Coached a front-line manager to inspect deals before forecast.",
         strengtheningNote: null,
       },
     });

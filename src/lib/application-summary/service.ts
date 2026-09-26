@@ -1062,7 +1062,7 @@ export async function answerCheatSheetCoachItem(input: {
   if (!polished.ok) {
     throw new TenantError(polished.message);
   }
-  const sampleAnswer = polished.data.interviewAnswer.text.trim();
+  const sampleAnswer = polished.data.interviewAnswer.trim();
   if (!sampleAnswer) {
     throw new TenantError(consultationConversationCopy.generationFailed);
   }
@@ -1088,8 +1088,8 @@ export async function answerCheatSheetCoachItem(input: {
     verbatimAnswer: answer,
     interviewAnswer: sampleAnswer,
     interviewAnswerApprovedAt: now,
-    resumeBullet: polished.data.resumeBullet?.text.trim() || null,
-    resumeBulletApprovedAt: polished.data.resumeBullet?.text.trim()
+    resumeBullet: polished.data.resumeBullet?.trim() || null,
+    resumeBulletApprovedAt: polished.data.resumeBullet?.trim()
       ? now
       : null,
     seekerAuthored: true,
@@ -1132,14 +1132,14 @@ export async function answerCheatSheetCoachItem(input: {
         kind: "INTERVIEW_ANSWER",
         content: sampleAnswer,
         status: "APPROVED",
-        groundingJson: polished.data.interviewAnswer.claims as Prisma.InputJsonValue,
+        groundingJson: [],
         promptVersion: CONSULTATION_PROMPT_VERSION,
         approvedAt: now,
       },
       update: {
         content: sampleAnswer,
         status: "APPROVED",
-        groundingJson: polished.data.interviewAnswer.claims as Prisma.InputJsonValue,
+        groundingJson: [],
         approvedAt: now,
       },
     }),

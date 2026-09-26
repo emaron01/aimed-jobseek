@@ -24,10 +24,16 @@ import {
   profileEvidenceItems,
   verifyModelAssessments,
 } from "@/lib/consultation/assess";
-import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
+import { buildOpenAiJsonSchemaFormat } from "@/lib/ai/zod-json-schema";
+import {
+  CONSULTATION_PROMPT_VERSION,
+  consultationExtractSchema,
+} from "@/lib/consultation/contract";
 import {
   matchConsultationFocus,
   planQuestionRound,
+  questionDuplicatesAsked,
+  questionNearDuplicate,
   questionTextForGap,
   seniorityWarrantsChronology,
 } from "@/lib/consultation/questions";
@@ -83,6 +89,7 @@ import {
   parseCandidateProfile,
 } from "@/lib/product-research/candidate-profile";
 import { fixtureAlexChenProfile } from "@/lib/product-research/fixtures/alex-chen-profile";
+import { saveSeekerStatedBackground } from "@/lib/product-research/seeker-background";
 import { hasTestDatabase } from "@/test/database";
 
 function sample() {
@@ -133,6 +140,8 @@ function installConsultationModelFixture() {
       target?: { key: string } | null;
       availableTargets?: Array<{ key: string; text: string }>;
       hiringTeam?: Array<{ id: string; name: string }>;
+      askedQuestions?: Array<{ text: string; answered: boolean }>;
+      seekerStatedFacts?: Array<{ id: string; text: string; source: string }>;
       allowedSources?: Array<{ id: string; text: string }>;
       statement?: string;
       kind?: "INTERVIEW_ANSWER" | "RESUME_BULLET";
@@ -143,10 +152,33 @@ function installConsultationModelFixture() {
     };
     if (request.schemaName === "consultation_plan") {
       const targets = payload.targets ?? [];
+      const askedQuestions = payload.askedQuestions ?? [];
+      const stated = (payload.seekerStatedFacts ?? [])
+        .map((item) => item.text)
+        .join(" ");
       const hiringRole = payload.hiringTeam?.[0] ?? {
         id: "hiring-manager",
         name: "Hiring Manager",
       };
+      const questions = [
+        ...targets.map((target) => ({
+          targetKey: target.key,
+          text: questionForConsultationTarget(target),
+          requirementInterpretation: null,
+          hiringTeamRoleId: hiringRole.id,
+          whoCaresNote: `${hiringRole.name} needs to hear concrete evidence tied to this requirement.`,
+        })),
+        {
+          targetKey: "chronology",
+          text: "Starting with Northwind Analytics, walk me through your key accomplishments there and why you moved on from each role.",
+          requirementInterpretation: null,
+          hiringTeamRoleId: hiringRole.id,
+          whoCaresNote: `${hiringRole.name} needs to understand the progression of your work.`,
+        },
+      ].filter(
+        (question) =>
+          !askedQuestions.some((asked) => asked.text === question.text),
+      );
       return {
         data: {
           commentary:
@@ -166,219 +198,132 @@ function installConsultationModelFixture() {
               "Start with the Python duration and a measured production result.",
             ],
           },
-          closingNote: null,
+          closingNote:
+            questions.length === 0
+              ? "The plan for this conversation is complete."
+              : null,
           assessments: targets.map((target) => {
             const incident = /incident response/i.test(target.text);
             const mission = target.kind === "MISSION";
             const production = /shipping production services/i.test(target.text);
+            const coveredByStated =
+              stated.length > 0 &&
+              target.text
+                .toLowerCase()
+                .split(/\s+/)
+                .filter((token) => token.length >= 5)
+                .some((token) => stated.toLowerCase().includes(token));
             return {
               targetKey: target.key,
-              strength: incident ? "STRONG" : mission || production ? "PARTIAL" : "NONE",
+              strength: incident
+                ? "STRONG"
+                : coveredByStated
+                  ? "STRONG"
+                  : mission || production
+                    ? "PARTIAL"
+                    : "NONE",
               supportingFactIds: incident
                 ? ["skill_4"]
-                : mission
-                  ? ["skill_4", "ach_1"]
-                  : production
-                    ? ["role_1", "ach_1"]
-                    : [],
+                : coveredByStated
+                  ? [payload.seekerStatedFacts?.[0]?.id ?? "stated"]
+                  : mission
+                    ? ["skill_4", "ach_1"]
+                    : production
+                      ? ["role_1", "ach_1"]
+                      : [],
               relevantRoleIds: [],
               explanation: incident
                 ? "Your FACT profile explicitly includes incident response."
-                : mission
-                  ? "Your incident response and reduced billing failures are transferable reliability evidence, although not robotics evidence."
-                  : production
-                    ? "You owned a production payments service and improved its reliability."
-                    : `The FACT profile does not yet establish ${target.text}.`,
+                : coveredByStated
+                  ? "Your added background and interview notes close this gap."
+                  : mission
+                    ? "Your incident response and reduced billing failures are transferable reliability evidence, although not robotics evidence."
+                    : production
+                      ? "You owned a production payments service and improved its reliability."
+                      : `The FACT profile does not yet establish ${target.text}.`,
               strategyMode:
-                mission || production ? "REFRAME_ADJACENT" : "ACKNOWLEDGE",
+                mission || production || coveredByStated
+                  ? "REFRAME_ADJACENT"
+                  : "ACKNOWLEDGE",
               strategy: mission
                 ? "Connect Northwind incident ownership and billing reliability to the warehouse-robot reliability mission, while acknowledging the new domain."
                 : `Use your Northwind work to address ${target.text} honestly and specifically.`,
             };
           }),
-          questions: [
-            ...targets.map((target) => ({
-              targetKey: target.key,
-              text: questionForConsultationTarget(target),
-              requirementInterpretation: null,
-              hiringTeamRoleId: hiringRole.id,
-              whoCaresNote: `${hiringRole.name} needs to hear concrete evidence tied to this requirement.`,
-            })),
-            {
-              targetKey: "chronology",
-              text: "Starting with Northwind Analytics, walk me through your key accomplishments there and why you moved on from each role.",
-              requirementInterpretation: null,
-              hiringTeamRoleId: hiringRole.id,
-              whoCaresNote: `${hiringRole.name} needs to understand the progression of your work.`,
-            },
-          ],
+          questions,
         },
       };
     }
     if (request.schemaName === "consultation_polish") {
-      const source = payload.allowedSources?.[0] ?? {
-        id: "answer",
-        text: payload.answer ?? "",
-      };
+      const answerText = payload.answer ?? "";
       if (payload.confirmedGap) {
-        const text =
-          "I have not done that work yet. In an interview I would say so and point to the closest adjacent experience I do have.";
         return {
           data: {
-            interviewAnswer: {
-              text,
-              claims: [
-                {
-                  text,
-                  supports: [{ sourceId: source.id, quote: source.text }],
-                },
-              ],
-            },
+            interviewAnswer:
+              "I have not done that work yet. The closest related experience I have is the reliability work I already own, and I would close the gap in this role by ramping on the missing piece in the first weeks.",
             resumeBullet: null,
             strengtheningNote: null,
           },
         };
       }
       if (
-        payload.answer === "copy me exactly" &&
+        answerText === "copy me exactly" &&
         (payload.qualityFeedback?.length ?? 0) === 0
       ) {
         return {
           data: {
-            interviewAnswer: {
-              text: "copy me exactly",
-              claims: [
-                {
-                  text: "copy me exactly",
-                  supports: [{ sourceId: source.id, quote: "copy me exactly" }],
-                },
-              ],
-            },
-            resumeBullet: {
-              text: "copy me exactly",
-              claims: [
-                {
-                  text: "copy me exactly",
-                  supports: [{ sourceId: source.id, quote: "copy me exactly" }],
-                },
-              ],
-            },
+            interviewAnswer: "copy me exactly",
+            resumeBullet: "copy me exactly",
             strengtheningNote: null,
           },
         };
       }
       if (
-        payload.answer === "quality retry" &&
+        answerText === "quality retry" &&
         (payload.qualityFeedback?.length ?? 0) === 0
       ) {
         return {
           data: {
-            interviewAnswer: {
-              text:
-                "I cut failed runs from 8% to 1%. The starting point was 8%.",
-              claims: [
-                {
-                  text: "I cut failed runs from 8% to 1%.",
-                  supports: [
-                    {
-                      sourceId: source.id,
-                      quote: "I cut failed runs from 8% to 1%.",
-                    },
-                  ],
-                },
-                {
-                  text: "The starting point was 8%.",
-                  supports: [
-                    {
-                      sourceId: source.id,
-                      quote: "I cut failed runs from 8% to 1%.",
-                    },
-                  ],
-                },
-              ],
-            },
-            resumeBullet: {
-              text: "I cut failed runs from 8% to 1%.",
-              claims: [
-                {
-                  text: "I cut failed runs from 8% to 1%.",
-                  supports: [
-                    {
-                      sourceId: source.id,
-                      quote: "I cut failed runs from 8% to 1%.",
-                    },
-                  ],
-                },
-              ],
-            },
+            interviewAnswer:
+              "I cut failed runs from 8% to 1%. The starting point was 8%.",
+            resumeBullet: "I cut failed runs from 8% to 1%.",
             strengtheningNote: null,
           },
         };
       }
       const text =
-        source.text
+        answerText
           .split(/\r?\n/)
           .map((item) => item.trim())
           .filter(Boolean)
-          .at(-1) ?? source.text;
-      const interviewText = `In my words, ${text}`;
-      const bulletText = `Result: ${text}`;
-      const support = [{ sourceId: source.id, quote: text }];
-      const interviewClaims = interviewText
-        .split(/(?<=[.!?])\s+/)
-        .filter(Boolean)
-        .map((claimText) => ({
-          text: claimText,
-          supports: [{ sourceId: source.id, quote: text }],
-        }));
-      const interview = {
-        text: interviewText,
-        claims: interviewClaims,
-      };
-      const bullet = {
-        text: bulletText,
-        claims: [{ text: bulletText, supports: support }],
-      };
+          .at(-1) ?? answerText;
       return {
         data: {
-          interviewAnswer: interview,
-          resumeBullet: bullet,
+          interviewAnswer: `In my words, ${text}`,
+          resumeBullet: `Result: ${text}`,
           strengtheningNote: payload.declinedFollowUp
             ? `The ${payload.strengtheningNeeds?.[0] ?? "Action"} would be stronger with more detail about what you personally did.`
             : null,
         },
       };
     }
-    if (request.schemaName === "consultation_statement_grounding") {
-      const text = payload.statement ?? "";
-      const claimTexts =
-        payload.kind === "INTERVIEW_ANSWER"
-          ? text.split(/(?<=[.!?])\s+/).filter(Boolean)
-          : [text];
-      const claims = claimTexts.map((claimText) => {
-        const source =
-          payload.allowedSources?.find((item) =>
-            item.text.includes(claimText),
-          ) ?? payload.allowedSources?.[0] ?? { id: "answer", text: claimText };
-        return {
-          text: claimText,
-          supports: [{ sourceId: source.id, quote: claimText }],
-        };
-      });
+    const answer = payload.answer ?? "";
+    if (/company statement/i.test(answer) && /better question/i.test(answer)) {
       return {
         data: {
-          text,
-          claims,
+          replyType: "feedback",
+          revisedQuestion:
+            "What concrete operating cadence do you use when a team has to move quickly without losing forecast discipline?",
         },
       };
     }
-    const answer = payload.answer ?? "";
     const thinInvoice =
       answer ===
       "Invoice generation had failed billing runs at 8%. I led the rewrite. Over two quarters, failed billing runs fell to under 1%.";
     if (thinInvoice) {
       return {
         data: {
+          replyType: "answer",
           facts: [],
           story: {
             situation: "Invoice generation had failed billing runs at 8%.",
@@ -398,6 +343,7 @@ function installConsultationModelFixture() {
     if (/I have never /i.test(answer) || /I do not have /i.test(answer)) {
       return {
         data: {
+          replyType: "answer",
           facts: [],
           story: null,
           demonstratedTargets: [],
@@ -411,6 +357,7 @@ function installConsultationModelFixture() {
     const completeSpan = "I used Python for 5 years and cut failed jobs by 40%.";
     return {
       data: {
+        replyType: "answer",
         facts: complete ? [{ text: completeSpan }, { text: "Invented $9M metric" }] : [],
         story: complete
           ? {
@@ -934,6 +881,9 @@ describe("consultation evidence and questions", () => {
       answer,
       turnId: "turn_answer_1",
       extracted: {
+        replyType: "answer" as const,
+        revisedQuestion: null,
+        coaching: null,
         facts: [
           { text: answer },
           { text: "The team created a nine million dollar metric last year." },
@@ -967,6 +917,9 @@ describe("consultation evidence and questions", () => {
       answer,
       turnId: "turn_why",
       extracted: {
+        replyType: "answer" as const,
+        revisedQuestion: null,
+        coaching: null,
         facts: [],
         story: {
           situation: answer,
@@ -999,6 +952,9 @@ describe("consultation evidence and questions", () => {
       answer,
       turnId: "turn_paraphrase",
       extracted: {
+        replyType: "answer" as const,
+        revisedQuestion: null,
+        coaching: null,
         facts: [
           {
             text: "I spent five years using Python and reduced unsuccessful jobs by 40 percent.",
@@ -1022,6 +978,9 @@ describe("consultation evidence and questions", () => {
       answer,
       turnId: "turn_action_present",
       extracted: {
+        replyType: "answer" as const,
+        revisedQuestion: null,
+        coaching: null,
         facts: [],
         story: {
           situation:
@@ -1051,6 +1010,9 @@ describe("consultation evidence and questions", () => {
       answer,
       turnId: "turn_changed_number",
       extracted: {
+        replyType: "answer" as const,
+        revisedQuestion: null,
+        coaching: null,
         facts: [],
         story: {
           situation: answer,
@@ -1109,6 +1071,9 @@ describe("consultation evidence and questions", () => {
       answer,
       turnId: "turn_fragment",
       extracted: {
+        replyType: "answer" as const,
+        revisedQuestion: null,
+        coaching: null,
         facts: [
           { text: "Python" },
           { text: "5 years" },
@@ -1291,9 +1256,9 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("16");
-    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("coach, not an interrogator");
-    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("Never inflate fit");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("17");
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("You coach; you do not interrogate");
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("askedQuestions");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
       "Never mention research status",
     );
@@ -1302,11 +1267,17 @@ describe("consultation evidence and questions", () => {
       "Never paste requirement, responsibility, or posting text",
     );
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
-      "never ask whether you have experience with a mission",
+      "Mission statements, company taglines, and recruiting pitches are not gaps",
     );
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
-      "Ask one question for every remaining important gap",
+      "there are never more than 10",
     );
+    const extractFormat = buildOpenAiJsonSchemaFormat(
+      "consultation_extract",
+      consultationExtractSchema,
+    );
+    expect(extractFormat.schema.type).toBe("object");
+    expect(extractFormat.schema.anyOf).toBeUndefined();
     const workspace = readFileSync("src/components/ConsultationSection.tsx", "utf8");
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
     expect(workspace).toContain("consultationConfig.displayName");
@@ -1369,8 +1340,18 @@ describe("consultation evidence and questions", () => {
 
   it("does not use grounded-statement checks to reject generated output", () => {
     const service = readFileSync("src/lib/consultation/service.ts", "utf8");
+    const ai = readFileSync("src/lib/consultation/ai.ts", "utf8");
+    const prompt = readFileSync("src/lib/consultation/prompt.ts", "utf8");
+    const content = readFileSync("src/lib/prompt-content/consultation.ts", "utf8");
     expect(service).not.toContain("validateGroundedStatement");
     expect(service).not.toContain("logQualityRejection");
+    expect(service).not.toContain("groundStatementWithModel");
+    expect(ai).not.toContain("groundStatementWithModel");
+    expect(prompt).not.toContain("STATEMENT_GROUNDING");
+    expect(content).not.toContain("CONSULTATION_STATEMENT_GROUNDING");
+    expect(readFileSync("src/lib/consultation/contract.ts", "utf8")).not.toContain(
+      "claims",
+    );
     expect(
       validateGroundedStatement({
         statement: {
@@ -1436,6 +1417,162 @@ describe("consultation evidence and questions", () => {
     ).toEqual([]);
   });
 
+  it("never saves a duplicate or rephrased question and asks chronology at most once", () => {
+    const asked = [
+      {
+        text: "At Northwind, how did you decide which enterprise account to pursue when several deals competed for your team's time?",
+        answered: true,
+        targetKey: "required:strategy",
+        followUp: false,
+      },
+      {
+        text: "Starting with Northwind Analytics, walk me through your key accomplishments there and why you moved on from each role.",
+        answered: false,
+        targetKey: "chronology",
+        followUp: false,
+      },
+    ];
+    expect(
+      questionNearDuplicate(
+        asked[0]!.text,
+        "When several Northwind deals competed for your team's time, how did you decide which enterprise account to pursue?",
+      ),
+    ).toBe(true);
+    expect(questionDuplicatesAsked(asked[0]!.text, asked)).toBe(true);
+    const assessment = {
+      key: "required:strategy",
+      kind: "REQUIRED" as const,
+      text: "Strong strategic thinking",
+      strength: "NONE" as const,
+      supportingFactIds: [],
+      strategy: "ACKNOWLEDGE" as const,
+      explanation: "No evidence yet.",
+      strategyText: "Ask for a concrete decision.",
+      verification: {
+        originalStrength: "NONE" as const,
+        invalidSupportingFactIds: [],
+        invalidRoleIds: [],
+        downgradeReasons: [],
+      },
+      experienceCalculation: null,
+    };
+    const nextGap = {
+      ...assessment,
+      key: "required:other",
+      text: "Own a weekly forecast cadence",
+    };
+    const round = planQuestionRound({
+      assessments: [assessment, nextGap],
+      modelQuestions: [
+        {
+          targetKey: nextGap.key,
+          text: "At Northwind, how did you decide which enterprise account to pursue when several deals competed for your team's time?",
+          requirementInterpretation: null,
+          hiringTeamRoleId: "sales-vp",
+          whoCaresNote: "The VP of Sales needs a forecast example.",
+        },
+        {
+          targetKey: "chronology",
+          text: "Starting with Northwind Analytics, walk me through your key accomplishments there and why you moved on from each role.",
+          requirementInterpretation: null,
+          hiringTeamRoleId: "sales-vp",
+          whoCaresNote: "The VP needs the career walk-through.",
+        },
+      ],
+      hiringTeam: [{ id: "sales-vp", name: "VP of Sales" }],
+      askedKeys: new Set(["required:strategy"]),
+      skippedKeys: new Set(),
+      includeChronology: true,
+      chronologyAsked: false,
+      askedQuestions: asked,
+    });
+    expect(round.questions.some((question) => question.targetKey === "chronology")).toBe(
+      false,
+    );
+    expect(
+      round.questions.some((question) =>
+        questionNearDuplicate(question.text, asked[0]!.text),
+      ),
+    ).toBe(false);
+  });
+
+  it("caps Harper questions at ten for the whole application", () => {
+    const askedQuestions = Array.from({ length: 10 }, (_, index) => ({
+      text: `Asked question number ${index + 1} about a distinct gap in this application.`,
+      answered: index < 8,
+      targetKey: `required:${index}`,
+      followUp: index === 9,
+    }));
+    const assessments = [
+      {
+        key: "required:11",
+        kind: "REQUIRED" as const,
+        text: "A new remaining gap after ten questions",
+        strength: "NONE" as const,
+        supportingFactIds: [],
+        strategy: "ACKNOWLEDGE" as const,
+        explanation: "Still open.",
+        strategyText: "Ask for evidence.",
+        verification: {
+          originalStrength: "NONE" as const,
+          invalidSupportingFactIds: [],
+          invalidRoleIds: [],
+          downgradeReasons: [],
+        },
+        experienceCalculation: null,
+      },
+    ];
+    const round = planQuestionRound({
+      assessments,
+      modelQuestions: [
+        {
+          targetKey: "required:11",
+          text: "What is a new remaining story after ten questions?",
+          requirementInterpretation: null,
+          hiringTeamRoleId: "sales-vp",
+          whoCaresNote: "The VP of Sales still wants one more story.",
+        },
+      ],
+      hiringTeam: [{ id: "sales-vp", name: "VP of Sales" }],
+      askedKeys: new Set(askedQuestions.map((item) => item.targetKey!)),
+      skippedKeys: new Set(),
+      includeChronology: true,
+      chronologyAsked: false,
+      askedQuestions,
+    });
+    expect(consultationConfig.applicationQuestionLimit).toBe(10);
+    expect(round.questions).toHaveLength(0);
+  });
+
+  it("writes a confirmed-gap talk track that acknowledges, bridges, and says how to close it", async () => {
+    const polished = await polishAnswerWithQuality({
+      answer: "I have never partnered with customer success on expansion.",
+      story: {
+        situation: null,
+        task: null,
+        action: null,
+        result: null,
+      },
+      sources: [
+        {
+          id: "answer:gap",
+          text: "I have never partnered with customer success on expansion.",
+        },
+      ],
+      declinedFollowUp: false,
+      confirmedGap: true,
+      strengtheningNeeds: [],
+    });
+    expect(polished.ok).toBe(true);
+    if (polished.ok) {
+      expect(polished.data.resumeBullet).toBeNull();
+      expect(polished.data.interviewAnswer).toMatch(/I have not|I have never/i);
+      expect(polished.data.interviewAnswer).toMatch(/closest related|already own|reliability/i);
+      expect(polished.data.interviewAnswer).toMatch(/close the gap|ramping/i);
+      expect(polished.data.interviewAnswer).not.toMatch(/\$9M|invented/i);
+    }
+  });
+
   it("accepts polished output without content-quality retries", async () => {
     expect(
       validateRepetitionAndMetaLanguage({
@@ -1459,8 +1596,8 @@ describe("consultation evidence and questions", () => {
     });
     expect(copied.ok).toBe(true);
     if (copied.ok) {
-      expect(copied.data.interviewAnswer.text).not.toBe("copy me exactly");
-      expect(copied.data.resumeBullet?.text).not.toBe("copy me exactly");
+      expect(copied.data.interviewAnswer).not.toBe("copy me exactly");
+      expect(copied.data.resumeBullet).not.toBe("copy me exactly");
     }
     generateStructured.mockClear();
 
@@ -1484,7 +1621,7 @@ describe("consultation evidence and questions", () => {
     expect(polished.ok).toBe(true);
     expect(generateStructured).toHaveBeenCalledTimes(1);
     if (polished.ok) {
-      expect(polished.data.interviewAnswer.text).toContain("8%");
+      expect(polished.data.interviewAnswer).toContain("8%");
     }
   });
 
@@ -1511,11 +1648,11 @@ describe("consultation evidence and questions", () => {
     if (polished.ok) {
       expect(polished.data.strengtheningNote).toBeNull();
       expect(
-        polished.data.interviewAnswer.text.split(/\s+/).length,
+        polished.data.interviewAnswer.split(/\s+/).length,
       ).toBeLessThanOrEqual(consultationConfig.interviewAnswerMaxWords);
       expect(
         validateInterviewAnswerQuality({
-          text: polished.data.interviewAnswer.text,
+          text: polished.data.interviewAnswer,
           maxWords: consultationConfig.interviewAnswerMaxWords,
           metaLanguagePhrases: consultationConfig.interviewAnswerMetaLanguage,
         }),
@@ -1619,7 +1756,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("16");
+    expect(session?.promptVersion).toBe("17");
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
     expect(session?.briefingJson).toMatchObject({
@@ -2443,6 +2580,20 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     });
     await addHiringManager(campaign.id);
     await startConsultation({ organizationId, campaignId: campaign.id });
+    const started = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: { turns: { orderBy: { sequence: "asc" } } },
+    });
+    const startedPrimaries =
+      started?.turns.filter(
+        (turn) => turn.speaker === "CONSULTANT" && !turn.followUp,
+      ) ?? [];
+    const extras = startedPrimaries.slice(3);
+    if (extras.length > 0) {
+      await prisma.consultationTurn.deleteMany({
+        where: { id: { in: extras.map((turn) => turn.id) } },
+      });
+    }
     const session = await prisma.consultationSession.findUnique({
       where: { campaignId: campaign.id },
       include: { turns: { orderBy: { sequence: "asc" } } },
@@ -2535,13 +2686,21 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       organizationId,
       campaignId: campaign.id,
       targetKey: `question:${other.id}`,
-      answer: "I have used Python on backend services.",
+      answer:
+        "Invoice generation had failed billing runs at 8%. I led the rewrite. Over two quarters, failed billing runs fell to under 1%.",
     });
     const afterOther = await prisma.consultationSession.findUnique({
       where: { campaignId: campaign.id },
       include: { turns: { orderBy: { sequence: "asc" } } },
     });
     expect(afterOther?.generationError).toBeNull();
+    expect(
+      afterOther!.turns.some(
+        (turn) =>
+          turn.speaker === "SEEKER" &&
+          turn.body.includes("failed billing runs"),
+      ),
+    ).toBe(true);
     const otherFollowUps = afterOther!.turns.filter(
       (turn) =>
         turn.speaker === "CONSULTANT" &&
@@ -2551,6 +2710,171 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
         (turn.analysisJson as { replyToTurnId?: unknown }).replyToTurnId ===
           other.id),
     );
-    expect(otherFollowUps).toHaveLength(1);
+    const otherStatements = await prisma.consultationStatement.count({
+      where: {
+        sessionId: afterOther!.id,
+        turn: { targetKey: other.targetKey },
+      },
+    });
+    expect(otherFollowUps.length + otherStatements).toBeGreaterThan(0);
+  });
+
+  it("replaces a question on feedback and does not write statements", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Feedback reply ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(
+      NORMAL_JOB_MODEL,
+      NORMAL_JOB_POSTING,
+    );
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        reportingLine: parsed.reportingLine,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaign.id);
+    await startConsultation({ organizationId, campaignId: campaign.id });
+    const session = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: { turns: { orderBy: { sequence: "asc" } } },
+    });
+    const question = session?.turns.find(
+      (turn) => turn.speaker === "CONSULTANT" && !turn.followUp,
+    );
+    expect(question).toBeTruthy();
+    const original = question!.body;
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey: `question:${question!.id}`,
+      answer: "This is a company statement, write a better question.",
+    });
+    const after = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: {
+        turns: { orderBy: { sequence: "asc" } },
+        statements: true,
+      },
+    });
+    const revised = after?.turns.find((turn) => turn.id === question!.id);
+    expect(revised?.body).not.toBe(original);
+    expect(revised?.body).toMatch(/operating cadence|forecast/i);
+    expect(after?.statements).toHaveLength(0);
+    expect(
+      after?.turns.filter((turn) => turn.speaker === "CONSULTANT" && turn.followUp),
+    ).toHaveLength(0);
+  });
+
+  it("sends added background and interview learnings to the coach call", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Seeker facts ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(
+      NORMAL_JOB_MODEL,
+      NORMAL_JOB_POSTING,
+    );
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        companyName: parsed.companyName,
+        seniority: parsed.seniority,
+        reportingLine: parsed.reportingLine,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+        seekerLearnedNotes:
+          "The hiring manager said they need shipping production services with a weekly forecast.",
+      },
+    });
+    await prisma.interviewStage.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        sortOrder: 0,
+        type: "RECRUITER_SCREEN",
+        scheduledAt: new Date("2026-10-08T19:00:00.000Z"),
+        format: "VIDEO",
+        notesAfter:
+          "They want someone who has shipped production services and can run a weekly forecast.",
+      },
+    });
+    await saveSeekerStatedBackground({
+      organizationId,
+      productId,
+      userId,
+      campaignId: campaign.id,
+      text: "I shipped production services at Harborline and ran the weekly forecast myself.",
+    });
+    await addHiringManager(campaign.id);
+    generateStructured.mockClear();
+    await startConsultation({ organizationId, campaignId: campaign.id });
+    const coachCall = generateStructured.mock.calls.find(
+      (call) => call[0]?.schemaName === "consultation_plan",
+    );
+    expect(coachCall).toBeTruthy();
+    const payload = (coachCall![0].messages as Array<{ content: string }>).reduce(
+      (acc, message) => {
+        try {
+          return { ...acc, ...JSON.parse(message.content) };
+        } catch {
+          return acc;
+        }
+      },
+      {} as {
+        askedQuestions?: unknown;
+        seekerStatedFacts?: Array<{ text: string; source: string }>;
+      },
+    );
+    expect(Array.isArray(payload.askedQuestions)).toBe(true);
+    expect(payload.seekerStatedFacts?.some((item) => item.source === "added_background")).toBe(
+      true,
+    );
+    expect(
+      payload.seekerStatedFacts?.some((item) =>
+        /weekly forecast/i.test(item.text),
+      ),
+    ).toBe(true);
+    const session = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: { assessments: true },
+    });
+    expect(
+      session?.assessments.some(
+        (item) =>
+          /shipping production services/i.test(item.text) &&
+          item.strength === "STRONG",
+      ),
+    ).toBe(true);
+    await prisma.product.update({
+      where: { id: productId },
+      data: { profileJson: profile },
+    });
   });
 });

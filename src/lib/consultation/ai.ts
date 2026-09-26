@@ -10,17 +10,16 @@ import {
   consultationPlanSchema,
   consultationExtractSchema,
   consultationPolishSchema,
-  consultationStatementGroundingSchema,
+  type AskedConsultationQuestion,
   type ConsultationPlanResult,
   type ConsultationExtractResult,
   type ConsultationPolishResult,
-  type ConsultationStatementGroundingResult,
+  type SeekerStatedFactPayload,
 } from "@/lib/consultation/contract";
 import {
   buildConsultationCoachMessages,
   buildConsultationExtractMessages,
   buildConsultationPolishMessages,
-  buildConsultationStatementGroundingMessages,
 } from "@/lib/consultation/prompt";
 import { consultationConversationCopy } from "@/lib/product-config";
 import { aiCallTracking } from "@/lib/usage/ai-call";
@@ -56,11 +55,12 @@ export async function planConsultationWithModel(input: {
     likelyTitles: string[];
     whyThisRoleMatters: string | null;
   }>;
+  seekerStatedFacts: SeekerStatedFactPayload[];
+  askedQuestions: AskedConsultationQuestion[];
   chronologyRequested: boolean;
   coveredTargetKeys: string[];
   focusTargetKey?: string | null;
   qualityFeedback?: string[];
-  seekerLearnedNotes?: string | null;
   usage?: AiCallUsageContext;
 }): Promise<ConsultationPlanAiResult> {
   if (!isConsultationAiConfigured()) {
@@ -145,7 +145,6 @@ export async function polishAnswerWithModel(input: {
     action: string | null;
     result: string | null;
   };
-  sources: Array<{ id: string; text: string }>;
   declinedFollowUp: boolean;
   confirmedGap?: boolean;
   strengtheningNeeds: string[];
@@ -177,41 +176,6 @@ export async function polishAnswerWithModel(input: {
     return {
       ok: false,
       message: "Consultation statements could not be generated. Retry consultation.",
-    };
-  }
-}
-
-export async function groundStatementWithModel(input: {
-  statement: string;
-  kind: "INTERVIEW_ANSWER" | "RESUME_BULLET";
-  sources: Array<{ id: string; text: string }>;
-  usage?: AiCallUsageContext;
-}): Promise<
-  | { ok: true; data: ConsultationStatementGroundingResult }
-  | { ok: false; message: string }
-> {
-  if (!isConsultationReplyAiConfigured()) {
-    return { ok: false, message: REPLY_UNCONFIGURED };
-  }
-  try {
-    const response = await getConsultationReplyAiProvider().generateStructured({
-      ...structuredOutputRequest("consultationStatementGrounding"),
-      ...tracking(input.usage),
-      messages: buildConsultationStatementGroundingMessages(input),
-      parseOutput: (raw) => ({
-        data: consultationStatementGroundingSchema.parse(raw),
-        coercedFields: [],
-      }),
-    });
-    return { ok: true, data: response.data };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "unknown";
-    console.error(
-      JSON.stringify({ event: "consultation_statement_grounding_failed", message }),
-    );
-    return {
-      ok: false,
-      message: "The edited statement could not be verified. Retry approval.",
     };
   }
 }

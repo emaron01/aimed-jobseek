@@ -1,7 +1,7 @@
 import type { EvidenceTarget } from "@/lib/consultation/assess";
 import {
   WHY_THIS_COMPANY_TARGET_KEY,
-  type ConsultationExtractResult,
+  type ConsultationExtractAnswer,
 } from "@/lib/consultation/contract";
 import {
   factsSupportedBySources,
@@ -39,7 +39,7 @@ export type DroppedExtraction = {
 export function proposalsFromExtraction(input: {
   answer: string;
   turnId: string;
-  extracted: ConsultationExtractResult;
+  extracted: ConsultationExtractAnswer;
   targets: EvidenceTarget[];
   profile?: CandidateProfile | null;
 }): {
@@ -47,7 +47,7 @@ export function proposalsFromExtraction(input: {
   dropped: string[];
   droppedDetails: DroppedExtraction[];
   followUpQuestion: string | null;
-  missingStarElements: ConsultationExtractResult["missingStarElements"];
+  missingStarElements: ConsultationExtractAnswer["missingStarElements"];
   partialStory: StoryDraft | null;
 } {
   const dropped: string[] = [];
@@ -123,18 +123,18 @@ export function proposalsFromExtraction(input: {
     }];
   });
   const story = input.extracted.story;
-  const missingStarElements: ConsultationExtractResult["missingStarElements"] = [
+  const missingStarElements: ConsultationExtractAnswer["missingStarElements"] = [
     ...input.extracted.missingStarElements,
   ];
   const addMissing = (
-    part: ConsultationExtractResult["missingStarElements"][number],
+    part: ConsultationExtractAnswer["missingStarElements"][number],
   ) => {
     if (!missingStarElements.includes(part)) missingStarElements.push(part);
   };
   let partialStory: StoryDraft | null = null;
   if (story) {
     const parts: Array<{
-      key: ConsultationExtractResult["missingStarElements"][number];
+      key: ConsultationExtractAnswer["missingStarElements"][number];
       value: string | null;
     }> = [
       { key: "SITUATION", value: story.situation },
@@ -208,7 +208,7 @@ export function proposalsFromExtraction(input: {
 }
 
 export function followUpForMissingStar(
-  missing: ConsultationExtractResult["missingStarElements"],
+  missing: ConsultationExtractAnswer["missingStarElements"],
 ): string {
   const first = missing[0];
   if (first && first in consultationConversationCopy.missingStarAsk) {

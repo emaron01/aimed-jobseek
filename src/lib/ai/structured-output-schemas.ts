@@ -20,7 +20,6 @@ import {
   consultationPlanSchema,
   consultationExtractSchema,
   consultationPolishSchema,
-  consultationStatementGroundingSchema,
 } from "@/lib/consultation/contract";
 import { hiringTeamIdentificationSchema } from "@/lib/hiring-team/contract";
 import {
@@ -172,11 +171,6 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   consultationPolish: {
     schemaName: "consultation_polish",
     schema: consultationPolishSchema,
-    usageOperations: ["CONSULTATION_REPLY"],
-  },
-  consultationStatementGrounding: {
-    schemaName: "consultation_statement_grounding",
-    schema: consultationStatementGroundingSchema,
     usageOperations: ["CONSULTATION_REPLY"],
   },
   applicationSummaryGuidance: {

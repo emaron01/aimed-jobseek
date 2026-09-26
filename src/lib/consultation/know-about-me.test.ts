@@ -39,8 +39,10 @@ describe("What You Should Know About Me", () => {
       "utf8",
     );
     expect(consultation).toContain("learnedNotesEvidence");
-    expect(consultation).toContain("seekerLearnedNotes");
-    expect(prompt).toContain("seekerLearnedNotes");
+    expect(consultation).toContain("seekerStatedFactsForCoach");
+    expect(consultation).toContain("interviewNotesEvidence");
+    expect(prompt).toContain("seekerStatedFacts");
+    expect(prompt).toContain("askedQuestions");
     expect(summary).toContain("job:learned-notes");
   });
 

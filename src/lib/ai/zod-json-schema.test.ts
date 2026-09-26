@@ -99,6 +99,7 @@ describe("zodToOpenAiStrictJsonSchema", () => {
     "$name: every object node has full required key set",
     ({ schema }) => {
       const jsonSchema = zodToOpenAiStrictJsonSchema(schema);
+      expect(jsonSchema.type).toBe("object");
       expectStrictObjectNodes(jsonSchema);
       assertStrictOpenAiObjectNodes(jsonSchema, (condition, message) => {
         expect(condition, message).toBe(true);

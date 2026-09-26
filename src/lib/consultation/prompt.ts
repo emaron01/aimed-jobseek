@@ -1,10 +1,13 @@
 import type { AiMessage } from "@/lib/ai/types";
-import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
+import {
+  CONSULTATION_PROMPT_VERSION,
+  type AskedConsultationQuestion,
+  type SeekerStatedFactPayload,
+} from "@/lib/consultation/contract";
 import {
   CONSULTATION_COACH_SYSTEM_INSTRUCTIONS,
   CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS,
   CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS,
-  CONSULTATION_STATEMENT_GROUNDING_SYSTEM_INSTRUCTIONS,
 } from "@/lib/prompt-content";
 import { consultationConfig } from "@/lib/product-config/consultation";
 
@@ -26,12 +29,6 @@ function polishSystem() {
 ${CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS}`;
 }
 
-function groundingSystem() {
-  return `Prompt version: ${CONSULTATION_PROMPT_VERSION}
-
-${CONSULTATION_STATEMENT_GROUNDING_SYSTEM_INSTRUCTIONS}`;
-}
-
 export function buildConsultationCoachMessages(input: {
   targets: Array<{ key: string; kind: string; text: string }>;
   profileItems: Array<{
@@ -51,7 +48,8 @@ export function buildConsultationCoachMessages(input: {
     likelyTitles: string[];
     whyThisRoleMatters: string | null;
   }>;
-  seekerLearnedNotes?: string | null;
+  seekerStatedFacts: SeekerStatedFactPayload[];
+  askedQuestions: AskedConsultationQuestion[];
   chronologyRequested: boolean;
   coveredTargetKeys: string[];
   focusTargetKey?: string | null;
@@ -64,7 +62,7 @@ export function buildConsultationCoachMessages(input: {
       content: JSON.stringify({
         consultantName: consultationConfig.displayName,
         personalProfileItems: input.profileItems,
-        seekerLearnedNotes: input.seekerLearnedNotes?.trim() || null,
+        seekerStatedFacts: input.seekerStatedFacts,
         targets: input.targets,
         hiringTeam: input.hiringTeam.map((role) => ({
           id: role.id,
@@ -77,6 +75,7 @@ export function buildConsultationCoachMessages(input: {
     {
       role: "user",
       content: JSON.stringify({
+        askedQuestions: input.askedQuestions,
         chronologyRequested: input.chronologyRequested,
         coveredTargetKeys: input.coveredTargetKeys,
         focusTargetKey: input.focusTargetKey ?? null,
@@ -122,7 +121,6 @@ export function buildConsultationPolishMessages(input: {
     action: string | null;
     result: string | null;
   };
-  sources: Array<{ id: string; text: string }>;
   declinedFollowUp: boolean;
   confirmedGap?: boolean;
   strengtheningNeeds: string[];
@@ -137,7 +135,6 @@ export function buildConsultationPolishMessages(input: {
         interviewAnswerMetaLanguage:
           consultationConfig.interviewAnswerMetaLanguage,
         interviewAnswerMaxWords: consultationConfig.interviewAnswerMaxWords,
-        allowedSources: input.sources,
       }),
     },
     {
@@ -149,29 +146,6 @@ export function buildConsultationPolishMessages(input: {
         confirmedGap: input.confirmedGap === true,
         strengtheningNeeds: input.strengtheningNeeds,
         qualityFeedback: input.qualityFeedback ?? [],
-      }),
-    },
-  ];
-}
-
-export function buildConsultationStatementGroundingMessages(input: {
-  statement: string;
-  kind: "INTERVIEW_ANSWER" | "RESUME_BULLET";
-  sources: Array<{ id: string; text: string }>;
-}): AiMessage[] {
-  return [
-    { role: "system", content: groundingSystem() },
-    {
-      role: "user",
-      content: JSON.stringify({
-        allowedSources: input.sources,
-      }),
-    },
-    {
-      role: "user",
-      content: JSON.stringify({
-        statement: input.statement,
-        kind: input.kind,
       }),
     },
   ];

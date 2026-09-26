@@ -76,8 +76,8 @@ describe("Harper voice", () => {
       ),
     ).toContain("Make your personal decisions");
     const coach = readFileSync("src/lib/prompt-content/consultation.ts", "utf8");
-    expect(coach).toContain('address them as "you"');
-    expect(coach).toContain("Ask one question for every remaining important gap");
+    expect(coach).toContain('speak to the person as "you"');
+    expect(coach).toContain("Ask one question per remaining important gap");
     expect(coach).toContain("storyPlan is []");
     expect(coach).not.toContain("Ask only the next remaining gap");
     const polish = readFileSync("src/lib/prompt-content/consultation.ts", "utf8");
