@@ -28,6 +28,7 @@ export type { EmploymentTypeCode } from "./compensation";
 export {
   consultationConfig,
   consultationConversationCopy,
+  consultationGapStatusCopy,
   consultationStatementLabels,
   evidenceStrengthLabels,
   gapStrategyCopy,

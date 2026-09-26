@@ -38,6 +38,12 @@ export const evidenceStrengthLabels = Object.freeze({
   NONE: "None",
 });
 
+export const consultationGapStatusCopy = Object.freeze({
+  open: "Open",
+  closed: "Closed",
+  confirmed: "Confirmed gap",
+});
+
 export const gapStrategyCopy = Object.freeze({
   PROVE_WITH_STORY: "Prove it with a story",
   REFRAME_ADJACENT: "Reframe adjacent experience",

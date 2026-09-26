@@ -1088,8 +1088,10 @@ export async function answerCheatSheetCoachItem(input: {
     verbatimAnswer: answer,
     interviewAnswer: sampleAnswer,
     interviewAnswerApprovedAt: now,
-    resumeBullet: polished.data.resumeBullet.text.trim() || null,
-    resumeBulletApprovedAt: polished.data.resumeBullet.text.trim() ? now : null,
+    resumeBullet: polished.data.resumeBullet?.text.trim() || null,
+    resumeBulletApprovedAt: polished.data.resumeBullet?.text.trim()
+      ? now
+      : null,
     seekerAuthored: true,
   };
   const nextGuidance = replaceCoachItem(guidance, input.itemId, {

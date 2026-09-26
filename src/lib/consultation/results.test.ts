@@ -125,7 +125,7 @@ describe("Harper result quality", () => {
     expect(consultationConversationCopy.editAnswer).toBe("Edit");
     expect(consultationConversationCopy.saveAnswer).toBe("Save");
     const polish = readFileSync("src/lib/prompt-content/consultation.ts", "utf8");
-    expect(polish).toContain("Never return the seeker's reply unchanged");
+    expect(polish).toContain("Never return the reply unchanged");
     expect(polish).toContain("Do not add facts from other profile items");
   });
 

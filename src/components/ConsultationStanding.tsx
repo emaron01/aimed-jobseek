@@ -2,7 +2,12 @@
 
 import { AppButton } from "@/components/AppButton";
 import { useMemo, useState } from "react";
-import { consultationConversationCopy, evidenceStrengthLabels } from "@/lib/product-config";
+import {
+  consultationConversationCopy,
+  consultationGapStatusCopy,
+  evidenceStrengthLabels,
+} from "@/lib/product-config";
+import type { ConsultationGapStatus } from "@/lib/consultation/standing";
 
 export type StandingRequirement = {
   id: string;
@@ -13,6 +18,13 @@ export type StandingRequirement = {
   experience: string | null;
 };
 
+export type StandingGapView = {
+  targetKey: string;
+  label: string;
+  status: ConsultationGapStatus;
+  talkTrack: string | null;
+};
+
 export function ConsultationStanding({
   overall,
   gaps,
@@ -20,7 +32,7 @@ export function ConsultationStanding({
   requirements,
 }: {
   overall: string | null;
-  gaps: string[];
+  gaps: StandingGapView[];
   careerRecap: string | null;
   requirements: StandingRequirement[];
 }) {
@@ -68,9 +80,19 @@ export function ConsultationStanding({
           {evidenceStrengthLabels.NONE} {counts.NONE}
         </p>
         {gaps.length > 0 ? (
-          <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
+          <ul className="list-disc space-y-3 pl-5 text-sm text-ink">
             {gaps.map((gap) => (
-              <li key={gap}>{gap}</li>
+              <li key={gap.targetKey} data-testid={`consultation-gap-${gap.status}`}>
+                <p>
+                  <span className="font-medium">{gap.label}</span>
+                  <span className="ml-2 rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink">
+                    {consultationGapStatusCopy[gap.status]}
+                  </span>
+                </p>
+                {gap.talkTrack ? (
+                  <p className="mt-1 whitespace-pre-wrap">{gap.talkTrack}</p>
+                ) : null}
+              </li>
             ))}
           </ul>
         ) : null}

@@ -25,7 +25,7 @@ export type ConsultationQaItem = {
   targetKey: string | null;
   question: string;
   followUp: { turnId: string; text: string } | null;
-  seekerAnswers: Array<{ id: string; body: string }>;
+  seekerAnswers: Array<{ id: string; body: string; analysisJson?: unknown }>;
   statements: QaStatement[];
   resumeBullet: QaStatement | null;
   talkingPoint: QaStatement | null;
@@ -273,14 +273,22 @@ export function buildConsultationQaView(input: {
         followUp: false,
         sequence: seeker.sequence,
       });
-      item.seekerAnswers.push({ id: seeker.id, body: seeker.body });
+      item.seekerAnswers.push({
+        id: seeker.id,
+        body: seeker.body,
+        analysisJson: seeker.analysisJson,
+      });
       item.statements.push(...(byTurn.get(seeker.id) ?? []));
       continue;
     }
     const primary = primaryFor(turns, answered);
     const host = isPrimaryHarperQuestion(primary) ? primary : answered;
     const item = ensure(host);
-    item.seekerAnswers.push({ id: seeker.id, body: seeker.body });
+    item.seekerAnswers.push({
+      id: seeker.id,
+      body: seeker.body,
+      analysisJson: seeker.analysisJson,
+    });
     item.statements.push(...(byTurn.get(seeker.id) ?? []));
   }
 

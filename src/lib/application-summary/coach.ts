@@ -3,39 +3,18 @@ import type {
   CheatSheetCoachItem,
 } from "@/lib/application-summary/contract";
 import { applicationSummaryConfig, consultationConfig } from "@/lib/product-config";
+import {
+  seekerFirstName,
+  seekerPrepInstructionViolations,
+  seekerThirdPersonViolations,
+} from "@/lib/consultation/voice";
 
-const PREPARE_INSTRUCTION = /\b(be ready to|be ready for|prepare a|prepare to|prepare your|expect questions|expect to discuss|expect to be asked|bring a concrete)\b/i;
+export { seekerFirstName, seekerThirdPersonViolations };
 
 export function prepareInstructionViolations(text: string): string[] {
-  if (!text.trim()) return [];
-  return PREPARE_INSTRUCTION.test(text)
-    ? ["Replace prepare-style instructions with a sample answer or Harper's question."]
-    : [];
-}
-
-export function seekerFirstName(name: string | null | undefined): string | null {
-  const first = name?.trim().split(/\s+/)[0] ?? "";
-  return first || null;
-}
-
-export function seekerThirdPersonViolations(input: {
-  text: string;
-  firstName: string | null;
-}): string[] {
-  const text = input.text.trim();
-  if (!text) return [];
-  const errors: string[] = [];
-  if (/\b(the seeker|the candidate)\b/i.test(text)) {
-    errors.push("Describe the seeker in first person.");
-  }
-  const firstName = input.firstName?.trim();
-  if (firstName && firstName.length > 1) {
-    const name = firstName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    if (new RegExp(`\\b${name}\\b`, "i").test(text)) {
-      errors.push("Describe the seeker in first person.");
-    }
-  }
-  return [...new Set(errors)];
+  return seekerPrepInstructionViolations(text).map(
+    () => "Replace prepare-style instructions with a sample answer or Harper's question.",
+  );
 }
 
 export function coachItemIsComplete(item: CheatSheetCoachItem): boolean {

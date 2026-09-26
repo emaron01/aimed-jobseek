@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONSULTATION_PROMPT_VERSION = "15";
+export const CONSULTATION_PROMPT_VERSION = "16";
 
 export const WHY_THIS_COMPANY_TARGET_KEY = "why-this-company";
 export const PERSON_PREP_TARGET_PREFIX = "person-prep:";
@@ -15,8 +15,8 @@ const strategyModeSchema = z.enum([
 export const consultationBriefingSchema = z.object({
   overall: z.string(),
   strongestAngles: z.array(z.string()).min(2).max(3),
-  importantGaps: z.array(z.string()).min(2).max(3),
-  storyPlan: z.array(z.string()).min(1).max(5),
+  importantGaps: z.array(z.string()).min(1).max(10),
+  storyPlan: z.array(z.string()).max(5),
 });
 
 export const consultationPlanSchema = z.object({
@@ -70,6 +70,7 @@ export const consultationExtractSchema = z.object({
   ),
   coaching: z.string().nullable().optional(),
   followUpQuestion: z.string().nullable(),
+  gapDecision: z.enum(["evidence", "no_evidence", "incomplete"]),
 });
 
 const statementSupportSchema = z.object({
@@ -89,7 +90,7 @@ const groundedStatementSchema = z.object({
 
 export const consultationPolishSchema = z.object({
   interviewAnswer: groundedStatementSchema,
-  resumeBullet: groundedStatementSchema,
+  resumeBullet: groundedStatementSchema.nullable(),
   strengtheningNote: z.string().nullable(),
 });
 

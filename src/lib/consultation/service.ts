@@ -47,6 +47,13 @@ import {
 } from "@/lib/consultation/results";
 import { nextConsultationStatus } from "@/lib/consultation/state";
 import {
+  harperCoachingVoiceViolations,
+  rewriteHarperCoachingVoice,
+  seekerFirstName,
+  seekerPrepInstructionViolations,
+  talkTrackVoiceViolations,
+} from "@/lib/consultation/voice";
+import {
   appendConfirmedFact,
   followUpForMissingStar,
   proposalsFromExtraction,
@@ -394,8 +401,10 @@ export async function polishAnswerWithQuality(input: {
   };
   sources: GroundingSource[];
   declinedFollowUp: boolean;
+  confirmedGap?: boolean;
   strengtheningNeeds: string[];
   seekerAnswers?: string[];
+  firstName?: string | null;
   usage?: AiCallUsageContext;
 }) {
   const seekerAnswers =
@@ -404,6 +413,7 @@ export async function polishAnswerWithQuality(input: {
       .split("\n")
       .map((answer) => answer.trim())
       .filter(Boolean);
+  const confirmedGap = input.confirmedGap === true;
   let lastFailure: string = consultationConversationCopy.generationFailed;
   let qualityFeedback: string[] = [];
   for (
@@ -413,6 +423,7 @@ export async function polishAnswerWithQuality(input: {
   ) {
     const polished = await polishAnswerWithModel({
       ...input,
+      confirmedGap,
       qualityFeedback,
       usage: input.usage,
     });
@@ -421,21 +432,36 @@ export async function polishAnswerWithQuality(input: {
       continue;
     }
     const interviewText = polished.data.interviewAnswer.text.trim();
-    const bulletText = polished.data.resumeBullet.text.trim();
-    if (
+    const bulletText = polished.data.resumeBullet?.text.trim() ?? "";
+    const interviewBroken =
       !interviewText ||
-      !bulletText ||
       isRawSeekerResult(interviewText, seekerAnswers) ||
-      isRawSeekerResult(bulletText, seekerAnswers) ||
-      resultIgnoresLatestAnswer(interviewText, seekerAnswers)
-    ) {
+      resultIgnoresLatestAnswer(interviewText, seekerAnswers) ||
+      talkTrackVoiceViolations({
+        text: interviewText,
+        firstName: input.firstName ?? null,
+      }).length > 0;
+    const bulletBroken =
+      !confirmedGap &&
+      (!bulletText ||
+        isRawSeekerResult(bulletText, seekerAnswers) ||
+        resultIgnoresLatestAnswer(bulletText, seekerAnswers));
+    if (interviewBroken || bulletBroken) {
       lastFailure = consultationConversationCopy.generationFailed;
       qualityFeedback = [
-        "The last interview answer or resume bullet copied the seeker's wording, ignored the latest reply, or used facts that were not in the supplied answer. Write polished statements from every supplied reply. Do not paste the seeker's wording.",
+        confirmedGap
+          ? "Write a first-person talk track for addressing this gap honestly. Do not invent experience. Do not copy the reply unchanged. Never refer to the person in third person."
+          : "The last interview answer or resume bullet copied the wording, ignored the latest reply, used third person, or used facts that were not in the supplied answer. Write polished first-person statements from every supplied reply.",
       ];
       continue;
     }
-    return polished;
+    return {
+      ...polished,
+      data: {
+        ...polished.data,
+        resumeBullet: confirmedGap ? null : polished.data.resumeBullet,
+      },
+    };
   }
   return {
     ok: false as const,
@@ -516,6 +542,108 @@ function learnedNotesEvidence(
   ];
 }
 
+function profileFirstName(
+  profile: ReturnType<typeof parseCandidateProfile>,
+): string | null {
+  return seekerFirstName(profile.identity.name?.text);
+}
+
+function consultationPlanQualityIssues(input: {
+  briefing: {
+    overall: string;
+    strongestAngles: string[];
+    importantGaps: string[];
+    storyPlan: string[];
+  };
+  commentary: string;
+  closingNote: string | null;
+  questions: QuestionRoundPlan["questions"];
+  assessments: EvidenceAssessment[];
+  dropped: QuestionRoundPlan["dropped"];
+  firstName: string | null;
+}): string[] {
+  const issues: string[] = [];
+  const droppedGaps = input.dropped.filter(
+    (item) => item.targetKey !== "chronology",
+  );
+  if (droppedGaps.length > 0) {
+    issues.push(
+      "Write one question for every remaining gap, most important first.",
+    );
+  }
+  const texts = [
+    input.commentary,
+    input.briefing.overall,
+    ...input.briefing.strongestAngles,
+    ...input.briefing.importantGaps,
+    ...input.briefing.storyPlan,
+    input.closingNote ?? "",
+    ...input.questions.map((question) => question.text),
+    ...input.assessments.map((assessment) => assessment.explanation),
+  ];
+  for (const text of texts) {
+    issues.push(
+      ...harperCoachingVoiceViolations({
+        text,
+        firstName: input.firstName,
+      }),
+      ...seekerPrepInstructionViolations(text),
+    );
+  }
+  return [...new Set(issues)];
+}
+
+function applyHarperVoiceToText(
+  text: string,
+  firstName: string | null,
+): string {
+  return rewriteHarperCoachingVoice(text, firstName);
+}
+
+async function rewriteStoredHarperVoice(
+  sessionId: string,
+  firstName: string | null,
+): Promise<void> {
+  const [turns, assessments] = await Promise.all([
+    prisma.consultationTurn.findMany({
+      where: { sessionId, speaker: "CONSULTANT" },
+      select: { id: true, body: true },
+    }),
+    prisma.consultationAssessment.findMany({
+      where: { sessionId },
+      select: { id: true, explanation: true, strategyText: true },
+    }),
+  ]);
+  for (const turn of turns) {
+    const body = applyHarperVoiceToText(turn.body, firstName);
+    if (body !== turn.body) {
+      await prisma.consultationTurn.update({
+        where: { id: turn.id },
+        data: { body },
+      });
+    }
+  }
+  for (const assessment of assessments) {
+    const explanation = applyHarperVoiceToText(
+      assessment.explanation ?? "",
+      firstName,
+    );
+    const strategyText = applyHarperVoiceToText(
+      assessment.strategyText ?? "",
+      firstName,
+    );
+    if (
+      explanation !== assessment.explanation ||
+      strategyText !== assessment.strategyText
+    ) {
+      await prisma.consultationAssessment.update({
+        where: { id: assessment.id },
+        data: { explanation, strategyText },
+      });
+    }
+  }
+}
+
 async function planAndStoreRound(input: {
   organizationId: string;
   campaignId: string;
@@ -546,6 +674,8 @@ async function planAndStoreRound(input: {
     title: input.requirement.title,
   });
   let lastFailure: string = consultationConversationCopy.planUnusable;
+  let qualityFeedback = [...(input.focusGuidance ?? [])];
+  const firstName = profileFirstName(input.profile);
   let accepted:
     | {
         plan: Extract<
@@ -580,7 +710,7 @@ async function planAndStoreRound(input: {
         ),
       ],
       focusTargetKey: input.focusTargetKey ?? null,
-      qualityFeedback: input.focusGuidance ?? [],
+      qualityFeedback,
     });
     if (!plan.ok) {
       lastFailure = plan.message;
@@ -602,6 +732,25 @@ async function planAndStoreRound(input: {
       chronologyAsked: input.askedKeys.has("chronology"),
       focusTargetKey: input.focusTargetKey ?? null,
     });
+    const issues = consultationPlanQualityIssues({
+      briefing: plan.data.briefing,
+      commentary: plan.data.commentary,
+      closingNote: plan.data.closingNote,
+      questions: planned.questions,
+      assessments,
+      dropped: planned.dropped,
+      firstName,
+    });
+    const lastAttempt = attempt === consultationConfig.qualityRegenerationAttempts;
+    if (issues.length > 0 && !lastAttempt) {
+      qualityFeedback = [
+        ...qualityFeedback,
+        ...issues,
+        "Write one question for every remaining gap, most important first. Speak to the person as you. Never write instructions to close a gap or prepare a story.",
+      ];
+      lastFailure = consultationConversationCopy.planUnusable;
+      continue;
+    }
     accepted = { plan, assessments, questions: planned.questions };
     break;
   }
@@ -610,8 +759,59 @@ async function planAndStoreRound(input: {
     throw new Error(lastFailure);
   }
   const { plan, assessments, questions } = accepted;
-  await saveAssessments(input.organizationId, input.sessionId, assessments);
-  for (const question of questions) {
+  const voicedAssessments = assessments.map((assessment) => ({
+    ...assessment,
+    explanation: applyHarperVoiceToText(assessment.explanation, firstName),
+    strategyText: applyHarperVoiceToText(assessment.strategyText, firstName),
+  }));
+  const voicedQuestions = questions.map((question) => ({
+    ...question,
+    text: applyHarperVoiceToText(question.text, firstName),
+    whoCaresNote: applyHarperVoiceToText(question.whoCaresNote, firstName),
+  }));
+  const gapLabels = voicedQuestions
+    .filter(
+      (question) =>
+        !question.followUp &&
+        question.targetKey &&
+        question.targetKey !== "chronology",
+    )
+    .map((question) => {
+      const assessment = voicedAssessments.find(
+        (item) => item.key === question.targetKey,
+      );
+      return applyHarperVoiceToText(
+        assessment?.text ?? question.text,
+        firstName,
+      );
+    })
+    .filter((label) => !seekerPrepInstructionViolations(label).length);
+  const briefing = {
+    overall: applyHarperVoiceToText(plan.data.briefing.overall, firstName),
+    strongestAngles: plan.data.briefing.strongestAngles.map((item) =>
+      applyHarperVoiceToText(item, firstName),
+    ),
+    importantGaps:
+      gapLabels.length > 0
+        ? gapLabels
+        : plan.data.briefing.importantGaps
+            .map((item) => applyHarperVoiceToText(item, firstName))
+            .filter((item) => !seekerPrepInstructionViolations(item).length),
+    storyPlan: [],
+  };
+  if (briefing.importantGaps.length === 0) {
+    briefing.importantGaps = voicedAssessments
+      .filter((assessment) => assessment.strength !== "STRONG")
+      .slice(0, 3)
+      .map((assessment) => assessment.text);
+  }
+  if (briefing.importantGaps.length === 0) {
+    briefing.importantGaps = [
+      "No remaining experience gaps after combining your profile with this job.",
+    ];
+  }
+  await saveAssessments(input.organizationId, input.sessionId, voicedAssessments);
+  for (const question of voicedQuestions) {
     await addTurn({
       organizationId: input.organizationId,
       sessionId: input.sessionId,
@@ -629,12 +829,14 @@ async function planAndStoreRound(input: {
   await prisma.consultationSession.update({
     where: { id: input.sessionId },
     data: {
-      coachNote: plan.data.commentary.trim() || null,
-      briefingJson: plan.data.briefing as Prisma.InputJsonValue,
+      coachNote: applyHarperVoiceToText(plan.data.commentary, firstName).trim() || null,
+      briefingJson: briefing as Prisma.InputJsonValue,
+      promptVersion: CONSULTATION_PROMPT_VERSION,
       generationStatus: "READY",
       generationError: null,
     },
   });
+  await rewriteStoredHarperVoice(input.sessionId, firstName);
   if (questions.length === 0 && plan.data.closingNote?.trim()) {
     await addTurn({
       organizationId: input.organizationId,
@@ -857,12 +1059,15 @@ async function processAnswerGeneration(input: {
   targets: EvidenceTarget[];
   profile: ReturnType<typeof parseCandidateProfile>;
   replyToTurnId?: string | null;
+  allowFollowUp?: boolean;
 }): Promise<
   | {
       ok: true;
       followUpQuestion: string | null;
       coaching: string | null;
       missingStarElements: string[];
+      wroteResult: boolean;
+      gapDecision: "evidence" | "no_evidence" | "incomplete";
     }
   | { ok: false }
 > {
@@ -897,6 +1102,55 @@ async function processAnswerGeneration(input: {
     verified.partialStory ??
     extracted.data.story ??
     null;
+  const gapDecision = extracted.data.gapDecision;
+  const followUpQuestion =
+    verified.followUpQuestion ??
+    (verified.missingStarElements.length > 0
+      ? followUpForMissingStar(verified.missingStarElements)
+      : storyProposal?.story
+        ? null
+        : consultationConversationCopy.askForStory);
+  const incomplete =
+    gapDecision === "incomplete" ||
+    (verified.missingStarElements.length > 0 && gapDecision !== "no_evidence");
+  const coaching =
+    extracted.data.coaching?.trim() ||
+    followUpQuestion ||
+    consultationConversationCopy.keepCoaching;
+  const analysisJson = {
+    status: "READY",
+    ...(input.replyToTurnId ? { replyToTurnId: input.replyToTurnId } : {}),
+    answerContext: input.answerContext,
+    story: storyProposal?.story ?? verified.partialStory ?? extracted.data.story,
+    dropped: verified.droppedDetails,
+    missingStarElements: verified.missingStarElements,
+    demonstratedTargets: extracted.data.demonstratedTargets,
+    gapDecision,
+  };
+  if (incomplete && input.allowFollowUp && followUpQuestion) {
+    await prisma.$transaction([
+      prisma.consultationProposal.deleteMany({
+        where: { turnId: input.turnId, status: "PENDING" },
+      }),
+      prisma.consultationTurn.update({
+        where: { id: input.turnId },
+        data: { analysisJson },
+      }),
+      prisma.consultationSession.update({
+        where: { id: input.sessionId },
+        data: { generationStatus: "READY", generationError: null },
+      }),
+    ]);
+    return {
+      ok: true,
+      followUpQuestion,
+      coaching,
+      missingStarElements: verified.missingStarElements,
+      wroteResult: false,
+      gapDecision: "incomplete",
+    };
+  }
+  const confirmedGap = gapDecision === "no_evidence";
   const polished = await polishAnswerWithQuality({
     answer: input.answerContext,
     story: {
@@ -910,31 +1164,22 @@ async function processAnswerGeneration(input: {
       turnId: input.turnId,
     }),
     declinedFollowUp: false,
+    confirmedGap,
     strengtheningNeeds: verified.missingStarElements,
     seekerAnswers: input.answerContext
       .split("\n")
       .map((answer) => answer.trim())
       .filter(Boolean),
+    firstName: profileFirstName(input.profile),
     usage: replyUsage,
   });
   if (!polished.ok) {
     await failGeneration(input.sessionId, polished.message);
     return { ok: false };
   }
-  const followUpQuestion =
-    verified.followUpQuestion ??
-    (verified.missingStarElements.length > 0
-      ? followUpForMissingStar(verified.missingStarElements)
-      : storyProposal?.story
-        ? null
-        : consultationConversationCopy.askForStory);
-  const coaching =
-    extracted.data.coaching?.trim() ||
-    followUpQuestion ||
-    consultationConversationCopy.keepCoaching;
   const interviewText = polished.data.interviewAnswer.text.trim();
-  const bulletText = polished.data.resumeBullet.text.trim();
-  if (!interviewText || !bulletText) {
+  const bulletText = polished.data.resumeBullet?.text.trim() ?? "";
+  if (!interviewText || (!confirmedGap && !bulletText)) {
     await failGeneration(input.sessionId, consultationConversationCopy.generationFailed);
     return { ok: false };
   }
@@ -946,13 +1191,8 @@ async function processAnswerGeneration(input: {
       where: { id: input.turnId },
       data: {
         analysisJson: {
-          status: "READY",
-          ...(input.replyToTurnId ? { replyToTurnId: input.replyToTurnId } : {}),
-          answerContext: input.answerContext,
-          story: storyProposal?.story ?? verified.partialStory ?? extracted.data.story,
-          dropped: verified.droppedDetails,
-          missingStarElements: verified.missingStarElements,
-          demonstratedTargets: extracted.data.demonstratedTargets,
+          ...analysisJson,
+          gapDecision: confirmedGap ? "no_evidence" : "evidence",
         },
       },
     }),
@@ -985,12 +1225,16 @@ async function processAnswerGeneration(input: {
       claims: polished.data.interviewAnswer.claims,
       note: polished.data.strengtheningNote?.trim() || null,
     },
-    {
-      kind: "RESUME_BULLET" as const,
-      content: bulletText,
-      claims: polished.data.resumeBullet.claims,
-      note: null,
-    },
+    ...(confirmedGap || !polished.data.resumeBullet || !bulletText
+      ? []
+      : [
+          {
+            kind: "RESUME_BULLET" as const,
+            content: bulletText,
+            claims: polished.data.resumeBullet.claims,
+            note: null,
+          },
+        ]),
   ];
   const resultTurnId = input.resultTurnId ?? input.turnId;
   const supersedeTurnIds = (input.supersedeTurnIds ?? []).filter(
@@ -1035,12 +1279,25 @@ async function processAnswerGeneration(input: {
       }),
     ),
   );
+  if (confirmedGap) {
+    operations.push(
+      prisma.consultationStatement.deleteMany({
+        where: {
+          sessionId: input.sessionId,
+          turnId: input.resultTurnId ?? input.turnId,
+          kind: "RESUME_BULLET",
+        },
+      }),
+    );
+  }
   await prisma.$transaction(operations);
   return {
     ok: true,
-    followUpQuestion,
+    followUpQuestion: null,
     coaching,
     missingStarElements: verified.missingStarElements,
+    wroteResult: true,
+    gapDecision: confirmedGap ? "no_evidence" : "evidence",
   };
 }
 
@@ -1426,6 +1683,7 @@ export async function processConsultationReply(input: {
   questionTurnId?: string;
   answer?: string;
   intent?: string | null;
+  forceDecision?: boolean;
 }): Promise<void> {
   const answer = input.answer?.trim() ?? "";
   const session = await prisma.consultationSession.findFirst({
@@ -1549,6 +1807,14 @@ export async function processConsultationReply(input: {
     resolvedItem?.seekerAnswers
       .map((entry) => entry.id)
       .filter((turnId) => turnId !== resultTurnId) ?? [];
+  const followUpCount = consultationFollowUpCount(
+    toQaTurns(turns),
+    questionTurnId,
+  );
+  const allowFollowUp =
+    !input.forceDecision &&
+    assessmentKey !== "chronology" &&
+    followUpCount < consultationConfig.maxFollowUpsPerTarget;
   const processed = await processAnswerGeneration({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
@@ -1565,6 +1831,7 @@ export async function processConsultationReply(input: {
     targets,
     profile,
     replyToTurnId: questionTurnId,
+    allowFollowUp,
   });
   if (!processed.ok) {
     throw new Error(consultationConversationCopy.generationFailed);
@@ -1576,23 +1843,22 @@ export async function processConsultationReply(input: {
       answer: recordedAnswer,
     });
   }
-  const followUpCount = consultationFollowUpCount(
-    toQaTurns(turns),
-    questionTurnId,
-  );
   const coaching = processed.coaching?.trim();
   const askFollowUp =
+    !processed.wroteResult &&
     Boolean(processed.followUpQuestion) &&
-    assessmentKey !== "chronology" &&
-    followUpCount < consultationConfig.maxFollowUpsPerTarget;
+    allowFollowUp;
   if (askFollowUp && processed.followUpQuestion) {
     await addTurn({
       organizationId: input.organizationId,
       sessionId: session.id,
       speaker: "CONSULTANT",
-      body: coaching
-        ? `${coaching}\n\n${processed.followUpQuestion}`
-        : processed.followUpQuestion,
+      body: applyHarperVoiceToText(
+        coaching
+          ? `${coaching}\n\n${processed.followUpQuestion}`
+          : processed.followUpQuestion,
+        profileFirstName(profile),
+      ),
       targetKey: assessmentKey || targetKey,
       followUp: true,
       analysisJson: {
@@ -1611,27 +1877,32 @@ function declinedPolishInput(value: unknown): {
     result: string | null;
   };
   missingStarElements: string[];
+  gapDecision: "evidence" | "no_evidence" | "incomplete" | null;
   analysis: Record<string, unknown>;
 } | null {
   if (!value || typeof value !== "object") return null;
   const analysis = value as Record<string, unknown>;
-  if (
-    typeof analysis.answerContext !== "string" ||
-    !analysis.story ||
-    typeof analysis.story !== "object" ||
-    !Array.isArray(analysis.missingStarElements)
-  ) {
-    return null;
-  }
-  const row = analysis.story as Record<string, unknown>;
+  if (typeof analysis.answerContext !== "string") return null;
+  const row =
+    analysis.story && typeof analysis.story === "object"
+      ? (analysis.story as Record<string, unknown>)
+      : {};
   const part = (name: string) =>
     typeof row[name] === "string" && row[name].trim()
       ? row[name].trim()
       : null;
-  const missingStarElements = analysis.missingStarElements.filter(
-    (item): item is string => typeof item === "string",
-  );
-  if (missingStarElements.length === 0) return null;
+  const missingStarElements = Array.isArray(analysis.missingStarElements)
+    ? analysis.missingStarElements.filter(
+        (item): item is string => typeof item === "string",
+      )
+    : [];
+  const gapDecision =
+    analysis.gapDecision === "evidence" ||
+    analysis.gapDecision === "no_evidence" ||
+    analysis.gapDecision === "incomplete"
+      ? analysis.gapDecision
+      : null;
+  if (missingStarElements.length === 0 && !gapDecision) return null;
   return {
     answerContext: analysis.answerContext,
     story: {
@@ -1641,6 +1912,7 @@ function declinedPolishInput(value: unknown): {
       result: part("result"),
     },
     missingStarElements,
+    gapDecision,
     analysis,
   };
 }
@@ -1670,10 +1942,13 @@ async function declineConsultationFollowUp(input: {
       "The answer behind this follow-up could not be prepared. Answer the follow-up or retry.",
     );
   }
-  await requireApplication(
+  const { profile } = await requireApplication(
     input.organizationId,
     input.campaignId,
   );
+  const confirmedGap =
+    analyzed.gapDecision === "no_evidence" ||
+    (!analyzed.story.result && analyzed.gapDecision !== "evidence");
   const polished = await polishAnswerWithQuality({
     answer: analyzed.answerContext,
     story: analyzed.story,
@@ -1686,6 +1961,8 @@ async function declineConsultationFollowUp(input: {
       .map((answer) => answer.trim())
       .filter(Boolean),
     declinedFollowUp: true,
+    confirmedGap,
+    firstName: profileFirstName(profile),
     strengtheningNeeds: analyzed.missingStarElements,
     usage: consultationUsage(
       input.organizationId,
@@ -1699,18 +1976,25 @@ async function declineConsultationFollowUp(input: {
       (maximum, turn) => Math.max(maximum, turn.sequence),
       0,
     ) + 1;
-  const statements = [
-    {
-      kind: "INTERVIEW_ANSWER" as const,
+  const statements: Array<{
+    kind: "INTERVIEW_ANSWER" | "RESUME_BULLET";
+    value: NonNullable<(typeof polished.data)["interviewAnswer"]>;
+    strengtheningNote: string | null;
+  }> = [];
+  if (polished.data.interviewAnswer.text.trim()) {
+    statements.push({
+      kind: "INTERVIEW_ANSWER",
       value: polished.data.interviewAnswer,
       strengtheningNote: polished.data.strengtheningNote?.trim() || null,
-    },
-    {
-      kind: "RESUME_BULLET" as const,
+    });
+  }
+  if (!confirmedGap && polished.data.resumeBullet?.text.trim()) {
+    statements.push({
+      kind: "RESUME_BULLET",
       value: polished.data.resumeBullet,
       strengtheningNote: null,
-    },
-  ].filter((statement) => statement.value.text.trim());
+    });
+  }
   await prisma.$transaction([
     prisma.consultationTurn.create({
       data: {
@@ -1731,6 +2015,7 @@ async function declineConsultationFollowUp(input: {
         analysisJson: {
           ...analyzed.analysis,
           followUpDeclined: true,
+          gapDecision: confirmedGap ? "no_evidence" : "evidence",
           strengtheningNote: polished.data.strengtheningNote,
         } as Prisma.InputJsonValue,
       },
@@ -1854,6 +2139,7 @@ function completeStoryFromAnalysis(value: unknown): {
   };
   missingStarElements: string[];
   followUpDeclined: boolean;
+  gapDecision: "evidence" | "no_evidence" | "incomplete" | null;
 } | null {
   if (!value || typeof value !== "object") return null;
   const row = value as {
@@ -1861,6 +2147,7 @@ function completeStoryFromAnalysis(value: unknown): {
     story?: unknown;
     missingStarElements?: unknown;
     followUpDeclined?: unknown;
+    gapDecision?: unknown;
   };
   if (typeof row.answerContext !== "string" || !row.story || typeof row.story !== "object") {
     return null;
@@ -1888,6 +2175,12 @@ function completeStoryFromAnalysis(value: unknown): {
         )
       : [],
     followUpDeclined: row.followUpDeclined === true,
+    gapDecision:
+      row.gapDecision === "evidence" ||
+      row.gapDecision === "no_evidence" ||
+      row.gapDecision === "incomplete"
+        ? row.gapDecision
+        : null,
   };
 }
 
@@ -1907,10 +2200,11 @@ export async function regenerateConsultationStatement(input: {
   if (!answer) {
     throw new TenantError(consultationConversationCopy.generationFailed);
   }
-  await requireApplication(
+  const { profile } = await requireApplication(
     input.organizationId,
     statement.session.campaignId,
   );
+  const confirmedGap = analyzed?.gapDecision === "no_evidence";
   const polished = await polishAnswerWithQuality({
     answer,
     story: analyzed?.story ?? {
@@ -1928,6 +2222,8 @@ export async function regenerateConsultationStatement(input: {
       .map((entry) => entry.trim())
       .filter(Boolean),
     declinedFollowUp: analyzed?.followUpDeclined ?? false,
+    confirmedGap,
+    firstName: profileFirstName(profile),
     strengtheningNeeds: analyzed?.missingStarElements ?? [],
     usage: consultationUsage(
       input.organizationId,
@@ -1940,7 +2236,7 @@ export async function regenerateConsultationStatement(input: {
     statement.kind === "INTERVIEW_ANSWER"
       ? polished.data.interviewAnswer
       : polished.data.resumeBullet;
-  if (!value.text.trim()) {
+  if (!value?.text.trim()) {
     throw new TenantError(consultationConversationCopy.generationFailed);
   }
   const story = await prisma.profileStory.findFirst({
@@ -2214,6 +2510,7 @@ export async function repairConsultationResults(input: {
       turnId: latest.id,
       questionTurnId: item.questionTurnId,
       targetKey: consultationReplyTargetKey(item.questionTurnId),
+      forceDecision: true,
     });
   }
   const { view: refreshed } = await loadSessionQaView(session.id);

@@ -137,6 +137,7 @@ function installConsultationModelFixture() {
       statement?: string;
       kind?: "INTERVIEW_ANSWER" | "RESUME_BULLET";
       declinedFollowUp?: boolean;
+      confirmedGap?: boolean;
       strengtheningNeeds?: string[];
       qualityFeedback?: string[];
     };
@@ -182,17 +183,17 @@ function installConsultationModelFixture() {
                     : [],
               relevantRoleIds: [],
               explanation: incident
-                ? "Alex's FACT profile explicitly includes incident response."
+                ? "Your FACT profile explicitly includes incident response."
                 : mission
-                  ? "Alex's incident response and reduced billing failures are transferable reliability evidence, although not robotics evidence."
+                  ? "Your incident response and reduced billing failures are transferable reliability evidence, although not robotics evidence."
                   : production
-                    ? "Alex owned a production payments service and improved its reliability."
+                    ? "You owned a production payments service and improved its reliability."
                     : `The FACT profile does not yet establish ${target.text}.`,
               strategyMode:
                 mission || production ? "REFRAME_ADJACENT" : "ACKNOWLEDGE",
               strategy: mission
                 ? "Connect Northwind incident ownership and billing reliability to the warehouse-robot reliability mission, while acknowledging the new domain."
-                : `Use Alex's Northwind work to address ${target.text} honestly and specifically.`,
+                : `Use your Northwind work to address ${target.text} honestly and specifically.`,
             };
           }),
           questions: [
@@ -219,6 +220,25 @@ function installConsultationModelFixture() {
         id: "answer",
         text: payload.answer ?? "",
       };
+      if (payload.confirmedGap) {
+        const text =
+          "I have not done that work yet. In an interview I would say so and point to the closest adjacent experience I do have.";
+        return {
+          data: {
+            interviewAnswer: {
+              text,
+              claims: [
+                {
+                  text,
+                  supports: [{ sourceId: source.id, quote: source.text }],
+                },
+              ],
+            },
+            resumeBullet: null,
+            strengtheningNote: null,
+          },
+        };
+      }
       if (
         payload.answer === "copy me exactly" &&
         (payload.qualityFeedback?.length ?? 0) === 0
@@ -371,6 +391,19 @@ function installConsultationModelFixture() {
           missingStarElements: ["ACTION"],
           followUpQuestion:
             "When you led the rewrite, what did you personally change, what options did you weigh, and who did you work with?",
+          gapDecision: "incomplete",
+        },
+      };
+    }
+    if (/I have never /i.test(answer) || /I do not have /i.test(answer)) {
+      return {
+        data: {
+          facts: [],
+          story: null,
+          demonstratedTargets: [],
+          missingStarElements: [],
+          followUpQuestion: null,
+          gapDecision: "no_evidence",
         },
       };
     }
@@ -411,6 +444,7 @@ function installConsultationModelFixture() {
         followUpQuestion: complete
           ? null
           : "On that Python backend work, what changed because of your contribution, ideally a concrete result or metric?",
+        gapDecision: complete ? "evidence" : "incomplete",
       },
     };
   });
@@ -918,6 +952,7 @@ describe("consultation evidence and questions", () => {
         ],
         missingStarElements: [],
         followUpQuestion: null,
+        gapDecision: "evidence",
       },
       targets,
     });
@@ -947,6 +982,7 @@ describe("consultation evidence and questions", () => {
         ],
         missingStarElements: [],
         followUpQuestion: null,
+        gapDecision: "evidence",
       },
       targets: [
         ...targets,
@@ -978,6 +1014,7 @@ describe("consultation evidence and questions", () => {
         demonstratedTargets: [],
         missingStarElements: [],
         followUpQuestion: null,
+        gapDecision: "evidence",
       },
       targets,
     });
@@ -996,6 +1033,7 @@ describe("consultation evidence and questions", () => {
         demonstratedTargets: [],
         missingStarElements: ["ACTION"],
         followUpQuestion: "What did you personally do?",
+        gapDecision: "incomplete",
       },
       targets,
     });
@@ -1023,6 +1061,7 @@ describe("consultation evidence and questions", () => {
         demonstratedTargets: [],
         missingStarElements: [],
         followUpQuestion: null,
+        gapDecision: "evidence",
       },
       targets,
     });
@@ -1079,6 +1118,7 @@ describe("consultation evidence and questions", () => {
         demonstratedTargets: [],
         missingStarElements: [],
         followUpQuestion: null,
+        gapDecision: "evidence",
       },
       targets,
     });
@@ -1251,7 +1291,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("15");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("16");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("coach, not an interrogator");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("Never inflate fit");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -1262,7 +1302,10 @@ describe("consultation evidence and questions", () => {
       "Never paste requirement, responsibility, or posting text",
     );
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
-      "never ask whether the seeker has experience with a mission",
+      "never ask whether you have experience with a mission",
+    );
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
+      "Ask one question for every remaining important gap",
     );
     const workspace = readFileSync("src/components/ConsultationSection.tsx", "utf8");
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
@@ -1417,7 +1460,7 @@ describe("consultation evidence and questions", () => {
     expect(copied.ok).toBe(true);
     if (copied.ok) {
       expect(copied.data.interviewAnswer.text).not.toBe("copy me exactly");
-      expect(copied.data.resumeBullet.text).not.toBe("copy me exactly");
+      expect(copied.data.resumeBullet?.text).not.toBe("copy me exactly");
     }
     generateStructured.mockClear();
 
@@ -1576,13 +1619,13 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("15");
+    expect(session?.promptVersion).toBe("16");
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
     expect(session?.briefingJson).toMatchObject({
       strongestAngles: expect.any(Array),
       importantGaps: expect.any(Array),
-      storyPlan: expect.any(Array),
+      storyPlan: [],
     });
     const incident = session?.assessments.find((item) => item.text === "Leads incident response");
     expect(incident?.strength).toBe("STRONG");
@@ -1629,7 +1672,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       await prisma.consultationStatement.count({
         where: { sessionId: session!.id },
       }),
-    ).toBeGreaterThan(0);
+    ).toBe(0);
     expect(
       (
         await prisma.consultationTurn.findMany({
@@ -1746,6 +1789,35 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       });
       expect(bank?.seekerAuthored).toBe(true);
       expect(JSON.stringify(bank?.competencyLinks).toLowerCase()).toContain("python");
+    }
+    const otherQuestion = draftedQuestions.find(
+      (turn) => turn.id !== first!.id && turn.targetKey,
+    );
+    if (otherQuestion) {
+      await answerConsultationQuestion({
+        organizationId,
+        campaignId,
+        targetKey: `question:${otherQuestion.id}`,
+        answer: "I have never developed a sales manager.",
+      });
+      const confirmedTurn = await prisma.consultationTurn.findFirst({
+        where: {
+          sessionId: session!.id,
+          speaker: "SEEKER",
+          body: "I have never developed a sales manager.",
+        },
+      });
+      const confirmedInterview = await prisma.consultationStatement.findFirst({
+        where: { turnId: confirmedTurn!.id, kind: "INTERVIEW_ANSWER" },
+      });
+      const confirmedBullet = await prisma.consultationStatement.findFirst({
+        where: { turnId: confirmedTurn!.id, kind: "RESUME_BULLET" },
+      });
+      expect(confirmedInterview?.content).toMatch(/I have not done that work yet/i);
+      expect(confirmedInterview?.content).not.toBe(
+        "I have never developed a sales manager.",
+      );
+      expect(confirmedBullet).toBeNull();
     }
     await editConsultationAnswer({
       organizationId,
@@ -2031,7 +2103,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     expect(interview?.content).toMatch(/8%/);
     expect(interview?.content.match(/8%/g)).toHaveLength(1);
     if (followUp) {
-      expect(interview?.content).toBe(answer);
+      expect(interview?.content).not.toBe(answer);
       expect(interview?.strengtheningNote).toContain("ACTION");
       expect(
         polished?.turns.some(

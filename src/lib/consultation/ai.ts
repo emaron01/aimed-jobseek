@@ -147,6 +147,7 @@ export async function polishAnswerWithModel(input: {
   };
   sources: Array<{ id: string; text: string }>;
   declinedFollowUp: boolean;
+  confirmedGap?: boolean;
   strengtheningNeeds: string[];
   qualityFeedback?: string[];
   usage?: AiCallUsageContext;

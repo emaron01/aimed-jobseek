@@ -137,22 +137,12 @@ function questionForGap(input: {
   };
 }
 
-export function planQuestionRound(input: {
+export function selectGapsForRound(input: {
   assessments: EvidenceAssessment[];
-  modelQuestions: Array<{
-    targetKey: string;
-    text: string;
-    requirementInterpretation: string | null;
-    hiringTeamRoleId: string;
-    whoCaresNote: string;
-  }>;
-  hiringTeam: Array<{ id: string; name: string }>;
   askedKeys: ReadonlySet<string>;
   skippedKeys: ReadonlySet<string>;
-  includeChronology: boolean;
-  chronologyAsked: boolean;
   focusTargetKey?: string | null;
-}): QuestionRoundPlan {
+}): EvidenceAssessment[] {
   const askedKeys = new Set(input.askedKeys);
   if (input.focusTargetKey) askedKeys.delete(input.focusTargetKey);
   const coveredMeanings = new Set(
@@ -201,6 +191,31 @@ export function planQuestionRound(input: {
     selected.push(gap);
     selectedMeanings.add(meaning);
   }
+  return selected;
+}
+
+export function planQuestionRound(input: {
+  assessments: EvidenceAssessment[];
+  modelQuestions: Array<{
+    targetKey: string;
+    text: string;
+    requirementInterpretation: string | null;
+    hiringTeamRoleId: string;
+    whoCaresNote: string;
+  }>;
+  hiringTeam: Array<{ id: string; name: string }>;
+  askedKeys: ReadonlySet<string>;
+  skippedKeys: ReadonlySet<string>;
+  includeChronology: boolean;
+  chronologyAsked: boolean;
+  focusTargetKey?: string | null;
+}): QuestionRoundPlan {
+  const selected = selectGapsForRound({
+    assessments: input.assessments,
+    askedKeys: input.askedKeys,
+    skippedKeys: input.skippedKeys,
+    focusTargetKey: input.focusTargetKey,
+  });
   const byKey = new Map(
     input.modelQuestions
       .filter((question) => question.text.trim())

@@ -124,6 +124,7 @@ export function buildConsultationPolishMessages(input: {
   };
   sources: Array<{ id: string; text: string }>;
   declinedFollowUp: boolean;
+  confirmedGap?: boolean;
   strengtheningNeeds: string[];
   qualityFeedback?: string[];
 }): AiMessage[] {
@@ -145,6 +146,7 @@ export function buildConsultationPolishMessages(input: {
         answer: input.answer,
         story: input.story,
         declinedFollowUp: input.declinedFollowUp,
+        confirmedGap: input.confirmedGap === true,
         strengtheningNeeds: input.strengtheningNeeds,
         qualityFeedback: input.qualityFeedback ?? [],
       }),

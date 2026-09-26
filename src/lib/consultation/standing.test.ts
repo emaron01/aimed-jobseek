@@ -1,0 +1,216 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { planQuestionRound } from "@/lib/consultation/questions";
+import {
+  briefingNeedsStandingRegen,
+  buildStandingGaps,
+  shouldEnqueueConsultationStandingRegen,
+} from "@/lib/consultation/standing";
+import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
+import { consultationGapStatusCopy } from "@/lib/product-config/consultation";
+
+const emptyVerification = {
+  originalStrength: "NONE" as const,
+  invalidSupportingFactIds: [],
+  invalidRoleIds: [],
+  downgradeReasons: [],
+};
+
+function gap(input: {
+  key: string;
+  kind: "REQUIRED" | "COMPETENCY";
+  text: string;
+  strength: "NONE" | "PARTIAL" | "STRONG";
+}) {
+  return {
+    key: input.key,
+    kind: input.kind,
+    text: input.text,
+    strength: input.strength,
+    supportingFactIds: [],
+    strategy: "ACKNOWLEDGE" as const,
+    explanation: "No evidence yet.",
+    strategyText: "Ask for the story.",
+    verification: {
+      ...emptyVerification,
+      originalStrength: input.strength,
+    },
+    experienceCalculation: null,
+  };
+}
+
+describe("Harper core loop standing", () => {
+  it("asks one question per surfaced gap, most important first", () => {
+    const assessments = [
+      gap({
+        key: "required:managers",
+        kind: "REQUIRED",
+        text: "Built front-line sales managers",
+        strength: "NONE",
+      }),
+      gap({
+        key: "required:channel",
+        kind: "REQUIRED",
+        text: "Lead a channel motion",
+        strength: "PARTIAL",
+      }),
+      gap({
+        key: "competency:forecast",
+        kind: "COMPETENCY",
+        text: "Run a weekly forecast",
+        strength: "NONE",
+      }),
+    ];
+    const questions = planQuestionRound({
+      assessments,
+      modelQuestions: assessments.map((assessment) => ({
+        targetKey: assessment.key,
+        text: `The job wants ${assessment.text.toLowerCase()}. I do not see that in your background. Tell me about it.`,
+        requirementInterpretation: null,
+        hiringTeamRoleId: "hm",
+        whoCaresNote: "The Hiring Manager needs this story.",
+      })),
+      hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
+      askedKeys: new Set(),
+      skippedKeys: new Set(),
+      includeChronology: false,
+      chronologyAsked: false,
+    });
+    expect(questions.questions.map((question) => question.targetKey)).toEqual([
+      "required:managers",
+      "required:channel",
+      "competency:forecast",
+    ]);
+  });
+
+  it("shows each gap's status and never tells the seeker to go close it", () => {
+    const assessments = [
+      gap({
+        key: "required:managers",
+        kind: "REQUIRED",
+        text: "Built front-line sales managers",
+        strength: "NONE",
+      }),
+      gap({
+        key: "required:meddic",
+        kind: "REQUIRED",
+        text: "Installed a MEDDIC cadence",
+        strength: "NONE",
+      }),
+    ];
+    const standing = buildStandingGaps({
+      assessments,
+      questions: [
+        {
+          questionTurnId: "q1",
+          targetKey: "required:managers",
+          question: "Tell me about a manager you developed.",
+          followUp: null,
+          seekerAnswers: [
+            {
+              id: "s1",
+              body: "I coached Priya into a first-line manager.",
+              analysisJson: { gapDecision: "evidence" },
+            },
+          ],
+          statements: [],
+          resumeBullet: {
+            id: "b1",
+            turnId: "s1",
+            kind: "RESUME_BULLET",
+            status: "DRAFT",
+            content: "Coached an AE into a first-line manager.",
+            strengtheningNote: null,
+          },
+          talkingPoint: {
+            id: "i1",
+            turnId: "s1",
+            kind: "INTERVIEW_ANSWER",
+            status: "DRAFT",
+            content:
+              "I coached Priya from a high-performing AE into a first-line manager.",
+            strengtheningNote: null,
+          },
+        },
+        {
+          questionTurnId: "q2",
+          targetKey: "required:meddic",
+          question: "How did you install MEDDIC?",
+          followUp: null,
+          seekerAnswers: [
+            {
+              id: "s2",
+              body: "I have never installed MEDDIC.",
+              analysisJson: { gapDecision: "no_evidence" },
+            },
+          ],
+          statements: [],
+          resumeBullet: null,
+          talkingPoint: {
+            id: "i2",
+            turnId: "s2",
+            kind: "INTERVIEW_ANSWER",
+            status: "DRAFT",
+            content:
+              "I have not installed a MEDDIC cadence. In an interview I would say that and talk about the forecast rhythm I do run.",
+            strengtheningNote: null,
+          },
+        },
+      ],
+    });
+    expect(standing).toEqual([
+      {
+        targetKey: "required:managers",
+        label: "Built front-line sales managers",
+        status: "closed",
+        talkTrack:
+          "I coached Priya from a high-performing AE into a first-line manager.",
+      },
+      {
+        targetKey: "required:meddic",
+        label: "Installed a MEDDIC cadence",
+        status: "confirmed",
+        talkTrack:
+          "I have not installed a MEDDIC cadence. In an interview I would say that and talk about the forecast rhythm I do run.",
+      },
+    ]);
+    expect(consultationGapStatusCopy.closed).toBe("Closed");
+    expect(consultationGapStatusCopy.confirmed).toBe("Confirmed gap");
+    const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
+    const standingUi = readFileSync(
+      "src/components/ConsultationStanding.tsx",
+      "utf8",
+    );
+    expect(section).not.toContain("storyPlan.map");
+    expect(section).toContain("buildStandingGaps");
+    expect(standingUi).toContain("consultationGapStatusCopy");
+    expect(section).toContain("shouldEnqueueConsultationStandingRegen");
+  });
+
+  it("regenerates standing when the prompt version is stale", () => {
+    expect(
+      briefingNeedsStandingRegen({
+        texts: ["You have a strong enterprise-sales record."],
+        firstName: "Jordan",
+        promptVersion: "15",
+        currentPromptVersion: CONSULTATION_PROMPT_VERSION,
+      }),
+    ).toBe(true);
+    expect(
+      shouldEnqueueConsultationStandingRegen({
+        needsRegen: true,
+        busy: false,
+        lastReassessAttemptAt: null,
+      }),
+    ).toBe(true);
+    expect(
+      shouldEnqueueConsultationStandingRegen({
+        needsRegen: true,
+        busy: false,
+        lastReassessAttemptAt: new Date("2026-09-26T19:00:00.000Z"),
+        lastReassessSucceeded: true,
+        stalePromptVersion: false,
+      }),
+    ).toBe(false);
+  });
+});
