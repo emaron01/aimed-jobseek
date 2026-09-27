@@ -171,7 +171,10 @@ export async function abandonStaleApplicationJobs(): Promise<void> {
   await prisma.applicationJob.updateMany({
     where: {
       status: "IN_PROGRESS",
-      workerHeartbeatAt: { lt: staleBefore },
+      OR: [
+        { workerHeartbeatAt: null },
+        { workerHeartbeatAt: { lt: staleBefore } },
+      ],
     },
     data: {
       status: "PENDING",

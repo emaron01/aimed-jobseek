@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fixtureAlexChenProfile } from "@/lib/product-research/fixtures/alex-chen-profile";
 import { hasTestDatabase } from "@/test/database";
@@ -50,6 +51,14 @@ vi.mock("@/lib/contact-profile/ai", () => ({
   })),
 }));
 
+describe("interviewer profile rebuild startup gate", () => {
+  it("does not queue interviewer profile rebuilds on worker startup", () => {
+    const worker = readFileSync("scripts/research-worker.ts", "utf8");
+    expect(worker).not.toContain("queueExistingInterviewerProfileRebuilds");
+    expect(worker).not.toContain("queued interviewer profile rebuilds");
+  });
+});
+
 describe.skipIf(!hasTestDatabase())("rebuild existing interviewer profiles", () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   let prisma: import("@prisma/client").PrismaClient;
@@ -85,6 +94,16 @@ describe.skipIf(!hasTestDatabase())("rebuild existing interviewer profiles", () 
       },
     });
     campaignId = campaign.id;
+    const persona = await prisma.persona.create({
+      data: {
+        organizationId,
+        productId: product.id,
+        campaignId,
+        name: "Hiring Manager",
+        suggestionKey: "hiring_manager",
+        targetTitles: ["Head of Talent"],
+      },
+    });
     const contact = await prisma.contact.create({
       data: {
         organizationId,
@@ -100,6 +119,7 @@ describe.skipIf(!hasTestDatabase())("rebuild existing interviewer profiles", () 
         organizationId,
         campaignId,
         contactId,
+        chosenPersonaId: persona.id,
         linkedInProfileText:
           "Christina Schivley, Head of Talent at CSC since 2019. Previously led campus recruiting at Northwind.",
         linkedInExtractedJson: {
@@ -129,13 +149,16 @@ describe.skipIf(!hasTestDatabase())("rebuild existing interviewer profiles", () 
     await prisma.$disconnect();
   });
 
-  it("queues a rebuild for people who already have pasted text, without re-pasting", async () => {
-    const { queueExistingInterviewerProfileRebuilds } = await import(
-      "@/lib/contact-profile/service"
-    );
-    const queued = await queueExistingInterviewerProfileRebuilds();
-    expect(queued).toBeGreaterThanOrEqual(1);
-    const jobs = await prisma.applicationJob.findMany({
+  it("queues profile build and cheat sheet section when pasted text is saved", async () => {
+    const { saveLinkedInPaste } = await import("@/lib/contact-profile/service");
+    await saveLinkedInPaste({
+      organizationId,
+      campaignId,
+      contactId,
+      pastedText:
+        "Christina Schivley, Head of Talent at CSC since 2019. Previously led campus recruiting at Northwind. Updated paste.",
+    });
+    const profileJobs = await prisma.applicationJob.findMany({
       where: {
         organizationId,
         campaignId,
@@ -144,11 +167,21 @@ describe.skipIf(!hasTestDatabase())("rebuild existing interviewer profiles", () 
         status: { in: ["PENDING", "IN_PROGRESS"] },
       },
     });
-    expect(jobs).toHaveLength(1);
+    expect(profileJobs).toHaveLength(1);
+    const summaryJobs = await prisma.applicationJob.findMany({
+      where: {
+        organizationId,
+        campaignId,
+        type: "APPLICATION_SUMMARY",
+        status: { in: ["PENDING", "IN_PROGRESS"] },
+      },
+    });
+    expect(summaryJobs.length).toBeGreaterThanOrEqual(1);
     const membership = await prisma.campaignContact.findFirst({
       where: { campaignId, contactId },
     });
-    expect(membership?.linkedInProfileText).toContain("Christina Schivley");
+    expect(membership?.linkedInProfileText).toContain("Updated paste");
+    expect(membership?.individualProfileStatus).toBe("PENDING");
   });
 
   it("re-extracts stored text and writes likelyToValue without re-pasting", async () => {

@@ -60,10 +60,13 @@ function stateLabel(state: ApplicationStepState): string {
 export function ApplicationStepMarker({
   state,
   current,
+  hasActiveJob = false,
 }: {
   state: ApplicationStepState;
   current: boolean;
+  hasActiveJob?: boolean;
 }) {
+  const showSpinner = state === "in_progress" && hasActiveJob;
   return (
     <span
       className={cn(
@@ -71,10 +74,17 @@ export function ApplicationStepMarker({
         current ? "bg-primary text-on-primary" : stateTone(state),
       )}
       aria-label={stateLabel(state)}
+      data-testid={
+        showSpinner
+          ? "tracker-step-marker-spinner"
+          : state === "in_progress"
+            ? "tracker-step-marker-static"
+            : "tracker-step-marker"
+      }
     >
       {state === "done" ? (
         <AppIcon name="check" className="h-3.5 w-3.5" />
-      ) : state === "in_progress" ? (
+      ) : showSpinner ? (
         <AppIcon name="spinner" className="h-3.5 w-3.5" />
       ) : state === "active" ? (
         <AppIcon name="dot" className="h-3.5 w-3.5" />
@@ -115,7 +125,11 @@ export function ApplicationTrackerList({
                   : "hover:bg-canvas",
             )}
           >
-            <ApplicationStepMarker state={step.state} current={step.isCurrent} />
+            <ApplicationStepMarker
+              state={step.state}
+              current={step.isCurrent}
+              hasActiveJob={step.hasActiveJob}
+            />
             <span className="min-w-0 flex-1">
               <span className="block font-medium">
                 {step.number}. {step.title}

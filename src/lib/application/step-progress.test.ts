@@ -6,12 +6,14 @@ import {
   applicationStepCopy,
 } from "@/lib/product-config/application-steps";
 import { applicationAssetConfig, applicationSummaryConfig } from "@/lib/product-config";
+import { readFileSync } from "node:fs";
 import {
   buildApplicationStepViews,
   emptyApplicationStepFacts,
   migrateWorkspaceSeen,
   parseWorkspaceSeenJson,
   resolveApplicationStepState,
+  stepHasActiveJob,
   stepNewLabel,
   WORKSPACE_SEEN_VERSION,
   type ApplicationStepFactInput,
@@ -285,6 +287,7 @@ describe("application step colors", () => {
     });
     const assets = unread.find((step) => step.key === "assets");
     expect(assets?.state).toBe("in_progress");
+    expect(assets?.hasActiveJob).toBe(false);
     expect(assets?.hasNew).toBe(true);
     expect(assets?.newLabel).toBe("New: resume version 3");
     expect(assets?.newLabel).not.toMatch(/^NEW$/i);
@@ -298,6 +301,65 @@ describe("application step colors", () => {
     });
     expect(viewed.find((step) => step.key === "assets")?.state).toBe("done");
     expect(viewed.find((step) => step.key === "assets")?.hasNew).toBe(false);
+  });
+
+  it("marks active jobs separately from started unfinished steps and unread results", () => {
+    const activeJobViews = buildApplicationStepViews({
+      campaignId: "camp_1",
+      currentStep: null,
+      facts: { ...idle, hasResumeVersion: true },
+      jobs: [job("RESUME", "IN_PROGRESS")],
+      seen: {},
+    });
+    const assetsActive = activeJobViews.find((step) => step.key === "assets");
+    expect(assetsActive?.state).toBe("in_progress");
+    expect(assetsActive?.hasActiveJob).toBe(true);
+    expect(
+      stepHasActiveJob("assets", { ...idle, hasResumeVersion: true }, [
+        job("RESUME", "PENDING"),
+      ]),
+    ).toBe(true);
+
+    const startedViews = buildApplicationStepViews({
+      campaignId: "camp_1",
+      currentStep: null,
+      facts: {
+        ...idle,
+        consultationStarted: true,
+        consultationComplete: false,
+      },
+      jobs: [],
+      seen: {},
+    });
+    const consultation = startedViews.find((step) => step.key === "consultation");
+    expect(consultation?.state).toBe("in_progress");
+    expect(consultation?.hasActiveJob).toBe(false);
+
+    const unreadDone = buildApplicationStepViews({
+      campaignId: "camp_1",
+      currentStep: "job",
+      facts: {
+        ...idle,
+        researchDone: true,
+      },
+      jobs: [],
+      seen: {},
+    });
+    const company = unreadDone.find((step) => step.key === "company");
+    expect(company?.state).toBe("in_progress");
+    expect(company?.hasNew).toBe(true);
+    expect(company?.hasActiveJob).toBe(false);
+    expect(company?.newLabel).toBeTruthy();
+  });
+
+  it("spins the sidebar marker only when an in-progress step has an active job", () => {
+    const marker = readFileSync("src/components/ApplicationSidebarTracker.tsx", "utf8");
+    expect(marker).toContain("hasActiveJob");
+    expect(marker).toContain(
+      "const showSpinner = state === \"in_progress\" && hasActiveJob;",
+    );
+    expect(marker).toContain("tracker-step-marker-spinner");
+    expect(marker).toContain("tracker-step-marker-static");
   });
 
   it("never writes NEW-only pills, ids, or timestamps, and migrates seen keys without a burst", () => {

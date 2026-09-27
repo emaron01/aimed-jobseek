@@ -57,6 +57,7 @@ export type ApplicationStepView = {
   newLabel: string | null;
   statusNote: string | null;
   hasNew: boolean;
+  hasActiveJob: boolean;
   isCurrent: boolean;
   isPage: boolean;
 };
@@ -280,15 +281,9 @@ export function stepIsInProgress(
   facts: ApplicationStepFactInput,
   jobs: WorkspaceJobStatusView[],
 ): boolean {
-  if (
-    jobsForStep(key, jobs).some(
-      (job) => job.status === "PENDING" || job.status === "IN_PROGRESS",
-    )
-  ) {
+  if (stepHasActiveJob(key, facts, jobs)) {
     return true;
   }
-  if (key === "company") return facts.researchInProgress;
-  if (key === "job") return facts.jobReprocessing;
   if (key === "consultation") {
     return facts.consultationStarted && !facts.consultationComplete;
   }
@@ -301,6 +296,24 @@ export function stepIsInProgress(
       (!facts.latestResumeApproved || facts.hasUnapprovedAssetDraft)
     );
   }
+  return false;
+}
+
+/** True when generation or research work for this step is queued or running. */
+export function stepHasActiveJob(
+  key: ApplicationStepKey,
+  facts: ApplicationStepFactInput,
+  jobs: WorkspaceJobStatusView[],
+): boolean {
+  if (
+    jobsForStep(key, jobs).some(
+      (job) => job.status === "PENDING" || job.status === "IN_PROGRESS",
+    )
+  ) {
+    return true;
+  }
+  if (key === "company") return facts.researchInProgress;
+  if (key === "job") return facts.jobReprocessing;
   return false;
 }
 
@@ -378,6 +391,7 @@ export function buildApplicationStepViews(input: {
     const resultKey = stepResultKey(step.key, input.facts);
     const viewed = input.seen[step.key];
     const hasNew = Boolean(resultKey && viewed !== resultKey);
+    const hasActiveJob = stepHasActiveJob(step.key, input.facts, input.jobs);
     const state = resolveApplicationStepState(
       step.key,
       input.facts,
@@ -399,6 +413,7 @@ export function buildApplicationStepViews(input: {
           ? applicationStepCopy.reviewRemainingPersonas
           : null,
       hasNew,
+      hasActiveJob,
       isCurrent:
         input.currentStep === step.key ||
         (input.currentStep === "overview" && step.key === "applied"),
