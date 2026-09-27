@@ -35,6 +35,19 @@ export type ApplicationJobPayload = {
   adjustmentNote?: string | null;
   planType?: "RESUME" | "COVER_LETTER";
   sectionKey?: string;
+  deferredOutreach?: {
+    userId?: string;
+    assetType: string;
+    personaId: string;
+    contactId?: string | null;
+    purpose?: string;
+    followUpToAssetId?: string | null;
+    interviewStageId?: string | null;
+    emailLength?: string | null;
+    regenerationInstruction?: string | null;
+    skipThankYouQuestions?: boolean;
+    thankYouAnswers?: Array<{ id: string; answer: string }>;
+  };
 };
 
 export function isTimeoutMessage(message: string): boolean {

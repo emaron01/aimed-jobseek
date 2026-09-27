@@ -72,6 +72,7 @@ import {
   consultationQuestionAcceptsReply,
   isLegacyInaccuracyReply,
 } from "@/lib/consultation/qa-view";
+import { buildStandingGaps } from "@/lib/consultation/standing";
 import {
   collapseIdenticalEvidence,
   looksLikeInternalId,
@@ -181,6 +182,7 @@ function installConsultationModelFixture() {
       qualityFeedback?: string[];
       targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
       supportingEvidence?: string[];
+      followUpAlreadyUsed?: boolean;
       interviewerPrep?: { contactId: string; name: string; roleName: string } | null;
     };
     if (request.schemaName === "consultation_plan") {
@@ -487,10 +489,14 @@ function installConsultationModelFixture() {
         missingStarElements: complete ? [] : ["TASK", "ACTION", "RESULT", "METRIC"],
         coaching: complete
           ? null
-          : "You named the Python work. The missing piece is what changed because of your contribution.",
+          : payload.followUpAlreadyUsed
+            ? "You named Python work. Use a fuller answer like: At Contoso I owned backend services and [what you did], which led to [the result]."
+            : "You named the Python work. The missing piece is what changed because of your contribution.",
         followUpQuestion: complete
           ? null
-          : "On that Python backend work, what changed because of your contribution, ideally a concrete result or metric?",
+          : payload.followUpAlreadyUsed
+            ? null
+            : "On that Python backend work, what changed because of your contribution, ideally a concrete result or metric?",
         gapDecision: complete ? "evidence" : "incomplete",
         companyMotivation: fixtureCompanyMotivation({ ...payload, answer }),
       },
@@ -1584,7 +1590,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("22");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("23");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("You coach; you do not interrogate");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("askedQuestions");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -1634,6 +1640,24 @@ describe("consultation evidence and questions", () => {
     expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
       "combine the existing supporting evidence with the new detail into one statement",
     );
+    expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
+      "When followUpAlreadyUsed is true and the reply is still incomplete, write coaching only",
+    );
+    expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
+      "marks missing pieces in brackets, such as [what you did], [the result], or [the number]",
+    );
+    expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
+      "followUpQuestion is null. Ask no new question.",
+    );
+    const extractPrompt = readFileSync(
+      "src/lib/consultation/prompt.ts",
+      "utf8",
+    );
+    expect(extractPrompt).toContain("followUpAlreadyUsed");
+    const service = readFileSync("src/lib/consultation/service.ts", "utf8");
+    expect(service).toContain("followUpAlreadyUsed");
+    expect(service).toContain('intent: "COACHING"');
+    expect(service).not.toContain("isThinIncompleteAnswer");
     expect(CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS).toContain(
       "When the target is PARTIAL, combine the existing supporting Personal Profile evidence",
     );
@@ -1655,7 +1679,6 @@ describe("consultation evidence and questions", () => {
     expect(workspace).not.toContain("planComplete");
     const questions = readFileSync("src/lib/consultation/questions.ts", "utf8");
     const writeBack = readFileSync("src/lib/consultation/write-back.ts", "utf8");
-    const service = readFileSync("src/lib/consultation/service.ts", "utf8");
     expect(questions).not.toContain("Which roles did that come from?");
     expect(questions).not.toContain("What in your background speaks to this?");
     expect(questions).not.toContain("withRoleSourceAsk");
@@ -3597,6 +3620,77 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS,
     ).toContain("personalProfileItems is the person's full Personal Profile");
     expect(consultationConversationCopy.shareSomeDetails).toBe("Share some details");
+
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey: `question:${followUp!.id}`,
+      answer: "I have used forecasting.",
+    });
+    const secondIncomplete = await prisma.consultationTurn.findFirst({
+      where: {
+        sessionId: session.id,
+        speaker: "SEEKER",
+        body: "I have used forecasting.",
+      },
+      include: { statements: true },
+    });
+    expect(secondIncomplete?.analysisJson).toMatchObject({
+      gapDecision: "incomplete",
+    });
+    expect(secondIncomplete?.statements).toEqual([]);
+    const coachingNote = await prisma.consultationTurn.findFirst({
+      where: {
+        sessionId: session.id,
+        speaker: "CONSULTANT",
+        intent: "COACHING",
+        followUp: false,
+      },
+      orderBy: { sequence: "desc" },
+    });
+    expect(coachingNote?.body).toMatch(/\[what you did\]|\[the result\]|\[the number\]/);
+    expect(coachingNote?.body).toMatch(/\byou\b/i);
+    const followUpCount = await prisma.consultationTurn.count({
+      where: {
+        sessionId: session.id,
+        speaker: "CONSULTANT",
+        followUp: true,
+        targetKey: "required:python",
+      },
+    });
+    expect(followUpCount).toBe(1);
+    const qaTurns = (
+      await prisma.consultationTurn.findMany({
+        where: { sessionId: session.id },
+        orderBy: { sequence: "asc" },
+      })
+    ).map((turn) => ({
+      id: turn.id,
+      speaker: turn.speaker as "CONSULTANT" | "SEEKER",
+      body: turn.body,
+      targetKey: turn.targetKey,
+      followUp: turn.followUp,
+      sequence: turn.sequence,
+      analysisJson: turn.analysisJson,
+      intent: turn.intent,
+    }));
+    const standing = buildStandingGaps({
+      assessments: [
+        {
+          key: "required:python",
+          kind: "REQUIRED",
+          text: "5 years of Python",
+          strength: "NONE",
+        },
+      ],
+      questions: buildConsultationQaView({
+        turns: qaTurns,
+        statements: [],
+      }).questions,
+    });
+    expect(standing.find((gap) => gap.targetKey === "required:python")?.status).toBe(
+      "open",
+    );
   });
 
   it("confirms a denied gap with related experience and does not write a resume bullet", async () => {

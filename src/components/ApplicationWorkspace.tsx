@@ -23,6 +23,7 @@ import {
 } from "@/lib/application/workspace-links";
 import { listApplicationContacts } from "@/lib/application/contacts";
 import { mergeExistingHiringTeamRoles } from "@/lib/hiring-team/merge-existing";
+import { isHiringTeamPersonaBuilt } from "@/lib/hiring-team/build";
 import { getApplicationResearchStatus } from "@/lib/application/research-status";
 import {
   addApplicationRoleAction,
@@ -341,7 +342,13 @@ export async function ApplicationWorkspace({
           hiringTeamRoles: {
             where: { archivedAt: null },
             orderBy: { createdAt: "asc" },
-            select: { id: true, name: true, suggestionKey: true },
+            select: {
+              id: true,
+              name: true,
+              suggestionKey: true,
+              setupStatus: true,
+              profileJson: true,
+            },
           },
           applicationAssets: {
             orderBy: [{ type: "asc" }, { version: "desc" }],
@@ -873,7 +880,12 @@ export async function ApplicationWorkspace({
           (asset) => asset.type === "RESUME" && asset.status === "APPROVED",
         )?.id ?? null
       }
-      roles={requirement.campaign.hiringTeamRoles}
+      roles={requirement.campaign.hiringTeamRoles.map((role) => ({
+        id: role.id,
+        name: role.name,
+        suggestionKey: role.suggestionKey,
+        personaBuilt: isHiringTeamPersonaBuilt(role),
+      }))}
       contacts={requirement.campaign.contacts.map(toContactRow)}
       interviewStages={requirement.campaign.interviewStages.map((stage) => ({
         id: stage.id,

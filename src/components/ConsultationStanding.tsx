@@ -29,6 +29,7 @@ export type StandingGapView = {
   label: string;
   status: ConsultationGapStatus;
   talkTrack: string | null;
+  harperNote?: string | null;
   questionTurnId: string | null;
   resumeBullet: QaStatement | null;
   talkingPoint: QaStatement | null;
@@ -104,6 +105,14 @@ export function ConsultationStanding({
                 </p>
                 {gap.talkTrack ? (
                   <p className="mt-1 whitespace-pre-wrap">{gap.talkTrack}</p>
+                ) : null}
+                {gap.harperNote ? (
+                  <p
+                    className="mt-1 whitespace-pre-wrap text-ink"
+                    data-testid={`harper-coaching-note-${gap.targetKey}`}
+                  >
+                    {gap.harperNote}
+                  </p>
                 ) : null}
                 {gap.resumeBullet ? (
                   <p className="mt-1 whitespace-pre-wrap text-muted">

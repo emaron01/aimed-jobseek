@@ -406,6 +406,7 @@ function extractAnswerQualityIssues(input: {
   data: ConsultationExtractResult;
   gapText?: string;
   profileItems?: ReturnType<typeof profileEvidenceItems>;
+  followUpAlreadyUsed?: boolean;
 }): string[] {
   if (!isConsultationExtractAnswer(input.data)) return [];
   const issues: string[] = [];
@@ -415,17 +416,30 @@ function extractAnswerQualityIssues(input: {
         "When gapDecision is incomplete, coaching is required and must be written by you.",
       );
     }
-    if (!input.data.followUpQuestion?.trim()) {
+    if (input.followUpAlreadyUsed) {
+      if (input.data.followUpQuestion?.trim()) {
+        issues.push(
+          "When followUpAlreadyUsed is true and gapDecision is incomplete, followUpQuestion must be null.",
+        );
+      }
+      const coaching = input.data.coaching?.trim() ?? "";
+      if (coaching && !/\[[^\]]+\]/.test(coaching)) {
+        issues.push(
+          "When followUpAlreadyUsed is true, coaching must include one example with missing pieces in brackets such as [what you did] or [the result].",
+        );
+      }
+    } else if (!input.data.followUpQuestion?.trim()) {
       issues.push(
         "When gapDecision is incomplete, followUpQuestion is required and must be written by you.",
       );
-    }
-    const coaching = input.data.coaching?.trim() ?? "";
-    const followUp = input.data.followUpQuestion?.trim() ?? "";
-    if (coaching && followUp && coaching === followUp) {
-      issues.push(
-        "coaching and followUpQuestion must be different: a brief note, then one question for the missing piece.",
-      );
+    } else {
+      const coaching = input.data.coaching?.trim() ?? "";
+      const followUp = input.data.followUpQuestion?.trim() ?? "";
+      if (coaching && followUp && coaching === followUp) {
+        issues.push(
+          "coaching and followUpQuestion must be different: a brief note, then one question for the missing piece.",
+        );
+      }
     }
   }
   if (input.data.gapDecision === "no_evidence") {
@@ -456,6 +470,7 @@ function extractAnswerQualityIssues(input: {
     }
   }
   if (
+    !input.followUpAlreadyUsed &&
     input.gapText &&
     questionNeedsRoleSource({
       gapText: input.gapText,
@@ -479,6 +494,7 @@ async function extractAnswerWithQuality(input: {
   profileItems: ReturnType<typeof profileEvidenceItems>;
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
   supportingEvidence?: string[];
+  followUpAlreadyUsed?: boolean;
   usage?: AiCallUsageContext;
 }) {
   let lastFailure: string = consultationConversationCopy.generationFailed;
@@ -506,6 +522,7 @@ async function extractAnswerWithQuality(input: {
       data: extracted.data,
       gapText: input.target?.text,
       profileItems: input.profileItems,
+      followUpAlreadyUsed: input.followUpAlreadyUsed,
     });
     const lastAttempt =
       attempt === consultationConfig.qualityRegenerationAttempts;
@@ -1811,6 +1828,7 @@ async function processAnswerGeneration(input: {
         )
         .map((item) => item.text)
     : [];
+  const followUpAlreadyUsed = !(input.allowFollowUp ?? true);
   const extracted = await extractAnswerWithQuality({
     answer: input.answerContext,
     question: input.question,
@@ -1819,6 +1837,7 @@ async function processAnswerGeneration(input: {
     profileItems,
     targetStrength,
     supportingEvidence,
+    followUpAlreadyUsed,
     usage: replyUsage,
   });
   if (!extracted.ok) {
@@ -1916,10 +1935,15 @@ async function processAnswerGeneration(input: {
     companyMotivation: companyMotivationFromExtract(extracted.data.companyMotivation),
   };
   if (incomplete) {
-    if (
-      (input.allowFollowUp ?? true) &&
-      (!coaching || !followUpQuestion?.trim())
-    ) {
+    if (followUpAlreadyUsed) {
+      if (!coaching?.trim()) {
+        await failGeneration(
+          input.sessionId,
+          consultationConversationCopy.generationFailed,
+        );
+        return { ok: false };
+      }
+    } else if (!coaching || !followUpQuestion?.trim()) {
       await failGeneration(
         input.sessionId,
         consultationConversationCopy.generationFailed,
@@ -1951,9 +1975,23 @@ async function processAnswerGeneration(input: {
         data: { generationStatus: "READY", generationError: null },
       }),
     ]);
+    if (followUpAlreadyUsed && coaching?.trim()) {
+      await addTurn({
+        organizationId: input.organizationId,
+        sessionId: input.sessionId,
+        speaker: "CONSULTANT",
+        body: coaching.trim(),
+        targetKey: input.target?.key ?? null,
+        followUp: false,
+        intent: "COACHING",
+        analysisJson: input.replyToTurnId
+          ? { replyToTurnId: input.replyToTurnId }
+          : undefined,
+      });
+    }
     return {
       ok: true,
-      followUpQuestion: (input.allowFollowUp ?? true) ? followUpQuestion : null,
+      followUpQuestion: followUpAlreadyUsed ? null : followUpQuestion,
       coaching,
       missingStarElements: verified.missingStarElements,
       wroteResult: false,

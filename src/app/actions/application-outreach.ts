@@ -15,7 +15,12 @@ import {
 import {
   resolveOutreachGeneratorKind,
 } from "@/lib/application-assets/display";
-import { hiringTeamConfig, outreachConfig, vocab, workspaceProgressText } from "@/lib/product-config";
+import {
+  applicationSummaryConfig,
+  outreachConfig,
+  vocab,
+  workspaceProgressText,
+} from "@/lib/product-config";
 import { prisma } from "@/lib/prisma";
 import {
   addApplicationContact,
@@ -35,6 +40,7 @@ export type ApplicationOutreachActionResult = {
   personaId?: string | null;
   violations?: string[];
   questions?: Array<{ id: string; text: string }>;
+  needsPersonaBuild?: boolean;
 };
 
 function campaignId(formData: FormData): string {
@@ -225,14 +231,12 @@ export async function generateOutreachAssetAction(
         where: { id: personaId, organizationId, campaignId: id, archivedAt: null },
       });
       if (persona && !isHiringTeamPersonaBuilt(persona)) {
-        await queueHiringTeamBuild({
-          organizationId,
-          campaignId: id,
-          personaId,
-          initiatedByUserId: user.id,
-        });
         revalidate(id);
-        return { ok: false, message: hiringTeamConfig.needsBuildFirst };
+        return {
+          ok: false,
+          needsPersonaBuild: true,
+          message: applicationSummaryConfig.sections.unbuiltPersona,
+        };
       }
     }
     await enqueueApplicationJob({
@@ -268,6 +272,85 @@ export async function generateOutreachAssetAction(
     });
     revalidate(id);
     return { ok: true, message: workspaceProgressText("OUTREACH") };
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
+export async function buildOutreachPersonaThenGenerateAction(
+  _previous: ApplicationOutreachActionResult | null,
+  formData: FormData,
+): Promise<ApplicationOutreachActionResult> {
+  try {
+    const [user, organizationId] = await Promise.all([
+      requireCurrentUser(),
+      requireOrganizationId(),
+    ]);
+    const id = campaignId(formData);
+    const kind = String(formData.get("kind") ?? formData.get("type") ?? "");
+    let resolved;
+    try {
+      resolved = resolveOutreachGeneratorKind(kind);
+    } catch {
+      throw new TenantError("Outreach type is invalid.");
+    }
+    const type = resolved.type;
+    const purposeRaw = String(formData.get("purpose") ?? "PROACTIVE");
+    const purpose =
+      resolved.purpose ??
+      (purposeRaw === "FOLLOW_UP" ||
+      purposeRaw === "THANK_YOU" ||
+      purposeRaw === "CHECK_IN"
+        ? purposeRaw
+        : "PROACTIVE");
+    if (purpose === "THANK_YOU" && !String(formData.get("interviewStageId") ?? "").trim()) {
+      throw new TenantError(outreachConfig.labels.needInterviewStage);
+    }
+    const lengthRaw = String(formData.get("emailLength") ?? "MEDIUM");
+    const emailLength: EmailLength =
+      lengthRaw === "SHORT" || lengthRaw === "LONG" ? lengthRaw : "MEDIUM";
+    const personaId = String(formData.get("personaId") ?? "").trim();
+    if (!personaId) {
+      throw new TenantError(`${vocab.persona.Singular} was not found.`);
+    }
+    const persona = await prisma.persona.findFirst({
+      where: { id: personaId, organizationId, campaignId: id, archivedAt: null },
+    });
+    if (!persona) {
+      throw new TenantError(`${vocab.persona.Singular} was not found.`);
+    }
+    await queueHiringTeamBuild({
+      organizationId,
+      campaignId: id,
+      personaId,
+      initiatedByUserId: user.id,
+      deferredOutreach: {
+        userId: user.id,
+        assetType: type,
+        personaId,
+        contactId: String(formData.get("contactId") ?? "").trim() || null,
+        purpose,
+        followUpToAssetId:
+          String(formData.get("followUpToAssetId") ?? "").trim() || null,
+        interviewStageId:
+          String(formData.get("interviewStageId") ?? "").trim() || null,
+        emailLength,
+        regenerationInstruction:
+          String(formData.get("regenerationInstruction") ?? "").trim() || null,
+        skipThankYouQuestions:
+          String(formData.get("skipThankYouQuestions") ?? "") === "1" ||
+          (purpose === "THANK_YOU" &&
+            Boolean(
+              String(formData.get("regenerationInstruction") ?? "").trim(),
+            )),
+        thankYouAnswers: formData.getAll("thankYouAnswerId").map((raw, index) => ({
+          id: String(raw),
+          answer: String(formData.getAll("thankYouAnswer")[index] ?? ""),
+        })),
+      },
+    });
+    revalidate(id);
+    return { ok: true, message: workspaceProgressText("HIRING_TEAM_BUILD") };
   } catch (error) {
     return errorResult(error);
   }

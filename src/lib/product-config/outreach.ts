@@ -5,6 +5,7 @@
  * documents 200-character subjects and 1,900-character bodies. Article a546814
  * mentions a 2,000-character body; this product uses the stricter 1,900 limit.
  */
+import { consultationConfig } from "./consultation";
 import { applicationWorkspaceCopy, vocab } from "./vocabulary";
 
 export const outreachConfig = Object.freeze({
@@ -21,6 +22,7 @@ export const outreachConfig = Object.freeze({
     notAppliedStatus: "Not marked applied",
     generate: "Generate",
     regenerate: "Regenerate",
+    addContact: "Add Contact",
     addNextMessage: "Add the next message",
     generatorTitle: "Write the next message",
     generatorPrompt: "Instructions for this message",
@@ -36,6 +38,7 @@ export const outreachConfig = Object.freeze({
     sequenceTitle: "Sequence",
     contactStatusNone: "No messages",
     contactStatusDraft: "Draft ready",
+    contactStatusReadySuffix: "ready",
     fieldFirstName: "First name",
     fieldLastName: "Last name",
     fieldTitle: "Title",
@@ -51,7 +54,7 @@ export const outreachConfig = Object.freeze({
     copySubject: "Copy subject",
     copyBody: "Copy message",
     openLinkedIn: "Open LinkedIn profile",
-    changeInstruction: "What should change?",
+    changeInstruction: `What should ${consultationConfig.displayName} change?`,
     purposeProactive: "Proactive outreach",
     purposeFollowUp: "Follow-up",
     noContact: "No named contact",

@@ -21,6 +21,7 @@ export type StandingGap = {
   label: string;
   status: ConsultationGapStatus;
   talkTrack: string | null;
+  harperNote?: string | null;
 };
 
 export function gapDecisionFromAnalysis(value: unknown):

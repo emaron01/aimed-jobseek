@@ -83,6 +83,7 @@ export function askedQuestionsFromTurns(
   for (const turn of turns) {
     if (turn.speaker !== "CONSULTANT") continue;
     if (turn.intent === "CLOSING") continue;
+    if (turn.intent === "COACHING") continue;
     const text = turn.body.trim();
     if (!text) continue;
     const answered = turns.some(

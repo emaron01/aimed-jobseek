@@ -20,6 +20,7 @@ import {
   buildConsultationQaView,
   consultationHasUnansweredQuestions,
   latestClosingNote,
+  latestCoachingNoteForTarget,
 } from "@/lib/consultation/qa-view";
 import {
   consultationItemNeedsResultRepair,
@@ -620,6 +621,10 @@ export async function ConsultationSection({
                     );
                     return {
                       ...gap,
+                      harperNote: latestCoachingNoteForTarget(
+                        threadTurns,
+                        gap.targetKey,
+                      ),
                       questionTurnId: item?.questionTurnId ?? null,
                       resumeBullet: item?.resumeBullet ?? null,
                       talkingPoint: item?.talkingPoint ?? null,

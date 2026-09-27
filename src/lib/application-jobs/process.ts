@@ -1,5 +1,6 @@
 import {
   completeApplicationJob,
+  enqueueApplicationJob,
   failApplicationJob,
   readJobPayload,
 } from "@/lib/application-jobs/service";
@@ -89,6 +90,33 @@ export async function processApplicationJob(
                 personaId: job.targetId,
                 userId: job.initiatedByUserId ?? payload.userId ?? null,
               });
+              const deferred = payload.deferredOutreach;
+              if (deferred?.assetType && deferred.personaId) {
+                await enqueueApplicationJob({
+                  organizationId: job.organizationId,
+                  campaignId: job.campaignId,
+                  type: "OUTREACH",
+                  targetId: deferred.personaId,
+                  initiatedByUserId: job.initiatedByUserId,
+                  payload: {
+                    userId:
+                      deferred.userId ??
+                      job.initiatedByUserId ??
+                      payload.userId,
+                    assetType: deferred.assetType,
+                    personaId: deferred.personaId,
+                    contactId: deferred.contactId ?? null,
+                    purpose: deferred.purpose,
+                    followUpToAssetId: deferred.followUpToAssetId ?? null,
+                    interviewStageId: deferred.interviewStageId ?? null,
+                    emailLength: deferred.emailLength ?? null,
+                    regenerationInstruction:
+                      deferred.regenerationInstruction ?? null,
+                    skipThankYouQuestions: deferred.skipThankYouQuestions,
+                    thankYouAnswers: deferred.thankYouAnswers,
+                  },
+                });
+              }
             }
             break;
           case "CONTACT_PROFILE":

@@ -119,6 +119,7 @@ export async function extractWithModel(input: {
   qualityFeedback?: string[];
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
   supportingEvidence?: string[];
+  followUpAlreadyUsed?: boolean;
   usage?: AiCallUsageContext;
 }): Promise<
   | { ok: true; data: ConsultationExtractResult }

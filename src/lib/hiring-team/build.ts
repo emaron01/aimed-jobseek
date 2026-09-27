@@ -14,7 +14,8 @@ import {
 import type { PersonaDifferentiationInput } from "@/lib/persona/persona-differentiation";
 import { parsePersonaListField } from "@/lib/persona/persona-differentiation";
 import { PERSONA_SYNTHESIS_PROMPT_VERSION } from "@/lib/persona-research/contract";
-import { enqueueApplicationJob } from "@/lib/application-jobs/service";
+import { enqueueApplicationJob, readJobPayload } from "@/lib/application-jobs/service";
+import type { ApplicationJobPayload } from "@/lib/application-jobs/types";
 import { mergeExistingHiringTeamRoles } from "@/lib/hiring-team/merge-existing";
 import { prisma } from "@/lib/prisma-client";
 import { hiringTeamConfig, vocab } from "@/lib/product-config";
@@ -445,18 +446,50 @@ export async function queueHiringTeamBuild(input: {
   campaignId: string;
   personaId: string;
   initiatedByUserId?: string | null;
+  deferredOutreach?: ApplicationJobPayload["deferredOutreach"];
 }): Promise<void> {
   const persona = await requireRole(input);
   await prisma.persona.update({
     where: { id: persona.id },
     data: { setupStatus: "SYNTHESIZING", staleAt: null, staleReason: null },
   });
+  const existing = await prisma.applicationJob.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      type: "HIRING_TEAM_BUILD",
+      targetId: persona.id,
+      status: { in: ["PENDING", "IN_PROGRESS"] },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  if (existing) {
+    if (input.deferredOutreach) {
+      const current = readJobPayload(existing.payload);
+      await prisma.applicationJob.update({
+        where: { id: existing.id },
+        data: {
+          payload: {
+            ...current,
+            deferredOutreach: input.deferredOutreach,
+          } as Prisma.InputJsonValue,
+        },
+      });
+    }
+    return;
+  }
   await enqueueApplicationJob({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
     type: "HIRING_TEAM_BUILD",
     targetId: persona.id,
     initiatedByUserId: input.initiatedByUserId,
+    payload: input.deferredOutreach
+      ? {
+          userId: input.initiatedByUserId ?? undefined,
+          deferredOutreach: input.deferredOutreach,
+        }
+      : undefined,
   });
 }
 

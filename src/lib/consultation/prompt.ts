@@ -116,6 +116,7 @@ export function buildConsultationExtractMessages(input: {
   qualityFeedback?: string[];
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
   supportingEvidence?: string[];
+  followUpAlreadyUsed?: boolean;
 }): AiMessage[] {
   return [
     { role: "system", content: extractSystem() },
@@ -136,6 +137,7 @@ export function buildConsultationExtractMessages(input: {
         supportingEvidence: input.supportingEvidence ?? [],
         answer: input.answer,
         qualityFeedback: input.qualityFeedback ?? [],
+        followUpAlreadyUsed: input.followUpAlreadyUsed === true,
       }),
     },
   ];

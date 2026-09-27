@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  contactOutreachReadyLabel,
   contactOutreachStatus,
   latestOutreachMessageId,
   sentMessagesForContact,
@@ -12,7 +13,11 @@ import {
   resolveOutreachGeneratorKind,
 } from "@/lib/application-assets/display";
 import { resolveInterviewThankYouNotes } from "@/lib/application-assets/display";
-import { hiringTeamConfig, outreachConfig } from "@/lib/product-config";
+import {
+  applicationSummaryConfig,
+  hiringTeamConfig,
+  outreachConfig,
+} from "@/lib/product-config";
 
 const emptyAsset = {
   id: "asset_1",
@@ -29,7 +34,7 @@ const emptyAsset = {
 };
 
 describe("application outreach workspace", () => {
-  it("adds a named contact with a Hiring Team role and shows status", () => {
+  it("opens without the add-contact form and both Add Contact buttons open it", () => {
     const section = readFileSync(
       "src/components/ApplicationOutreachSections.tsx",
       "utf8",
@@ -40,13 +45,24 @@ describe("application outreach workspace", () => {
     expect(section).toContain('name="lastName"');
     expect(section).toContain('name="title"');
     expect(section).toContain('name="personaId" required');
+    expect(section).toContain('data-testid="add-contact-top"');
+    expect(section).toContain('data-testid="add-contact-bottom"');
+    expect(section).toContain("showAddContact");
+    expect(section).toContain("openAddContact");
+    expect(section).toContain("outreachConfig.labels.addContact");
+    expect(outreachConfig.labels.addContact).toBe("Add Contact");
+    expect(section).toContain("canEdit && showAddContact");
     expect(section).toContain("outreach-contact-status-");
     expect(action).toContain("Choose ${vocab.persona.aSingular}");
+  });
+
+  it("shows a ready indicator for completed messages without job ids or timestamps", () => {
     expect(contactOutreachStatus([], "contact_1")).toBe(
       outreachConfig.labels.contactStatusNone,
     );
-    expect(contactOutreachStatus([emptyAsset], "contact_1")).toBe(
-      outreachConfig.labels.contactStatusDraft,
+    expect(contactOutreachStatus([emptyAsset], "contact_1")).toBe("Email ready");
+    expect(contactOutreachReadyLabel([emptyAsset], "contact_1")).toBe(
+      "Email ready",
     );
     expect(
       contactOutreachStatus(
@@ -54,6 +70,29 @@ describe("application outreach workspace", () => {
         "contact_1",
       ),
     ).toContain(outreachConfig.labels.sentStatus);
+    const section = readFileSync(
+      "src/components/ApplicationOutreachSections.tsx",
+      "utf8",
+    );
+    expect(section).toContain("outreach-contact-ready-");
+    expect(section).toContain("contactOutreachReadyLabel");
+    expect(section).not.toContain("jobId");
+    expect(outreachConfig.labels.contactStatusReadySuffix).toBe("ready");
+  });
+
+  it("puts Regenerate with Harper change instructions on each message", () => {
+    const section = readFileSync(
+      "src/components/ApplicationOutreachSections.tsx",
+      "utf8",
+    );
+    expect(section).toContain("outreach-regenerate-");
+    expect(section).toContain("outreach-regenerate-instruction-");
+    expect(section).toContain("outreachConfig.labels.changeInstruction");
+    expect(section).toContain("outreachConfig.labels.regenerate");
+    expect(outreachConfig.labels.changeInstruction).toBe(
+      "What should Harper change?",
+    );
+    expect(section).toContain('name="regenerationInstruction"');
   });
 
   it("lists sent messages under each name with type and date and opens on click", () => {
@@ -182,6 +221,41 @@ describe("application outreach workspace", () => {
     expect(outreach).toContain("resolveInterviewThankYouNotes");
     expect(outreach).toContain("regenerationInstruction: input.regenerationInstruction");
     expect(outreach).toContain("guidance: input.regenerationInstruction");
+  });
+
+  it("prompts to build an unbuilt persona instead of auto-building", () => {
+    const section = readFileSync(
+      "src/components/ApplicationOutreachSections.tsx",
+      "utf8",
+    );
+    const action = readFileSync("src/app/actions/application-outreach.ts", "utf8");
+    const process = readFileSync("src/lib/application-jobs/process.ts", "utf8");
+    const researchFinish = readFileSync(
+      "src/lib/application/research-finish.ts",
+      "utf8",
+    );
+    expect(section).toContain("outreach-unbuilt-persona");
+    expect(section).toContain("outreach-unbuilt-persona-no");
+    expect(section).toContain("applicationSummaryConfig.sections.unbuiltPersona");
+    expect(section).toContain("buildOutreachPersonaThenGenerateAction");
+    expect(section).toContain("applicationSummaryConfig.actions.buildPersonaNow");
+    expect(section).toContain("applicationSummaryConfig.actions.buildPersonaNo");
+    expect(applicationSummaryConfig.sections.unbuiltPersona).toBe(
+      "You have not fully built this persona. Do you want to build it now?",
+    );
+    expect(action).toContain("needsPersonaBuild: true");
+    expect(action).toContain("buildOutreachPersonaThenGenerateAction");
+    expect(action).toContain("deferredOutreach");
+    expect(action).not.toContain("hiringTeamConfig.needsBuildFirst");
+    const generateFn = action.slice(
+      action.indexOf("export async function generateOutreachAssetAction"),
+      action.indexOf("export async function buildOutreachPersonaThenGenerateAction"),
+    );
+    expect(generateFn).not.toContain("queueHiringTeamBuild");
+    expect(generateFn).toContain("needsPersonaBuild: true");
+    expect(process).toContain("deferredOutreach");
+    expect(process).toContain('type: "OUTREACH"');
+    expect(researchFinish).toContain('type: "HIRING_TEAM_IDENTIFY"');
   });
 
   it("reuses the gated contact-list and selected-sequence layout", () => {

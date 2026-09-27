@@ -40,6 +40,10 @@ export function isClosingNoteTurn(turn: Pick<QaTurn, "speaker" | "intent">): boo
   return turn.speaker === "CONSULTANT" && turn.intent === "CLOSING";
 }
 
+export function isCoachingNoteTurn(turn: Pick<QaTurn, "speaker" | "intent">): boolean {
+  return turn.speaker === "CONSULTANT" && turn.intent === "COACHING";
+}
+
 export function isLegacyInaccuracyReply(
   turn: Pick<QaTurn, "speaker" | "body" | "intent">,
 ): boolean {
@@ -56,11 +60,29 @@ export function latestClosingNote(turns: QaTurn[]): string | null {
   return closing?.body.trim() || null;
 }
 
+export function latestCoachingNoteForTarget(
+  turns: QaTurn[],
+  targetKey: string | null,
+): string | null {
+  if (!targetKey) return null;
+  const note = [...turns]
+    .filter(
+      (turn) =>
+        isCoachingNoteTurn(turn) &&
+        turn.targetKey === targetKey &&
+        Boolean(turn.body.trim()),
+    )
+    .sort((left, right) => left.sequence - right.sequence)
+    .at(-1);
+  return note?.body.trim() || null;
+}
+
 export function isPrimaryHarperQuestion(turn: QaTurn): boolean {
   return (
     turn.speaker === "CONSULTANT" &&
     !turn.followUp &&
-    !isClosingNoteTurn(turn)
+    !isClosingNoteTurn(turn) &&
+    !isCoachingNoteTurn(turn)
   );
 }
 

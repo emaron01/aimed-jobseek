@@ -16,6 +16,7 @@ export const applicationSummaryConfig = Object.freeze({
     filterNoMatches: "No matching people",
     generateSection: "Generate",
     buildPersonaNow: "Yes",
+    buildPersonaNo: "No",
   },
   sections: {
     overview: "At a glance",
