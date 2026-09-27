@@ -5,6 +5,7 @@ import {
   consultationQuestionAcceptsReply,
   consultationReplyTargetKey,
   findConsultationQaItem,
+  isLegacyInaccuracyReply,
   isPrimaryHarperQuestion,
   latestClosingNote,
   resolveReplyableQaItem,
@@ -75,6 +76,35 @@ describe("Harper ten-question coach", () => {
     expect(thread).toContain("consultation-question");
     expect(thread).toContain("consultation-question-item");
     expect(thread).toContain("name=\"targetKey\"");
+  });
+
+  it("hides legacy Not accurate seeker turns from the thread", () => {
+    const view = buildConsultationQaView({
+      turns: [
+        question,
+        seeker("s1", "I used Python for 5 years and cut failed jobs by 40%.", 2, "why"),
+        {
+          id: "s-flag",
+          speaker: "SEEKER" as const,
+          body: "Not accurate.",
+          targetKey: "why",
+          followUp: false,
+          sequence: 3,
+          intent: "NOT_ACCURATE",
+        },
+      ],
+      statements: [],
+    });
+    expect(view.questions[0]?.seekerAnswers.map((answer) => answer.body)).toEqual([
+      "I used Python for 5 years and cut failed jobs by 40%.",
+    ]);
+    expect(
+      isLegacyInaccuracyReply({
+        speaker: "SEEKER",
+        body: "Not accurate.",
+        intent: null,
+      }),
+    ).toBe(true);
   });
 
   it("lets the seeker answer in any order and keeps the other questions", () => {

@@ -37,10 +37,6 @@ import {
   seniorityWarrantsChronology,
   type QuestionRoundPlan,
 } from "@/lib/consultation/questions";
-import {
-  looksLikeCompanyMotivation,
-  seekerWrittenReply,
-} from "@/lib/consultation/reply-voice";
 import { repairExistingConsultationSession } from "@/lib/consultation/repair-existing";
 import { SEEKER_STATED_FACT_ID } from "@/lib/product-research/seeker-background";
 import { type GroundingSource } from "@/lib/consultation/output-quality";
@@ -495,14 +491,51 @@ export async function polishAnswerWithQuality(input: {
   };
 }
 
+function companyMotivationFromExtract(
+  value: string | null | undefined,
+): string | null {
+  const text = value?.trim() ?? "";
+  return text || null;
+}
+
+function analysisHasCompanyMotivation(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  return "companyMotivation" in value;
+}
+
+function analysisWithCompanyMotivation(
+  value: unknown,
+  companyMotivation: string | null,
+): Prisma.InputJsonValue {
+  const base =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? { ...(value as Record<string, unknown>) }
+      : {};
+  return { ...base, companyMotivation } as Prisma.InputJsonValue;
+}
+
+function profileWithoutWhyThisCompanyFact(
+  profile: ReturnType<typeof parseCandidateProfile>,
+  campaignId: string,
+): ReturnType<typeof parseCandidateProfile> {
+  const factId = whyThisCompanyFactId(campaignId);
+  const next = parseCandidateProfile(profile);
+  next.skills = next.skills.filter((item) => item.id !== factId);
+  for (const role of next.experience) {
+    role.achievements = role.achievements.filter((item) => item.id !== factId);
+  }
+  return parseCandidateProfile(next);
+}
+
 async function persistWhyThisCompany(input: {
   organizationId: string;
   campaignId: string;
-  answer: string;
+  companyMotivation: string | null;
 }): Promise<void> {
-  const text = input.answer.trim();
+  const text = companyMotivationFromExtract(input.companyMotivation);
   if (!text) return;
-  if (!looksLikeCompanyMotivation(text)) return;
   await prisma.campaign.update({
     where: { id: input.campaignId },
     data: { whyThisCompany: text },
@@ -511,15 +544,134 @@ async function persistWhyThisCompany(input: {
     input.organizationId,
     input.campaignId,
   );
-  const next = appendConfirmedFact(profile, {
-    id: whyThisCompanyFactId(input.campaignId),
-    text,
-    turnId: WHY_THIS_COMPANY_TARGET_KEY,
-  });
+  const next = appendConfirmedFact(
+    profileWithoutWhyThisCompanyFact(profile, input.campaignId),
+    {
+      id: whyThisCompanyFactId(input.campaignId),
+      text,
+      turnId: WHY_THIS_COMPANY_TARGET_KEY,
+    },
+  );
   await prisma.product.update({
     where: { id: product.id },
     data: { profileJson: next },
   });
+}
+
+async function clearWhyThisCompanyMotivation(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const { product, profile, campaign } = await requireApplication(
+    input.organizationId,
+    input.campaignId,
+  );
+  if (!campaign.whyThisCompany?.trim()) {
+    const factId = whyThisCompanyFactId(input.campaignId);
+    const hasFact =
+      profile.skills.some((item) => item.id === factId) ||
+      profile.experience.some((role) =>
+        role.achievements.some((item) => item.id === factId),
+      );
+    if (!hasFact) return;
+  }
+  await prisma.campaign.update({
+    where: { id: input.campaignId },
+    data: { whyThisCompany: null },
+  });
+  await prisma.product.update({
+    where: { id: product.id },
+    data: {
+      profileJson: profileWithoutWhyThisCompanyFact(profile, input.campaignId),
+    },
+  });
+}
+
+async function reextractExistingWhyThisCompanyMotivation(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const session = await prisma.consultationSession.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+    },
+    include: { turns: { orderBy: { sequence: "asc" } } },
+  });
+  if (!session) return;
+  const whyQuestions = session.turns.filter(
+    (turn) =>
+      turn.speaker === "CONSULTANT" &&
+      turn.targetKey === WHY_THIS_COMPANY_TARGET_KEY,
+  );
+  const whyReplies = session.turns.filter(
+    (turn) =>
+      turn.speaker === "SEEKER" &&
+      !turn.skipped &&
+      turn.body.trim() &&
+      (turn.targetKey === WHY_THIS_COMPANY_TARGET_KEY ||
+        whyQuestions.some(
+          (question) =>
+            replyToTurnIdFromAnalysis(turn.analysisJson) === question.id,
+        )),
+  );
+  if (whyReplies.length === 0) return;
+  if (whyReplies.every((turn) => analysisHasCompanyMotivation(turn.analysisJson))) {
+    return;
+  }
+  const { requirement, profile } = await requireApplication(
+    input.organizationId,
+    input.campaignId,
+  );
+  const targets = targetsFromRequirement(requirement);
+  const target =
+    targets.find((entry) => entry.key === WHY_THIS_COMPANY_TARGET_KEY) ??
+    whyThisCompanyTarget();
+  const question =
+    [...whyQuestions].at(-1)?.body.trim() ||
+    consultationConversationCopy.whyThisCompanyQuestion;
+  const extracted = await extractAnswerWithQuality({
+    answer: whyReplies.map((turn) => turn.body).join("\n"),
+    question,
+    target,
+    targets,
+    profileItems: profileEvidenceItems(profile),
+    usage: consultationUsage(
+      input.organizationId,
+      input.campaignId,
+      "CONSULTATION_REPLY",
+    ),
+  });
+  if (!extracted.ok) {
+    await failGeneration(session.id, extracted.message);
+    throw new Error(extracted.message);
+  }
+  const companyMotivation = isConsultationExtractAnswer(extracted.data)
+    ? companyMotivationFromExtract(extracted.data.companyMotivation)
+    : null;
+  if (companyMotivation) {
+    await persistWhyThisCompany({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      companyMotivation,
+    });
+  } else {
+    await clearWhyThisCompanyMotivation({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+    });
+  }
+  for (const reply of whyReplies) {
+    await prisma.consultationTurn.update({
+      where: { id: reply.id },
+      data: {
+        analysisJson: analysisWithCompanyMotivation(
+          reply.analysisJson,
+          companyMotivation,
+        ),
+      },
+    });
+  }
 }
 
 function seekerFacingGenerationError(message: string): string {
@@ -1078,6 +1230,10 @@ export async function startConsultation(input: {
     organizationId: input.organizationId,
     campaignId: input.campaignId,
   });
+  await reextractExistingWhyThisCompanyMotivation({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+  });
   const { campaign, requirement, profile } = await requireApplication(
     input.organizationId,
     input.campaignId,
@@ -1178,6 +1334,7 @@ async function processAnswerGeneration(input: {
       missingStarElements: string[];
       wroteResult: boolean;
       gapDecision: "evidence" | "no_evidence" | "incomplete";
+      companyMotivation: string | null;
     }
   | { ok: false }
 > {
@@ -1247,6 +1404,7 @@ async function processAnswerGeneration(input: {
       missingStarElements: [],
       wroteResult: false,
       gapDecision: "incomplete",
+      companyMotivation: null,
     };
   }
   if (!isConsultationExtractAnswer(extracted.data)) {
@@ -1292,6 +1450,7 @@ async function processAnswerGeneration(input: {
     missingStarElements: verified.missingStarElements,
     demonstratedTargets: extracted.data.demonstratedTargets,
     gapDecision,
+    companyMotivation: companyMotivationFromExtract(extracted.data.companyMotivation),
   };
   if (incomplete && input.allowFollowUp && followUpQuestion) {
     await prisma.$transaction([
@@ -1314,6 +1473,7 @@ async function processAnswerGeneration(input: {
       missingStarElements: verified.missingStarElements,
       wroteResult: false,
       gapDecision: "incomplete",
+      companyMotivation: analysisJson.companyMotivation,
     };
   }
   const confirmedGap = gapDecision === "no_evidence";
@@ -1463,6 +1623,7 @@ async function processAnswerGeneration(input: {
     missingStarElements: verified.missingStarElements,
     wroteResult: true,
     gapDecision: confirmedGap ? "no_evidence" : "evidence",
+    companyMotivation: analysisJson.companyMotivation,
   };
 }
 
@@ -1798,7 +1959,7 @@ export async function recordConsultationReply(input: {
   turnId: string;
   questionTurnId: string;
 }> {
-  const answer = seekerWrittenReply(input.answer);
+  const answer = input.answer.trim();
   if (!answer) throw new TenantError("Write an answer, or skip the question.");
   const session = await prisma.consultationSession.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
@@ -2069,7 +2230,7 @@ export async function processConsultationReply(input: {
     await persistWhyThisCompany({
       organizationId: input.organizationId,
       campaignId: input.campaignId,
-      answer: recordedAnswer,
+      companyMotivation: processed.companyMotivation,
     });
   }
   const coaching = processed.coaching?.trim();
@@ -2667,7 +2828,7 @@ export async function editConsultationAnswer(input: {
   turnId: string;
   answer: string;
 }): Promise<void> {
-  const body = seekerWrittenReply(input.answer);
+  const body = input.answer.trim();
   if (!body) throw new TenantError("Write an answer, or skip the question.");
   const turn = await prisma.consultationTurn.findFirst({
     where: {
@@ -3048,14 +3209,14 @@ export async function flagConsultationInaccuracy(input: {
   if (!draft?.turn.targetKey) {
     throw new TenantError("There is no polished result to correct yet.");
   }
-  await addTurn({
-    organizationId: input.organizationId,
-    sessionId: session.id,
-    speaker: "SEEKER",
-    body: "Not accurate.",
-    targetKey: draft.turn.targetKey,
-    seekerAuthored: true,
-    intent: "NOT_ACCURATE",
+  const flaggedAt = new Date();
+  await prisma.consultationStatement.updateMany({
+    where: {
+      sessionId: session.id,
+      turnId: draft.turnId,
+      status: "DRAFT",
+    },
+    data: { inaccuracyFlaggedAt: flaggedAt },
   });
   const turns = await loadSessionTurns(session.id);
   const { askedKeys, skippedKeys } = askedAndSkipped(turns);
@@ -3071,7 +3232,7 @@ export async function flagConsultationInaccuracy(input: {
   });
   askedKeys.delete(draft.turn.targetKey);
   const roles = await loadCoachHiringTeam(input.organizationId, input.campaignId);
-  const next = await planAndStoreRound({
+  await planAndStoreRound({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
     sessionId: session.id,
@@ -3086,19 +3247,6 @@ export async function flagConsultationInaccuracy(input: {
       "The seeker said the last polished result was not accurate. Ask what is wrong before rewriting.",
     ],
   });
-  if (next.length === 0) {
-    await addTurn({
-      organizationId: input.organizationId,
-      sessionId: session.id,
-      speaker: "CONSULTANT",
-      body: consultationConversationCopy.askForStory,
-      targetKey: draft.turn.targetKey,
-    });
-    await prisma.consultationSession.update({
-      where: { id: session.id },
-      data: { generationStatus: "READY", generationError: null },
-    });
-  }
 }
 
 export async function replyConsultation(input: {

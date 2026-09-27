@@ -44,6 +44,14 @@ export function isClosingNoteTurn(turn: Pick<QaTurn, "speaker" | "intent">): boo
   return turn.speaker === "CONSULTANT" && turn.intent === "CLOSING";
 }
 
+export function isLegacyInaccuracyReply(
+  turn: Pick<QaTurn, "speaker" | "body" | "intent">,
+): boolean {
+  if (turn.speaker !== "SEEKER") return false;
+  if (turn.intent === "NOT_ACCURATE") return true;
+  return turn.body.trim() === "Not accurate.";
+}
+
 export function latestClosingNote(turns: QaTurn[]): string | null {
   const closing = [...turns]
     .filter(isClosingNoteTurn)
@@ -277,6 +285,7 @@ export function buildConsultationQaView(input: {
 
   for (const seeker of turns) {
     if (seeker.speaker !== "SEEKER") continue;
+    if (isLegacyInaccuracyReply(seeker)) continue;
     const answered = questionAnsweredBy(turns, seeker);
     if (!answered) {
       const item = ensure({

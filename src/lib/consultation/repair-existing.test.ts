@@ -16,8 +16,9 @@ describe("existing consultation repair", () => {
     expect(repair).toContain("questionNearDuplicate");
     expect(repair).toContain("isCompanyMissionOrTagline");
     expect(repair).toContain("isInterviewerPrepTarget");
-    expect(repair).toContain("looksLikeCompanyMotivation");
-    expect(repair).toContain("seekerWrittenReply");
+    expect(repair).not.toContain("looksLikeCompanyMotivation");
+    expect(repair).not.toContain("seekerWrittenReply");
+    expect(repair).not.toContain("looksLikeWorkStory");
     expect(repair).toContain('status: "IN_PROGRESS"');
     const service = readFileSync("src/lib/consultation/service.ts", "utf8");
     expect(service).toContain("repairExistingConsultationSession");
@@ -198,14 +199,6 @@ describe.skipIf(!hasTestDatabase())("existing consultation repair on stored sess
         },
       ],
     });
-    const whyReply = await prisma.consultationTurn.findFirst({
-      where: {
-        sessionId: session.id,
-        speaker: "SEEKER",
-        targetKey: WHY_THIS_COMPANY_TARGET_KEY,
-        body: motivation,
-      },
-    });
     const whyStory = await prisma.consultationTurn.findFirst({
       where: {
         sessionId: session.id,
@@ -295,7 +288,9 @@ describe.skipIf(!hasTestDatabase())("existing consultation repair on stored sess
     expect(chronology[0]?.id).toBe(chronologyKept?.id);
     expect(
       turns.find((turn) => turn.id === armReply?.id)?.body,
-    ).toBe("I have built OpenText's ARM products.");
+    ).toBe(
+      "I have built OpenText's ARM products. He also reports building the business from under $2M to $6.8M.",
+    );
     const assessments = await prisma.consultationAssessment.findMany({
       where: { sessionId: session.id },
     });
@@ -311,11 +306,13 @@ describe.skipIf(!hasTestDatabase())("existing consultation repair on stored sess
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
     });
-    expect(campaign?.whyThisCompany).toBe(motivation);
+    expect(campaign?.whyThisCompany).toBe(
+      "I have built OpenText's ARM products by retooling GTM.",
+    );
     const statements = await prisma.consultationStatement.findMany({
       where: { sessionId: session.id },
     });
-    expect(statements.every((row) => row.turnId === whyReply?.id)).toBe(true);
+    expect(statements.every((row) => row.turnId === whyStory?.id)).toBe(true);
     const repairedSession = await prisma.consultationSession.findUnique({
       where: { id: session.id },
     });

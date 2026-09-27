@@ -3,12 +3,7 @@ import {
   isInterviewerPrepTarget,
   type EvidenceKind,
 } from "@/lib/consultation/assess";
-import { WHY_THIS_COMPANY_TARGET_KEY } from "@/lib/consultation/contract";
 import { questionNearDuplicate } from "@/lib/consultation/questions";
-import {
-  looksLikeCompanyMotivation,
-  seekerWrittenReply,
-} from "@/lib/consultation/reply-voice";
 import { prisma } from "@/lib/prisma-client";
 
 export function isTemplatedUnseenQuestion(text: string): boolean {
@@ -120,86 +115,6 @@ export async function repairExistingConsultationSession(input: {
       },
     });
     repaired = true;
-  }
-
-  const seekerTurns = session.turns.filter(
-    (turn) => turn.speaker === "SEEKER" && !turn.skipped,
-  );
-
-  const whyQuestions = session.turns.filter(
-    (turn) =>
-      turn.speaker === "CONSULTANT" &&
-      turn.targetKey === WHY_THIS_COMPANY_TARGET_KEY &&
-      !dropIds.has(turn.id),
-  );
-  const whyReplies = seekerTurns.filter(
-    (turn) =>
-      turn.targetKey === WHY_THIS_COMPANY_TARGET_KEY ||
-      whyQuestions.some((question) => {
-        const analysis = turn.analysisJson;
-        return (
-          analysis &&
-          typeof analysis === "object" &&
-          !Array.isArray(analysis) &&
-          (analysis as { replyToTurnId?: string }).replyToTurnId === question.id
-        );
-      }),
-  );
-  const motivation = [...whyReplies]
-    .reverse()
-    .find((turn) => looksLikeCompanyMotivation(turn.body));
-  if (motivation) {
-    const campaign = await prisma.campaign.findFirst({
-      where: { id: input.campaignId, organizationId: input.organizationId },
-      select: { whyThisCompany: true },
-    });
-    const motivationText = seekerWrittenReply(motivation.body);
-    if (
-      motivationText &&
-      campaign &&
-      campaign.whyThisCompany?.trim() !== motivationText
-    ) {
-      await prisma.campaign.update({
-        where: { id: input.campaignId },
-        data: { whyThisCompany: motivationText },
-      });
-      repaired = true;
-    }
-    const misplaced = session.statements.filter((statement) =>
-      whyReplies.some(
-        (reply) =>
-          reply.id === statement.turnId && reply.id !== motivation.id,
-      ),
-    );
-    for (const statement of misplaced) {
-      const existing = session.statements.find(
-        (row) => row.turnId === motivation.id && row.kind === statement.kind,
-      );
-      if (existing) {
-        await prisma.consultationStatement.delete({ where: { id: statement.id } });
-      } else {
-        await prisma.consultationStatement.update({
-          where: { id: statement.id },
-          data: { turnId: motivation.id },
-        });
-      }
-      repaired = true;
-    }
-  }
-
-  for (const turn of seekerTurns) {
-    const cleaned = seekerWrittenReply(turn.body);
-    if (cleaned !== turn.body.trim()) {
-      if (!cleaned) {
-        await prisma.consultationTurn.delete({ where: { id: turn.id } });
-      } else {
-        await prisma.consultationTurn.update({
-          where: { id: turn.id },
-          data: { body: cleaned },
-        });
-      }
-      repaired = true;
-    }
   }
 
   const remaining = await prisma.consultationTurn.findMany({

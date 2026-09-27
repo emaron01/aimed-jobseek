@@ -73,15 +73,6 @@ export function proposalsFromExtraction(input: {
       });
       return;
     }
-    const grounding = meaningGroundedInAnswer(fact.text, input.answer, input.profile);
-    if (!grounding.ok) {
-      drop({
-        key: `fact:${index}`,
-        text: fact.text,
-        reason: grounding.reason ?? "The fact is not supported by the answer or Personal Profile.",
-      });
-      return;
-    }
     proposals.push({
       kind: "FACT",
       text: fact.text.trim(),
@@ -145,22 +136,6 @@ export function proposalsFromExtraction(input: {
     const kept: Partial<Record<(typeof parts)[number]["key"], string>> = {};
     for (const part of parts) {
       if (!part.value?.trim()) {
-        addMissing(part.key);
-        continue;
-      }
-      const grounding = meaningGroundedInAnswer(
-        part.value,
-        input.answer,
-        input.profile,
-      );
-      if (!grounding.ok) {
-        drop({
-          key: `story:${part.key.toLowerCase()}`,
-          text: part.value,
-          reason:
-            grounding.reason ??
-            "This part of the story is not supported by the answer or Personal Profile.",
-        });
         addMissing(part.key);
         continue;
       }

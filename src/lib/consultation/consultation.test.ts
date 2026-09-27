@@ -31,6 +31,7 @@ import {
 import { buildOpenAiJsonSchemaFormat } from "@/lib/ai/zod-json-schema";
 import {
   CONSULTATION_PROMPT_VERSION,
+  WHY_THIS_COMPANY_TARGET_KEY,
   consultationExtractSchema,
 } from "@/lib/consultation/contract";
 import {
@@ -60,11 +61,14 @@ import {
   confirmConsultationResult,
   continueConsultationPlanning,
   editConsultationAnswer,
+  flagConsultationInaccuracy,
+  recordConsultationReply,
   repairConsultationResults,
 } from "@/lib/consultation/service";
 import {
   buildConsultationQaView,
   consultationQuestionAcceptsReply,
+  isLegacyInaccuracyReply,
 } from "@/lib/consultation/qa-view";
 import {
   collapseIdenticalEvidence,
@@ -75,7 +79,6 @@ import {
 } from "@/lib/consultation/evidence-display";
 import {
   appendConfirmedFact,
-  groundedInAnswer,
   isCompleteFactStatement,
   proposalsFromExtraction,
 } from "@/lib/consultation/write-back";
@@ -113,6 +116,19 @@ function sample() {
     scorecard: parsed.scorecard,
   });
   return { profile, parsed, targets };
+}
+
+const WHY_THIS_COMPANY_MOTIVATION =
+  "They are a global company we compete with today. Winning culture and known to be an outstanding employer with forward-thinking leadership.";
+
+function fixtureCompanyMotivation(input: {
+  target?: { key?: string } | null;
+  answer?: string;
+}): string | null {
+  if (input.target?.key !== "why-this-company") return null;
+  return (input.answer ?? "").includes(WHY_THIS_COMPANY_MOTIVATION)
+    ? WHY_THIS_COMPANY_MOTIVATION
+    : null;
 }
 
 function questionForConsultationTarget(target: {
@@ -349,6 +365,7 @@ function installConsultationModelFixture() {
           followUpQuestion:
             "When you led the rewrite, what did you personally change, what options did you weigh, and who did you work with?",
           gapDecision: "incomplete",
+          companyMotivation: fixtureCompanyMotivation({ ...payload, answer }),
         },
       };
     }
@@ -362,6 +379,7 @@ function installConsultationModelFixture() {
           missingStarElements: [],
           followUpQuestion: null,
           gapDecision: "no_evidence",
+          companyMotivation: fixtureCompanyMotivation({ ...payload, answer }),
         },
       };
     }
@@ -404,6 +422,7 @@ function installConsultationModelFixture() {
           ? null
           : "On that Python backend work, what changed because of your contribution, ideally a concrete result or metric?",
         gapDecision: complete ? "evidence" : "incomplete",
+        companyMotivation: fixtureCompanyMotivation({ ...payload, answer }),
       },
     };
   });
@@ -1063,7 +1082,7 @@ describe("consultation evidence and questions", () => {
     }
   });
 
-  it("drops unsupported extraction and keeps semantic links pending confirmation", () => {
+  it("keeps seeker-stated and paraphrased facts as proposals until confirmation", () => {
     const { profile, targets } = sample();
     const before = JSON.stringify(profile);
     const answer = "I used Python for 5 years and cut failed jobs by 40%.";
@@ -1093,12 +1112,13 @@ describe("consultation evidence and questions", () => {
         missingStarElements: [],
         followUpQuestion: null,
         gapDecision: "evidence",
+        companyMotivation: null,
       },
       targets,
     });
     expect(JSON.stringify(profile)).toBe(before);
-    expect(result.dropped).toContain("fact:1");
-    expect(result.proposals.every((proposal) => groundedInAnswer(proposal.text, answer))).toBe(
+    expect(result.dropped).not.toContain("fact:1");
+    expect(result.proposals.some((proposal) => proposal.text.includes("nine million"))).toBe(
       true,
     );
     const story = result.proposals.find((proposal) => proposal.kind === "STORY");
@@ -1126,6 +1146,7 @@ describe("consultation evidence and questions", () => {
         missingStarElements: [],
         followUpQuestion: null,
         gapDecision: "evidence",
+        companyMotivation: null,
       },
       targets: [
         ...targets,
@@ -1161,6 +1182,7 @@ describe("consultation evidence and questions", () => {
         missingStarElements: [],
         followUpQuestion: null,
         gapDecision: "evidence",
+        companyMotivation: null,
       },
       targets,
     });
@@ -1183,6 +1205,7 @@ describe("consultation evidence and questions", () => {
         missingStarElements: ["ACTION"],
         followUpQuestion: "What did you personally do?",
         gapDecision: "incomplete",
+        companyMotivation: null,
       },
       targets,
     });
@@ -1214,13 +1237,13 @@ describe("consultation evidence and questions", () => {
         missingStarElements: [],
         followUpQuestion: null,
         gapDecision: "evidence",
+        companyMotivation: null,
       },
       targets,
     });
-    expect(changedNumber.dropped).toContain("story:result");
-    expect(changedNumber.proposals.find((proposal) => proposal.kind === "STORY")).toBeUndefined();
-    expect(changedNumber.missingStarElements).toContain("RESULT");
-    expect(changedNumber.followUpQuestion).toMatch(/result/i);
+    expect(changedNumber.dropped).not.toContain("story:result");
+    expect(changedNumber.proposals.find((proposal) => proposal.kind === "STORY")).toBeTruthy();
+    expect(changedNumber.missingStarElements).not.toContain("RESULT");
     expect(why.proposals.find((proposal) => proposal.kind === "STORY")?.story?.competencyLinks).toEqual(
       [],
     );
@@ -1235,6 +1258,7 @@ describe("consultation evidence and questions", () => {
       .find((item) => item.id === "consult_turn_answer_1_fact");
     expect(written?.kind).toBe("FACT");
     expect(written?.provenance).toEqual([{ sourceId: "turn_answer_1" }]);
+    expect(JSON.stringify(profile)).toBe(before);
   });
 
   it("rejects fragment facts and does not show them for confirmation", () => {
@@ -1274,6 +1298,7 @@ describe("consultation evidence and questions", () => {
         missingStarElements: [],
         followUpQuestion: null,
         gapDecision: "evidence",
+        companyMotivation: null,
       },
       targets,
     });
@@ -1461,6 +1486,9 @@ describe("consultation evidence and questions", () => {
     );
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
       "there are never more than 10",
+    );
+    expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
+      "Set companyMotivation to the part of the reply that states why they want to work at this company",
     );
     const extractFormat = buildOpenAiJsonSchemaFormat(
       "consultation_extract",
@@ -3335,5 +3363,304 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS,
     ).toContain("personalProfileItems is the person's full Personal Profile");
     expect(consultationConversationCopy.shareSomeDetails).toBe("Share some details");
+  });
+
+  it("stores replies and edits exactly as typed", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Exact reply ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaign.id);
+    await expect(
+      recordConsultationReply({
+        organizationId,
+        campaignId: campaign.id,
+        answer: "   ",
+      }),
+    ).rejects.toThrow(/Write an answer, or skip the question/);
+    await startConsultation({ organizationId, campaignId: campaign.id });
+    const question = await prisma.consultationTurn.findFirst({
+      where: { session: { campaignId: campaign.id }, speaker: "CONSULTANT" },
+      orderBy: { sequence: "asc" },
+    });
+    const typed =
+      "I led enterprise security sales. He also reports building the business. the seeker already said this.";
+    const recorded = await recordConsultationReply({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey: question!.targetKey,
+      answer: `  ${typed}  `,
+    });
+    const stored = await prisma.consultationTurn.findUnique({
+      where: { id: recorded.turnId },
+    });
+    expect(stored?.body).toBe(typed);
+    await editConsultationAnswer({
+      organizationId,
+      campaignId: campaign.id,
+      turnId: recorded.turnId,
+      answer: `  ${typed} And the seeker added more.  `,
+    });
+    const edited = await prisma.consultationTurn.findUnique({
+      where: { id: recorded.turnId },
+    });
+    expect(edited?.body).toBe(`${typed} And the seeker added more.`);
+  });
+
+  it("flags not accurate without writing a seeker turn", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Flag ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaign.id);
+    await startConsultation({ organizationId, campaignId: campaign.id });
+    const question = await prisma.consultationTurn.findFirst({
+      where: { session: { campaignId: campaign.id }, speaker: "CONSULTANT" },
+      orderBy: { sequence: "asc" },
+    });
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey: question!.targetKey!,
+      answer: "I used Python for 5 years and cut failed jobs by 40%.",
+    });
+    const beforeTurns = await prisma.consultationTurn.count({
+      where: { session: { campaignId: campaign.id }, speaker: "SEEKER" },
+    });
+    await flagConsultationInaccuracy({
+      organizationId,
+      campaignId: campaign.id,
+    });
+    const afterTurns = await prisma.consultationTurn.findMany({
+      where: { session: { campaignId: campaign.id }, speaker: "SEEKER" },
+    });
+    expect(afterTurns).toHaveLength(beforeTurns);
+    expect(afterTurns.every((turn) => turn.body !== "Not accurate.")).toBe(true);
+    const flagged = await prisma.consultationStatement.findFirst({
+      where: {
+        session: { campaignId: campaign.id },
+        inaccuracyFlaggedAt: { not: null },
+      },
+    });
+    expect(flagged?.inaccuracyFlaggedAt).toBeTruthy();
+    const session = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: { turns: true },
+    });
+    const view = buildConsultationQaView({
+      turns: session!.turns,
+      statements: [],
+    });
+    expect(
+      view.questions.some((item) =>
+        item.seekerAnswers.some((answer) => answer.body === "Not accurate."),
+      ),
+    ).toBe(false);
+    expect(
+      isLegacyInaccuracyReply({
+        speaker: "SEEKER",
+        body: "Not accurate.",
+        intent: "NOT_ACCURATE",
+      }),
+    ).toBe(true);
+  });
+
+  it("saves why-this-company motivation from extract, not from the raw reply", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Why company ${suffix}`,
+        productId,
+        icpId,
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaign.id);
+    await startConsultation({ organizationId, campaignId: campaign.id });
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey: WHY_THIS_COMPANY_TARGET_KEY,
+      answer: `${WHY_THIS_COMPANY_MOTIVATION} I led enterprise security sales.`,
+    });
+    const withMotivation = await prisma.campaign.findUnique({
+      where: { id: campaign.id },
+    });
+    expect(withMotivation?.whyThisCompany).toBe(WHY_THIS_COMPANY_MOTIVATION);
+
+    const storyOnly = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Why story ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "Keep this until a motivation arrives.",
+      },
+    });
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: storyOnly.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(storyOnly.id);
+    await startConsultation({ organizationId, campaignId: storyOnly.id });
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: storyOnly.id,
+      targetKey: WHY_THIS_COMPANY_TARGET_KEY,
+      answer: "I have built OpenText's ARM products by completely retool the GTM.",
+    });
+    const unchanged = await prisma.campaign.findUnique({
+      where: { id: storyOnly.id },
+    });
+    expect(unchanged?.whyThisCompany).toBe("Keep this until a motivation arrives.");
+    const service = readFileSync("src/lib/consultation/service.ts", "utf8");
+    expect(service).not.toMatch(/looksLikeCompanyMotivation|looksLikeWorkStory/);
+  });
+
+  it("re-extracts existing why-this-company replies once and corrects saved motivation", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Why repair ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "I have built OpenText's ARM products by retooling GTM.",
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaign.id);
+    const session = await prisma.consultationSession.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        productId,
+        status: "IN_PROGRESS",
+        generationStatus: "READY",
+        promptVersion: CONSULTATION_PROMPT_VERSION,
+      },
+    });
+    await prisma.consultationTurn.createMany({
+      data: [
+        {
+          organizationId,
+          sessionId: session.id,
+          sequence: 1,
+          speaker: "CONSULTANT",
+          body: "Why do you want to work at this company?",
+          targetKey: WHY_THIS_COMPANY_TARGET_KEY,
+        },
+        {
+          organizationId,
+          sessionId: session.id,
+          sequence: 2,
+          speaker: "SEEKER",
+          body: `${WHY_THIS_COMPANY_MOTIVATION} I led enterprise security sales.`,
+          targetKey: WHY_THIS_COMPANY_TARGET_KEY,
+          seekerAuthored: true,
+        },
+      ],
+    });
+    await startConsultation({ organizationId, campaignId: campaign.id });
+    const corrected = await prisma.campaign.findUnique({
+      where: { id: campaign.id },
+    });
+    expect(corrected?.whyThisCompany).toBe(WHY_THIS_COMPANY_MOTIVATION);
+    const reply = await prisma.consultationTurn.findFirst({
+      where: {
+        sessionId: session.id,
+        speaker: "SEEKER",
+        targetKey: WHY_THIS_COMPANY_TARGET_KEY,
+      },
+    });
+    expect(reply?.analysisJson).toMatchObject({
+      companyMotivation: WHY_THIS_COMPANY_MOTIVATION,
+    });
+    await prisma.campaign.update({
+      where: { id: campaign.id },
+      data: { whyThisCompany: "should not be overwritten on the second pass" },
+    });
+    await startConsultation({ organizationId, campaignId: campaign.id });
+    const second = await prisma.campaign.findUnique({
+      where: { id: campaign.id },
+    });
+    expect(second?.whyThisCompany).toBe("should not be overwritten on the second pass");
   });
 });

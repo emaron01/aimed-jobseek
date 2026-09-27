@@ -2,7 +2,6 @@ import type {
   ApplicationSummaryGuidance,
   CheatSheetCoachItem,
 } from "@/lib/application-summary/contract";
-import { applicationSummaryConfig, consultationConfig } from "@/lib/product-config";
 import {
   seekerFirstName,
   seekerPrepInstructionViolations,
@@ -162,36 +161,3 @@ export function replaceCoachItem(
   };
 }
 
-export function validateCoachItems(guidance: ApplicationSummaryGuidance): string[] {
-  const errors: string[] = [];
-  for (const item of collectCoachItems(guidance)) {
-    if (!coachItemIsComplete(item)) {
-      errors.push(
-        `Each ${applicationSummaryConfig.sections.likelyQuestions.toLowerCase()} item needs a sample answer or ${consultationConfig.displayName}'s question.`,
-      );
-    }
-    errors.push(...prepareInstructionViolations(item.prompt));
-    if (item.sampleAnswer) {
-      errors.push(...prepareInstructionViolations(item.sampleAnswer));
-    }
-    if (item.harperQuestion) {
-      errors.push(...prepareInstructionViolations(item.harperQuestion));
-      if (!item.harperQuestion.trim().endsWith("?")) {
-        errors.push(`${consultationConfig.displayName}'s question must be written as a question.`);
-      }
-    }
-  }
-  return [...new Set(errors)];
-}
-
-export function validateSeekerVoice(input: {
-  texts: string[];
-  firstName: string | null;
-}): string[] {
-  const errors: string[] = [];
-  for (const text of input.texts) {
-    errors.push(...prepareInstructionViolations(text));
-    errors.push(...seekerThirdPersonViolations({ text, firstName: input.firstName }));
-  }
-  return [...new Set(errors)];
-}

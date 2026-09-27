@@ -179,6 +179,9 @@ describe("Interview cheat sheet coach", () => {
         firstName: "Erik",
       }),
     ).toEqual([]);
+    const coach = readFileSync("src/lib/application-summary/coach.ts", "utf8");
+    expect(coach).not.toContain("function validateCoachItems");
+    expect(coach).not.toContain("function validateSeekerVoice");
     const page = readFileSync("src/app/(app)/campaigns/[id]/summary/page.tsx", "utf8");
     const prompt = readFileSync("src/lib/prompt-content/application-summary.ts", "utf8");
     const labels = JSON.stringify(applicationSummaryConfig);

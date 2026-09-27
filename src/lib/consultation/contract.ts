@@ -75,6 +75,7 @@ export const consultationExtractSchema = z.object({
   coaching: z.string().nullable(),
   followUpQuestion: z.string().nullable(),
   gapDecision: z.enum(["evidence", "no_evidence", "incomplete"]).nullable(),
+  companyMotivation: z.string().nullable(),
 });
 
 export const consultationPolishSchema = z.object({

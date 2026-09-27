@@ -2667,6 +2667,8 @@ model ConsultationStatement {
   promptVersion     String
   generation        Int                         @default(1)
   approvedAt        DateTime?
+  /// Set when the seeker flags the polished result as not accurate. Not a seeker reply.
+  inaccuracyFlaggedAt DateTime?
   createdAt         DateTime                    @default(now())
   updatedAt         DateTime                    @updatedAt
 

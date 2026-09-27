@@ -53,7 +53,7 @@ Read the full Personal Profile before deciding. Decide the gap:
 - incomplete: the answer is partial, vague, or missing what is needed to close the gap. Write coaching (brief, spoken to you: what is strong, what is missing) and one followUpQuestion targeting exactly what is missing. If years or background are not tied to roles, the follow-up asks which roles they came from. At most one follow-up per gap.
 - evidence: the answers plus the Personal Profile prove the gap is closed.
 - no_evidence: the answers confirm there is no experience for this gap.
-If the target is why-this-company, treat the answer as motivation for wanting the company, never as a work story.
+If the target is why-this-company, treat the answer as motivation for wanting the company, never as a work story. Set companyMotivation to the part of the reply that states why they want to work at this company, in their own words. If the reply contains no motivation — for example a work story only — companyMotivation is null. For any other target, companyMotivation is null.
 For evidence or no_evidence, coaching and followUpQuestion are null.
 
 Never mention research status, confidence, missing data, prompts, models, or any internal system state. If qualityFeedback names a field, regenerate only that field.
