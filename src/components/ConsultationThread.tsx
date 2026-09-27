@@ -7,6 +7,7 @@ import {
   regenerateConsultationQaResultAction,
   replyConsultationAction,
   skipConsultationQuestionAction,
+  ignoreConsultationQuestionAction,
 } from "@/app/actions/consultation";
 import { AppButton } from "@/components/AppButton";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
@@ -220,6 +221,7 @@ function QuestionCard({
     showReply &&
     (consultationQuestionAcceptsReply(item) || Boolean(item.seekerAnswers.length));
   const canSkip = showReply && unanswered;
+  const canIgnore = showReply && unanswered;
   const replyKey = consultationReplyTargetKey(item.questionTurnId);
   return (
     <article
@@ -290,6 +292,18 @@ function QuestionCard({
             submitLabel={consultationConversationCopy.skipQuestion}
             pendingLabel={consultationConversationCopy.thinking}
             testId="consultation-skip-question"
+            variant="secondary"
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+            <input type="hidden" name="targetKey" value={replyKey} />
+          </ApplicationActionForm>
+        ) : null}
+        {canIgnore ? (
+          <ApplicationActionForm
+            action={ignoreConsultationQuestionAction}
+            submitLabel={consultationConversationCopy.ignoreQuestion}
+            pendingLabel={consultationConversationCopy.thinking}
+            testId="consultation-ignore-question"
             variant="secondary"
           >
             <input type="hidden" name="campaignId" value={campaignId} />

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONSULTATION_PROMPT_VERSION = "25";
+export const CONSULTATION_PROMPT_VERSION = "26";
 
 export const WHY_THIS_COMPANY_TARGET_KEY = "why-this-company";
 export const PERSON_PREP_TARGET_PREFIX = "person-prep:";
@@ -117,6 +117,8 @@ export function isConsultationExtractFeedback(
 export type AskedConsultationQuestion = {
   text: string;
   answered: boolean;
+  /** Seeker permanently dismissed this question and will not answer it. */
+  ignored: boolean;
   targetKey: string | null;
   followUp: boolean;
 };

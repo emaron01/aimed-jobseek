@@ -43,6 +43,7 @@ import {
   questionNeedsRoleSource,
   questionTextForGap,
   seniorityWarrantsChronology,
+  askedQuestionsFromTurns,
 } from "@/lib/consultation/questions";
 import { nextConsultationStatus } from "@/lib/consultation/state";
 import {
@@ -1634,9 +1635,12 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("25");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("26");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("You coach; you do not interrogate");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("askedQuestions");
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
+      "askedQuestions may include ignored: true when the seeker permanently dismissed that question",
+    );
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
       "Career walk-through: cover only roles held within the last 10 years from today",
     );
@@ -1972,17 +1976,103 @@ describe("consultation evidence and questions", () => {
     ).toEqual([]);
   });
 
+  it("marks ignored questions for Harper and blocks close rephrasing", () => {
+    const asked = askedQuestionsFromTurns([
+      {
+        id: "q1",
+        speaker: "CONSULTANT",
+        body: "Tell me about a forecasting cadence you ran?",
+        targetKey: "required:forecast",
+        followUp: false,
+        skipped: false,
+      },
+      {
+        id: "ignore-1",
+        speaker: "SEEKER",
+        body: "",
+        targetKey: "required:forecast",
+        followUp: false,
+        skipped: true,
+        analysisJson: {
+          status: "READY",
+          replyToTurnId: "q1",
+          ignored: true,
+        },
+      },
+    ]);
+    expect(asked).toEqual([
+      {
+        text: "Tell me about a forecasting cadence you ran?",
+        answered: false,
+        ignored: true,
+        targetKey: "required:forecast",
+        followUp: false,
+      },
+    ]);
+    expect(
+      questionDuplicatesAsked(
+        "Tell me about a forecasting cadence you ran?",
+        asked,
+      ),
+    ).toBe(true);
+    expect(
+      questionDuplicatesAsked(
+        "Can you tell me about a forecasting cadence you ran?",
+        asked,
+      ),
+    ).toBe(true);
+    const round = planQuestionRound({
+      assessments: [
+        {
+          key: "required:forecast",
+          kind: "REQUIRED",
+          text: "Run a weekly forecast",
+          strength: "NONE",
+          supportingFactIds: [],
+          strategy: "ACKNOWLEDGE",
+          explanation: "Missing.",
+          strategyText: "Ask.",
+          verification: {
+            originalStrength: "NONE",
+            invalidSupportingFactIds: [],
+            invalidRoleIds: [],
+            downgradeReasons: [],
+          },
+          experienceCalculation: null,
+        },
+      ],
+      modelQuestions: [
+        {
+          targetKey: "required:forecast",
+          text: "Walk me through a forecasting cadence you owned?",
+          requirementInterpretation: null,
+          hiringTeamRoleId: "hm",
+          whoCaresNote: "The Hiring Manager needs this story.",
+        },
+      ],
+      hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
+      askedKeys: new Set(["required:forecast"]),
+      skippedKeys: new Set(["required:forecast"]),
+      askedQuestions: asked,
+      includeChronology: false,
+      chronologyAsked: false,
+    });
+    expect(round.questions).toEqual([]);
+  });
+
   it("never saves a duplicate or rephrased question and asks chronology at most once", () => {
     const asked = [
       {
         text: "At Northwind, how did you decide which enterprise account to pursue when several deals competed for your team's time?",
         answered: true,
+        ignored: false,
         targetKey: "required:strategy",
         followUp: false,
       },
       {
         text: "Starting with Northwind Analytics, walk me through your key accomplishments there and why you moved on from each role.",
         answered: false,
+        ignored: false,
         targetKey: "chronology",
         followUp: false,
       },
@@ -2055,6 +2145,7 @@ describe("consultation evidence and questions", () => {
     const askedQuestions = Array.from({ length: 10 }, (_, index) => ({
       text: `Asked question number ${index + 1} about a distinct gap in this application.`,
       answered: index < 8,
+      ignored: false,
       targetKey: `required:${index}`,
       followUp: index === 9,
     }));

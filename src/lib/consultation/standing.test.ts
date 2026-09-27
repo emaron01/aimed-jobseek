@@ -86,6 +86,32 @@ describe("Harper core loop standing", () => {
     ]);
   });
 
+  it("keeps an open gap with Share some details after its question is ignored", () => {
+    const standing = buildStandingGaps({
+      assessments: [
+        gap({
+          key: "required:forecast",
+          kind: "REQUIRED",
+          text: "Run a weekly forecast",
+          strength: "NONE",
+        }),
+      ],
+      questions: [],
+    });
+    expect(standing).toEqual([
+      {
+        targetKey: "required:forecast",
+        label: "Run a weekly forecast",
+        status: "open",
+        talkTrack: null,
+      },
+    ]);
+    expect(consultationGapStatusCopy.open).toBeTruthy();
+    const standingUi = readFileSync("src/components/ConsultationStanding.tsx", "utf8");
+    expect(standingUi).toContain("shareSomeDetails");
+    expect(standingUi).toContain('gap.status === "open"');
+  });
+
   it("shows each gap's status and never tells the seeker to go close it", () => {
     const assessments = [
       gap({

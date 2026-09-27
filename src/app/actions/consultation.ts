@@ -16,6 +16,7 @@ import {
   reviseConsultationResult,
   skipConsultation,
   skipConsultationQuestion,
+  ignoreConsultationQuestion,
   confirmConsultationResult,
   flagConsultationInaccuracy,
   recordConsultationReply,
@@ -241,6 +242,26 @@ export async function skipConsultationQuestionAction(
     return { ok: true, message: "Question skipped." };
   } catch (error) {
     return fail(error, "The question could not be skipped.");
+  }
+}
+
+export async function ignoreConsultationQuestionAction(
+  _prev: ConsultationActionResult | null,
+  formData: FormData,
+): Promise<ConsultationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = campaignIdFrom(formData);
+    const targetKey = String(formData.get("targetKey") ?? "").trim();
+    if (!campaignId || !targetKey) {
+      return { ok: false, message: consultationConversationCopy.replyFailed };
+    }
+    await ignoreConsultationQuestion({ organizationId, campaignId, targetKey });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: "Question ignored." };
+  } catch (error) {
+    return fail(error, "The question could not be ignored.");
   }
 }
 

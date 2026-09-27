@@ -8,7 +8,7 @@ import {
   WHY_THIS_COMPANY_TARGET_KEY,
   type AskedConsultationQuestion,
 } from "@/lib/consultation/contract";
-import { replyToTurnIdFromAnalysis } from "@/lib/consultation/qa-view";
+import { replyToTurnIdFromAnalysis, isIgnoredSeekerTurn } from "@/lib/consultation/qa-view";
 import { consultationConfig } from "@/lib/product-config/consultation";
 
 export type PlannedQuestion = {
@@ -86,19 +86,32 @@ export function askedQuestionsFromTurns(
     if (turn.intent === "COACHING") continue;
     const text = turn.body.trim();
     if (!text) continue;
-    const answered = turns.some(
+    const ignored = turns.some(
       (reply) =>
         reply.speaker === "SEEKER" &&
-        !reply.skipped &&
-        reply.body.trim().length > 0 &&
+        isIgnoredSeekerTurn(reply) &&
         (replyToTurnIdFromAnalysis(reply.analysisJson) === turn.id ||
           (!replyToTurnIdFromAnalysis(reply.analysisJson) &&
             Boolean(turn.targetKey) &&
             reply.targetKey === turn.targetKey)),
     );
+    const answered =
+      !ignored &&
+      turns.some(
+        (reply) =>
+          reply.speaker === "SEEKER" &&
+          !reply.skipped &&
+          !isIgnoredSeekerTurn(reply) &&
+          reply.body.trim().length > 0 &&
+          (replyToTurnIdFromAnalysis(reply.analysisJson) === turn.id ||
+            (!replyToTurnIdFromAnalysis(reply.analysisJson) &&
+              Boolean(turn.targetKey) &&
+              reply.targetKey === turn.targetKey)),
+      );
     asked.push({
       text,
       answered,
+      ignored,
       targetKey: turn.targetKey,
       followUp: turn.followUp,
     });

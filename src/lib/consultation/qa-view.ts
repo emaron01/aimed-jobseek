@@ -125,6 +125,15 @@ export function replyToTurnIdFromAnalysis(value: unknown): string | null {
   return typeof id === "string" && id.trim() ? id.trim() : null;
 }
 
+/** Seeker permanently dismissed a Harper question (Ignore). */
+export function isIgnoredSeekerTurn(
+  turn: Pick<QaTurn, "speaker" | "analysisJson">,
+): boolean {
+  if (turn.speaker !== "SEEKER") return false;
+  if (!turn.analysisJson || typeof turn.analysisJson !== "object") return false;
+  return (turn.analysisJson as { ignored?: unknown }).ignored === true;
+}
+
 export function consultationReplyTargetKey(questionTurnId: string): string {
   return `question:${questionTurnId}`;
 }
@@ -303,6 +312,7 @@ export function buildConsultationQaView(input: {
   for (const seeker of turns) {
     if (seeker.speaker !== "SEEKER") continue;
     if (isLegacyInaccuracyReply(seeker)) continue;
+    if (isIgnoredSeekerTurn(seeker)) continue;
     const answered = questionAnsweredBy(turns, seeker);
     if (!answered) {
       const item = ensure({
@@ -344,6 +354,18 @@ export function buildConsultationQaView(input: {
     ensure(turn);
   }
 
+  const ignoredPrimaryIds = new Set(
+    turns
+      .filter(isIgnoredSeekerTurn)
+      .map((turn) => {
+        const pinned = replyToTurnIdFromAnalysis(turn.analysisJson);
+        if (pinned) return pinned;
+        const matched = questionAnsweredBy(turns, turn);
+        return matched ? primaryFor(turns, matched).id : null;
+      })
+      .filter((id): id is string => Boolean(id)),
+  );
+
   const sequenceById = new Map(turns.map((turn) => [turn.id, turn.sequence]));
   const questions = order
     .map((id) => {
@@ -365,6 +387,7 @@ export function buildConsultationQaView(input: {
         ),
       };
     })
+    .filter((item) => !ignoredPrimaryIds.has(item.questionTurnId))
     .sort(
       (left, right) =>
         (sequenceById.get(left.questionTurnId) ?? 0) -

@@ -2831,6 +2831,75 @@ export async function skipConsultationQuestion(input: {
   await finishIfPlanningIsComplete(session.id, next);
 }
 
+/** Permanently dismiss a Harper question for this application; the gap stays open. */
+export async function ignoreConsultationQuestion(input: {
+  organizationId: string;
+  campaignId: string;
+  targetKey: string;
+}): Promise<void> {
+  const session = await prisma.consultationSession.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+  });
+  if (!session || session.status !== "IN_PROGRESS") {
+    throw new TenantError(consultationConversationCopy.notAcceptingReplies);
+  }
+  const { turns, view } = await loadSessionQaView(session.id);
+  const item = resolveReplyableQaItem(view, input.targetKey);
+  const question = item ? consultantForQaItem(turns, item) : null;
+  if (!item || !question) replyCouldNotBeRecorded();
+  await addTurn({
+    organizationId: input.organizationId,
+    sessionId: session.id,
+    speaker: "SEEKER",
+    body: "",
+    targetKey: question.targetKey ?? input.targetKey,
+    skipped: true,
+    seekerAuthored: true,
+    analysisJson: {
+      status: "READY",
+      replyToTurnId: item.questionTurnId,
+      ignored: true,
+    },
+  });
+  const refreshed = await loadSessionQaView(session.id);
+  if (consultationHasUnansweredQuestions(refreshed.view)) return;
+  const { campaign, requirement, profile } = await requireApplication(
+    input.organizationId,
+    input.campaignId,
+  );
+  const stored = await prisma.consultationAssessment.findMany({
+    where: { sessionId: session.id },
+  });
+  const assessments = stored.map(storedAssessment);
+  const { askedKeys, skippedKeys } = askedAndSkipped(refreshed.turns);
+  markWhyThisCompanyAsked(askedKeys, {
+    campaignId: campaign.id,
+    whyThisCompany: campaign.whyThisCompany,
+    profile,
+  });
+  if (gapsAreCovered(assessments, skippedKeys)) {
+    await prisma.consultationSession.update({
+      where: { id: session.id },
+      data: { status: "DONE" },
+    });
+    await queueAssetsWhenConsultationEnds(session.id);
+    return;
+  }
+  const roles = await loadCoachHiringTeam(input.organizationId, input.campaignId);
+  const next = await planAndStoreRound({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    sessionId: session.id,
+    askedKeys,
+    skippedKeys,
+    profile,
+    requirement,
+    targets: targetsFromRequirement(requirement),
+    roles,
+  });
+  await finishIfPlanningIsComplete(session.id, next);
+}
+
 function completeStoryFromAnalysis(value: unknown): {
   answerContext: string;
   story: {

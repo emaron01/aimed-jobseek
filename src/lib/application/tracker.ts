@@ -304,7 +304,9 @@ export function consultationFacts(
     (question) =>
       Boolean(question.targetKey) || question.text.includes("?"),
   );
-  const unanswered = asked.some((question) => !question.answered);
+  const unanswered = asked.some(
+    (question) => !question.answered && !question.ignored,
+  );
   return {
     started: true,
     unanswered,

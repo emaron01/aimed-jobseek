@@ -79,6 +79,7 @@ export const consultationConversationCopy = Object.freeze({
   showYourReplies: "Show your replies",
   hideYourReplies: "Hide your replies",
   skipQuestion: "Skip",
+  ignoreQuestion: "Ignore",
   coachingDisclaimer:
     "Harper's coaching and suggestions to help you prepare and strengthen your interview skills.",
   approve: "Approve",

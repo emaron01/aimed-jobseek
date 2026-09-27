@@ -111,4 +111,65 @@ describe("consultationFacts Harper green", () => {
       ),
     ).toBe("in_progress");
   });
+
+  it("is green when remaining questions are answered and the rest are ignored", () => {
+    const facts = consultationFacts({
+      turns: [
+        turn({
+          id: "q1",
+          speaker: "CONSULTANT",
+          body: "Walk me through the last decade of your career?",
+          targetKey: "chronology",
+          sequence: 1,
+        }),
+        turn({
+          id: "a1",
+          speaker: "SEEKER",
+          body: "I led sales at Acme then OpenText.",
+          targetKey: "chronology",
+          sequence: 2,
+          analysisJson: { replyToTurnId: "q1" },
+        }),
+        turn({
+          id: "q2",
+          speaker: "CONSULTANT",
+          body: "Tell me about a forecasting win at OpenText?",
+          targetKey: "forecasting",
+          sequence: 3,
+        }),
+        {
+          ...turn({
+            id: "ignore-2",
+            speaker: "SEEKER",
+            body: "",
+            targetKey: "forecasting",
+            sequence: 4,
+            analysisJson: {
+              status: "READY",
+              replyToTurnId: "q2",
+              ignored: true,
+            },
+          }),
+          skipped: true,
+        },
+      ],
+    });
+    expect(facts).toEqual({
+      started: true,
+      unanswered: false,
+      complete: true,
+    });
+    expect(
+      resolveApplicationStepState(
+        "consultation",
+        {
+          ...emptyApplicationStepFacts(),
+          consultationStarted: facts.started,
+          consultationComplete: facts.complete,
+          consultationUnanswered: facts.unanswered,
+        },
+        [],
+      ),
+    ).toBe("done");
+  });
 });

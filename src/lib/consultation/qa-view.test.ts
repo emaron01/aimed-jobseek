@@ -77,9 +77,37 @@ describe("Harper ten-question coach", () => {
     expect(thread).toContain("name=\"targetKey\"");
     expect(thread).toContain("skipConsultationQuestionAction");
     expect(thread).toContain("consultationConversationCopy.skipQuestion");
+    expect(thread).toContain("ignoreConsultationQuestionAction");
+    expect(thread).toContain("consultationConversationCopy.ignoreQuestion");
     expect(thread).toContain("consultationConversationCopy.showYourReplies");
     expect(thread).toContain("consultationConversationCopy.hideYourReplies");
     expect(consultationConversationCopy.skipQuestion).toBe("Skip");
+    expect(consultationConversationCopy.ignoreQuestion).toBe("Ignore");
+  });
+
+  it("removes an ignored question from the seeker list permanently", () => {
+    const view = buildConsultationQaView({
+      turns: [
+        question,
+        second,
+        {
+          id: "ignore-1",
+          speaker: "SEEKER" as const,
+          body: "",
+          targetKey: "why",
+          followUp: false,
+          sequence: 3,
+          analysisJson: {
+            status: "READY",
+            replyToTurnId: "q1",
+            ignored: true,
+          },
+        },
+      ],
+      statements: [],
+    });
+    expect(view.questions.map((item) => item.questionTurnId)).toEqual(["q2"]);
+    expect(view.questions.some((item) => item.questionTurnId === "q1")).toBe(false);
   });
 
   it("hides legacy Not accurate seeker turns from the thread", () => {
