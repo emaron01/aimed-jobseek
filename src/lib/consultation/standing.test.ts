@@ -5,6 +5,7 @@ import {
   briefingNeedsStandingRegen,
   buildStandingGaps,
   shouldEnqueueConsultationStandingRegen,
+  standingGapStatus,
   standingWorkIsComplete,
 } from "@/lib/consultation/standing";
 import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
@@ -177,6 +178,79 @@ describe("Harper core loop standing", () => {
     ]);
     expect(consultationGapStatusCopy.closed).toBe("Closed");
     expect(consultationGapStatusCopy.confirmed).toBe("Confirmed gap");
+    expect(
+      standingGapStatus({
+        questionTurnId: "q-inc",
+        targetKey: "required:forecast",
+        question: "How do you forecast?",
+        followUp: {
+          turnId: "f1",
+          text: "What result did you get when you used forecasting?",
+        },
+        seekerAnswers: [
+          {
+            id: "s-inc",
+            body: "I have used forecasting.",
+            analysisJson: { gapDecision: "incomplete" },
+          },
+        ],
+        statements: [],
+        resumeBullet: {
+          id: "b-inc",
+          turnId: "s-inc",
+          kind: "RESUME_BULLET",
+          status: "DRAFT",
+          content: "Used forecasting.",
+          strengtheningNote: null,
+        },
+        talkingPoint: {
+          id: "i-inc",
+          turnId: "s-inc",
+          kind: "INTERVIEW_ANSWER",
+          status: "DRAFT",
+          content: "I have experience using forecasting.",
+          strengtheningNote: null,
+        },
+      }),
+    ).toEqual({ status: "open", talkTrack: null });
+    expect(
+      standingGapStatus({
+        questionTurnId: "q-no",
+        targetKey: "required:domain",
+        question: "Have you sold brand protection?",
+        followUp: {
+          turnId: "f2",
+          text: "What adjacent work would you bring?",
+        },
+        seekerAnswers: [
+          {
+            id: "s-no",
+            body:
+              "I have never sold digital brand protection, domain services, or digital-risk products. My closest work is patient-identity software at Contoso Health.",
+            analysisJson: { gapDecision: "no_evidence" },
+          },
+        ],
+        statements: [],
+        resumeBullet: {
+          id: "b-no",
+          turnId: "s-no",
+          kind: "RESUME_BULLET",
+          status: "DRAFT",
+          content:
+            "Bring adjacent patient-identity software experience rather than direct sales experience.",
+          strengtheningNote: null,
+        },
+        talkingPoint: {
+          id: "i-no",
+          turnId: "s-no",
+          kind: "INTERVIEW_ANSWER",
+          status: "DRAFT",
+          content:
+            "I have not done that work yet. The closest related experience I have is patient-identity software at Contoso Health, and I would close the gap in this role by ramping on digital brand protection in the first weeks.",
+          strengtheningNote: null,
+        },
+      }).status,
+    ).toBe("confirmed");
     const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
     const standingUi = readFileSync(
       "src/components/ConsultationStanding.tsx",

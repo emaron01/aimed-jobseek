@@ -48,11 +48,14 @@ export function standingGapStatus(item: ConsultationQaItem | undefined): {
   const decision = gapDecisionFromAnalysis(
     item?.seekerAnswers.at(-1)?.analysisJson,
   );
-  if (item?.followUp && !talkTrack) {
+  if (decision === "incomplete") {
     return { status: "open", talkTrack: null };
   }
-  if (decision === "no_evidence" && talkTrack) {
+  if (decision === "no_evidence") {
     return { status: "confirmed", talkTrack };
+  }
+  if (item?.followUp && !talkTrack) {
+    return { status: "open", talkTrack: null };
   }
   if (decision === "evidence" && talkTrack) {
     return { status: "closed", talkTrack };

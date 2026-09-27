@@ -217,6 +217,9 @@ describe("workflow audit fixes", () => {
     expect(service).toContain("ensureNamedEmployerResearch");
     expect(service).toContain("queueMissingNamedEmployerResearch");
     expect(service).toContain("queueApplicationResearch");
+    expect(service).toContain(
+      "runWithTenantContext({ organizationId: row.organizationId }",
+    );
     expect(worker).toContain("queueMissingNamedEmployerResearch");
   });
 });
@@ -337,6 +340,45 @@ describe.skipIf(!hasTestDatabase())("workflow audit database behavior", () => {
         campaignId: leftover.id,
       });
     });
+    const leftoverRuns = await prisma.researchRun.count({
+      where: {
+        organizationId,
+        campaignId: leftover.id,
+        status: { in: ["PENDING", "IN_PROGRESS"] },
+      },
+    });
+    expect(leftoverRuns).toBeGreaterThan(0);
+  });
+
+  it("starts the worker named-employer backfill when existing applications need research", async () => {
+    const leftover = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Worker start research ${suffix}`,
+        productId,
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(
+      NORMAL_JOB_MODEL,
+      NORMAL_JOB_POSTING,
+    );
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: leftover.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        companyName: parsed.companyName,
+        scorecardJson: parsed.scorecard,
+      },
+    });
+    const { queueMissingNamedEmployerResearch } = await import(
+      "@/lib/application/service"
+    );
+    await expect(queueMissingNamedEmployerResearch()).resolves.toBeGreaterThanOrEqual(
+      1,
+    );
     const leftoverRuns = await prisma.researchRun.count({
       where: {
         organizationId,

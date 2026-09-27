@@ -418,14 +418,19 @@ function installConsultationModelFixture() {
           story: null,
           demonstratedTargets: [],
           missingStarElements: [],
+          coaching: null,
           followUpQuestion: null,
           gapDecision: "no_evidence",
           companyMotivation: fixtureCompanyMotivation({ ...payload, answer }),
         },
       };
     }
-    const complete = /cut failed jobs by 40%/i.test(answer);
-    const completeSpan = "I used Python for 5 years and cut failed jobs by 40%.";
+    const complete =
+      /cut failed jobs by \d+%/i.test(answer) ||
+      /I sat with that manager on the weekly forecast/i.test(answer);
+    const completeSpan = /cut failed jobs by \d+%/i.test(answer)
+      ? answer.trim()
+      : "I sat with that manager on the weekly forecast, set an inspection cadence, and stayed with it until the team ran it without me.";
     return {
       data: {
         replyType: "answer",
@@ -1558,7 +1563,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("20");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("21");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("You coach; you do not interrogate");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("askedQuestions");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -1589,6 +1594,15 @@ describe("consultation evidence and questions", () => {
     );
     expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
       "Never write \"The seeker was responsible\" or \"He also reports\"",
+    );
+    expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
+      'coaching and followUpQuestion address the seeker as "you"',
+    );
+    expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
+      "even when they name the closest related work",
+    );
+    expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
+      'A one-line claim such as "I have used forecasting" is incomplete',
     );
     expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
       "combine the existing supporting evidence with the new detail into one statement",
@@ -1629,6 +1643,8 @@ describe("consultation evidence and questions", () => {
     );
     expect(service).toContain("prepareExistingConsultationSession");
     expect(service).toContain("reextractExistingWhyThisCompanyMotivation");
+    expect(service).toContain("answerDeniesGapExperience");
+    expect(service).toContain("coachingSpeaksAsSeekerI");
   });
 
   it("merges posting requirements and scorecard items that mean the same thing", () => {
@@ -3523,10 +3539,99 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       },
     });
     expect(followUp?.body).toMatch(/concrete result or metric/i);
+    expect(followUp?.body).toMatch(/\byou\b/i);
+    expect(followUp?.body).not.toMatch(/\bdid I\b/);
+    expect(
+      await prisma.consultationStatement.count({
+        where: { turnId: incomplete!.id },
+      }),
+    ).toBe(0);
     expect(
       CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS,
     ).toContain("personalProfileItems is the person's full Personal Profile");
     expect(consultationConversationCopy.shareSomeDetails).toBe("Share some details");
+  });
+
+  it("confirms a denied gap with related experience and does not write a resume bullet", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Confirmed gap ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaign.id);
+    const session = await prisma.consultationSession.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        productId,
+        status: "IN_PROGRESS",
+        promptVersion: CONSULTATION_PROMPT_VERSION,
+      },
+    });
+    await prisma.consultationAssessment.create({
+      data: {
+        organizationId,
+        sessionId: session.id,
+        targetKey: "required:domain",
+        kind: "REQUIRED",
+        text: "Sell digital brand protection, domain, or digital-risk services",
+        strength: "PARTIAL",
+        supportingFactIds: [],
+      },
+    });
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey: "required:domain",
+      answer:
+        "I have never sold digital brand protection, domain services, or digital-risk products. My closest work is patient-identity software at Contoso Health.",
+    });
+    const confirmed = await prisma.consultationTurn.findFirst({
+      where: {
+        sessionId: session.id,
+        speaker: "SEEKER",
+        targetKey: "required:domain",
+      },
+      include: { statements: true },
+    });
+    expect(confirmed?.analysisJson).toMatchObject({ gapDecision: "no_evidence" });
+    expect(
+      confirmed?.statements.find((row) => row.kind === "INTERVIEW_ANSWER")?.content,
+    ).toMatch(/I have not done that work yet/i);
+    expect(
+      confirmed?.statements.find((row) => row.kind === "INTERVIEW_ANSWER")?.content,
+    ).toMatch(/closest related experience/i);
+    expect(
+      confirmed?.statements.some((row) => row.kind === "RESUME_BULLET"),
+    ).toBe(false);
+    expect(
+      await prisma.consultationTurn.count({
+        where: {
+          sessionId: session.id,
+          speaker: "CONSULTANT",
+          followUp: true,
+        },
+      }),
+    ).toBe(0);
   });
 
   it("stores replies and edits exactly as typed", async () => {

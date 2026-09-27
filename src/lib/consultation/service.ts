@@ -394,19 +394,56 @@ function extractThirdPersonViolations(text: string): string[] {
     /\b(the seeker|the candidate|he|she)\b/i.test(text)
   ) {
     return [
-      "Write facts, story fields, coaching, follow-ups, and explanations in first person or neutral. Never use the seeker, the candidate, he, she, or the person's name.",
+      "Write facts, story fields, and explanations in first person or neutral. Never use the seeker, the candidate, he, she, or the person's name.",
     ];
   }
   return [];
 }
 
+function answerDeniesGapExperience(answer: string): boolean {
+  return /\b(i have never|i've never|i do not have|i don't have|i have not|i haven't|i never (sold|did|ran|built|led|owned|developed|installed)|no experience with)\b/i.test(
+    answer,
+  );
+}
+
+function coachingSpeaksAsSeekerI(text: string): boolean {
+  return /\b((did|do|have|has|am|was|were|would|can|could) I|that I |which \w+ I |what I )\b/i.test(
+    text,
+  );
+}
+
+function isThinIncompleteAnswer(
+  answer: string,
+  data: Pick<ConsultationExtractResult, "missingStarElements">,
+): boolean {
+  return (
+    data.missingStarElements.length >= 3 &&
+    answer.split(/\s+/).filter(Boolean).length <= 8
+  );
+}
+
 function extractAnswerQualityIssues(input: {
   data: ConsultationExtractResult;
+  answer?: string;
   gapText?: string;
   profileItems?: ReturnType<typeof profileEvidenceItems>;
 }): string[] {
   if (!isConsultationExtractAnswer(input.data)) return [];
   const issues: string[] = [];
+  const answer = input.answer?.trim() ?? "";
+  if (answerDeniesGapExperience(answer) && input.data.gapDecision !== "no_evidence") {
+    issues.push(
+      "When the person says they have never done the required work, gapDecision is no_evidence even if they name related experience. coaching and followUpQuestion must be null.",
+    );
+  }
+  if (
+    input.data.gapDecision === "evidence" &&
+    isThinIncompleteAnswer(answer, input.data)
+  ) {
+    issues.push(
+      "A short or vague answer is incomplete, not evidence. Set gapDecision to incomplete and write coaching plus one followUpQuestion addressed to you.",
+    );
+  }
   if (input.data.gapDecision === "incomplete") {
     if (!input.data.coaching?.trim()) {
       issues.push(
@@ -426,18 +463,32 @@ function extractAnswerQualityIssues(input: {
       );
     }
   }
-  const texts = [
+  if (input.data.gapDecision === "no_evidence") {
+    if (input.data.coaching?.trim() || input.data.followUpQuestion?.trim()) {
+      issues.push(
+        "When gapDecision is no_evidence, coaching and followUpQuestion must be null.",
+      );
+    }
+  }
+  const workTexts = [
     ...input.data.facts.map((fact) => fact.text),
     input.data.story?.situation ?? "",
     input.data.story?.task ?? "",
     input.data.story?.action ?? "",
     input.data.story?.result ?? "",
-    input.data.coaching ?? "",
-    input.data.followUpQuestion ?? "",
     ...input.data.demonstratedTargets.map((item) => item.explanation),
   ];
-  for (const text of texts) {
+  for (const text of workTexts) {
     issues.push(...extractThirdPersonViolations(text));
+  }
+  for (const text of [input.data.coaching ?? "", input.data.followUpQuestion ?? ""]) {
+    if (!text.trim()) continue;
+    issues.push(...extractThirdPersonViolations(text));
+    if (coachingSpeaksAsSeekerI(text)) {
+      issues.push(
+        "coaching and followUpQuestion must address the seeker as you, not as I.",
+      );
+    }
   }
   if (
     input.gapText &&
@@ -488,6 +539,7 @@ async function extractAnswerWithQuality(input: {
     lastOk = extracted;
     const issues = extractAnswerQualityIssues({
       data: extracted.data,
+      answer: input.answer,
       gapText: input.target?.text,
       profileItems: input.profileItems,
     });
@@ -1745,12 +1797,19 @@ async function processAnswerGeneration(input: {
     verified.partialStory ??
     extracted.data.story ??
     null;
-  const gapDecision = extracted.data.gapDecision;
-  const followUpQuestion = verified.followUpQuestion;
-  const incomplete =
-    gapDecision === "incomplete" ||
-    (verified.missingStarElements.length > 0 && gapDecision !== "no_evidence");
-  const coaching = extracted.data.coaching?.trim() || null;
+  const gapDecision = answerDeniesGapExperience(input.answerContext)
+    ? "no_evidence"
+    : extracted.data.gapDecision === "incomplete" ||
+        isThinIncompleteAnswer(input.answerContext, extracted.data)
+      ? "incomplete"
+      : extracted.data.gapDecision;
+  const followUpQuestion =
+    gapDecision === "no_evidence" ? null : verified.followUpQuestion;
+  const incomplete = gapDecision === "incomplete";
+  const coaching =
+    gapDecision === "no_evidence"
+      ? null
+      : extracted.data.coaching?.trim() || null;
   const analysisJson = {
     status: "READY",
     ...(input.replyToTurnId ? { replyToTurnId: input.replyToTurnId } : {}),
@@ -1762,14 +1821,36 @@ async function processAnswerGeneration(input: {
     gapDecision,
     companyMotivation: companyMotivationFromExtract(extracted.data.companyMotivation),
   };
-  if (incomplete && input.allowFollowUp && followUpQuestion) {
+  if (incomplete) {
+    if (
+      (input.allowFollowUp ?? true) &&
+      (!coaching || !followUpQuestion?.trim())
+    ) {
+      await failGeneration(
+        input.sessionId,
+        consultationConversationCopy.generationFailed,
+      );
+      return { ok: false };
+    }
     await prisma.$transaction([
       prisma.consultationProposal.deleteMany({
         where: { turnId: input.turnId, status: "PENDING" },
       }),
       prisma.consultationTurn.update({
         where: { id: input.turnId },
-        data: { analysisJson },
+        data: {
+          analysisJson: {
+            ...analysisJson,
+            gapDecision: "incomplete",
+          },
+        },
+      }),
+      prisma.consultationStatement.deleteMany({
+        where: {
+          sessionId: input.sessionId,
+          turnId: { in: [input.turnId, input.resultTurnId ?? input.turnId] },
+          kind: { in: ["INTERVIEW_ANSWER", "RESUME_BULLET"] },
+        },
       }),
       prisma.consultationSession.update({
         where: { id: input.sessionId },
@@ -1778,7 +1859,7 @@ async function processAnswerGeneration(input: {
     ]);
     return {
       ok: true,
-      followUpQuestion,
+      followUpQuestion: (input.allowFollowUp ?? true) ? followUpQuestion : null,
       coaching,
       missingStarElements: verified.missingStarElements,
       wroteResult: false,

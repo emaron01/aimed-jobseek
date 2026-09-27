@@ -36,6 +36,7 @@ import { normalizeCompanyName } from "@/lib/research";
 import { ingestNamedJobContacts } from "@/lib/application/contacts";
 import { queueHiringTeamIdentify } from "@/lib/hiring-team/build";
 import { TenantError } from "@/lib/tenant/errors";
+import { runWithTenantContext } from "@/lib/tenant/request-context";
 import { resolveOrCreateCompany } from "@/lib/tenant/company-research-service";
 
 const BUCKETS = ["GOOD", "NEEDS_REVIEW", "POOR_FIT", "EXCLUDED"] as const;
@@ -156,10 +157,12 @@ export async function queueMissingNamedEmployerResearch(): Promise<number> {
         status: { in: ["PENDING", "IN_PROGRESS"] },
       },
     });
-    await ensureNamedEmployerResearch({
-      organizationId: row.organizationId,
-      campaignId: row.campaignId,
-    });
+    await runWithTenantContext({ organizationId: row.organizationId }, () =>
+      ensureNamedEmployerResearch({
+        organizationId: row.organizationId,
+        campaignId: row.campaignId,
+      }),
+    );
     const after = await prisma.researchRun.count({
       where: {
         organizationId: row.organizationId,
