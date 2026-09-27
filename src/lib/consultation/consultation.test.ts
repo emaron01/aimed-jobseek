@@ -1634,9 +1634,18 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("24");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("25");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("You coach; you do not interrogate");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("askedQuestions");
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
+      "Career walk-through: cover only roles held within the last 10 years from today",
+    );
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
+      "Never ask about a role that ended more than 10 years ago, in the walk-through or in any gap question",
+    );
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
+      "If the seeker volunteers experience from an older role, you may still use it as evidence",
+    );
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
       "Never mention research status",
     );

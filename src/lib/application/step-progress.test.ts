@@ -282,6 +282,32 @@ describe("application step colors", () => {
         [],
       ),
     ).toBe("in_progress");
+    expect(
+      resolveApplicationStepState(
+        "consultation",
+        {
+          ...complete,
+          consultationComplete: false,
+          consultationUnanswered: false,
+        },
+        [],
+      ),
+    ).toBe("in_progress");
+  });
+
+  it("marks Harper green when every question is answered even if open gaps remain", () => {
+    expect(
+      resolveApplicationStepState(
+        "consultation",
+        {
+          ...idle,
+          consultationStarted: true,
+          consultationComplete: true,
+          consultationUnanswered: false,
+        },
+        [],
+      ),
+    ).toBe("done");
   });
 
   it("shows yellow and a specific NEW pill on a green step Harper changed until it is opened", () => {

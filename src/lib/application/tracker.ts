@@ -11,10 +11,7 @@ import {
 } from "@/lib/application/step-progress";
 import { isHiringTeamPersonaBuilt, hiringTeamInvolvement } from "@/lib/hiring-team/build";
 import { JOB_REQUIREMENT_PROCESSING_VERSION } from "@/lib/job-requirement/types";
-import type { EvidenceKind } from "@/lib/consultation/assess";
 import { askedQuestionsFromTurns } from "@/lib/consultation/questions";
-import { buildConsultationQaView } from "@/lib/consultation/qa-view";
-import { buildStandingGaps } from "@/lib/consultation/standing";
 import { prisma } from "@/lib/prisma-client";
 import {
   applicationStepFromPathname,
@@ -284,24 +281,9 @@ export async function markApplicationStepViewed(input: {
   });
 }
 
-function isEvidenceKind(value: string): value is EvidenceKind {
-  return (
-    value === "REQUIRED" ||
-    value === "OUTCOME" ||
-    value === "COMPETENCY" ||
-    value === "MISSION" ||
-    value === "PREFERRED"
-  );
-}
-
-function consultationFacts(
+/** Harper step facts: green when every asked question is answered; open gaps alone do not block. */
+export function consultationFacts(
   session: {
-    assessments: Array<{
-      targetKey: string;
-      kind: string;
-      text: string;
-      strength: "STRONG" | "PARTIAL" | "NONE";
-    }>;
     turns: Array<{
       id: string;
       speaker: "CONSULTANT" | "SEEKER";
@@ -313,15 +295,6 @@ function consultationFacts(
       intent: string | null;
       analysisJson: unknown;
     }>;
-    statements: Array<{
-      id: string;
-      turnId: string;
-      kind: "INTERVIEW_ANSWER" | "RESUME_BULLET";
-      status: string;
-      content: string;
-      strengtheningNote: string | null;
-      createdAt: Date;
-    }>;
   } | null,
 ): { started: boolean; complete: boolean; unanswered: boolean } {
   if (!session) {
@@ -332,29 +305,9 @@ function consultationFacts(
       Boolean(question.targetKey) || question.text.includes("?"),
   );
   const unanswered = asked.some((question) => !question.answered);
-  const qa = buildConsultationQaView({
-    turns: session.turns,
-    statements: session.statements,
-  });
-  const gaps = buildStandingGaps({
-    assessments: session.assessments.flatMap((row) => {
-      if (!isEvidenceKind(row.kind)) return [];
-      return [
-        {
-          key: row.targetKey,
-          kind: row.kind,
-          text: row.text,
-          strength: row.strength,
-          supportingFactIds: [],
-        },
-      ];
-    }),
-    questions: qa.questions,
-  });
-  const openGaps = gaps.some((gap) => gap.status === "open");
   return {
     started: true,
     unanswered,
-    complete: !unanswered && !openGaps,
+    complete: !unanswered,
   };
 }
