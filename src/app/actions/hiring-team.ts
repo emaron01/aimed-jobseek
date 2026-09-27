@@ -403,6 +403,16 @@ export async function addHiringTeamPersonAction(
         pastedText,
         personaId,
       });
+    } else {
+      const { enqueueInterviewerCheatSheetSection } = await import(
+        "@/lib/application-summary/enqueue"
+      );
+      await enqueueInterviewerCheatSheetSection({
+        organizationId,
+        campaignId,
+        userId: user.id,
+        contactId: added.contactId,
+      });
     }
     const { offerPersonPrep } = await import("@/lib/interview/person-prep");
     await offerPersonPrep({
@@ -410,15 +420,6 @@ export async function addHiringTeamPersonAction(
       campaignId,
       contactId: added.contactId,
       personaId,
-    });
-    const { enqueueInterviewerCheatSheetSection } = await import(
-      "@/lib/application-summary/enqueue"
-    );
-    await enqueueInterviewerCheatSheetSection({
-      organizationId,
-      campaignId,
-      userId: user.id,
-      contactId: added.contactId,
     });
     revalidatePath(`/campaigns/${campaignId}`);
     return {

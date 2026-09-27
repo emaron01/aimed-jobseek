@@ -34,8 +34,10 @@ import { prisma } from "@/lib/prisma-client";
 import { isHiringTeamPersonaBuilt } from "@/lib/hiring-team/build";
 import {
   buildCheatSheetPeople,
+  cheatSheetPersonSectionInputHash,
   cheatSheetSectionKind,
   interviewerContactIdsFrom,
+  personSectionNeedsGeneration,
 } from "@/lib/application-summary/people";
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { enqueueCheatSheetPersonSection } from "@/lib/application-summary/enqueue";
@@ -113,6 +115,37 @@ export function sourcesForPersonSection(input: {
     }
     return !PER_PERSON_SOURCE_CATEGORIES.has(source.category);
   });
+}
+
+export async function personSectionInputsUnchanged(input: {
+  organizationId: string;
+  campaignId: string;
+  sectionKey: string;
+}): Promise<boolean> {
+  const data = await loadSummaryData(input.organizationId, input.campaignId);
+  const existing = parsedGuidance(data.campaign.applicationSummary?.guidanceJson);
+  const person = data.people.find((item) => item.sectionKey === input.sectionKey);
+  if (!person || !existing) return false;
+  const existingPerson = existing.people.find(
+    (item) => item.sectionKey === input.sectionKey,
+  );
+  if (!existingPerson || personSectionNeedsGeneration(existingPerson)) {
+    return false;
+  }
+  const personSources = sourcesForPersonSection({
+    sources: data.sources,
+    contactId: person.contactId,
+    roleId: person.roleId,
+    noteIds: (person.contactId
+      ? data.notesByContactId.get(person.contactId) ?? []
+      : []
+    ).map((note) => note.id),
+  });
+  const inputHash = cheatSheetPersonSectionInputHash({
+    person: personPayload(person),
+    sources: personSources,
+  });
+  return existingPerson.inputHash === inputHash;
 }
 
 const SHELL_EXCLUDED_SOURCE_CATEGORIES = new Set([
@@ -658,6 +691,20 @@ export async function generateApplicationSummary(input: {
         : []
       ).map((note) => note.id),
     });
+    const inputHash = cheatSheetPersonSectionInputHash({
+      person: personPayload(person),
+      sources: personSources,
+    });
+    const existingPerson = existing?.people.find(
+      (item) => item.sectionKey === person.sectionKey,
+    );
+    if (
+      existingPerson &&
+      existingPerson.inputHash === inputHash &&
+      !personSectionNeedsGeneration(existingPerson)
+    ) {
+      return;
+    }
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const generated = await generateCheatSheetPersonSectionGuidance({
         sources: personSources,
@@ -671,17 +718,20 @@ export async function generateApplicationSummary(input: {
         }
         continue;
       }
-      const section = assignCoachItemIds({
-        overview: existing?.overview,
-        stories: existing?.stories ?? [],
-        people: [
-          {
-            ...generated.data,
-            bestMaterial: [],
-            storyIds: [],
-          },
-        ],
-      }).people[0]!;
+      const section = {
+        ...assignCoachItemIds({
+          overview: existing?.overview,
+          stories: existing?.stories ?? [],
+          people: [
+            {
+              ...generated.data,
+              bestMaterial: [],
+              storyIds: [],
+            },
+          ],
+        }).people[0]!,
+        inputHash,
+      };
       const next: ApplicationSummaryGuidance = {
         overview: existing?.overview,
         stories: existing?.stories ?? [],

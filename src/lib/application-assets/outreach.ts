@@ -1176,4 +1176,11 @@ export async function markApplicationApplied(input: {
   if (updated.count === 0) {
     throw new TenantError(`${vocab.campaign.Singular} was not found.`);
   }
+  const { queueApplicationNextStepIfNeeded } = await import(
+    "@/lib/application/next-step"
+  );
+  await queueApplicationNextStepIfNeeded({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+  });
 }

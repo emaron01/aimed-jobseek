@@ -9,6 +9,29 @@ export async function enqueueCheatSheetPersonSection(input: {
   userId?: string | null;
 }): Promise<void> {
   const sectionKey = `contact:${input.contactId}`;
+  try {
+    const { personSectionInputsUnchanged } = await import(
+      "@/lib/application-summary/service"
+    );
+    if (
+      await personSectionInputsUnchanged({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        sectionKey,
+      })
+    ) {
+      return;
+    }
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "cheat_sheet_input_hash_check_failed",
+        campaignId: input.campaignId,
+        contactId: input.contactId,
+        message: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+  }
   await enqueueApplicationJob({
     organizationId: input.organizationId,
     campaignId: input.campaignId,

@@ -112,7 +112,11 @@ describe("Interview cheat sheet coaching guide", () => {
     expect(stages).not.toContain("if (people.some((person) => person.sectionKey === sectionKey))");
     expect(hiringTeam).toContain("enqueueInterviewerCheatSheetSection");
     expect(notes).toContain("enqueueCheatSheetPersonSection");
-    expect(contactProfile).toContain("enqueueInterviewerCheatSheetSection");
+    // Paste queues CONTACT_PROFILE only; cheat sheet runs once after profile finishes.
+    expect(contactProfile).not.toContain("enqueueInterviewerCheatSheetSection");
+    expect(process).toMatch(
+      /case "CONTACT_PROFILE":[\s\S]*enqueueInterviewerCheatSheetSection/,
+    );
     expect(process).toContain("enqueueCheatSheetSectionsForPersona");
     expect(notes).not.toContain("validateGroundedStatement");
     expect(notes).not.toContain("qualityFeedback = errors");

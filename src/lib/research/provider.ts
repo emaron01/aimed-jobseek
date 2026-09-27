@@ -11,6 +11,7 @@ import {
   AiValidationError,
 } from "@/lib/ai/errors";
 import { RESEARCH_PROMPT_VERSION } from "@/lib/research/config";
+import { aiCallTracking } from "@/lib/usage/ai-call";
 import {
   evidenceFromNormalizedSources,
   mergeEvidenceBundles,
@@ -182,6 +183,14 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
             ai.generateStructured({
               ...structuredOutputRequest("companyResearch"),
               webSearchEnabled: opts.webSearchEnabled,
+              ...aiCallTracking({
+                organizationId: input.organizationId,
+                userId: input.userId ?? null,
+                campaignId: input.campaignId ?? null,
+                companyId: input.companyId,
+                category: "RESEARCH",
+                operation: "RESEARCH_SYNTHESIS",
+              }),
               messages: buildCompanyResearchMessages({
                 company: input,
                 evidence,

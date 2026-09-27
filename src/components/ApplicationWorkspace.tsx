@@ -79,15 +79,13 @@ import {
   coverLetterThinEvidenceCopy,
 } from "@/lib/application-assets/service";
 import { presentationPlanSchema } from "@/lib/application-assets/plan-contract";
-import { ensureApplicationNextStep } from "@/lib/application/next-step";
+import { readApplicationNextStep } from "@/lib/application/next-step";
 import { applicationResearchCopy, applicationSummaryConfig, applicationWorkspaceCopy, consultationConfig, consultationConversationCopy, employerIdentityCopy, hiringTeamConfig, hiringTeamDetailsTitle, outreachConfig, polishCopy, vocab } from "@/lib/product-config";
 import {
   parseIdentityVerification,
 } from "@/lib/job-requirement/identity-verification";
 import {
-  ensureHiringTeamAfterResearch,
   ensureIdentityVerification,
-  ensureNamedEmployerResearch,
 } from "@/lib/application/service";
 import { AppActionLink } from "@/components/ui";
 import { parseStringArray } from "@/lib/research";
@@ -313,8 +311,6 @@ export async function ApplicationWorkspace({
   focus?: ApplicationWorkspaceFocus;
 }) {
   await ensureIdentityVerification({ organizationId, campaignId });
-  await ensureNamedEmployerResearch({ organizationId, campaignId });
-  await ensureHiringTeamAfterResearch({ organizationId, campaignId });
   await mergeExistingHiringTeamRoles({ organizationId, campaignId });
   const requirement = await prisma.jobRequirement.findFirst({
     where: { campaignId, organizationId },
@@ -450,7 +446,7 @@ export async function ApplicationWorkspace({
   });
   await supersedeObsoleteWorkspaceFailures({ organizationId, campaignId });
   const [nextStep, live] = await Promise.all([
-    ensureApplicationNextStep({
+    readApplicationNextStep({
       organizationId,
       campaignId,
     }),

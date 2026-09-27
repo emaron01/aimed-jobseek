@@ -271,6 +271,15 @@ export async function processApplicationJob(
       },
     );
     await completeApplicationJob(job.id);
+    if (job.type !== "NEXT_STEP") {
+      const { queueApplicationNextStepIfNeeded } = await import(
+        "@/lib/application/next-step"
+      );
+      await queueApplicationNextStepIfNeeded({
+        organizationId: job.organizationId,
+        campaignId: job.campaignId,
+      });
+    }
     return {
       ok: true,
       jobId: job.id,

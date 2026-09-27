@@ -102,7 +102,7 @@ export async function updateInterviewStageAction(
     const id = campaignId(formData);
     const stageId = String(formData.get("stageId") ?? "").trim();
     if (!stageId) throw new TenantError("Interview stage is required.");
-    await updateInterviewStage({
+    const updated = await updateInterviewStage({
       organizationId,
       campaignId: id,
       userId: user.id,
@@ -124,16 +124,14 @@ export async function updateInterviewStageAction(
         ? String(formData.get("outcome") ?? "").trim() || null
         : undefined,
     });
-    const notesChanged =
-      formData.has("notesBefore") || formData.has("notesAfter");
-    if (formData.has("notesAfter")) {
+    if (formData.has("notesAfter") && updated.notesTextChanged) {
       await refreshConsultationOffer({
         organizationId,
         campaignId: id,
         stageId,
       });
     }
-    if (notesChanged) {
+    if (updated.notesTextChanged) {
       await regenerateApplicationJobRequirement({
         organizationId,
         campaignId: id,

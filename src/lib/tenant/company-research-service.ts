@@ -875,6 +875,7 @@ export async function researchCompany(
     force?: boolean;
     evidenceTargets?: string[];
     seekerSuppliedNotes?: string;
+    campaignId?: string | null;
   },
 ): Promise<ResearchCompanyResult> {
   // Tenant ownership check BEFORE any external API spend.
@@ -1088,6 +1089,8 @@ export async function researchCompany(
       depthPolicy: researchPolicy,
       evidenceTargets: options?.evidenceTargets,
       seekerSuppliedNotes: options?.seekerSuppliedNotes,
+      campaignId: options?.campaignId ?? null,
+      userId: user?.id ?? null,
     })) as CompanyResearchResult | AutomatedCompanyResearchResult;
 
     const provenance =
@@ -1125,6 +1128,9 @@ export async function researchCompany(
       freshnessDays: researchPolicy.researchFreshnessDays,
     });
 
+    // Per-stage UsageEvents are recorded via aiCallTracking on each
+    // generateStructured call (tokens, cached tokens, cost, campaignId).
+    // Keep a run-level marker without tokens so costs are not double-counted.
     await recordUsageEvent({
       organizationId,
       userId: user?.id ?? null,
@@ -1133,9 +1139,7 @@ export async function researchCompany(
       provider: provenance?.aiProvider ?? null,
       model: provenance?.aiModel ?? null,
       companyId: company.id,
-      inputTokens: usage?.inputTokens ?? null,
-      outputTokens: usage?.outputTokens ?? null,
-      webSearchCalls: usage?.webSearchCallCount ?? null,
+      campaignId: options?.campaignId ?? null,
       status: status === "PARTIAL" ? "PARTIAL" : "SUCCESS",
       durationMs: usage?.researchDurationMs ?? null,
       metadata: {
@@ -1146,6 +1150,7 @@ export async function researchCompany(
         ),
         searchStagesUsed: telemetry?.searchStagesUsed ?? null,
         researchStoppedReason: telemetry?.researchStoppedReason ?? null,
+        tokensRecordedPerStage: true,
       },
     });
 
@@ -1169,6 +1174,7 @@ export async function researchCompany(
       category: "RESEARCH",
       operation: "RESEARCH_SYNTHESIS",
       companyId: company.id,
+      campaignId: options?.campaignId ?? null,
       status: "FAILED",
       metadata: {
         forceRefresh: Boolean(options?.force),

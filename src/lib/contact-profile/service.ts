@@ -37,7 +37,7 @@ export async function saveLinkedInPaste(input: {
   contactId: string;
   pastedText: string;
   personaId?: string | null;
-}): Promise<{ suggestedPersonaId: string | null }> {
+}): Promise<{ suggestedPersonaId: string | null; queued: boolean }> {
   const text = input.pastedText.trim();
   if (!text) throw new TenantError(outreachConfig.labels.pasteProfileRequired);
   const membership = await prisma.campaignContact.findFirst({
@@ -56,6 +56,14 @@ export async function saveLinkedInPaste(input: {
   const override = input.personaId?.trim() || null;
   const nextPersonaId =
     override ?? (await matchedPersonaId(input, membership.contact.title));
+  if (
+    membership.linkedInProfileText?.trim() === text &&
+    membership.chosenPersonaId === nextPersonaId &&
+    membership.individualProfileStatus === "COMPLETED" &&
+    membership.individualProfileJson != null
+  ) {
+    return { suggestedPersonaId: nextPersonaId, queued: false };
+  }
   await prisma.campaignContact.update({
     where: { id: membership.id },
     data: {
@@ -73,22 +81,8 @@ export async function saveLinkedInPaste(input: {
     type: "CONTACT_PROFILE",
     targetId: membership.contactId,
   });
-  const { enqueueInterviewerCheatSheetSection } = await import(
-    "@/lib/application-summary/enqueue"
-  );
-  const campaign = await prisma.campaign.findFirst({
-    where: { id: input.campaignId, organizationId: input.organizationId },
-    select: { ownerUserId: true },
-  });
-  if (campaign) {
-    await enqueueInterviewerCheatSheetSection({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      userId: campaign.ownerUserId,
-      contactId: input.contactId,
-    });
-  }
-  return { suggestedPersonaId: nextPersonaId };
+  // Cheat sheet section is queued once after CONTACT_PROFILE finishes.
+  return { suggestedPersonaId: nextPersonaId, queued: true };
 }
 
 /**

@@ -1,4 +1,8 @@
-import type { CheatSheetSectionKind } from "@/lib/application-summary/contract";
+import { createHash } from "node:crypto";
+import {
+  APPLICATION_SUMMARY_PROMPT_VERSION,
+  type CheatSheetSectionKind,
+} from "@/lib/application-summary/contract";
 
 export type CheatSheetPersonInput = {
   sectionKey: string;
@@ -10,6 +14,32 @@ export type CheatSheetPersonInput = {
   involvement: "DIRECT" | "INDIRECT";
   suggestionKey: string | null;
 };
+
+export function cheatSheetPersonSectionInputHash(input: {
+  person: {
+    sectionKey: string;
+    roleId: string;
+    contactId: string | null;
+    heading: string;
+    roleName: string;
+    titles: string[];
+    sectionKind: string;
+  };
+  sources: Array<{ id: string; text: string }>;
+}): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        promptVersion: APPLICATION_SUMMARY_PROMPT_VERSION,
+        person: input.person,
+        sources: input.sources.map((source) => ({
+          id: source.id,
+          text: source.text,
+        })),
+      }),
+    )
+    .digest("hex");
+}
 
 export function cheatSheetSectionKind(
   person: Pick<

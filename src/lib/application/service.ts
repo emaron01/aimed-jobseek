@@ -80,6 +80,23 @@ async function queueApplicationResearch(input: {
   companyId: string;
   forceRefresh?: boolean;
 }): Promise<void> {
+  if (!input.forceRefresh) {
+    const latest = await prisma.companyResearch.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        companyId: input.companyId,
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (latest) {
+      const { getResearchPolicy } = await import("@/lib/usage/policy-service");
+      const { isResearchFresh } = await import("@/lib/research/freshness");
+      const policy = await getResearchPolicy(input.organizationId);
+      if (isResearchFresh(latest, new Date(), policy.researchFreshnessDays)) {
+        return;
+      }
+    }
+  }
   await enqueueApplicationResearch({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
@@ -131,8 +148,13 @@ export async function ensureNamedEmployerResearch(input: {
     });
   }
   const latest = requirement.company?.research[0];
-  if (latest && (latest.status === "COMPLETED" || latest.status === "PARTIAL")) {
-    return;
+  if (latest) {
+    const { getResearchPolicy } = await import("@/lib/usage/policy-service");
+    const { isResearchFresh } = await import("@/lib/research/freshness");
+    const policy = await getResearchPolicy(input.organizationId);
+    if (isResearchFresh(latest, new Date(), policy.researchFreshnessDays)) {
+      return;
+    }
   }
   await queueApplicationResearch({
     organizationId: input.organizationId,

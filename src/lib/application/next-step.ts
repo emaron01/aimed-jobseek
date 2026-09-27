@@ -134,7 +134,10 @@ export async function writeApplicationNextStep(input: {
   }
 }
 
-export async function ensureApplicationNextStep(input: {
+/**
+ * Read the last saved next-step card. Never enqueues AI — page views use this.
+ */
+export async function readApplicationNextStep(input: {
   organizationId: string;
   campaignId: string;
 }): Promise<{
@@ -177,22 +180,81 @@ export async function ensureApplicationNextStep(input: {
   if (campaign.nextStepStateKey === `failed:${state.key}`) {
     return { text: null, stateKey: state.key, failed: true };
   }
+  return {
+    text: campaign.nextStepText,
+    stateKey: state.key,
+    failed: false,
+  };
+}
+
+/**
+ * Enqueue next-step generation when application state changed (seeker action or
+ * finished job). Page views must call readApplicationNextStep instead.
+ */
+export async function queueApplicationNextStepIfNeeded(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: {
+      nextStepText: true,
+      nextStepStateKey: true,
+      appliedAt: true,
+      consultationSession: {
+        select: { status: true, generationStatus: true },
+      },
+      presentationPlans: { select: { type: true, status: true } },
+      applicationAssets: { select: { type: true } },
+    },
+  });
+  if (!campaign) return;
+  const resumePlan = campaign.presentationPlans.find((plan) => plan.type === "RESUME");
+  const coverPlan = campaign.presentationPlans.find(
+    (plan) => plan.type === "COVER_LETTER",
+  );
+  const state = applicationNextStepState({
+    consultationStatus: campaign.consultationSession?.status ?? null,
+    consultationGenerationStatus:
+      campaign.consultationSession?.generationStatus ?? null,
+    resumePlanStatus: resumePlan?.status ?? null,
+    coverPlanStatus: coverPlan?.status ?? null,
+    hasResume: campaign.applicationAssets.some((asset) => asset.type === "RESUME"),
+    hasCoverLetter: campaign.applicationAssets.some(
+      (asset) => asset.type === "COVER_LETTER",
+    ),
+    appliedAt: campaign.appliedAt?.toISOString() ?? null,
+  });
+  if (campaign.nextStepStateKey === `failed:${state.key}`) return;
   if (
     campaign.nextStepStateKey === state.key &&
     campaign.nextStepText?.trim()
   ) {
-    return { text: campaign.nextStepText, stateKey: state.key, failed: false };
+    return;
   }
   await enqueueApplicationJob({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
     type: "NEXT_STEP",
   });
-  return {
-    text: campaign.nextStepText,
-    stateKey: state.key,
-    failed: false,
-  };
+}
+
+export async function retryApplicationNextStep(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  await prisma.campaign.update({
+    where: { id: input.campaignId },
+    data: {
+      nextStepText: null,
+      nextStepStateKey: null,
+    },
+  });
+  await enqueueApplicationJob({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    type: "NEXT_STEP",
+  });
 }
 
 export function rejectedNextStep(text: string, stateKey: string): boolean {
@@ -282,22 +344,4 @@ async function writeStoredApplicationNextStep(input: {
     },
   });
   return { text: written.text, stateKey: state.key, failed: false };
-}
-
-export async function retryApplicationNextStep(input: {
-  organizationId: string;
-  campaignId: string;
-}): Promise<void> {
-  await prisma.campaign.update({
-    where: { id: input.campaignId },
-    data: {
-      nextStepText: null,
-      nextStepStateKey: null,
-    },
-  });
-  await enqueueApplicationJob({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    type: "NEXT_STEP",
-  });
 }

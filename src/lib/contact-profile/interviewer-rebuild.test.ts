@@ -150,7 +150,7 @@ describe.skipIf(!hasTestDatabase())("rebuild existing interviewer profiles", () 
     await prisma.$disconnect();
   });
 
-  it("queues profile build and cheat sheet section when pasted text is saved", async () => {
+  it("queues profile build when pasted text is saved; cheat sheet waits for profile finish", async () => {
     const { saveLinkedInPaste } = await import("@/lib/contact-profile/service");
     await saveLinkedInPaste({
       organizationId,
@@ -177,7 +177,7 @@ describe.skipIf(!hasTestDatabase())("rebuild existing interviewer profiles", () 
         status: { in: ["PENDING", "IN_PROGRESS"] },
       },
     });
-    expect(summaryJobs.length).toBeGreaterThanOrEqual(1);
+    expect(summaryJobs).toHaveLength(0);
     const membership = await prisma.campaignContact.findFirst({
       where: { campaignId, contactId },
     });

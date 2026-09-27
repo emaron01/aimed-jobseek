@@ -276,6 +276,15 @@ describe.skipIf(!hasTestDatabase())("edit an existing application contact", () =
     expect(afterBuild.individualProfileJson).toMatchObject({
       likelyToValue: [{ text: "Likely to value interviewer training." }],
     });
+    const { enqueueInterviewerCheatSheetSection } = await import(
+      "@/lib/application-summary/enqueue"
+    );
+    await enqueueInterviewerCheatSheetSection({
+      organizationId,
+      campaignId,
+      userId,
+      contactId,
+    });
     const cheatSheetJobs = await prisma.applicationJob.findMany({
       where: { campaignId, type: "APPLICATION_SUMMARY", targetId: `contact:${contactId}` },
     });

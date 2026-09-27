@@ -647,6 +647,7 @@ async function processApplicationResearchRun(run: ResearchRun): Promise<void> {
           force: run.forceRefresh,
           seekerSuppliedNotes:
             campaign.companyResearchNotes?.trim() || undefined,
+          campaignId: run.campaignId,
         });
 
         const { finishApplicationAfterResearch } = await import(

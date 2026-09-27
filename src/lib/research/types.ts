@@ -94,6 +94,10 @@ export type CompanyResearchInput = {
   evidenceTargets?: string[];
   /** Application-scoped seeker notes used as an additional research source. */
   seekerSuppliedNotes?: string;
+  /** Application id for UsageEvent attribution on the costs page. */
+  campaignId?: string | null;
+  /** Seeker who initiated research, when known. */
+  userId?: string | null;
 };
 
 export interface CompanyResearchProvider {

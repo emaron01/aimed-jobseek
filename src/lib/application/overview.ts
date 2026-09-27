@@ -1,4 +1,4 @@
-import { ensureApplicationNextStep } from "@/lib/application/next-step";
+import { readApplicationNextStep } from "@/lib/application/next-step";
 import {
   displayedFitBucket,
   formatFitBucketLabel,
@@ -93,7 +93,7 @@ export async function getApplicationOverview(input: {
   if (!campaign) return null;
   const tracker = await getApplicationTracker(input);
   if (!tracker) return null;
-  const nextStep = await ensureApplicationNextStep(input);
+  const nextStep = await readApplicationNextStep(input);
   const status = applicationStatusDisplay({
     appliedAt: campaign.appliedAt?.toISOString() ?? null,
     applicationProgress: campaign.applicationProgress,

@@ -162,17 +162,27 @@ export async function updateInterviewStage(input: {
   if (input.outcome && !isInterviewStageOutcome(input.outcome)) {
     throw new TenantError("Interview outcome is invalid.");
   }
+  const notesBeforeNext =
+    input.notesBefore !== undefined
+      ? input.notesBefore?.trim() || null
+      : undefined;
+  const notesAfterNext =
+    input.notesAfter !== undefined
+      ? input.notesAfter?.trim() || null
+      : undefined;
+  const notesBeforeChanged =
+    notesBeforeNext !== undefined && notesBeforeNext !== (stage.notesBefore ?? null);
+  const notesAfterChanged =
+    notesAfterNext !== undefined && notesAfterNext !== (stage.notesAfter ?? null);
+  const notesTextChanged = notesBeforeChanged || notesAfterChanged;
+
   const updated = await prisma.interviewStage.update({
     where: { id: stage.id },
     data: {
       ...(input.scheduledAt ? { scheduledAt: input.scheduledAt } : {}),
       ...(input.format ? { format: input.format as InterviewFormat } : {}),
-      ...(input.notesBefore !== undefined
-        ? { notesBefore: input.notesBefore?.trim() || null }
-        : {}),
-      ...(input.notesAfter !== undefined
-        ? { notesAfter: input.notesAfter?.trim() || null }
-        : {}),
+      ...(notesBeforeNext !== undefined ? { notesBefore: notesBeforeNext } : {}),
+      ...(notesAfterNext !== undefined ? { notesAfter: notesAfterNext } : {}),
       ...(input.expectedDecisionAt !== undefined
         ? { expectedDecisionAt: input.expectedDecisionAt }
         : {}),
@@ -186,7 +196,7 @@ export async function updateInterviewStage(input: {
     },
     include: { interviewers: { select: { contactId: true } } },
   });
-  if (input.notesBefore !== undefined || input.notesAfter !== undefined) {
+  if (notesTextChanged) {
     const { enqueueInterviewerCheatSheetSection } = await import(
       "@/lib/application-summary/enqueue"
     );
@@ -199,7 +209,7 @@ export async function updateInterviewStage(input: {
       });
     }
   }
-  return updated;
+  return { stage: updated, notesTextChanged };
 }
 
 export async function setApplicationProgress(input: {
@@ -374,12 +384,14 @@ export async function addInterviewStageInterviewer(input: {
     contactId: added.contactId,
     personaId: input.personaId,
   });
-  await enqueueInterviewerCheatSheetSection({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    userId: input.userId,
-    contactId: added.contactId,
-  });
+  if (!pasted) {
+    await enqueueInterviewerCheatSheetSection({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      userId: input.userId,
+      contactId: added.contactId,
+    });
+  }
   return added;
 }
 

@@ -151,6 +151,8 @@ export const cheatSheetPersonSectionSchema = z.preprocess(
     executive: z.unknown().nullable().optional(),
     crossFunctional: z.unknown().nullable().optional(),
     linkedinAddendum: z.unknown().nullable().optional(),
+    /** Hash of inputs used to generate this section; skip regen when unchanged. */
+    inputHash: z.string().optional(),
   }),
 );
 
