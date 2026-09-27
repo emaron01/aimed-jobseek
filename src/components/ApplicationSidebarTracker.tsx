@@ -134,22 +134,15 @@ export function ApplicationTrackerList({
               <span className="block font-medium">
                 {step.number}. {step.title}
               </span>
+              {step.hasNew && step.newLabel ? (
+                <span
+                  className="mt-0.5 inline-block max-w-full break-words rounded-full bg-warning-tint px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-warning"
+                  data-testid={`tracker-new-${step.key}`}
+                >
+                  {step.newLabel}
+                </span>
+              ) : null}
             </span>
-            {step.hasNew && step.newLabel ? (
-              <span
-                className="rounded-full bg-warning-tint px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-warning"
-                data-testid={`tracker-new-${step.key}`}
-              >
-                {step.newLabel}
-              </span>
-            ) : step.statusNote ? (
-              <span
-                className="rounded-full bg-warning-tint px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-warning"
-                data-testid={`tracker-note-${step.key}`}
-              >
-                {step.statusNote}
-              </span>
-            ) : null}
           </Link>
         </li>
       ))}

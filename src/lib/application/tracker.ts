@@ -9,7 +9,7 @@ import {
   type ApplicationStepFactInput,
   type ApplicationStepView,
 } from "@/lib/application/step-progress";
-import { isHiringTeamPersonaBuilt } from "@/lib/hiring-team/build";
+import { isHiringTeamPersonaBuilt, hiringTeamInvolvement } from "@/lib/hiring-team/build";
 import { JOB_REQUIREMENT_PROCESSING_VERSION } from "@/lib/job-requirement/types";
 import type { EvidenceKind } from "@/lib/consultation/assess";
 import { askedQuestionsFromTurns } from "@/lib/consultation/questions";
@@ -155,9 +155,13 @@ export async function loadApplicationStepFacts(input: {
     jobReprocessing:
       campaign.jobRequirement?.parserPromptVersion ===
       JOB_REQUIREMENT_PROCESSING_VERSION,
-    hiringTeamRoleCount: campaign.hiringTeamRoles.length,
-    hiringTeamBuiltCount: campaign.hiringTeamRoles.filter((role) =>
-      isHiringTeamPersonaBuilt(role),
+    hiringTeamRoleCount: campaign.hiringTeamRoles.filter(
+      (role) => hiringTeamInvolvement(role.profileJson) === "DIRECT",
+    ).length,
+    hiringTeamBuiltCount: campaign.hiringTeamRoles.filter(
+      (role) =>
+        hiringTeamInvolvement(role.profileJson) === "DIRECT" &&
+        isHiringTeamPersonaBuilt(role),
     ).length,
     hasResumeVersion: resumes.length > 0,
     latestResumeApproved: latestResume?.status === "APPROVED",

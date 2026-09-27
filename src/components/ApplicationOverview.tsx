@@ -53,10 +53,10 @@ export function ApplicationOverview({
             <li key={step.key}>
               <Link
                 href={step.href}
-                className="flex items-center justify-between gap-2 rounded-md border border-edge px-3 py-2 text-sm text-ink hover:bg-canvas"
+                className="flex flex-col gap-1 rounded-md border border-edge px-3 py-2 text-sm text-ink hover:bg-canvas"
                 data-testid={`overview-step-${step.key}`}
               >
-                <span>
+                <span className="font-medium">
                   {step.number}. {step.title}
                 </span>
                 <StatusPill
@@ -72,8 +72,6 @@ export function ApplicationOverview({
                 >
                   {step.hasNew && step.newLabel
                     ? step.newLabel
-                    : step.statusNote
-                      ? step.statusNote
                     : step.state === "done"
                       ? applicationStepCopy.done
                       : step.state === "active"

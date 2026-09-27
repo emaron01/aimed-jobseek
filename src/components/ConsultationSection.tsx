@@ -45,6 +45,7 @@ import {
   resolveEvidenceLabels,
   stripInternalIdsFromDisplayText,
 } from "@/lib/consultation/evidence-display";
+import { formatExperienceLine } from "@/lib/consultation/experience-display";
 import { prisma } from "@/lib/prisma";
 import {
   consultationConfig,
@@ -109,46 +110,6 @@ function experienceCalculation(value: unknown): {
     missingDateRoleIds: parseStringArray(row.missingDateRoleIds),
     periods,
   };
-}
-
-function formatExperienceRange(calculation: {
-  requiredYears: number;
-  totalMonths: number;
-  totalYears: number;
-  maximumMonths: number;
-  maximumYears: number;
-  missingDateRoleIds: string[];
-  periods: Array<{ roleId: string; startDate: string; endDate: string }>;
-  roleLabels: Array<{ id: string; label: string }>;
-}): string {
-  const years =
-    calculation.maximumYears === calculation.totalYears
-      ? `${calculation.totalYears} years`
-      : `${calculation.totalYears}–${calculation.maximumYears} years`;
-  const months =
-    calculation.maximumMonths === calculation.totalMonths
-      ? `${calculation.totalMonths} months`
-      : `${calculation.totalMonths}–${calculation.maximumMonths} months`;
-  const labelById = new Map(calculation.roleLabels.map((entry) => [entry.id, entry]));
-  const across =
-    calculation.periods.length > 0
-      ? ` across ${calculation.periods
-          .map((period) => {
-            const label = labelById.get(period.roleId)?.label;
-            return label
-              ? `${label}: ${period.startDate}–${period.endDate}`
-              : `${period.startDate}–${period.endDate}`;
-          })
-          .join("; ")}`
-      : "";
-  const missing =
-    calculation.missingDateRoleIds.length > 0
-      ? ` Dates needed for ${calculation.missingDateRoleIds
-          .map((id) => labelById.get(id)?.label)
-          .filter(Boolean)
-          .join(", ")}.`
-      : "";
-  return `Verified experience: ${years} (${months}) toward ${calculation.requiredYears} years${across}.${missing}`;
 }
 
 export async function ConsultationSection({
@@ -245,15 +206,27 @@ export async function ConsultationSection({
         profileItems,
       );
       const calculation = experienceCalculation(item.experienceCalculationJson);
-      const roleLabels = calculation
-        ? resolveEvidenceLabels(
-            [
-              ...calculation.periods.map((period) => period.roleId),
-              ...calculation.missingDateRoleIds,
-            ],
-            profileItems,
-          )
+      const roleIds = calculation
+        ? [
+            ...calculation.periods.map((period) => period.roleId),
+            ...calculation.missingDateRoleIds,
+          ]
         : [];
+      const roles = roleIds.flatMap((id) => {
+        const profileItem = profileItems.find((entry) => entry.id === id);
+        if (!profileItem) return [];
+        return [
+          {
+            id: profileItem.id,
+            employer: profileItem.employer ?? null,
+            title: profileItem.title ?? null,
+            label:
+              profileItem.title?.trim() ||
+              profileItem.employer?.trim() ||
+              profileItem.text.trim(),
+          },
+        ];
+      });
       const qaItem = qaItemForTargetKey(qaView.questions, item.targetKey);
       const worked = Boolean(
         qaItem &&
@@ -275,7 +248,12 @@ export async function ConsultationSection({
           detail: fact.detail,
         })),
         experience: calculation
-          ? formatExperienceRange({ ...calculation, roleLabels })
+          ? formatExperienceLine({
+              totalYears: calculation.totalYears,
+              periods: calculation.periods,
+              missingDateRoleIds: calculation.missingDateRoleIds,
+              roles,
+            })
           : null,
       };
     }) ?? [];

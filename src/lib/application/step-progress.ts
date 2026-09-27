@@ -175,9 +175,7 @@ export function stepNewLabel(
         ? applicationStepCopy.newHarperQuestion
         : applicationStepCopy.newHarperResults;
     case "hiring-team":
-      return hiringTeamAllBuilt(facts)
-        ? applicationStepCopy.newHiringPersonas
-        : applicationStepCopy.reviewRemainingPersonas;
+      return applicationStepCopy.newHiringPersonas;
     case "assets":
       if (facts.latestAssetKind === "cover" && facts.latestCoverLetterVersion) {
         return `${applicationStepCopy.newCoverLetterVersion} ${facts.latestCoverLetterVersion}`;
@@ -258,7 +256,7 @@ export function stepIsStarted(
     case "summary":
       return facts.cheatSheetReady;
     case "applied":
-      return Boolean(facts.appliedAt);
+      return Boolean(facts.appliedAt) || anyOtherStepDone(facts);
     default: {
       const exhaustive: never = key;
       throw new Error(`Unknown application step: ${String(exhaustive)}`);
@@ -323,6 +321,13 @@ export function resolveApplicationStepState(
   jobs: WorkspaceJobStatusView[],
   unread = false,
 ): ApplicationStepState {
+  if (key === "applied") {
+    if (stepIsDone(key, facts)) {
+      return unread ? "in_progress" : "done";
+    }
+    if (anyOtherStepDone(facts)) return "in_progress";
+    return "not_started";
+  }
   if (key === "outreach") {
     if (stepIsInProgress(key, facts, jobs)) return "in_progress";
     if (stepNeedsAttention(key, facts, jobs) && stepIsStarted(key, facts)) {
@@ -399,12 +404,7 @@ export function buildApplicationStepViews(input: {
       state,
       resultKey,
       newLabel: hasNew ? stepNewLabel(step.key, input.facts) : null,
-      statusNote:
-        step.key === "hiring-team" &&
-        state === "in_progress" &&
-        !hiringTeamAllBuilt(input.facts)
-          ? applicationStepCopy.reviewRemainingPersonas
-          : null,
+      statusNote: null,
       hasNew,
       hasActiveJob,
       isCurrent:
@@ -424,6 +424,13 @@ export function initialWorkspaceSeen(
     if (result) keys[key] = result;
   }
   return { version: WORKSPACE_SEEN_VERSION, keys };
+}
+
+/** True when any step other than Application Status is green (done). */
+export function anyOtherStepDone(facts: ApplicationStepFactInput): boolean {
+  return APPLICATION_STEP_KEYS.some(
+    (key) => key !== "applied" && stepIsDone(key, facts),
+  );
 }
 
 function jobsForStep(

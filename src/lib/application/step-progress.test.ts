@@ -92,6 +92,13 @@ describe("application step colors", () => {
   it("uses red, yellow, and green under the owner rules", () => {
     expect(resolveApplicationStepState("applied", idle, [])).toBe("not_started");
     expect(
+      resolveApplicationStepState(
+        "applied",
+        { ...idle, researchDone: true },
+        [],
+      ),
+    ).toBe("in_progress");
+    expect(
       resolveApplicationStepState("applied", { ...idle, appliedAt: "2026-09-25" }, []),
     ).toBe("done");
 
@@ -185,6 +192,13 @@ describe("application step colors", () => {
         [],
       ),
     ).toBe("done");
+    expect(
+      resolveApplicationStepState(
+        "hiring-team",
+        { ...idle, hiringTeamRoleCount: 0, hiringTeamBuiltCount: 0 },
+        [],
+      ),
+    ).toBe("not_started");
 
     expect(resolveApplicationStepState("outreach", idle, [])).toBe("not_started");
     expect(
@@ -407,7 +421,7 @@ describe("application step colors", () => {
     expect(applicationStepCopy.newMarker).toBe("New");
   });
 
-  it("labels remaining personas and never marks Send Outreach done", () => {
+  it("never shows Review remaining personas; NEW is the only sidebar prompt", () => {
     const remaining = buildApplicationStepViews({
       campaignId: "camp_1",
       currentStep: null,
@@ -417,8 +431,20 @@ describe("application step colors", () => {
     });
     const hiring = remaining.find((step) => step.key === "hiring-team");
     expect(hiring?.state).toBe("in_progress");
-    expect(hiring?.statusNote).toBe("Review remaining personas");
-    expect(hiring?.newLabel).toBe("Review remaining personas");
+    expect(hiring?.statusNote).toBeNull();
+    expect(hiring?.newLabel).toBe(applicationStepCopy.newHiringPersonas);
+    expect(hiring?.newLabel).not.toBe("Review remaining personas");
+    expect(applicationStepCopy).not.toHaveProperty("reviewRemainingPersonas");
+    const sidebar = readFileSync(
+      "src/components/ApplicationSidebarTracker.tsx",
+      "utf8",
+    );
+    expect(sidebar).not.toContain("statusNote");
+    expect(sidebar).toContain("min-w-0 flex-1");
+    expect(sidebar).toContain("mt-0.5 inline-block max-w-full break-words");
+    expect(sidebar).not.toMatch(
+      /flex-1[\s\S]*tracker-new[\s\S]*<\/span>\s*\{step\.hasNew/,
+    );
     const outreach = buildApplicationStepViews({
       campaignId: "camp_1",
       currentStep: null,
