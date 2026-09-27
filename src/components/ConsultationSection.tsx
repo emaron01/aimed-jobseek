@@ -20,6 +20,8 @@ import {
 } from "@/lib/consultation/qa-view";
 import {
   buildStandingGaps,
+  qaItemForTargetKey,
+  standingGapStatus,
   standingWorkIsComplete,
 } from "@/lib/consultation/standing";
 import { listPersonPreps } from "@/lib/interview/person-prep";
@@ -41,6 +43,7 @@ import {
 } from "@/lib/consultation/assess";
 import {
   resolveEvidenceLabels,
+  stripInternalIdsFromDisplayText,
 } from "@/lib/consultation/evidence-display";
 import { prisma } from "@/lib/prisma";
 import {
@@ -198,6 +201,30 @@ export async function ConsultationSection({
       job.type === "CONSULTATION" &&
       (job.status === "PENDING" || job.status === "IN_PROGRESS"),
   );
+  const threadTurns =
+    session?.turns.map((turn) => ({
+      id: turn.id,
+      speaker: turn.speaker,
+      body: turn.body,
+      targetKey: turn.targetKey,
+      followUp: turn.followUp,
+      sequence: turn.sequence,
+      analysisJson: turn.analysisJson,
+      intent: turn.intent,
+    })) ?? [];
+  const threadStatements = statements.map((statement) => ({
+    id: statement.id,
+    turnId: statement.turnId,
+    kind: statement.kind,
+    status: statement.status,
+    content: statement.content,
+    strengtheningNote: statement.strengtheningNote,
+    createdAt: statement.createdAt,
+  }));
+  const qaView = buildConsultationQaView({
+    turns: threadTurns,
+    statements: threadStatements,
+  });
   const standingRequirements =
     session?.assessments
       .filter((item) =>
@@ -227,11 +254,21 @@ export async function ConsultationSection({
             profileItems,
           )
         : [];
+      const qaItem = qaItemForTargetKey(qaView.questions, item.targetKey);
+      const worked = Boolean(
+        qaItem &&
+          (qaItem.seekerAnswers.length > 0 ||
+            qaItem.talkingPoint ||
+            qaItem.resumeBullet),
+      );
       return {
         id: item.id,
         text: item.text,
-        strength: item.strength,
-        explanation: item.explanation,
+        strength: item.strength as "STRONG" | "PARTIAL" | "NONE",
+        explanation: item.explanation
+          ? stripInternalIdsFromDisplayText(item.explanation)
+          : item.explanation,
+        gapStatus: worked ? standingGapStatus(qaItem).status : null,
         facts: facts.map((fact) => ({
           id: fact.id,
           label: fact.label,
@@ -244,30 +281,6 @@ export async function ConsultationSection({
     }) ?? [];
   const hasStanding =
     briefing?.success || standingRequirements.length > 0;
-  const threadTurns =
-    session?.turns.map((turn) => ({
-      id: turn.id,
-      speaker: turn.speaker,
-      body: turn.body,
-      targetKey: turn.targetKey,
-      followUp: turn.followUp,
-      sequence: turn.sequence,
-      analysisJson: turn.analysisJson,
-      intent: turn.intent,
-    })) ?? [];
-  const threadStatements = statements.map((statement) => ({
-    id: statement.id,
-    turnId: statement.turnId,
-    kind: statement.kind,
-    status: statement.status,
-    content: statement.content,
-    strengtheningNote: statement.strengtheningNote,
-    createdAt: statement.createdAt,
-  }));
-  const qaView = buildConsultationQaView({
-    turns: threadTurns,
-    statements: threadStatements,
-  });
   const unanswered = consultationHasUnansweredQuestions(qaView);
   const standingGaps = session
     ? buildStandingGaps({
@@ -405,7 +418,7 @@ export async function ConsultationSection({
         ) : null}
         {standingComplete && closingNote ? (
           <p className="text-sm text-ink" data-testid="consultation-complete">
-            {closingNote}
+            {stripInternalIdsFromDisplayText(closingNote)}
           </p>
         ) : null}
         {canEdit && !session && !consultationBusy ? (
@@ -484,7 +497,7 @@ export async function ConsultationSection({
                   <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
                     {briefing.data.strongestAngles.map((item) => (
                       <li key={item}>
-                        {item}
+                        {stripInternalIdsFromDisplayText(item)}
                       </li>
                     ))}
                   </ul>
@@ -499,21 +512,68 @@ export async function ConsultationSection({
                     threadStatus !== "PAUSED" &&
                     !consultationBusy
                   }
-                  overall={briefing?.success ? briefing.data.overall : null}
+                  overall={
+                    briefing?.success
+                      ? stripInternalIdsFromDisplayText(briefing.data.overall)
+                      : null
+                  }
                   gaps={standingGaps.map((gap) => {
-                    const item = qaView.questions.find(
-                      (question) => question.targetKey === gap.targetKey,
+                    const item = qaItemForTargetKey(
+                      qaView.questions,
+                      gap.targetKey,
+                    );
+                    const harperNote = latestCoachingNoteForTarget(
+                      threadTurns,
+                      gap.targetKey,
                     );
                     return {
                       ...gap,
-                      harperNote: latestCoachingNoteForTarget(
-                        threadTurns,
-                        gap.targetKey,
-                      ),
+                      talkTrack: gap.talkTrack
+                        ? stripInternalIdsFromDisplayText(gap.talkTrack)
+                        : null,
+                      harperNote: harperNote
+                        ? stripInternalIdsFromDisplayText(harperNote)
+                        : null,
                       questionTurnId: item?.questionTurnId ?? null,
-                      resumeBullet: item?.resumeBullet ?? null,
-                      talkingPoint: item?.talkingPoint ?? null,
-                      statements: item?.statements ?? [],
+                      resumeBullet: item?.resumeBullet
+                        ? {
+                            ...item.resumeBullet,
+                            content: stripInternalIdsFromDisplayText(
+                              item.resumeBullet.content,
+                            ),
+                            strengtheningNote: item.resumeBullet
+                              .strengtheningNote
+                              ? stripInternalIdsFromDisplayText(
+                                  item.resumeBullet.strengtheningNote,
+                                )
+                              : null,
+                          }
+                        : null,
+                      talkingPoint: item?.talkingPoint
+                        ? {
+                            ...item.talkingPoint,
+                            content: stripInternalIdsFromDisplayText(
+                              item.talkingPoint.content,
+                            ),
+                            strengtheningNote: item.talkingPoint
+                              .strengtheningNote
+                              ? stripInternalIdsFromDisplayText(
+                                  item.talkingPoint.strengtheningNote,
+                                )
+                              : null,
+                          }
+                        : null,
+                      statements: (item?.statements ?? []).map((statement) => ({
+                        ...statement,
+                        content: stripInternalIdsFromDisplayText(
+                          statement.content,
+                        ),
+                        strengtheningNote: statement.strengtheningNote
+                          ? stripInternalIdsFromDisplayText(
+                              statement.strengtheningNote,
+                            )
+                          : null,
+                      })),
                     };
                   })}
                   careerRecap={null}

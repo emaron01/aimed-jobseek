@@ -4,6 +4,7 @@ import { planQuestionRound } from "@/lib/consultation/questions";
 import {
   briefingNeedsStandingRegen,
   buildStandingGaps,
+  qaItemForTargetKey,
   shouldEnqueueConsultationStandingRegen,
   standingGapStatus,
   standingWorkIsComplete,
@@ -251,6 +252,60 @@ describe("Harper core loop standing", () => {
         },
       }).status,
     ).toBe("confirmed");
+
+    const dualQuestions = [
+      {
+        questionTurnId: "q-decided",
+        targetKey: "outcome:cs-expansion",
+        question: "Have you partnered with customer success on expansion?",
+        followUp: null,
+        seekerAnswers: [
+          {
+            id: "s-decided",
+            body: "I have never partnered with customer success on expansion.",
+            analysisJson: { gapDecision: "no_evidence" as const },
+          },
+        ],
+        statements: [],
+        resumeBullet: null,
+        talkingPoint: {
+          id: "i-decided",
+          turnId: "s-decided",
+          kind: "INTERVIEW_ANSWER" as const,
+          status: "DRAFT",
+          content:
+            "I have not partnered with customer success on expansion in existing accounts.",
+          strengtheningNote: null,
+        },
+      },
+      {
+        questionTurnId: "q-later",
+        targetKey: "outcome:cs-expansion",
+        question: "Walk me through one expansion with the post-sale team.",
+        followUp: null,
+        seekerAnswers: [],
+        statements: [],
+        resumeBullet: null,
+        talkingPoint: null,
+      },
+    ];
+    const decided = qaItemForTargetKey(dualQuestions, "outcome:cs-expansion");
+    expect(decided?.questionTurnId).toBe("q-decided");
+    expect(standingGapStatus(decided).status).toBe("confirmed");
+    const dualGaps = buildStandingGaps({
+      assessments: [
+        {
+          key: "outcome:cs-expansion",
+          kind: "OUTCOME",
+          text: "Partner with customer success on expansion in existing accounts",
+          strength: "NONE",
+        },
+      ],
+      questions: dualQuestions,
+    });
+    expect(dualGaps[0]?.status).toBe("confirmed");
+    expect(dualGaps[0]?.status).toBe(standingGapStatus(decided).status);
+
     const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
     const standingUi = readFileSync(
       "src/components/ConsultationStanding.tsx",
@@ -258,7 +313,9 @@ describe("Harper core loop standing", () => {
     );
     expect(section).not.toContain("storyPlan.map");
     expect(section).toContain("buildStandingGaps");
+    expect(section).toContain("qaItemForTargetKey");
     expect(standingUi).toContain("consultationGapStatusCopy");
+    expect(standingUi).toContain("gapStatus");
     expect(standingUi).toContain("shareSomeDetails");
     expect(standingUi).toContain("replyConsultationAction");
     expect(standingUi).not.toContain("consultationConversationCopy.whereYouStand");

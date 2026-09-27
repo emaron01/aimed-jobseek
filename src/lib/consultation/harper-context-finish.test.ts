@@ -85,7 +85,21 @@ describe("Harper context finish", () => {
   });
 
   it("bumps the consultation prompt version", () => {
-    expect(CONSULTATION_PROMPT_VERSION).toBe("23");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("24");
+  });
+
+  it("passes whyThisCompany into polish messages", () => {
+    const polish = JSON.parse(
+      buildConsultationPolishMessages({
+        answer: "Mission fit.",
+        story: { situation: null, task: null, action: null, result: null },
+        declinedFollowUp: false,
+        whyThisCompany: true,
+        strengtheningNeeds: [],
+        profileItems,
+      })[2]!.content,
+    );
+    expect(polish.whyThisCompany).toBe(true);
   });
 
   it("labels the paste field Paste Interviewer Profile everywhere it appears", () => {

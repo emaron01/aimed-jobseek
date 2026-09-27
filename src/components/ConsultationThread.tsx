@@ -16,6 +16,7 @@ import {
   consultationStatementLabels,
   polishCopy,
 } from "@/lib/product-config";
+import { stripInternalIdsFromDisplayText } from "@/lib/consultation/evidence-display";
 import {
   buildConsultationQaView,
   consultationQuestionAcceptsReply,
@@ -101,10 +102,12 @@ function ResultBody({ statement }: { statement: QaStatement }) {
       </p>
       {statement.strengtheningNote ? (
         <p className={`text-sm text-ink ${wrapClass}`} data-testid="consultation-strengthening-note">
-          {statement.strengtheningNote}
+          {stripInternalIdsFromDisplayText(statement.strengtheningNote)}
         </p>
       ) : null}
-      <p className={`text-sm text-ink ${wrapClass}`}>{statement.content}</p>
+      <p className={`text-sm text-ink ${wrapClass}`}>
+        {stripInternalIdsFromDisplayText(statement.content)}
+      </p>
     </div>
   );
 }
@@ -227,12 +230,12 @@ function QuestionCard({
         className="text-sm font-medium text-ink"
         data-testid="consultation-question"
       >
-        {item.question}
+        {stripInternalIdsFromDisplayText(item.question)}
       </p>
       <div className="mt-3 space-y-3">
         {item.followUp ? (
           <p className={`text-sm text-ink ${wrapClass}`} data-testid="consultation-follow-up">
-            {item.followUp.text}
+            {stripInternalIdsFromDisplayText(item.followUp.text)}
           </p>
         ) : null}
         {hasResult ? (

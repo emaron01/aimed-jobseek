@@ -68,12 +68,15 @@ import {
   consultationQuestionAcceptsReply,
   isLegacyInaccuracyReply,
 } from "@/lib/consultation/qa-view";
-import { buildStandingGaps } from "@/lib/consultation/standing";
+import { buildStandingGaps, standingGapStatus } from "@/lib/consultation/standing";
 import {
   collapseIdenticalEvidence,
   looksLikeInternalId,
+  proseContainsInternalId,
   profileItemDisplayLabel,
   resolveEvidenceLabels,
+  stripInternalIdsFromDisplayText,
+  INTERNAL_ID_PROSE_QUALITY_FEEDBACK,
 } from "@/lib/consultation/evidence-display";
 import {
   appendConfirmedFact,
@@ -174,6 +177,7 @@ function installConsultationModelFixture() {
       kind?: "INTERVIEW_ANSWER" | "RESUME_BULLET";
       declinedFollowUp?: boolean;
       confirmedGap?: boolean;
+      whyThisCompany?: boolean;
       strengtheningNeeds?: string[];
       qualityFeedback?: string[];
       targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
@@ -287,12 +291,35 @@ function installConsultationModelFixture() {
     }
     if (request.schemaName === "consultation_polish") {
       const answerText = payload.answer ?? "";
+      if (payload.whyThisCompany) {
+        return {
+          data: {
+            interviewAnswer: `I want to work here because ${answerText}`,
+            resumeBullet: null,
+            strengtheningNote: null,
+          },
+        };
+      }
       if (payload.confirmedGap) {
         return {
           data: {
             interviewAnswer:
               "I have not done that work yet. The closest related experience I have is the reliability work I already own, and I would close the gap in this role by ramping on the missing piece in the first weeks.",
             resumeBullet: null,
+            strengtheningNote: null,
+          },
+        };
+      }
+      if (
+        payload.qualityFeedback?.some((item) =>
+          item.includes("belong only in structured citation fields"),
+        ) &&
+        /consult_|achievement_|role_/.test(answerText)
+      ) {
+        return {
+          data: {
+            interviewAnswer: "In my words, I owned the reliability rewrite without citing internal ids.",
+            resumeBullet: "Owned the reliability rewrite.",
             strengtheningNote: null,
           },
         };
@@ -353,6 +380,27 @@ function installConsultationModelFixture() {
       };
     }
     const answer = payload.answer ?? "";
+    if (payload.target?.key === "why-this-company") {
+      const motivation = fixtureCompanyMotivation({ ...payload, answer });
+      return {
+        data: {
+          replyType: "answer",
+          facts: [],
+          story: null,
+          demonstratedTargets: [],
+          missingStarElements: [],
+          revisedQuestion: null,
+          coaching: motivation
+            ? null
+            : "You told a work story. The missing piece is why you want this company.",
+          followUpQuestion: motivation
+            ? null
+            : "What draws you to this company specifically?",
+          gapDecision: motivation ? "evidence" : "incomplete",
+          companyMotivation: motivation,
+        },
+      };
+    }
     if (
       payload.qualityFeedback?.some((item) =>
         /address the seeker as you/i.test(item),
@@ -1586,7 +1634,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("23");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("24");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("You coach; you do not interrogate");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("askedQuestions");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -1655,7 +1703,16 @@ describe("consultation evidence and questions", () => {
     expect(service).toContain('intent: "COACHING"');
     expect(service).not.toContain("isThinIncompleteAnswer");
     expect(CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS).toContain(
-      "When the target is PARTIAL, combine the existing supporting Personal Profile evidence",
+      "When the target is PARTIAL and whyThisCompany is false, combine the existing supporting Personal Profile evidence",
+    );
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
+      "Never put an id (consult_…, achievement_…, role_…, skill_…, or similar)",
+    );
+    expect(CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS).toContain(
+      "When whyThisCompany is true",
+    );
+    expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
+      "When companyMotivation is set, gapDecision is evidence",
     );
     const extractFormat = buildOpenAiJsonSchemaFormat(
       "consultation_extract",
@@ -1737,6 +1794,24 @@ describe("consultation evidence and questions", () => {
   it("shows evidence in plain language and never treats internal ids as labels", () => {
     expect(looksLikeInternalId("direction_function_1")).toBe(true);
     expect(looksLikeInternalId("role_5")).toBe(true);
+    expect(
+      proseContainsInternalId(
+        "Supported by consult_turn_1_fact_0 at Northwind.",
+      ),
+    ).toBe(true);
+    expect(
+      proseContainsInternalId("Supported by reliability work at Northwind."),
+    ).toBe(false);
+    expect(
+      stripInternalIdsFromDisplayText(
+        "Supported by consult_turn_1_fact_0 at Northwind.",
+      ),
+    ).toBe("Supported by at Northwind.");
+    expect(
+      stripInternalIdsFromDisplayText(
+        "Owned the rewrite at Northwind (role_1, achievement_2).",
+      ),
+    ).toBe("Owned the rewrite at Northwind.");
     const items = profileEvidenceItems(fixtureAlexChenProfile());
     const role = items.find((item) => item.id === "role_1");
     expect(role).toBeTruthy();
@@ -3856,6 +3931,41 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { id: campaign.id },
     });
     expect(withMotivation?.whyThisCompany).toBe(WHY_THIS_COMPANY_MOTIVATION);
+    const whySession = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: {
+        statements: true,
+        turns: { orderBy: { sequence: "asc" } },
+      },
+    });
+    const whyStatements = whySession?.statements ?? [];
+    expect(
+      whyStatements.some((item) => item.kind === "INTERVIEW_ANSWER"),
+    ).toBe(true);
+    expect(
+      whyStatements.some((item) => item.kind === "RESUME_BULLET"),
+    ).toBe(false);
+    const interview = whyStatements.find(
+      (item) => item.kind === "INTERVIEW_ANSWER",
+    );
+    expect(interview?.content).toContain(WHY_THIS_COMPANY_MOTIVATION);
+    expect(interview?.content).toMatch(/I want to work here because/i);
+    const seekerTurn = [...(whySession?.turns ?? [])]
+      .reverse()
+      .find((turn) => turn.speaker === "SEEKER");
+    expect(
+      (seekerTurn?.analysisJson as { gapDecision?: string } | null)?.gapDecision,
+    ).toBe("evidence");
+    const whyView = buildConsultationQaView({
+      turns: whySession!.turns,
+      statements: whyStatements,
+    });
+    const whyItem = whyView.questions.find(
+      (item) => item.targetKey === WHY_THIS_COMPANY_TARGET_KEY,
+    );
+    expect(standingGapStatus(whyItem).status).toBe("closed");
+    expect(whyItem?.resumeBullet).toBeNull();
+    expect(whyItem?.talkingPoint?.content).toContain(WHY_THIS_COMPANY_MOTIVATION);
 
     const storyOnly = await prisma.campaign.create({
       data: {
@@ -3894,6 +4004,180 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     expect(unchanged?.whyThisCompany).toBe("Keep this until a motivation arrives.");
     const service = readFileSync("src/lib/consultation/service.ts", "utf8");
     expect(service).not.toMatch(/looksLikeCompanyMotivation|looksLikeWorkStory/);
+  });
+
+  it("updates assessment strength from evidence and no_evidence decisions", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Strength ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaign.id);
+    await startConsultation({ organizationId, campaignId: campaign.id });
+    const session = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaign.id },
+      include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
+    });
+    const openQuestion = session?.turns.find(
+      (turn) =>
+        turn.speaker === "CONSULTANT" &&
+        turn.targetKey &&
+        turn.targetKey !== WHY_THIS_COMPANY_TARGET_KEY &&
+        !turn.followUp,
+    );
+    expect(openQuestion?.targetKey).toBeTruthy();
+    const targetKey = openQuestion!.targetKey!;
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey,
+      answer:
+        "I sat with that manager on the weekly forecast, set an inspection cadence, and stayed with it until the team ran it without me. We cut failed jobs by 40%.",
+    });
+    const afterEvidence = await prisma.consultationAssessment.findFirst({
+      where: { sessionId: session!.id, targetKey },
+    });
+    expect(afterEvidence?.strength).toBe("STRONG");
+
+    const campaignNone = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `None ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
+      },
+    });
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaignNone.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaignNone.id);
+    await startConsultation({ organizationId, campaignId: campaignNone.id });
+    const noneSession = await prisma.consultationSession.findUnique({
+      where: { campaignId: campaignNone.id },
+      include: { turns: { orderBy: { sequence: "asc" } } },
+    });
+    const noneQuestion = noneSession?.turns.find(
+      (turn) =>
+        turn.speaker === "CONSULTANT" &&
+        turn.targetKey &&
+        turn.targetKey !== WHY_THIS_COMPANY_TARGET_KEY &&
+        !turn.followUp,
+    );
+    expect(noneQuestion?.targetKey).toBeTruthy();
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: campaignNone.id,
+      targetKey: noneQuestion!.targetKey!,
+      answer: "I have never done that work.",
+    });
+    const afterNone = await prisma.consultationAssessment.findFirst({
+      where: {
+        sessionId: noneSession!.id,
+        targetKey: noneQuestion!.targetKey!,
+      },
+    });
+    expect(afterNone?.strength).toBe("NONE");
+  });
+
+  it("regenerates polished answers when prose contains an internal id", async () => {
+    let polishCalls = 0;
+    generateStructured.mockImplementation(async (request: {
+      schemaName: string;
+      messages: Array<{ content: string }>;
+    }) => {
+      if (request.schemaName !== "consultation_polish") {
+        throw new Error(`unexpected schema ${request.schemaName}`);
+      }
+      polishCalls += 1;
+      const payload = request.messages.reduce((acc, message) => {
+        try {
+          return { ...acc, ...JSON.parse(message.content) };
+        } catch {
+          return acc;
+        }
+      }, {}) as { qualityFeedback?: string[] };
+      if (
+        payload.qualityFeedback?.some((item) =>
+          item.includes("belong only in structured citation fields"),
+        )
+      ) {
+        return {
+          data: {
+            interviewAnswer:
+              "In my words, I owned the reliability rewrite without citing internal ids.",
+            resumeBullet: "Owned the reliability rewrite.",
+            strengtheningNote: null,
+          },
+        };
+      }
+      return {
+        data: {
+          interviewAnswer:
+            "In my words, I owned consult_turn_1_fact_0 at Northwind.",
+          resumeBullet: "Owned the reliability rewrite.",
+          strengtheningNote: null,
+        },
+      };
+    });
+    const polished = await polishAnswerWithQuality({
+      answer: "I owned the reliability rewrite at Northwind.",
+      story: {
+        situation: null,
+        task: null,
+        action: null,
+        result: null,
+      },
+      sources: [
+        {
+          id: "answer:id",
+          text: "I owned the reliability rewrite at Northwind.",
+        },
+      ],
+      profileItems: [],
+      declinedFollowUp: false,
+      strengtheningNeeds: [],
+    });
+    expect(polished.ok).toBe(true);
+    expect(polishCalls).toBeGreaterThan(1);
+    if (polished.ok) {
+      expect(polished.data.interviewAnswer).not.toMatch(/consult_/);
+      expect(proseContainsInternalId(polished.data.interviewAnswer)).toBe(false);
+    }
+    expect(INTERNAL_ID_PROSE_QUALITY_FEEDBACK).toContain(
+      "structured citation fields",
+    );
+    installConsultationModelFixture();
   });
 
 

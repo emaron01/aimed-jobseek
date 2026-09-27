@@ -10,6 +10,7 @@ import {
   consultationGapStatusCopy,
   evidenceStrengthLabels,
 } from "@/lib/product-config";
+import { stripInternalIdsFromDisplayText } from "@/lib/consultation/evidence-display";
 import type { ConsultationGapStatus } from "@/lib/consultation/standing";
 import type { QaStatement } from "@/lib/consultation/qa-view";
 
@@ -20,6 +21,7 @@ export type StandingRequirement = {
   text: string;
   strength: "STRONG" | "PARTIAL" | "NONE";
   explanation: string | null;
+  gapStatus: ConsultationGapStatus | null;
   facts: Array<{ id: string; label: string; detail: string | null }>;
   experience: string | null;
 };
@@ -87,7 +89,11 @@ export function ConsultationStanding({
         className="space-y-2 rounded-md border border-edge bg-canvas p-4"
         data-testid="consultation-standing-summary"
       >
-        {overall ? <p className="text-sm text-ink">{overall}</p> : null}
+        {overall ? (
+          <p className="text-sm text-ink">
+            {stripInternalIdsFromDisplayText(overall)}
+          </p>
+        ) : null}
         <p className="text-sm text-ink">
           {evidenceStrengthLabels.STRONG} {counts.STRONG},{" "}
           {evidenceStrengthLabels.PARTIAL} {counts.PARTIAL},{" "}
@@ -104,19 +110,21 @@ export function ConsultationStanding({
                   </span>
                 </p>
                 {gap.talkTrack ? (
-                  <p className="mt-1 whitespace-pre-wrap">{gap.talkTrack}</p>
+                  <p className="mt-1 whitespace-pre-wrap">
+                    {stripInternalIdsFromDisplayText(gap.talkTrack)}
+                  </p>
                 ) : null}
                 {gap.harperNote ? (
                   <p
                     className="mt-1 whitespace-pre-wrap text-ink"
                     data-testid={`harper-coaching-note-${gap.targetKey}`}
                   >
-                    {gap.harperNote}
+                    {stripInternalIdsFromDisplayText(gap.harperNote)}
                   </p>
                 ) : null}
                 {gap.resumeBullet ? (
                   <p className="mt-1 whitespace-pre-wrap text-muted">
-                    {gap.resumeBullet.content}
+                    {stripInternalIdsFromDisplayText(gap.resumeBullet.content)}
                   </p>
                 ) : null}
                 {gap.statements.length > 0 && canEdit ? (
@@ -157,7 +165,7 @@ export function ConsultationStanding({
         ) : null}
         {careerRecap ? (
           <p className="text-sm text-ink" data-testid="consultation-career-recap">
-            {careerRecap}
+            {stripInternalIdsFromDisplayText(careerRecap)}
           </p>
         ) : null}
       </div>
@@ -182,11 +190,15 @@ export function ConsultationStanding({
               <div>
                 <span className="font-medium break-words">{item.text}</span>
                 <span className="ml-2 rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink">
-                  {evidenceStrengthLabels[item.strength]}
+                  {item.gapStatus
+                    ? consultationGapStatusCopy[item.gapStatus]
+                    : evidenceStrengthLabels[item.strength]}
                 </span>
               </div>
               {item.explanation ? (
-                <p className="break-words whitespace-pre-wrap">{item.explanation}</p>
+                <p className="break-words whitespace-pre-wrap">
+                  {stripInternalIdsFromDisplayText(item.explanation)}
+                </p>
               ) : null}
               {item.experience ? (
                 <p className="break-words text-xs text-subtle">{item.experience}</p>

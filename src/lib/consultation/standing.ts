@@ -70,22 +70,43 @@ export function standingGapStatus(item: ConsultationQaItem | undefined): {
   return { status: "open", talkTrack: null };
 }
 
+/**
+ * One QA item per target key for gap status. Prefer Harper's decided work
+ * (evidence / no_evidence, or a drafted result) over a later unanswered ask.
+ */
+export function qaItemForTargetKey(
+  questions: ConsultationQaItem[],
+  targetKey: string | null | undefined,
+): ConsultationQaItem | undefined {
+  if (!targetKey) return undefined;
+  const matches = questions.filter((item) => item.targetKey === targetKey);
+  if (matches.length <= 1) return matches[0];
+  const rank = (item: ConsultationQaItem): number => {
+    const decision = gapDecisionFromAnalysis(
+      item.seekerAnswers.at(-1)?.analysisJson,
+    );
+    if (decision === "evidence" || decision === "no_evidence") return 3;
+    if (item.talkingPoint || item.resumeBullet) return 2;
+    if (item.seekerAnswers.length > 0) return 1;
+    return 0;
+  };
+  return matches.reduce((best, item) =>
+    rank(item) >= rank(best) ? item : best,
+  );
+}
+
 export function buildStandingGaps(input: {
   assessments: Array<
     Pick<EvidenceAssessment, "key" | "kind" | "text" | "strength">
   >;
   questions: ConsultationQaItem[];
 }): StandingGap[] {
-  const byKey = new Map(
-    input.questions
-      .filter((item) => item.targetKey)
-      .map((item) => [item.targetKey as string, item]),
-  );
   return input.assessments
     .filter((assessment) => isStandingRequirement(assessment))
     .filter(
       (assessment) =>
-        assessment.strength !== "STRONG" || byKey.has(assessment.key),
+        assessment.strength !== "STRONG" ||
+        Boolean(qaItemForTargetKey(input.questions, assessment.key)),
     )
     .sort((left, right) => {
       const byKind = KIND_RANK[left.kind] - KIND_RANK[right.kind];
@@ -96,7 +117,7 @@ export function buildStandingGaps(input: {
       return left.key.localeCompare(right.key);
     })
     .map((assessment) => {
-      const item = byKey.get(assessment.key);
+      const item = qaItemForTargetKey(input.questions, assessment.key);
       const { status, talkTrack } = standingGapStatus(item);
       return {
         targetKey: assessment.key,

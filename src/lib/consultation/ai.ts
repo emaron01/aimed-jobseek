@@ -161,6 +161,7 @@ export async function polishAnswerWithModel(input: {
   };
   declinedFollowUp: boolean;
   confirmedGap?: boolean;
+  whyThisCompany?: boolean;
   strengtheningNeeds: string[];
   qualityFeedback?: string[];
   target?: { key: string; kind: string; text: string } | null;

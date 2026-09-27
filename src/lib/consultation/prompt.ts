@@ -153,6 +153,7 @@ export function buildConsultationPolishMessages(input: {
   };
   declinedFollowUp: boolean;
   confirmedGap?: boolean;
+  whyThisCompany?: boolean;
   strengtheningNeeds: string[];
   qualityFeedback?: string[];
   target?: { key: string; kind: string; text: string } | null;
@@ -191,6 +192,7 @@ export function buildConsultationPolishMessages(input: {
         story: input.story,
         declinedFollowUp: input.declinedFollowUp,
         confirmedGap: input.confirmedGap === true,
+        whyThisCompany: input.whyThisCompany === true,
         target: input.target ?? null,
         targetStrength: input.targetStrength ?? null,
         supportingEvidence: input.supportingEvidence ?? [],
