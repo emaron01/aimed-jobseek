@@ -34,7 +34,10 @@ import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 
-type PageProps = { params: Promise<{ id: string }> };
+type PageProps = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ person?: string }>;
+};
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
@@ -94,11 +97,15 @@ function SummarySection({
   );
 }
 
-export default async function ApplicationSummaryPage({ params }: PageProps) {
+export default async function ApplicationSummaryPage({
+  params,
+  searchParams,
+}: PageProps) {
   const organization = await getCurrentOrganization();
   const user = await requireCurrentUser();
   if (!organization) return <TenantMissing />;
   const { id } = await params;
+  const query = await searchParams;
   let view: Awaited<ReturnType<typeof getApplicationSummaryView>>;
   try {
     view = await getApplicationSummaryView({
@@ -143,7 +150,10 @@ export default async function ApplicationSummaryPage({ params }: PageProps) {
   }));
 
   return (
-    <CheatSheetFilterProvider options={filterOptions}>
+    <CheatSheetFilterProvider
+      options={filterOptions}
+      initialPersonKey={query.person ?? null}
+    >
     <main className="application-summary mx-auto max-w-5xl space-y-6">
       <style>{`
         @media print {

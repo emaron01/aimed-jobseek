@@ -5,6 +5,7 @@ import {
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { CheatSheetCoachItems } from "@/components/CheatSheetCoachItems";
 import { statedListItems } from "@/lib/application-summary/display";
+import { cheatSheetLikelyQuestionsElementId } from "@/lib/application-summary/filter";
 import type { CheatSheetNote } from "@/lib/application-summary/notes";
 import type { CheatSheetPersonSection } from "@/lib/application-summary/contract";
 import {
@@ -135,7 +136,7 @@ export function CheatSheetPersonBody({
         </h3>
         <TextList items={section.keyStatements.map((item) => item.text)} />
       </div>
-      <div>
+      <div id={cheatSheetLikelyQuestionsElementId(sectionKey)}>
         <h3 className="font-medium text-ink">
           {applicationSummaryConfig.sections.likelyQuestions}
         </h3>

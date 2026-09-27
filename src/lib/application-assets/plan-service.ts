@@ -177,6 +177,30 @@ export async function acceptedPresentationPlan(input: {
   return parsePlan(plan.planJson);
 }
 
+export async function ensureAcceptedPresentationPlan(input: {
+  organizationId: string;
+  campaignId: string;
+  type: ApplicationPresentationPlanType;
+}): Promise<
+  { ok: true; plan: PresentationPlan } | { ok: false; message: string }
+> {
+  const existing = await loadPresentationPlan(input);
+  if (!existing) {
+    const written = await writePresentationPlan({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      type: input.type,
+    });
+    if (!written.ok) return written;
+    await acceptPresentationPlan(input);
+    return { ok: true, plan: written.plan };
+  }
+  if (existing.status !== "ACCEPTED") {
+    await acceptPresentationPlan(input);
+  }
+  return { ok: true, plan: parsePlan(existing.planJson) };
+}
+
 export function condensedRoleIdsFromPlan(plan: PresentationPlan | null): string[] {
   return plan?.type === "RESUME" ? plan.condensedRoleIds : [];
 }

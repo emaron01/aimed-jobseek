@@ -226,6 +226,65 @@ export async function addApplicationContact(input: {
   };
 }
 
+export async function assignApplicationContactToPersona(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  contactId: string;
+  personaId: string;
+}): Promise<{ contactId: string; personaId: string; moved: boolean }> {
+  const campaign = await prisma.campaign.findFirst({
+    where: {
+      id: input.campaignId,
+      organizationId: input.organizationId,
+      ownerUserId: input.userId,
+    },
+    select: { id: true },
+  });
+  if (!campaign) {
+    throw new TenantError(`${vocab.campaign.Singular} was not found.`);
+  }
+  const personaId = input.personaId.trim();
+  if (!personaId) {
+    throw new TenantError(`Choose ${vocab.persona.aSingular}.`);
+  }
+  const persona = await prisma.persona.findFirst({
+    where: {
+      id: personaId,
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      archivedAt: null,
+    },
+    select: { id: true },
+  });
+  if (!persona) {
+    throw new TenantError(
+      `That ${vocab.persona.singular} does not belong to this ${vocab.campaign.singular}.`,
+    );
+  }
+  const membership = await prisma.campaignContact.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      contactId: input.contactId,
+    },
+    select: { id: true, chosenPersonaId: true },
+  });
+  if (!membership) {
+    throw new TenantError(
+      `${vocab.contact.Singular} was not found on this ${vocab.campaign.singular}.`,
+    );
+  }
+  const moved = membership.chosenPersonaId !== personaId;
+  if (moved) {
+    await prisma.campaignContact.update({
+      where: { id: membership.id },
+      data: { chosenPersonaId: personaId, roleConfirmed: true, selected: true },
+    });
+  }
+  return { contactId: input.contactId, personaId, moved };
+}
+
 export async function updateApplicationContact(input: {
   organizationId: string;
   userId: string;

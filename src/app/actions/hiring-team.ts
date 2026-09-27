@@ -13,7 +13,10 @@ import {
   moveApplicationHiringTeamRoleInvolvement,
 } from "@/lib/hiring-team/build";
 import { retryApplicationJob } from "@/lib/application-jobs/service";
-import { addApplicationContact } from "@/lib/application/contacts";
+import {
+  addApplicationContact,
+  assignApplicationContactToPersona,
+} from "@/lib/application/contacts";
 import { saveLinkedInPaste } from "@/lib/contact-profile/service";
 import { hiringTeamConfig, workspaceProgressText } from "@/lib/product-config";
 import {
@@ -318,6 +321,52 @@ export async function retryApplicationJobAction(
     return { ok: true, message: hiringTeamConfig.actions.retry };
   } catch (error) {
     return fail(error, "The job could not be retried.");
+  }
+}
+
+export async function assignExistingHiringTeamPersonAction(
+  _prev: HiringTeamActionResult | null,
+  formData: FormData,
+): Promise<HiringTeamActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    const user = await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    const personaId = String(formData.get("personaId") ?? "").trim();
+    const contactId = String(formData.get("contactId") ?? "").trim();
+    if (!campaignId || !personaId) {
+      return { ok: false, message: `${vocab.persona.Singular} was not found.` };
+    }
+    if (!contactId) {
+      return { ok: false, message: `${vocab.contact.Singular} was not found.` };
+    }
+    const assigned = await assignApplicationContactToPersona({
+      organizationId,
+      campaignId,
+      userId: user.id,
+      contactId,
+      personaId,
+    });
+    const { offerPersonPrep } = await import("@/lib/interview/person-prep");
+    await offerPersonPrep({
+      organizationId,
+      campaignId,
+      contactId: assigned.contactId,
+      personaId: assigned.personaId,
+    });
+    const { enqueueInterviewerCheatSheetSection } = await import(
+      "@/lib/application-summary/enqueue"
+    );
+    await enqueueInterviewerCheatSheetSection({
+      organizationId,
+      campaignId,
+      userId: user.id,
+      contactId: assigned.contactId,
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: `${vocab.contact.Singular} assigned.` };
+  } catch (error) {
+    return fail(error, `${vocab.contact.Singular} could not be assigned.`);
   }
 }
 

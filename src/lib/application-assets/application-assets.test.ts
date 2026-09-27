@@ -525,14 +525,51 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
         if (request.schemaName === "application_asset_claim_validation") {
           return { data: { violations: input?.violations ?? [] } };
         }
+        if (request.schemaName === "resumePresentationPlan") {
+          return {
+            data: {
+              type: "RESUME",
+              leadingRoleIds: ["role_1"],
+              featuredStories: ["Invoice reliability at Northwind"],
+              summaryAngle: "Lead with production reliability ownership.",
+              earlierExperienceHeading: "Earlier experience",
+              condensedRoleIds: [],
+              recommendations: [
+                {
+                  text: "Lead with Northwind",
+                  reason: "It is the most relevant production role.",
+                  roleId: "role_1",
+                },
+              ],
+            },
+          };
+        }
+        if (request.schemaName === "coverLetterPresentationPlan") {
+          return {
+            data: {
+              type: "COVER_LETTER",
+              angle: "Reliability ownership for this role",
+              storiesToUse: ["Invoice rewrite"],
+              gapHandling: "Name the robotics gap and how you close it.",
+              recommendations: [
+                {
+                  text: "Open with reliability",
+                  reason: "That is the strongest overlap.",
+                  roleId: null,
+                },
+              ],
+            },
+          };
+        }
         throw new Error(`Unexpected schema ${request.schemaName}`);
       },
     );
   }
 
-  it("does not generate a resume until the seeker accepts a plan", async () => {
-    await prisma.applicationPresentationPlan.deleteMany({
-      where: { campaignId, type: "RESUME" },
+  it("accepts an existing draft plan automatically and generates the resume", async () => {
+    await prisma.applicationPresentationPlan.update({
+      where: { campaignId_type: { campaignId, type: "RESUME" } },
+      data: { status: "DRAFT", acceptedAt: null },
     });
     installModel({ resumes: [validResume()] });
     const result = await generateApplicationAsset({
@@ -540,14 +577,23 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
       campaignId,
       userId,
       type: "RESUME",
+      regenerationInstruction: "Tighten the summary.",
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.message).toBe(applicationAssetConfig.labels.acceptPlanFirst);
-    }
-    expect(
-      await prisma.applicationAsset.count({ where: { campaignId, type: "RESUME" } }),
-    ).toBe(0);
+    expect(result.ok).toBe(true);
+    const plan = await prisma.applicationPresentationPlan.findFirst({
+      where: { campaignId, type: "RESUME" },
+    });
+    expect(plan?.status).toBe("ACCEPTED");
+    expect(plan?.acceptedAt).toBeTruthy();
+    const asset = await prisma.applicationAsset.findFirst({
+      where: { campaignId, type: "RESUME" },
+      orderBy: { version: "desc" },
+    });
+    expect(asset?.guidance).toBeNull();
+    const resumeCall = generateStructured.mock.calls.find(
+      (call) => call[0]?.schemaName === "application_resume",
+    );
+    expect(JSON.stringify(resumeCall?.[0])).toContain("Tighten the summary.");
   });
 
   it("keeps condensed roles visible by title and employer after an accepted plan", async () => {
@@ -1469,7 +1515,6 @@ describe("application asset seeker-facing labels", () => {
     const {
       formatAssetSourceKind,
       formatAssetStatusLabel,
-      formatClaimEditorLabel,
       formatClaimSupportLabel,
     } = await import("@/lib/application-assets/display");
     const { vocab, consultationConfig } = await import("@/lib/product-config");
@@ -1484,9 +1529,6 @@ describe("application asset seeker-facing labels", () => {
     );
     expect(formatClaimSupportLabel("profile:identity_name", "Alex Chen")).toBe(
       `${vocab.product.singular}: “Alex Chen”`,
-    );
-    expect(formatClaimEditorLabel("  Led the invoice rewrite  ")).toBe(
-      "Led the invoice rewrite",
     );
     expect(formatClaimSupportLabel("profile:identity_name", "Alex Chen")).not.toMatch(
       /profile:identity_name/,
@@ -1506,7 +1548,8 @@ describe("application asset seeker-facing labels", () => {
     );
     expect(section).toContain("formatClaimSupportLabel");
     expect(section).toContain("formatAssetStatusLabel");
-    expect(section).toContain("formatClaimEditorLabel");
+    expect(section).toContain("asset-in-place-editor");
+    expect(section).not.toContain("formatClaimEditorLabel");
     expect(section).not.toContain("${item.sourceId}");
     expect(section).not.toContain("{claim.id}</span>");
     expect(section).not.toContain("{asset.status}");

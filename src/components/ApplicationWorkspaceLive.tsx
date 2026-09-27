@@ -162,6 +162,30 @@ export function WorkspaceProgress({
       </div>
     );
   }
+  if (type === "RESUME" || type === "COVER_LETTER") {
+    const ready = jobs.find(
+      (job) =>
+        job.type === type &&
+        job.status === "COMPLETED" &&
+        job.readyText !== applicationAssetConfig.labels.readyPlan,
+    );
+    if (ready) {
+      const documentId =
+        type === "RESUME" ? "resume-document" : "cover-letter-document";
+      return (
+        <p
+          className={`text-sm text-success ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
+          data-testid={`workspace-ready-notice-${type}`}
+          role="status"
+        >
+          {ready.readyText}{" "}
+          <AppActionLink href={`#${documentId}`} variant="chip">
+            {workspaceJobCopy.readyLink}
+          </AppActionLink>
+        </p>
+      );
+    }
+  }
   if (stayAndWatch) return null;
   return null;
 }

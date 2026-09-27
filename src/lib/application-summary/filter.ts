@@ -62,3 +62,17 @@ export function cheatSheetPrintSectionId(
 ): string | undefined {
   return selectedKey ?? undefined;
 }
+
+export function cheatSheetLikelyQuestionsElementId(sectionKey: string): string {
+  const key = sectionKey.trim();
+  if (!key) {
+    throw new Error("Likely questions are missing a person.");
+  }
+  return `${key}-likely-questions`;
+}
+
+export function cheatSheetPersonQueryKey(value: string | null | undefined): string | null {
+  const key = value?.trim() ?? "";
+  if (!key.startsWith("contact:")) return null;
+  return key;
+}

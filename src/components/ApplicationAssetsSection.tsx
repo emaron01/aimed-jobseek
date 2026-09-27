@@ -1,12 +1,10 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useState } from "react";
 import {
-  acceptPresentationPlanAction,
   approveApplicationAssetAction,
   generateApplicationAssetAction,
   saveEditedApplicationAssetAction,
-  writePresentationPlanAction,
   type ApplicationAssetActionResult,
 } from "@/app/actions/application-assets";
 import {
@@ -18,7 +16,6 @@ import type { PresentationPlan } from "@/lib/application-assets/plan-contract";
 import { formatResumeRoleMeta } from "@/lib/application-assets/dates";
 import {
   formatAssetStatusLabel,
-  formatClaimEditorLabel,
   formatClaimSupportLabel,
   hasVisibleText,
   sanitizeAssetContent,
@@ -131,12 +128,29 @@ function Status({
 
 function ClaimText({
   claim,
+  editable = false,
+  onChange,
 }: {
   claim: AssetClaim;
+  editable?: boolean;
+  onChange?: (claimId: string, text: string) => void;
 }) {
   const support = claim.supports
     .map((item) => formatClaimSupportLabel(item.sourceId, item.quote))
     .join("\n");
+  if (editable && onChange) {
+    return (
+      <textarea
+        id={`claim-edit-${claim.id}`}
+        data-testid={`claim-edit-${claim.id}`}
+        value={claim.text}
+        rows={Math.max(2, Math.ceil(claim.text.length / 72))}
+        title={support}
+        onChange={(event) => onChange(claim.id, event.target.value)}
+        className="w-full resize-y border-0 bg-transparent p-0 text-inherit leading-inherit outline-none focus-visible:ring-1 focus-visible:ring-focus"
+      />
+    );
+  }
   return (
     <span>
       <span title={support} tabIndex={0} className="cursor-help underline decoration-dotted">
@@ -149,9 +163,13 @@ function ClaimText({
 function AssetPreview({
   content,
   earlierExperienceHeading,
+  editable = false,
+  onChange,
 }: {
   content: ApplicationAssetContent;
   earlierExperienceHeading: string | null;
+  editable?: boolean;
+  onChange?: (claimId: string, text: string) => void;
 }) {
   if (content.type === "COVER_LETTER") {
     const paragraphs = visibleItems(content.paragraphs, (claim) => claim.text);
@@ -163,6 +181,8 @@ function AssetPreview({
             <p key={claim.id}>
               <ClaimText
                 claim={claim}
+                editable={editable}
+                onChange={onChange}
               />
             </p>
           ))
@@ -188,6 +208,8 @@ function AssetPreview({
         <h4 className="text-xl font-semibold">
           <ClaimText
             claim={content.header.name}
+            editable={editable}
+            onChange={onChange}
           />
         </h4>
         <p className="mt-1">
@@ -196,6 +218,8 @@ function AssetPreview({
               {index > 0 ? " | " : ""}
               <ClaimText
                 claim={claim}
+                editable={editable}
+                onChange={onChange}
               />
             </span>
           ))}
@@ -207,6 +231,8 @@ function AssetPreview({
             <p key={claim.id}>
               <ClaimText
                 claim={claim}
+                editable={editable}
+                onChange={onChange}
               />
             </p>
           ))
@@ -235,8 +261,10 @@ function AssetPreview({
                 {visibleItems(role.bullets, (claim) => claim.text).map((claim) => (
                   <li key={claim.id}>
                     <ClaimText
-                claim={claim}
-              />
+                      claim={claim}
+                      editable={editable}
+                      onChange={onChange}
+                    />
                   </li>
                 ))}
               </ul>
@@ -271,8 +299,10 @@ function AssetPreview({
               (claim) => (
                 <p key={claim.id}>
                   <ClaimText
-                claim={claim}
-              />
+                    claim={claim}
+                    editable={editable}
+                    onChange={onChange}
+                  />
                 </p>
               ),
             )}
@@ -328,53 +358,30 @@ function mapClaimText(
   };
 }
 
-function AssetEditor({
+function LatestAssetEditor({
   campaignId,
   asset,
+  earlierExperienceHeading,
 }: {
   campaignId: string;
   asset: AssetRow;
+  earlierExperienceHeading: string | null;
 }) {
   const [content, setContent] = useState(asset.content);
   const [result, action] = useActionState(saveEditedApplicationAssetAction, initial);
-  const claims = useMemo(() => {
-    const raw =
-      content.type === "COVER_LETTER"
-        ? content.paragraphs
-        : content.type === "RESUME"
-          ? [
-              ...content.summary,
-              ...content.experience.flatMap((role) => role.bullets),
-              ...content.skills,
-              ...content.education,
-              ...content.credentials,
-            ]
-          : [];
-    return visibleItems(raw, (claim) => claim.text);
-  }, [content]);
   return (
-    <form action={action} className="mt-4 space-y-3 border-t border-edge pt-4">
+    <form action={action} className="space-y-4" data-testid="asset-in-place-editor">
       <input type="hidden" name="campaignId" value={campaignId} />
       <input type="hidden" name="assetId" value={asset.id} />
       <input type="hidden" name="contentJson" value={JSON.stringify(content)} />
-      {claims.map((claim) => (
-        <label key={claim.id} className="block text-sm">
-          <span className="font-medium text-ink">
-            {formatClaimEditorLabel(claim.text)}
-          </span>
-          <textarea
-            id={`claim-edit-${claim.id}`}
-            value={claim.text}
-            rows={3}
-            onChange={(event) =>
-              setContent((current) =>
-                mapClaimText(current, claim.id, event.target.value),
-              )
-            }
-            className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
-          />
-        </label>
-      ))}
+      <AssetPreview
+        content={content}
+        earlierExperienceHeading={earlierExperienceHeading}
+        editable
+        onChange={(claimId, text) =>
+          setContent((current) => mapClaimText(current, claimId, text))
+        }
+      />
       <SubmitButton>{applicationAssetConfig.labels.saveNewVersion}</SubmitButton>
       <Status result={result} />
     </form>
@@ -407,19 +414,21 @@ function AssetHistory({
           className="rounded-md border border-edge p-4"
         >
           <summary className="cursor-pointer text-sm font-medium">
-            Version {asset.version} · {formatAssetStatusLabel(asset.status)} ·{" "}
-            {new Date(asset.createdAt).toLocaleString()}
+            Version {asset.version} · {formatAssetStatusLabel(asset.status)}
           </summary>
           <div className="mt-4 space-y-4">
-            <AssetPreview
-              content={asset.content}
-              earlierExperienceHeading={earlierExperienceHeading}
-            />
-            {asset.guidance ? (
-              <p className="text-xs text-subtle">
-                {applicationAssetConfig.labels.changeInstruction} {asset.guidance}
-              </p>
-            ) : null}
+            {canEdit && index === 0 ? (
+              <LatestAssetEditor
+                campaignId={campaignId}
+                asset={asset}
+                earlierExperienceHeading={earlierExperienceHeading}
+              />
+            ) : (
+              <AssetPreview
+                content={asset.content}
+                earlierExperienceHeading={earlierExperienceHeading}
+              />
+            )}
             <div className="flex flex-wrap gap-2">
               <AppActionLink href={workspaceAssetDocxHref(asset.id)}>
                 {applicationAssetConfig.labels.downloadDocx}
@@ -434,101 +443,10 @@ function AssetHistory({
                 </form>
               ) : null}
             </div>
-            {canEdit && index === 0 ? (
-              <AssetEditor campaignId={campaignId} asset={asset} />
-            ) : null}
           </div>
         </details>
       ))}
       <Status result={approveResult} profileHref={profileHref} />
-    </div>
-  );
-}
-
-function PlanPanel({
-  campaignId,
-  type,
-  plan,
-  canEdit,
-}: {
-  campaignId: string;
-  type: "RESUME" | "COVER_LETTER";
-  plan: PlanRow | null;
-  canEdit: boolean;
-}) {
-  const [writeResult, writeAction] = useActionState(writePresentationPlanAction, initial);
-  const [acceptResult, acceptAction] = useActionState(acceptPresentationPlanAction, initial);
-  return (
-    <div className="space-y-3" data-testid={`${type.toLowerCase()}-plan`}>
-      {plan ? (
-        <div className="space-y-2 rounded-md border border-edge bg-canvas p-3">
-          {plan.plan.type === "RESUME" ? (
-            <>
-              <p className="text-sm text-ink">{plan.plan.summaryAngle}</p>
-              <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
-                {visibleItems(
-                  plan.plan.recommendations,
-                  (item) => `${item.text} ${item.reason}`,
-                ).map((item) => (
-                  <li key={`${item.text}-${item.reason}`}>
-                    {item.text} {item.reason}
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-ink">{plan.plan.angle}</p>
-              <p className="text-sm text-ink">{plan.plan.gapHandling}</p>
-              <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
-                {visibleItems(
-                  plan.plan.recommendations,
-                  (item) => `${item.text} ${item.reason}`,
-                ).map((item) => (
-                  <li key={`${item.text}-${item.reason}`}>
-                    {item.text} {item.reason}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-      ) : null}
-      {canEdit && !plan ? (
-        <form action={writeAction} className="space-y-2">
-          <input type="hidden" name="campaignId" value={campaignId} />
-          <input type="hidden" name="type" value={type} />
-          <SubmitButton>{applicationAssetConfig.labels.writePlan}</SubmitButton>
-          <Status result={writeResult} errorsOnly />
-        </form>
-      ) : null}
-      {canEdit && plan?.status === "DRAFT" ? (
-        <div className="space-y-3">
-          <form action={acceptAction}>
-            <input type="hidden" name="campaignId" value={campaignId} />
-            <input type="hidden" name="type" value={type} />
-            <SubmitButton>{applicationAssetConfig.labels.acceptPlan}</SubmitButton>
-          </form>
-          <form action={writeAction} className="space-y-2">
-            <input type="hidden" name="campaignId" value={campaignId} />
-            <input type="hidden" name="type" value={type} />
-            <label className="block text-sm">
-              <span className="font-medium text-ink">
-                {applicationAssetConfig.labels.adjustPlanPrompt}
-              </span>
-              <textarea
-                name="adjustmentNote"
-                required
-                rows={2}
-                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
-              />
-            </label>
-            <SubmitButton>{applicationAssetConfig.labels.adjustPlan}</SubmitButton>
-          </form>
-          <Status result={acceptResult} />
-          <Status result={writeResult} errorsOnly />
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -563,11 +481,15 @@ function AssetTypePanel({
     type === "RESUME" && rows[0]?.content.type === "RESUME"
       ? rows[0].content
       : null;
-  const accepted = plan?.status === "ACCEPTED";
   const earlierExperienceHeading =
     plan?.plan.type === "RESUME" ? plan.plan.earlierExperienceHeading : null;
+  const documentId =
+    type === "RESUME" ? "resume-document" : "cover-letter-document";
   return (
-    <section className={`space-y-4 rounded-md border border-edge p-4 ${WORKSPACE_CARD_WRAP_CLASS}`}>
+    <section
+      id={documentId}
+      className={`space-y-4 rounded-md border border-edge p-4 ${WORKSPACE_CARD_WRAP_CLASS}`}
+    >
         <h3 className="font-semibold text-ink">
           {type === "RESUME"
             ? applicationAssetConfig.labels.resume
@@ -602,8 +524,7 @@ function AssetTypePanel({
           {planError}
         </p>
       ) : null}
-      <PlanPanel campaignId={campaignId} type={type} plan={plan} canEdit={canEdit} />
-      {canEdit && accepted ? <form action={action} className="space-y-3">
+      {canEdit ? <form action={action} className="space-y-3">
         <input type="hidden" name="campaignId" value={campaignId} />
         <input type="hidden" name="type" value={type} />
         {type === "RESUME" ? (
@@ -645,6 +566,7 @@ function AssetTypePanel({
               name="regenerationInstruction"
               rows={2}
               className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
+              data-testid={`${type.toLowerCase()}-regenerate-instruction`}
             />
           </label>
         ) : null}

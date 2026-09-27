@@ -8,7 +8,12 @@ import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { InterviewStagePanel } from "@/components/InterviewStagePanel";
 import { listApplicationContacts } from "@/lib/application/contacts";
 import { getApplicationSummaryView } from "@/lib/application-summary/service";
-import { listInterviewStages, stageTypeLabel } from "@/lib/interview/stages";
+import {
+  listInterviewStages,
+  openInterviewStage,
+  stageTypeLabel,
+} from "@/lib/interview/stages";
+import { InterviewStageOpenActions } from "@/components/InterviewStageOpenActions";
 import { interviewConfig } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 import { AppActionLink } from "@/components/ui";
@@ -60,6 +65,7 @@ export async function InterviewStagesSection({
     personaName: row.chosenPersona?.name ?? null,
   }));
   const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
+  const openStage = openInterviewStage(stages);
 
   return (
     <section
@@ -181,12 +187,21 @@ export async function InterviewStagesSection({
                     {stageTypeLabel(stage.type)} ·{" "}
                     {interviewConfig.formats[stage.format]}
                   </h3>
-                  <AppActionLink
-                    href={workspaceInterviewStageHref(campaignId, stage.id)}
-                    variant="secondary"
-                  >
-                    {interviewConfig.labels.openGuide}
-                  </AppActionLink>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {openStage?.id === stage.id ? (
+                      <InterviewStageOpenActions
+                        campaignId={campaignId}
+                        stageId={stage.id}
+                        interviewerContactId={interviewer?.contactId ?? null}
+                      />
+                    ) : null}
+                    <AppActionLink
+                      href={workspaceInterviewStageHref(campaignId, stage.id)}
+                      variant="secondary"
+                    >
+                      {interviewConfig.labels.openGuide}
+                    </AppActionLink>
+                  </div>
                 </div>
                 <p className="text-sm text-muted">
                   {stage.scheduledAt.toLocaleString()}

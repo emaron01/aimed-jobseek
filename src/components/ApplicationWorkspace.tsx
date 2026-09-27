@@ -26,7 +26,6 @@ import { mergeExistingHiringTeamRoles } from "@/lib/hiring-team/merge-existing";
 import { getApplicationResearchStatus } from "@/lib/application/research-status";
 import {
   addApplicationRoleAction,
-  addHiringTeamPersonAction,
   addTemplateRoleAction,
   approveApplicationRoleAction,
   buildAllDirectRolesAction,
@@ -62,6 +61,7 @@ import {
 } from "@/components/ApplicationOutreachSections";
 import { isOutreachAssetType } from "@/lib/product-config";
 import { HiringTeamDisclosureGroup } from "@/components/HiringTeamDisclosureGroup";
+import { HiringTeamPersonPicker } from "@/components/HiringTeamPersonPicker";
 import { HiringTeamRoleActions } from "@/components/HiringTeamRoleActions";
 import {
   displayedFitBucket,
@@ -1125,57 +1125,21 @@ async function HiringTeamSection({
             <HiringTeamRoleActions
               personaId={role.id}
               addPersonForm={
-                <ApplicationActionForm
-                  action={addHiringTeamPersonAction}
-                  submitLabel={hiringTeamConfig.actions.addPerson}
-                  testId={`add-person-${role.id}`}
-                >
-                  <input type="hidden" name="campaignId" value={campaignId} />
-                  <input type="hidden" name="personaId" value={role.id} />
-                  <label className="block text-sm">
-                    <span className="font-medium text-ink">
-                      {outreachConfig.labels.fieldFirstName}
-                    </span>
-                    <input name="firstName" required className={fieldClass} />
-                  </label>
-                  <label className="block text-sm">
-                    <span className="font-medium text-ink">
-                      {outreachConfig.labels.fieldLastName}
-                    </span>
-                    <input name="lastName" required className={fieldClass} />
-                  </label>
-                  <label className="block text-sm">
-                    <span className="font-medium text-ink">
-                      {outreachConfig.labels.fieldTitle}
-                    </span>
-                    <input name="title" required className={fieldClass} />
-                  </label>
-                  <label className="block text-sm">
-                    <span className="font-medium text-ink">
-                      {outreachConfig.labels.fieldEmail}
-                    </span>
-                    <input name="email" type="email" className={fieldClass} />
-                  </label>
-                  <label className="block text-sm">
-                    <span className="font-medium text-ink">
-                      {outreachConfig.labels.fieldLinkedIn}
-                    </span>
-                    <input name="linkedinUrl" type="url" className={fieldClass} />
-                  </label>
-                  <label className="block text-sm">
-                    <span className="font-medium text-ink">
-                      {outreachConfig.labels.pasteInterviewerProfile}
-                    </span>
-                    <textarea
-                      name="linkedInProfileText"
-                      rows={5}
-                      className={fieldClass}
-                    />
-                    <span className="mt-1 block text-xs text-muted">
-                      {outreachConfig.labels.pasteInterviewerProfileHelp}
-                    </span>
-                  </label>
-                </ApplicationActionForm>
+                <HiringTeamPersonPicker
+                  campaignId={campaignId}
+                  personaId={role.id}
+                  people={people.map((person) => ({
+                    contactId: person.contactId,
+                    name:
+                      [person.contact.firstName, person.contact.lastName]
+                        .filter(Boolean)
+                        .join(" ")
+                        .trim() ||
+                      person.contact.title ||
+                      person.contactId,
+                    title: person.contact.title,
+                  }))}
+                />
               }
               editForm={
             <ApplicationActionForm

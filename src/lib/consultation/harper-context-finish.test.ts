@@ -94,7 +94,7 @@ describe("Harper context finish", () => {
     );
     const stage = readFileSync("src/components/InterviewStagePanel.tsx", "utf8");
     const addPerson = readFileSync(
-      "src/components/ApplicationWorkspace.tsx",
+      "src/components/HiringTeamPersonPicker.tsx",
       "utf8",
     );
     const contacts = readFileSync(

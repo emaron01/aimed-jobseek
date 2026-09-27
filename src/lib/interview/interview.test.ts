@@ -573,6 +573,12 @@ describeDb("interview stages persistence", () => {
       true,
     );
     expect(jobs.some((job) => job.targetId === `contact:${added.contactId}`)).toBe(true);
+    const reassessJobs = await prisma.applicationJob.findMany({
+      where: { campaignId, type: "CONSULTATION" },
+    });
+    expect(
+      reassessJobs.some((job) => JSON.stringify(job.payload).includes("reassess")),
+    ).toBe(true);
     expect(
       await prisma.applicationJob.count({
         where: { campaignId, type: "INTERVIEW_GUIDE" },

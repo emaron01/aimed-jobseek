@@ -156,7 +156,9 @@ describe("workspace links", () => {
     expect(outreach).toContain("workspaceAssetDocxHref");
     expect(joined).not.toMatch(/`\/products\/\$\{/);
     expect(joined).not.toMatch(/\/campaigns\/\$\{[^}]+\}#consultation/);
-    expect(live).not.toContain("workspace-ready-notice");
+    expect(live).toContain("workspace-ready-notice-");
+    expect(live).toContain("resume-document");
+    expect(live).toContain("cover-letter-document");
   });
 });
 

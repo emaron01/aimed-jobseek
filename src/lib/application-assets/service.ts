@@ -35,8 +35,8 @@ import {
   type ResumeAssetContent,
 } from "./contract";
 import {
-  acceptedPresentationPlan,
   condensedRoleIdsFromPlan,
+  ensureAcceptedPresentationPlan,
 } from "./plan-service";
 import type { AssetGenerationResult } from "./outreach-types";
 import { formatAssetSourceKind } from "./display";
@@ -793,18 +793,19 @@ export async function generateApplicationAsset(input: {
       violations: [],
     };
   }
-  const acceptedPlan = await acceptedPresentationPlan({
+  const ensured = await ensureAcceptedPresentationPlan({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
     type: input.type,
   });
-  if (!acceptedPlan) {
+  if (!ensured.ok) {
     return {
       ok: false,
-      message: applicationAssetConfig.labels.acceptPlanFirst,
+      message: ensured.message,
       violations: [],
     };
   }
+  const acceptedPlan = ensured.plan;
   if (!base.requirement || !base.profile) {
     return {
       ok: false,
@@ -900,7 +901,7 @@ export async function generateApplicationAsset(input: {
       type: input.type,
       personaId,
       content,
-      guidance: input.regenerationInstruction?.trim() || null,
+      guidance: null,
     });
     return { ok: true, assetId: saved.id, version: saved.version };
   }

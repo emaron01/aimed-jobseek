@@ -10,7 +10,11 @@ import {
 } from "@/lib/application/step-progress";
 import { buildConsultationPolishMessages } from "@/lib/consultation/prompt";
 import { voiceReadiness } from "@/lib/voice/types";
-import { applicationAssetConfig, vocab } from "@/lib/product-config";
+import {
+  applicationAssetConfig,
+  consultationConfig,
+  vocab,
+} from "@/lib/product-config";
 import { hasTestDatabase } from "@/test/database";
 import { NORMAL_JOB_MODEL, NORMAL_JOB_POSTING } from "@/lib/job-requirement/fixtures";
 import { normalizeParsedJobRequirement } from "@/lib/job-requirement/normalize";
@@ -118,14 +122,15 @@ describe("workflow audit fixes", () => {
     expect(plans).toContain("plan_accept_generate");
     expect(process).toContain("plan_accept_generate");
     expect(process).toContain("acceptPresentationPlan");
-    expect(assets).toContain("applicationAssetConfig.labels.adjustPlan");
+    expect(plans).toContain("ensureAcceptedPresentationPlan");
+    expect(assets).not.toContain("applicationAssetConfig.labels.adjustPlan");
     expect(assets).toContain("applicationAssetConfig.labels.regenerate");
     expect(assets).toContain("applicationAssetConfig.labels.changeInstruction");
     expect(assets).toContain("applicationAssetConfig.labels.downloadDocx");
     expect(applicationAssetConfig.labels.adjustPlan).toMatch(/Adjust/);
     expect(applicationAssetConfig.labels.regenerate).toBe("Regenerate");
     expect(applicationAssetConfig.labels.changeInstruction).toBe(
-      "What should change?",
+      `What should ${consultationConfig.displayName} change?`,
     );
     expect(applicationAssetConfig.labels.downloadDocx).toBe("Download DOCX");
   });

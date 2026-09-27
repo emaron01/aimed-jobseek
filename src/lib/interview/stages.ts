@@ -43,6 +43,12 @@ export async function requireOwnedCampaign(input: {
   return campaign;
 }
 
+export function openInterviewStage<T extends { outcome: string | null }>(
+  stages: T[],
+): T | null {
+  return stages.find((stage) => stage.outcome == null) ?? null;
+}
+
 export async function listInterviewStages(input: {
   organizationId: string;
   campaignId: string;

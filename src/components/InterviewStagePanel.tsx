@@ -188,22 +188,24 @@ export function InterviewStagePanel({
       )}
 
       {canEdit && interviewerContactId ? (
-        <ApplicationActionForm
-          action={addCheatSheetInterviewNoteAction}
-          submitLabel={interviewConfig.labels.addGainedInformation}
-          testId={`add-cheat-sheet-note-${stageId}`}
-        >
-          <input type="hidden" name="campaignId" value={campaignId} />
-          <input type="hidden" name="stageId" value={stageId} />
-          <input type="hidden" name="contactId" value={interviewerContactId} />
-          <label className="text-sm">
-            {interviewConfig.labels.gainedInformation}
-            <textarea name="note" rows={4} required className={fieldClass} />
-            <span className="mt-1 block text-xs text-muted">
-              {interviewConfig.labels.gainedInformationHelp}
-            </span>
-          </label>
-        </ApplicationActionForm>
+        <div id={`gained-information-${stageId}`}>
+          <ApplicationActionForm
+            action={addCheatSheetInterviewNoteAction}
+            submitLabel={interviewConfig.labels.addGainedInformation}
+            testId={`add-cheat-sheet-note-${stageId}`}
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+            <input type="hidden" name="stageId" value={stageId} />
+            <input type="hidden" name="contactId" value={interviewerContactId} />
+            <label className="text-sm">
+              {interviewConfig.labels.gainedInformation}
+              <textarea name="note" rows={4} required className={fieldClass} />
+              <span className="mt-1 block text-xs text-muted">
+                {interviewConfig.labels.gainedInformationHelp}
+              </span>
+            </label>
+          </ApplicationActionForm>
+        </div>
       ) : null}
     </div>
   );

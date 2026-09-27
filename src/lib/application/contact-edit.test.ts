@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { hasTestDatabase } from "@/test/database";
 import {
   addApplicationContact,
+  assignApplicationContactToPersona,
   listApplicationContacts,
   updateApplicationContact,
 } from "@/lib/application/contacts";
@@ -202,6 +203,32 @@ describe.skipIf(!hasTestDatabase())("edit an existing application contact", () =
       campaignId: otherCampaignId,
     });
     expect(otherListed).toEqual([]);
+  });
+
+  it("moves a contact from one persona to another without building either persona", async () => {
+    const before = await prisma.campaignContact.findUniqueOrThrow({
+      where: { id: membershipId },
+    });
+    const target =
+      before.chosenPersonaId === personaId ? recruiterPersonaId : personaId;
+    const moved = await assignApplicationContactToPersona({
+      organizationId,
+      campaignId,
+      userId,
+      contactId,
+      personaId: target,
+    });
+    expect(moved.moved).toBe(true);
+    expect(moved.personaId).toBe(target);
+    const after = await prisma.campaignContact.findUniqueOrThrow({
+      where: { id: membershipId },
+    });
+    expect(after.chosenPersonaId).toBe(target);
+    expect(
+      await prisma.applicationJob.count({
+        where: { campaignId, type: "HIRING_TEAM_BUILD" },
+      }),
+    ).toBe(0);
   });
 
   it("runs extraction, the individual profile, and cheat sheet regen when paste changes", async () => {

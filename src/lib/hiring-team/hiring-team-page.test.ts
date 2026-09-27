@@ -15,6 +15,7 @@ import {
 function sourceFiles() {
   return {
     workspace: readFileSync("src/components/ApplicationWorkspace.tsx", "utf8"),
+    picker: readFileSync("src/components/HiringTeamPersonPicker.tsx", "utf8"),
     actions: readFileSync("src/components/HiringTeamRoleActions.tsx", "utf8"),
     tracker: readFileSync("src/components/ApplicationSidebarTracker.tsx", "utf8"),
     steps: readFileSync("src/lib/product-config/application-steps.ts", "utf8"),
@@ -70,7 +71,7 @@ describe("hiring team page copy and layout", () => {
   });
 
   it("puts Edit and I know who is interviewing at the top right of each card", () => {
-    const { workspace, actions } = sourceFiles();
+    const { workspace, actions, picker } = sourceFiles();
     expect(actions).toContain("hiringTeamConfig.actions.edit");
     expect(actions).toContain("hiringTeamConfig.actions.knowWhoInterviewing");
     expect(actions).toContain("persona-card-actions-");
@@ -78,15 +79,20 @@ describe("hiring team page copy and layout", () => {
     expect(actions).toContain("justify-end");
     expect(actions).toContain("hiringTeamConfig.addPersonTitle");
     expect(workspace).toContain("items-start justify-between");
-    expect(workspace).toContain('name="firstName" required');
-    expect(workspace).toContain('name="lastName" required');
-    expect(workspace).toContain('name="title" required');
-    expect(workspace).toContain('name="email" type="email"');
-    expect(workspace).not.toContain('name="email" required');
-    expect(workspace).toContain('name="linkedinUrl"');
-    expect(workspace).not.toContain('name="linkedinUrl" required');
-    expect(workspace).toContain('name="linkedInProfileText"');
-    expect(workspace).toContain("pasteInterviewerProfile");
+    expect(workspace).toContain("HiringTeamPersonPicker");
+    expect(picker).toContain("assignExistingHiringTeamPersonAction");
+    expect(picker).toContain("addHiringTeamPersonAction");
+    expect(picker).toContain("interviewConfig.labels.chooseInterviewer");
+    expect(picker).toContain("interviewConfig.labels.addNewInterviewer");
+    expect(picker).toContain('name="firstName" required');
+    expect(picker).toContain('name="lastName" required');
+    expect(picker).toContain('name="title" required');
+    expect(picker).toContain('name="email" type="email"');
+    expect(picker).not.toContain('name="email" required');
+    expect(picker).toContain('name="linkedinUrl"');
+    expect(picker).not.toContain('name="linkedinUrl" required');
+    expect(picker).toContain('name="linkedInProfileText"');
+    expect(picker).toContain("pasteInterviewerProfile");
     const cardBlock = workspace.slice(
       workspace.indexOf("hiring-team-role"),
       workspace.indexOf('id="hiring-team"'),

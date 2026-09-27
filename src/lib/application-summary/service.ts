@@ -37,6 +37,7 @@ import {
   cheatSheetSectionKind,
   interviewerContactIdsFrom,
 } from "@/lib/application-summary/people";
+import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { enqueueCheatSheetPersonSection } from "@/lib/application-summary/enqueue";
 import { listPersonPreps } from "@/lib/interview/person-prep";
 import {
@@ -861,6 +862,14 @@ export async function addCheatSheetInterviewNote(input: {
     campaignId: input.campaignId,
     contactId: input.contactId,
     userId: input.userId,
+  });
+  await enqueueApplicationJob({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    type: "CONSULTATION",
+    targetId: "reassess",
+    initiatedByUserId: input.userId,
+    payload: { operation: "reassess" },
   });
   return notes;
 }

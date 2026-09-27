@@ -52,6 +52,18 @@ export function workspaceCampaignSummaryHref(campaignId: string): string {
   return `${workspaceCampaignHref(campaignId)}/summary`;
 }
 
+export function workspaceInterviewLikelyQuestionsHref(
+  campaignId: string,
+  contactId: string,
+): string {
+  const person = contactId.trim();
+  if (!person) {
+    throw new Error("Interview questions link is missing an interviewer.");
+  }
+  const sectionKey = `contact:${person}`;
+  return `${workspaceCampaignSummaryHref(campaignId)}?person=${encodeURIComponent(sectionKey)}#${encodeURIComponent(`${sectionKey}-likely-questions`)}`;
+}
+
 export function workspaceApplicationContactsHref(campaignId: string): string {
   return `${workspaceCampaignHref(campaignId)}/contacts`;
 }

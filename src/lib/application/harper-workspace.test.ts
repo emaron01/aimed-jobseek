@@ -113,7 +113,7 @@ describe("workspace order and Harper start", () => {
       consultation.indexOf("consultation-briefing"),
     );
     expect(workspace).not.toContain("<ConsultationSection");
-    expect(workspace).toContain("addHiringTeamPersonAction");
+    expect(workspace).toContain("HiringTeamPersonPicker");
     expect(workspace).toContain("HiringTeamRoleActions");
     expect(
       readFileSync("src/components/HiringTeamRoleActions.tsx", "utf8"),
@@ -210,8 +210,19 @@ describe("persona edit protection and add person", () => {
     expect(build).toContain("name: persona.name");
     const actions = readFileSync("src/app/actions/hiring-team.ts", "utf8");
     expect(actions).toContain("addHiringTeamPersonAction");
+    expect(actions).toContain("assignExistingHiringTeamPersonAction");
     expect(actions).toContain("saveLinkedInPaste");
     expect(actions).toContain("confirmRole: true");
+    const assignFn = actions.slice(
+      actions.indexOf("export async function assignExistingHiringTeamPersonAction"),
+      actions.indexOf("export async function addHiringTeamPersonAction"),
+    );
+    expect(assignFn).not.toContain("queueHiringTeamBuild");
+    const addFn = actions.slice(
+      actions.indexOf("export async function addHiringTeamPersonAction"),
+      actions.indexOf("export async function saveRoleAsTemplateAction"),
+    );
+    expect(addFn).not.toContain("queueHiringTeamBuild");
   });
 });
 

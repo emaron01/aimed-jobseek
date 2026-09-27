@@ -3,6 +3,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -11,6 +12,7 @@ import { AppButton } from "@/components/AppButton";
 import { PrintApplicationSummaryButton } from "@/components/PrintApplicationSummaryButton";
 import {
   cheatSheetPrintSectionId,
+  cheatSheetPersonQueryKey,
   matchCheatSheetFilterOptions,
   visibleCheatSheetSectionKeys,
   type CheatSheetFilterOption,
@@ -52,13 +54,39 @@ function optionLabel(option: CheatSheetFilterOption): string {
 
 export function CheatSheetFilterProvider({
   options,
+  initialPersonKey = null,
   children,
 }: {
   options: CheatSheetFilterOption[];
+  initialPersonKey?: string | null;
   children: ReactNode;
 }) {
-  const [query, setQuery] = useState("");
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const initialKey = cheatSheetPersonQueryKey(initialPersonKey);
+  const initialOption = initialKey
+    ? options.find((item) => item.sectionKey === initialKey) ?? null
+    : null;
+  const [query, setQuery] = useState(initialOption ? optionLabel(initialOption) : "");
+  const [selectedKey, setSelectedKey] = useState<string | null>(
+    initialOption ? initialOption.sectionKey : null,
+  );
+  useEffect(() => {
+    if (!initialKey) return;
+    const hash = window.location.hash.replace(/^#/, "");
+    if (!hash) return;
+    const id = decodeURIComponent(hash);
+    let attempts = 0;
+    const find = () => {
+      const target = document.getElementById(id);
+      if (target) {
+        target.scrollIntoView({ block: "start" });
+        return;
+      }
+      attempts += 1;
+      if (attempts > 20) return;
+      window.setTimeout(find, 50);
+    };
+    find();
+  }, [initialKey]);
   const value = useMemo<FilterState>(
     () => ({
       query,

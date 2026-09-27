@@ -10,7 +10,7 @@ export const applicationAssetConfig = Object.freeze({
     regenerate: "Regenerate",
     approve: "Approve",
     downloadDocx: "Download DOCX",
-    changeInstruction: "What should change?",
+    changeInstruction: `What should ${consultationConfig.displayName} change?`,
     sourceSupport: "Source",
     hideRolesLegend: "Roles to hide",
     acceptPlan: "Accept this plan",
