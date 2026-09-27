@@ -35,7 +35,6 @@ import {
   consultationExtractSchema,
 } from "@/lib/consultation/contract";
 import {
-  defaultGapShareQuestion,
   looksLikeTemplatedUnseenQuestion,
   matchConsultationFocus,
   planQuestionRound,
@@ -63,6 +62,8 @@ import {
   editConsultationAnswer,
   flagConsultationInaccuracy,
   recordConsultationReply,
+  reextractExistingWhyThisCompanyMotivation,
+  regenerateCannedConsultationWording,
   repairConsultationResults,
 } from "@/lib/consultation/service";
 import {
@@ -99,6 +100,7 @@ import {
 import {
   CONSULTATION_COACH_SYSTEM_INSTRUCTIONS,
   CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS,
+  CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS,
 } from "@/lib/prompt-content/consultation";
 import {
   parseCandidateProfile,
@@ -177,6 +179,9 @@ function installConsultationModelFixture() {
       confirmedGap?: boolean;
       strengtheningNeeds?: string[];
       qualityFeedback?: string[];
+      targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
+      supportingEvidence?: string[];
+      interviewerPrep?: { contactId: string; name: string; roleName: string } | null;
     };
     if (request.schemaName === "consultation_plan") {
       const targets = payload.targets ?? [];
@@ -325,17 +330,51 @@ function installConsultationModelFixture() {
           .map((item) => item.trim())
           .filter(Boolean)
           .at(-1) ?? answerText;
+      const supported = (payload.supportingEvidence ?? []).join(" ").trim();
+      if (
+        (payload.targetStrength === "PARTIAL" && supported) ||
+        /partner program/i.test(answerText)
+      ) {
+        const evidence = supported || "owned production payments reliability";
+        return {
+          data: {
+            interviewAnswer: `I already had this in my profile: ${evidence}. ${text}`,
+            resumeBullet: `${evidence}; ${text}`,
+            strengtheningNote: null,
+          },
+        };
+      }
       return {
         data: {
           interviewAnswer: `In my words, ${text}`,
           resumeBullet: `Result: ${text}`,
           strengtheningNote: payload.declinedFollowUp
-            ? `The ${payload.strengtheningNeeds?.[0] ?? "Action"} would be stronger with more detail about what you personally did.`
+            ? `The ${payload.strengtheningNeeds?.[0] ?? "ACTION"} would be stronger with more detail about what you personally did.`
             : null,
         },
       };
     }
     const answer = payload.answer ?? "";
+    if (/partner program/i.test(answer)) {
+      return {
+        data: {
+          replyType: "answer",
+          facts: [{ text: "I built a two-tier partner program at Contoso that opened three new logos." }],
+          story: {
+            situation: "Contoso needed a partner motion beyond direct selling.",
+            task: "I built the partner program.",
+            action: "I stood up a two-tier partner program and opened three new logos.",
+            result: "Three new logos came through that partner motion.",
+          },
+          demonstratedTargets: [],
+          missingStarElements: [],
+          coaching: null,
+          followUpQuestion: null,
+          gapDecision: "evidence",
+          companyMotivation: null,
+        },
+      };
+    }
     if (/company statement/i.test(answer) && /better question/i.test(answer)) {
       return {
         data: {
@@ -362,6 +401,8 @@ function installConsultationModelFixture() {
           },
           demonstratedTargets: [],
           missingStarElements: ["ACTION"],
+          coaching:
+            "You named the rewrite and the result. The missing piece is what you personally changed.",
           followUpQuestion:
             "When you led the rewrite, what did you personally change, what options did you weigh, and who did you work with?",
           gapDecision: "incomplete",
@@ -418,6 +459,9 @@ function installConsultationModelFixture() {
             ]
           : [],
         missingStarElements: complete ? [] : ["TASK", "ACTION", "RESULT", "METRIC"],
+        coaching: complete
+          ? null
+          : "You named the Python work. The missing piece is what changed because of your contribution.",
         followUpQuestion: complete
           ? null
           : "On that Python backend work, what changed because of your contribution, ideally a concrete result or metric?",
@@ -798,10 +842,13 @@ describe("consultation evidence and questions", () => {
         { key: "required:cyber", text: gapText },
         modelText,
       ),
-    ).toBe(`${modelText} Which roles did that come from?`);
-    expect(defaultGapShareQuestion({ key: "required:cyber", text: gapText })).toBe(
-      "What in your background speaks to this? Which roles did that come from?",
-    );
+    ).toBe(modelText);
+    expect(
+      questionTextForGap(
+        { key: WHY_THIS_COMPANY_TARGET_KEY, text: "Why this company" },
+        null,
+      ),
+    ).toBe("");
     expect(
       looksLikeTemplatedUnseenQuestion(
         "Do you have experience with Join us to help protect the world's most valuable digital brands that Harper does not see?",
@@ -813,6 +860,46 @@ describe("consultation evidence and questions", () => {
         "Do you have experience with Join us to help protect the world's most valuable digital brands that Harper does not see?",
       ),
     ).toBe("");
+    const kept = planQuestionRound({
+      assessments: [
+        {
+          key: "required:cyber",
+          kind: "REQUIRED",
+          text: gapText,
+          strength: "NONE",
+          supportingFactIds: [],
+          strategy: "PROVE_WITH_STORY",
+          explanation: "Gap.",
+          strategyText: "Ask.",
+          verification: {
+            originalStrength: "NONE",
+            invalidSupportingFactIds: [],
+            invalidRoleIds: [],
+            downgradeReasons: [],
+          },
+          experienceCalculation: null,
+        },
+      ],
+      modelQuestions: [
+        {
+          targetKey: "required:cyber",
+          text: "You mentioned nine years in cybersecurity sales. What did that work look like?",
+          requirementInterpretation: null,
+          hiringTeamRoleId: "hm",
+          whoCaresNote: "",
+        },
+      ],
+      hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
+      askedKeys: new Set(),
+      skippedKeys: new Set(),
+      includeChronology: false,
+      chronologyAsked: false,
+    });
+    expect(kept.questions).toHaveLength(1);
+    expect(kept.questions[0]?.text).toBe(
+      "You mentioned nine years in cybersecurity sales. What did that work look like?",
+    );
+    expect(kept.questions[0]?.whoCaresNote).toBe("");
   });
 
   it("never treats a mission statement or recruiting pitch as an experience gap", () => {
@@ -1471,7 +1558,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("19");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("20");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("You coach; you do not interrogate");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("askedQuestions");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -1490,6 +1577,25 @@ describe("consultation evidence and questions", () => {
     expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
       "Set companyMotivation to the part of the reply that states why they want to work at this company",
     );
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
+      "that gap's question must ask which roles that background came from, in your own words",
+    );
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
+      "When a gap is PARTIAL, briefly state what the Personal Profile already supports",
+    );
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("interviewerPrep:");
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
+      'Do not use the words "Harper prepares the seeker"',
+    );
+    expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
+      "Never write \"The seeker was responsible\" or \"He also reports\"",
+    );
+    expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
+      "combine the existing supporting evidence with the new detail into one statement",
+    );
+    expect(CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS).toContain(
+      "When the target is PARTIAL, combine the existing supporting Personal Profile evidence",
+    );
     const extractFormat = buildOpenAiJsonSchemaFormat(
       "consultation_extract",
       consultationExtractSchema,
@@ -1505,6 +1611,24 @@ describe("consultation evidence and questions", () => {
     expect(thread).toContain("consultationConversationCopy.approve");
     expect(thread).toContain("consultationConversationCopy.thinking");
     expect(workspace).not.toContain("supportingFactIds).join");
+    expect(workspace).not.toContain("planComplete");
+    const questions = readFileSync("src/lib/consultation/questions.ts", "utf8");
+    const writeBack = readFileSync("src/lib/consultation/write-back.ts", "utf8");
+    const service = readFileSync("src/lib/consultation/service.ts", "utf8");
+    expect(questions).not.toContain("Which roles did that come from?");
+    expect(questions).not.toContain("What in your background speaks to this?");
+    expect(questions).not.toContain("withRoleSourceAsk");
+    expect(questions).not.toContain("defaultGapShareQuestion");
+    expect(writeBack).not.toContain("followUpForMissingStar");
+    expect(writeBack).not.toContain("askForStory");
+    expect(service).not.toContain("askForStory");
+    expect(service).not.toContain("keepCoaching");
+    expect(service).not.toContain("ensureGapShareQuestion");
+    expect(service).not.toContain(
+      "No remaining experience gaps after combining your profile with this job.",
+    );
+    expect(service).toContain("prepareExistingConsultationSession");
+    expect(service).toContain("reextractExistingWhyThisCompanyMotivation");
   });
 
   it("merges posting requirements and scorecard items that mean the same thing", () => {
@@ -1888,6 +2012,33 @@ describe("consultation evidence and questions", () => {
     if (polished.ok) {
       expect(polished.data.interviewAnswer).toContain("8%");
     }
+
+    generateStructured.mockImplementation(async () => ({
+      data: {
+        interviewAnswer: "The seeker reduced failed invoice runs from eight percent to one percent.",
+        resumeBullet: "Reduced failed invoice runs from eight percent to one percent.",
+        strengtheningNote: null,
+      },
+    }));
+    const voiced = await polishAnswerWithQuality({
+      answer: "I cut failed runs from 8% to 1%.",
+      story: {
+        situation: "Failed runs were at 8%.",
+        task: "I needed to stabilize them.",
+        action: "I rewrote the failing path.",
+        result: "I cut failed runs from 8% to 1%.",
+      },
+      sources: [{ id: "answer:voice", text: "I cut failed runs from 8% to 1%." }],
+      profileItems: [],
+      declinedFollowUp: false,
+      strengtheningNeeds: [],
+      firstName: "Alex",
+    });
+    expect(voiced.ok).toBe(true);
+    if (voiced.ok) {
+      expect(voiced.data.interviewAnswer).toContain("The seeker");
+    }
+    installConsultationModelFixture();
   });
 
   it("keeps a rich grounded answer natural and within the maximum", async () => {
@@ -2022,7 +2173,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { campaignId },
       include: { assessments: true, turns: { orderBy: { sequence: "asc" } } },
     });
-    expect(session?.promptVersion).toBe("19");
+    expect(session?.promptVersion).toBe(CONSULTATION_PROMPT_VERSION);
     expect(session?.generationStatus).toBe("READY");
     expect(session?.status).toBe("IN_PROGRESS");
     expect(session?.briefingJson).toMatchObject({
@@ -2685,7 +2836,11 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     expect(after?.generationStatus).toBe("FAILED");
     expect(after?.generationError).toBeTruthy();
     expect(
-      after?.turns.some((turn) => turn.body === consultationConversationCopy.askForStory),
+      after?.turns.some((turn) =>
+        /Tell me what happened, what you did, and what the result was/i.test(
+          turn.body,
+        ),
+      ),
     ).toBe(false);
   });
 
@@ -3313,6 +3468,15 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     expect(
       closed?.statements.some((row) => row.kind === "RESUME_BULLET"),
     ).toBe(true);
+    expect(
+      await prisma.consultationTurn.count({
+        where: {
+          sessionId: session.id,
+          speaker: "CONSULTANT",
+          followUp: false,
+        },
+      }),
+    ).toBe(0);
 
     await answerConsultationQuestion({
       organizationId,
@@ -3662,5 +3826,259 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { id: campaign.id },
     });
     expect(second?.whyThisCompany).toBe("should not be overwritten on the second pass");
+  });
+
+  it("re-extracts why-this-company on an in-progress session without Start", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Why load ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "I have built OpenText's ARM products by retooling GTM.",
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    const session = await prisma.consultationSession.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        productId,
+        status: "IN_PROGRESS",
+        generationStatus: "READY",
+        promptVersion: CONSULTATION_PROMPT_VERSION,
+      },
+    });
+    await prisma.consultationTurn.createMany({
+      data: [
+        {
+          organizationId,
+          sessionId: session.id,
+          sequence: 1,
+          speaker: "CONSULTANT",
+          body: "Why do you want this role at this company?",
+          targetKey: WHY_THIS_COMPANY_TARGET_KEY,
+        },
+        {
+          organizationId,
+          sessionId: session.id,
+          sequence: 2,
+          speaker: "SEEKER",
+          body: `${WHY_THIS_COMPANY_MOTIVATION} I led enterprise security sales.`,
+          targetKey: WHY_THIS_COMPANY_TARGET_KEY,
+          seekerAuthored: true,
+        },
+      ],
+    });
+    await reextractExistingWhyThisCompanyMotivation({
+      organizationId,
+      campaignId: campaign.id,
+    });
+    const corrected = await prisma.campaign.findUnique({
+      where: { id: campaign.id },
+    });
+    expect(corrected?.whyThisCompany).toBe(WHY_THIS_COMPANY_MOTIVATION);
+    expect(await prisma.consultationSession.count({
+      where: { id: session.id, promptVersion: CONSULTATION_PROMPT_VERSION },
+    })).toBe(1);
+  });
+
+  it("regenerates unanswered canned questions once and leaves answered ones unchanged", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Canned ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaign.id);
+    const session = await prisma.consultationSession.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        productId,
+        status: "IN_PROGRESS",
+        promptVersion: CONSULTATION_PROMPT_VERSION,
+      },
+    });
+    const canned =
+      "What in your background speaks to this? Which roles did that come from?";
+    const answeredCanned =
+      "Tell me what happened, what you did, and what the result was.";
+    await prisma.consultationTurn.createMany({
+      data: [
+        {
+          organizationId,
+          sessionId: session.id,
+          sequence: 1,
+          speaker: "CONSULTANT",
+          body: canned,
+          targetKey: WHY_THIS_COMPANY_TARGET_KEY,
+        },
+        {
+          organizationId,
+          sessionId: session.id,
+          sequence: 2,
+          speaker: "CONSULTANT",
+          body: answeredCanned,
+          targetKey: "required:0",
+        },
+        {
+          organizationId,
+          sessionId: session.id,
+          sequence: 3,
+          speaker: "SEEKER",
+          body: "I used Python for 5 years and cut failed jobs by 40%.",
+          targetKey: "required:0",
+          seekerAuthored: true,
+        },
+      ],
+    });
+    await regenerateCannedConsultationWording({
+      organizationId,
+      campaignId: campaign.id,
+    });
+    const unanswered = await prisma.consultationTurn.findFirst({
+      where: {
+        sessionId: session.id,
+        targetKey: WHY_THIS_COMPANY_TARGET_KEY,
+        speaker: "CONSULTANT",
+      },
+    });
+    const answered = await prisma.consultationTurn.findFirst({
+      where: { sessionId: session.id, targetKey: "required:0", speaker: "CONSULTANT" },
+    });
+    expect(unanswered?.body).not.toBe(canned);
+    expect(unanswered?.body).toMatch(/company|role/i);
+    expect(answered?.body).toBe(answeredCanned);
+    generateStructured.mockClear();
+    await regenerateCannedConsultationWording({
+      organizationId,
+      campaignId: campaign.id,
+    });
+    expect(generateStructured).not.toHaveBeenCalled();
+    const second = await prisma.consultationTurn.findFirst({
+      where: {
+        sessionId: session.id,
+        targetKey: WHY_THIS_COMPANY_TARGET_KEY,
+        speaker: "CONSULTANT",
+      },
+    });
+    expect(second?.body).toBe(unanswered?.body);
+  });
+
+  it("combines existing Partial-gap evidence with the added detail", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Partial ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    const session = await prisma.consultationSession.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        productId,
+        status: "IN_PROGRESS",
+        promptVersion: CONSULTATION_PROMPT_VERSION,
+      },
+    });
+    const gap =
+      evidenceTargets({
+        scorecard: parsed.scorecard,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+      }).find((target) => target.kind === "REQUIRED") ??
+      evidenceTargets({
+        scorecard: parsed.scorecard,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+      })[0];
+    const question =
+      "Your profile already shows you owned production payments reliability. What is the closest you have come to a partner or channel motion?";
+    await prisma.consultationAssessment.create({
+      data: {
+        organizationId,
+        sessionId: session.id,
+        targetKey: gap!.key,
+        kind: gap!.kind,
+        text: gap!.text,
+        strength: "PARTIAL",
+        supportingFactIds: ["ach_1"],
+      },
+    });
+    await prisma.consultationTurn.create({
+      data: {
+        organizationId,
+        sessionId: session.id,
+        sequence: 1,
+        speaker: "CONSULTANT",
+        body: question,
+        targetKey: gap!.key,
+      },
+    });
+    const added =
+      "I also built a two-tier partner program at Contoso that opened three new logos.";
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey: gap!.key,
+      answer: added,
+    });
+    const statement = await prisma.consultationStatement.findFirst({
+      where: { sessionId: session.id, kind: "INTERVIEW_ANSWER" },
+    });
+    expect(question).toMatch(/already shows/i);
+    expect(statement?.content).toMatch(/already had this in my profile/i);
+    expect(statement?.content).toContain(added);
   });
 });

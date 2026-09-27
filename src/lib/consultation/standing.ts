@@ -12,10 +12,6 @@ const KIND_RANK: Record<EvidenceKind, number> = {
   PREFERRED: 4,
 };
 import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
-import {
-  harperCoachingVoiceViolations,
-  seekerPrepInstructionViolations,
-} from "@/lib/consultation/voice";
 
 export const CONSULTATION_GAP_STATUSES = ["open", "closed", "confirmed"] as const;
 export type ConsultationGapStatus = (typeof CONSULTATION_GAP_STATUSES)[number];
@@ -113,14 +109,7 @@ export function briefingNeedsStandingRegen(input: {
   promptVersion: string | null | undefined;
   currentPromptVersion: string;
 }): boolean {
-  if (input.promptVersion !== input.currentPromptVersion) return true;
-  return input.texts.some(
-    (text) =>
-      harperCoachingVoiceViolations({
-        text,
-        firstName: input.firstName,
-      }).length > 0 || seekerPrepInstructionViolations(text).length > 0,
-  );
+  return input.promptVersion !== input.currentPromptVersion;
 }
 
 export function standingWorkIsComplete(input: {

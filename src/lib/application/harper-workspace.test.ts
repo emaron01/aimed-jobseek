@@ -161,7 +161,15 @@ describe("why this company", () => {
           experienceCalculation: null,
         },
       ],
-      modelQuestions: [],
+      modelQuestions: [
+        {
+          targetKey: WHY_THIS_COMPANY_TARGET_KEY,
+          text: "Why do you want this role at this company, given the reliability work you have already done?",
+          requirementInterpretation: null,
+          hiringTeamRoleId: "role_1",
+          whoCaresNote: "The hiring manager needs to hear your motivation.",
+        },
+      ],
       hiringTeam: [{ id: "role_1", name: "Hiring Manager" }],
       askedKeys: new Set(),
       skippedKeys: new Set(),
@@ -172,7 +180,7 @@ describe("why this company", () => {
     expect(planned.questions.length).toBeLessThanOrEqual(10);
     expect(planned.questions[0]?.targetKey).toBe(WHY_THIS_COMPANY_TARGET_KEY);
     expect(planned.questions[0]?.text).toBe(
-      consultationConversationCopy.whyThisCompanyQuestion,
+      "Why do you want this role at this company, given the reliability work you have already done?",
     );
   });
 });

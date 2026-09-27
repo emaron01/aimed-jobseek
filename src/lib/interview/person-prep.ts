@@ -2,7 +2,6 @@ import { Prisma } from "@prisma/client";
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { PERSON_PREP_TARGET_PREFIX } from "@/lib/consultation/contract";
 import { prisma } from "@/lib/prisma-client";
-import { consultationConfig, interviewConfig } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 
 export type PersonPrepAnswer = {
@@ -89,7 +88,14 @@ export async function personPrepFocus(input: {
   organizationId: string;
   campaignId: string;
   contactId: string;
-}): Promise<{ focusTargetKey: string; focusNote: string }> {
+}): Promise<{
+  focusTargetKey: string;
+  interviewerPrep: {
+    contactId: string;
+    name: string;
+    roleName: string;
+  };
+}> {
   const membership = await prisma.campaignContact.findFirst({
     where: {
       organizationId: input.organizationId,
@@ -111,7 +117,11 @@ export async function personPrepFocus(input: {
   const roleName = membership.chosenPersona?.name ?? membership.contact.title ?? "this interviewer";
   return {
     focusTargetKey: personPrepTargetKey(input.contactId),
-    focusNote: `${consultationConfig.displayName} prepares the seeker for ${name || "this interviewer"} (${roleName}). Cover what they will likely probe, which of the seeker's stories fit, and one or two questions that strengthen weak spots for this interviewer.`,
+    interviewerPrep: {
+      contactId: input.contactId,
+      name: name || "this interviewer",
+      roleName,
+    },
   };
 }
 
@@ -136,8 +146,7 @@ export async function recordPersonPrepOpening(input: {
     where: { id: membership.id },
     data: {
       personPrepStatus: "IN_PROGRESS",
-      personPrepOpening:
-        input.openingText?.trim() || interviewConfig.labels.personPrepFallbackOpening,
+      personPrepOpening: input.openingText?.trim() || null,
     },
   });
 }

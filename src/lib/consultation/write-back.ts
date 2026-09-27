@@ -7,7 +7,6 @@ import {
   factsSupportedBySources,
   knownNamesFromProfile,
 } from "@/lib/grounding/fact-tokens";
-import { consultationConversationCopy } from "@/lib/product-config";
 import {
   parseCandidateProfile,
   type CandidateProfile,
@@ -167,11 +166,7 @@ export function proposalsFromExtraction(input: {
       });
     }
   }
-  const followUpQuestion =
-    missingStarElements.length > 0
-      ? input.extracted.followUpQuestion?.trim() ||
-        followUpForMissingStar(missingStarElements)
-      : null;
+  const followUpQuestion = input.extracted.followUpQuestion?.trim() || null;
   return {
     proposals,
     dropped,
@@ -180,16 +175,6 @@ export function proposalsFromExtraction(input: {
     missingStarElements,
     partialStory,
   };
-}
-
-export function followUpForMissingStar(
-  missing: ConsultationExtractAnswer["missingStarElements"],
-): string {
-  const first = missing[0];
-  if (first && first in consultationConversationCopy.missingStarAsk) {
-    return consultationConversationCopy.missingStarAsk[first];
-  }
-  return consultationConversationCopy.askForStory;
 }
 
 export function isCompleteFactStatement(text: string): boolean {

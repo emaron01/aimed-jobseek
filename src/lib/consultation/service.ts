@@ -20,6 +20,8 @@ import {
   isConsultationExtractAnswer,
   isConsultationExtractFeedback,
   type CoachHiringTeamRole,
+  type ConsultationExtractResult,
+  type InterviewerPrepPayload,
   type SeekerStatedFactPayload,
 } from "@/lib/consultation/contract";
 import {
@@ -32,12 +34,15 @@ import {
   matchConsultationFocus,
   planQuestionRound,
   questionDuplicatesAsked,
-  defaultGapShareQuestion,
-  questionTextForGap,
+  questionNeedsRoleSource,
   seniorityWarrantsChronology,
   type QuestionRoundPlan,
 } from "@/lib/consultation/questions";
-import { repairExistingConsultationSession } from "@/lib/consultation/repair-existing";
+import {
+  cannedWordingRepairedAt,
+  looksLikeCannedHarperText,
+  repairExistingConsultationSession,
+} from "@/lib/consultation/repair-existing";
 import { SEEKER_STATED_FACT_ID } from "@/lib/product-research/seeker-background";
 import { type GroundingSource } from "@/lib/consultation/output-quality";
 import {
@@ -67,7 +72,6 @@ import {
 } from "@/lib/consultation/voice";
 import {
   appendConfirmedFact,
-  followUpForMissingStar,
   proposalsFromExtraction,
 } from "@/lib/consultation/write-back";
 import { prisma } from "@/lib/prisma-client";
@@ -83,7 +87,10 @@ import {
 } from "@/lib/product-research/candidate-profile";
 import { persistExtractedExperienceDates } from "@/lib/product-research/restore-role-dates";
 import { persistExtractedContactDetails } from "@/lib/product-research/restore-contact-details";
-import { contactIdFromPersonPrepTarget } from "@/lib/interview/person-prep";
+import {
+  contactIdFromPersonPrepTarget,
+  personPrepTargetKey,
+} from "@/lib/interview/person-prep";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
 
@@ -381,15 +388,89 @@ function polishingSources(input: {
   return [{ id: `answer:${input.turnId}`, text: input.answer }];
 }
 
+function extractThirdPersonViolations(text: string): string[] {
+  if (!text.trim()) return [];
+  if (
+    /\b(the seeker|the candidate|he|she)\b/i.test(text)
+  ) {
+    return [
+      "Write facts, story fields, coaching, follow-ups, and explanations in first person or neutral. Never use the seeker, the candidate, he, she, or the person's name.",
+    ];
+  }
+  return [];
+}
+
+function extractAnswerQualityIssues(input: {
+  data: ConsultationExtractResult;
+  gapText?: string;
+  profileItems?: ReturnType<typeof profileEvidenceItems>;
+}): string[] {
+  if (!isConsultationExtractAnswer(input.data)) return [];
+  const issues: string[] = [];
+  if (input.data.gapDecision === "incomplete") {
+    if (!input.data.coaching?.trim()) {
+      issues.push(
+        "When gapDecision is incomplete, coaching is required and must be written by you.",
+      );
+    }
+    if (!input.data.followUpQuestion?.trim()) {
+      issues.push(
+        "When gapDecision is incomplete, followUpQuestion is required and must be written by you.",
+      );
+    }
+    const coaching = input.data.coaching?.trim() ?? "";
+    const followUp = input.data.followUpQuestion?.trim() ?? "";
+    if (coaching && followUp && coaching === followUp) {
+      issues.push(
+        "coaching and followUpQuestion must be different: a brief note, then one question for the missing piece.",
+      );
+    }
+  }
+  const texts = [
+    ...input.data.facts.map((fact) => fact.text),
+    input.data.story?.situation ?? "",
+    input.data.story?.task ?? "",
+    input.data.story?.action ?? "",
+    input.data.story?.result ?? "",
+    input.data.coaching ?? "",
+    input.data.followUpQuestion ?? "",
+    ...input.data.demonstratedTargets.map((item) => item.explanation),
+  ];
+  for (const text of texts) {
+    issues.push(...extractThirdPersonViolations(text));
+  }
+  if (
+    input.gapText &&
+    questionNeedsRoleSource({
+      gapText: input.gapText,
+      profileItems: input.profileItems,
+    }) &&
+    input.data.followUpQuestion &&
+    !/which roles?/i.test(input.data.followUpQuestion)
+  ) {
+    issues.push(
+      "If years or background are not tied to roles, the follow-up must ask which roles they came from, in your own words.",
+    );
+  }
+  return [...new Set(issues)];
+}
+
 async function extractAnswerWithQuality(input: {
   answer: string;
   question: string;
   target: EvidenceTarget | null;
   targets: EvidenceTarget[];
   profileItems: ReturnType<typeof profileEvidenceItems>;
+  targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
+  supportingEvidence?: string[];
   usage?: AiCallUsageContext;
 }) {
   let lastFailure: string = consultationConversationCopy.generationFailed;
+  let qualityFeedback: string[] = [];
+  let lastOk: Extract<
+    Awaited<ReturnType<typeof extractWithModel>>,
+    { ok: true }
+  > | null = null;
   for (
     let attempt = 0;
     attempt <= consultationConfig.qualityRegenerationAttempts;
@@ -397,12 +478,28 @@ async function extractAnswerWithQuality(input: {
   ) {
     const extracted = await extractWithModel({
       ...input,
-      qualityFeedback: [],
+      qualityFeedback,
       usage: input.usage,
     });
-    if (extracted.ok) return extracted;
-    lastFailure = extracted.message;
+    if (!extracted.ok) {
+      lastFailure = extracted.message;
+      continue;
+    }
+    lastOk = extracted;
+    const issues = extractAnswerQualityIssues({
+      data: extracted.data,
+      gapText: input.target?.text,
+      profileItems: input.profileItems,
+    });
+    const lastAttempt =
+      attempt === consultationConfig.qualityRegenerationAttempts;
+    if (issues.length > 0 && !lastAttempt) {
+      qualityFeedback = issues;
+      continue;
+    }
+    return extracted;
   }
+  if (lastOk) return lastOk;
   return {
     ok: false as const,
     message: lastFailure,
@@ -424,6 +521,9 @@ export async function polishAnswerWithQuality(input: {
   seekerAnswers?: string[];
   firstName?: string | null;
   profileItems: ReturnType<typeof profileEvidenceItems>;
+  target?: EvidenceTarget | null;
+  targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
+  supportingEvidence?: string[];
   usage?: AiCallUsageContext;
 }) {
   const seekerAnswers =
@@ -436,6 +536,10 @@ export async function polishAnswerWithQuality(input: {
   const voiceSamples = await voiceSamplesForUsage(input.usage);
   let lastFailure: string = consultationConversationCopy.generationFailed;
   let qualityFeedback: string[] = [];
+  let lastAcceptable: Extract<
+    Awaited<ReturnType<typeof polishAnswerWithModel>>,
+    { ok: true }
+  > | null = null;
   for (
     let attempt = 0;
     attempt <= consultationConfig.qualityRegenerationAttempts;
@@ -448,6 +552,9 @@ export async function polishAnswerWithQuality(input: {
       confirmedGap,
       strengtheningNeeds: input.strengtheningNeeds,
       qualityFeedback,
+      target: input.target ?? null,
+      targetStrength: input.targetStrength ?? null,
+      supportingEvidence: input.supportingEvidence ?? [],
       voiceSamples,
       profileItems: input.profileItems,
       usage: input.usage,
@@ -458,33 +565,62 @@ export async function polishAnswerWithQuality(input: {
     }
     const interviewText = polished.data.interviewAnswer.trim();
     const bulletText = polished.data.resumeBullet?.trim() ?? "";
-    const interviewBroken =
-      !interviewText ||
-      isRawSeekerResult(interviewText, seekerAnswers) ||
-      talkTrackVoiceViolations({
-        text: interviewText,
-        firstName: input.firstName ?? null,
-      }).length > 0;
-    const bulletBroken =
-      !confirmedGap &&
-      (!bulletText || isRawSeekerResult(bulletText, seekerAnswers));
-    if (interviewBroken || bulletBroken) {
+    const interviewRaw = Boolean(
+      interviewText && isRawSeekerResult(interviewText, seekerAnswers),
+    );
+    const bulletRaw = Boolean(
+      !confirmedGap && bulletText && isRawSeekerResult(bulletText, seekerAnswers),
+    );
+    const lastAttempt =
+      attempt === consultationConfig.qualityRegenerationAttempts;
+    if (interviewRaw || bulletRaw) {
       lastFailure = consultationConversationCopy.generationFailed;
       qualityFeedback = [
         confirmedGap
           ? "Write a first-person talk track for addressing this gap honestly. Do not invent experience. Do not copy the reply unchanged. Never refer to the person in third person."
-          : "The last interview answer or resume bullet copied the wording or used third person. Write polished first-person statements. You may use the supplied Personal Profile; do not copy the reply unchanged.",
+          : "The last interview answer or resume bullet copied the wording. Write polished first-person statements. You may use the supplied Personal Profile; do not copy the reply unchanged.",
       ];
+      if (lastAttempt) {
+        return {
+          ok: false as const,
+          message: lastFailure,
+        };
+      }
       continue;
     }
-    return {
+    const accepted = {
       ...polished,
       data: {
         ...polished.data,
         resumeBullet: confirmedGap ? null : polished.data.resumeBullet,
       },
     };
+    const empty =
+      !interviewText || (!confirmedGap && !bulletText);
+    const voiceBroken =
+      talkTrackVoiceViolations({
+        text: interviewText,
+        firstName: input.firstName ?? null,
+      }).length > 0;
+    if ((empty || voiceBroken) && !lastAttempt) {
+      lastAcceptable = empty ? lastAcceptable : accepted;
+      qualityFeedback = [
+        confirmedGap
+          ? "Write a first-person talk track for addressing this gap honestly. Do not invent experience. Never refer to the person in third person."
+          : "Write polished first-person statements. You may use the supplied Personal Profile; do not copy the reply unchanged.",
+      ];
+      continue;
+    }
+    if (empty && lastAttempt && lastAcceptable) return lastAcceptable;
+    if (empty) {
+      return {
+        ok: false as const,
+        message: lastFailure,
+      };
+    }
+    return accepted;
   }
+  if (lastAcceptable) return lastAcceptable;
   return {
     ok: false as const,
     message: lastFailure,
@@ -587,7 +723,7 @@ async function clearWhyThisCompanyMotivation(input: {
   });
 }
 
-async function reextractExistingWhyThisCompanyMotivation(input: {
+export async function reextractExistingWhyThisCompanyMotivation(input: {
   organizationId: string;
   campaignId: string;
 }): Promise<void> {
@@ -629,7 +765,7 @@ async function reextractExistingWhyThisCompanyMotivation(input: {
     whyThisCompanyTarget();
   const question =
     [...whyQuestions].at(-1)?.body.trim() ||
-    consultationConversationCopy.whyThisCompanyQuestion;
+    target.text;
   const extracted = await extractAnswerWithQuality({
     answer: whyReplies.map((turn) => turn.body).join("\n"),
     question,
@@ -672,6 +808,163 @@ async function reextractExistingWhyThisCompanyMotivation(input: {
       },
     });
   }
+}
+
+function consultantTurnIsAnswered(
+  turns: Array<{
+    id: string;
+    speaker: string;
+    skipped: boolean;
+    body: string;
+    targetKey: string | null;
+    analysisJson: unknown;
+  }>,
+  question: { id: string; targetKey: string | null },
+): boolean {
+  return turns.some(
+    (reply) =>
+      reply.speaker === "SEEKER" &&
+      !reply.skipped &&
+      reply.body.trim() &&
+      (replyToTurnIdFromAnalysis(reply.analysisJson) === question.id ||
+        (Boolean(question.targetKey) && reply.targetKey === question.targetKey)),
+  );
+}
+
+function analysisWithCannedRepair(value: unknown): Prisma.InputJsonValue {
+  const base =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? { ...(value as Record<string, unknown>) }
+      : {};
+  return {
+    ...base,
+    cannedWordingRepairedAt: new Date().toISOString(),
+  } as Prisma.InputJsonValue;
+}
+
+export async function regenerateCannedConsultationWording(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const session = await prisma.consultationSession.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+    },
+    include: { turns: { orderBy: { sequence: "asc" } } },
+  });
+  if (!session) return;
+  const unansweredCanned = session.turns.filter(
+    (turn) =>
+      turn.speaker === "CONSULTANT" &&
+      turn.intent !== "CLOSING" &&
+      looksLikeCannedHarperText(turn.body) &&
+      !cannedWordingRepairedAt(turn.analysisJson) &&
+      !consultantTurnIsAnswered(session.turns, turn),
+  );
+  if (unansweredCanned.length === 0) return;
+  const { requirement, profile } = await requireApplication(
+    input.organizationId,
+    input.campaignId,
+  );
+  const [roles, companyResearch, interviewStages] = await Promise.all([
+    loadCoachHiringTeam(input.organizationId, input.campaignId),
+    loadCoachCompanyResearch(input.organizationId, input.campaignId),
+    prisma.interviewStage.findMany({
+      where: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+      },
+      select: { id: true, notesBefore: true, notesAfter: true },
+    }),
+  ]);
+  const askedQuestions = askedQuestionsFromTurns(session.turns);
+  const profileItems = [
+    ...profileEvidenceItems(profile),
+    ...learnedNotesEvidence(input.campaignId, requirement.seekerLearnedNotes),
+    ...interviewNotesEvidence(interviewStages),
+  ];
+  const focusTargetKey = unansweredCanned[0]?.targetKey ?? null;
+  let lastPlan: Extract<
+    Awaited<ReturnType<typeof planConsultationWithModel>>,
+    { ok: true }
+  > | null = null;
+  let qualityFeedback = [
+    "These unanswered questions use stock product wording and must be rewritten in your own words. Keep the same targetKey. Never paste a fixed stock sentence.",
+    ...unansweredCanned.map((turn) => `Rewrite: ${turn.body}`),
+  ];
+  for (
+    let attempt = 0;
+    attempt <= consultationConfig.qualityRegenerationAttempts;
+    attempt += 1
+  ) {
+    const plan = await planConsultationWithModel({
+      targets: targetsFromRequirement(requirement),
+      profileItems,
+      seekerStatedFacts: seekerStatedFactsForCoach({
+        profile,
+        campaignId: input.campaignId,
+        learnedNotes: requirement.seekerLearnedNotes,
+        stages: interviewStages,
+      }),
+      askedQuestions,
+      hiringTeam: roles,
+      companyResearch,
+      chronologyRequested: seniorityWarrantsChronology({
+        seniority: requirement.seniority,
+        title: requirement.title,
+      }),
+      coveredTargetKeys: [],
+      focusTargetKey,
+      qualityFeedback,
+      usage: consultationUsage(
+        input.organizationId,
+        input.campaignId,
+        "CONSULTATION",
+      ),
+    });
+    if (!plan.ok) continue;
+    lastPlan = plan;
+    const lastAttempt =
+      attempt === consultationConfig.qualityRegenerationAttempts;
+    const stillCanned = unansweredCanned.some((turn) => {
+      const replacement = plan.data.questions.find(
+        (question) => question.targetKey === turn.targetKey,
+      );
+      const next = replacement?.text.trim() || "";
+      return !next || looksLikeCannedHarperText(next);
+    });
+    if (stillCanned && !lastAttempt) {
+      qualityFeedback = [
+        ...qualityFeedback,
+        "Write each replacement question yourself. Do not reuse stock wording.",
+      ];
+      continue;
+    }
+    break;
+  }
+  for (const turn of unansweredCanned) {
+    const replacement = lastPlan?.data.questions.find(
+      (question) => question.targetKey === turn.targetKey,
+    );
+    const next = replacement?.text.trim() || "";
+    await prisma.consultationTurn.update({
+      where: { id: turn.id },
+      data: {
+        ...(next && !looksLikeCannedHarperText(next) ? { body: next } : {}),
+        analysisJson: analysisWithCannedRepair(turn.analysisJson),
+      },
+    });
+  }
+}
+
+export async function prepareExistingConsultationSession(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  await repairExistingConsultationSession(input);
+  await reextractExistingWhyThisCompanyMotivation(input);
+  await regenerateCannedConsultationWording(input);
 }
 
 function seekerFacingGenerationError(message: string): string {
@@ -804,6 +1097,7 @@ function consultationPlanQualityIssues(input: {
   assessments: EvidenceAssessment[];
   dropped: QuestionRoundPlan["dropped"];
   firstName: string | null;
+  profileItems?: ReturnType<typeof profileEvidenceItems>;
 }): string[] {
   const issues: string[] = [];
   const droppedGaps = input.dropped.filter(
@@ -814,6 +1108,28 @@ function consultationPlanQualityIssues(input: {
     issues.push(
       "Write one question for every remaining gap, most important first.",
     );
+  }
+  for (const question of input.questions) {
+    if (!question.whoCaresNote.trim()) {
+      issues.push(
+        "whoCaresNote is required on every question: name the Hiring Team role and what that person needs to hear.",
+      );
+    }
+    const assessment = input.assessments.find(
+      (item) => item.key === question.targetKey,
+    );
+    if (
+      assessment &&
+      questionNeedsRoleSource({
+        gapText: assessment.text,
+        profileItems: input.profileItems,
+      }) &&
+      !/which roles?/i.test(question.text)
+    ) {
+      issues.push(
+        "When a seeker-stated background fact is not tied to roles, that gap's question must ask which roles that background came from, in your own words.",
+      );
+    }
   }
   const texts = [
     input.commentary,
@@ -837,6 +1153,13 @@ function consultationPlanQualityIssues(input: {
   return [...new Set(issues)];
 }
 
+function followUpBody(coaching: string | null | undefined, question: string): string {
+  const note = coaching?.trim() ?? "";
+  const ask = question.trim();
+  if (note && ask && note !== ask) return `${note}\n\n${ask}`;
+  return note || ask;
+}
+
 async function planAndStoreRound(input: {
   organizationId: string;
   campaignId: string;
@@ -853,6 +1176,7 @@ async function planAndStoreRound(input: {
   roles: CoachHiringTeamRole[];
   focusTargetKey?: string | null;
   focusGuidance?: string[];
+  interviewerPrep?: InterviewerPrepPayload | null;
 }): Promise<QuestionRoundPlan["questions"]> {
   await prisma.consultationSession.update({
     where: { id: input.sessionId },
@@ -924,6 +1248,7 @@ async function planAndStoreRound(input: {
         ),
       ],
       focusTargetKey: input.focusTargetKey ?? null,
+      interviewerPrep: input.interviewerPrep ?? null,
       qualityFeedback,
     });
     if (!plan.ok) {
@@ -962,6 +1287,7 @@ async function planAndStoreRound(input: {
       assessments,
       dropped: planned.dropped,
       firstName,
+      profileItems,
     });
     const lastAttempt = attempt === consultationConfig.qualityRegenerationAttempts;
     if (issues.length > 0 && !lastAttempt) {
@@ -990,42 +1316,12 @@ async function planAndStoreRound(input: {
       0,
       Math.max(0, consultationConfig.applicationQuestionLimit - askedQuestions.length),
     );
-  const gapLabels = voicedQuestions
-    .filter(
-      (question) =>
-        !question.followUp &&
-        question.targetKey &&
-        question.targetKey !== "chronology",
-    )
-    .map((question) => {
-      const assessment = voicedAssessments.find(
-        (item) => item.key === question.targetKey,
-      );
-      return assessment?.text ?? question.text;
-    })
-    .filter((label) => !seekerPrepInstructionViolations(label).length);
   const briefing = {
     overall: plan.data.briefing.overall,
     strongestAngles: plan.data.briefing.strongestAngles,
-    importantGaps:
-      gapLabels.length > 0
-        ? gapLabels
-        : plan.data.briefing.importantGaps.filter(
-            (item) => !seekerPrepInstructionViolations(item).length,
-          ),
+    importantGaps: plan.data.briefing.importantGaps,
     storyPlan: [],
   };
-  if (briefing.importantGaps.length === 0) {
-    briefing.importantGaps = voicedAssessments
-      .filter((assessment) => assessment.strength !== "STRONG")
-      .slice(0, 3)
-      .map((assessment) => assessment.text);
-  }
-  if (briefing.importantGaps.length === 0) {
-    briefing.importantGaps = [
-      "No remaining experience gaps after combining your profile with this job.",
-    ];
-  }
   await saveAssessments(input.organizationId, input.sessionId, voicedAssessments);
   for (const question of voicedQuestions) {
     await addTurn({
@@ -1202,6 +1498,7 @@ function resolveConsultationTargets(input: {
   };
   focusTargetKey?: string | null;
   focusNote?: string | null;
+  interviewerPrep?: InterviewerPrepPayload | null;
 }): { targets: EvidenceTarget[]; focusTargetKey: string | null } {
   const targets = targetsFromRequirement(input.requirement);
   let focusTargetKey = matchConsultationFocus({
@@ -1211,8 +1508,8 @@ function resolveConsultationTargets(input: {
   });
   const note = input.focusNote?.trim() ?? "";
   const personPrepKey = input.focusTargetKey?.trim() ?? "";
-  if (personPrepKey.startsWith("person-prep:")) {
-    focusTargetKey = personPrepKey;
+  if (input.interviewerPrep || personPrepKey.startsWith("person-prep:")) {
+    focusTargetKey = personPrepKey || personPrepTargetKey(input.interviewerPrep?.contactId ?? "");
   } else if (!focusTargetKey && note) {
     focusTargetKey = "interview-note-focus";
   }
@@ -1224,13 +1521,10 @@ export async function startConsultation(input: {
   campaignId: string;
   focusNote?: string | null;
   focusTargetKey?: string | null;
+  interviewerPrep?: InterviewerPrepPayload | null;
   forceReassess?: boolean;
 }): Promise<void> {
-  await repairExistingConsultationSession({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-  });
-  await reextractExistingWhyThisCompanyMotivation({
+  await prepareExistingConsultationSession({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
   });
@@ -1239,12 +1533,15 @@ export async function startConsultation(input: {
     input.campaignId,
   );
   const hasFocus = Boolean(
-    input.focusNote?.trim() || input.focusTargetKey?.trim(),
+    input.focusNote?.trim() ||
+      input.focusTargetKey?.trim() ||
+      input.interviewerPrep,
   );
   const { targets, focusTargetKey } = resolveConsultationTargets({
     requirement,
     focusTargetKey: input.focusTargetKey,
     focusNote: input.focusNote,
+    interviewerPrep: input.interviewerPrep,
   });
   const existing = await prisma.consultationSession.findUnique({
     where: { campaignId: input.campaignId },
@@ -1292,6 +1589,7 @@ export async function startConsultation(input: {
       targets,
       roles,
       focusTargetKey,
+      interviewerPrep: input.interviewerPrep,
     });
   } catch (error) {
     const message =
@@ -1343,12 +1641,33 @@ async function processAnswerGeneration(input: {
     input.campaignId,
     "CONSULTATION_REPLY",
   );
+  const profileItems = profileEvidenceItems(input.profile);
+  const storedAssessment = input.target
+    ? await prisma.consultationAssessment.findFirst({
+        where: { sessionId: input.sessionId, targetKey: input.target.key },
+      })
+    : null;
+  const targetStrength =
+    storedAssessment?.strength === "STRONG" ||
+    storedAssessment?.strength === "PARTIAL" ||
+    storedAssessment?.strength === "NONE"
+      ? storedAssessment.strength
+      : null;
+  const supportingEvidence = storedAssessment
+    ? profileItems
+        .filter((item) =>
+          parseStringArray(storedAssessment.supportingFactIds).includes(item.id),
+        )
+        .map((item) => item.text)
+    : [];
   const extracted = await extractAnswerWithQuality({
     answer: input.answerContext,
     question: input.question,
     target: input.target,
     targets: input.targets,
-    profileItems: profileEvidenceItems(input.profile),
+    profileItems,
+    targetStrength,
+    supportingEvidence,
     usage: replyUsage,
   });
   if (!extracted.ok) {
@@ -1427,20 +1746,11 @@ async function processAnswerGeneration(input: {
     extracted.data.story ??
     null;
   const gapDecision = extracted.data.gapDecision;
-  const followUpQuestion =
-    verified.followUpQuestion ??
-    (verified.missingStarElements.length > 0
-      ? followUpForMissingStar(verified.missingStarElements)
-      : storyProposal?.story
-        ? null
-        : consultationConversationCopy.askForStory);
+  const followUpQuestion = verified.followUpQuestion;
   const incomplete =
     gapDecision === "incomplete" ||
     (verified.missingStarElements.length > 0 && gapDecision !== "no_evidence");
-  const coaching =
-    extracted.data.coaching?.trim() ||
-    followUpQuestion ||
-    consultationConversationCopy.keepCoaching;
+  const coaching = extracted.data.coaching?.trim() || null;
   const analysisJson = {
     status: "READY",
     ...(input.replyToTurnId ? { replyToTurnId: input.replyToTurnId } : {}),
@@ -1497,7 +1807,10 @@ async function processAnswerGeneration(input: {
       .map((answer) => answer.trim())
       .filter(Boolean),
     firstName: profileFirstName(input.profile),
-    profileItems: profileEvidenceItems(input.profile),
+    profileItems,
+    target: input.target,
+    targetStrength,
+    supportingEvidence,
     usage: replyUsage,
   });
   if (!polished.ok) {
@@ -1712,14 +2025,11 @@ export async function retryConsultationGeneration(input: {
         question.id,
       );
       if (followUpCount < consultationConfig.maxFollowUpsPerTarget) {
-        const coaching = processed.coaching?.trim();
         await addTurn({
           organizationId: input.organizationId,
           sessionId: session.id,
           speaker: "CONSULTANT",
-          body: coaching
-            ? `${coaching}\n\n${processed.followUpQuestion}`
-            : processed.followUpQuestion,
+          body: followUpBody(processed.coaching, processed.followUpQuestion),
           targetKey: question.targetKey ?? failedAnswer.targetKey,
           followUp: true,
           analysisJson: { replyToTurnId: question.id },
@@ -1900,51 +2210,62 @@ function analysisIsComplete(value: unknown): boolean {
   return status !== "FAILED" && status !== "PENDING";
 }
 
-async function ensureGapShareQuestion(input: {
+async function recordGapShareReply(input: {
   organizationId: string;
   sessionId: string;
-  campaignId: string;
   targetKey: string;
-}) {
-  const existing = await prisma.consultationTurn.findFirst({
-    where: {
-      sessionId: input.sessionId,
-      speaker: "CONSULTANT",
-      targetKey: input.targetKey,
-      followUp: false,
-      NOT: { intent: "CLOSING" },
-    },
-    orderBy: { sequence: "desc" },
-  });
-  if (existing) return existing;
+  answer: string;
+  intent?: string | null;
+}): Promise<{
+  sessionId: string;
+  targetKey: string;
+  turnId: string;
+  questionTurnId: string;
+} | null> {
   const assessment = await prisma.consultationAssessment.findFirst({
     where: { sessionId: input.sessionId, targetKey: input.targetKey },
   });
   if (!assessment) return null;
-  const { profile } = await requireApplication(
-    input.organizationId,
-    input.campaignId,
+  const turns = await loadSessionTurns(input.sessionId);
+  const existing = [...turns].reverse().find(
+    (turn) =>
+      turn.speaker === "SEEKER" &&
+      turn.body === input.answer &&
+      !analysisIsComplete(turn.analysisJson) &&
+      turn.targetKey === input.targetKey,
   );
-  const profileItems = profileEvidenceItems(profile);
-  const text =
-    questionTextForGap(
-      { key: assessment.targetKey, text: assessment.text },
-      null,
-      profileItems,
-    ) ||
-    defaultGapShareQuestion(
-      { key: assessment.targetKey, text: assessment.text },
-      profileItems,
-    );
-  if (!text) return null;
-  return addTurn({
+  if (existing) {
+    await prisma.consultationSession.update({
+      where: { id: input.sessionId },
+      data: { generationStatus: "GENERATING", generationError: null },
+    });
+    return {
+      sessionId: input.sessionId,
+      targetKey: input.targetKey,
+      turnId: existing.id,
+      questionTurnId: "",
+    };
+  }
+  const seekerTurn = await addTurn({
     organizationId: input.organizationId,
     sessionId: input.sessionId,
-    speaker: "CONSULTANT",
-    body: text,
+    speaker: "SEEKER",
+    body: input.answer,
     targetKey: input.targetKey,
-    intent: "REPLY",
+    seekerAuthored: true,
+    intent: input.intent ?? "REPLY",
+    analysisJson: { status: "PENDING" },
   });
+  await prisma.consultationSession.update({
+    where: { id: input.sessionId },
+    data: { generationStatus: "GENERATING", generationError: null },
+  });
+  return {
+    sessionId: input.sessionId,
+    targetKey: input.targetKey,
+    turnId: seekerTurn.id,
+    questionTurnId: "",
+  };
 }
 
 export async function recordConsultationReply(input: {
@@ -1973,25 +2294,23 @@ export async function recordConsultationReply(input: {
       data: { status: "IN_PROGRESS" },
     });
   }
-  let { turns, view } = await loadSessionQaView(session.id);
+  const { turns, view } = await loadSessionQaView(session.id);
   const requested = input.targetKey?.trim() ?? "";
-  let item = requested.startsWith("question:")
+  const item = requested.startsWith("question:")
     ? findConsultationQaItem(view, requested)
     : resolveReplyableQaItem(view, requested) ??
       (!requested
         ? view.questions.find(consultationQuestionAcceptsReply) ?? null
         : null);
   if (!item && requested && !requested.startsWith("question:")) {
-    const created = await ensureGapShareQuestion({
+    const shared = await recordGapShareReply({
       organizationId: input.organizationId,
       sessionId: session.id,
-      campaignId: input.campaignId,
       targetKey: requested,
+      answer,
+      intent: input.intent,
     });
-    if (created) {
-      ({ turns, view } = await loadSessionQaView(session.id));
-      item = findConsultationQaItem(view, consultationReplyTargetKey(created.id));
-    }
+    if (shared) return shared;
   }
   const question = item ? consultantForQaItem(turns, item) : null;
   if (!item || !question) replyCouldNotBeRecorded();
@@ -2143,19 +2462,28 @@ export async function processConsultationReply(input: {
             (turn.id === questionTurnId ||
               turn.targetKey === (seekerTurn.targetKey ?? targetKey)),
         );
-  if (!question) {
+  const resolvedItem =
+    item ??
+    (question
+      ? view.questions.find(
+          (questionItem) => questionItem.questionTurnId === question.id,
+        ) ?? null
+      : view.questions.find(
+          (questionItem) =>
+            questionItem.targetKey ===
+            (targetKey.startsWith("question:") ? "" : targetKey),
+        ) ?? null);
+  if (question) {
+    questionTurnId = resolvedItem?.questionTurnId ?? question.id;
+  }
+  const assessmentKey =
+    question?.targetKey ??
+    resolvedItem?.targetKey ??
+    (targetKey.startsWith("question:") ? "" : targetKey);
+  if (!question && !assessmentKey) {
     await failGeneration(session.id, consultationConversationCopy.generationFailed);
     throw new Error(consultationConversationCopy.generationFailed);
   }
-  const resolvedItem =
-    item ??
-    view.questions.find((questionItem) => questionItem.questionTurnId === question.id) ??
-    null;
-  questionTurnId = resolvedItem?.questionTurnId ?? question.id;
-  const assessmentKey =
-    question.targetKey ??
-    resolvedItem?.targetKey ??
-    (targetKey.startsWith("question:") ? "" : targetKey);
   const seekerTurnId = seekerTurn.id;
   const { requirement, profile } = await requireApplication(
     input.organizationId,
@@ -2197,10 +2525,14 @@ export async function processConsultationReply(input: {
     resolvedItem?.seekerAnswers
       .map((entry) => entry.id)
       .filter((turnId) => turnId !== resultTurnId) ?? [];
-  const followUpCount = consultationFollowUpCount(
-    toQaTurns(turns),
-    questionTurnId,
-  );
+  const followUpCount = questionTurnId
+    ? consultationFollowUpCount(toQaTurns(turns), questionTurnId)
+    : turns.filter(
+        (turn) =>
+          turn.speaker === "CONSULTANT" &&
+          turn.followUp &&
+          turn.targetKey === assessmentKey,
+      ).length;
   const allowFollowUp =
     !input.forceDecision &&
     assessmentKey !== "chronology" &&
@@ -2216,11 +2548,13 @@ export async function processConsultationReply(input: {
     question:
       askedTurn?.body ??
       resolvedItem?.followUp?.text ??
-      question.body,
+      question?.body ??
+      target?.text ??
+      assessmentKey,
     target: target ?? null,
     targets,
     profile,
-    replyToTurnId: questionTurnId,
+    replyToTurnId: questionTurnId || null,
     allowFollowUp,
   });
   if (!processed.ok) {
@@ -2233,7 +2567,6 @@ export async function processConsultationReply(input: {
       companyMotivation: processed.companyMotivation,
     });
   }
-  const coaching = processed.coaching?.trim();
   const askFollowUp =
     !processed.wroteResult &&
     Boolean(processed.followUpQuestion) &&
@@ -2249,9 +2582,7 @@ export async function processConsultationReply(input: {
       organizationId: input.organizationId,
       sessionId: session.id,
       speaker: "CONSULTANT",
-      body: coaching
-        ? `${coaching}\n\n${processed.followUpQuestion}`
-        : processed.followUpQuestion,
+      body: followUpBody(processed.coaching, processed.followUpQuestion),
       targetKey: assessmentKey || targetKey,
       followUp: true,
       analysisJson: {

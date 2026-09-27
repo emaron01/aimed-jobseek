@@ -16,6 +16,7 @@ import {
   type ConsultationPlanResult,
   type ConsultationExtractResult,
   type ConsultationPolishResult,
+  type InterviewerPrepPayload,
   type SeekerStatedFactPayload,
 } from "@/lib/consultation/contract";
 import {
@@ -58,6 +59,7 @@ export async function planConsultationWithModel(input: {
   chronologyRequested: boolean;
   coveredTargetKeys: string[];
   focusTargetKey?: string | null;
+  interviewerPrep?: InterviewerPrepPayload | null;
   qualityFeedback?: string[];
   usage?: AiCallUsageContext;
 }): Promise<ConsultationPlanAiResult> {
@@ -115,6 +117,8 @@ export async function extractWithModel(input: {
     roleId?: string | null;
   }>;
   qualityFeedback?: string[];
+  targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
+  supportingEvidence?: string[];
   usage?: AiCallUsageContext;
 }): Promise<
   | { ok: true; data: ConsultationExtractResult }
@@ -158,6 +162,9 @@ export async function polishAnswerWithModel(input: {
   confirmedGap?: boolean;
   strengtheningNeeds: string[];
   qualityFeedback?: string[];
+  target?: { key: string; kind: string; text: string } | null;
+  targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
+  supportingEvidence?: string[];
   voiceSamples?: Array<{ label: string; sampleText: string }>;
   profileItems: Array<{
     id: string;

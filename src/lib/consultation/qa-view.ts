@@ -36,10 +36,6 @@ export type ConsultationQaView = {
   questions: ConsultationQaItem[];
 };
 
-export function isGenericFollowUpText(body: string): boolean {
-  return body.trim() === consultationConversationCopy.askForStory.trim();
-}
-
 export function isClosingNoteTurn(turn: Pick<QaTurn, "speaker" | "intent">): boolean {
   return turn.speaker === "CONSULTANT" && turn.intent === "CLOSING";
 }
@@ -64,8 +60,7 @@ export function isPrimaryHarperQuestion(turn: QaTurn): boolean {
   return (
     turn.speaker === "CONSULTANT" &&
     !turn.followUp &&
-    !isClosingNoteTurn(turn) &&
-    !isGenericFollowUpText(turn.body)
+    !isClosingNoteTurn(turn)
   );
 }
 
@@ -176,7 +171,7 @@ export function consultationFollowUpCount(
 ): number {
   return turns.filter((turn) => {
     if (turn.speaker !== "CONSULTANT") return false;
-    if (!turn.followUp && !isGenericFollowUpText(turn.body)) return false;
+    if (!turn.followUp) return false;
     return primaryFor(turns, turn).id === questionTurnId;
   }).length;
 }
@@ -245,7 +240,7 @@ function seekerAnsweredThis(turns: QaTurn[], consultant: QaTurn): boolean {
     if (answered?.id === consultant.id) return true;
     return (
       replyToTurnIdFromAnalysis(turn.analysisJson) === primaryId &&
-      (consultant.followUp || isGenericFollowUpText(consultant.body))
+      consultant.followUp
     );
   });
 }
@@ -317,7 +312,7 @@ export function buildConsultationQaView(input: {
 
   for (const turn of turns) {
     if (turn.speaker !== "CONSULTANT") continue;
-    const followUp = turn.followUp || isGenericFollowUpText(turn.body);
+    const followUp = turn.followUp;
     if (!followUp || seekerAnsweredThis(turns, turn)) continue;
     const primary = primaryFor(turns, turn);
     if (isPrimaryHarperQuestion(primary) && primary.id !== turn.id) {

@@ -25,7 +25,7 @@ import {
   consultationItemNeedsResultRepair,
   shouldEnqueueConsultationResultRepair,
 } from "@/lib/consultation/results";
-import { repairExistingConsultationSession } from "@/lib/consultation/repair-existing";
+import { prepareExistingConsultationSession } from "@/lib/consultation/service";
 import {
   briefingNeedsStandingRegen,
   buildStandingGaps,
@@ -172,7 +172,7 @@ export async function ConsultationSection({
   jobs?: WorkspaceJobStatusView[];
 }) {
   if (canEdit) {
-    await repairExistingConsultationSession({ organizationId, campaignId });
+    await prepareExistingConsultationSession({ organizationId, campaignId });
   }
   const [session, campaign] = await Promise.all([
     prisma.consultationSession.findFirst({
@@ -511,9 +511,9 @@ export async function ConsultationSection({
         {threadStatus === "PAUSED" ? (
           <p className="text-sm text-ink">Paused. Resume when you want to continue.</p>
         ) : null}
-        {standingComplete && (closingNote || threadStatus === "DONE") ? (
+        {standingComplete && closingNote ? (
           <p className="text-sm text-ink" data-testid="consultation-complete">
-            {closingNote || consultationConversationCopy.planComplete}
+            {closingNote}
           </p>
         ) : null}
         {canEdit && !session && !consultationBusy ? (

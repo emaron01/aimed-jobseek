@@ -23,7 +23,7 @@ describe("existing consultation repair", () => {
     const service = readFileSync("src/lib/consultation/service.ts", "utf8");
     expect(service).toContain("repairExistingConsultationSession");
     const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
-    expect(section).toContain("repairExistingConsultationSession");
+    expect(section).toContain("prepareExistingConsultationSession");
     const standing = readFileSync(
       "src/components/ConsultationStanding.tsx",
       "utf8",

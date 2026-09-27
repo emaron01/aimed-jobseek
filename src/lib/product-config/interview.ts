@@ -48,8 +48,6 @@ export const interviewConfig = Object.freeze({
     startConsultation: "Start a short consultation",
     personPrepOffer: "Prep for this interviewer",
     personPrepStart: "Start interviewer prep",
-    personPrepFallbackOpening:
-      "We will cover what this person will likely probe, which of your stories fit, and one or two questions that strengthen weak spots.",
     progressTitle: "Application status",
     staleGuide: "This guide is stale because interview information changed.",
     clarifyingHelp: "Answer or skip. These questions change how the guide is written.",

@@ -89,27 +89,13 @@ export const consultationConversationCopy = Object.freeze({
   notAcceptingReplies: `${consultationConfig.displayName} is not taking replies right now.`,
   generationQualityFailed: `${consultationConfig.displayName} could not keep one part of this coaching after checks. The rest is below. Retry the missing part.`,
   planUnusable: `${consultationConfig.displayName} could not plan this conversation. Retry.`,
-  askForStory:
-    "Tell me what happened, what you did, and what the result was.",
-  keepCoaching:
-    "I can work with what you shared. A bit more detail will make the story stronger.",
-  missingStarAsk: {
-    SITUATION: "Tell me what the situation was.",
-    TASK: "Tell me what you were asked to do.",
-    ACTION: "Tell me what you did.",
-    RESULT: "Tell me what the result was.",
-    METRIC: "Tell me the number or outcome.",
-  },
   modelUnavailable: `${consultationConfig.displayName} could not start this coaching. Retry when you are ready.`,
   retry: `Retry ${consultationConfig.displayName}`,
   start: `Start with ${consultationConfig.displayName}`,
-  planComplete: "The plan for this conversation is complete.",
   starting: `${consultationConfig.displayName} is reading your ${vocab.product.singular} and the job…`,
   typing: `${consultationConfig.displayName} is thinking…`,
   thinking: `${consultationConfig.displayName} is thinking…`,
   whyThisCompanyTarget: "Why you want to work at this company",
-  whyThisCompanyQuestion:
-    "Why do you want to work at this company? Say what specifically draws you to it for this role.",
   knowAboutMe: "What You Should Know About Me",
   knowAboutMeHelp:
     `Tell ${consultationConfig.displayName} background that is not already in your ${vocab.product.singular}, for example experience that was left off the resume. This is saved as a seeker-stated fact and applies to every application.`,

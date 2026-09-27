@@ -14,6 +14,37 @@ export function looksLikeCareerWalkthrough(text: string): boolean {
   return /walk me through your (?:career|background|work history)/i.test(text);
 }
 
+const LEGACY_CANNED_HARPER_TEXT = [
+  "Which roles did that come from?",
+  "What in your background speaks to this?",
+  "Why do you want to work at this company? Say what specifically draws you to it for this role.",
+  "Tell me what happened, what you did, and what the result was.",
+  "I can work with what you shared. A bit more detail will make the story stronger.",
+  "Tell me what the situation was.",
+  "Tell me what you were asked to do.",
+  "Tell me what you did.",
+  "Tell me what the result was.",
+  "Tell me the number or outcome.",
+] as const;
+
+export function looksLikeCannedHarperText(text: string): boolean {
+  const body = text.trim();
+  if (!body) return false;
+  return LEGACY_CANNED_HARPER_TEXT.some(
+    (fragment) =>
+      body === fragment ||
+      body.endsWith(` ${fragment}`) ||
+      body.includes(fragment),
+  );
+}
+
+export function cannedWordingRepairedAt(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const marked = (value as { cannedWordingRepairedAt?: unknown })
+    .cannedWordingRepairedAt;
+  return typeof marked === "string" && marked.trim() ? marked.trim() : null;
+}
+
 export async function repairExistingConsultationSession(input: {
   organizationId: string;
   campaignId: string;

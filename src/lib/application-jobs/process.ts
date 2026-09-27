@@ -29,6 +29,7 @@ import {
   continueConsultationPlanning,
   editConsultationAnswer,
   processConsultationReply,
+  prepareExistingConsultationSession,
   repairConsultationResults,
   replyConsultation,
   reassessConsultationStanding,
@@ -285,6 +286,10 @@ async function processConsultationJob(input: {
   questionTurnId?: string;
   contactId?: string | null;
 }): Promise<void> {
+  await prepareExistingConsultationSession({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+  });
   if (input.operation === "retry") {
     await retryConsultationGeneration(input);
     return;
@@ -316,24 +321,17 @@ async function processConsultationJob(input: {
       organizationId: input.organizationId,
       campaignId: input.campaignId,
       focusTargetKey: focus.focusTargetKey,
-      focusNote: focus.focusNote,
+      interviewerPrep: focus.interviewerPrep,
     });
     const session = await prisma.consultationSession.findUnique({
       where: { campaignId: input.campaignId },
-      select: { id: true },
+      select: { coachNote: true },
     });
-    const opening = session
-      ? await prisma.consultationTurn.findFirst({
-          where: { sessionId: session.id, speaker: "CONSULTANT" },
-          orderBy: { sequence: "desc" },
-          select: { body: true },
-        })
-      : null;
     await recordPersonPrepOpening({
       organizationId: input.organizationId,
       campaignId: input.campaignId,
       contactId: input.contactId,
-      openingText: opening?.body ?? null,
+      openingText: session?.coachNote ?? null,
     });
     return;
   }

@@ -193,7 +193,7 @@ describe("Harper core loop standing", () => {
       2,
     );
     expect(section).toContain("latestClosingNote");
-    expect(section).toContain("repairExistingConsultationSession");
+    expect(section).toContain("prepareExistingConsultationSession");
     expect(section).toContain("shouldEnqueueConsultationStandingRegen");
     expect(
       standingWorkIsComplete({
@@ -266,6 +266,14 @@ describe("Harper core loop standing", () => {
         lastReassessAttemptAt: new Date("2026-09-26T19:00:00.000Z"),
         lastReassessSucceeded: true,
         stalePromptVersion: false,
+      }),
+    ).toBe(false);
+    expect(
+      briefingNeedsStandingRegen({
+        texts: ["The seeker has a strong enterprise-sales record."],
+        firstName: "Jordan",
+        promptVersion: CONSULTATION_PROMPT_VERSION,
+        currentPromptVersion: CONSULTATION_PROMPT_VERSION,
       }),
     ).toBe(false);
   });

@@ -4,6 +4,7 @@ import {
   type AskedConsultationQuestion,
   type CoachCompanyResearch,
   type CoachHiringTeamRole,
+  type InterviewerPrepPayload,
   type SeekerStatedFactPayload,
 } from "@/lib/consultation/contract";
 import {
@@ -51,6 +52,7 @@ export function buildConsultationCoachMessages(input: {
   chronologyRequested: boolean;
   coveredTargetKeys: string[];
   focusTargetKey?: string | null;
+  interviewerPrep?: InterviewerPrepPayload | null;
   qualityFeedback?: string[];
 }): AiMessage[] {
   return [
@@ -88,6 +90,7 @@ export function buildConsultationCoachMessages(input: {
         chronologyRequested: input.chronologyRequested,
         coveredTargetKeys: input.coveredTargetKeys,
         focusTargetKey: input.focusTargetKey ?? null,
+        interviewerPrep: input.interviewerPrep ?? null,
         qualityFeedback: input.qualityFeedback ?? [],
       }),
     },
@@ -111,6 +114,8 @@ export function buildConsultationExtractMessages(input: {
     roleId?: string | null;
   }>;
   qualityFeedback?: string[];
+  targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
+  supportingEvidence?: string[];
 }): AiMessage[] {
   return [
     { role: "system", content: extractSystem() },
@@ -127,6 +132,8 @@ export function buildConsultationExtractMessages(input: {
       content: JSON.stringify({
         question: input.question,
         target: input.target,
+        targetStrength: input.targetStrength ?? null,
+        supportingEvidence: input.supportingEvidence ?? [],
         answer: input.answer,
         qualityFeedback: input.qualityFeedback ?? [],
       }),
@@ -146,6 +153,9 @@ export function buildConsultationPolishMessages(input: {
   confirmedGap?: boolean;
   strengtheningNeeds: string[];
   qualityFeedback?: string[];
+  target?: { key: string; kind: string; text: string } | null;
+  targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
+  supportingEvidence?: string[];
   voiceSamples?: Array<{ label: string; sampleText: string }>;
   profileItems: Array<{
     id: string;
@@ -179,6 +189,9 @@ export function buildConsultationPolishMessages(input: {
         story: input.story,
         declinedFollowUp: input.declinedFollowUp,
         confirmedGap: input.confirmedGap === true,
+        target: input.target ?? null,
+        targetStrength: input.targetStrength ?? null,
+        supportingEvidence: input.supportingEvidence ?? [],
         strengtheningNeeds: input.strengtheningNeeds,
         qualityFeedback: input.qualityFeedback ?? [],
       }),

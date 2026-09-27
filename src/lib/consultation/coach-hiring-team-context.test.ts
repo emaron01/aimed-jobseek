@@ -170,6 +170,30 @@ describe("Coach Hiring Team context", () => {
 
     expect(JSON.stringify(role.generalPersona)).not.toContain("Dana Reyes");
     expect(JSON.stringify(role.generalPersona)).not.toContain("Clari");
+    const settings = JSON.parse(messages[3]!.content);
+    expect(settings.interviewerPrep).toBeNull();
+    const prepMessages = buildConsultationCoachMessages({
+      targets: [{ key: "forecasting", kind: "REQUIRED", text: "Forecasting" }],
+      profileItems: [],
+      hiringTeam: [roleWithPerson()],
+      seekerStatedFacts: [],
+      companyResearch: null,
+      askedQuestions: [],
+      chronologyRequested: false,
+      coveredTargetKeys: [],
+      interviewerPrep: {
+        contactId: "contact_1",
+        name: "Dana Reyes",
+        roleName: "Hiring Manager",
+      },
+    });
+    const prepSettings = JSON.parse(prepMessages[3]!.content);
+    expect(prepSettings.interviewerPrep).toEqual({
+      contactId: "contact_1",
+      name: "Dana Reyes",
+      roleName: "Hiring Manager",
+    });
+    expect(JSON.stringify(prepSettings)).not.toContain("prepares the seeker");
   });
 
   it("sends a role with no built persona and no people without inventing detail", () => {

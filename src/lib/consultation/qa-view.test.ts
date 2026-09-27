@@ -402,7 +402,7 @@ describe("Harper ten-question coach", () => {
         {
           id: "generic",
           speaker: "CONSULTANT" as const,
-          body: consultationConversationCopy.askForStory,
+          body: "What changed because of that work?",
           targetKey: "why",
           followUp: false,
           sequence: 1,
@@ -422,7 +422,7 @@ describe("Harper ten-question coach", () => {
     });
     expect(view.questions).toHaveLength(1);
     expect(view.questions[0]?.question).toBe(
-      consultationConversationCopy.askForStory,
+      "What changed because of that work?",
     );
     expect(view.questions[0]?.talkingPoint?.content).toBe(
       "I rebuilt ARM GTM at OpenText.",
@@ -438,9 +438,9 @@ describe("Harper ten-question coach", () => {
         {
           id: "generic",
           speaker: "CONSULTANT" as const,
-          body: consultationConversationCopy.askForStory,
+          body: "What changed because of that work?",
           targetKey: "why",
-          followUp: false,
+          followUp: true,
           sequence: 4,
         },
       ],
@@ -451,7 +451,7 @@ describe("Harper ten-question coach", () => {
       second.body,
     ]);
     expect(view.questions[0]?.followUp?.text).toBe(
-      consultationConversationCopy.askForStory,
+      "What changed because of that work?",
     );
     expect(view.questions[0]?.resumeBullet).toBeNull();
     expect(consultationQuestionAcceptsReply(view.questions[0]!)).toBe(true);
@@ -464,9 +464,9 @@ describe("Harper ten-question coach", () => {
         {
           id: "generic",
           speaker: "CONSULTANT" as const,
-          body: consultationConversationCopy.askForStory,
+          body: "What changed because of that work?",
           targetKey: "why",
-          followUp: false,
+          followUp: true,
           sequence: 4,
         },
         {
