@@ -25,8 +25,6 @@ import {
   processResearchRun,
   researchWorkerShutdown,
 } from "@/lib/research/runs-service";
-import { queueMissingNamedEmployerResearch } from "@/lib/application/service";
-
 const IDLE_POLL_MS = 5_000;
 
 function sleep(ms: number): Promise<void> {
@@ -86,10 +84,6 @@ async function main(): Promise<void> {
   console.log(`[research-worker] concurrency: ${concurrency}`);
   await waitForResearchRunSchema();
   console.log("[research-worker] schema ready");
-  const backfilled = await queueMissingNamedEmployerResearch();
-  console.log(
-    `[research-worker] queued missing named-employer research: ${backfilled}`,
-  );
 
   while (!researchWorkerShutdown.requested) {
     await abandonStaleResearchRuns();

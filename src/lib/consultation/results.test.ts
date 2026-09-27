@@ -167,7 +167,9 @@ describe("Harper result quality", () => {
     expect(service).toContain("polishAnswerWithQuality");
     expect(service).toContain("isRawSeekerResult");
     const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
-    expect(section).toContain("shouldEnqueueConsultationResultRepair");
+    expect(section).not.toContain("shouldEnqueueConsultationResultRepair");
+    expect(section).not.toContain("repair_results");
+    expect(section).not.toContain("repairConsultationResults");
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
     expect(thread).toContain("Boolean(item.resumeBullet || item.talkingPoint)");
     expect(thread).not.toContain("&& !item.followUp");

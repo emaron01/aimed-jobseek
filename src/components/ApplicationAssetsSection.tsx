@@ -27,7 +27,12 @@ import {
   vocab,
 } from "@/lib/product-config";
 import { usePathname } from "next/navigation";
-import { AppActionLink, SubmitButton } from "@/components/ui";
+import {
+  AppActionLink,
+  AppButton,
+  SecondaryButton,
+  SubmitButton,
+} from "@/components/ui";
 import {
   WORKSPACE_CARD_WRAP_CLASS,
   WORKSPACE_MESSAGE_WRAP_CLASS,
@@ -126,6 +131,12 @@ function Status({
   );
 }
 
+function claimSupportTitle(claim: AssetClaim): string {
+  return claim.supports
+    .map((item) => formatClaimSupportLabel(item.sourceId, item.quote))
+    .join("\n");
+}
+
 function ClaimText({
   claim,
   editable = false,
@@ -135,9 +146,7 @@ function ClaimText({
   editable?: boolean;
   onChange?: (claimId: string, text: string) => void;
 }) {
-  const support = claim.supports
-    .map((item) => formatClaimSupportLabel(item.sourceId, item.quote))
-    .join("\n");
+  const support = claimSupportTitle(claim);
   if (editable && onChange) {
     return (
       <textarea
@@ -147,16 +156,46 @@ function ClaimText({
         rows={Math.max(2, Math.ceil(claim.text.length / 72))}
         title={support}
         onChange={(event) => onChange(claim.id, event.target.value)}
-        className="w-full resize-y border-0 bg-transparent p-0 text-inherit leading-inherit outline-none focus-visible:ring-1 focus-visible:ring-focus"
+        className="w-full resize-y border border-edge-strong bg-surface px-2 py-1 text-inherit leading-inherit outline-none focus-visible:ring-1 focus-visible:ring-focus"
       />
     );
   }
   return (
-    <span>
-      <span title={support} tabIndex={0} className="cursor-help underline decoration-dotted">
-        {claim.text}
-      </span>
+    <span title={support || undefined} className={support ? "cursor-help" : undefined}>
+      {claim.text}
     </span>
+  );
+}
+
+function ContactDetailsLine({
+  claims,
+  editable = false,
+  onChange,
+}: {
+  claims: AssetClaim[];
+  editable?: boolean;
+  onChange?: (claimId: string, text: string) => void;
+}) {
+  const visible = visibleItems(claims, (claim) => claim.text);
+  if (!visible.length) return null;
+  if (editable && onChange) {
+    return (
+      <div className="mt-1 space-y-2 text-left">
+        {visible.map((claim) => (
+          <ClaimText
+            key={claim.id}
+            claim={claim}
+            editable
+            onChange={onChange}
+          />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <p className="mt-1">
+      {visible.map((claim) => claim.text).join(" | ")}
+    </p>
   );
 }
 
@@ -212,18 +251,11 @@ function AssetPreview({
             onChange={onChange}
           />
         </h4>
-        <p className="mt-1">
-          {content.header.contactDetails.map((claim, index) => (
-            <span key={claim.id}>
-              {index > 0 ? " | " : ""}
-              <ClaimText
-                claim={claim}
-                editable={editable}
-                onChange={onChange}
-              />
-            </span>
-          ))}
-        </p>
+        <ContactDetailsLine
+          claims={content.header.contactDetails}
+          editable={editable}
+          onChange={onChange}
+        />
       </header>
       <AssetSection title={applicationAssetConfig.resumeHeadings.summary}>
         {visibleItems(content.summary, (claim) => claim.text).length ? (
@@ -367,8 +399,31 @@ function LatestAssetEditor({
   asset: AssetRow;
   earlierExperienceHeading: string | null;
 }) {
+  const [editing, setEditing] = useState(false);
   const [content, setContent] = useState(asset.content);
   const [result, action] = useActionState(saveEditedApplicationAssetAction, initial);
+
+  if (!editing) {
+    return (
+      <div className="space-y-4" data-testid="asset-in-place-editor">
+        <AssetPreview
+          content={asset.content}
+          earlierExperienceHeading={earlierExperienceHeading}
+        />
+        <SecondaryButton
+          type="button"
+          onClick={() => {
+            setContent(asset.content);
+            setEditing(true);
+          }}
+        >
+          {applicationAssetConfig.labels.adjustManually}
+        </SecondaryButton>
+        <Status result={result} />
+      </div>
+    );
+  }
+
   return (
     <form action={action} className="space-y-4" data-testid="asset-in-place-editor">
       <input type="hidden" name="campaignId" value={campaignId} />
@@ -382,7 +437,18 @@ function LatestAssetEditor({
           setContent((current) => mapClaimText(current, claimId, text))
         }
       />
-      <SubmitButton>{applicationAssetConfig.labels.saveNewVersion}</SubmitButton>
+      <div className="flex flex-wrap gap-2">
+        <SubmitButton>{applicationAssetConfig.labels.saveNewVersion}</SubmitButton>
+        <SecondaryButton
+          type="button"
+          onClick={() => {
+            setContent(asset.content);
+            setEditing(false);
+          }}
+        >
+          {applicationAssetConfig.labels.cancel}
+        </SecondaryButton>
+      </div>
       <Status result={result} />
     </form>
   );
@@ -417,18 +483,10 @@ function AssetHistory({
             Version {asset.version} · {formatAssetStatusLabel(asset.status)}
           </summary>
           <div className="mt-4 space-y-4">
-            {canEdit && index === 0 ? (
-              <LatestAssetEditor
-                campaignId={campaignId}
-                asset={asset}
-                earlierExperienceHeading={earlierExperienceHeading}
-              />
-            ) : (
-              <AssetPreview
-                content={asset.content}
-                earlierExperienceHeading={earlierExperienceHeading}
-              />
-            )}
+            <AssetPreview
+              content={asset.content}
+              earlierExperienceHeading={earlierExperienceHeading}
+            />
             <div className="flex flex-wrap gap-2">
               <AppActionLink href={workspaceAssetDocxHref(asset.id)}>
                 {applicationAssetConfig.labels.downloadDocx}
@@ -477,9 +535,10 @@ function AssetTypePanel({
   profileEditHref: string | null;
 }) {
   const [result, action] = useActionState(generateApplicationAssetAction, initial);
+  const latest = rows[0] ?? null;
   const latestResume =
-    type === "RESUME" && rows[0]?.content.type === "RESUME"
-      ? rows[0].content
+    type === "RESUME" && latest?.content.type === "RESUME"
+      ? latest.content
       : null;
   const earlierExperienceHeading =
     plan?.plan.type === "RESUME" ? plan.plan.earlierExperienceHeading : null;
@@ -490,97 +549,114 @@ function AssetTypePanel({
       id={documentId}
       className={`space-y-4 rounded-md border border-edge p-4 ${WORKSPACE_CARD_WRAP_CLASS}`}
     >
-        <h3 className="font-semibold text-ink">
-          {type === "RESUME"
-            ? applicationAssetConfig.labels.resume
-            : applicationAssetConfig.labels.coverLetter}
-        </h3>
-        {rows[0]?.staleReason ? (
-          <p
-            className={`text-sm text-warning ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
-            data-testid={`${type.toLowerCase()}-new-information`}
-          >
-            {rows[0].staleReason}
-          </p>
-        ) : null}
-        {type === "RESUME" && missingContacts.length > 0 ? (
-          <p className={`text-sm text-warning ${WORKSPACE_MESSAGE_WRAP_CLASS}`} data-testid="resume-missing-contact">
-            {applicationAssetConfig.missingContact.heading}: {missingContacts.join(", ")}.{" "}
-            {profileEditHref ? (
-              <AppActionLink href={profileEditHref} variant="chip">
-                {vocab.product.Singular}
-              </AppActionLink>
-            ) : null}{" "}
-            {applicationAssetConfig.missingContact.addInProfile}
-          </p>
-        ) : null}
-        {type === "COVER_LETTER" && thinNotice ? (
-          <p className="text-sm text-muted" data-testid="cover-letter-thin-evidence">
-            {thinNotice}
-          </p>
-        ) : null}
+      <h3 className="font-semibold text-ink">
+        {type === "RESUME"
+          ? applicationAssetConfig.labels.resume
+          : applicationAssetConfig.labels.coverLetter}
+      </h3>
+      {latest?.staleReason ? (
+        <p
+          className={`text-sm text-warning ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
+          data-testid={`${type.toLowerCase()}-new-information`}
+        >
+          {latest.staleReason}
+        </p>
+      ) : null}
+      {type === "RESUME" && missingContacts.length > 0 ? (
+        <p
+          className={`text-sm text-warning ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
+          data-testid="resume-missing-contact"
+        >
+          {applicationAssetConfig.missingContact.heading}:{" "}
+          {missingContacts.join(", ")}.{" "}
+          {profileEditHref ? (
+            <AppActionLink href={profileEditHref} variant="chip">
+              {vocab.product.Singular}
+            </AppActionLink>
+          ) : null}{" "}
+          {applicationAssetConfig.missingContact.addInProfile}
+        </p>
+      ) : null}
+      {type === "COVER_LETTER" && thinNotice ? (
+        <p className="text-sm text-muted" data-testid="cover-letter-thin-evidence">
+          {thinNotice}
+        </p>
+      ) : null}
       {planError ? (
         <p className="text-sm text-danger" role="status">
           {planError}
         </p>
       ) : null}
-      {canEdit ? <form action={action} className="space-y-3">
-        <input type="hidden" name="campaignId" value={campaignId} />
-        <input type="hidden" name="type" value={type} />
-        {type === "RESUME" ? (
-          <details>
-            <summary className="cursor-pointer text-sm font-medium">
-              {applicationAssetConfig.labels.adjustManually}
-            </summary>
-            <fieldset className="mt-2">
-              <legend className="text-sm font-medium">
+      {latest ? (
+        canEdit ? (
+          <LatestAssetEditor
+            key={`${latest.id}-${latest.version}`}
+            campaignId={campaignId}
+            asset={latest}
+            earlierExperienceHeading={earlierExperienceHeading}
+          />
+        ) : (
+          <AssetPreview
+            content={latest.content}
+            earlierExperienceHeading={earlierExperienceHeading}
+          />
+        )
+      ) : null}
+      {canEdit ? (
+        <form action={action} className="space-y-3">
+          <input type="hidden" name="campaignId" value={campaignId} />
+          <input type="hidden" name="type" value={type} />
+          {type === "RESUME" ? (
+            <details>
+              <summary className="cursor-pointer text-sm font-medium">
                 {applicationAssetConfig.labels.hideRolesLegend}
-              </legend>
-              <div className="mt-2 space-y-1">
-                {profileRoles.map((role) => (
-                  <label key={role.id} className="block text-sm">
-                    <input
-                      type="checkbox"
-                      name="hiddenRoleId"
-                      value={role.id}
-                      defaultChecked={Boolean(
-                        latestResume?.experience.find(
-                          (item) => item.roleId === role.id,
-                        )?.hidden,
-                      )}
-                      className="mr-2"
-                    />
-                    {[role.title, role.employer].filter(Boolean).join(" at ")}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          </details>
-        ) : null}
-        {rows.length ? (
-          <label className="block text-sm">
-            <span className="font-medium text-ink">
-              {applicationAssetConfig.labels.changeInstruction}
-            </span>
-            <textarea
-              name="regenerationInstruction"
-              rows={2}
-              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
-              data-testid={`${type.toLowerCase()}-regenerate-instruction`}
-            />
-          </label>
-        ) : null}
-        <SubmitButton>
-          {rows.length
-            ? applicationAssetConfig.labels.regenerate
-            : applicationAssetConfig.labels.generate}
-        </SubmitButton>
-        <Status
-          result={result}
-          errorsOnly
-          profileHref={profileHref}
-        />
-      </form> : null}
+              </summary>
+              <fieldset className="mt-2">
+                <legend className="sr-only">
+                  {applicationAssetConfig.labels.hideRolesLegend}
+                </legend>
+                <div className="mt-2 space-y-1">
+                  {profileRoles.map((role) => (
+                    <label key={role.id} className="block text-sm">
+                      <input
+                        type="checkbox"
+                        name="hiddenRoleId"
+                        value={role.id}
+                        defaultChecked={Boolean(
+                          latestResume?.experience.find(
+                            (item) => item.roleId === role.id,
+                          )?.hidden,
+                        )}
+                        className="mr-2"
+                      />
+                      {[role.title, role.employer].filter(Boolean).join(" at ")}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            </details>
+          ) : null}
+          {rows.length ? (
+            <label className="block text-sm">
+              <span className="font-medium text-ink">
+                {applicationAssetConfig.labels.changeInstruction}
+              </span>
+              <textarea
+                name="regenerationInstruction"
+                rows={2}
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
+                data-testid={`${type.toLowerCase()}-regenerate-instruction`}
+              />
+            </label>
+          ) : null}
+          <SubmitButton>
+            {rows.length
+              ? applicationAssetConfig.labels.regenerate
+              : applicationAssetConfig.labels.generate}
+          </SubmitButton>
+          <Status result={result} errorsOnly profileHref={profileHref} />
+        </form>
+      ) : null}
       {rows.length ? (
         <AssetHistory
           campaignId={campaignId}
@@ -627,6 +703,9 @@ export function ApplicationAssetsSection({
   profileEditHref?: string | null;
   defaultOpen?: boolean;
 }) {
+  const [activeType, setActiveType] = useState<"RESUME" | "COVER_LETTER">(
+    "RESUME",
+  );
   const valid = assets.flatMap((asset) => {
     const parsed = applicationAssetContentSchema.safeParse(asset.content);
     if (parsed.success) {
@@ -673,31 +752,58 @@ export function ApplicationAssetsSection({
         {applicationAssetConfig.labels.sectionTitle}
       </summary>
       <div className="mt-4 space-y-4">
-      <p className="text-sm text-muted">
-        {applicationAssetConfig.labels.sectionHelp}
-      </p>
-      <div className="grid gap-5 xl:grid-cols-2">
-        {(["RESUME", "COVER_LETTER"] as const).map((type) => (
-          <AssetTypePanel
-            key={type}
-            campaignId={campaignId}
-            type={type}
-            rows={valid.filter((asset) => asset.type === type)}
-            profileRoles={profileRoles}
-            plan={plans.find((item) => item.type === type) ?? null}
-            planError={
-              invalidPlanTypes.includes(type)
-                ? applicationAssetConfig.labels.planFailed
-                : null
-            }
-            canEdit={canEdit}
-            thinNotice={type === "COVER_LETTER" ? coverLetterThinNotice : null}
-            missingContacts={type === "RESUME" ? missingResumeContacts : []}
-            profileHref={profileHref}
-            profileEditHref={profileEditHref}
-          />
-        ))}
-      </div>
+        <p className="text-sm text-muted">
+          {applicationAssetConfig.labels.sectionHelp}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <AppButton
+            type="button"
+            variant={activeType === "RESUME" ? "primary" : "secondary"}
+            aria-pressed={activeType === "RESUME"}
+            onClick={() => setActiveType("RESUME")}
+          >
+            {applicationAssetConfig.labels.viewEditResume}
+          </AppButton>
+          <AppButton
+            type="button"
+            variant={activeType === "COVER_LETTER" ? "primary" : "secondary"}
+            aria-pressed={activeType === "COVER_LETTER"}
+            onClick={() => setActiveType("COVER_LETTER")}
+          >
+            {applicationAssetConfig.labels.viewEditCoverLetter}
+          </AppButton>
+        </div>
+        <div className="space-y-4">
+          {(["RESUME", "COVER_LETTER"] as const).map((type) => (
+            <div
+              key={type}
+              className={activeType === type ? undefined : "hidden"}
+              hidden={activeType !== type}
+            >
+              <AssetTypePanel
+                campaignId={campaignId}
+                type={type}
+                rows={valid.filter((asset) => asset.type === type)}
+                profileRoles={profileRoles}
+                plan={plans.find((item) => item.type === type) ?? null}
+                planError={
+                  invalidPlanTypes.includes(type)
+                    ? applicationAssetConfig.labels.planFailed
+                    : null
+                }
+                canEdit={canEdit}
+                thinNotice={
+                  type === "COVER_LETTER" ? coverLetterThinNotice : null
+                }
+                missingContacts={
+                  type === "RESUME" ? missingResumeContacts : []
+                }
+                profileHref={profileHref}
+                profileEditHref={profileEditHref}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </details>
   );

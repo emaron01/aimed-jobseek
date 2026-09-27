@@ -30,8 +30,6 @@ import {
   continueConsultationPlanning,
   editConsultationAnswer,
   processConsultationReply,
-  prepareExistingConsultationSession,
-  repairConsultationResults,
   replyConsultation,
   reassessConsultationStanding,
   retryConsultationGeneration,
@@ -314,10 +312,6 @@ async function processConsultationJob(input: {
   questionTurnId?: string;
   contactId?: string | null;
 }): Promise<void> {
-  await prepareExistingConsultationSession({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-  });
   if (input.operation === "retry") {
     await retryConsultationGeneration(input);
     return;
@@ -383,13 +377,6 @@ async function processConsultationJob(input: {
       campaignId: input.campaignId,
       turnId: input.turnId,
       answer: input.answer ?? "",
-    });
-    return;
-  }
-  if (input.operation === "repair_results") {
-    await repairConsultationResults({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
     });
     return;
   }

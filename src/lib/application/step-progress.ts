@@ -368,16 +368,9 @@ export function serializeWorkspaceSeen(state: WorkspaceSeenState): {
 
 export function migrateWorkspaceSeen(
   parsed: WorkspaceSeenState,
-  facts: ApplicationStepFactInput,
 ): WorkspaceSeenState {
   if (parsed.version >= WORKSPACE_SEEN_VERSION) return parsed;
-  const keys: Record<string, string> = {};
-  for (const key of APPLICATION_STEP_KEYS) {
-    const current = stepResultKey(key, facts);
-    if (!current) continue;
-    if (parsed.keys[key]) keys[key] = current;
-  }
-  return { version: WORKSPACE_SEEN_VERSION, keys };
+  return { version: WORKSPACE_SEEN_VERSION, keys: { ...parsed.keys } };
 }
 
 export function buildApplicationStepViews(input: {

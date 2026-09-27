@@ -616,6 +616,19 @@ describe("application summary seeker-facing labels", () => {
     expect(page).not.toContain("evidenceStrengthLabels");
   });
 
+  it("loads the cheat sheet view without scanning for missing interviewer sections", () => {
+    const service = readFileSync(
+      "src/lib/application-summary/service.ts",
+      "utf8",
+    );
+    const viewStart = service.indexOf(
+      "export async function getApplicationSummaryView",
+    );
+    expect(viewStart).toBeGreaterThan(-1);
+    const viewBody = service.slice(viewStart);
+    expect(viewBody).not.toContain("enqueueMissingInterviewerCheatSheetSections");
+  });
+
   it("never shows Application Summary to the seeker", () => {
     expect(applicationSummaryConfig.title).toBe("Interview cheat sheet");
     expect(JSON.stringify(applicationSummaryConfig)).not.toContain("Application Summary");

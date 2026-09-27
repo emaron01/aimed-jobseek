@@ -13,27 +13,15 @@ import {
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
 import {
-  enqueueApplicationJob,
-  readJobPayload,
-} from "@/lib/application-jobs/service";
-import {
   buildConsultationQaView,
   consultationHasUnansweredQuestions,
   latestClosingNote,
   latestCoachingNoteForTarget,
 } from "@/lib/consultation/qa-view";
 import {
-  consultationItemNeedsResultRepair,
-  shouldEnqueueConsultationResultRepair,
-} from "@/lib/consultation/results";
-import { prepareExistingConsultationSession } from "@/lib/consultation/service";
-import {
-  briefingNeedsStandingRegen,
   buildStandingGaps,
-  shouldEnqueueConsultationStandingRegen,
   standingWorkIsComplete,
 } from "@/lib/consultation/standing";
-import { seekerFirstName } from "@/lib/consultation/voice";
 import { listPersonPreps } from "@/lib/interview/person-prep";
 import { ConsultationKnowAboutMe } from "@/components/ConsultationKnowAboutMe";
 import { ConsultationStanding } from "@/components/ConsultationStanding";
@@ -45,7 +33,6 @@ import {
   WORKSPACE_MESSAGE_WRAP_CLASS,
 } from "@/lib/application/workspace-links";
 import {
-  CONSULTATION_PROMPT_VERSION,
   consultationBriefingSchema,
 } from "@/lib/consultation/contract";
 import {
@@ -172,9 +159,6 @@ export async function ConsultationSection({
   canEdit: boolean;
   jobs?: WorkspaceJobStatusView[];
 }) {
-  if (canEdit) {
-    await prepareExistingConsultationSession({ organizationId, campaignId });
-  }
   const [session, campaign] = await Promise.all([
     prisma.consultationSession.findFirst({
       where: { campaignId, organizationId },
@@ -192,9 +176,6 @@ export async function ConsultationSection({
   const parsed = campaign?.product.profileJson
     ? parseCandidateProfileSafe(campaign.product.profileJson)
     : { ok: true as const, profile: emptyCandidateProfile() };
-  const firstName = parsed.ok
-    ? seekerFirstName(parsed.profile.identity.name?.text)
-    : null;
   const profileItems = parsed.ok ? profileEvidenceItems(parsed.profile) : [];
   const personPreps = await listPersonPreps({ organizationId, campaignId });
   const briefing = session
@@ -287,102 +268,6 @@ export async function ConsultationSection({
     turns: threadTurns,
     statements: threadStatements,
   });
-  const latestSeekerAnswerAt =
-    session?.turns
-      .filter((turn) => turn.speaker === "SEEKER" && !turn.skipped)
-      .reduce<Date | null>((latest, turn) => {
-        const at = turn.createdAt;
-        if (!latest || at > latest) return at;
-        return latest;
-      }, null) ?? null;
-  const recentConsultationJobs = canEdit
-    ? await prisma.applicationJob.findMany({
-        where: {
-          organizationId,
-          campaignId,
-          type: "CONSULTATION",
-          status: { in: ["COMPLETED", "FAILED"] },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 40,
-        select: { createdAt: true, completedAt: true, payload: true, status: true },
-      })
-    : [];
-  const lastRepairJob = recentConsultationJobs.find(
-    (job) => readJobPayload(job.payload).operation === "repair_results",
-  );
-  const lastRepairAttemptAt = lastRepairJob
-    ? lastRepairJob.completedAt ?? lastRepairJob.createdAt
-    : null;
-  if (
-    shouldEnqueueConsultationResultRepair({
-      needsRepair:
-        canEdit && qaView.questions.some(consultationItemNeedsResultRepair),
-      busy: consultationBusy,
-      latestSeekerAnswerAt,
-      lastRepairAttemptAt,
-      lastRepairSucceeded: lastRepairJob?.status === "COMPLETED",
-      stalePromptVersion: qaView.questions.some((item) => {
-        if (!consultationItemNeedsResultRepair(item)) return false;
-        const versions = [item.talkingPoint, item.resumeBullet]
-          .map((statement) =>
-            statement
-              ? statements.find((row) => row.id === statement.id)?.promptVersion
-              : null,
-          )
-          .filter((version): version is string => Boolean(version));
-        if (versions.length < 2) return true;
-        return versions.some(
-          (version) => version !== CONSULTATION_PROMPT_VERSION,
-        );
-      }),
-    })
-  ) {
-    await enqueueApplicationJob({
-      organizationId,
-      campaignId,
-      type: "CONSULTATION",
-      payload: { operation: "repair_results" },
-    });
-  }
-  const lastReassessJob = recentConsultationJobs.find(
-    (job) => readJobPayload(job.payload).operation === "reassess",
-  );
-  const briefingTexts = briefing?.success
-    ? [
-        briefing.data.overall,
-        ...briefing.data.strongestAngles,
-        ...briefing.data.importantGaps,
-        ...briefing.data.storyPlan,
-        ...(session?.assessments.map((item) => item.explanation ?? "") ?? []),
-      ]
-    : session?.assessments.map((item) => item.explanation ?? "") ?? [];
-  if (
-    shouldEnqueueConsultationStandingRegen({
-      needsRegen:
-        canEdit &&
-        Boolean(session) &&
-        briefingNeedsStandingRegen({
-          texts: briefingTexts,
-          firstName,
-          promptVersion: session?.promptVersion,
-          currentPromptVersion: CONSULTATION_PROMPT_VERSION,
-        }),
-      busy: consultationBusy,
-      lastReassessAttemptAt: lastReassessJob
-        ? lastReassessJob.completedAt ?? lastReassessJob.createdAt
-        : null,
-      lastReassessSucceeded: lastReassessJob?.status === "COMPLETED",
-      stalePromptVersion: session?.promptVersion !== CONSULTATION_PROMPT_VERSION,
-    })
-  ) {
-    await enqueueApplicationJob({
-      organizationId,
-      campaignId,
-      type: "CONSULTATION",
-      payload: { operation: "reassess" },
-    });
-  }
   const unanswered = consultationHasUnansweredQuestions(qaView);
   const standingGaps = session
     ? buildStandingGaps({

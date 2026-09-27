@@ -205,16 +205,20 @@ describe("workflow audit fixes", () => {
     ).toBe("done");
   });
 
-  it("queues research automatically for a named employer", () => {
+  it("queues research automatically for a named employer without worker startup backfill", () => {
     const service = readFileSync("src/lib/application/service.ts", "utf8");
     const worker = readFileSync("scripts/research-worker.ts", "utf8");
     expect(service).toContain("ensureNamedEmployerResearch");
-    expect(service).toContain("queueMissingNamedEmployerResearch");
     expect(service).toContain("queueApplicationResearch");
-    expect(service).toContain(
-      "runWithTenantContext({ organizationId: row.organizationId }",
+    expect(service).toMatch(
+      /export async function attachParsedPosting[\s\S]*queueApplicationResearch/,
     );
-    expect(worker).toContain("queueMissingNamedEmployerResearch");
+    expect(service).toMatch(
+      /persistInterpretedJobRequirement[\s\S]*ensureNamedEmployerResearch/,
+    );
+    expect(worker).not.toContain("queueMissingNamedEmployerResearch");
+    expect(worker).toContain("abandonStaleResearchRuns");
+    expect(worker).toContain("abandonStaleApplicationJobs");
   });
 });
 
@@ -276,7 +280,7 @@ describe.skipIf(!hasTestDatabase())("workflow audit database behavior", () => {
     expect(kept?.name).toBe(`Kept ${suffix}`);
   });
 
-  it("queues research for a named employer and for existing applications without research", async () => {
+  it("queues research when creating or updating an application with a named employer", async () => {
     const campaign = await prisma.campaign.create({
       data: {
         organizationId,
@@ -314,7 +318,7 @@ describe.skipIf(!hasTestDatabase())("workflow audit database behavior", () => {
       data: {
         organizationId,
         ownerUserId: userId,
-        name: `Leftover research ${suffix}`,
+        name: `Update research ${suffix}`,
         productId,
       },
     });
@@ -334,45 +338,6 @@ describe.skipIf(!hasTestDatabase())("workflow audit database behavior", () => {
         campaignId: leftover.id,
       });
     });
-    const leftoverRuns = await prisma.researchRun.count({
-      where: {
-        organizationId,
-        campaignId: leftover.id,
-        status: { in: ["PENDING", "IN_PROGRESS"] },
-      },
-    });
-    expect(leftoverRuns).toBeGreaterThan(0);
-  });
-
-  it("starts the worker named-employer backfill when existing applications need research", async () => {
-    const leftover = await prisma.campaign.create({
-      data: {
-        organizationId,
-        ownerUserId: userId,
-        name: `Worker start research ${suffix}`,
-        productId,
-      },
-    });
-    const parsed = normalizeParsedJobRequirement(
-      NORMAL_JOB_MODEL,
-      NORMAL_JOB_POSTING,
-    );
-    await prisma.jobRequirement.create({
-      data: {
-        organizationId,
-        campaignId: leftover.id,
-        rawText: NORMAL_JOB_POSTING,
-        title: parsed.title,
-        companyName: parsed.companyName,
-        scorecardJson: parsed.scorecard,
-      },
-    });
-    const { queueMissingNamedEmployerResearch } = await import(
-      "@/lib/application/service"
-    );
-    await expect(queueMissingNamedEmployerResearch()).resolves.toBeGreaterThanOrEqual(
-      1,
-    );
     const leftoverRuns = await prisma.researchRun.count({
       where: {
         organizationId,

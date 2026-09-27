@@ -1549,12 +1549,20 @@ describe("application asset seeker-facing labels", () => {
     expect(section).toContain("formatClaimSupportLabel");
     expect(section).toContain("formatAssetStatusLabel");
     expect(section).toContain("asset-in-place-editor");
+    expect(section).toContain("viewEditResume");
+    expect(section).toContain("viewEditCoverLetter");
+    expect(section).toContain("applicationAssetConfig.labels.adjustManually");
+    expect(section).toContain("applicationAssetConfig.labels.cancel");
+    expect(section).toContain("applicationAssetConfig.labels.hideRolesLegend");
+    expect(section).not.toContain("xl:grid-cols-2");
     expect(section).not.toContain("formatClaimEditorLabel");
     expect(section).not.toContain("${item.sourceId}");
     expect(section).not.toContain("{claim.id}</span>");
     expect(section).not.toContain("{asset.status}");
     expect(section).toContain("coverLetterThinNotice");
     expect(section).toContain("cover-letter-thin-evidence");
+    expect(section).toContain('.join(" | ")');
+    expect(section).not.toContain("decoration-dotted");
   });
 });
 

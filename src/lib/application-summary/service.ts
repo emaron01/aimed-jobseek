@@ -779,13 +779,6 @@ export async function getApplicationSummaryView(input: {
         data.campaign.applicationSummary.guidanceJson,
       )
     : null;
-  await enqueueMissingInterviewerCheatSheetSections({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    userId: data.campaign.ownerUserId,
-    people: data.people,
-    existingPeople: guidance?.success ? guidance.data.people : [],
-  });
   return {
     campaign: {
       id: data.campaign.id,

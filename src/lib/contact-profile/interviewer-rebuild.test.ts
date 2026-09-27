@@ -56,6 +56,7 @@ describe("interviewer profile rebuild startup gate", () => {
     const worker = readFileSync("scripts/research-worker.ts", "utf8");
     expect(worker).not.toContain("queueExistingInterviewerProfileRebuilds");
     expect(worker).not.toContain("queued interviewer profile rebuilds");
+    expect(worker).not.toContain("queueMissingNamedEmployerResearch");
   });
 });
 

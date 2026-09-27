@@ -267,8 +267,9 @@ describe("Harper core loop standing", () => {
       2,
     );
     expect(section).toContain("latestClosingNote");
-    expect(section).toContain("prepareExistingConsultationSession");
-    expect(section).toContain("shouldEnqueueConsultationStandingRegen");
+    expect(section).not.toContain("prepareExistingConsultationSession");
+    expect(section).not.toContain("shouldEnqueueConsultationStandingRegen");
+    expect(section).not.toContain("briefingNeedsStandingRegen");
     expect(
       standingWorkIsComplete({
         gaps: [

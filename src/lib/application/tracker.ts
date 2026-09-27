@@ -206,7 +206,7 @@ export async function getApplicationTracker(input: {
   const seenState =
     campaign.workspaceSeenJson == null
       ? initialWorkspaceSeen(facts)
-      : migrateWorkspaceSeen(parsed, facts);
+      : migrateWorkspaceSeen(parsed);
   const shouldPersist =
     campaign.workspaceSeenJson == null ||
     parsed.version !== seenState.version ||
@@ -254,7 +254,6 @@ export async function markApplicationStepViewed(input: {
   if (!facts) throw new Error("Application was not found.");
   const seenState = migrateWorkspaceSeen(
     parseWorkspaceSeenJson(campaign.workspaceSeenJson),
-    facts,
   );
   if (seenState.keys[input.stepKey] === step.resultKey) {
     if (seenState.version < 2) {

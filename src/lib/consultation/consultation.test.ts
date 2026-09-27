@@ -62,10 +62,6 @@ import {
   editConsultationAnswer,
   flagConsultationInaccuracy,
   recordConsultationReply,
-  reextractExistingWhyThisCompanyMotivation,
-  regenerateCannedConsultationWording,
-  regenerateFirstPersonCoaching,
-  repairConsultationResults,
 } from "@/lib/consultation/service";
 import {
   buildConsultationQaView,
@@ -1691,9 +1687,12 @@ describe("consultation evidence and questions", () => {
     expect(service).not.toContain(
       "No remaining experience gaps after combining your profile with this job.",
     );
-    expect(service).toContain("prepareExistingConsultationSession");
-    expect(service).toContain("reextractExistingWhyThisCompanyMotivation");
-    expect(service).toContain("regenerateFirstPersonCoaching");
+    expect(service).not.toContain("prepareExistingConsultationSession");
+    expect(service).not.toContain("reextractExistingWhyThisCompanyMotivation");
+    expect(service).not.toContain("regenerateCannedConsultationWording");
+    expect(service).not.toContain("regenerateFirstPersonCoaching");
+    expect(service).not.toContain("repairConsultationResults");
+    expect(service).not.toContain("repair_results");
     expect(service).not.toContain("answerDeniesGapExperience");
     expect(service).not.toContain("isThinIncompleteAnswer");
     expect(service).toContain("coachingSpeaksAsSeekerI");
@@ -2014,6 +2013,33 @@ describe("consultation evidence and questions", () => {
     });
     expect(consultationConfig.applicationQuestionLimit).toBe(10);
     expect(round.questions).toHaveLength(0);
+  });
+
+  it("keeps legacy repair off page load and jobs, and still enforces duplicates and the ten-question cap", () => {
+    const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
+    const process = readFileSync("src/lib/application-jobs/process.ts", "utf8");
+    const service = readFileSync("src/lib/consultation/service.ts", "utf8");
+    const questions = readFileSync("src/lib/consultation/questions.ts", "utf8");
+    for (const source of [section, process, service]) {
+      expect(source).not.toContain("prepareExistingConsultationSession");
+      expect(source).not.toContain("repairExistingConsultationSession");
+      expect(source).not.toContain("reextractExistingWhyThisCompanyMotivation");
+      expect(source).not.toContain("regenerateCannedConsultationWording");
+      expect(source).not.toContain("regenerateFirstPersonCoaching");
+      expect(source).not.toContain("repairConsultationResults");
+      expect(source).not.toContain("repair_results");
+    }
+    expect(section).not.toContain("shouldEnqueueConsultationStandingRegen");
+    expect(section).not.toContain("shouldEnqueueConsultationResultRepair");
+    expect(process).not.toMatch(/operation === ["']repair_results["']/);
+    expect(service).toContain("regenerateConsultationStatement");
+    expect(service).toContain("regenerateConsultationQaResult");
+    expect(questions).toContain("questionNearDuplicate");
+    expect(questions).toContain("questionDuplicatesAsked");
+    expect(questions).toContain("consultationConfig.applicationQuestionLimit");
+    expect(service).toContain("questionDuplicatesAsked");
+    expect(service).toContain("consultationConfig.applicationQuestionLimit");
+    expect(consultationConfig.applicationQuestionLimit).toBe(10);
   });
 
   it("writes a confirmed-gap talk track that acknowledges, bridges, and says how to close it", async () => {
@@ -2570,127 +2596,6 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     expect(later > before || after?.status === "DONE").toBe(true);
   });
 
-  it("repairs a raw joined interview and fragment bullet into Harper-written results", async () => {
-    const campaign = await prisma.campaign.create({
-      data: {
-        organizationId,
-        ownerUserId: userId,
-        name: `Repair results ${suffix}`,
-        productId,
-        icpId,
-        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
-      },
-    });
-    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
-    await prisma.jobRequirement.create({
-      data: {
-        organizationId,
-        campaignId: campaign.id,
-        rawText: NORMAL_JOB_POSTING,
-        title: parsed.title,
-        companyName: parsed.companyName,
-        seniority: parsed.seniority,
-        reportingLine: parsed.reportingLine,
-        responsibilities: parsed.responsibilities,
-        requiredItems: parsed.requiredItems,
-        preferredItems: parsed.preferredItems,
-        scorecardJson: parsed.scorecard,
-        employerDisposition: "IDENTIFIED",
-      },
-    });
-    await addHiringManager(campaign.id);
-    await startConsultation({ organizationId, campaignId: campaign.id });
-    const session = await prisma.consultationSession.findUnique({
-      where: { campaignId: campaign.id },
-      include: { turns: { orderBy: { sequence: "asc" } } },
-    });
-    const question = session?.turns.find(
-      (turn) => turn.speaker === "CONSULTANT" && !turn.followUp,
-    );
-    expect(question).toBeTruthy();
-    const firstAnswer =
-      "I coached a manager who was not inspecting deals. The manager later became an RVP of North America Channels running a team.";
-    const secondAnswer =
-      "I sat with that manager on the weekly forecast, set an inspection cadence, and stayed with it until the team ran it without me.";
-    const joined = `${firstAnswer}\n${secondAnswer}`;
-    const fragment =
-      "The manager later became an RVP of North America Channels running a team.";
-    const nextSequence =
-      (session?.turns.reduce((maximum, turn) => Math.max(maximum, turn.sequence), 0) ??
-        0) + 1;
-    const first = await prisma.consultationTurn.create({
-      data: {
-        organizationId,
-        sessionId: session!.id,
-        sequence: nextSequence,
-        speaker: "SEEKER",
-        body: firstAnswer,
-        targetKey: question!.targetKey,
-        seekerAuthored: true,
-        analysisJson: {
-          status: "READY",
-          replyToTurnId: question!.id,
-          answerContext: firstAnswer,
-        },
-      },
-    });
-    const second = await prisma.consultationTurn.create({
-      data: {
-        organizationId,
-        sessionId: session!.id,
-        sequence: nextSequence + 1,
-        speaker: "SEEKER",
-        body: secondAnswer,
-        targetKey: question!.targetKey,
-        seekerAuthored: true,
-        analysisJson: {
-          status: "READY",
-          replyToTurnId: question!.id,
-          answerContext: joined,
-        },
-      },
-    });
-    await prisma.consultationStatement.create({
-      data: {
-        organizationId,
-        sessionId: session!.id,
-        turnId: first.id,
-        kind: "INTERVIEW_ANSWER",
-        content: joined,
-        groundingJson: [],
-        promptVersion: CONSULTATION_PROMPT_VERSION,
-      },
-    });
-    await prisma.consultationStatement.create({
-      data: {
-        organizationId,
-        sessionId: session!.id,
-        turnId: first.id,
-        kind: "RESUME_BULLET",
-        content: fragment,
-        groundingJson: [],
-        promptVersion: CONSULTATION_PROMPT_VERSION,
-      },
-    });
-    await repairConsultationResults({
-      organizationId,
-      campaignId: campaign.id,
-    });
-    const repaired = await prisma.consultationStatement.findMany({
-      where: { sessionId: session!.id, turnId: second.id },
-    });
-    const interview = repaired.find((row) => row.kind === "INTERVIEW_ANSWER");
-    const bullet = repaired.find((row) => row.kind === "RESUME_BULLET");
-    expect(interview?.content).toBeTruthy();
-    expect(interview?.content).not.toBe(joined);
-    expect(bullet?.content).toBeTruthy();
-    expect(bullet?.content).not.toBe(fragment);
-    expect(
-      await prisma.consultationStatement.count({
-        where: { turnId: first.id },
-      }),
-    ).toBe(0);
-  });
 
   it("records an unparseable plan as failed so the seeker can retry", async () => {
     const campaign = await prisma.campaign.create({
@@ -3991,360 +3896,9 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     expect(service).not.toMatch(/looksLikeCompanyMotivation|looksLikeWorkStory/);
   });
 
-  it("re-extracts existing why-this-company replies once and corrects saved motivation", async () => {
-    const campaign = await prisma.campaign.create({
-      data: {
-        organizationId,
-        ownerUserId: userId,
-        name: `Why repair ${suffix}`,
-        productId,
-        icpId,
-        whyThisCompany: "I have built OpenText's ARM products by retooling GTM.",
-      },
-    });
-    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
-    await prisma.jobRequirement.create({
-      data: {
-        organizationId,
-        campaignId: campaign.id,
-        rawText: NORMAL_JOB_POSTING,
-        title: parsed.title,
-        seniority: parsed.seniority,
-        requiredItems: parsed.requiredItems,
-        preferredItems: parsed.preferredItems,
-        scorecardJson: parsed.scorecard,
-        employerDisposition: "IDENTIFIED",
-      },
-    });
-    await addHiringManager(campaign.id);
-    const session = await prisma.consultationSession.create({
-      data: {
-        organizationId,
-        campaignId: campaign.id,
-        productId,
-        status: "IN_PROGRESS",
-        generationStatus: "READY",
-        promptVersion: CONSULTATION_PROMPT_VERSION,
-      },
-    });
-    await prisma.consultationTurn.createMany({
-      data: [
-        {
-          organizationId,
-          sessionId: session.id,
-          sequence: 1,
-          speaker: "CONSULTANT",
-          body: "Why do you want to work at this company?",
-          targetKey: WHY_THIS_COMPANY_TARGET_KEY,
-        },
-        {
-          organizationId,
-          sessionId: session.id,
-          sequence: 2,
-          speaker: "SEEKER",
-          body: `${WHY_THIS_COMPANY_MOTIVATION} I led enterprise security sales.`,
-          targetKey: WHY_THIS_COMPANY_TARGET_KEY,
-          seekerAuthored: true,
-        },
-      ],
-    });
-    await startConsultation({ organizationId, campaignId: campaign.id });
-    const corrected = await prisma.campaign.findUnique({
-      where: { id: campaign.id },
-    });
-    expect(corrected?.whyThisCompany).toBe(WHY_THIS_COMPANY_MOTIVATION);
-    const reply = await prisma.consultationTurn.findFirst({
-      where: {
-        sessionId: session.id,
-        speaker: "SEEKER",
-        targetKey: WHY_THIS_COMPANY_TARGET_KEY,
-      },
-    });
-    expect(reply?.analysisJson).toMatchObject({
-      companyMotivation: WHY_THIS_COMPANY_MOTIVATION,
-    });
-    await prisma.campaign.update({
-      where: { id: campaign.id },
-      data: { whyThisCompany: "should not be overwritten on the second pass" },
-    });
-    await startConsultation({ organizationId, campaignId: campaign.id });
-    const second = await prisma.campaign.findUnique({
-      where: { id: campaign.id },
-    });
-    expect(second?.whyThisCompany).toBe("should not be overwritten on the second pass");
-  });
 
-  it("re-extracts why-this-company on an in-progress session without Start", async () => {
-    const campaign = await prisma.campaign.create({
-      data: {
-        organizationId,
-        ownerUserId: userId,
-        name: `Why load ${suffix}`,
-        productId,
-        icpId,
-        whyThisCompany: "I have built OpenText's ARM products by retooling GTM.",
-      },
-    });
-    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
-    await prisma.jobRequirement.create({
-      data: {
-        organizationId,
-        campaignId: campaign.id,
-        rawText: NORMAL_JOB_POSTING,
-        title: parsed.title,
-        seniority: parsed.seniority,
-        requiredItems: parsed.requiredItems,
-        preferredItems: parsed.preferredItems,
-        scorecardJson: parsed.scorecard,
-        employerDisposition: "IDENTIFIED",
-      },
-    });
-    const session = await prisma.consultationSession.create({
-      data: {
-        organizationId,
-        campaignId: campaign.id,
-        productId,
-        status: "IN_PROGRESS",
-        generationStatus: "READY",
-        promptVersion: CONSULTATION_PROMPT_VERSION,
-      },
-    });
-    await prisma.consultationTurn.createMany({
-      data: [
-        {
-          organizationId,
-          sessionId: session.id,
-          sequence: 1,
-          speaker: "CONSULTANT",
-          body: "Why do you want this role at this company?",
-          targetKey: WHY_THIS_COMPANY_TARGET_KEY,
-        },
-        {
-          organizationId,
-          sessionId: session.id,
-          sequence: 2,
-          speaker: "SEEKER",
-          body: `${WHY_THIS_COMPANY_MOTIVATION} I led enterprise security sales.`,
-          targetKey: WHY_THIS_COMPANY_TARGET_KEY,
-          seekerAuthored: true,
-        },
-      ],
-    });
-    await reextractExistingWhyThisCompanyMotivation({
-      organizationId,
-      campaignId: campaign.id,
-    });
-    const corrected = await prisma.campaign.findUnique({
-      where: { id: campaign.id },
-    });
-    expect(corrected?.whyThisCompany).toBe(WHY_THIS_COMPANY_MOTIVATION);
-    expect(await prisma.consultationSession.count({
-      where: { id: session.id, promptVersion: CONSULTATION_PROMPT_VERSION },
-    })).toBe(1);
-  });
 
-  it("regenerates unanswered canned questions once and leaves answered ones unchanged", async () => {
-    const campaign = await prisma.campaign.create({
-      data: {
-        organizationId,
-        ownerUserId: userId,
-        name: `Canned ${suffix}`,
-        productId,
-        icpId,
-        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
-      },
-    });
-    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
-    await prisma.jobRequirement.create({
-      data: {
-        organizationId,
-        campaignId: campaign.id,
-        rawText: NORMAL_JOB_POSTING,
-        title: parsed.title,
-        seniority: parsed.seniority,
-        requiredItems: parsed.requiredItems,
-        preferredItems: parsed.preferredItems,
-        scorecardJson: parsed.scorecard,
-        employerDisposition: "IDENTIFIED",
-      },
-    });
-    await addHiringManager(campaign.id);
-    const session = await prisma.consultationSession.create({
-      data: {
-        organizationId,
-        campaignId: campaign.id,
-        productId,
-        status: "IN_PROGRESS",
-        promptVersion: CONSULTATION_PROMPT_VERSION,
-      },
-    });
-    const canned =
-      "What in your background speaks to this? Which roles did that come from?";
-    const answeredCanned =
-      "Tell me what happened, what you did, and what the result was.";
-    await prisma.consultationTurn.createMany({
-      data: [
-        {
-          organizationId,
-          sessionId: session.id,
-          sequence: 1,
-          speaker: "CONSULTANT",
-          body: canned,
-          targetKey: WHY_THIS_COMPANY_TARGET_KEY,
-        },
-        {
-          organizationId,
-          sessionId: session.id,
-          sequence: 2,
-          speaker: "CONSULTANT",
-          body: answeredCanned,
-          targetKey: "required:0",
-        },
-        {
-          organizationId,
-          sessionId: session.id,
-          sequence: 3,
-          speaker: "SEEKER",
-          body: "I used Python for 5 years and cut failed jobs by 40%.",
-          targetKey: "required:0",
-          seekerAuthored: true,
-        },
-      ],
-    });
-    await regenerateCannedConsultationWording({
-      organizationId,
-      campaignId: campaign.id,
-    });
-    const unanswered = await prisma.consultationTurn.findFirst({
-      where: {
-        sessionId: session.id,
-        targetKey: WHY_THIS_COMPANY_TARGET_KEY,
-        speaker: "CONSULTANT",
-      },
-    });
-    const answered = await prisma.consultationTurn.findFirst({
-      where: { sessionId: session.id, targetKey: "required:0", speaker: "CONSULTANT" },
-    });
-    expect(unanswered?.body).not.toBe(canned);
-    expect(unanswered?.body).toMatch(/company|role/i);
-    expect(answered?.body).toBe(answeredCanned);
-    generateStructured.mockClear();
-    await regenerateCannedConsultationWording({
-      organizationId,
-      campaignId: campaign.id,
-    });
-    expect(generateStructured).not.toHaveBeenCalled();
-    const second = await prisma.consultationTurn.findFirst({
-      where: {
-        sessionId: session.id,
-        targetKey: WHY_THIS_COMPANY_TARGET_KEY,
-        speaker: "CONSULTANT",
-      },
-    });
-    expect(second?.body).toBe(unanswered?.body);
-  });
 
-  it("regenerates first-person coaching once and leaves seeker replies unchanged", async () => {
-    const campaign = await prisma.campaign.create({
-      data: {
-        organizationId,
-        ownerUserId: userId,
-        name: `First person ${suffix}`,
-        productId,
-        icpId,
-        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
-      },
-    });
-    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
-    await prisma.jobRequirement.create({
-      data: {
-        organizationId,
-        campaignId: campaign.id,
-        rawText: NORMAL_JOB_POSTING,
-        title: parsed.title,
-        seniority: parsed.seniority,
-        requiredItems: parsed.requiredItems,
-        preferredItems: parsed.preferredItems,
-        scorecardJson: parsed.scorecard,
-        employerDisposition: "IDENTIFIED",
-      },
-    });
-    const session = await prisma.consultationSession.create({
-      data: {
-        organizationId,
-        campaignId: campaign.id,
-        productId,
-        status: "IN_PROGRESS",
-        promptVersion: CONSULTATION_PROMPT_VERSION,
-      },
-    });
-    const brokenFollowUp =
-      "You named the inspection work.\n\nWhich MEDDIC elements did I inspect?";
-    const seekerReply = "I inspected metrics, economic buyer, and decision criteria.";
-    await prisma.consultationTurn.createMany({
-      data: [
-        {
-          organizationId,
-          sessionId: session.id,
-          sequence: 1,
-          speaker: "CONSULTANT",
-          body: "How did you inspect deals at Login VSI?",
-          targetKey: "required:0",
-        },
-        {
-          organizationId,
-          sessionId: session.id,
-          sequence: 2,
-          speaker: "SEEKER",
-          body: "I sat with managers on the weekly forecast.",
-          targetKey: "required:0",
-          seekerAuthored: true,
-        },
-        {
-          organizationId,
-          sessionId: session.id,
-          sequence: 3,
-          speaker: "CONSULTANT",
-          body: brokenFollowUp,
-          targetKey: "required:0",
-          followUp: true,
-        },
-        {
-          organizationId,
-          sessionId: session.id,
-          sequence: 4,
-          speaker: "SEEKER",
-          body: seekerReply,
-          targetKey: "required:0",
-          seekerAuthored: true,
-        },
-      ],
-    });
-    await regenerateFirstPersonCoaching({
-      organizationId,
-      campaignId: campaign.id,
-    });
-    const followUp = await prisma.consultationTurn.findFirst({
-      where: { sessionId: session.id, followUp: true, speaker: "CONSULTANT" },
-    });
-    const seeker = await prisma.consultationTurn.findFirst({
-      where: { sessionId: session.id, speaker: "SEEKER", body: seekerReply },
-    });
-    expect(followUp?.body).not.toBe(brokenFollowUp);
-    expect(followUp?.body).toMatch(/\byou\b/i);
-    expect(followUp?.body).not.toMatch(/\bdid I\b/);
-    expect(seeker?.body).toBe(seekerReply);
-    generateStructured.mockClear();
-    await regenerateFirstPersonCoaching({
-      organizationId,
-      campaignId: campaign.id,
-    });
-    expect(generateStructured).not.toHaveBeenCalled();
-    const second = await prisma.consultationTurn.findFirst({
-      where: { sessionId: session.id, followUp: true, speaker: "CONSULTANT" },
-    });
-    expect(second?.body).toBe(followUp?.body);
-  });
 
   it("combines existing Partial-gap evidence with the added detail", async () => {
     const campaign = await prisma.campaign.create({

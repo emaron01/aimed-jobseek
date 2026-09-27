@@ -27,8 +27,14 @@ describe("resume and cover letter page", () => {
     expect(section).not.toContain("acceptPresentationPlanAction");
     expect(section).not.toContain("writePresentationPlanAction");
     expect(section).not.toContain("formatClaimEditorLabel");
+    expect(section).not.toContain("xl:grid-cols-2");
     expect(section).toContain("asset-in-place-editor");
+    expect(section).toContain("viewEditResume");
+    expect(section).toContain("viewEditCoverLetter");
+    expect(section).toContain("applicationAssetConfig.labels.adjustManually");
+    expect(section).toContain("applicationAssetConfig.labels.cancel");
     expect(section).toContain("applicationAssetConfig.labels.saveNewVersion");
+    expect(section).toContain("applicationAssetConfig.labels.hideRolesLegend");
     expect(section).toContain("applicationAssetConfig.labels.approve");
     expect(section).toContain("applicationAssetConfig.labels.downloadDocx");
     expect(section).toContain("regenerationInstruction");
@@ -36,11 +42,22 @@ describe("resume and cover letter page", () => {
     expect(applicationAssetConfig.labels.changeInstruction).toBe(
       `What should ${consultationConfig.displayName} change?`,
     );
+    expect(applicationAssetConfig.labels.viewEditResume).toBe("View/Edit Resume");
+    expect(applicationAssetConfig.labels.viewEditCoverLetter).toBe(
+      "View/Edit Cover Letter",
+    );
+    expect(applicationAssetConfig.labels.cancel).toBe("Cancel");
     expect(section).not.toContain("toLocaleString");
     expect(section).toContain("Version {asset.version} · {formatAssetStatusLabel(asset.status)}");
     expect(section).not.toContain("asset.guidance");
     expect(service).toContain("ensureAcceptedPresentationPlan");
     expect(service).toContain("guidance: null");
+    const hideRolesDetails = section.slice(
+      section.indexOf('name="hiddenRoleId"') - 400,
+      section.indexOf('name="hiddenRoleId"'),
+    );
+    expect(hideRolesDetails).toContain("hideRolesLegend");
+    expect(hideRolesDetails).not.toContain("adjustManually");
   });
 
   it("shows each document ready notice once", () => {

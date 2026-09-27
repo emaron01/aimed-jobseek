@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  APPLICATION_STEP_KEYS,
   applicationStepFromPathname,
   applicationStepHref,
   applicationStepList,
@@ -362,7 +363,7 @@ describe("application step colors", () => {
     expect(marker).toContain("tracker-step-marker-static");
   });
 
-  it("never writes NEW-only pills, ids, or timestamps, and migrates seen keys without a burst", () => {
+  it("never writes NEW-only pills, ids, or timestamps, and migrates seen by bumping version only", () => {
     const facts: ApplicationStepFactInput = {
       ...idle,
       researchDone: true,
@@ -392,17 +393,10 @@ describe("application step colors", () => {
       summary: "summary:ready",
       applied: "2026-09-25T00:00:00.000Z",
     });
-    const migrated = migrateWorkspaceSeen(legacy, facts);
+    const migrated = migrateWorkspaceSeen(legacy);
     expect(migrated.version).toBe(WORKSPACE_SEEN_VERSION);
-    const views = buildApplicationStepViews({
-      campaignId: "camp_1",
-      currentStep: null,
-      facts,
-      jobs: [],
-      seen: migrated.keys,
-    });
-    expect(views.filter((step) => step.hasNew)).toEqual([]);
-    for (const key of views.map((step) => step.key)) {
+    expect(migrated.keys).toEqual(legacy.keys);
+    for (const key of APPLICATION_STEP_KEYS) {
       const label = stepNewLabel(key, facts);
       expect(label).toBeTruthy();
       expect(label).not.toBe("NEW");
