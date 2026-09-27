@@ -29,7 +29,10 @@ import {
 } from "@/lib/job-requirement/identity-verification";
 import { applicationWorkspaceCopy, employerIdentityCopy } from "@/lib/product-config";
 import type { ParsedJobRequirement } from "@/lib/job-requirement/types";
-import { JOB_REQUIREMENT_PROMPT_VERSION } from "@/lib/job-requirement/types";
+import {
+  JOB_REQUIREMENT_PROCESSING_VERSION,
+  JOB_REQUIREMENT_PROMPT_VERSION,
+} from "@/lib/job-requirement/types";
 import { prisma } from "@/lib/prisma";
 import { vocab } from "@/lib/product-config";
 import { normalizeCompanyName } from "@/lib/research";
@@ -793,6 +796,26 @@ async function loadJobRequirementForEdit(input: {
   return requirement;
 }
 
+async function withJobRequirementProcessing<T>(
+  requirement: { id: string; parserPromptVersion: string | null },
+  work: () => Promise<T>,
+): Promise<T> {
+  const previous = requirement.parserPromptVersion;
+  await prisma.jobRequirement.update({
+    where: { id: requirement.id },
+    data: { parserPromptVersion: JOB_REQUIREMENT_PROCESSING_VERSION },
+  });
+  try {
+    return await work();
+  } catch (error) {
+    await prisma.jobRequirement.update({
+      where: { id: requirement.id },
+      data: { parserPromptVersion: previous },
+    });
+    throw error;
+  }
+}
+
 async function persistInterpretedJobRequirement(input: {
   requirement: {
     id: string;
@@ -855,21 +878,23 @@ export async function saveApplicationJobPosting(input: {
     throw new TenantError(applicationWorkspaceCopy.jobEditEmpty);
   }
   const requirement = await loadJobRequirementForEdit(input);
-  const parsed = await interpretJobPosting(
-    posting,
-    {
-      organizationId: input.organizationId,
-      userId: input.userId,
-      campaignId: input.campaignId,
-      category: "INTERPRETATION",
-      operation: "JOB_REQUIREMENT_PARSE",
-    },
-    requirement.seekerLearnedNotes,
-  );
-  await persistInterpretedJobRequirement({
-    requirement,
-    rawText: posting,
-    parsed,
+  await withJobRequirementProcessing(requirement, async () => {
+    const parsed = await interpretJobPosting(
+      posting,
+      {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        campaignId: input.campaignId,
+        category: "INTERPRETATION",
+        operation: "JOB_REQUIREMENT_PARSE",
+      },
+      requirement.seekerLearnedNotes,
+    );
+    await persistInterpretedJobRequirement({
+      requirement,
+      rawText: posting,
+      parsed,
+    });
   });
 }
 
@@ -879,21 +904,23 @@ export async function regenerateApplicationJobRequirement(input: {
   userId: string;
 }): Promise<void> {
   const requirement = await loadJobRequirementForEdit(input);
-  const parsed = await interpretJobPosting(
-    requirement.rawText,
-    {
-      organizationId: input.organizationId,
-      userId: input.userId,
-      campaignId: input.campaignId,
-      category: "INTERPRETATION",
-      operation: "JOB_REQUIREMENT_PARSE",
-    },
-    requirement.seekerLearnedNotes,
-  );
-  await persistInterpretedJobRequirement({
-    requirement,
-    rawText: requirement.rawText,
-    parsed,
+  await withJobRequirementProcessing(requirement, async () => {
+    const parsed = await interpretJobPosting(
+      requirement.rawText,
+      {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        campaignId: input.campaignId,
+        category: "INTERPRETATION",
+        operation: "JOB_REQUIREMENT_PARSE",
+      },
+      requirement.seekerLearnedNotes,
+    );
+    await persistInterpretedJobRequirement({
+      requirement,
+      rawText: requirement.rawText,
+      parsed,
+    });
   });
 }
 
@@ -912,21 +939,23 @@ export async function saveApplicationJobLearnedNotes(input: {
     where: { id: requirement.id },
     data: { seekerLearnedNotes: notes.length > 0 ? notes : null },
   });
-  const parsed = await interpretJobPosting(
-    requirement.rawText,
-    {
-      organizationId: input.organizationId,
-      userId: input.userId,
-      campaignId: input.campaignId,
-      category: "INTERPRETATION",
-      operation: "JOB_REQUIREMENT_PARSE",
-    },
-    notes.length > 0 ? notes : null,
-  );
-  await persistInterpretedJobRequirement({
-    requirement,
-    rawText: requirement.rawText,
-    parsed,
+  await withJobRequirementProcessing(requirement, async () => {
+    const parsed = await interpretJobPosting(
+      requirement.rawText,
+      {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        campaignId: input.campaignId,
+        category: "INTERPRETATION",
+        operation: "JOB_REQUIREMENT_PARSE",
+      },
+      notes.length > 0 ? notes : null,
+    );
+    await persistInterpretedJobRequirement({
+      requirement,
+      rawText: requirement.rawText,
+      parsed,
+    });
   });
   const { enqueueApplicationJob } = await import("@/lib/application-jobs/service");
   await enqueueApplicationJob({

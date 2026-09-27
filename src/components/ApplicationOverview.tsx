@@ -63,15 +63,21 @@ export function ApplicationOverview({
                   tone={
                     step.state === "done"
                       ? "done"
-                      : step.state === "in_progress"
-                        ? "progress"
-                        : "attention"
+                      : step.state === "active"
+                        ? "active"
+                        : step.state === "in_progress"
+                          ? "progress"
+                          : "attention"
                   }
                 >
-                  {step.hasNew
-                    ? applicationStepCopy.newMarker
+                  {step.hasNew && step.newLabel
+                    ? step.newLabel
+                    : step.statusNote
+                      ? step.statusNote
                     : step.state === "done"
                       ? applicationStepCopy.done
+                      : step.state === "active"
+                        ? applicationStepCopy.active
                       : step.state === "in_progress"
                         ? applicationStepCopy.inProgress
                         : step.state === "needs_attention"

@@ -45,7 +45,10 @@ import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { InterviewStagesSection } from "@/components/InterviewStagesSection";
 import { ApplicationAssetsSection } from "@/components/ApplicationAssetsSection";
 import { ApplicationCompanyBriefing } from "@/components/ApplicationCompanyBriefing";
-import { ApplicationJobRequirementActions } from "@/components/ApplicationJobRequirementActions";
+import {
+  ApplicationJobRequirementActions,
+  ApplicationJobRequirementTopActions,
+} from "@/components/ApplicationJobRequirementActions";
 import { EmptyState } from "@/components/design";
 import { OpenDetailsOnMount } from "@/components/OpenDetailsOnMount";
 import {
@@ -631,6 +634,7 @@ export async function ApplicationWorkspace({
       </summary>
       <div className="mt-4 space-y-4">
     <section className="space-y-4">
+      {canEdit ? <ApplicationJobRequirementTopActions /> : null}
       <p className="text-sm text-muted">
         {applicationWorkspaceCopy.jobPostingHelp}
       </p>

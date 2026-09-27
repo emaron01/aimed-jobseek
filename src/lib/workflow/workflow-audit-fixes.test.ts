@@ -4,7 +4,10 @@ import { parseCampaignFormData } from "@/lib/campaign/save";
 import { buildSidebarNavItems } from "@/lib/auth/user-menu";
 import { buildHomeSetupRail } from "@/lib/workflow/home-setup-rail";
 import { getProductCampaignReadiness } from "@/lib/workflow/product-campaign-readiness";
-import { resolveApplicationStepState } from "@/lib/application/step-progress";
+import {
+  emptyApplicationStepFacts,
+  resolveApplicationStepState,
+} from "@/lib/application/step-progress";
 import { buildConsultationPolishMessages } from "@/lib/consultation/prompt";
 import { voiceReadiness } from "@/lib/voice/types";
 import { applicationAssetConfig, vocab } from "@/lib/product-config";
@@ -170,22 +173,8 @@ describe("workflow audit fixes", () => {
     expect(listing).toContain("_count.icps");
   });
 
-  it("bases interview progress on application stages, not INTERVIEW_GUIDE jobs", () => {
-    const idle = {
-      researchDone: false,
-      researchFailed: false,
-      researchInProgress: false,
-      hasJobTitle: false,
-      fitNeedsRescore: false,
-      hiringTeamRoleCount: 0,
-      hasApprovedResume: false,
-      hasApprovedCoverLetter: false,
-      contactCount: 0,
-      interviewStageCount: 0,
-      cheatSheetReady: false,
-      appliedAt: null,
-      consultationStarted: false,
-    };
+  it("maps INTERVIEW_GUIDE jobs onto the interview stages step", () => {
+    const idle = emptyApplicationStepFacts();
     expect(
       resolveApplicationStepState("interviews", idle, [
         {
@@ -201,7 +190,7 @@ describe("workflow audit fixes", () => {
           readyText: "Guide is ready.",
         },
       ]),
-    ).toBe("not_started");
+    ).toBe("in_progress");
     expect(
       resolveApplicationStepState(
         "interviews",

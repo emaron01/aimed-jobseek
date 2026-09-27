@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-export type StatusTone = "neutral" | "current" | "done" | "attention" | "progress";
+export type StatusTone = "neutral" | "current" | "done" | "attention" | "progress" | "active";
 
 const TONE_CLASS: Record<StatusTone, string> = {
   neutral: "bg-canvas text-muted",
@@ -8,6 +8,7 @@ const TONE_CLASS: Record<StatusTone, string> = {
   done: "bg-success-tint text-success",
   attention: "bg-danger-tint text-danger",
   progress: "bg-warning-tint text-warning",
+  active: "bg-active-tint text-active",
 };
 
 export function StatusPill({

@@ -24,6 +24,8 @@ function stateTone(state: ApplicationStepState): string {
   switch (state) {
     case "done":
       return "bg-success text-on-ink";
+    case "active":
+      return "bg-active text-on-ink";
     case "in_progress":
       return "bg-warning-tint text-warning";
     case "needs_attention":
@@ -40,6 +42,8 @@ function stateLabel(state: ApplicationStepState): string {
   switch (state) {
     case "done":
       return applicationStepCopy.done;
+    case "active":
+      return applicationStepCopy.active;
     case "in_progress":
       return applicationStepCopy.inProgress;
     case "needs_attention":
@@ -72,6 +76,8 @@ export function ApplicationStepMarker({
         <AppIcon name="check" className="h-3.5 w-3.5" />
       ) : state === "in_progress" ? (
         <AppIcon name="spinner" className="h-3.5 w-3.5" />
+      ) : state === "active" ? (
+        <AppIcon name="dot" className="h-3.5 w-3.5" />
       ) : (
         <AppIcon name="dot" className="h-3.5 w-3.5" />
       )}
@@ -115,12 +121,19 @@ export function ApplicationTrackerList({
                 {step.number}. {step.title}
               </span>
             </span>
-            {step.hasNew ? (
+            {step.hasNew && step.newLabel ? (
               <span
-                className="rounded-full bg-warning-tint px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning"
+                className="rounded-full bg-warning-tint px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-warning"
                 data-testid={`tracker-new-${step.key}`}
               >
-                {applicationStepCopy.newMarker}
+                {step.newLabel}
+              </span>
+            ) : step.statusNote ? (
+              <span
+                className="rounded-full bg-warning-tint px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-warning"
+                data-testid={`tracker-note-${step.key}`}
+              >
+                {step.statusNote}
               </span>
             ) : null}
           </Link>
@@ -240,6 +253,7 @@ export function ApplicationCompactTracker({
   const [tracker, setTracker] = useState<ApplicationTrackerView | null>(null);
   const [open, setOpen] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -247,11 +261,15 @@ export function ApplicationCompactTracker({
       const next = await getApplicationTrackerAction(campaignId, pathname);
       if (!cancelled) {
         setTracker(next);
+        setLoaded(true);
         setFailed(false);
       }
     };
     void load().catch((error) => {
-      if (!cancelled) setFailed(true);
+      if (!cancelled) {
+        setLoaded(true);
+        setFailed(true);
+      }
       console.error(
         JSON.stringify({
           event: "application_tracker_poll_failed",
@@ -291,12 +309,16 @@ export function ApplicationCompactTracker({
               ? `${current.number}. ${current.title}`
               : applicationStepCopy.trackerLabel}
           </p>
-          <div           className="mt-1 h-1.5 overflow-hidden rounded-full bg-edge">
-            <div
-              className="h-full bg-primary transition-[width] duration-200 motion-reduce:transition-none"
-              style={{ width: total ? `${(doneCount / total) * 100}%` : "0%" }}
-            />
-          </div>
+          {!loaded ? (
+            <Skeleton className="mt-1" lines={1} />
+          ) : (
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-edge">
+              <div
+                className="h-full bg-primary transition-[width] duration-200 motion-reduce:transition-none"
+                style={{ width: total ? `${(doneCount / total) * 100}%` : "0%" }}
+              />
+            </div>
+          )}
         </div>
         <AppButton
           type="button"

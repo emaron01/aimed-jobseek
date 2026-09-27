@@ -3,29 +3,36 @@ import {
   applicationStepFromPathname,
   applicationStepHref,
   applicationStepList,
+  applicationStepCopy,
 } from "@/lib/product-config/application-steps";
 import { applicationAssetConfig, applicationSummaryConfig } from "@/lib/product-config";
 import {
   buildApplicationStepViews,
+  emptyApplicationStepFacts,
+  migrateWorkspaceSeen,
+  parseWorkspaceSeenJson,
   resolveApplicationStepState,
+  stepNewLabel,
+  WORKSPACE_SEEN_VERSION,
   type ApplicationStepFactInput,
 } from "@/lib/application/step-progress";
 
-const idle: ApplicationStepFactInput = {
-  researchDone: false,
-  researchFailed: false,
-  researchInProgress: false,
-  hasJobTitle: false,
-  fitNeedsRescore: false,
-  hiringTeamRoleCount: 0,
-  hasApprovedResume: false,
-  hasApprovedCoverLetter: false,
-  contactCount: 0,
-  interviewStageCount: 0,
-  cheatSheetReady: false,
-  appliedAt: null,
-  consultationStarted: false,
-};
+const idle = emptyApplicationStepFacts();
+
+function job(type: "RESUME" | "COVER_LETTER" | "OUTREACH" | "INTERVIEW_GUIDE" | "CONSULTATION" | "APPLICATION_SUMMARY" | "HIRING_TEAM_BUILD", status: "PENDING" | "IN_PROGRESS" | "FAILED" | "COMPLETED") {
+  return {
+    id: "job_1",
+    type,
+    status,
+    targetId: null,
+    error: status === "FAILED" ? "Retry." : null,
+    canRetry: status === "FAILED",
+    progressText: "Working",
+    waitKind: "longer" as const,
+    sectionId: "section",
+    readyText: "Ready.",
+  };
+}
 
 describe("application step routes", () => {
   it("gives every page step its own URL and keeps Applied on the overview", () => {
@@ -66,68 +73,142 @@ describe("application step routes", () => {
     expect(applicationStepList.find((step) => step.key === "summary")?.title).toBe(
       applicationSummaryConfig.title,
     );
+    expect(applicationStepList.find((step) => step.key === "applied")?.title).toBe(
+      "Application Status",
+    );
+    expect(applicationStepList.find((step) => step.key === "hiring-team")?.title).toBe(
+      "Personas and Interviewers",
+    );
+    expect(applicationStepList.find((step) => step.key === "outreach")?.title).toBe(
+      "Send Outreach",
+    );
   });
 });
 
-describe("application step done states", () => {
-  it("follows real application data", () => {
-    expect(resolveApplicationStepState("assets", idle, [])).toBe("not_started");
-    expect(
-      resolveApplicationStepState("assets", { ...idle, hasApprovedResume: true }, []),
-    ).toBe("done");
+describe("application step colors", () => {
+  it("uses red, yellow, and green under the owner rules", () => {
+    expect(resolveApplicationStepState("applied", idle, [])).toBe("not_started");
     expect(
       resolveApplicationStepState("applied", { ...idle, appliedAt: "2026-09-25" }, []),
     ).toBe("done");
+
+    expect(resolveApplicationStepState("company", idle, [])).toBe("not_started");
+    expect(
+      resolveApplicationStepState("company", { ...idle, researchInProgress: true }, []),
+    ).toBe("in_progress");
+    expect(
+      resolveApplicationStepState("company", { ...idle, researchFailed: true }, []),
+    ).toBe("in_progress");
+    expect(
+      resolveApplicationStepState("company", { ...idle, researchDone: true }, []),
+    ).toBe("done");
+
+    expect(resolveApplicationStepState("job", idle, [])).toBe("not_started");
     expect(
       resolveApplicationStepState(
-        "company",
-        { ...idle, researchInProgress: true },
+        "job",
+        { ...idle, hasJobTitle: true, jobReprocessing: true },
         [],
       ),
     ).toBe("in_progress");
     expect(
-      resolveApplicationStepState("company", { ...idle, researchFailed: true }, []),
-    ).toBe("needs_attention");
+      resolveApplicationStepState("job", { ...idle, hasJobTitle: true }, []),
+    ).toBe("done");
+
+    expect(resolveApplicationStepState("consultation", idle, [])).toBe("not_started");
+    expect(
+      resolveApplicationStepState(
+        "consultation",
+        {
+          ...idle,
+          consultationStarted: true,
+          consultationComplete: false,
+          consultationUnanswered: true,
+        },
+        [],
+      ),
+    ).toBe("in_progress");
+    expect(
+      resolveApplicationStepState(
+        "consultation",
+        { ...idle, consultationStarted: true, consultationComplete: true },
+        [],
+      ),
+    ).toBe("done");
+
+    expect(resolveApplicationStepState("assets", idle, [])).toBe("not_started");
     expect(
       resolveApplicationStepState(
         "assets",
-        idle,
-        [
-          {
-            id: "job_1",
-            type: "RESUME",
-            status: "FAILED",
-            targetId: null,
-            error: "Retry.",
-            canRetry: true,
-            progressText: "Writing",
-            waitKind: "longer",
-            sectionId: "assets",
-            readyText: "Resume is ready.",
-          },
-        ],
+        {
+          ...idle,
+          hasResumeVersion: true,
+          latestResumeApproved: false,
+          hasUnapprovedAssetDraft: true,
+          latestResumeVersion: 2,
+        },
+        [],
       ),
-    ).toBe("needs_attention");
+    ).toBe("in_progress");
+    expect(
+      resolveApplicationStepState("assets", idle, [job("RESUME", "IN_PROGRESS")]),
+    ).toBe("in_progress");
+    expect(
+      resolveApplicationStepState(
+        "assets",
+        {
+          ...idle,
+          hasResumeVersion: true,
+          latestResumeApproved: true,
+          hasApprovedResume: true,
+          latestResumeVersion: 1,
+        },
+        [],
+      ),
+    ).toBe("done");
+
+    expect(resolveApplicationStepState("hiring-team", idle, [])).toBe("not_started");
+    expect(
+      resolveApplicationStepState(
+        "hiring-team",
+        { ...idle, hiringTeamRoleCount: 2, hiringTeamBuiltCount: 1 },
+        [],
+      ),
+    ).toBe("in_progress");
+    expect(
+      resolveApplicationStepState(
+        "hiring-team",
+        { ...idle, hiringTeamRoleCount: 2, hiringTeamBuiltCount: 2 },
+        [],
+      ),
+    ).toBe("done");
+
+    expect(resolveApplicationStepState("outreach", idle, [])).toBe("not_started");
+    expect(
+      resolveApplicationStepState("outreach", { ...idle, contactCount: 1 }, []),
+    ).toBe("active");
+    expect(
+      resolveApplicationStepState(
+        "outreach",
+        { ...idle, contactCount: 1 },
+        [job("OUTREACH", "IN_PROGRESS")],
+      ),
+    ).toBe("in_progress");
+    expect(
+      resolveApplicationStepState("outreach", { ...idle, contactCount: 3 }, []),
+    ).not.toBe("done");
+
+    expect(resolveApplicationStepState("interviews", idle, [])).toBe("not_started");
+    expect(
+      resolveApplicationStepState("interviews", idle, [job("INTERVIEW_GUIDE", "IN_PROGRESS")]),
+    ).toBe("in_progress");
     expect(
       resolveApplicationStepState(
         "interviews",
-        idle,
-        [
-          {
-            id: "guide_1",
-            type: "INTERVIEW_GUIDE",
-            status: "IN_PROGRESS",
-            targetId: "stage_1",
-            error: null,
-            canRetry: false,
-            progressText: "Writing",
-            waitKind: "longer",
-            sectionId: "interviews",
-            readyText: "Guide is ready.",
-          },
-        ],
+        { ...idle, interviewStageCount: 1 },
+        [job("INTERVIEW_GUIDE", "IN_PROGRESS")],
       ),
-    ).toBe("not_started");
+    ).toBe("in_progress");
     expect(
       resolveApplicationStepState(
         "interviews",
@@ -135,30 +216,161 @@ describe("application step done states", () => {
         [],
       ),
     ).toBe("done");
+
+    expect(resolveApplicationStepState("summary", idle, [])).toBe("not_started");
+    expect(
+      resolveApplicationStepState("summary", idle, [job("APPLICATION_SUMMARY", "IN_PROGRESS")]),
+    ).toBe("in_progress");
+    expect(
+      resolveApplicationStepState("summary", { ...idle, cheatSheetReady: true }, []),
+    ).toBe("done");
   });
 
-  it("shows one new marker per latest result and clears it after view", () => {
-    const views = buildApplicationStepViews({
+  it("treats a failed step that already has work as yellow, not red", () => {
+    expect(
+      resolveApplicationStepState("assets", idle, [job("RESUME", "FAILED")]),
+    ).toBe("in_progress");
+    expect(
+      resolveApplicationStepState(
+        "company",
+        { ...idle, researchFailed: true },
+        [],
+      ),
+    ).toBe("in_progress");
+    expect(
+      resolveApplicationStepState(
+        "hiring-team",
+        { ...idle, hiringTeamRoleCount: 1, hiringTeamBuiltCount: 0 },
+        [job("HIRING_TEAM_BUILD", "FAILED")],
+      ),
+    ).toBe("in_progress");
+  });
+
+  it("returns Harper to yellow when new data presents after every question was answered", () => {
+    const complete: ApplicationStepFactInput = {
+      ...idle,
+      consultationStarted: true,
+      consultationComplete: true,
+      consultationUnanswered: false,
+    };
+    expect(resolveApplicationStepState("consultation", complete, [])).toBe("done");
+    expect(
+      resolveApplicationStepState(
+        "consultation",
+        {
+          ...complete,
+          consultationComplete: false,
+          consultationUnanswered: true,
+        },
+        [],
+      ),
+    ).toBe("in_progress");
+  });
+
+  it("shows yellow and a specific NEW pill on a green step Harper changed until it is opened", () => {
+    const facts: ApplicationStepFactInput = {
+      ...idle,
+      latestResumeApproved: true,
+      hasApprovedResume: true,
+      hasResumeVersion: true,
+      latestResumeVersion: 3,
+      latestAssetKind: "resume",
+    };
+    const unread = buildApplicationStepViews({
       campaignId: "camp_1",
-      currentStep: "assets",
-      facts: { ...idle, hasApprovedResume: true },
+      currentStep: "job",
+      facts,
       jobs: [],
-      seen: {},
+      seen: { assets: "resume:v2" },
     });
-    const assets = views.find((step) => step.key === "assets");
+    const assets = unread.find((step) => step.key === "assets");
+    expect(assets?.state).toBe("in_progress");
     expect(assets?.hasNew).toBe(true);
-    expect(assets?.isCurrent).toBe(true);
-    expect(assets?.href).toBe("/campaigns/camp_1/assets");
+    expect(assets?.newLabel).toBe("New: resume version 3");
+    expect(assets?.newLabel).not.toMatch(/^NEW$/i);
+    expect(assets?.newLabel).not.toMatch(/job_|camp_|[0-9]{4}-[0-9]{2}-[0-9]{2}T/);
     const viewed = buildApplicationStepViews({
       campaignId: "camp_1",
       currentStep: "assets",
-      facts: { ...idle, hasApprovedResume: true },
+      facts,
       jobs: [],
-      seen: { assets: "resume:approved" },
+      seen: { assets: "resume:v3" },
     });
+    expect(viewed.find((step) => step.key === "assets")?.state).toBe("done");
     expect(viewed.find((step) => step.key === "assets")?.hasNew).toBe(false);
-    expect(views.filter((step) => step.hasNew).map((step) => step.key)).toEqual([
-      "assets",
-    ]);
+  });
+
+  it("never writes NEW-only pills, ids, or timestamps, and migrates seen keys without a burst", () => {
+    const facts: ApplicationStepFactInput = {
+      ...idle,
+      researchDone: true,
+      hasJobTitle: true,
+      consultationStarted: true,
+      consultationComplete: true,
+      hiringTeamRoleCount: 1,
+      hiringTeamBuiltCount: 1,
+      hasResumeVersion: true,
+      latestResumeApproved: true,
+      hasApprovedResume: true,
+      latestResumeVersion: 1,
+      latestAssetKind: "resume",
+      contactCount: 1,
+      interviewStageCount: 1,
+      cheatSheetReady: true,
+      appliedAt: "2026-09-25T00:00:00.000Z",
+    };
+    const legacy = parseWorkspaceSeenJson({
+      company: "cuidjob1234567890",
+      job: "job:ready",
+      consultation: "consultation:started",
+      assets: "resume:approved",
+      "hiring-team": "hiring-team:1",
+      outreach: "outreach:1",
+      interviews: "interviews:1",
+      summary: "summary:ready",
+      applied: "2026-09-25T00:00:00.000Z",
+    });
+    const migrated = migrateWorkspaceSeen(legacy, facts);
+    expect(migrated.version).toBe(WORKSPACE_SEEN_VERSION);
+    const views = buildApplicationStepViews({
+      campaignId: "camp_1",
+      currentStep: null,
+      facts,
+      jobs: [],
+      seen: migrated.keys,
+    });
+    expect(views.filter((step) => step.hasNew)).toEqual([]);
+    for (const key of views.map((step) => step.key)) {
+      const label = stepNewLabel(key, facts);
+      expect(label).toBeTruthy();
+      expect(label).not.toBe("NEW");
+      expect(label).not.toBe("New");
+      expect(label).not.toMatch(/cuid|job_1|camp_1/);
+      expect(label).not.toMatch(/T00:00:00/);
+    }
+    expect(applicationStepCopy.newMarker).toBe("New");
+  });
+
+  it("labels remaining personas and never marks Send Outreach done", () => {
+    const remaining = buildApplicationStepViews({
+      campaignId: "camp_1",
+      currentStep: null,
+      facts: { ...idle, hiringTeamRoleCount: 3, hiringTeamBuiltCount: 1 },
+      jobs: [],
+      seen: {},
+    });
+    const hiring = remaining.find((step) => step.key === "hiring-team");
+    expect(hiring?.state).toBe("in_progress");
+    expect(hiring?.statusNote).toBe("Review remaining personas");
+    expect(hiring?.newLabel).toBe("Review remaining personas");
+    const outreach = buildApplicationStepViews({
+      campaignId: "camp_1",
+      currentStep: null,
+      facts: { ...idle, contactCount: 2 },
+      jobs: [],
+      seen: { outreach: "outreach:contacts:2" },
+    }).find((step) => step.key === "outreach");
+    expect(outreach?.state).toBe("active");
+    expect(outreach?.state).not.toBe("done");
   });
 });

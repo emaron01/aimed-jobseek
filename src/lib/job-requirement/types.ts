@@ -1,4 +1,5 @@
 export const JOB_REQUIREMENT_PROMPT_VERSION = "3";
+export const JOB_REQUIREMENT_PROCESSING_VERSION = "processing";
 
 export type NamedJobContact = {
   firstName: string | null;

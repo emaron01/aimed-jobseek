@@ -106,6 +106,7 @@ describe("restored workspace editing and Harper", () => {
     expect(tracker).toContain("bg-success");
     expect(tracker).toContain("bg-warning-tint");
     expect(tracker).toContain("bg-danger");
+    expect(tracker).toContain("bg-active");
     expect(designTokens.color.nav).toBe("#163A7A");
     expect(
       contrastRatio(designTokens.color.onNav, designTokens.color.nav),

@@ -24,7 +24,7 @@ function sourceFiles() {
 
 describe("hiring team page copy and layout", () => {
   it("uses the new name in the page header, side navigation, and overview", () => {
-    const title = "Review Hiring Personas – Add Who Will Be Interviewing";
+    const title = "Personas and Interviewers";
     expect(applicationWorkspaceCopy.hiringTeamTitle).toBe(title);
     expect(hiringTeamConfig.workspaceTitle).toBe(title);
     expect(applicationStepByKey("hiring-team").title).toBe(title);

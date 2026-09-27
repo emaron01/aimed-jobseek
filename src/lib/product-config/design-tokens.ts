@@ -18,6 +18,8 @@ export const designTokens = Object.freeze({
     dangerTint: "#FEE2E2",
     warning: "#92400E",
     warningTint: "#FEF3C7",
+    active: "#0F766E",
+    activeTint: "#CCFBF1",
     canvas: "#F8FAFC",
     surface: "#FFFFFF",
     muted: "#475569",
@@ -68,6 +70,8 @@ export const tokenContrastPairs = Object.freeze([
   { name: "danger on danger tint", fg: designTokens.color.danger, bg: designTokens.color.dangerTint },
   { name: "white on danger", fg: designTokens.color.onInk, bg: designTokens.color.danger },
   { name: "warning on warning tint", fg: designTokens.color.warning, bg: designTokens.color.warningTint },
+  { name: "white on active", fg: designTokens.color.onInk, bg: designTokens.color.active },
+  { name: "active on active tint", fg: designTokens.color.active, bg: designTokens.color.activeTint },
   { name: "ink on canvas", fg: designTokens.color.ink, bg: designTokens.color.canvas },
 ] as const);
 

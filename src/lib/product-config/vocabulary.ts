@@ -204,8 +204,8 @@ export const applicationResearchCopy = Object.freeze({
 export const applicationWorkspaceCopy = Object.freeze({
   nextStepTitle: "Let's walk through this application",
   jobRequirementTitle: "Job requirements",
-  hiringTeamTitle: "Review Hiring Personas – Add Who Will Be Interviewing",
-  appliedTitle: "Update application date and status",
+  hiringTeamTitle: "Personas and Interviewers",
+  appliedTitle: "Application Status",
   contactsTitle: "Add and review interview contacts",
   companyTitle: "Company",
   whatTheyDoTitle: "What they do",
@@ -235,6 +235,8 @@ export const applicationWorkspaceCopy = Object.freeze({
   jobRegenerateFailed: "The job requirements could not be regenerated.",
   jobPostingSaved: "Job requirements were regenerated from the posting.",
   jobRegenerated: "Job requirements were regenerated.",
+  jobEditTop: "Edit",
+  jobLearnedTop: "Enter any new requirements you have learned here",
   jobLearnedTitle: "What I've learned",
   jobLearnedHelp:
     "Add what you learn at any time, for example after a call with an interviewer. These notes are included when the job requirements regenerate, and they are used by {consultant} and the Interview cheat sheet.",

@@ -24,6 +24,7 @@ describe("job requirements page", () => {
 
   it("renders the job requirements once and has no field-by-field edit form", () => {
     expect(workspace).toContain("job-requirement-view");
+    expect(workspace).toContain("ApplicationJobRequirementTopActions");
     expect(workspace).toContain("ApplicationJobRequirementActions");
     expect(workspace).not.toContain("ApplicationJobRequirementForm");
     expect(workspace.split("job-requirement-view").length).toBe(2);
@@ -33,6 +34,11 @@ describe("job requirements page", () => {
   });
 
   it("edits the original posting, regenerates, and keeps learned notes collapsed", () => {
+    expect(actions).toContain("job-requirement-top-actions");
+    expect(actions).toContain("job-learned-top");
+    expect(actions).toContain("job-edit-top");
+    expect(actions).toContain("openExistingSection(\"job-learned-notes\")");
+    expect(actions).toContain("openExistingSection(\"edit-job-posting\")");
     expect(actions).toContain("edit-job-posting");
     expect(actions).toContain("saveApplicationJobPostingAction");
     expect(actions).toContain("regenerate-job-requirement");

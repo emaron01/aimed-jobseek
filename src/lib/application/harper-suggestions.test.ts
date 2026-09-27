@@ -1,22 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { buildHarperSuggestions } from "@/lib/application/harper-suggestions";
-import type { ApplicationStepFactInput } from "@/lib/application/step-progress";
+import {
+  emptyApplicationStepFacts,
+  type ApplicationStepFactInput,
+} from "@/lib/application/step-progress";
 import { consultationConfig } from "@/lib/product-config";
 
 const facts: ApplicationStepFactInput = {
+  ...emptyApplicationStepFacts(),
   researchDone: true,
-  researchFailed: false,
-  researchInProgress: false,
   hasJobTitle: true,
-  fitNeedsRescore: false,
   hiringTeamRoleCount: 1,
+  hiringTeamBuiltCount: 1,
   hasApprovedResume: true,
   hasApprovedCoverLetter: true,
   contactCount: 1,
   interviewStageCount: 1,
-  cheatSheetReady: false,
-  appliedAt: null,
-  consultationStarted: false,
 };
 
 describe("Harper suggestions", () => {

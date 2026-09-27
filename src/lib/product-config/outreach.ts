@@ -9,7 +9,7 @@ import { applicationWorkspaceCopy, vocab } from "./vocabulary";
 
 export const outreachConfig = Object.freeze({
   labels: {
-    sectionTitle: "Outreach",
+    sectionTitle: "Send Outreach",
     sectionHelp:
       "Add the people you will write to. Sent messages appear under each name. Open one to send it, or generate the next message for the selected person. Open email in your own client, or copy LinkedIn text. Nothing is sent from this product.",
     contactsTitle: applicationWorkspaceCopy.contactsTitle,

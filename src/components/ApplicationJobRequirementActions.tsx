@@ -7,6 +7,7 @@ import {
   saveApplicationJobPostingAction,
 } from "@/app/actions/application";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
+import { AppButton } from "@/components/ui";
 import {
   applicationWorkspaceCopy,
   consultationConfig,
@@ -22,6 +23,40 @@ function withConsultant(text: string): string {
   return text
     .replaceAll("{consultant}", consultationConfig.displayName)
     .replaceAll("{product}", vocab.product.Singular);
+}
+
+function openExistingSection(id: string): void {
+  const section = document.getElementById(id);
+  if (!(section instanceof HTMLDetailsElement)) {
+    throw new Error(`Job requirements section #${id} was not found.`);
+  }
+  section.open = true;
+  const field = section.querySelector("textarea");
+  if (field instanceof HTMLTextAreaElement) field.focus();
+  section.scrollIntoView({ block: "start" });
+}
+
+export function ApplicationJobRequirementTopActions() {
+  return (
+    <div className="flex flex-wrap gap-3" data-testid="job-requirement-top-actions">
+      <AppButton
+        type="button"
+        variant="secondary"
+        data-testid="job-learned-top"
+        onClick={() => openExistingSection("job-learned-notes")}
+      >
+        {applicationWorkspaceCopy.jobLearnedTop}
+      </AppButton>
+      <AppButton
+        type="button"
+        variant="secondary"
+        data-testid="job-edit-top"
+        onClick={() => openExistingSection("edit-job-posting")}
+      >
+        {applicationWorkspaceCopy.jobEditTop}
+      </AppButton>
+    </div>
+  );
 }
 
 export function ApplicationJobRequirementActions({
@@ -40,6 +75,7 @@ export function ApplicationJobRequirementActions({
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3">
         <details
+          id="edit-job-posting"
           className="w-full rounded-md border border-edge bg-canvas p-4"
           data-testid="edit-job-posting"
         >
@@ -81,6 +117,7 @@ export function ApplicationJobRequirementActions({
         </ApplicationActionForm>
       </div>
       <details
+        id="job-learned-notes"
         className="rounded-md border border-edge bg-canvas p-4"
         data-testid="job-learned-notes"
       >
