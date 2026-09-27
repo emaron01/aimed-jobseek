@@ -109,16 +109,80 @@ function targetMeaning(text: string): string {
   return requirementMeaning(text);
 }
 
+export function looksLikeTemplatedUnseenQuestion(text: string): boolean {
+  return /harper does not see/i.test(text);
+}
+
+export function questionNeedsRoleSource(input: {
+  gapText: string;
+  profileItems?: Array<{
+    itemType?: string;
+    title?: string | null;
+    employer?: string | null;
+    text: string;
+  }>;
+}): boolean {
+  const mentionsYears = /\b\d+\s+years?\b/i.test(input.gapText);
+  if (!mentionsYears && !/\bbackground\b/i.test(input.gapText)) return false;
+  const tied = (input.profileItems ?? []).some(
+    (item) =>
+      item.itemType === "EXPERIENCE" &&
+      Boolean(item.title?.trim() || item.employer?.trim()) &&
+      sameRequirementMeaning(item.text, input.gapText),
+  );
+  return !tied;
+}
+
+type GapProfileItem = {
+  itemType?: string;
+  title?: string | null;
+  employer?: string | null;
+  text: string;
+};
+
+function withRoleSourceAsk(
+  text: string,
+  gap: Pick<EvidenceAssessment, "text">,
+  profileItems?: GapProfileItem[],
+): string {
+  if (
+    questionNeedsRoleSource({ gapText: gap.text, profileItems }) &&
+    !/which roles?/i.test(text)
+  ) {
+    return `${text} Which roles did that come from?`;
+  }
+  return text;
+}
+
+export function defaultGapShareQuestion(
+  gap: Pick<EvidenceAssessment, "key" | "text">,
+  profileItems?: GapProfileItem[],
+): string {
+  if (gap.key === WHY_THIS_COMPANY_TARGET_KEY) {
+    return consultationConversationCopy.whyThisCompanyQuestion;
+  }
+  return withRoleSourceAsk(
+    "What in your background speaks to this?",
+    gap,
+    profileItems,
+  );
+}
+
 export function questionTextForGap(
   gap: Pick<EvidenceAssessment, "key" | "text">,
   modelText?: string | null,
+  profileItems?: GapProfileItem[],
 ): string {
   if (gap.key === WHY_THIS_COMPANY_TARGET_KEY) {
     return (
       modelText?.trim() || consultationConversationCopy.whyThisCompanyQuestion
     );
   }
-  return modelText?.trim() ?? "";
+  const written = modelText?.trim() ?? "";
+  if (!written || looksLikeTemplatedUnseenQuestion(written)) {
+    return "";
+  }
+  return withRoleSourceAsk(written, gap, profileItems);
 }
 
 export function matchConsultationFocus(input: {
@@ -167,6 +231,7 @@ function questionForGap(input: {
     | undefined;
   hiringTeam: Array<{ id: string; name: string }>;
   rolesById: Map<string, { id: string; name: string }>;
+  profileItems?: GapProfileItem[];
 }): { question: PlannedQuestion } | { dropped: DroppedQuestion } {
   const { gap, modelQuestion } = input;
   const role =
@@ -182,7 +247,7 @@ function questionForGap(input: {
       },
     };
   }
-  const text = questionTextForGap(gap, modelQuestion?.text);
+  const text = questionTextForGap(gap, modelQuestion?.text, input.profileItems);
   if (!text) {
     return {
       dropped: {
@@ -283,6 +348,7 @@ export function planQuestionRound(input: {
   chronologyAsked: boolean;
   askedQuestions?: readonly AskedConsultationQuestion[];
   focusTargetKey?: string | null;
+  profileItems?: GapProfileItem[];
 }): QuestionRoundPlan {
   const askedQuestions = input.askedQuestions ?? [];
   const remainingQuestionSlots = Math.max(
@@ -314,6 +380,7 @@ export function planQuestionRound(input: {
       modelQuestion: byKey.get(gap.key),
       hiringTeam: input.hiringTeam,
       rolesById,
+      profileItems: input.profileItems,
     });
     if ("dropped" in result) {
       dropped.push(result.dropped);

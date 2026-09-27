@@ -8,6 +8,7 @@ import {
 import {
   evidenceTargets,
   gapsAreCovered,
+  isStandingRequirement,
   profileEvidenceItems,
   verifyModelAssessments,
   type EvidenceAssessment,
@@ -31,9 +32,16 @@ import {
   matchConsultationFocus,
   planQuestionRound,
   questionDuplicatesAsked,
+  defaultGapShareQuestion,
+  questionTextForGap,
   seniorityWarrantsChronology,
   type QuestionRoundPlan,
 } from "@/lib/consultation/questions";
+import {
+  looksLikeCompanyMotivation,
+  seekerWrittenReply,
+} from "@/lib/consultation/reply-voice";
+import { repairExistingConsultationSession } from "@/lib/consultation/repair-existing";
 import { SEEKER_STATED_FACT_ID } from "@/lib/product-research/seeker-background";
 import { type GroundingSource } from "@/lib/consultation/output-quality";
 import {
@@ -246,7 +254,14 @@ async function saveAssessments(
   sessionId: string,
   assessments: EvidenceAssessment[],
 ) {
-  for (const assessment of assessments) {
+  const keep = assessments.filter((assessment) => isStandingRequirement(assessment));
+  await prisma.consultationAssessment.deleteMany({
+    where: {
+      sessionId,
+      targetKey: { notIn: keep.map((assessment) => assessment.key) },
+    },
+  });
+  for (const assessment of keep) {
     await prisma.consultationAssessment.upsert({
       where: {
         sessionId_targetKey: { sessionId, targetKey: assessment.key },
@@ -487,6 +502,7 @@ async function persistWhyThisCompany(input: {
 }): Promise<void> {
   const text = input.answer.trim();
   if (!text) return;
+  if (!looksLikeCompanyMotivation(text)) return;
   await prisma.campaign.update({
     where: { id: input.campaignId },
     data: { whyThisCompany: text },
@@ -762,11 +778,17 @@ async function planAndStoreRound(input: {
       lastFailure = plan.message;
       continue;
     }
+    const previousAssessments = (
+      await prisma.consultationAssessment.findMany({
+        where: { sessionId: input.sessionId },
+      })
+    ).map(storedAssessment);
     const assessments = verifyModelAssessments({
       targets: input.targets,
       profileItems,
       assessments: plan.data.assessments,
       asOf: new Date(),
+      previousAssessments,
     });
     const planned = planQuestionRound({
       assessments,
@@ -778,6 +800,7 @@ async function planAndStoreRound(input: {
       chronologyAsked: input.askedKeys.has("chronology"),
       askedQuestions,
       focusTargetKey: input.focusTargetKey ?? null,
+      profileItems,
     });
     const issues = consultationPlanQualityIssues({
       briefing: plan.data.briefing,
@@ -877,7 +900,20 @@ async function planAndStoreRound(input: {
       generationError: null,
     },
   });
-  if (voicedQuestions.length === 0 && plan.data.closingNote?.trim()) {
+  const remainingGaps = voicedAssessments.filter(
+    (assessment) =>
+      isStandingRequirement(assessment) && assessment.strength !== "STRONG",
+  );
+  const alreadyClosed = await prisma.consultationTurn.findFirst({
+    where: { sessionId: input.sessionId, intent: "CLOSING" },
+    select: { id: true },
+  });
+  if (
+    voicedQuestions.length === 0 &&
+    remainingGaps.length === 0 &&
+    !alreadyClosed &&
+    plan.data.closingNote?.trim()
+  ) {
     await addTurn({
       organizationId: input.organizationId,
       sessionId: input.sessionId,
@@ -1025,20 +1061,8 @@ function resolveConsultationTargets(input: {
   const personPrepKey = input.focusTargetKey?.trim() ?? "";
   if (personPrepKey.startsWith("person-prep:")) {
     focusTargetKey = personPrepKey;
-    if (!targets.some((target) => target.key === focusTargetKey)) {
-      targets.unshift({
-        key: focusTargetKey,
-        kind: "COMPETENCY",
-        text: note || "Interview prep for this person",
-      });
-    }
   } else if (!focusTargetKey && note) {
     focusTargetKey = "interview-note-focus";
-    targets.unshift({
-      key: focusTargetKey,
-      kind: "COMPETENCY",
-      text: note,
-    });
   }
   return { targets, focusTargetKey };
 }
@@ -1050,6 +1074,10 @@ export async function startConsultation(input: {
   focusTargetKey?: string | null;
   forceReassess?: boolean;
 }): Promise<void> {
+  await repairExistingConsultationSession({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+  });
   const { campaign, requirement, profile } = await requireApplication(
     input.organizationId,
     input.campaignId,
@@ -1632,6 +1660,7 @@ function toQaTurns(
     followUp: boolean;
     sequence: number;
     analysisJson?: unknown;
+    intent?: string | null;
   }>,
 ): QaTurn[] {
   return turns.map((turn) => ({
@@ -1642,6 +1671,7 @@ function toQaTurns(
     followUp: turn.followUp,
     sequence: turn.sequence,
     analysisJson: turn.analysisJson,
+    intent: turn.intent,
   }));
 }
 
@@ -1709,6 +1739,53 @@ function analysisIsComplete(value: unknown): boolean {
   return status !== "FAILED" && status !== "PENDING";
 }
 
+async function ensureGapShareQuestion(input: {
+  organizationId: string;
+  sessionId: string;
+  campaignId: string;
+  targetKey: string;
+}) {
+  const existing = await prisma.consultationTurn.findFirst({
+    where: {
+      sessionId: input.sessionId,
+      speaker: "CONSULTANT",
+      targetKey: input.targetKey,
+      followUp: false,
+      NOT: { intent: "CLOSING" },
+    },
+    orderBy: { sequence: "desc" },
+  });
+  if (existing) return existing;
+  const assessment = await prisma.consultationAssessment.findFirst({
+    where: { sessionId: input.sessionId, targetKey: input.targetKey },
+  });
+  if (!assessment) return null;
+  const { profile } = await requireApplication(
+    input.organizationId,
+    input.campaignId,
+  );
+  const profileItems = profileEvidenceItems(profile);
+  const text =
+    questionTextForGap(
+      { key: assessment.targetKey, text: assessment.text },
+      null,
+      profileItems,
+    ) ||
+    defaultGapShareQuestion(
+      { key: assessment.targetKey, text: assessment.text },
+      profileItems,
+    );
+  if (!text) return null;
+  return addTurn({
+    organizationId: input.organizationId,
+    sessionId: input.sessionId,
+    speaker: "CONSULTANT",
+    body: text,
+    targetKey: input.targetKey,
+    intent: "REPLY",
+  });
+}
+
 export async function recordConsultationReply(input: {
   organizationId: string;
   campaignId: string;
@@ -1721,7 +1798,7 @@ export async function recordConsultationReply(input: {
   turnId: string;
   questionTurnId: string;
 }> {
-  const answer = input.answer.trim();
+  const answer = seekerWrittenReply(input.answer);
   if (!answer) throw new TenantError("Write an answer, or skip the question.");
   const session = await prisma.consultationSession.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
@@ -1735,14 +1812,26 @@ export async function recordConsultationReply(input: {
       data: { status: "IN_PROGRESS" },
     });
   }
-  const { turns, view } = await loadSessionQaView(session.id);
+  let { turns, view } = await loadSessionQaView(session.id);
   const requested = input.targetKey?.trim() ?? "";
-  const item = requested.startsWith("question:")
+  let item = requested.startsWith("question:")
     ? findConsultationQaItem(view, requested)
     : resolveReplyableQaItem(view, requested) ??
       (!requested
         ? view.questions.find(consultationQuestionAcceptsReply) ?? null
         : null);
+  if (!item && requested && !requested.startsWith("question:")) {
+    const created = await ensureGapShareQuestion({
+      organizationId: input.organizationId,
+      sessionId: session.id,
+      campaignId: input.campaignId,
+      targetKey: requested,
+    });
+    if (created) {
+      ({ turns, view } = await loadSessionQaView(session.id));
+      item = findConsultationQaItem(view, consultationReplyTargetKey(created.id));
+    }
+  }
   const question = item ? consultantForQaItem(turns, item) : null;
   if (!item || !question) replyCouldNotBeRecorded();
   const targetKey =
@@ -2578,7 +2667,7 @@ export async function editConsultationAnswer(input: {
   turnId: string;
   answer: string;
 }): Promise<void> {
-  const body = input.answer.trim();
+  const body = seekerWrittenReply(input.answer);
   if (!body) throw new TenantError("Write an answer, or skip the question.");
   const turn = await prisma.consultationTurn.findFirst({
     where: {

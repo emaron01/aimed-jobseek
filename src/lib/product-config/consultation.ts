@@ -66,6 +66,9 @@ export const consultationConversationCopy = Object.freeze({
   collapseEvidence: "Collapse evidence",
   expandAllEvidence: "Expand all",
   collapseAllEvidence: "Collapse all",
+  shareSomeDetails: "Share some details",
+  shareSomeDetailsHelp:
+    "Add anything you have about this gap. Harper will use your Personal Profile and this note.",
   threadReply: "Reply",
   addAnotherReply: "Add another reply",
   seekerSpeaker: "You",

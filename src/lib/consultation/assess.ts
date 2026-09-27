@@ -1,4 +1,7 @@
-import { WHY_THIS_COMPANY_TARGET_KEY } from "@/lib/consultation/contract";
+import {
+  PERSON_PREP_TARGET_PREFIX,
+  WHY_THIS_COMPANY_TARGET_KEY,
+} from "@/lib/consultation/contract";
 import type { JobScorecard } from "@/lib/job-requirement/types";
 import type { CandidateProfile, ProfileFactItem } from "@/lib/product-research/candidate-profile";
 import {
@@ -225,11 +228,12 @@ export function evidenceTargets(input: {
 }): EvidenceTarget[] {
   const targets: EvidenceTarget[] = [];
   input.requiredItems.forEach((text, index) => {
-    if (text.trim()) {
+    const trimmed = text.trim();
+    if (trimmed && !looksLikeCompanyPitch(trimmed)) {
       pushUniqueTarget(targets, {
         key: `required:${index}`,
         kind: "REQUIRED",
-        text: text.trim(),
+        text: trimmed,
       });
     }
   });
@@ -252,11 +256,14 @@ export function evidenceTargets(input: {
     }
   });
   if (input.scorecard.mission?.text.trim()) {
-    pushUniqueTarget(targets, {
-      key: `mission:${input.scorecard.mission.id}`,
-      kind: "MISSION",
-      text: input.scorecard.mission.text.trim(),
-    });
+    const mission = input.scorecard.mission.text.trim();
+    if (!looksLikeCompanyPitch(mission)) {
+      pushUniqueTarget(targets, {
+        key: `mission:${input.scorecard.mission.id}`,
+        kind: "MISSION",
+        text: mission,
+      });
+    }
   }
   input.preferredItems.forEach((text, index) => {
     if (text.trim()) {
@@ -402,34 +409,85 @@ export type ModelAssessment = {
 };
 
 /** Verifies model reasoning without writing replacement assessment or strategy prose. */
+const STRENGTH_RANK: Record<EvidenceStrengthName, number> = {
+  NONE: 0,
+  PARTIAL: 1,
+  STRONG: 2,
+};
+
+export function assessmentContradictsPrior(input: {
+  previous: Pick<EvidenceAssessment, "explanation" | "supportingFactIds">;
+  next: Pick<EvidenceAssessment, "explanation" | "supportingFactIds" | "verification">;
+}): boolean {
+  const explanation = `${input.next.explanation} ${input.next.verification.downgradeReasons.join(" ")}`;
+  return /\b(?:no experience|never (?:installed|done|led|built|run)|do not have|don't have|not something i(?: have|'ve)?|contradicts? (?:the )?(?:earlier|prior|previous))\b/i.test(
+    explanation,
+  );
+}
+
+export function preserveAssessmentStrength(input: {
+  previous: EvidenceAssessment | undefined;
+  next: EvidenceAssessment;
+}): EvidenceAssessment {
+  const previous = input.previous;
+  if (!previous) return input.next;
+  if (STRENGTH_RANK[input.next.strength] >= STRENGTH_RANK[previous.strength]) {
+    return input.next;
+  }
+  if (assessmentContradictsPrior({ previous, next: input.next })) {
+    return input.next;
+  }
+  return {
+    ...input.next,
+    strength: previous.strength,
+    supportingFactIds: [
+      ...new Set([...previous.supportingFactIds, ...input.next.supportingFactIds]),
+    ],
+    verification: {
+      ...input.next.verification,
+      originalStrength: previous.strength,
+      downgradeReasons: input.next.verification.downgradeReasons.filter(
+        (reason) => !/missing or was not FACT/i.test(reason),
+      ),
+    },
+  };
+}
+
 export function verifyModelAssessments(input: {
   targets: EvidenceTarget[];
   profileItems: ProfileFactRef[];
   assessments: ModelAssessment[];
   asOf: Date;
+  previousAssessments?: EvidenceAssessment[];
 }): EvidenceAssessment[] {
   const byKey = new Map(input.assessments.map((item) => [item.targetKey, item]));
   const itemsById = new Map(input.profileItems.map((item) => [item.id, item]));
+  const previousByKey = new Map(
+    (input.previousAssessments ?? []).map((item) => [item.key, item]),
+  );
   return input.targets.map((target) => {
     const model = byKey.get(target.key);
     if (!model) {
-      return {
-        key: target.key,
-        kind: target.kind,
-        text: target.text,
-        strength: "NONE" as const,
-        supportingFactIds: [],
-        strategy: "ACKNOWLEDGE" as const,
-        explanation: "",
-        strategyText: "",
-        verification: {
-          originalStrength: "NONE" as const,
-          invalidSupportingFactIds: [],
-          invalidRoleIds: [],
-          downgradeReasons: [],
-        },
-        experienceCalculation: null,
-      };
+      const previous = previousByKey.get(target.key);
+      return (
+        previous ?? {
+          key: target.key,
+          kind: target.kind,
+          text: target.text,
+          strength: "NONE" as const,
+          supportingFactIds: [],
+          strategy: "ACKNOWLEDGE" as const,
+          explanation: "",
+          strategyText: "",
+          verification: {
+            originalStrength: "NONE" as const,
+            invalidSupportingFactIds: [],
+            invalidRoleIds: [],
+            downgradeReasons: [],
+          },
+          experienceCalculation: null,
+        }
+      );
     }
     let strength = model.strength;
     const validFactIds = model.supportingFactIds.filter(
@@ -486,23 +544,26 @@ export function verifyModelAssessments(input: {
         downgradeReasons.push("Verified, non-overlapping role dates do not meet the required duration.");
       }
     }
-    return {
-      key: target.key,
-      kind: target.kind,
-      text: target.text,
-      strength,
-      supportingFactIds: strength === "NONE" ? [] : validFactIds,
-      strategy: model.strategyMode,
-      explanation: model.explanation.trim(),
-      strategyText: model.strategy.trim(),
-      verification: {
-        originalStrength: model.strength,
-        invalidSupportingFactIds,
-        invalidRoleIds,
-        downgradeReasons,
+    return preserveAssessmentStrength({
+      previous: previousByKey.get(target.key),
+      next: {
+        key: target.key,
+        kind: target.kind,
+        text: target.text,
+        strength,
+        supportingFactIds: strength === "NONE" ? [] : validFactIds,
+        strategy: model.strategyMode,
+        explanation: model.explanation.trim(),
+        strategyText: model.strategy.trim(),
+        verification: {
+          originalStrength: model.strength,
+          invalidSupportingFactIds,
+          invalidRoleIds,
+          downgradeReasons,
+        },
+        experienceCalculation,
       },
-      experienceCalculation,
-    };
+    });
   });
 }
 
@@ -541,10 +602,27 @@ export function isCompanyMissionOrTagline(item: {
   return looksLikeCompanyPitch(item.text);
 }
 
+export function isInterviewerPrepTarget(item: {
+  key: string;
+  text: string;
+}): boolean {
+  if (item.key.startsWith(PERSON_PREP_TARGET_PREFIX)) return true;
+  if (item.key.startsWith("interview-note-focus")) return true;
+  return /prepares (?:the seeker|you) for\b/i.test(item.text);
+}
+
+export function isStandingRequirement(item: {
+  key: string;
+  kind: EvidenceKind;
+  text: string;
+}): boolean {
+  return !isCompanyMissionOrTagline(item) && !isInterviewerPrepTarget(item);
+}
+
 export function openGaps(assessments: EvidenceAssessment[]): EvidenceAssessment[] {
   return assessments
     .filter((item) => item.strength !== "STRONG")
-    .filter((item) => !isCompanyMissionOrTagline(item))
+    .filter((item) => isStandingRequirement(item))
     .sort((a, b) => {
       const byKind = KIND_RANK[a.kind] - KIND_RANK[b.kind];
       if (byKind !== 0) return byKind;
@@ -559,6 +637,6 @@ export function gapsAreCovered(
 ): boolean {
   return assessments
     .filter((item) => item.kind !== "PREFERRED")
-    .filter((item) => !isCompanyMissionOrTagline(item))
+    .filter((item) => isStandingRequirement(item))
     .every((item) => item.strength === "STRONG" || skippedKeys.has(item.key));
 }

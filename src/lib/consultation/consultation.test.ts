@@ -16,11 +16,15 @@ vi.mock("@/lib/ai", async (importOriginal) => {
 });
 
 import {
+  assessmentContradictsPrior,
   calculateExperienceYears,
   evidenceTargets,
   gapsAreCovered,
   isCompanyMissionOrTagline,
+  isInterviewerPrepTarget,
+  isStandingRequirement,
   looksLikeCompanyPitch,
+  preserveAssessmentStrength,
   profileEvidenceItems,
   verifyModelAssessments,
 } from "@/lib/consultation/assess";
@@ -30,10 +34,13 @@ import {
   consultationExtractSchema,
 } from "@/lib/consultation/contract";
 import {
+  defaultGapShareQuestion,
+  looksLikeTemplatedUnseenQuestion,
   matchConsultationFocus,
   planQuestionRound,
   questionDuplicatesAsked,
   questionNearDuplicate,
+  questionNeedsRoleSource,
   questionTextForGap,
   seniorityWarrantsChronology,
 } from "@/lib/consultation/questions";
@@ -60,7 +67,9 @@ import {
   consultationQuestionAcceptsReply,
 } from "@/lib/consultation/qa-view";
 import {
+  collapseIdenticalEvidence,
   looksLikeInternalId,
+  looksLikeRawSeekerNote,
   profileItemDisplayLabel,
   resolveEvidenceLabels,
 } from "@/lib/consultation/evidence-display";
@@ -84,7 +93,10 @@ import {
   validateInterviewAnswerQuality,
   validateRepetitionAndMetaLanguage,
 } from "@/lib/consultation/output-quality";
-import { CONSULTATION_COACH_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content/consultation";
+import {
+  CONSULTATION_COACH_SYSTEM_INSTRUCTIONS,
+  CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS,
+} from "@/lib/prompt-content/consultation";
 import {
   parseCandidateProfile,
 } from "@/lib/product-research/candidate-profile";
@@ -449,6 +461,100 @@ describe("consultation evidence and questions", () => {
     expect(assessed?.verification.downgradeReasons.length).toBeGreaterThan(0);
   });
 
+  it("never lowers a rating when new evidence is added unless it contradicts the earlier evidence", () => {
+    const emptyVerification = {
+      originalStrength: "STRONG" as const,
+      invalidSupportingFactIds: [],
+      invalidRoleIds: [],
+      downgradeReasons: [],
+    };
+    const previous = {
+      key: "required:security",
+      kind: "REQUIRED" as const,
+      text: "Enterprise security sales",
+      strength: "STRONG" as const,
+      supportingFactIds: ["fact_old"],
+      strategy: "PROVE_WITH_STORY" as const,
+      explanation: "The profile already shows security sales leadership.",
+      strategyText: "Use the existing security sales story.",
+      verification: emptyVerification,
+      experienceCalculation: null,
+    };
+    const lowered = {
+      ...previous,
+      strength: "PARTIAL" as const,
+      supportingFactIds: ["fact_new"],
+      explanation: "Additional manager-development detail was added.",
+      verification: {
+        originalStrength: "PARTIAL" as const,
+        invalidSupportingFactIds: [],
+        invalidRoleIds: [],
+        downgradeReasons: [],
+      },
+    };
+    expect(
+      assessmentContradictsPrior({ previous, next: lowered }),
+    ).toBe(false);
+    expect(preserveAssessmentStrength({ previous, next: lowered }).strength).toBe(
+      "STRONG",
+    );
+    expect(
+      preserveAssessmentStrength({ previous, next: lowered }).supportingFactIds,
+    ).toEqual(["fact_old", "fact_new"]);
+    const contradicted = {
+      ...lowered,
+      explanation: "The seeker said they have no experience in security sales.",
+    };
+    expect(
+      assessmentContradictsPrior({ previous, next: contradicted }),
+    ).toBe(true);
+    expect(
+      preserveAssessmentStrength({ previous, next: contradicted }).strength,
+    ).toBe("PARTIAL");
+
+    const items = [
+      {
+        id: "fact_old",
+        kind: "FACT" as const,
+        text: "Led enterprise security sales.",
+        itemType: "ITEM" as const,
+      },
+      {
+        id: "fact_new",
+        kind: "FACT" as const,
+        text: "Developed two sales managers.",
+        itemType: "ITEM" as const,
+      },
+    ];
+    const [reassessed] = verifyModelAssessments({
+      targets: [
+        {
+          key: "required:security",
+          kind: "REQUIRED",
+          text: "Enterprise security sales",
+        },
+      ],
+      profileItems: items,
+      asOf: new Date("2026-09-23T00:00:00.000Z"),
+      previousAssessments: [previous],
+      assessments: [
+        {
+          targetKey: "required:security",
+          strength: "PARTIAL",
+          supportingFactIds: ["fact_new"],
+          relevantRoleIds: [],
+          explanation: "New manager-development evidence was added.",
+          strategyMode: "PROVE_WITH_STORY",
+          strategy: "Keep the security sales story.",
+        },
+      ],
+    });
+    expect(reassessed?.strength).toBe("STRONG");
+    expect(reassessed?.supportingFactIds).toEqual(
+      expect.arrayContaining(["fact_old", "fact_new"]),
+    );
+  });
+
   it("accepts semantic reliability evidence for the fixture mission", () => {
     const { profile, targets } = sample();
     const assessments = verifyModelAssessments({
@@ -640,6 +746,56 @@ describe("consultation evidence and questions", () => {
     expect(withModel.questions[0]!.text).not.toMatch(/does not see/i);
   });
 
+  it("asks which roles untied background came from as part of that gap's question", () => {
+    const gapText = "9 years of cybersecurity sales";
+    expect(
+      questionNeedsRoleSource({
+        gapText,
+        profileItems: [
+          {
+            itemType: "ITEM",
+            text: "9 years of cybersecurity sales",
+          },
+        ],
+      }),
+    ).toBe(true);
+    expect(
+      questionNeedsRoleSource({
+        gapText,
+        profileItems: [
+          {
+            itemType: "EXPERIENCE",
+            title: "Account Executive",
+            employer: "OpenText",
+            text: "9 years of cybersecurity sales at OpenText",
+          },
+        ],
+      }),
+    ).toBe(false);
+    const modelText =
+      "You mentioned nine years in cybersecurity sales. What did that work look like?";
+    expect(
+      questionTextForGap(
+        { key: "required:cyber", text: gapText },
+        modelText,
+      ),
+    ).toBe(`${modelText} Which roles did that come from?`);
+    expect(defaultGapShareQuestion({ key: "required:cyber", text: gapText })).toBe(
+      "What in your background speaks to this? Which roles did that come from?",
+    );
+    expect(
+      looksLikeTemplatedUnseenQuestion(
+        "Do you have experience with Join us to help protect the world's most valuable digital brands that Harper does not see?",
+      ),
+    ).toBe(true);
+    expect(
+      questionTextForGap(
+        { key: "required:cyber", text: gapText },
+        "Do you have experience with Join us to help protect the world's most valuable digital brands that Harper does not see?",
+      ),
+    ).toBe("");
+  });
+
   it("never treats a mission statement or recruiting pitch as an experience gap", () => {
     const cscMission =
       "Join us to help protect the world's most valuable digital brands while building a disciplined, world-class sales organization defined by execution excellence, leadership depth, and sustainable growth.";
@@ -741,6 +897,40 @@ describe("consultation evidence and questions", () => {
     ]);
     expect(round.questions[0]!.text).not.toContain(cscMission);
     expect(round.questions[0]!.text).not.toMatch(/experience with Join us/i);
+    expect(
+      isStandingRequirement({
+        key: "mission:csc",
+        kind: "MISSION",
+        text: cscMission,
+      }),
+    ).toBe(false);
+    expect(
+      isStandingRequirement({
+        key: "required:pitch",
+        kind: "REQUIRED",
+        text: cscMission,
+      }),
+    ).toBe(false);
+    expect(
+      isInterviewerPrepTarget({
+        key: "person-prep:contact_1",
+        text: "Harper prepares the seeker for Christina Schivley",
+      }),
+    ).toBe(true);
+    expect(
+      isStandingRequirement({
+        key: "person-prep:contact_1",
+        kind: "COMPETENCY",
+        text: "Harper prepares the seeker for Christina Schivley",
+      }),
+    ).toBe(false);
+    expect(
+      isStandingRequirement({
+        key: "why-this-company",
+        kind: "MISSION",
+        text: consultationConversationCopy.whyThisCompanyTarget,
+      }),
+    ).toBe(true);
     expect(
       gapsAreCovered(
         [missionAssessment, pitchAsRequired, { ...skillGap, strength: "STRONG" }],
@@ -1321,6 +1511,50 @@ describe("consultation evidence and questions", () => {
     expect(resolveEvidenceLabels(["role_1"], items)[0]?.label).not.toMatch(
       /role_1/,
     );
+    const roleLabel = resolveEvidenceLabels(["role_1"], items)[0];
+    expect(roleLabel?.detail).toBeTruthy();
+    expect(roleLabel?.detail).not.toBe(roleLabel?.label);
+    expect(
+      looksLikeRawSeekerNote(
+        "I have built OpenText's ARM products from the ground up by completely retool the GTM motion.",
+      ),
+    ).toBe(true);
+    const collapsed = collapseIdenticalEvidence([
+      {
+        id: "a",
+        label: "Scaled, coached, and led a consultative sales team.",
+        detail: "Scaled, coached, and led a consultative sales team.",
+      },
+      {
+        id: "b",
+        label: "Scaled, coached, and led a consultative sales team.",
+        detail: "Scaled, coached, and led a consultative sales team.",
+      },
+    ]);
+    expect(collapsed).toEqual([
+      {
+        id: "a",
+        label: "Scaled, coached, and led a consultative sales team.",
+        detail: null,
+      },
+    ]);
+    const rawNote = {
+      id: "note_1",
+      kind: "FACT" as const,
+      text: "I have built OpenText ARM products and rebuilt the GTM motion by completely retool the launch.",
+      itemType: "ITEM" as const,
+    };
+    const cleanRole = {
+      id: "role_arm",
+      kind: "FACT" as const,
+      text: "Built OpenText ARM products and rebuilt the GTM motion.",
+      itemType: "EXPERIENCE" as const,
+      title: "VP Sales",
+      employer: "OpenText",
+    };
+    const preferred = resolveEvidenceLabels(["note_1"], [rawNote, cleanRole]);
+    expect(preferred[0]?.label).toBe("VP Sales at OpenText");
+    expect(preferred[0]?.detail).not.toMatch(/completely retool/i);
   });
 
   it("contains no deterministic consultation narrative generators", () => {
@@ -2953,5 +3187,153 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       where: { id: productId },
       data: { profileJson: profile },
     });
+  });
+
+  it("analyzes Share some details on an open gap with the full Personal Profile", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Share details ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        companyName: parsed.companyName,
+        seniority: parsed.seniority,
+        reportingLine: parsed.reportingLine,
+        responsibilities: parsed.responsibilities,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    await addHiringManager(campaign.id);
+    const session = await prisma.consultationSession.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        productId,
+        status: "IN_PROGRESS",
+        promptVersion: CONSULTATION_PROMPT_VERSION,
+      },
+    });
+    await prisma.consultationAssessment.createMany({
+      data: [
+        {
+          organizationId,
+          sessionId: session.id,
+          targetKey: "required:channel",
+          kind: "REQUIRED",
+          text: "Build and lead a partner and channel motion",
+          strength: "NONE",
+          supportingFactIds: [],
+        },
+        {
+          organizationId,
+          sessionId: session.id,
+          targetKey: "required:managers",
+          kind: "REQUIRED",
+          text: "Built front-line sales managers",
+          strength: "NONE",
+          supportingFactIds: [],
+        },
+        {
+          organizationId,
+          sessionId: session.id,
+          targetKey: "required:python",
+          kind: "REQUIRED",
+          text: "5 years of Python",
+          strength: "NONE",
+          supportingFactIds: [],
+        },
+      ],
+    });
+    expect(
+      await prisma.consultationTurn.count({
+        where: { sessionId: session.id, speaker: "CONSULTANT" },
+      }),
+    ).toBe(0);
+
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey: "required:channel",
+      answer: "I used Python for 5 years and cut failed jobs by 40%.",
+    });
+    const closed = await prisma.consultationTurn.findFirst({
+      where: {
+        sessionId: session.id,
+        speaker: "SEEKER",
+        targetKey: "required:channel",
+      },
+      include: { statements: true },
+    });
+    expect(closed?.analysisJson).toMatchObject({ gapDecision: "evidence" });
+    expect(
+      closed?.statements.some((row) => row.kind === "INTERVIEW_ANSWER"),
+    ).toBe(true);
+    expect(
+      closed?.statements.some((row) => row.kind === "RESUME_BULLET"),
+    ).toBe(true);
+
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey: "required:managers",
+      answer: "I have never developed a sales manager.",
+    });
+    const confirmed = await prisma.consultationTurn.findFirst({
+      where: {
+        sessionId: session.id,
+        speaker: "SEEKER",
+        targetKey: "required:managers",
+      },
+      include: { statements: true },
+    });
+    expect(confirmed?.analysisJson).toMatchObject({ gapDecision: "no_evidence" });
+    expect(
+      confirmed?.statements.find((row) => row.kind === "INTERVIEW_ANSWER")?.content,
+    ).toMatch(/I have not done that work yet/i);
+    expect(
+      confirmed?.statements.some((row) => row.kind === "RESUME_BULLET"),
+    ).toBe(false);
+
+    await answerConsultationQuestion({
+      organizationId,
+      campaignId: campaign.id,
+      targetKey: "required:python",
+      answer: "I have used Python on backend services.",
+    });
+    const incomplete = await prisma.consultationTurn.findFirst({
+      where: {
+        sessionId: session.id,
+        speaker: "SEEKER",
+        targetKey: "required:python",
+      },
+    });
+    expect(incomplete?.analysisJson).toMatchObject({ gapDecision: "incomplete" });
+    const followUp = await prisma.consultationTurn.findFirst({
+      where: {
+        sessionId: session.id,
+        speaker: "CONSULTANT",
+        followUp: true,
+        targetKey: "required:python",
+      },
+    });
+    expect(followUp?.body).toMatch(/concrete result or metric/i);
+    expect(
+      CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS,
+    ).toContain("personalProfileItems is the person's full Personal Profile");
+    expect(consultationConversationCopy.shareSomeDetails).toBe("Share some details");
   });
 });

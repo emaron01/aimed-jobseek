@@ -29,7 +29,7 @@ const wrapClass = "min-w-0 overflow-hidden break-words whitespace-pre-wrap";
 export type ThreadTurn = QaTurn;
 export type ThreadStatement = QaStatement;
 
-function ResultActions({
+export function ResultActions({
   campaignId,
   statements,
   testId,

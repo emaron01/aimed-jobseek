@@ -1,6 +1,9 @@
 "use client";
 
+import { replyConsultationAction } from "@/app/actions/consultation";
 import { AppButton } from "@/components/AppButton";
+import { ApplicationActionForm } from "@/components/ApplicationActionForm";
+import { ResultActions } from "@/components/ConsultationThread";
 import { useMemo, useState } from "react";
 import {
   consultationConversationCopy,
@@ -8,13 +11,16 @@ import {
   evidenceStrengthLabels,
 } from "@/lib/product-config";
 import type { ConsultationGapStatus } from "@/lib/consultation/standing";
+import type { QaStatement } from "@/lib/consultation/qa-view";
+
+const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
 
 export type StandingRequirement = {
   id: string;
   text: string;
   strength: "STRONG" | "PARTIAL" | "NONE";
   explanation: string | null;
-  facts: Array<{ id: string; label: string; detail: string }>;
+  facts: Array<{ id: string; label: string; detail: string | null }>;
   experience: string | null;
 };
 
@@ -23,14 +29,24 @@ export type StandingGapView = {
   label: string;
   status: ConsultationGapStatus;
   talkTrack: string | null;
+  questionTurnId: string | null;
+  resumeBullet: QaStatement | null;
+  talkingPoint: QaStatement | null;
+  statements: QaStatement[];
 };
 
 export function ConsultationStanding({
+  campaignId,
+  canEdit,
+  acceptingReplies,
   overall,
   gaps,
   careerRecap,
   requirements,
 }: {
+  campaignId: string;
+  canEdit: boolean;
+  acceptingReplies: boolean;
   overall: string | null;
   gaps: StandingGapView[];
   careerRecap: string | null;
@@ -66,9 +82,6 @@ export function ConsultationStanding({
 
   return (
     <section className="space-y-4" data-testid="consultation-evidence">
-      <h3 className="text-sm font-semibold text-ink">
-        {consultationConversationCopy.whereYouStand}
-      </h3>
       <div
         className="space-y-2 rounded-md border border-edge bg-canvas p-4"
         data-testid="consultation-standing-summary"
@@ -91,6 +104,43 @@ export function ConsultationStanding({
                 </p>
                 {gap.talkTrack ? (
                   <p className="mt-1 whitespace-pre-wrap">{gap.talkTrack}</p>
+                ) : null}
+                {gap.resumeBullet ? (
+                  <p className="mt-1 whitespace-pre-wrap text-muted">
+                    {gap.resumeBullet.content}
+                  </p>
+                ) : null}
+                {gap.statements.length > 0 && canEdit ? (
+                  <ResultActions
+                    campaignId={campaignId}
+                    statements={gap.statements}
+                    testId={`consultation-gap-result-${gap.targetKey}`}
+                  />
+                ) : null}
+                {gap.status === "open" && canEdit && acceptingReplies ? (
+                  <ApplicationActionForm
+                    action={replyConsultationAction}
+                    submitLabel={consultationConversationCopy.shareSomeDetails}
+                    pendingLabel={consultationConversationCopy.thinking}
+                    testId={`share-gap-details-${gap.targetKey}`}
+                  >
+                    <input type="hidden" name="campaignId" value={campaignId} />
+                    <input type="hidden" name="targetKey" value={gap.targetKey} />
+                    <label className="mt-2 block text-sm">
+                      <span className="font-medium text-ink">
+                        {consultationConversationCopy.shareSomeDetails}
+                      </span>
+                      <textarea
+                        name="answer"
+                        required
+                        rows={4}
+                        className={fieldClass}
+                      />
+                      <span className="mt-1 block text-xs text-muted">
+                        {consultationConversationCopy.shareSomeDetailsHelp}
+                      </span>
+                    </label>
+                  </ApplicationActionForm>
                 ) : null}
               </li>
             ))}
@@ -149,9 +199,11 @@ export function ConsultationStanding({
                       {item.facts.map((fact) => (
                         <li key={fact.id} className="min-w-0 overflow-hidden">
                           <p className="break-words font-medium text-ink">{fact.label}</p>
-                          <p className="break-words whitespace-pre-wrap text-muted">
-                            {fact.detail}
-                          </p>
+                          {fact.detail ? (
+                            <p className="break-words whitespace-pre-wrap text-muted">
+                              {fact.detail}
+                            </p>
+                          ) : null}
                         </li>
                       ))}
                     </ul>

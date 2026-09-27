@@ -5,6 +5,8 @@ import {
   consultationQuestionAcceptsReply,
   consultationReplyTargetKey,
   findConsultationQaItem,
+  isPrimaryHarperQuestion,
+  latestClosingNote,
   resolveReplyableQaItem,
 } from "@/lib/consultation/qa-view";
 import {
@@ -465,6 +467,41 @@ describe("Harper ten-question coach", () => {
     expect(consultationQuestionAcceptsReply(afterFollowUp.questions[0]!)).toBe(
       false,
     );
+  });
+
+  it("shows only the latest closing note and never treats it as a question", () => {
+    const firstClose = {
+      id: "c1",
+      speaker: "CONSULTANT" as const,
+      body: "The question plan is complete.",
+      targetKey: null,
+      followUp: false,
+      sequence: 10,
+      intent: "CLOSING",
+    };
+    const laterClose = {
+      id: "c2",
+      speaker: "CONSULTANT" as const,
+      body: "The question plan is complete after your last answers.",
+      targetKey: null,
+      followUp: false,
+      sequence: 14,
+      intent: "CLOSING",
+    };
+    expect(isPrimaryHarperQuestion(firstClose)).toBe(false);
+    expect(isPrimaryHarperQuestion(laterClose)).toBe(false);
+    expect(
+      latestClosingNote([question, firstClose, laterClose]),
+    ).toBe("The question plan is complete after your last answers.");
+    const view = buildConsultationQaView({
+      turns: [question, firstClose, laterClose],
+      statements: [],
+    });
+    expect(view.questions.map((item) => item.questionTurnId)).toEqual(["q1"]);
+    const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
+    expect(section).toContain("latestClosingNote");
+    expect(section).toContain("standingWorkIsComplete");
+    expect(section).toContain("threadStatus");
   });
 
   it("keeps Where you stand below the questions and has no Harper-page navigation", () => {

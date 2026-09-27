@@ -5,6 +5,7 @@ import {
   briefingNeedsStandingRegen,
   buildStandingGaps,
   shouldEnqueueConsultationStandingRegen,
+  standingWorkIsComplete,
 } from "@/lib/consultation/standing";
 import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
 import { consultationGapStatusCopy } from "@/lib/product-config/consultation";
@@ -184,7 +185,62 @@ describe("Harper core loop standing", () => {
     expect(section).not.toContain("storyPlan.map");
     expect(section).toContain("buildStandingGaps");
     expect(standingUi).toContain("consultationGapStatusCopy");
+    expect(standingUi).toContain("shareSomeDetails");
+    expect(standingUi).toContain("replyConsultationAction");
+    expect(standingUi).not.toContain("consultationConversationCopy.whereYouStand");
+    expect(section).toContain("consultationConversationCopy.whereYouStand");
+    expect(section.split("consultationConversationCopy.whereYouStand").length).toBe(
+      2,
+    );
+    expect(section).toContain("latestClosingNote");
+    expect(section).toContain("repairExistingConsultationSession");
     expect(section).toContain("shouldEnqueueConsultationStandingRegen");
+    expect(
+      standingWorkIsComplete({
+        gaps: [
+          { status: "closed" },
+          { status: "confirmed" },
+        ],
+        unansweredQuestions: false,
+      }),
+    ).toBe(true);
+    expect(
+      standingWorkIsComplete({
+        gaps: [{ status: "closed" }, { status: "open" }],
+        unansweredQuestions: false,
+      }),
+    ).toBe(false);
+    expect(
+      standingWorkIsComplete({
+        gaps: [{ status: "closed" }],
+        unansweredQuestions: true,
+      }),
+    ).toBe(false);
+    const withPitch = buildStandingGaps({
+      assessments: [
+        {
+          key: "required:pitch",
+          kind: "REQUIRED",
+          text: "Join us to help protect the world's most valuable digital brands",
+          strength: "NONE",
+        },
+        {
+          key: "person-prep:c1",
+          kind: "COMPETENCY",
+          text: "Harper prepares the seeker for Christina Schivley",
+          strength: "NONE",
+        },
+        {
+          key: "required:channel",
+          kind: "REQUIRED",
+          text: "Build and lead a partner and channel motion",
+          strength: "NONE",
+        },
+      ],
+      questions: [],
+    });
+    expect(withPitch.map((gap) => gap.targetKey)).toEqual(["required:channel"]);
+    expect(withPitch[0]?.status).toBe("open");
   });
 
   it("regenerates standing when the prompt version is stale", () => {

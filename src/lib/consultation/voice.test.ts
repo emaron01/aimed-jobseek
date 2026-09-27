@@ -66,6 +66,9 @@ describe("Harper voice", () => {
     expect(coach).toContain('speak to the person as "you"');
     expect(coach).toContain("Ask one question per remaining important gap");
     expect(coach).toContain("storyPlan is []");
+    expect(coach).toContain("ask which roles that background came from");
+    expect(coach).toContain("Never lower a STRONG or PARTIAL rating");
+    expect(coach).toContain("If any gap is still open, closingNote is null");
     expect(coach).not.toContain("Ask only the next remaining gap");
     const polish = readFileSync("src/lib/prompt-content/consultation.ts", "utf8");
     expect(polish).toContain('first person as "I"');

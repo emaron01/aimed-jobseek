@@ -19,15 +19,18 @@ import {
 import {
   buildConsultationQaView,
   consultationHasUnansweredQuestions,
+  latestClosingNote,
 } from "@/lib/consultation/qa-view";
 import {
   consultationItemNeedsResultRepair,
   shouldEnqueueConsultationResultRepair,
 } from "@/lib/consultation/results";
+import { repairExistingConsultationSession } from "@/lib/consultation/repair-existing";
 import {
   briefingNeedsStandingRegen,
   buildStandingGaps,
   shouldEnqueueConsultationStandingRegen,
+  standingWorkIsComplete,
 } from "@/lib/consultation/standing";
 import { seekerFirstName } from "@/lib/consultation/voice";
 import { listPersonPreps } from "@/lib/interview/person-prep";
@@ -45,6 +48,7 @@ import {
   consultationBriefingSchema,
 } from "@/lib/consultation/contract";
 import {
+  isStandingRequirement,
   profileEvidenceItems,
 } from "@/lib/consultation/assess";
 import {
@@ -167,6 +171,9 @@ export async function ConsultationSection({
   canEdit: boolean;
   jobs?: WorkspaceJobStatusView[];
 }) {
+  if (canEdit) {
+    await repairExistingConsultationSession({ organizationId, campaignId });
+  }
   const [session, campaign] = await Promise.all([
     prisma.consultationSession.findFirst({
       where: { campaignId, organizationId },
@@ -210,7 +217,20 @@ export async function ConsultationSection({
       (job.status === "PENDING" || job.status === "IN_PROGRESS"),
   );
   const standingRequirements =
-    session?.assessments.map((item) => {
+    session?.assessments
+      .filter((item) =>
+        isStandingRequirement({
+          key: item.targetKey,
+          kind: item.kind as
+            | "REQUIRED"
+            | "OUTCOME"
+            | "COMPETENCY"
+            | "MISSION"
+            | "PREFERRED",
+          text: item.text,
+        }),
+      )
+      .map((item) => {
       const facts = resolveEvidenceLabels(
         parseStringArray(item.supportingFactIds),
         profileItems,
@@ -241,7 +261,7 @@ export async function ConsultationSection({
       };
     }) ?? [];
   const hasStanding =
-    briefing?.success || (session != null && session.assessments.length > 0);
+    briefing?.success || standingRequirements.length > 0;
   const threadTurns =
     session?.turns.map((turn) => ({
       id: turn.id,
@@ -251,6 +271,7 @@ export async function ConsultationSection({
       followUp: turn.followUp,
       sequence: turn.sequence,
       analysisJson: turn.analysisJson,
+      intent: turn.intent,
     })) ?? [];
   const threadStatements = statements.map((statement) => ({
     id: statement.id,
@@ -362,8 +383,48 @@ export async function ConsultationSection({
     });
   }
   const unanswered = consultationHasUnansweredQuestions(qaView);
+  const standingGaps = session
+    ? buildStandingGaps({
+        assessments: session.assessments
+          .filter((item) =>
+            isStandingRequirement({
+              key: item.targetKey,
+              kind: item.kind as
+                | "REQUIRED"
+                | "OUTCOME"
+                | "COMPETENCY"
+                | "MISSION"
+                | "PREFERRED",
+              text: item.text,
+            }),
+          )
+          .map((item) => ({
+            key: item.targetKey,
+            kind: item.kind as
+              | "REQUIRED"
+              | "OUTCOME"
+              | "COMPETENCY"
+              | "MISSION"
+              | "PREFERRED",
+            text: item.text,
+            strength: item.strength,
+          })),
+        questions: qaView.questions,
+      })
+    : [];
+  const standingComplete = standingWorkIsComplete({
+    gaps: standingGaps,
+    unansweredQuestions: unanswered,
+  });
   const threadStatus =
-    session?.status === "DONE" && unanswered ? "IN_PROGRESS" : session?.status ?? "";
+    session &&
+    (session.status === "DONE" || session.status === "SKIPPED") &&
+    !standingComplete
+      ? "IN_PROGRESS"
+      : session?.status ?? "";
+  const closingNote = standingComplete
+    ? latestClosingNote(threadTurns)
+    : null;
 
   return (
     <>
@@ -441,18 +502,18 @@ export async function ConsultationSection({
             ) : null}
           </div>
         ) : null}
-        {session?.status === "SKIPPED" ? (
+        {threadStatus === "SKIPPED" ? (
           <p className="text-sm text-ink">
             Consultation is skipped. Materials can still be generated from the{" "}
             {vocab.product.singular} alone.
           </p>
         ) : null}
-        {session?.status === "PAUSED" ? (
+        {threadStatus === "PAUSED" ? (
           <p className="text-sm text-ink">Paused. Resume when you want to continue.</p>
         ) : null}
-        {session?.status === "DONE" && !unanswered ? (
+        {standingComplete && (closingNote || threadStatus === "DONE") ? (
           <p className="text-sm text-ink" data-testid="consultation-complete">
-            {consultationConversationCopy.planComplete}
+            {closingNote || consultationConversationCopy.planComplete}
           </p>
         ) : null}
         {canEdit && !session && !consultationBusy ? (
@@ -508,7 +569,7 @@ export async function ConsultationSection({
             </ApplicationActionForm>
           </div>
         ) : null}
-        {canEdit && (session?.status === "PAUSED" || session?.status === "SKIPPED") ? (
+        {canEdit && (threadStatus === "PAUSED" || threadStatus === "SKIPPED") ? (
           <ApplicationActionForm
             action={resumeConsultationAction}
             submitLabel="Resume"
@@ -537,22 +598,27 @@ export async function ConsultationSection({
                   </ul>
                 </div>
               ) : null}
-              {session && session.assessments.length > 0 ? (
+              {session && standingRequirements.length > 0 ? (
                 <ConsultationStanding
+                  campaignId={campaignId}
+                  canEdit={canEdit}
+                  acceptingReplies={
+                    threadStatus !== "SKIPPED" &&
+                    threadStatus !== "PAUSED" &&
+                    !consultationBusy
+                  }
                   overall={briefing?.success ? briefing.data.overall : null}
-                  gaps={buildStandingGaps({
-                    assessments: session.assessments.map((item) => ({
-                      key: item.targetKey,
-                      kind: item.kind as
-                        | "REQUIRED"
-                        | "OUTCOME"
-                        | "COMPETENCY"
-                        | "MISSION"
-                        | "PREFERRED",
-                      text: item.text,
-                      strength: item.strength,
-                    })),
-                    questions: qaView.questions,
+                  gaps={standingGaps.map((gap) => {
+                    const item = qaView.questions.find(
+                      (question) => question.targetKey === gap.targetKey,
+                    );
+                    return {
+                      ...gap,
+                      questionTurnId: item?.questionTurnId ?? null,
+                      resumeBullet: item?.resumeBullet ?? null,
+                      talkingPoint: item?.talkingPoint ?? null,
+                      statements: item?.statements ?? [],
+                    };
                   })}
                   careerRecap={null}
                   requirements={standingRequirements}

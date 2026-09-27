@@ -8,6 +8,7 @@ export type QaTurn = {
   followUp: boolean;
   sequence: number;
   analysisJson?: unknown;
+  intent?: string | null;
 };
 
 export type QaStatement = {
@@ -39,10 +40,23 @@ export function isGenericFollowUpText(body: string): boolean {
   return body.trim() === consultationConversationCopy.askForStory.trim();
 }
 
+export function isClosingNoteTurn(turn: Pick<QaTurn, "speaker" | "intent">): boolean {
+  return turn.speaker === "CONSULTANT" && turn.intent === "CLOSING";
+}
+
+export function latestClosingNote(turns: QaTurn[]): string | null {
+  const closing = [...turns]
+    .filter(isClosingNoteTurn)
+    .sort((left, right) => left.sequence - right.sequence)
+    .at(-1);
+  return closing?.body.trim() || null;
+}
+
 export function isPrimaryHarperQuestion(turn: QaTurn): boolean {
   return (
     turn.speaker === "CONSULTANT" &&
     !turn.followUp &&
+    !isClosingNoteTurn(turn) &&
     !isGenericFollowUpText(turn.body)
   );
 }

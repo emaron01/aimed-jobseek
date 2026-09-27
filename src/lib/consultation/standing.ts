@@ -1,5 +1,5 @@
 import {
-  isCompanyMissionOrTagline,
+  isStandingRequirement,
   type EvidenceAssessment,
   type EvidenceKind,
 } from "@/lib/consultation/assess";
@@ -82,7 +82,7 @@ export function buildStandingGaps(input: {
       .map((item) => [item.targetKey as string, item]),
   );
   return input.assessments
-    .filter((assessment) => !isCompanyMissionOrTagline(assessment))
+    .filter((assessment) => isStandingRequirement(assessment))
     .filter(
       (assessment) =>
         assessment.strength !== "STRONG" || byKey.has(assessment.key),
@@ -120,6 +120,16 @@ export function briefingNeedsStandingRegen(input: {
         text,
         firstName: input.firstName,
       }).length > 0 || seekerPrepInstructionViolations(text).length > 0,
+  );
+}
+
+export function standingWorkIsComplete(input: {
+  gaps: Array<{ status: ConsultationGapStatus }>;
+  unansweredQuestions: boolean;
+}): boolean {
+  if (input.unansweredQuestions) return false;
+  return input.gaps.every(
+    (gap) => gap.status === "closed" || gap.status === "confirmed",
   );
 }
 
