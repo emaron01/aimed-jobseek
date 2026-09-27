@@ -141,6 +141,7 @@ describe("Interview cheat sheet coach", () => {
     const widget = readFileSync("src/components/CheatSheetCoachItems.tsx", "utf8");
     const prompt = readFileSync("src/lib/prompt-content/application-summary.ts", "utf8");
     expect(page).not.toContain("CheatSheetCoachItems");
+    expect(personBody).toContain("consultationConversationCopy.coachingDisclaimer");
     expect(personBody).toContain("section.likelyQuestions");
     expect(personBody).toContain("section.positioningStatements");
     expect(personBody).toContain("section.keyStatements");

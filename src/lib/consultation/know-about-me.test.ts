@@ -24,8 +24,10 @@ describe("What You Should Know About Me", () => {
     expect(widget).toContain("consultationConversationCopy.knowAboutMe");
     expect(widget).toContain("saveWhatYouShouldKnowAboutMeAction");
     expect(consultationConversationCopy.knowAboutMe).toBe(
-      "What You Should Know About Me",
+      "Missing relevant experience for this role? Add it here",
     );
+    expect(section).not.toContain("What You Should Know About Me");
+    expect(widget).not.toContain("What You Should Know About Me");
   });
 
   it("feeds learned notes to Harper and the Interview cheat sheet", () => {

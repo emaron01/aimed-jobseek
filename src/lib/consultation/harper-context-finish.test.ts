@@ -85,7 +85,7 @@ describe("Harper context finish", () => {
   });
 
   it("bumps the consultation prompt version", () => {
-    expect(CONSULTATION_PROMPT_VERSION).toBe("21");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("22");
   });
 
   it("labels the paste field Paste Interviewer Profile everywhere it appears", () => {

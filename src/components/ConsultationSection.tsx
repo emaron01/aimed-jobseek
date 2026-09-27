@@ -437,6 +437,12 @@ export async function ConsultationSection({
         <h2 className="text-base font-semibold text-ink">
           {consultationConfig.displayName}
         </h2>
+        <p
+          className={`text-sm text-muted ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
+          data-testid="harper-coaching-disclaimer"
+        >
+          {consultationConversationCopy.coachingDisclaimer}
+        </p>
         <p className={`text-sm text-muted ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
           {consultationConfig.displayName} compares this job with the{" "}
           {vocab.product.singular} and draws out the stories behind the gaps.

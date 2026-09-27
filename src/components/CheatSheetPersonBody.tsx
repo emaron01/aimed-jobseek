@@ -7,7 +7,18 @@ import { CheatSheetCoachItems } from "@/components/CheatSheetCoachItems";
 import { statedListItems } from "@/lib/application-summary/display";
 import type { CheatSheetNote } from "@/lib/application-summary/notes";
 import type { CheatSheetPersonSection } from "@/lib/application-summary/contract";
-import { applicationSummaryConfig } from "@/lib/product-config";
+import {
+  applicationSummaryConfig,
+  consultationConversationCopy,
+} from "@/lib/product-config";
+
+function CoachingDisclaimer() {
+  return (
+    <p className="text-sm text-muted" data-testid="harper-coaching-disclaimer">
+      {consultationConversationCopy.coachingDisclaimer}
+    </p>
+  );
+}
 
 function TextList({ items }: { items: readonly string[] }) {
   const stated = statedListItems(items);
@@ -41,6 +52,7 @@ export function CheatSheetPersonBody({
   if (!personaBuilt) {
     return (
       <div className="space-y-3" data-testid={`unbuilt-persona-${sectionKey}`}>
+        <CoachingDisclaimer />
         <p className="text-sm text-ink">{applicationSummaryConfig.sections.unbuiltPersona}</p>
         {canEdit ? (
           <ApplicationActionForm
@@ -59,6 +71,7 @@ export function CheatSheetPersonBody({
   if (!section) {
     return (
       <div className="space-y-3">
+        <CoachingDisclaimer />
         {canEdit ? (
           <ApplicationActionForm
             action={generateApplicationSummaryAction}
@@ -83,6 +96,7 @@ export function CheatSheetPersonBody({
 
   return (
     <div className="space-y-4">
+      <CoachingDisclaimer />
       {notes.length > 0 ? (
         <div>
           <h3 className="font-medium text-ink">

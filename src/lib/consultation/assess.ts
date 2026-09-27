@@ -33,17 +33,27 @@ export type EvidenceTarget = {
   text: string;
 };
 
+export type EvidenceSourceType = "profile" | "consultation";
+
 export type ProfileFactRef = {
   id: string;
   kind: "FACT" | "INFERENCE";
   text: string;
   itemType: "ITEM" | "EXPERIENCE";
+  source?: EvidenceSourceType;
   employer?: string | null;
   title?: string | null;
   startDate?: string | null;
   endDate?: string | null;
   roleId?: string | null;
 };
+
+export function evidenceSourceOf(
+  item: Pick<ProfileFactRef, "id" | "source">,
+): EvidenceSourceType {
+  if (item.source) return item.source;
+  return item.id.startsWith("consult_") ? "consultation" : "profile";
+}
 
 export type ExperienceCalculation = {
   requiredYears: number;
@@ -124,6 +134,7 @@ function pushItem(
     kind: item.kind,
     text,
     itemType: "ITEM",
+    source: evidenceSourceOf({ id: item.id }),
     roleId: roleId ?? null,
   });
 }
@@ -163,6 +174,7 @@ export function profileEvidenceItems(profile: CandidateProfile): ProfileFactRef[
         kind: role.kind,
         text: bits.join(". "),
         itemType: "EXPERIENCE",
+        source: evidenceSourceOf({ id: role.id }),
         employer: role.employer,
         title: role.title,
         startDate: role.startDate,

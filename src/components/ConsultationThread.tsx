@@ -6,7 +6,9 @@ import {
   editConsultationAnswerAction,
   regenerateConsultationQaResultAction,
   replyConsultationAction,
+  skipConsultationQuestionAction,
 } from "@/app/actions/consultation";
+import { AppButton } from "@/components/AppButton";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import {
   consultationConfig,
@@ -157,6 +159,43 @@ function SeekerAnswerEntry({
   );
 }
 
+function SeekerRepliesSection({
+  campaignId,
+  canEdit,
+  answers,
+}: {
+  campaignId: string;
+  canEdit: boolean;
+  answers: Array<{ id: string; body: string }>;
+}) {
+  const [open, setOpen] = useState(false);
+  if (answers.length === 0) return null;
+  return (
+    <div className="space-y-2" data-testid="consultation-seeker-answers">
+      <AppButton
+        type="button"
+        className="text-sm font-medium text-ink underline"
+        data-testid="consultation-toggle-replies"
+        onClick={() => setOpen((value) => !value)}
+      >
+        {open
+          ? consultationConversationCopy.hideYourReplies
+          : consultationConversationCopy.showYourReplies}
+      </AppButton>
+      {open
+        ? answers.map((answer) => (
+            <SeekerAnswerEntry
+              key={answer.id}
+              campaignId={campaignId}
+              canEdit={canEdit}
+              answer={answer}
+            />
+          ))
+        : null}
+    </div>
+  );
+}
+
 function QuestionCard({
   campaignId,
   canEdit,
@@ -173,38 +212,28 @@ function QuestionCard({
   onSubmitStart: (answer: string) => void;
 }) {
   const hasResult = Boolean(item.resumeBullet || item.talkingPoint);
+  const unanswered = !hasResult;
   const canAnswer =
     showReply &&
     (consultationQuestionAcceptsReply(item) || Boolean(item.seekerAnswers.length));
+  const canSkip = showReply && unanswered;
   const replyKey = consultationReplyTargetKey(item.questionTurnId);
   return (
-    <details
+    <article
       className="min-w-0 overflow-hidden rounded-md border border-edge bg-canvas p-4"
       data-testid={hasResult ? "consultation-answered" : "consultation-question-item"}
     >
-      <summary
-        className="cursor-pointer text-sm font-medium text-ink"
+      <p
+        className="text-sm font-medium text-ink"
         data-testid="consultation-question"
       >
         {item.question}
-      </summary>
+      </p>
       <div className="mt-3 space-y-3">
         {item.followUp ? (
           <p className={`text-sm text-ink ${wrapClass}`} data-testid="consultation-follow-up">
             {item.followUp.text}
           </p>
-        ) : null}
-        {item.seekerAnswers.length > 0 ? (
-          <div className="space-y-2" data-testid="consultation-seeker-answers">
-            {item.seekerAnswers.map((answer) => (
-              <SeekerAnswerEntry
-                key={answer.id}
-                campaignId={campaignId}
-                canEdit={canEdit && showReply}
-                answer={answer}
-              />
-            ))}
-          </div>
         ) : null}
         {hasResult ? (
           <>
@@ -219,6 +248,11 @@ function QuestionCard({
             ) : null}
           </>
         ) : null}
+        <SeekerRepliesSection
+          campaignId={campaignId}
+          canEdit={canEdit && showReply}
+          answers={item.seekerAnswers}
+        />
         {canAnswer ? (
           <ApplicationActionForm
             action={replyConsultationAction}
@@ -247,6 +281,18 @@ function QuestionCard({
             </label>
           </ApplicationActionForm>
         ) : null}
+        {canSkip ? (
+          <ApplicationActionForm
+            action={skipConsultationQuestionAction}
+            submitLabel={consultationConversationCopy.skipQuestion}
+            pendingLabel={consultationConversationCopy.thinking}
+            testId="consultation-skip-question"
+            variant="secondary"
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+            <input type="hidden" name="targetKey" value={replyKey} />
+          </ApplicationActionForm>
+        ) : null}
         {pending ? (
           <div
             className="flex items-center gap-2 text-sm text-muted"
@@ -261,7 +307,7 @@ function QuestionCard({
           </div>
         ) : null}
       </div>
-    </details>
+    </article>
   );
 }
 

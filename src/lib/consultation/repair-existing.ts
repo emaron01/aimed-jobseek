@@ -45,6 +45,19 @@ export function cannedWordingRepairedAt(value: unknown): string | null {
   return typeof marked === "string" && marked.trim() ? marked.trim() : null;
 }
 
+export function coachingSpeaksAsSeekerI(text: string): boolean {
+  return /\b((did|do|have|has|am|was|were|would|can|could) I|that I |which \w+ I |what I )\b/i.test(
+    text,
+  );
+}
+
+export function firstPersonCoachingRepairedAt(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const marked = (value as { firstPersonCoachingRepairedAt?: unknown })
+    .firstPersonCoachingRepairedAt;
+  return typeof marked === "string" && marked.trim() ? marked.trim() : null;
+}
+
 export async function repairExistingConsultationSession(input: {
   organizationId: string;
   campaignId: string;

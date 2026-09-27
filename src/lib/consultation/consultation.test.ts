@@ -64,6 +64,7 @@ import {
   recordConsultationReply,
   reextractExistingWhyThisCompanyMotivation,
   regenerateCannedConsultationWording,
+  regenerateFirstPersonCoaching,
   repairConsultationResults,
 } from "@/lib/consultation/service";
 import {
@@ -74,7 +75,6 @@ import {
 import {
   collapseIdenticalEvidence,
   looksLikeInternalId,
-  looksLikeRawSeekerNote,
   profileItemDisplayLabel,
   resolveEvidenceLabels,
 } from "@/lib/consultation/evidence-display";
@@ -355,6 +355,27 @@ function installConsultationModelFixture() {
       };
     }
     const answer = payload.answer ?? "";
+    if (
+      payload.qualityFeedback?.some((item) =>
+        /address the seeker as you/i.test(item),
+      )
+    ) {
+      return {
+        data: {
+          replyType: "answer",
+          facts: [],
+          story: null,
+          demonstratedTargets: [],
+          missingStarElements: ["RESULT"],
+          revisedQuestion: null,
+          coaching:
+            "You named the inspection work. The missing piece is which MEDDIC elements you inspected.",
+          followUpQuestion: "Which MEDDIC elements did you inspect?",
+          gapDecision: "incomplete",
+          companyMotivation: fixtureCompanyMotivation({ ...payload, answer }),
+        },
+      };
+    }
     if (/partner program/i.test(answer)) {
       return {
         data: {
@@ -1563,7 +1584,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("21");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("22");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("You coach; you do not interrogate");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("askedQuestions");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -1591,6 +1612,12 @@ describe("consultation evidence and questions", () => {
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("interviewerPrep:");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
       'Do not use the words "Harper prepares the seeker"',
+    );
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
+      'Never describe them as a "question plan"',
+    );
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
+      "Interviewer prep, closing notes, and commentary are coaching and suggestions",
     );
     expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
       "Never write \"The seeker was responsible\" or \"He also reports\"",
@@ -1643,8 +1670,25 @@ describe("consultation evidence and questions", () => {
     );
     expect(service).toContain("prepareExistingConsultationSession");
     expect(service).toContain("reextractExistingWhyThisCompanyMotivation");
-    expect(service).toContain("answerDeniesGapExperience");
+    expect(service).toContain("regenerateFirstPersonCoaching");
+    expect(service).not.toContain("answerDeniesGapExperience");
+    expect(service).not.toContain("isThinIncompleteAnswer");
     expect(service).toContain("coachingSpeaksAsSeekerI");
+    expect(service).not.toMatch(
+      /i have never\|i've never\|i do not have\|i don't have/,
+    );
+    expect(consultationConversationCopy.coachingDisclaimer).toBe(
+      "Harper's coaching and suggestions to help you prepare and strengthen your interview skills.",
+    );
+    expect(consultationConversationCopy.knowAboutMe).toBe(
+      "Missing relevant experience for this role? Add it here",
+    );
+    expect(workspace).toContain("consultationConversationCopy.coachingDisclaimer");
+    const cheatSheet = readFileSync(
+      "src/components/CheatSheetPersonBody.tsx",
+      "utf8",
+    );
+    expect(cheatSheet).toContain("consultationConversationCopy.coachingDisclaimer");
   });
 
   it("merges posting requirements and scorecard items that mean the same thing", () => {
@@ -1683,10 +1727,8 @@ describe("consultation evidence and questions", () => {
     expect(roleLabel?.detail).toBeTruthy();
     expect(roleLabel?.detail).not.toBe(roleLabel?.label);
     expect(
-      looksLikeRawSeekerNote(
-        "I have built OpenText's ARM products from the ground up by completely retool the GTM motion.",
-      ),
-    ).toBe(true);
+      readFileSync("src/lib/consultation/evidence-display.ts", "utf8"),
+    ).not.toContain("looksLikeRawSeekerNote");
     const collapsed = collapseIdenticalEvidence([
       {
         id: "a",
@@ -1706,21 +1748,26 @@ describe("consultation evidence and questions", () => {
         detail: null,
       },
     ]);
-    const rawNote = {
-      id: "note_1",
+    const consultationNote = {
+      id: "consult_turn_1_fact_0",
       kind: "FACT" as const,
       text: "I have built OpenText ARM products and rebuilt the GTM motion by completely retool the launch.",
       itemType: "ITEM" as const,
+      source: "consultation" as const,
     };
-    const cleanRole = {
+    const profileRole = {
       id: "role_arm",
       kind: "FACT" as const,
       text: "Built OpenText ARM products and rebuilt the GTM motion.",
       itemType: "EXPERIENCE" as const,
+      source: "profile" as const,
       title: "VP Sales",
       employer: "OpenText",
     };
-    const preferred = resolveEvidenceLabels(["note_1"], [rawNote, cleanRole]);
+    const preferred = resolveEvidenceLabels(
+      ["consult_turn_1_fact_0"],
+      [consultationNote, profileRole],
+    );
     expect(preferred[0]?.label).toBe("VP Sales at OpenText");
     expect(preferred[0]?.detail).not.toMatch(/completely retool/i);
   });
@@ -4101,6 +4148,108 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       },
     });
     expect(second?.body).toBe(unanswered?.body);
+  });
+
+  it("regenerates first-person coaching once and leaves seeker replies unchanged", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `First person ${suffix}`,
+        productId,
+        icpId,
+        whyThisCompany: "The warehouse robotics mission matches my reliability work.",
+      },
+    });
+    const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        seniority: parsed.seniority,
+        requiredItems: parsed.requiredItems,
+        preferredItems: parsed.preferredItems,
+        scorecardJson: parsed.scorecard,
+        employerDisposition: "IDENTIFIED",
+      },
+    });
+    const session = await prisma.consultationSession.create({
+      data: {
+        organizationId,
+        campaignId: campaign.id,
+        productId,
+        status: "IN_PROGRESS",
+        promptVersion: CONSULTATION_PROMPT_VERSION,
+      },
+    });
+    const brokenFollowUp =
+      "You named the inspection work.\n\nWhich MEDDIC elements did I inspect?";
+    const seekerReply = "I inspected metrics, economic buyer, and decision criteria.";
+    await prisma.consultationTurn.createMany({
+      data: [
+        {
+          organizationId,
+          sessionId: session.id,
+          sequence: 1,
+          speaker: "CONSULTANT",
+          body: "How did you inspect deals at Login VSI?",
+          targetKey: "required:0",
+        },
+        {
+          organizationId,
+          sessionId: session.id,
+          sequence: 2,
+          speaker: "SEEKER",
+          body: "I sat with managers on the weekly forecast.",
+          targetKey: "required:0",
+          seekerAuthored: true,
+        },
+        {
+          organizationId,
+          sessionId: session.id,
+          sequence: 3,
+          speaker: "CONSULTANT",
+          body: brokenFollowUp,
+          targetKey: "required:0",
+          followUp: true,
+        },
+        {
+          organizationId,
+          sessionId: session.id,
+          sequence: 4,
+          speaker: "SEEKER",
+          body: seekerReply,
+          targetKey: "required:0",
+          seekerAuthored: true,
+        },
+      ],
+    });
+    await regenerateFirstPersonCoaching({
+      organizationId,
+      campaignId: campaign.id,
+    });
+    const followUp = await prisma.consultationTurn.findFirst({
+      where: { sessionId: session.id, followUp: true, speaker: "CONSULTANT" },
+    });
+    const seeker = await prisma.consultationTurn.findFirst({
+      where: { sessionId: session.id, speaker: "SEEKER", body: seekerReply },
+    });
+    expect(followUp?.body).not.toBe(brokenFollowUp);
+    expect(followUp?.body).toMatch(/\byou\b/i);
+    expect(followUp?.body).not.toMatch(/\bdid I\b/);
+    expect(seeker?.body).toBe(seekerReply);
+    generateStructured.mockClear();
+    await regenerateFirstPersonCoaching({
+      organizationId,
+      campaignId: campaign.id,
+    });
+    expect(generateStructured).not.toHaveBeenCalled();
+    const second = await prisma.consultationTurn.findFirst({
+      where: { sessionId: session.id, followUp: true, speaker: "CONSULTANT" },
+    });
+    expect(second?.body).toBe(followUp?.body);
   });
 
   it("combines existing Partial-gap evidence with the added detail", async () => {

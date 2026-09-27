@@ -40,6 +40,8 @@ import {
 } from "@/lib/consultation/questions";
 import {
   cannedWordingRepairedAt,
+  coachingSpeaksAsSeekerI,
+  firstPersonCoachingRepairedAt,
   looksLikeCannedHarperText,
   repairExistingConsultationSession,
 } from "@/lib/consultation/repair-existing";
@@ -400,50 +402,13 @@ function extractThirdPersonViolations(text: string): string[] {
   return [];
 }
 
-function answerDeniesGapExperience(answer: string): boolean {
-  return /\b(i have never|i've never|i do not have|i don't have|i have not|i haven't|i never (sold|did|ran|built|led|owned|developed|installed)|no experience with)\b/i.test(
-    answer,
-  );
-}
-
-function coachingSpeaksAsSeekerI(text: string): boolean {
-  return /\b((did|do|have|has|am|was|were|would|can|could) I|that I |which \w+ I |what I )\b/i.test(
-    text,
-  );
-}
-
-function isThinIncompleteAnswer(
-  answer: string,
-  data: Pick<ConsultationExtractResult, "missingStarElements">,
-): boolean {
-  return (
-    data.missingStarElements.length >= 3 &&
-    answer.split(/\s+/).filter(Boolean).length <= 8
-  );
-}
-
 function extractAnswerQualityIssues(input: {
   data: ConsultationExtractResult;
-  answer?: string;
   gapText?: string;
   profileItems?: ReturnType<typeof profileEvidenceItems>;
 }): string[] {
   if (!isConsultationExtractAnswer(input.data)) return [];
   const issues: string[] = [];
-  const answer = input.answer?.trim() ?? "";
-  if (answerDeniesGapExperience(answer) && input.data.gapDecision !== "no_evidence") {
-    issues.push(
-      "When the person says they have never done the required work, gapDecision is no_evidence even if they name related experience. coaching and followUpQuestion must be null.",
-    );
-  }
-  if (
-    input.data.gapDecision === "evidence" &&
-    isThinIncompleteAnswer(answer, input.data)
-  ) {
-    issues.push(
-      "A short or vague answer is incomplete, not evidence. Set gapDecision to incomplete and write coaching plus one followUpQuestion addressed to you.",
-    );
-  }
   if (input.data.gapDecision === "incomplete") {
     if (!input.data.coaching?.trim()) {
       issues.push(
@@ -539,7 +504,6 @@ async function extractAnswerWithQuality(input: {
     lastOk = extracted;
     const issues = extractAnswerQualityIssues({
       data: extracted.data,
-      answer: input.answer,
       gapText: input.target?.text,
       profileItems: input.profileItems,
     });
@@ -894,6 +858,19 @@ function analysisWithCannedRepair(value: unknown): Prisma.InputJsonValue {
   } as Prisma.InputJsonValue;
 }
 
+function analysisWithFirstPersonCoachingRepair(
+  value: unknown,
+): Prisma.InputJsonValue {
+  const base =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? { ...(value as Record<string, unknown>) }
+      : {};
+  return {
+    ...base,
+    firstPersonCoachingRepairedAt: new Date().toISOString(),
+  } as Prisma.InputJsonValue;
+}
+
 export async function regenerateCannedConsultationWording(input: {
   organizationId: string;
   campaignId: string;
@@ -1010,6 +987,127 @@ export async function regenerateCannedConsultationWording(input: {
   }
 }
 
+export async function regenerateFirstPersonCoaching(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const session = await prisma.consultationSession.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+    },
+    include: {
+      turns: { orderBy: { sequence: "asc" } },
+      assessments: true,
+    },
+  });
+  if (!session) return;
+  const broken = session.turns.filter(
+    (turn) =>
+      turn.speaker === "CONSULTANT" &&
+      turn.intent !== "CLOSING" &&
+      coachingSpeaksAsSeekerI(turn.body) &&
+      !firstPersonCoachingRepairedAt(turn.analysisJson),
+  );
+  if (broken.length === 0) return;
+  const { requirement, profile } = await requireApplication(
+    input.organizationId,
+    input.campaignId,
+  );
+  const interviewStages = await prisma.interviewStage.findMany({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+    },
+    select: { id: true, notesBefore: true, notesAfter: true },
+  });
+  const profileItems = [
+    ...profileEvidenceItems(profile),
+    ...learnedNotesEvidence(input.campaignId, requirement.seekerLearnedNotes),
+    ...interviewNotesEvidence(interviewStages),
+  ];
+  const targets = targetsFromRequirement(requirement);
+  const replyUsage = consultationUsage(
+    input.organizationId,
+    input.campaignId,
+    "CONSULTATION_REPLY",
+  );
+  for (const turn of broken) {
+    const primary = session.turns.find(
+      (row) =>
+        row.speaker === "CONSULTANT" &&
+        !row.followUp &&
+        row.intent !== "CLOSING" &&
+        row.targetKey === turn.targetKey,
+    );
+    const priorAnswer = [...session.turns]
+      .reverse()
+      .find(
+        (row) =>
+          row.speaker === "SEEKER" &&
+          !row.skipped &&
+          row.body.trim() &&
+          row.sequence < turn.sequence &&
+          (row.targetKey === turn.targetKey ||
+            replyToTurnIdFromAnalysis(row.analysisJson) ===
+              (primary?.id ?? turn.id)),
+      );
+    const target =
+      targets.find((item) => item.key === turn.targetKey) ??
+      (turn.targetKey
+        ? session.assessments
+            .filter((row) => row.targetKey === turn.targetKey)
+            .map((row) => ({
+              key: row.targetKey,
+              kind: row.kind as EvidenceTarget["kind"],
+              text: row.text,
+            }))[0] ?? null
+        : null);
+    let next = "";
+    let qualityFeedback = [
+      `The existing coaching and follow-up speak as I: ${turn.body}`,
+      "Rewrite coaching and followUpQuestion addressing the seeker as you, not as I. Keep the same missing piece.",
+    ];
+    for (
+      let attempt = 0;
+      attempt <= consultationConfig.qualityRegenerationAttempts;
+      attempt += 1
+    ) {
+      const extracted = await extractWithModel({
+        answer: priorAnswer?.body.trim() || turn.body,
+        question: primary?.body.trim() || turn.body,
+        target,
+        targets,
+        profileItems,
+        qualityFeedback,
+        usage: replyUsage,
+      });
+      if (!extracted.ok || !isConsultationExtractAnswer(extracted.data)) {
+        continue;
+      }
+      const rewritten = followUpBody(
+        extracted.data.coaching,
+        extracted.data.followUpQuestion?.trim() || "",
+      ).trim();
+      if (rewritten && !coachingSpeaksAsSeekerI(rewritten)) {
+        next = rewritten;
+        break;
+      }
+      qualityFeedback = [
+        ...qualityFeedback,
+        "coaching and followUpQuestion must address the seeker as you, not as I.",
+      ];
+    }
+    await prisma.consultationTurn.update({
+      where: { id: turn.id },
+      data: {
+        ...(next ? { body: next } : {}),
+        analysisJson: analysisWithFirstPersonCoachingRepair(turn.analysisJson),
+      },
+    });
+  }
+}
+
 export async function prepareExistingConsultationSession(input: {
   organizationId: string;
   campaignId: string;
@@ -1017,6 +1115,7 @@ export async function prepareExistingConsultationSession(input: {
   await repairExistingConsultationSession(input);
   await reextractExistingWhyThisCompanyMotivation(input);
   await regenerateCannedConsultationWording(input);
+  await regenerateFirstPersonCoaching(input);
 }
 
 function seekerFacingGenerationError(message: string): string {
@@ -1797,12 +1896,7 @@ async function processAnswerGeneration(input: {
     verified.partialStory ??
     extracted.data.story ??
     null;
-  const gapDecision = answerDeniesGapExperience(input.answerContext)
-    ? "no_evidence"
-    : extracted.data.gapDecision === "incomplete" ||
-        isThinIncompleteAnswer(input.answerContext, extracted.data)
-      ? "incomplete"
-      : extracted.data.gapDecision;
+  const gapDecision = extracted.data.gapDecision;
   const followUpQuestion =
     gapDecision === "no_evidence" ? null : verified.followUpQuestion;
   const incomplete = gapDecision === "incomplete";

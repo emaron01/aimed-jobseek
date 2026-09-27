@@ -1,4 +1,5 @@
 import {
+  evidenceSourceOf,
   sameRequirementMeaning,
   type ProfileFactRef,
 } from "@/lib/consultation/assess";
@@ -28,27 +29,18 @@ export function profileItemDisplayLabel(
   return item.text.trim();
 }
 
-export function looksLikeRawSeekerNote(text: string): boolean {
-  const trimmed = text.trim();
-  if (!trimmed) return false;
-  if (/\b(?:completely retool|i wanna|gonna|i have built)\b/i.test(trimmed)) {
-    return true;
-  }
-  return /\bi\b/i.test(trimmed) && trimmed.length > 80 && !/\bat\b.+\b(?:20\d{2}|19\d{2})\b/.test(trimmed);
-}
-
 function preferProfileFact(
   item: ProfileFactRef,
   items: ProfileFactRef[],
 ): ProfileFactRef {
-  if (item.itemType === "EXPERIENCE" || !looksLikeRawSeekerNote(item.text)) {
+  if (evidenceSourceOf(item) === "profile") {
     return item;
   }
   const match = items.find(
     (other) =>
       other.id !== item.id &&
+      evidenceSourceOf(other) === "profile" &&
       other.kind === "FACT" &&
-      other.itemType === "EXPERIENCE" &&
       sameRequirementMeaning(other.text, item.text),
   );
   return match ?? item;

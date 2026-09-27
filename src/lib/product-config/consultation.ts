@@ -78,6 +78,9 @@ export const consultationConversationCopy = Object.freeze({
   saveAnswer: "Save",
   showYourReplies: "Show your replies",
   hideYourReplies: "Hide your replies",
+  skipQuestion: "Skip",
+  coachingDisclaimer:
+    "Harper's coaching and suggestions to help you prepare and strengthen your interview skills.",
   approve: "Approve",
   useThis: "Use this",
   confirmed: "Approved.",
@@ -96,7 +99,7 @@ export const consultationConversationCopy = Object.freeze({
   typing: `${consultationConfig.displayName} is thinking…`,
   thinking: `${consultationConfig.displayName} is thinking…`,
   whyThisCompanyTarget: "Why you want to work at this company",
-  knowAboutMe: "What You Should Know About Me",
+  knowAboutMe: "Missing relevant experience for this role? Add it here",
   knowAboutMeHelp:
     `Tell ${consultationConfig.displayName} background that is not already in your ${vocab.product.singular}, for example experience that was left off the resume. This is saved as a seeker-stated fact and applies to every application.`,
   knowAboutMeSave: "Save",

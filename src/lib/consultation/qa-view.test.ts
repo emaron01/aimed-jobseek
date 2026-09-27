@@ -72,10 +72,14 @@ describe("Harper ten-question coach", () => {
     expect(view.questions[1]?.question).toBe("Question 2?");
 
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
-    expect(thread).toContain("<details");
     expect(thread).toContain("consultation-question");
     expect(thread).toContain("consultation-question-item");
     expect(thread).toContain("name=\"targetKey\"");
+    expect(thread).toContain("skipConsultationQuestionAction");
+    expect(thread).toContain("consultationConversationCopy.skipQuestion");
+    expect(thread).toContain("consultationConversationCopy.showYourReplies");
+    expect(thread).toContain("consultationConversationCopy.hideYourReplies");
+    expect(consultationConversationCopy.skipQuestion).toBe("Skip");
   });
 
   it("hides legacy Not accurate seeker turns from the thread", () => {
@@ -246,6 +250,17 @@ describe("Harper ten-question coach", () => {
     expect(thread).toContain("polishCopy.regenerate");
     expect(consultationConversationCopy.approve).toBe("Approve");
     expect(polishCopy.regenerate).toBe("Regenerate");
+    const card = thread.slice(thread.indexOf("function QuestionCard"));
+    const resultIndex = card.indexOf("{hasResult ? (");
+    const repliesIndex = card.indexOf("<SeekerRepliesSection");
+    const followUpIndex = card.indexOf("consultation-follow-up");
+    expect(resultIndex).toBeGreaterThan(-1);
+    expect(repliesIndex).toBeGreaterThan(resultIndex);
+    expect(followUpIndex).toBeGreaterThan(-1);
+    expect(followUpIndex).toBeLessThan(repliesIndex);
+    expect(card).not.toMatch(
+      /SeekerRepliesSection[\s\S]*consultation-follow-up/,
+    );
   });
 
   it("attaches each existing answer to the question it actually answered", () => {

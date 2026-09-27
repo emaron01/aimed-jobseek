@@ -1,7 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { WHY_THIS_COMPANY_TARGET_KEY } from "@/lib/consultation/contract";
-import { isTemplatedUnseenQuestion } from "@/lib/consultation/repair-existing";
+import {
+  coachingSpeaksAsSeekerI,
+  isTemplatedUnseenQuestion,
+} from "@/lib/consultation/repair-existing";
 import { hasTestDatabase } from "@/test/database";
 
 describe("existing consultation repair", () => {
@@ -20,6 +23,14 @@ describe("existing consultation repair", () => {
     expect(repair).not.toContain("seekerWrittenReply");
     expect(repair).not.toContain("looksLikeWorkStory");
     expect(repair).toContain('status: "IN_PROGRESS"');
+    expect(repair).toContain("coachingSpeaksAsSeekerI");
+    expect(repair).toContain("firstPersonCoachingRepairedAt");
+    expect(
+      coachingSpeaksAsSeekerI("Which MEDDIC elements did I inspect?"),
+    ).toBe(true);
+    expect(
+      coachingSpeaksAsSeekerI("Which MEDDIC elements did you inspect?"),
+    ).toBe(false);
     const service = readFileSync("src/lib/consultation/service.ts", "utf8");
     expect(service).toContain("repairExistingConsultationSession");
     const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
