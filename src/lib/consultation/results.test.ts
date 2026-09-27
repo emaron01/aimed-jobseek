@@ -110,6 +110,56 @@ describe("Harper result quality", () => {
     ).toBe(false);
   });
 
+  it("does not repair incomplete answers or confirmed gaps that have no resume bullet", () => {
+    expect(
+      consultationItemNeedsResultRepair({
+        questionTurnId: "q-inc",
+        targetKey: "required:forecast",
+        question: "How do you forecast?",
+        followUp: {
+          turnId: "f1",
+          text: "What result did you get when you used forecasting?",
+        },
+        seekerAnswers: [
+          {
+            id: "s-inc",
+            body: "I have used forecasting.",
+            analysisJson: { gapDecision: "incomplete" },
+          },
+        ],
+        statements: [],
+        resumeBullet: null,
+        talkingPoint: null,
+      }),
+    ).toBe(false);
+    expect(
+      consultationItemNeedsResultRepair({
+        questionTurnId: "q-no",
+        targetKey: "required:domain",
+        question: "Have you sold brand protection?",
+        followUp: null,
+        seekerAnswers: [
+          {
+            id: "s-no",
+            body: "I have never sold digital brand protection.",
+            analysisJson: { gapDecision: "no_evidence" },
+          },
+        ],
+        statements: [],
+        resumeBullet: null,
+        talkingPoint: {
+          id: "i-no",
+          turnId: "s-no",
+          kind: "INTERVIEW_ANSWER",
+          status: "DRAFT",
+          content:
+            "I have not done that work yet. The closest related experience I have is patient-identity software, and I would close the gap in this role by ramping on digital brand protection.",
+          strengtheningNote: null,
+        },
+      }),
+    ).toBe(false);
+  });
+
   it("never falls back to the seeker's raw text in production polish", () => {
     const service = readFileSync("src/lib/consultation/service.ts", "utf8");
     expect(service).not.toContain("input.answerContext.trim()");

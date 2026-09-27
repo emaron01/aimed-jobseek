@@ -1,4 +1,5 @@
 import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
+import { gapDecisionFromAnalysis } from "@/lib/consultation/standing";
 
 function normalized(text: string): string {
   return text.toLowerCase().replace(/\s+/g, " ").trim();
@@ -89,6 +90,15 @@ export function consultationItemNeedsResultRepair(
     .map((answer) => answer.body.trim())
     .filter(Boolean);
   if (answers.length === 0) return false;
+  const decision = gapDecisionFromAnalysis(
+    item.seekerAnswers.at(-1)?.analysisJson,
+  );
+  if (decision === "incomplete") return false;
+  if (decision === "no_evidence") {
+    if (!item.talkingPoint) return true;
+    if (isRawSeekerResult(item.talkingPoint.content, answers)) return true;
+    return resultIgnoresLatestAnswer(item.talkingPoint.content, answers);
+  }
   if (!item.talkingPoint || !item.resumeBullet) return true;
   if (isRawSeekerResult(item.talkingPoint.content, answers)) return true;
   if (isRawSeekerResult(item.resumeBullet.content, answers)) return true;
