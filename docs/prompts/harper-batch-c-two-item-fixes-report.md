@@ -66,8 +66,7 @@ Fixture replaced with the real CSC Global Senior Director of Sales - North Ameri
 ## 5. Commit / branch
 
 - **Branch:** `checkpoint/harper-prep-hub` (not merged to main)  
-- **Commit:** *(filled after commit)*
-
+- **Commit:** `d964cdd3ea1725ee33735656264aefa64ca62e1e`
 ---
 
 ## 6. Scope confirmation
