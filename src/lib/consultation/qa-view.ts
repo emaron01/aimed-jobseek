@@ -30,6 +30,8 @@ export type ConsultationQaItem = {
   statements: QaStatement[];
   resumeBullet: QaStatement | null;
   talkingPoint: QaStatement | null;
+  /** Seeker dismissed this question; show Ignored link until reopened. */
+  ignored?: boolean;
 };
 
 export type ConsultationQaView = {
@@ -116,6 +118,7 @@ function emptyItem(turn: QaTurn): ConsultationQaItem {
     statements: [],
     resumeBullet: null,
     talkingPoint: null,
+    ignored: false,
   };
 }
 
@@ -125,13 +128,39 @@ export function replyToTurnIdFromAnalysis(value: unknown): string | null {
   return typeof id === "string" && id.trim() ? id.trim() : null;
 }
 
-/** Seeker permanently dismissed a Harper question (Ignore). */
+/** Seeker dismissed a Harper question or gap (Ignore). */
 export function isIgnoredSeekerTurn(
   turn: Pick<QaTurn, "speaker" | "analysisJson">,
 ): boolean {
   if (turn.speaker !== "SEEKER") return false;
   if (!turn.analysisJson || typeof turn.analysisJson !== "object") return false;
   return (turn.analysisJson as { ignored?: unknown }).ignored === true;
+}
+
+/** Active ignore turns for a gap/question target (reopen clears these). */
+export function ignoredSeekerTurnsForTarget(
+  turns: Array<Pick<QaTurn, "id" | "speaker" | "targetKey" | "analysisJson">>,
+  targetKey: string | null | undefined,
+): Array<Pick<QaTurn, "id" | "speaker" | "targetKey" | "analysisJson">> {
+  const key = targetKey?.trim() ?? "";
+  if (!key) return [];
+  return turns.filter(
+    (turn) =>
+      isIgnoredSeekerTurn(turn) &&
+      (turn.targetKey === key ||
+        replyToTurnIdFromAnalysis(turn.analysisJson) === key),
+  );
+}
+
+export function isTargetCurrentlyIgnored(
+  turns: Array<Pick<QaTurn, "id" | "speaker" | "targetKey" | "analysisJson">>,
+  targetKey: string | null | undefined,
+): boolean {
+  const key = targetKey?.trim() ?? "";
+  if (!key) return false;
+  return turns.some(
+    (turn) => isIgnoredSeekerTurn(turn) && turn.targetKey === key,
+  );
 }
 
 export function consultationReplyTargetKey(questionTurnId: string): string {
@@ -153,6 +182,7 @@ export function parseConsultationReplyTarget(requested: string): {
 export function consultationQuestionAcceptsReply(
   item: ConsultationQaItem,
 ): boolean {
+  if (item.ignored) return false;
   return item.followUp != null || (!item.resumeBullet && !item.talkingPoint);
 }
 
@@ -279,7 +309,9 @@ function seekerAnsweredThis(turns: QaTurn[], consultant: QaTurn): boolean {
 export function consultationHasUnansweredQuestions(
   view: ConsultationQaView,
 ): boolean {
-  return view.questions.some(consultationQuestionAcceptsReply);
+  return view.questions.some(
+    (item) => !item.ignored && consultationQuestionAcceptsReply(item),
+  );
 }
 
 export function buildConsultationQaView(input: {
@@ -375,6 +407,7 @@ export function buildConsultationQaView(input: {
       }
       return {
         ...item,
+        ignored: ignoredPrimaryIds.has(item.questionTurnId),
         resumeBullet: latestOfKind(
           item.statements,
           "RESUME_BULLET",
@@ -387,7 +420,6 @@ export function buildConsultationQaView(input: {
         ),
       };
     })
-    .filter((item) => !ignoredPrimaryIds.has(item.questionTurnId))
     .sort(
       (left, right) =>
         (sequenceById.get(left.questionTurnId) ?? 0) -

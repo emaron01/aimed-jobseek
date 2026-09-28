@@ -10,6 +10,7 @@ import { interviewConfig } from "./interview";
 import { outreachConfig } from "./outreach";
 import { applicationWorkspaceCopy, vocab } from "./vocabulary";
 import type { ApplicationStepKey } from "./application-steps";
+import { isGatedSurfaceEnabled } from "./feature-access";
 
 export const harperActionTypes = Object.freeze({
   start_consultation: `Start with ${consultationConfig.displayName}`,
@@ -47,7 +48,9 @@ export function harperActionTypesForStep(
     case "company":
       return ["review_company", "start_consultation"];
     case "job":
-      return ["review_job", "review_fit", "start_consultation"];
+      return isGatedSurfaceEnabled("employerIcpFit")
+        ? ["review_job", "review_fit", "start_consultation"]
+        : ["review_job", "start_consultation"];
     case "consultation":
       return [
         "review_job",

@@ -54,9 +54,10 @@ function seeker(id: string, body: string, sequence: number, targetKey: string) {
   };
 }
 
-describe("Harper ten-question coach", () => {
-  it("drafts at most 10 questions in one step and lists each as collapsible", () => {
-    expect(consultationConfig.roundSize).toBe(10);
+describe("Harper question-limit coach", () => {
+  it("drafts at most the application question limit in one step and lists each as collapsible", () => {
+    expect(consultationConfig.roundSize).toBe(25);
+    expect(consultationConfig.applicationQuestionLimit).toBe(25);
     expect(consultationConfig.maxFollowUpsPerTarget).toBe(1);
     const drafted = Array.from({ length: 12 }, (_, index) => ({
       id: `q${index}`,
@@ -85,7 +86,8 @@ describe("Harper ten-question coach", () => {
     expect(consultationConversationCopy.ignoreQuestion).toBe("Ignore");
   });
 
-  it("removes an ignored question from the seeker list permanently", () => {
+  it("keeps an ignored question on the list with Ignored state until reopened", () => {
+    // Batch A: ignored questions stay visible with an Ignored reopen link (PO decision 3).
     const view = buildConsultationQaView({
       turns: [
         question,
@@ -106,8 +108,18 @@ describe("Harper ten-question coach", () => {
       ],
       statements: [],
     });
-    expect(view.questions.map((item) => item.questionTurnId)).toEqual(["q2"]);
-    expect(view.questions.some((item) => item.questionTurnId === "q1")).toBe(false);
+    expect(view.questions.map((item) => item.questionTurnId)).toEqual(["q1", "q2"]);
+    expect(view.questions.find((item) => item.questionTurnId === "q1")?.ignored).toBe(
+      true,
+    );
+    expect(view.questions.find((item) => item.questionTurnId === "q2")?.ignored).toBe(
+      false,
+    );
+    expect(
+      consultationQuestionAcceptsReply(
+        view.questions.find((item) => item.questionTurnId === "q1")!,
+      ),
+    ).toBe(false);
   });
 
   it("hides legacy Not accurate seeker turns from the thread", () => {
@@ -271,7 +283,9 @@ describe("Harper ten-question coach", () => {
     expect(thread).toContain("consultation-seeker-turn");
     expect(thread).toContain("editConsultationAnswerAction");
     expect(thread).toContain("consultationConversationCopy.yourReply");
-    expect(thread).toContain("consultationConversationCopy.addAnotherReply");
+    expect(thread).toContain("consultationConversationCopy.editAnswer");
+    expect(thread).toContain("consultation-edit-reply");
+    expect(thread).not.toContain("consultationConversationCopy.addAnotherReply");
     expect(thread).toContain("approveConsultationQaResultAction");
     expect(thread).toContain("regenerateConsultationQaResultAction");
     expect(thread).toContain("consultationConversationCopy.approve");
@@ -279,8 +293,8 @@ describe("Harper ten-question coach", () => {
     expect(consultationConversationCopy.approve).toBe("Approve");
     expect(polishCopy.regenerate).toBe("Regenerate");
     const card = thread.slice(thread.indexOf("function QuestionCard"));
-    const resultIndex = card.indexOf("{hasResult ? (");
-    const repliesIndex = card.indexOf("<SeekerRepliesSection");
+    const resultIndex = card.indexOf("{hasResult && !item.ignored ? (");
+    const repliesIndex = card.indexOf("{!item.ignored ? (\n          <SeekerRepliesSection");
     const followUpIndex = card.indexOf("consultation-follow-up");
     expect(resultIndex).toBeGreaterThan(-1);
     expect(repliesIndex).toBeGreaterThan(resultIndex);
@@ -577,12 +591,14 @@ describe("Harper ten-question coach", () => {
     expect(section).toContain("threadStatus");
   });
 
-  it("keeps Where you stand below the questions and has no Harper-page navigation", () => {
+  it("keeps Where you stand above the questions and has no Harper-page navigation", () => {
+    // Batch A: standing moves above General / interviewer questions (plan report).
     const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
+    const render = section.slice(section.indexOf("return ("));
     expect(section).not.toContain("HarperSuggestionList");
     expect(section).toContain("consultation-standing-panel");
-    expect(section.indexOf("ConsultationThread")).toBeLessThan(
-      section.indexOf("consultation-standing-panel"),
+    expect(render.indexOf("consultation-standing-panel")).toBeLessThan(
+      render.indexOf("<ConsultationThread"),
     );
     expect(section).toContain("consultationConversationCopy.whereYouStand");
     const service = readFileSync("src/lib/consultation/service.ts", "utf8");

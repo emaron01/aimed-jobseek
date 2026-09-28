@@ -5,8 +5,8 @@
 import { applicationWorkspaceCopy, vocab } from "./vocabulary";
 export const consultationConfig = Object.freeze({
   displayName: "Harper",
-  roundSize: 10,
-  applicationQuestionLimit: 10,
+  roundSize: 25,
+  applicationQuestionLimit: 25,
   maxFollowUpsPerTarget: 1,
   qualityRegenerationAttempts: 2,
   interviewAnswerMaxWords: 220,
@@ -62,6 +62,7 @@ export const consultationStatementLabels = Object.freeze({
 
 export const consultationConversationCopy = Object.freeze({
   whereYouStand: "Where you stand",
+  generalQuestions: "General questions",
   expandEvidence: "Expand evidence",
   collapseEvidence: "Collapse evidence",
   expandAllEvidence: "Expand all",
@@ -71,6 +72,8 @@ export const consultationConversationCopy = Object.freeze({
     "Add anything you have about this gap. Harper will use your Personal Profile and this note.",
   threadReply: "Reply",
   addAnotherReply: "Add another reply",
+  answerGap: "Answer",
+  ignoredGap: "Ignored",
   seekerSpeaker: "You",
   yourAnswer: "Your answer",
   yourReply: "Your reply",
@@ -80,6 +83,9 @@ export const consultationConversationCopy = Object.freeze({
   hideYourReplies: "Hide your replies",
   skipQuestion: "Skip",
   ignoreQuestion: "Ignore",
+  questionIgnored: "Ignored",
+  gapIgnored: "Ignored",
+  reopenIgnored: "Ignored",
   coachingDisclaimer:
     "Harper's coaching and suggestions to help you prepare and strengthen your interview skills.",
   approve: "Approve",
@@ -100,6 +106,7 @@ export const consultationConversationCopy = Object.freeze({
   typing: `${consultationConfig.displayName} is thinking…`,
   thinking: `${consultationConfig.displayName} is thinking…`,
   whyThisCompanyTarget: "Why you want to work at this company",
+  careerWalkThroughTarget: "Career walk-through",
   knowAboutMe: "Missing relevant experience for this role? Add it here",
   knowAboutMeHelp:
     `Tell ${consultationConfig.displayName} background that is not already in your ${vocab.product.singular}, for example experience that was left off the resume. This is saved as a seeker-stated fact and applies to every application.`,

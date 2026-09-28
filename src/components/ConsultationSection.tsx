@@ -15,9 +15,18 @@ import {
 import {
   buildConsultationQaView,
   consultationHasUnansweredQuestions,
+  consultationQuestionAcceptsReply,
+  isTargetCurrentlyIgnored,
   latestClosingNote,
   latestCoachingNoteForTarget,
 } from "@/lib/consultation/qa-view";
+import {
+  buildHarperQaLayout,
+  collectRenderedHarperQuestionTurnIds,
+  harperContentRenderCoverage,
+  partitionGeneralQuestionsForStanding,
+  type HarperInterviewerOrderItem,
+} from "@/lib/consultation/harper-layout";
 import {
   buildStandingGaps,
   qaItemForTargetKey,
@@ -123,7 +132,7 @@ export async function ConsultationSection({
   canEdit: boolean;
   jobs?: WorkspaceJobStatusView[];
 }) {
-  const [session, campaign] = await Promise.all([
+  const [session, campaign, stages] = await Promise.all([
     prisma.consultationSession.findFirst({
       where: { campaignId, organizationId },
       include: {
@@ -136,12 +145,41 @@ export async function ConsultationSection({
       where: { id: campaignId, organizationId },
       select: { product: { select: { profileJson: true } } },
     }),
+    prisma.interviewStage.findMany({
+      where: { campaignId, organizationId },
+      orderBy: [{ scheduledAt: "asc" }, { sortOrder: "asc" }],
+      select: {
+        scheduledAt: true,
+        interviewers: {
+          select: {
+            contact: {
+              select: { id: true, firstName: true, lastName: true, title: true },
+            },
+          },
+        },
+      },
+    }),
   ]);
   const parsed = campaign?.product.profileJson
     ? parseCandidateProfileSafe(campaign.product.profileJson)
     : { ok: true as const, profile: emptyCandidateProfile() };
   const profileItems = parsed.ok ? profileEvidenceItems(parsed.profile) : [];
   const personPreps = await listPersonPreps({ organizationId, campaignId });
+  const interviewerOrder = new Map<string, HarperInterviewerOrderItem>();
+  for (const stage of stages) {
+    const sortAt = stage.scheduledAt.getTime();
+    for (const row of stage.interviewers) {
+      const contactId = row.contact.id;
+      const heading =
+        [row.contact.firstName, row.contact.lastName].filter(Boolean).join(" ").trim() ||
+        row.contact.title?.trim() ||
+        interviewConfig.labels.interviewer;
+      const existing = interviewerOrder.get(contactId);
+      if (!existing || existing.sortAt == null || sortAt < existing.sortAt) {
+        interviewerOrder.set(contactId, { contactId, heading, sortAt });
+      }
+    }
+  }
   const briefing = session
     ? consultationBriefingSchema.safeParse(session.briefingJson)
     : null;
@@ -236,6 +274,7 @@ export async function ConsultationSection({
       );
       return {
         id: item.id,
+        targetKey: item.targetKey,
         text: item.text,
         strength: item.strength as "STRONG" | "PARTIAL" | "NONE",
         explanation: item.explanation
@@ -257,8 +296,6 @@ export async function ConsultationSection({
           : null,
       };
     }) ?? [];
-  const hasStanding =
-    briefing?.success || standingRequirements.length > 0;
   const unanswered = consultationHasUnansweredQuestions(qaView);
   const standingGaps = session
     ? buildStandingGaps({
@@ -289,6 +326,58 @@ export async function ConsultationSection({
         questions: qaView.questions,
       })
     : [];
+  const qaLayout = buildHarperQaLayout({
+    questions: qaView.questions,
+    interviewers: [...interviewerOrder.values()],
+  });
+  const requirementLabels = new Map(
+    (session?.assessments ?? []).map((item) => [item.targetKey, item.text]),
+  );
+  const standingInline = partitionGeneralQuestionsForStanding({
+    general: qaLayout.general,
+    requirementTargetKeys: standingRequirements.map((item) => item.targetKey),
+    requirementLabels,
+  });
+  const orphanedStandingRequirements = standingInline.orphanedRequirementTopics.map(
+    (topic) => ({
+      id: `orphaned:${topic.targetKey}`,
+      targetKey: topic.targetKey,
+      text: topic.label,
+      strength: null as const,
+      explanation: null,
+      gapStatus: null,
+      facts: [] as Array<{ id: string; label: string; detail: string | null }>,
+      experience: null,
+    }),
+  );
+  const standingRequirementsForUi = [
+    ...standingRequirements,
+    ...orphanedStandingRequirements,
+  ];
+  const requirementQuestionsForUi = [
+    ...standingInline.byRequirementKey.entries(),
+    ...standingInline.orphanedRequirementTopics.map(
+      (topic) => [topic.targetKey, topic.questions] as const,
+    ),
+  ].map(([targetKey, questions]) => ({
+    targetKey,
+    questions,
+  }));
+  // Render-time invariant (tested): every contentful Harper item is placed.
+  // STOP leftovers stay in standingInline.unmapped for the report — never "Other".
+  void harperContentRenderCoverage({
+    questions: qaView.questions,
+    renderedQuestionTurnIds: collectRenderedHarperQuestionTurnIds({
+      interviewers: qaLayout.interviewers,
+      dedicatedTopics: standingInline.dedicatedTopics,
+      byRequirementKey: standingInline.byRequirementKey,
+      orphanedRequirementTopics: standingInline.orphanedRequirementTopics,
+    }),
+  });
+  const hasStanding =
+    briefing?.success ||
+    standingRequirementsForUi.length > 0 ||
+    standingInline.dedicatedTopics.length > 0;
   const standingComplete = standingWorkIsComplete({
     gaps: standingGaps,
     unansweredQuestions: unanswered,
@@ -417,58 +506,14 @@ export async function ConsultationSection({
             </ApplicationActionForm>
           </div>
         ) : null}
-        {session && !failed ? (
-          <ConsultationThread
-            campaignId={campaignId}
-            canEdit={canEdit}
-            sessionStatus={threadStatus}
-            jobsActive={consultationBusy}
-            turns={threadTurns}
-            statements={threadStatements}
-          />
-        ) : null}
-        {canEdit && session?.status === "IN_PROGRESS" && !failed ? (
-          <div className="flex flex-wrap gap-3">
-            <ApplicationActionForm
-              action={pauseConsultationAction}
-              submitLabel="Pause"
-              testId="pause-consultation"
-            >
-              <input type="hidden" name="campaignId" value={campaignId} />
-            </ApplicationActionForm>
-            <ApplicationActionForm
-              action={completeConsultationAction}
-              submitLabel="Done"
-              testId="done-consultation"
-            >
-              <input type="hidden" name="campaignId" value={campaignId} />
-            </ApplicationActionForm>
-            <ApplicationActionForm
-              action={skipConsultationAction}
-              submitLabel="Skip the rest"
-              testId="skip-consultation-open"
-            >
-              <input type="hidden" name="campaignId" value={campaignId} />
-            </ApplicationActionForm>
-          </div>
-        ) : null}
-        {canEdit && (threadStatus === "PAUSED" || threadStatus === "SKIPPED") ? (
-          <ApplicationActionForm
-            action={resumeConsultationAction}
-            submitLabel="Resume"
-            testId="resume-consultation"
-          >
-            <input type="hidden" name="campaignId" value={campaignId} />
-          </ApplicationActionForm>
-        ) : null}
         {hasStanding ? (
-          <details
+          <section
             className="rounded-md border border-edge bg-canvas p-4"
             data-testid="consultation-standing-panel"
           >
-            <summary className="cursor-pointer text-sm font-semibold text-ink">
+            <h3 className="text-sm font-semibold text-ink">
               {consultationConversationCopy.whereYouStand}
-            </summary>
+            </h3>
             <div className="mt-4 space-y-4">
               {briefing?.success ? (
                 <div className="space-y-2" data-testid="consultation-briefing">
@@ -481,7 +526,9 @@ export async function ConsultationSection({
                   </ul>
                 </div>
               ) : null}
-              {session && standingRequirements.length > 0 ? (
+              {session &&
+              (standingRequirementsForUi.length > 0 ||
+                standingInline.dedicatedTopics.length > 0) ? (
                 <ConsultationStanding
                   campaignId={campaignId}
                   canEdit={canEdit}
@@ -490,6 +537,8 @@ export async function ConsultationSection({
                     threadStatus !== "PAUSED" &&
                     !consultationBusy
                   }
+                  sessionStatus={threadStatus}
+                  jobsActive={consultationBusy}
                   overall={
                     briefing?.success
                       ? stripInternalIdsFromDisplayText(briefing.data.overall)
@@ -500,6 +549,15 @@ export async function ConsultationSection({
                       qaView.questions,
                       gap.targetKey,
                     );
+                    const ignored =
+                      Boolean(item?.ignored) ||
+                      isTargetCurrentlyIgnored(threadTurns, gap.targetKey);
+                    const answerableQuestionTurnId =
+                      item &&
+                      !item.ignored &&
+                      consultationQuestionAcceptsReply(item)
+                        ? item.questionTurnId
+                        : null;
                     const harperNote = latestCoachingNoteForTarget(
                       threadTurns,
                       gap.targetKey,
@@ -513,6 +571,8 @@ export async function ConsultationSection({
                         ? stripInternalIdsFromDisplayText(harperNote)
                         : null,
                       questionTurnId: item?.questionTurnId ?? null,
+                      answerableQuestionTurnId,
+                      ignored,
                       resumeBullet: item?.resumeBullet
                         ? {
                             ...item.resumeBullet,
@@ -555,7 +615,9 @@ export async function ConsultationSection({
                     };
                   })}
                   careerRecap={null}
-                  requirements={standingRequirements}
+                  requirements={standingRequirementsForUi}
+                  dedicatedTopics={standingInline.dedicatedTopics}
+                  requirementQuestions={requirementQuestionsForUi}
                 />
               ) : (
                 <p className="text-sm text-muted">
@@ -563,7 +625,52 @@ export async function ConsultationSection({
                 </p>
               )}
             </div>
-          </details>
+          </section>
+        ) : null}
+        {session && !failed ? (
+          <ConsultationThread
+            campaignId={campaignId}
+            canEdit={canEdit}
+            sessionStatus={threadStatus}
+            jobsActive={consultationBusy}
+            turns={threadTurns}
+            statements={threadStatements}
+            interviewerSections={qaLayout.interviewers}
+          />
+        ) : null}
+        {canEdit && session?.status === "IN_PROGRESS" && !failed ? (
+          <div className="flex flex-wrap gap-3">
+            <ApplicationActionForm
+              action={pauseConsultationAction}
+              submitLabel="Pause"
+              testId="pause-consultation"
+            >
+              <input type="hidden" name="campaignId" value={campaignId} />
+            </ApplicationActionForm>
+            <ApplicationActionForm
+              action={completeConsultationAction}
+              submitLabel="Done"
+              testId="done-consultation"
+            >
+              <input type="hidden" name="campaignId" value={campaignId} />
+            </ApplicationActionForm>
+            <ApplicationActionForm
+              action={skipConsultationAction}
+              submitLabel="Skip the rest"
+              testId="skip-consultation-open"
+            >
+              <input type="hidden" name="campaignId" value={campaignId} />
+            </ApplicationActionForm>
+          </div>
+        ) : null}
+        {canEdit && (threadStatus === "PAUSED" || threadStatus === "SKIPPED") ? (
+          <ApplicationActionForm
+            action={resumeConsultationAction}
+            submitLabel="Resume"
+            testId="resume-consultation"
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+          </ApplicationActionForm>
         ) : null}
       </section>
     </>

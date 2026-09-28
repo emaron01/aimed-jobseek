@@ -73,8 +73,9 @@ describe("no AI on page view / skip unchanged / research cost", () => {
 
     expect(stages).toContain("notesTextChanged");
     expect(interviewAction).toContain("updated.notesTextChanged");
+    expect(interviewAction).not.toContain("regenerateApplicationJobRequirement");
     expect(interviewAction).toMatch(
-      /if \(updated\.notesTextChanged\)[\s\S]*regenerateApplicationJobRequirement/,
+      /if \(updated\.notesTextChanged\)[\s\S]*CONSULTATION/,
     );
 
     expect(contactProfile).toContain("queued: false");
@@ -155,5 +156,61 @@ describe("no AI on page view / skip unchanged / research cost", () => {
     expect(companyResearch).toContain("campaignId: options?.campaignId");
     expect(companyResearch).toContain("tokensRecordedPerStage: true");
     expect(runs).toContain("campaignId: run.campaignId");
+  });
+
+  it("Harper consultation page render enqueues no job and makes no paid call", () => {
+    const page = src("src/app/(app)/campaigns/[id]/consultation/page.tsx");
+    const section = src("src/components/ConsultationSection.tsx");
+    const thread = src("src/components/ConsultationThread.tsx");
+    const standing = src("src/components/ConsultationStanding.tsx");
+
+    expect(page).toContain("ConsultationSection");
+    expect(page).toContain("getApplicationWorkspaceLive");
+    expect(page).not.toContain("enqueueApplicationJob");
+    expect(page).not.toContain("runPaidStructuredCall");
+    expect(page).not.toContain("startConsultation");
+    expect(page).not.toContain("planAndStoreRound");
+
+    expect(section).not.toContain("enqueueApplicationJob");
+    expect(section).not.toContain("runPaidStructuredCall");
+    expect(section).not.toContain("reassessConsultationStanding");
+    expect(section).not.toContain("startConsultation(");
+    expect(section).not.toContain("planAndStoreRound");
+    expect(section).not.toContain("shouldEnqueueConsultationStandingRegen");
+    expect(section).toContain("buildHarperQaLayout");
+    expect(section).toContain("partitionGeneralQuestionsForStanding");
+    expect(section).toContain("consultationBusy");
+    expect(page).toContain("jobs={live.jobs}");
+
+    expect(thread).not.toContain("enqueueApplicationJob");
+    expect(thread).not.toContain("runPaidStructuredCall");
+    expect(standing).not.toContain("enqueueApplicationJob");
+    expect(standing).not.toContain("runPaidStructuredCall");
+    expect(standing).toContain("QuestionList");
+  });
+
+  it("Stage and Outreach page render enqueue no job and make no paid call", () => {
+    const interviewsPage = src("src/app/(app)/campaigns/[id]/interviews/page.tsx");
+    const outreachPage = src("src/app/(app)/campaigns/[id]/outreach/page.tsx");
+    const stages = src("src/components/InterviewStagesSection.tsx");
+    const panel = src("src/components/InterviewStagePanel.tsx");
+    const outreach = src("src/components/ApplicationOutreachSections.tsx");
+
+    expect(interviewsPage).not.toContain("enqueueApplicationJob");
+    expect(interviewsPage).not.toContain("runPaidStructuredCall");
+    expect(outreachPage).not.toContain("enqueueApplicationJob");
+    expect(outreachPage).not.toContain("runPaidStructuredCall");
+
+    expect(stages).not.toContain("enqueueApplicationJob");
+    expect(stages).not.toContain("runPaidStructuredCall");
+    expect(panel).not.toContain("enqueueApplicationJob");
+    expect(panel).not.toContain("runPaidStructuredCall");
+    // Removing Stage UI must not call summary/consultation enqueue on render
+    expect(stages).not.toContain("getApplicationSummaryView");
+    expect(stages).not.toContain("enqueueInterviewerCheatSheetSection");
+    expect(stages).not.toContain("offerPersonPrep");
+
+    expect(outreach).not.toContain("enqueueApplicationJob");
+    expect(outreach).not.toContain("runPaidStructuredCall");
   });
 });

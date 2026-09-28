@@ -8,18 +8,21 @@ import {
   replyConsultationAction,
   skipConsultationQuestionAction,
   ignoreConsultationQuestionAction,
+  reopenIgnoredConsultationTargetAction,
 } from "@/app/actions/consultation";
-import { AppButton } from "@/components/AppButton";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import {
-  consultationConfig,
   consultationConversationCopy,
   consultationStatementLabels,
   polishCopy,
 } from "@/lib/product-config";
 import { stripInternalIdsFromDisplayText } from "@/lib/consultation/evidence-display";
 import {
-  buildConsultationQaView,
+  harperContactAnchorId,
+  harperQuestionAnchorId,
+  type HarperInterviewerSection,
+} from "@/lib/consultation/harper-layout";
+import {
   consultationQuestionAcceptsReply,
   consultationReplyTargetKey,
   type ConsultationQaItem,
@@ -29,6 +32,8 @@ import {
 
 const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
 const wrapClass = "min-w-0 overflow-hidden break-words whitespace-pre-wrap";
+const textLinkClass =
+  "cursor-pointer text-sm font-medium text-ink underline decoration-ink underline-offset-2";
 
 export type ThreadTurn = QaTurn;
 export type ThreadStatement = QaStatement;
@@ -176,16 +181,19 @@ function SeekerRepliesSection({
   if (answers.length === 0) return null;
   return (
     <div className="space-y-2" data-testid="consultation-seeker-answers">
-      <AppButton
-        type="button"
-        className="text-sm font-medium text-ink underline"
+      <a
+        href="#harper-toggle-replies"
+        className={textLinkClass}
         data-testid="consultation-toggle-replies"
-        onClick={() => setOpen((value) => !value)}
+        onClick={(event) => {
+          event.preventDefault();
+          setOpen((value) => !value);
+        }}
       >
         {open
           ? consultationConversationCopy.hideYourReplies
           : consultationConversationCopy.showYourReplies}
-      </AppButton>
+      </a>
       {open
         ? answers.map((answer) => (
             <SeekerAnswerEntry
@@ -197,6 +205,71 @@ function SeekerRepliesSection({
           ))
         : null}
     </div>
+  );
+}
+
+function QuestionReplyForm({
+  campaignId,
+  item,
+  onSubmitStart,
+}: {
+  campaignId: string;
+  item: ConsultationQaItem;
+  onSubmitStart: (answer: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const hasPriorReply = item.seekerAnswers.length > 0;
+  const replyKey = consultationReplyTargetKey(item.questionTurnId);
+
+  if (hasPriorReply && !editing) {
+    return (
+      <a
+        href={`#${harperQuestionAnchorId(item.questionTurnId)}`}
+        className={textLinkClass}
+        data-testid="consultation-edit-reply"
+        onClick={(event) => {
+          event.preventDefault();
+          setEditing(true);
+        }}
+      >
+        {consultationConversationCopy.editAnswer}
+      </a>
+    );
+  }
+
+  return (
+    <ApplicationActionForm
+      action={replyConsultationAction}
+      submitLabel={
+        hasPriorReply
+          ? consultationConversationCopy.editAnswer
+          : consultationConversationCopy.threadReply
+      }
+      pendingLabel={consultationConversationCopy.thinking}
+      testId="consultation-reply"
+      onSubmitStart={(formData) => {
+        const answer = String(formData.get("answer") ?? "").trim();
+        if (!answer) return;
+        onSubmitStart(answer);
+      }}
+    >
+      <input type="hidden" name="campaignId" value={campaignId} />
+      <input type="hidden" name="targetKey" value={replyKey} />
+      <label className="block text-sm">
+        <span className="font-medium text-ink">
+          {hasPriorReply
+            ? consultationConversationCopy.editAnswer
+            : consultationConversationCopy.threadReply}
+        </span>
+        <textarea
+          name="answer"
+          required
+          rows={4}
+          className={fieldClass}
+          data-testid="consultation-reply-box"
+        />
+      </label>
+    </ApplicationActionForm>
   );
 }
 
@@ -216,17 +289,26 @@ function QuestionCard({
   onSubmitStart: (answer: string) => void;
 }) {
   const hasResult = Boolean(item.resumeBullet || item.talkingPoint);
-  const unanswered = !hasResult;
+  const unanswered = !hasResult && !item.ignored;
   const canAnswer =
     showReply &&
+    !item.ignored &&
     (consultationQuestionAcceptsReply(item) || Boolean(item.seekerAnswers.length));
   const canSkip = showReply && unanswered;
   const canIgnore = showReply && unanswered;
   const replyKey = consultationReplyTargetKey(item.questionTurnId);
   return (
     <article
+      id={harperQuestionAnchorId(item.questionTurnId)}
       className="min-w-0 overflow-hidden rounded-md border border-edge bg-canvas p-4"
-      data-testid={hasResult ? "consultation-answered" : "consultation-question-item"}
+      data-testid={
+        item.ignored
+          ? "consultation-ignored-question"
+          : hasResult
+            ? "consultation-answered"
+            : "consultation-question-item"
+      }
+      data-harper-question={item.questionTurnId}
     >
       <p
         className="text-sm font-medium text-ink"
@@ -235,12 +317,12 @@ function QuestionCard({
         {stripInternalIdsFromDisplayText(item.question)}
       </p>
       <div className="mt-3 space-y-3">
-        {item.followUp ? (
+        {item.followUp && !item.ignored ? (
           <p className={`text-sm text-ink ${wrapClass}`} data-testid="consultation-follow-up">
             {stripInternalIdsFromDisplayText(item.followUp.text)}
           </p>
         ) : null}
-        {hasResult ? (
+        {hasResult && !item.ignored ? (
           <>
             {item.resumeBullet ? <ResultBody statement={item.resumeBullet} /> : null}
             {item.talkingPoint ? <ResultBody statement={item.talkingPoint} /> : null}
@@ -253,38 +335,19 @@ function QuestionCard({
             ) : null}
           </>
         ) : null}
-        <SeekerRepliesSection
-          campaignId={campaignId}
-          canEdit={canEdit && showReply}
-          answers={item.seekerAnswers}
-        />
+        {!item.ignored ? (
+          <SeekerRepliesSection
+            campaignId={campaignId}
+            canEdit={canEdit && showReply}
+            answers={item.seekerAnswers}
+          />
+        ) : null}
         {canAnswer ? (
-          <ApplicationActionForm
-            action={replyConsultationAction}
-            submitLabel={
-              item.seekerAnswers.length > 0
-                ? consultationConversationCopy.addAnotherReply
-                : consultationConversationCopy.threadReply
-            }
-            pendingLabel={consultationConversationCopy.thinking}
-            testId="consultation-reply"
-            onSubmitStart={(formData) => {
-              const answer = String(formData.get("answer") ?? "").trim();
-              if (!answer) return;
-              onSubmitStart(answer);
-            }}
-          >
-            <input type="hidden" name="campaignId" value={campaignId} />
-            <input type="hidden" name="targetKey" value={replyKey} />
-            <label className="block text-sm">
-              <span className="font-medium text-ink">
-                {item.seekerAnswers.length > 0
-                  ? consultationConversationCopy.addAnotherReply
-                  : consultationConversationCopy.threadReply}
-              </span>
-              <textarea name="answer" required rows={4} className={fieldClass} />
-            </label>
-          </ApplicationActionForm>
+          <QuestionReplyForm
+            campaignId={campaignId}
+            item={item}
+            onSubmitStart={onSubmitStart}
+          />
         ) : null}
         {canSkip ? (
           <ApplicationActionForm
@@ -310,6 +373,29 @@ function QuestionCard({
             <input type="hidden" name="targetKey" value={replyKey} />
           </ApplicationActionForm>
         ) : null}
+        {item.ignored && canEdit && showReply ? (
+          <ApplicationActionForm
+            action={reopenIgnoredConsultationTargetAction}
+            submitLabel={consultationConversationCopy.reopenIgnored}
+            pendingLabel={consultationConversationCopy.thinking}
+            testId={`reopen-ignored-question-${item.questionTurnId}`}
+            hideSubmit
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+            <input type="hidden" name="targetKey" value={replyKey} />
+            <a
+              href="#harper-reopen-ignored"
+              className={textLinkClass}
+              data-testid={`reopen-ignored-question-${item.questionTurnId}-link`}
+              onClick={(event) => {
+                event.preventDefault();
+                event.currentTarget.closest("form")?.requestSubmit();
+              }}
+            >
+              {consultationConversationCopy.reopenIgnored}
+            </a>
+          </ApplicationActionForm>
+        ) : null}
         {pending ? (
           <div
             className="flex items-center gap-2 text-sm text-muted"
@@ -328,35 +414,27 @@ function QuestionCard({
   );
 }
 
-export function ConsultationThread({
+/** Shared open/answered question cards for Harper thread and Where you stand inline topics. */
+export function QuestionList({
   campaignId,
   canEdit,
-  sessionStatus,
+  questions,
+  showReply,
+  pendingTarget,
   jobsActive,
-  turns,
-  statements,
+  onSubmitStart,
 }: {
   campaignId: string;
   canEdit: boolean;
-  sessionStatus: string;
+  questions: ConsultationQaItem[];
+  showReply: boolean;
+  pendingTarget: string | null;
   jobsActive: boolean;
-  turns: ThreadTurn[];
-  statements: ThreadStatement[];
+  onSubmitStart: (replyKey: string, answer: string) => void;
 }) {
-  const [pendingTarget, setPendingTarget] = useState<string | null>(null);
-  const view = buildConsultationQaView({ turns, statements });
-  const showReply =
-    canEdit &&
-    sessionStatus !== "SKIPPED" &&
-    sessionStatus !== "PAUSED" &&
-    !jobsActive;
-
   return (
-    <div className="min-w-0 space-y-3 overflow-hidden" data-testid="consultation-thread">
-      <p className="text-xs font-medium uppercase tracking-wide text-subtle">
-        {consultationConfig.displayName}
-      </p>
-      {view.questions.map((item) => (
+    <>
+      {questions.map((item) => (
         <QuestionCard
           key={item.questionTurnId}
           campaignId={campaignId}
@@ -368,10 +446,65 @@ export function ConsultationThread({
             jobsActive
           }
           onSubmitStart={(answer) => {
-            setPendingTarget(consultationReplyTargetKey(item.questionTurnId));
-            void answer;
+            onSubmitStart(consultationReplyTargetKey(item.questionTurnId), answer);
           }}
         />
+      ))}
+    </>
+  );
+}
+
+export function ConsultationThread({
+  campaignId,
+  canEdit,
+  sessionStatus,
+  jobsActive,
+  interviewerSections,
+}: {
+  campaignId: string;
+  canEdit: boolean;
+  sessionStatus: string;
+  jobsActive: boolean;
+  turns: ThreadTurn[];
+  statements: ThreadStatement[];
+  interviewerSections?: HarperInterviewerSection[];
+}) {
+  const [pendingTarget, setPendingTarget] = useState<string | null>(null);
+  const interviewers = interviewerSections ?? [];
+  const showReply =
+    canEdit &&
+    sessionStatus !== "SKIPPED" &&
+    sessionStatus !== "PAUSED" &&
+    !jobsActive;
+
+  if (interviewers.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="min-w-0 space-y-6 overflow-hidden" data-testid="consultation-thread">
+      {interviewers.map((section) => (
+        <section
+          key={section.contactId}
+          id={harperContactAnchorId(section.contactId)}
+          className="min-w-0 space-y-3"
+          data-testid="harper-interviewer-section"
+          data-harper-contact={section.contactId}
+        >
+          <h3 className="text-sm font-semibold text-ink">{section.heading}</h3>
+          <QuestionList
+            campaignId={campaignId}
+            canEdit={canEdit}
+            questions={section.questions}
+            showReply={showReply}
+            pendingTarget={pendingTarget}
+            jobsActive={jobsActive}
+            onSubmitStart={(replyKey, answer) => {
+              setPendingTarget(replyKey);
+              void answer;
+            }}
+          />
+        </section>
       ))}
     </div>
   );

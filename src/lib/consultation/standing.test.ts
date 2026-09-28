@@ -86,7 +86,7 @@ describe("Harper core loop standing", () => {
     ]);
   });
 
-  it("keeps an open gap with Share some details after its question is ignored", () => {
+  it("keeps an open gap after its question is ignored so standing can show Ignored", () => {
     const standing = buildStandingGaps({
       assessments: [
         gap({
@@ -108,8 +108,12 @@ describe("Harper core loop standing", () => {
     ]);
     expect(consultationGapStatusCopy.open).toBeTruthy();
     const standingUi = readFileSync("src/components/ConsultationStanding.tsx", "utf8");
+    expect(standingUi).toContain("reopenIgnored");
+    // Batch B2: Answer jump link removed; question cards render inline under the requirement.
+    expect(standingUi).not.toContain("answerGap");
     expect(standingUi).toContain("shareSomeDetails");
-    expect(standingUi).toContain('gap.status === "open"');
+    expect(standingUi).toContain("ignoreQuestion");
+    expect(standingUi).toContain("QuestionList");
   });
 
   it("shows each gap's status and never tells the seeker to go close it", () => {
