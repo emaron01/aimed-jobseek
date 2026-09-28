@@ -48,6 +48,8 @@ import {
   consultationQuestionAcceptsReply,
   consultationReplyTargetKey,
   findConsultationQaItem,
+  isIgnoredSeekerTurn,
+  isTargetCurrentlyIgnored,
   parseConsultationReplyTarget,
   replyToTurnIdFromAnalysis,
   resolveReplyableQaItem,
@@ -2180,7 +2182,7 @@ function replyCouldNotBeRecorded(): never {
   throw new TenantError(consultationConversationCopy.replyFailed);
 }
 
-function analysisIsComplete(value: unknown): boolean {
+export function analysisIsComplete(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
   const status = (value as { status?: unknown }).status;
   return status !== "FAILED" && status !== "PENDING";
@@ -2383,6 +2385,12 @@ export async function processConsultationReply(input: {
     throw new TenantError(consultationConversationCopy.notAcceptingReplies);
   }
   let { turns, view } = await loadSessionQaView(session.id);
+  if (input.turnId) {
+    const targeted = turns.find((turn) => turn.id === input.turnId);
+    if (targeted && analysisIsComplete(targeted.analysisJson)) {
+      return;
+    }
+  }
   let seekerTurn = input.turnId
     ? turns.find((turn) => turn.id === input.turnId)
     : [...turns].reverse().find(
@@ -2831,7 +2839,7 @@ export async function skipConsultationQuestion(input: {
   await finishIfPlanningIsComplete(session.id, next);
 }
 
-/** Permanently dismiss a Harper question for this application; the gap stays open. */
+/** Dismiss a Harper question or an open gap without a question. No paid call. */
 export async function ignoreConsultationQuestion(input: {
   organizationId: string;
   campaignId: string;
@@ -2844,60 +2852,89 @@ export async function ignoreConsultationQuestion(input: {
     throw new TenantError(consultationConversationCopy.notAcceptingReplies);
   }
   const { turns, view } = await loadSessionQaView(session.id);
-  const item = resolveReplyableQaItem(view, input.targetKey);
-  const question = item ? consultantForQaItem(turns, item) : null;
-  if (!item || !question) replyCouldNotBeRecorded();
+  const replyable = resolveReplyableQaItem(view, input.targetKey);
+  if (replyable) {
+    const question = consultantForQaItem(turns, replyable);
+    if (!question) replyCouldNotBeRecorded();
+    await addTurn({
+      organizationId: input.organizationId,
+      sessionId: session.id,
+      speaker: "SEEKER",
+      body: "",
+      targetKey: question.targetKey ?? replyable.targetKey ?? input.targetKey,
+      skipped: true,
+      seekerAuthored: true,
+      analysisJson: {
+        status: "READY",
+        replyToTurnId: replyable.questionTurnId,
+        ignored: true,
+      },
+    });
+    return;
+  }
+  const found = findConsultationQaItem(view, input.targetKey);
+  if (found?.ignored) return;
+  if (found) replyCouldNotBeRecorded();
+
+  const gapKey = input.targetKey.trim();
+  if (!gapKey || gapKey.startsWith("question:")) {
+    replyCouldNotBeRecorded();
+  }
+  if (isTargetCurrentlyIgnored(turns, gapKey)) return;
+  const assessment = await prisma.consultationAssessment.findFirst({
+    where: { sessionId: session.id, targetKey: gapKey },
+    select: { id: true },
+  });
+  if (!assessment) replyCouldNotBeRecorded();
   await addTurn({
     organizationId: input.organizationId,
     sessionId: session.id,
     speaker: "SEEKER",
     body: "",
-    targetKey: question.targetKey ?? input.targetKey,
+    targetKey: gapKey,
     skipped: true,
     seekerAuthored: true,
     analysisJson: {
       status: "READY",
-      replyToTurnId: item.questionTurnId,
       ignored: true,
     },
   });
-  const refreshed = await loadSessionQaView(session.id);
-  if (consultationHasUnansweredQuestions(refreshed.view)) return;
-  const { campaign, requirement, profile } = await requireApplication(
-    input.organizationId,
-    input.campaignId,
-  );
-  const stored = await prisma.consultationAssessment.findMany({
-    where: { sessionId: session.id },
+}
+
+/**
+ * Reopen an ignored question or gap. Restores the original question card when
+ * one existed; otherwise restores Share-some-details. No paid call, no new question.
+ */
+export async function reopenIgnoredConsultationTarget(input: {
+  organizationId: string;
+  campaignId: string;
+  targetKey: string;
+}): Promise<void> {
+  const session = await prisma.consultationSession.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
-  const assessments = stored.map(storedAssessment);
-  const { askedKeys, skippedKeys } = askedAndSkipped(refreshed.turns);
-  markWhyThisCompanyAsked(askedKeys, {
-    campaignId: campaign.id,
-    whyThisCompany: campaign.whyThisCompany,
-    profile,
-  });
-  if (gapsAreCovered(assessments, skippedKeys)) {
-    await prisma.consultationSession.update({
-      where: { id: session.id },
-      data: { status: "DONE" },
-    });
-    await queueAssetsWhenConsultationEnds(session.id);
-    return;
+  if (!session || session.status !== "IN_PROGRESS") {
+    throw new TenantError(consultationConversationCopy.notAcceptingReplies);
   }
-  const roles = await loadCoachHiringTeam(input.organizationId, input.campaignId);
-  const next = await planAndStoreRound({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    sessionId: session.id,
-    askedKeys,
-    skippedKeys,
-    profile,
-    requirement,
-    targets: targetsFromRequirement(requirement),
-    roles,
+  const turns = await loadSessionTurns(session.id);
+  const { questionTurnId, raw } = parseConsultationReplyTarget(input.targetKey);
+  const gapKey = questionTurnId
+    ? turns.find((turn) => turn.id === questionTurnId)?.targetKey?.trim() || raw
+    : raw;
+  const ignoreTurns = turns.filter((turn) => {
+    if (!isIgnoredSeekerTurn(turn)) return false;
+    if (questionTurnId) {
+      return replyToTurnIdFromAnalysis(turn.analysisJson) === questionTurnId;
+    }
+    return turn.targetKey === gapKey;
   });
-  await finishIfPlanningIsComplete(session.id, next);
+  if (ignoreTurns.length === 0) return;
+  await prisma.consultationTurn.deleteMany({
+    where: {
+      sessionId: session.id,
+      id: { in: ignoreTurns.map((turn) => turn.id) },
+    },
+  });
 }
 
 function completeStoryFromAnalysis(value: unknown): {
@@ -3198,12 +3235,17 @@ export async function saveEditedConsultationStatement(input: {
   });
 }
 
-export async function editConsultationAnswer(input: {
+export async function recordConsultationAnswerEdit(input: {
   organizationId: string;
   campaignId: string;
   turnId: string;
   answer: string;
-}): Promise<void> {
+}): Promise<{
+  sessionId: string;
+  turnId: string;
+  targetKey: string;
+  questionTurnId: string;
+}> {
   const body = input.answer.trim();
   if (!body) throw new TenantError("Write an answer, or skip the question.");
   const turn = await prisma.consultationTurn.findFirst({
@@ -3221,21 +3263,82 @@ export async function editConsultationAnswer(input: {
   if (turn.session.status === "SKIPPED" || turn.session.status === "PAUSED") {
     throw new TenantError(consultationConversationCopy.notAcceptingReplies);
   }
+  const replyToTurnId = replyToTurnIdFromAnalysis(turn.analysisJson);
+  const prior =
+    turn.analysisJson && typeof turn.analysisJson === "object"
+      ? (turn.analysisJson as Record<string, unknown>)
+      : {};
   await prisma.consultationTurn.update({
     where: { id: turn.id },
-    data: { body },
+    data: {
+      body,
+      analysisJson: {
+        ...prior,
+        status: "PENDING",
+        ...(replyToTurnId ? { replyToTurnId } : {}),
+      },
+    },
   });
+  await prisma.consultationSession.update({
+    where: { id: turn.sessionId },
+    data: { generationStatus: "GENERATING", generationError: null },
+  });
+  return {
+    sessionId: turn.sessionId,
+    turnId: turn.id,
+    targetKey:
+      turn.targetKey ??
+      consultationReplyTargetKey(replyToTurnId ?? ""),
+    questionTurnId: replyToTurnId ?? "",
+  };
+}
+
+export async function editConsultationAnswer(input: {
+  organizationId: string;
+  campaignId: string;
+  turnId: string;
+  answer: string;
+}): Promise<void> {
+  const recorded = await recordConsultationAnswerEdit(input);
   await processConsultationReply({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
-    sessionId: turn.sessionId,
-    turnId: turn.id,
-    questionTurnId: replyToTurnIdFromAnalysis(turn.analysisJson) ?? undefined,
-    targetKey: turn.targetKey ?? consultationReplyTargetKey(
-      replyToTurnIdFromAnalysis(turn.analysisJson) ?? "",
-    ),
-    answer: body,
+    sessionId: recorded.sessionId,
+    turnId: recorded.turnId,
+    questionTurnId: recorded.questionTurnId || undefined,
+    targetKey: recorded.targetKey,
+    answer: input.answer,
   });
+}
+
+/** Incomplete SEEKER turns for a campaign, oldest first. */
+export async function listIncompleteConsultationSeekerTurns(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<Array<{ id: string; sessionId: string }>> {
+  const session = await prisma.consultationSession.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+    },
+    select: { id: true, status: true },
+  });
+  if (!session || session.status === "SKIPPED" || session.status === "PAUSED") {
+    return [];
+  }
+  const turns = await prisma.consultationTurn.findMany({
+    where: {
+      sessionId: session.id,
+      organizationId: input.organizationId,
+      speaker: "SEEKER",
+      skipped: false,
+    },
+    orderBy: [{ sequence: "asc" }, { createdAt: "asc" }],
+    select: { id: true, analysisJson: true },
+  });
+  return turns
+    .filter((turn) => !analysisIsComplete(turn.analysisJson))
+    .map((turn) => ({ id: turn.id, sessionId: session.id }));
 }
 
 export async function confirmConsultationProposal(input: {

@@ -49,6 +49,7 @@ export function CheatSheetCoachItems({
                     submitLabel={consultationConversationCopy.threadReply}
                     pendingLabel={consultationConversationCopy.thinking}
                     testId={`cheat-sheet-coach-reply-${item.id}`}
+                    disableFieldsWhilePending
                   >
                     <input type="hidden" name="campaignId" value={campaignId} />
                     <input type="hidden" name="itemId" value={item.id ?? ""} />

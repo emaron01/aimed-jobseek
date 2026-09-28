@@ -13,6 +13,11 @@ export type ApplicationJobView = {
 
 export type ApplicationJobPayload = {
   operation?: string;
+  /**
+   * Ordered unique CONSULTATION planning operations preserved across PENDING reuse.
+   * Drain-only ops (process_reply / answer / reply / edit_answer) are never stored here.
+   */
+  operations?: string[];
   userId?: string;
   personaId?: string;
   contactId?: string | null;
@@ -52,6 +57,16 @@ export type ApplicationJobPayload = {
 
 export function isTimeoutMessage(message: string): boolean {
   return /timed out|timeout/i.test(message);
+}
+
+/** Provider failures that should requeue HIRING_TEAM_BUILD (and similar) jobs. */
+export function isRetryableProviderMessage(message: string): boolean {
+  return (
+    isTimeoutMessage(message) ||
+    /rate limit|too many requests|\b429\b|\b502\b|\b503\b|\b504\b|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|fetch failed|network|socket hang up|temporarily unavailable/i.test(
+      message,
+    )
+  );
 }
 
 export type ApplicationJobResult = {

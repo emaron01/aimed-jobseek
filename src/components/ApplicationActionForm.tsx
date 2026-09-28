@@ -38,6 +38,7 @@ export function ApplicationActionForm({
   onSubmitStart,
   variant = "primary",
   hideSubmit = false,
+  disableFieldsWhilePending = false,
   children,
 }: {
   action: (
@@ -50,6 +51,8 @@ export function ApplicationActionForm({
   onSubmitStart?: (formData: FormData) => void;
   variant?: AppButtonVariant;
   hideSubmit?: boolean;
+  /** When true, disables all form fields (including textareas) while the action runs. */
+  disableFieldsWhilePending?: boolean;
   children: ReactNode;
 }) {
   const [state, setState] = useState<ActionResult | null>(null);
@@ -70,8 +73,8 @@ export function ApplicationActionForm({
     }
   }
 
-  return (
-    <form onSubmit={onSubmit} className="space-y-3" data-testid={testId}>
+  const fields = (
+    <>
       {children}
       {state ? (
         <p className={state.ok ? "text-sm text-success" : "text-sm text-danger"} role="status">
@@ -87,6 +90,22 @@ export function ApplicationActionForm({
       >
         {submitLabel}
       </AppButton>
+    </>
+  );
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-3" data-testid={testId}>
+      {disableFieldsWhilePending ? (
+        <fieldset
+          disabled={pending}
+          className="min-w-0 space-y-3 border-0 p-0 m-0"
+          data-testid={`${testId}-fields`}
+        >
+          {fields}
+        </fieldset>
+      ) : (
+        fields
+      )}
     </form>
   );
 }

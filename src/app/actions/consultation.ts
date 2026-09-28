@@ -17,8 +17,10 @@ import {
   skipConsultation,
   skipConsultationQuestion,
   ignoreConsultationQuestion,
+  reopenIgnoredConsultationTarget,
   confirmConsultationResult,
   flagConsultationInaccuracy,
+  recordConsultationAnswerEdit,
   recordConsultationReply,
 } from "@/lib/consultation/service";
 import { requireCurrentUser } from "@/lib/auth/session";
@@ -212,11 +214,17 @@ export async function answerConsultationAction(
     if (!campaignId || !targetKey) {
       return { ok: false, message: consultationConversationCopy.replyFailed };
     }
+    await recordConsultationReply({
+      organizationId,
+      campaignId,
+      targetKey,
+      answer,
+    });
     await enqueueApplicationJob({
       organizationId,
       campaignId,
       type: "CONSULTATION",
-      payload: { operation: "answer", targetKey, answer },
+      payload: { operation: "process_reply" },
     });
     revalidatePath(`/campaigns/${campaignId}`);
     return { ok: true, message: consultationConversationCopy.typing };
@@ -259,9 +267,33 @@ export async function ignoreConsultationQuestionAction(
     }
     await ignoreConsultationQuestion({ organizationId, campaignId, targetKey });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: "Question ignored." };
+    return { ok: true, message: "Ignored." };
   } catch (error) {
     return fail(error, "The question could not be ignored.");
+  }
+}
+
+export async function reopenIgnoredConsultationTargetAction(
+  _prev: ConsultationActionResult | null,
+  formData: FormData,
+): Promise<ConsultationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = campaignIdFrom(formData);
+    const targetKey = String(formData.get("targetKey") ?? "").trim();
+    if (!campaignId || !targetKey) {
+      return { ok: false, message: consultationConversationCopy.replyFailed };
+    }
+    await reopenIgnoredConsultationTarget({
+      organizationId,
+      campaignId,
+      targetKey,
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { ok: true, message: "Reopened." };
+  } catch (error) {
+    return fail(error, "That item could not be reopened.");
   }
 }
 
@@ -427,7 +459,7 @@ export async function replyConsultationAction(
       return { ok: false, message: consultationConversationCopy.threadReply };
     }
     const targetKey = String(formData.get("targetKey") ?? "").trim();
-    const recorded = await recordConsultationReply({
+    await recordConsultationReply({
       organizationId,
       campaignId,
       targetKey: targetKey || null,
@@ -438,13 +470,7 @@ export async function replyConsultationAction(
       organizationId,
       campaignId,
       type: "CONSULTATION",
-      payload: {
-        operation: "process_reply",
-        answer,
-        targetKey: recorded.targetKey,
-        turnId: recorded.turnId,
-        questionTurnId: recorded.questionTurnId,
-      },
+      payload: { operation: "process_reply" },
     });
     revalidatePath(`/campaigns/${campaignId}`);
     return { ok: true, message: consultationConversationCopy.thinking };
@@ -469,11 +495,17 @@ export async function editConsultationAnswerAction(
     if (!answer) {
       return { ok: false, message: consultationConversationCopy.threadReply };
     }
+    await recordConsultationAnswerEdit({
+      organizationId,
+      campaignId,
+      turnId,
+      answer,
+    });
     await enqueueApplicationJob({
       organizationId,
       campaignId,
       type: "CONSULTATION",
-      payload: { operation: "edit_answer", turnId, answer },
+      payload: { operation: "process_reply" },
     });
     revalidatePath(`/campaigns/${campaignId}`);
     revalidatePath(`/campaigns/${campaignId}/consultation`);

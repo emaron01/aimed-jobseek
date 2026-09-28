@@ -1,5 +1,6 @@
 import {
   completeApplicationJob,
+  consultationPlanningOperationsFromPayload,
   enqueueApplicationJob,
   failApplicationJob,
   readJobPayload,
@@ -25,12 +26,9 @@ import {
 } from "@/lib/interview/person-prep";
 import { prisma } from "@/lib/prisma-client";
 import { runWithTenantContext } from "@/lib/tenant/request-context";
+import { drainConsultationUnprocessedInput } from "@/lib/consultation/drain";
 import {
-  answerConsultationQuestion,
   continueConsultationPlanning,
-  editConsultationAnswer,
-  processConsultationReply,
-  replyConsultation,
   reassessConsultationStanding,
   retryConsultationGeneration,
   startConsultation,
@@ -73,47 +71,49 @@ export async function processApplicationJob(
             break;
           case "HIRING_TEAM_BUILD":
             if (!job.targetId) throw new Error("Hiring Team build is missing a role.");
-            await rebuildApplicationHiringTeamRole({
-              organizationId: job.organizationId,
-              campaignId: job.campaignId,
-              personaId: job.targetId,
-            });
             {
-              const { enqueueCheatSheetSectionsForPersona } = await import(
-                "@/lib/application-summary/enqueue"
-              );
-              await enqueueCheatSheetSectionsForPersona({
+              const rebuildResult = await rebuildApplicationHiringTeamRole({
                 organizationId: job.organizationId,
                 campaignId: job.campaignId,
                 personaId: job.targetId,
-                userId: job.initiatedByUserId ?? payload.userId ?? null,
               });
-              const deferred = payload.deferredOutreach;
-              if (deferred?.assetType && deferred.personaId) {
-                await enqueueApplicationJob({
+              if (!rebuildResult.synthesizeSkipped) {
+                const { enqueueCheatSheetSectionsForPersona } = await import(
+                  "@/lib/application-summary/enqueue"
+                );
+                await enqueueCheatSheetSectionsForPersona({
                   organizationId: job.organizationId,
                   campaignId: job.campaignId,
-                  type: "OUTREACH",
-                  targetId: deferred.personaId,
-                  initiatedByUserId: job.initiatedByUserId,
-                  payload: {
-                    userId:
-                      deferred.userId ??
-                      job.initiatedByUserId ??
-                      payload.userId,
-                    assetType: deferred.assetType,
-                    personaId: deferred.personaId,
-                    contactId: deferred.contactId ?? null,
-                    purpose: deferred.purpose,
-                    followUpToAssetId: deferred.followUpToAssetId ?? null,
-                    interviewStageId: deferred.interviewStageId ?? null,
-                    emailLength: deferred.emailLength ?? null,
-                    regenerationInstruction:
-                      deferred.regenerationInstruction ?? null,
-                    skipThankYouQuestions: deferred.skipThankYouQuestions,
-                    thankYouAnswers: deferred.thankYouAnswers,
-                  },
+                  personaId: job.targetId,
+                  userId: job.initiatedByUserId ?? payload.userId ?? null,
                 });
+                const deferred = payload.deferredOutreach;
+                if (deferred?.assetType && deferred.personaId) {
+                  await enqueueApplicationJob({
+                    organizationId: job.organizationId,
+                    campaignId: job.campaignId,
+                    type: "OUTREACH",
+                    targetId: deferred.personaId,
+                    initiatedByUserId: job.initiatedByUserId,
+                    payload: {
+                      userId:
+                        deferred.userId ??
+                        job.initiatedByUserId ??
+                        payload.userId,
+                      assetType: deferred.assetType,
+                      personaId: deferred.personaId,
+                      contactId: deferred.contactId ?? null,
+                      purpose: deferred.purpose,
+                      followUpToAssetId: deferred.followUpToAssetId ?? null,
+                      interviewStageId: deferred.interviewStageId ?? null,
+                      emailLength: deferred.emailLength ?? null,
+                      regenerationInstruction:
+                        deferred.regenerationInstruction ?? null,
+                      skipThankYouQuestions: deferred.skipThankYouQuestions,
+                      thankYouAnswers: deferred.thankYouAnswers,
+                    },
+                  });
+                }
               }
             }
             break;
@@ -149,11 +149,7 @@ export async function processApplicationJob(
             await processConsultationJob({
               organizationId: job.organizationId,
               campaignId: job.campaignId,
-              operation: payload.operation,
-              answer: payload.answer,
-              targetKey: payload.targetKey,
-              turnId: payload.turnId,
-              questionTurnId: payload.questionTurnId,
+              operations: consultationPlanningOperationsFromPayload(payload),
               contactId: payload.contactId ?? job.targetId,
             });
             break;
@@ -300,6 +296,25 @@ export async function processApplicationJob(
       }),
     );
     await failApplicationJob({ jobId: job.id, message });
+    const failed = await prisma.applicationJob.findFirst({
+      where: { id: job.id },
+      select: { status: true, targetId: true },
+    });
+    if (
+      job.type === "HIRING_TEAM_BUILD" &&
+      failed?.status === "FAILED" &&
+      (failed.targetId || job.targetId)
+    ) {
+      const { markHiringTeamBuildTemporaryExhausted } = await import(
+        "@/lib/hiring-team/build"
+      );
+      await markHiringTeamBuildTemporaryExhausted({
+        organizationId: job.organizationId,
+        campaignId: job.campaignId,
+        personaId: failed.targetId ?? job.targetId!,
+        message,
+      });
+    }
     return {
       ok: false,
       jobId: job.id,
@@ -314,97 +329,67 @@ export async function processApplicationJob(
 async function processConsultationJob(input: {
   organizationId: string;
   campaignId: string;
-  operation?: string;
-  answer?: string;
-  targetKey?: string;
-  turnId?: string;
-  questionTurnId?: string;
+  operations: string[];
   contactId?: string | null;
 }): Promise<void> {
-  if (input.operation === "retry") {
-    await retryConsultationGeneration(input);
-    return;
-  }
-  if (input.operation === "reassess") {
-    await reassessConsultationStanding({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-    });
-    return;
-  }
-  if (input.operation === "continue") {
-    await continueConsultationPlanning({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-    });
-    return;
-  }
-  if (input.operation === "person_prep") {
-    if (!input.contactId) {
-      throw new Error("Interviewer prep needs a person.");
+  // Answers first: incomplete SEEKER turns from the DB (DECISION 1).
+  await drainConsultationUnprocessedInput({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+  });
+
+  // Then planning ops in request order (duplicates already collapsed on merge).
+  for (const operation of input.operations) {
+    if (operation === "retry") {
+      await retryConsultationGeneration(input);
+      continue;
     }
-    const focus = await personPrepFocus({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      contactId: input.contactId,
-    });
-    await startConsultation({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      focusTargetKey: focus.focusTargetKey,
-      interviewerPrep: focus.interviewerPrep,
-    });
-    const session = await prisma.consultationSession.findUnique({
-      where: { campaignId: input.campaignId },
-      select: { coachNote: true },
-    });
-    await recordPersonPrepOpening({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      contactId: input.contactId,
-      openingText: session?.coachNote ?? null,
-    });
-    return;
-  }
-  if (input.operation === "process_reply") {
-    await processConsultationReply({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      targetKey: input.targetKey,
-      turnId: input.turnId,
-      questionTurnId: input.questionTurnId,
-      answer: input.answer,
-    });
-    return;
-  }
-  if (input.operation === "edit_answer") {
-    if (!input.turnId) {
-      throw new Error("An edited reply needs the original answer.");
+    if (operation === "reassess") {
+      await reassessConsultationStanding({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+      });
+      continue;
     }
-    await editConsultationAnswer({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      turnId: input.turnId,
-      answer: input.answer ?? "",
-    });
-    return;
+    if (operation === "continue") {
+      await continueConsultationPlanning({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+      });
+      continue;
+    }
+    if (operation === "person_prep") {
+      if (!input.contactId) {
+        throw new Error("Interviewer prep needs a person.");
+      }
+      const focus = await personPrepFocus({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        contactId: input.contactId,
+      });
+      await startConsultation({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        focusTargetKey: focus.focusTargetKey,
+        interviewerPrep: focus.interviewerPrep,
+      });
+      const session = await prisma.consultationSession.findUnique({
+        where: { campaignId: input.campaignId },
+        select: { coachNote: true },
+      });
+      await recordPersonPrepOpening({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        contactId: input.contactId,
+        openingText: session?.coachNote ?? null,
+      });
+      continue;
+    }
+    if (operation === "start") {
+      await startConsultation({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+      });
+    }
   }
-  if (input.operation === "reply") {
-    await replyConsultation({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      answer: input.answer ?? "",
-    });
-    return;
-  }
-  if (input.operation === "answer") {
-    await answerConsultationQuestion({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      targetKey: input.targetKey ?? "",
-      answer: input.answer ?? "",
-    });
-    return;
-  }
-  await startConsultation(input);
 }
