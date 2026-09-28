@@ -126,8 +126,7 @@ Permanent fixture `csc-senior-director-sales-fixture.ts` from local DB posting â
 ## 8. Commit / branch
 
 - **Branch:** `checkpoint/harper-prep-hub` (not merged to main)  
-- **Commit:** *(filled after commit)*
-
+- **Commit:** `9aee7ffbd15b8e841776003ae386b27b2bc3c155`
 ---
 
 ## 9. Scope confirmation
