@@ -47,11 +47,11 @@ describe("restored workspace editing and Harper", () => {
     expect(briefing).toContain("company-research-notes");
     expect(job).toContain("edit-job-posting");
     expect(job).toContain("saveApplicationJobPostingAction");
-    expect(job).toContain("regenerateApplicationJobRequirementAction");
+    expect(job).not.toContain("regenerateApplicationJobRequirementAction");
     expect(job).toContain("saveApplicationJobLearnedNotesAction");
     expect(actions).toContain("saveApplicationCompanyResearchNotes");
     expect(actions).toContain("saveApplicationJobPosting");
-    expect(actions).toContain("regenerateApplicationJobRequirement");
+    expect(actions).not.toContain("regenerateApplicationJobRequirement");
     expect(actions).toContain("saveApplicationJobLearnedNotes");
     const empty = new FormData();
     expect(readLineList(empty, "missing")).toEqual([]);

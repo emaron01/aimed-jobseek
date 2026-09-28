@@ -8,7 +8,6 @@ import {
   overrideApplicationFit,
   rejectApplicationEmployerIdentity,
   rescoreApplicationFit,
-  regenerateApplicationJobRequirement,
   retryApplicationResearch,
   saveApplicationCompanyResearchNotes,
   saveApplicationJobLearnedNotes,
@@ -32,6 +31,7 @@ import {
 } from "@/lib/application/form-fields";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
+import { assertGatedAction } from "@/lib/product-config/feature-access";
 
 export type ApplicationActionResult = { ok: boolean; message: string };
 
@@ -188,6 +188,7 @@ export async function rescoreApplicationFitAction(
   formData: FormData,
 ): Promise<ApplicationActionResult> {
   try {
+    assertGatedAction("employerIcpFit");
     const organizationId = await requireOrganizationId();
     await requireCurrentUser();
     const campaignId = String(formData.get("campaignId") ?? "").trim();
@@ -208,6 +209,7 @@ export async function overrideApplicationFitAction(
   formData: FormData,
 ): Promise<ApplicationActionResult> {
   try {
+    assertGatedAction("employerIcpFit");
     const organizationId = await requireOrganizationId();
     const user = await requireCurrentUser();
     const campaignId = String(formData.get("campaignId") ?? "").trim();
@@ -306,30 +308,6 @@ export async function saveApplicationJobPostingAction(
     return { ok: true, message: applicationWorkspaceCopy.jobPostingSaved };
   } catch (error) {
     return fail(error, applicationWorkspaceCopy.jobEditFailed);
-  }
-}
-
-export async function regenerateApplicationJobRequirementAction(
-  _prev: ApplicationActionResult | null,
-  formData: FormData,
-): Promise<ApplicationActionResult> {
-  try {
-    const organizationId = await requireOrganizationId();
-    const user = await requireCurrentUser();
-    const campaignId = readTrimmedField(formData, "campaignId");
-    if (!campaignId) {
-      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
-    }
-    await regenerateApplicationJobRequirement({
-      organizationId,
-      campaignId,
-      userId: user.id,
-    });
-    revalidatePath(`/campaigns/${campaignId}`);
-    revalidatePath(`/campaigns/${campaignId}/job`);
-    return { ok: true, message: applicationWorkspaceCopy.jobRegenerated };
-  } catch (error) {
-    return fail(error, applicationWorkspaceCopy.jobRegenerateFailed);
   }
 }
 

@@ -3,10 +3,6 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { NORMAL_JOB_MODEL, NORMAL_JOB_POSTING } from "@/lib/job-requirement/fixtures";
 import { normalizeParsedJobRequirement } from "@/lib/job-requirement/normalize";
 import { buildJobRequirementMessages } from "@/lib/job-requirement/prompt";
-import {
-  applicationWorkspaceCopy,
-  polishCopy,
-} from "@/lib/product-config";
 import { hasTestDatabase } from "@/test/database";
 
 const interpretJobPosting = vi.hoisted(() => vi.fn());
@@ -15,10 +11,24 @@ vi.mock("@/lib/job-requirement/parse", () => ({
   interpretJobPosting,
 }));
 
+// This file's DB suite asserts ApplicationFit after posting save. Enable the
+// Phase A flag for that path only (default in features.ts remains false).
+vi.mock("@/lib/product-config/features", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/product-config/features")>();
+  return {
+    ...actual,
+    features: Object.freeze({ ...actual.features, employerIcpFit: true }),
+  };
+});
+
 describe("job requirements page", () => {
   const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
   const actions = readFileSync(
     "src/components/ApplicationJobRequirementActions.tsx",
+    "utf8",
+  );
+  const applicationActions = readFileSync(
+    "src/app/actions/application.ts",
     "utf8",
   );
 
@@ -33,7 +43,7 @@ describe("job requirements page", () => {
     expect(actions).not.toContain('name="outcomes"');
   });
 
-  it("edits the original posting, regenerates, and keeps learned notes collapsed", () => {
+  it("edits the original posting and keeps learned notes collapsed, without Regenerate", () => {
     expect(actions).toContain("job-requirement-top-actions");
     expect(actions).toContain("job-learned-top");
     expect(actions).toContain("job-edit-top");
@@ -41,22 +51,38 @@ describe("job requirements page", () => {
     expect(actions).toContain("openExistingSection(\"edit-job-posting\")");
     expect(actions).toContain("edit-job-posting");
     expect(actions).toContain("saveApplicationJobPostingAction");
-    expect(actions).toContain("regenerate-job-requirement");
-    expect(actions).toContain("regenerateApplicationJobRequirementAction");
-    expect(actions).toContain("polishCopy.regenerate");
+    expect(actions).not.toContain("regenerate-job-requirement");
+    expect(actions).not.toContain("regenerateApplicationJobRequirementAction");
+    expect(applicationActions).not.toContain(
+      "regenerateApplicationJobRequirementAction",
+    );
     expect(actions).toContain("job-learned-notes");
     expect(actions).toContain("<details");
     expect(actions).toContain("saveApplicationJobLearnedNotesAction");
-    expect(polishCopy.regenerate).toBe("Regenerate");
   });
 
-  it("does not show Inferred tags and includes the scorecard note", () => {
+  it("does not render the Scorecard section or note on the Job Requirements page", () => {
     expect(workspace).not.toContain("criterionFlags.inference");
     expect(workspace).not.toContain("polishCopy.inferredLabel");
-    expect(workspace).toContain("scorecard-note");
-    expect(workspace).toContain("applicationWorkspaceCopy.scorecardNote");
-    expect(applicationWorkspaceCopy.scorecardNote).toContain("{consultant}");
-    expect(applicationWorkspaceCopy.scorecardNote).toContain("{product}");
+    expect(workspace).not.toContain("scorecard-note");
+    expect(workspace).not.toContain("applicationWorkspaceCopy.scorecardNote");
+    expect(workspace).not.toContain("applicationWorkspaceCopy.scorecardTitle");
+    expect(workspace).not.toContain("applicationWorkspaceCopy.outcomesTitle");
+    expect(workspace).not.toContain("applicationWorkspaceCopy.competenciesTitle");
+    expect(workspace).not.toContain("applicationWorkspaceCopy.noMission");
+    expect(workspace).not.toContain("ScorecardList");
+    expect(workspace).not.toContain("readScorecard");
+    expect(workspace).not.toContain("scorecardJson");
+  });
+
+  it("hides Employer fit behind employerIcpFit (no fit content without the flag)", () => {
+    expect(workspace).toContain("features.employerIcpFit && icp");
+    expect(workspace).toContain('data-testid="employer-fit"');
+    const featuresSource = readFileSync(
+      "src/lib/product-config/features.ts",
+      "utf8",
+    );
+    expect(featuresSource).toMatch(/employerIcpFit:\s*false/);
   });
 
   it("shows a reason per employer-fit criterion and keeps override without a save button", () => {
@@ -72,7 +98,7 @@ describe("job requirements page", () => {
     expect(override).not.toContain('submitLabel="Save"');
   });
 
-  it("includes learned notes when regenerating the posting interpretation", () => {
+  it("includes learned notes in the job-requirement message builder (unused by live parse triggers)", () => {
     const messages = buildJobRequirementMessages(
       "Senior sales role",
       "The interviewer said the role is more security sales than general sales.",
@@ -81,9 +107,74 @@ describe("job requirements page", () => {
     expect(user.seekerLearnedNotes).toContain("security sales");
     expect(user.instruction).toMatch(/notes/i);
   });
+
+  it("keeps scorecardJson readers outside the Job Requirements page display", () => {
+    const readers: Array<{ path: string; needle: string }> = [
+      {
+        path: "src/lib/hiring-team/build.ts",
+        needle: "readScorecard(requirement.scorecardJson)",
+      },
+      {
+        path: "src/lib/hiring-team/evidence.ts",
+        needle: "job.scorecard.mission",
+      },
+      {
+        path: "src/lib/hiring-team/draft-quality.ts",
+        needle: "job.scorecard.mission",
+      },
+      {
+        path: "src/lib/consultation/service.ts",
+        needle: "readScorecard(requirement.scorecardJson)",
+      },
+      {
+        path: "src/lib/consultation/assess.ts",
+        needle: "input.scorecard.outcomes",
+      },
+      {
+        path: "src/lib/generation/context.ts",
+        needle: "scorecard: requirement.scorecardJson",
+      },
+      {
+        path: "src/lib/application-assets/prompt.ts",
+        needle: "scorecard: requirement.scorecard",
+      },
+      {
+        path: "src/lib/application-assets/service.ts",
+        needle: "scorecardOutcomeTexts(context.requirement.scorecard)",
+      },
+      {
+        path: "src/lib/application-summary/service.ts",
+        needle: "requirement.scorecardJson",
+      },
+      {
+        path: "src/lib/interview/guide.ts",
+        needle: "jobRequirement?.scorecardJson",
+      },
+      {
+        path: "src/app/(app)/campaigns/[id]/summary/page.tsx",
+        needle: "view.requirement.scorecardJson",
+      },
+    ];
+    for (const reader of readers) {
+      expect(readFileSync(reader.path, "utf8")).toContain(reader.needle);
+    }
+  });
+
+  it("keeps Harper assessment wiring unchanged", () => {
+    const consultation = readFileSync(
+      "src/components/ConsultationSection.tsx",
+      "utf8",
+    );
+    expect(consultation).toContain("assessments");
+    expect(consultation).toContain("session?.assessments");
+    const assess = readFileSync("src/lib/consultation/assess.ts", "utf8");
+    expect(assess).toContain("input.scorecard.outcomes");
+    expect(assess).toContain("input.scorecard.competencies");
+    expect(assess).toContain("input.scorecard.mission");
+  });
 });
 
-describe.skipIf(!hasTestDatabase())("job requirement learned notes and regenerate", () => {
+describe.skipIf(!hasTestDatabase())("job requirement learned notes and posting save", () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";
@@ -168,26 +259,18 @@ describe.skipIf(!hasTestDatabase())("job requirement learned notes and regenerat
     await prisma.$disconnect();
   });
 
-  it("saves learned notes and uses them when the posting is saved and regenerated", async () => {
+  it("saves learned notes and uses them when the posting is saved", async () => {
     const {
       saveApplicationJobLearnedNotes,
       saveApplicationJobPosting,
-      regenerateApplicationJobRequirement,
     } = await import("@/lib/application/service");
     const parsed = normalizeParsedJobRequirement(NORMAL_JOB_MODEL, NORMAL_JOB_POSTING);
-    let parseCount = 0;
     interpretJobPosting.mockImplementation(
       async (_rawText: string, _usage?: unknown, notes?: string | null) => {
-        expect(notes).toContain("security sales");
-        parseCount += 1;
+        expect(notes).toBeUndefined();
         return {
           ...parsed,
-          title:
-            parseCount === 1
-              ? parsed.title
-              : parseCount === 2
-                ? "Replaced title"
-                : "Regenerated title",
+          title: "Replaced title",
           requiredItems: [...parsed.requiredItems, "Security sales experience"],
         };
       },
@@ -202,6 +285,7 @@ describe.skipIf(!hasTestDatabase())("job requirement learned notes and regenerat
       where: { campaignId },
     });
     expect(stored.seekerLearnedNotes).toContain("security sales");
+    expect(interpretJobPosting).not.toHaveBeenCalled();
 
     await saveApplicationJobPosting({
       organizationId,
@@ -217,21 +301,7 @@ describe.skipIf(!hasTestDatabase())("job requirement learned notes and regenerat
     expect(afterPosting.requiredItems).toEqual(
       expect.arrayContaining(["Security sales experience"]),
     );
-
-    await regenerateApplicationJobRequirement({
-      organizationId,
-      campaignId,
-      userId,
-    });
-    const afterRegen = await prisma.jobRequirement.findUniqueOrThrow({
-      where: { campaignId },
-    });
-    expect(afterRegen.title).toBe("Regenerated title");
-    expect(interpretJobPosting).toHaveBeenCalledTimes(3);
-    const fit = await prisma.applicationFit.findUnique({
-      where: { campaignId },
-    });
-    expect(fit).toBeTruthy();
-    expect(fit?.stale).toBe(false);
+    expect(afterPosting.scorecardJson).toEqual(parsed.scorecard);
+    expect(interpretJobPosting).toHaveBeenCalledTimes(1);
   });
 });

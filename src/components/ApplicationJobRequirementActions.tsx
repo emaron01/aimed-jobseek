@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  regenerateApplicationJobRequirementAction,
   saveApplicationJobLearnedNotesAction,
   saveApplicationJobPostingAction,
 } from "@/app/actions/application";
@@ -11,7 +10,6 @@ import { AppButton } from "@/components/ui";
 import {
   applicationWorkspaceCopy,
   consultationConfig,
-  polishCopy,
   vocab,
 } from "@/lib/product-config";
 import { JOB_LEARNED_NOTES_MAX_CHARS } from "@/lib/research/seeker-supplied-notes";
@@ -108,13 +106,6 @@ export function ApplicationJobRequirementActions({
             </ApplicationActionForm>
           </div>
         </details>
-        <ApplicationActionForm
-          action={regenerateApplicationJobRequirementAction}
-          submitLabel={polishCopy.regenerate}
-          testId="regenerate-job-requirement"
-        >
-          <input type="hidden" name="campaignId" value={campaignId} />
-        </ApplicationActionForm>
       </div>
       <details
         id="job-learned-notes"
