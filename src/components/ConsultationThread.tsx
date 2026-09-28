@@ -335,7 +335,7 @@ function QuestionCard({
             ) : null}
           </>
         ) : null}
-        {!hasResult && item.needsMoreDetail && !item.ignored ? (
+        {item.needsMoreDetail && !item.ignored ? (
           <p
             className="text-sm text-muted"
             data-testid="consultation-needs-more-detail"

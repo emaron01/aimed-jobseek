@@ -783,7 +783,8 @@ async function failGeneration(sessionId: string, message: string): Promise<void>
 
 /**
  * Polish quality failed after bounded regen: keep the seeker answer, store no
- * Harper result, leave the session READY, and ask for more detail on this item only.
+ * Harper draft for this attempt, leave the session READY, and ask for more
+ * detail on this item only. Never discards APPROVED statements.
  */
 async function finishItemNeedsMoreDetail(input: {
   sessionId: string;
@@ -792,10 +793,6 @@ async function finishItemNeedsMoreDetail(input: {
   supersedeTurnIds: string[];
   analysisJson: Record<string, unknown>;
 }): Promise<void> {
-  const turnIds = [
-    input.resultTurnId,
-    ...input.supersedeTurnIds.filter((id) => id && id !== input.resultTurnId),
-  ];
   await prisma.$transaction([
     prisma.consultationProposal.deleteMany({
       where: { turnId: input.turnId, status: "PENDING" },
@@ -809,10 +806,13 @@ async function finishItemNeedsMoreDetail(input: {
         },
       },
     }),
+    // Only the failed attempt's DRAFT on this reply turn — never APPROVED,
+    // and never statements on prior seeker turns (supersedeTurnIds).
     prisma.consultationStatement.deleteMany({
       where: {
         sessionId: input.sessionId,
-        turnId: { in: turnIds },
+        turnId: input.resultTurnId,
+        status: "DRAFT",
         kind: { in: ["INTERVIEW_ANSWER", "RESUME_BULLET"] },
       },
     }),

@@ -487,7 +487,7 @@ describe("Harper Batch C question and result defects", () => {
     );
   });
 
-  it("FIX 3: failed polish keeps session READY, stores no Harper result, shows needs-more-detail copy", () => {
+  it("FIX 3: failed polish keeps session READY, stores no Harper draft, never deletes APPROVED", () => {
     expect(consultationConversationCopy.needsMoreDetailToShape).toBe(
       "Add a bit more detail so Harper can shape this answer.",
     );
@@ -496,13 +496,19 @@ describe("Harper Batch C question and result defects", () => {
     expect(service).toContain("finishItemNeedsMoreDetail");
     expect(service).toContain("needsMoreDetail: true");
     expect(service).toContain('generationStatus: "READY"');
+    const finishStart = service.indexOf("async function finishItemNeedsMoreDetail");
+    const finishBody = service.slice(finishStart, finishStart + 1400);
+    expect(finishBody).toContain('status: "DRAFT"');
+    expect(finishBody).toContain("turnId: input.resultTurnId");
+    expect(finishBody).not.toContain("turnId: { in: turnIds }");
+    expect(finishBody).not.toContain("input.supersedeTurnIds");
     expect(thread).toContain("needsMoreDetailToShape");
     expect(thread).toContain("consultation-needs-more-detail");
-    // processAnswerGeneration routes polish failure to item-level ready, not failGeneration.
+    expect(thread).toMatch(/item\.needsMoreDetail && !item\.ignored/);
     expect(service).toContain("await finishItemNeedsMoreDetail({");
-    expect(service.split("await finishItemNeedsMoreDetail({").length - 1).toBeGreaterThanOrEqual(
-      2,
-    );
+    expect(
+      service.split("await finishItemNeedsMoreDetail({").length - 1,
+    ).toBeGreaterThanOrEqual(2);
   });
 
   it("FIX 4: canned-question guard still covers questions.ts; detection lives in a separate module", () => {
@@ -520,27 +526,30 @@ describe("Harper Batch C question and result defects", () => {
     expect(detection).toMatch(/Detection-only helpers/);
   });
 
-  it("FIX 5: CSC Senior Director posting excludes only the mission pitch", () => {
-    const {
-      responsibilities,
-      requiredItems,
-      preferredItems,
-      scorecard,
-      additionalKeptExamples,
-    } = cscSeniorDirectorSalesParsed;
+  it("FIX 5: real CSC Senior Director posting excludes only mission and mission-echo outcome", () => {
+    const { responsibilities, requiredItems, preferredItems, scorecard } =
+      cscSeniorDirectorSalesParsed;
+    const missionEcho = scorecard.outcomes[4]!;
+    const keptOutcomes = scorecard.outcomes.slice(0, 4);
 
     expect(looksLikeCompanyPitch(scorecard.mission.text)).toBe(true);
-    for (const text of [...responsibilities, ...requiredItems]) {
+    expect(looksLikeCompanyPitch(missionEcho.text)).toBe(true);
+    for (const text of responsibilities) {
       expect(looksLikeCompanyPitch(text)).toBe(false);
     }
-    for (const item of scorecard.outcomes) {
+    expect(
+      looksLikeCompanyPitch(
+        "Position domain and brand protection solutions as mission-critical controls within enterprise risk and security strategies",
+      ),
+    ).toBe(false);
+    for (const text of requiredItems) {
+      expect(looksLikeCompanyPitch(text)).toBe(false);
+    }
+    for (const item of keptOutcomes) {
       expect(looksLikeCompanyPitch(item.text)).toBe(false);
     }
     for (const item of scorecard.competencies) {
       expect(looksLikeCompanyPitch(item.text)).toBe(false);
-    }
-    for (const text of additionalKeptExamples) {
-      expect(looksLikeCompanyPitch(text)).toBe(false);
     }
 
     const targets = evidenceTargets({
@@ -548,20 +557,28 @@ describe("Harper Batch C question and result defects", () => {
       requiredItems: [...requiredItems],
       preferredItems: [...preferredItems],
     });
+    // Pitch exclusions only: mission + mission-echo outcome.
     expect(targets.some((t) => t.kind === "MISSION")).toBe(false);
+    expect(targets.some((t) => t.text === scorecard.mission.text)).toBe(false);
+    expect(targets.some((t) => t.text === missionEcho.text)).toBe(false);
     expect(targets.some((t) => looksLikeCompanyPitch(t.text))).toBe(false);
+
     for (const text of requiredItems) {
       expect(targets.some((t) => t.text === text)).toBe(true);
     }
-    expect(
-      targets.some((t) => t.text === scorecard.outcomes[0]!.text),
-    ).toBe(true);
-    expect(
-      targets.some((t) => t.text === scorecard.competencies[0]!.text),
-    ).toBe(true);
+    // First, second, and fourth outcomes are distinct targets.
+    expect(targets.some((t) => t.text === keptOutcomes[0]!.text)).toBe(true);
+    expect(targets.some((t) => t.text === keptOutcomes[1]!.text)).toBe(true);
+    expect(targets.some((t) => t.text === keptOutcomes[3]!.text)).toBe(true);
+    // Third outcome shares meaning with a required item — not a pitch exclusion.
+    expect(looksLikeCompanyPitch(keptOutcomes[2]!.text)).toBe(false);
+    // Competencies share meaning with required items — kept by pitch, not separate targets.
+    for (const item of scorecard.competencies) {
+      expect(looksLikeCompanyPitch(item.text)).toBe(false);
+    }
   });
 
-  it("FIX 3 view: needsMoreDetail surfaces the exact copy without a Harper result", () => {
+  it("FIX 3 view: needsMoreDetail with no approved answer shows the message and no Harper result", () => {
     expect(needsMoreDetailFromAnalysis({ needsMoreDetail: true })).toBe(true);
     expect(needsMoreDetailFromAnalysis({ gapDecision: "evidence" })).toBe(false);
     const view = buildConsultationQaView({
@@ -596,6 +613,81 @@ describe("Harper Batch C question and result defects", () => {
     expect(view.questions[0]?.seekerAnswers[0]?.body).toBe(
       "I ran a Monday ritual.",
     );
+  });
+
+  it("FIX 3 view: failed new reply keeps approved answer shown and still asks for more detail", () => {
+    const view = buildConsultationQaView({
+      turns: [
+        {
+          id: "q1",
+          speaker: "CONSULTANT",
+          body: "How do you forecast?",
+          targetKey: "required:forecast",
+          followUp: false,
+          sequence: 1,
+        },
+        {
+          id: "s-approved",
+          speaker: "SEEKER",
+          body: "I owned the Monday commit ritual and cut slip under ten percent.",
+          targetKey: "required:forecast",
+          followUp: false,
+          sequence: 2,
+          analysisJson: {
+            replyToTurnId: "q1",
+            gapDecision: "evidence",
+          },
+        },
+        {
+          id: "s-new",
+          speaker: "SEEKER",
+          body: "Also something thin.",
+          targetKey: "required:forecast",
+          followUp: false,
+          sequence: 3,
+          analysisJson: {
+            replyToTurnId: "q1",
+            gapDecision: "evidence",
+            needsMoreDetail: true,
+          },
+        },
+      ],
+      statements: [
+        {
+          id: "st-approved",
+          turnId: "s-approved",
+          kind: "INTERVIEW_ANSWER",
+          status: "APPROVED",
+          content:
+            "At Contoso I owned the Monday commit ritual until forecast slip fell under 10%.",
+          strengtheningNote: null,
+          createdAt: new Date("2026-09-01T00:00:00.000Z"),
+        },
+        {
+          id: "st-bullet",
+          turnId: "s-approved",
+          kind: "RESUME_BULLET",
+          status: "APPROVED",
+          content:
+            "Owned Contoso Monday commit ritual; forecast slip fell under 10%.",
+          strengtheningNote: null,
+          createdAt: new Date("2026-09-01T00:00:00.000Z"),
+        },
+      ],
+    });
+    expect(view.questions[0]?.needsMoreDetail).toBe(true);
+    expect(view.questions[0]?.talkingPoint?.status).toBe("APPROVED");
+    expect(view.questions[0]?.talkingPoint?.content).toContain(
+      "Monday commit ritual",
+    );
+    expect(view.questions[0]?.resumeBullet?.status).toBe("APPROVED");
+    expect(view.questions[0]?.seekerAnswers.map((a) => a.body)).toEqual([
+      "I owned the Monday commit ritual and cut slip under ten percent.",
+      "Also something thin.",
+    ]);
+    const thread = src("src/components/ConsultationThread.tsx");
+    expect(thread).toContain("hasResult");
+    expect(thread).toMatch(/item\.needsMoreDetail && !item\.ignored/);
   });
 
   it("B5 regression: profile's own coach items and interviewer questions never appear in Additional Interview Prep Q&A", () => {
