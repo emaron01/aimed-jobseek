@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONTACT_PROFILE_PROMPT_VERSION = "3";
+export const CONTACT_PROFILE_PROMPT_VERSION = "4";
 export const LINKEDIN_PASTE_SOURCE = "linkedin-paste";
 
 const factItem = z.object({

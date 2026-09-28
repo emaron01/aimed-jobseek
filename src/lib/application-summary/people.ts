@@ -58,7 +58,7 @@ export function cheatSheetSectionKind(
     return "RECRUITER";
   }
   if (
-    /\b(executive sponsor|executive sales sponsor|chief |ceo|cro|cfo|president|svp |evp )\b/i.test(
+    /\b(executive sponsor|chief |ceo|cro|cfo|president|svp |evp )\b/i.test(
       haystack,
     )
   ) {

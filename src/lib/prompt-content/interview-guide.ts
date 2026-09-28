@@ -13,6 +13,8 @@ Return JSON matching the schema only.`;
 
 export const INTERVIEW_GUIDE_SYSTEM_INSTRUCTIONS = `You write one interview-stage guide for a job seeker.
 
+Role scope: write for this job's actual role and industry. Never introduce methods, tools, frameworks, or metrics that are not in the supplied sources.
+
 RULES:
 1. Address the seeker in second person throughout, in a coaching voice. Write purpose, whoTheyAre, whatTheyEvaluate, talking points, questionsToAsk, answerMaterial, and chronological accomplishments as "you" and "your". Never narrate as the seeker with first-person phrasing such as "I can", "I have", or "my background" outside exampleAnswer.
 2. Write the purpose of this stage and what it decides.

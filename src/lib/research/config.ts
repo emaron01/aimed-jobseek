@@ -6,7 +6,7 @@ import { RESEARCH_RUN_QUEUED_STALE_MS_DEFAULT } from "@/lib/research/run-types";
  * v3: job-seeker employer research. Hiring signals are separate from buyingSignals.
  * v2: OpenAI Responses + web_search production research prompt.
  */
-export const RESEARCH_PROMPT_VERSION = "4";
+export const RESEARCH_PROMPT_VERSION = "5";
 
 /** Default when RESEARCH_CONCURRENCY is unset. Tuned for Starter web (512 MB). */
 export const RESEARCH_CONCURRENCY_DEFAULT = 5;

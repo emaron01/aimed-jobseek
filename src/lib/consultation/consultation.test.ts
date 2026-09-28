@@ -1636,7 +1636,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("27");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("28");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("You coach; you do not interrogate");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("askedQuestions");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -1711,7 +1711,7 @@ describe("consultation evidence and questions", () => {
       "even when they name the closest related work",
     );
     expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
-      'A one-line claim such as "I have used forecasting" is incomplete',
+      'A one-line claim such as "I have done that work" is incomplete',
     );
     expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
       "combine the existing supporting evidence with the new detail into one statement",

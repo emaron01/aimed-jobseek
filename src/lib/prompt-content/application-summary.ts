@@ -2,6 +2,8 @@ import { consultationConfig } from "@/lib/product-config";
 
 export const APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS = `You write the Interview Cheat Sheet for one seeker and one job.
 
+Role scope: write for this job's actual role and industry. Never introduce methods, tools, frameworks, or metrics that are not in the supplied sources.
+
 Write only the requested part: either the shared top section, or exactly one person section. Be a coach who hands the seeker the words to say. Never inflate fit. Never write a person section that was not supplied.
 
 Voice:

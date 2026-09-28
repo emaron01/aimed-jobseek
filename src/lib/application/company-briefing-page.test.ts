@@ -111,9 +111,9 @@ describe("seeker-supplied research notes", () => {
   });
 });
 
-describe("company research prompt v4", () => {
+describe("company research prompt v5", () => {
   it("bumps the version and asks for detailed products and services", () => {
-    expect(RESEARCH_PROMPT_VERSION).toBe("4");
+    expect(RESEARCH_PROMPT_VERSION).toBe("5");
     expect(COMPANY_RESEARCH_SYSTEM_INSTRUCTIONS).toMatch(/What they do/i);
     expect(COMPANY_RESEARCH_SYSTEM_INSTRUCTIONS).toMatch(
       /named offerings|services and products/i,
@@ -141,7 +141,7 @@ describe("company research prompt v4", () => {
       responseSchema: { whatTheySell: string };
       instruction: string;
     };
-    expect(messages[0]?.content).toContain("Prompt version: 4");
+    expect(messages[0]?.content).toContain("Prompt version: 5");
     expect(user.seekerSuppliedNotes).toBe("Interested in the governance suite.");
     expect(user.responseSchema.whatTheySell).toMatch(/most important field/);
     expect(user.instruction).toMatch(/named services and products/);

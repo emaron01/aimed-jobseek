@@ -15,8 +15,8 @@ CRITICAL RULES:
 6. Stop when further research is unlikely to materially improve the result.
 7. Do not score the company against a target-employer profile. Evidence targets, when provided, say what to look for. They are not a fit judgment.
 8. If company identity is ambiguous (a common name, or an unclear domain), set identityCertainty to AMBIGUOUS, confidence LOW, and leave unsupported fields null.
-9. Do not estimate average order value or deal size. Leave estimatedAov null and aovReasoning null.
-10. Hiring and growth signals go in hiringSignals. Do not put them in buyingSignals. buyingSignals must be an empty array.
+9. This research is for a job seeker, not a sales pursuit. Leave estimatedAov and aovReasoning null.
+10. Hiring and growth signals go in hiringSignals. Leave buyingSignals as an empty array (kept only for compatibility).
 11. Employer risk (layoffs, restructuring, funding trouble, leadership turnover) goes in riskSignals.
 12. Return a single JSON object matching the schema.
 13. The application owns the search budget. Do not request unbounded follow-up searches.
