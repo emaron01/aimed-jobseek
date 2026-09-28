@@ -650,11 +650,31 @@ model Organization {
   applicationFits               ApplicationFit[]
   presentationPlans             ApplicationPresentationPlan[]
   applicationJobs               ApplicationJob[]
+  paidCallReceipts              PaidCallReceipt[]
 
   @@index([status])
   @@index([accountType])
   @@index([createdAt])
   @@index([suspendedAt])
+}
+
+/// Durable fingerprint + last successful result for paid AI calls (skip when inputs unchanged).
+model PaidCallReceipt {
+  id             String   @id @default(cuid())
+  organizationId String
+  /// e.g. HIRING_TEAM_IDENTIFY, HIRING_TEAM_SYNTHESIZE
+  operation      String
+  /// identify: campaignId; synthesize: personaId
+  subjectKey     String
+  inputHash      String
+  resultJson     Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, operation, subjectKey])
+  @@index([organizationId])
 }
 
 /// Versioned AI model rates for estimated COGS (Phase B). Lookup: latest effectiveFrom <= event time.

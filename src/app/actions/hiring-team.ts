@@ -5,6 +5,7 @@ import {
   addApplicationHiringTeamRole,
   addTemplateToApplication,
   approveApplicationHiringTeamRole,
+  hiringTeamSynthesizeUnchanged,
   queueHiringTeamBuild,
   queueHiringTeamBuildDirect,
   removeApplicationHiringTeamRole,
@@ -217,6 +218,21 @@ export async function rebuildApplicationRoleAction(
     if (!campaignId || !personaId) {
       return { ok: false, message: `${vocab.persona.Singular} was not found.` };
     }
+    const skip = await hiringTeamSynthesizeUnchanged({
+      organizationId,
+      campaignId,
+      personaId,
+    });
+    if (skip.unchanged) {
+      revalidatePath(`/campaigns/${campaignId}`);
+      if (skip.awaitingDetails) {
+        return {
+          ok: true,
+          message: hiringTeamConfig.status.awaitingDetails,
+        };
+      }
+      return { ok: true, message: `No Changes To ${skip.roleName} Persona` };
+    }
     await queueHiringTeamBuild({ organizationId, campaignId, personaId });
     revalidatePath(`/campaigns/${campaignId}`);
     return { ok: true, message: hiringTeamConfig.queuedBuild };
@@ -276,6 +292,21 @@ export async function buildApplicationRoleAction(
     const personaId = String(formData.get("personaId") ?? "").trim();
     if (!campaignId || !personaId) {
       return { ok: false, message: `${vocab.persona.Singular} was not found.` };
+    }
+    const skip = await hiringTeamSynthesizeUnchanged({
+      organizationId,
+      campaignId,
+      personaId,
+    });
+    if (skip.unchanged) {
+      revalidatePath(`/campaigns/${campaignId}`);
+      if (skip.awaitingDetails) {
+        return {
+          ok: true,
+          message: hiringTeamConfig.status.awaitingDetails,
+        };
+      }
+      return { ok: true, message: `No Changes To ${skip.roleName} Persona` };
     }
     await queueHiringTeamBuild({ organizationId, campaignId, personaId });
     revalidatePath(`/campaigns/${campaignId}`);

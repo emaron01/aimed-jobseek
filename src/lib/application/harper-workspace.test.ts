@@ -53,7 +53,9 @@ describe("application job worker logging", () => {
     for (const type of WORKSPACE_JOB_TYPES) {
       expect(process).toContain(`case "${type}"`);
     }
-    expect(service).toContain('type: "CONSULTATION"');
+    expect(service).toMatch(/CONSULTATION/);
+    expect(service).toMatch(/FOR UPDATE(?: OF j)? SKIP LOCKED/);
+    expect(service).toContain("applicationJobAllowsFollowUpWhileRunning");
     expect(worker).toContain("getResearchWorkerConcurrency");
     expect(worker).toContain("formatApplicationJobLog");
     expect(worker).not.toContain("finished application job");
