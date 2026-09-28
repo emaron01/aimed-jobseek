@@ -495,6 +495,22 @@ export function assertAssetAiConfigured(): void {
   getAssetAiConfig();
 }
 
+/**
+ * Startup check: log an operational error when Persona AI env is missing.
+ * Never throws — web and worker must keep starting; seekers hit the
+ * queueHiringTeamBuild message when they try to build.
+ */
+export function assertPersonaAiConfigured(): void {
+  if (isPersonaAiConfigured()) return;
+  console.error(
+    JSON.stringify({
+      event: "persona_ai_configuration_missing",
+      severity: "operational",
+      message: "Persona AI is not configured.",
+    }),
+  );
+}
+
 /** Fail closed for resume and cover-letter generation. */
 export function getAssetAiConfig(): AiConfig {
   const config = getAiConfigForRole("asset");

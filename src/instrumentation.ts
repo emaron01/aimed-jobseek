@@ -2,12 +2,14 @@ import {
   assertAssetAiConfigured,
   assertConsultationAiConfigured,
   assertConsultationReplyAiConfigured,
+  assertPersonaAiConfigured,
 } from "@/lib/ai/config";
 import { assertBrandDeploymentConfig } from "@/lib/product-config/deployment";
 
 /**
- * Production server boot: fail loudly when required brand or consultation
- * AI env is missing. Skipped during `next build` so CI can compile without
+ * Production server boot: fail loudly when required brand, consultation,
+ * or asset AI env is missing. Persona AI missing is logged only (never
+ * stops boot). Skipped during `next build` so CI can compile without
  * production secrets.
  */
 export async function register() {
@@ -17,4 +19,5 @@ export async function register() {
   assertConsultationAiConfigured();
   assertConsultationReplyAiConfigured();
   assertAssetAiConfigured();
+  assertPersonaAiConfigured();
 }

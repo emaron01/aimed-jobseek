@@ -4,6 +4,7 @@ import { clearAiProviderCache, createAiProvider } from "@/lib/ai/provider";
 import {
   assertConsultationAiConfigured,
   assertConsultationReplyAiConfigured,
+  assertPersonaAiConfigured,
   getEmailAiConfig,
   getEmailFactsAiConfig,
   getResearchAiConfig,
@@ -231,6 +232,49 @@ describe("role-specific AI configuration", () => {
     expect(instrumentation).toContain("assertConsultationAiConfigured");
     expect(instrumentation).toContain("assertConsultationReplyAiConfigured");
     expect(instrumentation).toContain("assertAssetAiConfigured");
+  });
+
+  it("logs an operational error when PERSONA_AI is missing and never throws", () => {
+    clearAllAiEnv();
+    const errors: string[] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args.map(String).join(" "));
+    };
+    try {
+      expect(() => assertPersonaAiConfigured()).not.toThrow();
+      expect(errors.some((line) => line.includes("persona_ai_configuration_missing"))).toBe(
+        true,
+      );
+      expect(errors.some((line) => line.includes('"severity":"operational"'))).toBe(
+        true,
+      );
+    } finally {
+      console.error = originalError;
+    }
+
+    clearAllAiEnv();
+    process.env.PERSONA_AI_PROVIDER = "openai-compatible";
+    process.env.PERSONA_AI_MODEL = "persona-model";
+    process.env.PERSONA_AI_MODEL_URL =
+      "https://persona.example.test/v1/chat/completions";
+    process.env.PERSONA_AI_API_KEY = "persona-secret-key";
+    const configuredErrors: string[] = [];
+    console.error = (...args: unknown[]) => {
+      configuredErrors.push(args.map(String).join(" "));
+    };
+    try {
+      expect(() => assertPersonaAiConfigured()).not.toThrow();
+      expect(configuredErrors).toEqual([]);
+    } finally {
+      console.error = originalError;
+    }
+
+    const instrumentation = readFileSync("src/instrumentation.ts", "utf8");
+    expect(instrumentation).toContain("assertPersonaAiConfigured");
+    const worker = readFileSync("scripts/research-worker.ts", "utf8");
+    expect(worker).toContain("assertPersonaAiConfigured");
+    expect(worker).not.toContain("isPersonaAiConfigured()");
   });
 
   it("redacts research and scoring API keys from log text", () => {

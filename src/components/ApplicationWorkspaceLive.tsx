@@ -153,6 +153,9 @@ export function WorkspaceProgress({
     );
   }
   if (failed) {
+    if (type === "HIRING_TEAM_IDENTIFY" || type === "HIRING_TEAM_BUILD") {
+      return null;
+    }
     return (
       <div
         className={`space-y-2 rounded-md border border-warning bg-warning-tint p-3 ${WORKSPACE_CARD_WRAP_CLASS}`}

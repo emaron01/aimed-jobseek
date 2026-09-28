@@ -11,12 +11,6 @@ function seekerEdited(value: unknown): boolean {
 }
 
 function personaBuilt(persona: Persona): boolean {
-  if (
-    persona.setupStatus === "NEEDS_REVIEW" ||
-    persona.setupStatus === "APPROVED"
-  ) {
-    return true;
-  }
   if (!persona.profileJson || typeof persona.profileJson !== "object") return false;
   const narrative = (persona.profileJson as { narrative?: unknown }).narrative;
   return Boolean(narrative && typeof narrative === "object");

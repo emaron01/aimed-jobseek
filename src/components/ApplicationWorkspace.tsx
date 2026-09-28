@@ -24,6 +24,8 @@ import {
 import { listApplicationContacts } from "@/lib/application/contacts";
 import { mergeExistingHiringTeamRoles } from "@/lib/hiring-team/merge-existing";
 import { isHiringTeamPersonaBuilt } from "@/lib/hiring-team/build";
+import { profileJsonAwaitingSeekerInput } from "@/lib/hiring-team/synthesize-outcome";
+import { AppPendingIndicator } from "@/components/AppButton";
 import { getApplicationResearchStatus } from "@/lib/application/research-status";
 import {
   addApplicationRoleAction,
@@ -72,7 +74,6 @@ import {
 } from "@/lib/application/fit";
 import type { ApplicationFitOutcome } from "@/lib/application/fit";
 import { readApplicationFitStale } from "@/lib/application/service";
-import type { JobScorecard, ScorecardItem } from "@/lib/job-requirement/types";
 import { prisma } from "@/lib/prisma";
 import {
   coverLetterEvidenceIsThin,
@@ -80,7 +81,8 @@ import {
 } from "@/lib/application-assets/service";
 import { presentationPlanSchema } from "@/lib/application-assets/plan-contract";
 import { readApplicationNextStep } from "@/lib/application/next-step";
-import { applicationResearchCopy, applicationSummaryConfig, applicationWorkspaceCopy, consultationConfig, consultationConversationCopy, employerIdentityCopy, hiringTeamConfig, hiringTeamDetailsTitle, outreachConfig, polishCopy, vocab } from "@/lib/product-config";
+import { applicationResearchCopy, applicationSummaryConfig, applicationWorkspaceCopy, consultationConversationCopy, employerIdentityCopy, hiringTeamConfig, hiringTeamDetailsTitle, outreachConfig, polishCopy, vocab } from "@/lib/product-config";
+import { features } from "@/lib/product-config/features";
 import {
   parseIdentityVerification,
 } from "@/lib/job-requirement/identity-verification";
@@ -102,61 +104,12 @@ function textList(value: unknown): string[] {
   return parseStringArray(value);
 }
 
-function readScorecard(value: unknown): JobScorecard {
-  if (!value || typeof value !== "object") {
-    return { mission: null, outcomes: [], competencies: [] };
-  }
-  const row = value as Partial<JobScorecard>;
-  const item = (entry: unknown): ScorecardItem | null => {
-    if (!entry || typeof entry !== "object") return null;
-    const candidate = entry as Partial<ScorecardItem>;
-    if (typeof candidate.text !== "string" || !candidate.text.trim()) return null;
-    if (typeof candidate.id !== "string") return null;
-    return {
-      id: candidate.id,
-      text: candidate.text,
-      inferred: candidate.inferred === true,
-    };
-  };
-  return {
-    mission: item(row.mission),
-    outcomes: Array.isArray(row.outcomes)
-      ? row.outcomes.map(item).filter((entry): entry is ScorecardItem => Boolean(entry))
-      : [],
-    competencies: Array.isArray(row.competencies)
-      ? row.competencies.map(item).filter((entry): entry is ScorecardItem => Boolean(entry))
-      : [],
-  };
-}
-
 function readOutcomes(value: unknown): ApplicationFitOutcome[] {
   if (!Array.isArray(value)) return [];
   return value.filter((entry): entry is ApplicationFitOutcome => {
     if (!entry || typeof entry !== "object") return false;
     return typeof (entry as { name?: unknown }).name === "string";
   });
-}
-
-function ScorecardList({
-  title,
-  items,
-}: {
-  title: string;
-  items: ScorecardItem[];
-}) {
-  if (items.length === 0) return null;
-  return (
-    <div>
-      <h3 className="text-sm font-medium text-ink">{title}</h3>
-      <ul className="mt-2 space-y-2">
-        {items.map((item) => (
-          <li key={item.id} className="text-sm text-ink" data-scorecard-id={item.id}>
-            {item.text}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
 }
 
 function IdentityVerificationPanel({
@@ -356,6 +309,12 @@ export async function ApplicationWorkspace({
               type: true,
               format: true,
               scheduledAt: true,
+              notesAfter: true,
+              thankYouClarifyJson: true,
+              interviewers: {
+                take: 1,
+                select: { contactId: true },
+              },
             },
           },
           presentationPlans: true,
@@ -385,7 +344,6 @@ export async function ApplicationWorkspace({
     organizationId,
     campaignId,
   });
-  const scorecard = readScorecard(requirement.scorecardJson);
   const research = requirement.company?.research[0] ?? null;
   const fit = requirement.campaign.applicationFit;
   const icp = requirement.campaign.icp;
@@ -654,21 +612,6 @@ export async function ApplicationWorkspace({
       <BulletList title={applicationWorkspaceCopy.responsibilitiesTitle} items={textList(requirement.responsibilities)} />
       <BulletList title={applicationWorkspaceCopy.requiredTitle} items={textList(requirement.requiredItems)} />
       <BulletList title={applicationWorkspaceCopy.preferredTitle} items={textList(requirement.preferredItems)} />
-      <div className="space-y-3 border-t border-edge pt-4">
-        <h3 className="text-sm font-semibold text-ink">{applicationWorkspaceCopy.scorecardTitle}</h3>
-        {scorecard.mission ? (
-          <p className="text-sm text-ink">{scorecard.mission.text}</p>
-        ) : (
-          <p className="text-sm text-subtle">{applicationWorkspaceCopy.noMission}</p>
-        )}
-        <ScorecardList title={applicationWorkspaceCopy.outcomesTitle} items={scorecard.outcomes} />
-        <ScorecardList title={applicationWorkspaceCopy.competenciesTitle} items={scorecard.competencies} />
-        <p className="text-sm text-muted" data-testid="scorecard-note">
-          {applicationWorkspaceCopy.scorecardNote
-            .replaceAll("{product}", vocab.product.Singular)
-            .replaceAll("{consultant}", consultationConfig.displayName)}
-        </p>
-      </div>
       {canEdit ? (
         <ApplicationJobRequirementActions
           campaignId={requirement.campaignId}
@@ -710,7 +653,7 @@ export async function ApplicationWorkspace({
     </section>
       </div>
     </details>
-    {icp ? (
+    {features.employerIcpFit && icp ? (
     <details
       className="space-y-4 rounded-lg border border-edge bg-surface p-5"
       data-testid="employer-fit"
@@ -883,12 +826,23 @@ export async function ApplicationWorkspace({
         personaBuilt: isHiringTeamPersonaBuilt(role),
       }))}
       contacts={requirement.campaign.contacts.map(toContactRow)}
-      interviewStages={requirement.campaign.interviewStages.map((stage) => ({
-        id: stage.id,
-        type: stage.type,
-        format: stage.format,
-        scheduledAt: stage.scheduledAt.toISOString(),
-      }))}
+      interviewStages={requirement.campaign.interviewStages.map((stage) => {
+        const interviewerContactId = stage.interviewers[0]?.contactId ?? null;
+        const personaId =
+          requirement.campaign.contacts.find(
+            (row) => row.contact.id === interviewerContactId,
+          )?.chosenPersonaId ?? null;
+        return {
+          id: stage.id,
+          type: stage.type,
+          format: stage.format,
+          scheduledAt: stage.scheduledAt.toISOString(),
+          notesAfter: stage.notesAfter,
+          thankYouClarifyJson: stage.thankYouClarifyJson,
+          interviewerContactId,
+          personaId,
+        };
+      })}
       assets={requirement.campaign.applicationAssets
         .filter((asset): asset is typeof asset & {
           type: "EMAIL" | "LINKEDIN_CONNECTION_NOTE" | "LINKEDIN_INMAIL";
@@ -1053,18 +1007,33 @@ function toContactRow(row: {
   };
 }
 
-function hiringTeamStatusLabel(
-  setupStatus: string,
-  approvalStatus: string,
-  staleAt: Date | null,
-): string {
-  if (staleAt) return hiringTeamConfig.status.stale;
-  if (approvalStatus === "APPROVED") return hiringTeamConfig.status.approved;
-  if (setupStatus === "FAILED") return hiringTeamConfig.status.failed;
-  if (setupStatus === "SYNTHESIZING") return hiringTeamConfig.status.building;
-  if (setupStatus === "NEEDS_REVIEW") return hiringTeamConfig.status.built;
-  if (setupStatus === "PARTIAL") return hiringTeamConfig.status.built;
-  return hiringTeamConfig.status.identified;
+function hiringTeamStatusChip(input: {
+  setupStatus: string;
+  approvalStatus: string;
+  staleAt: Date | null;
+  profileJson: unknown;
+  building: boolean;
+}): { kind: "none" | "text" | "building"; text?: string } {
+  if (input.building) {
+    return { kind: "building", text: hiringTeamConfig.status.building };
+  }
+  if (input.staleAt) {
+    return { kind: "text", text: hiringTeamConfig.status.stale };
+  }
+  if (
+    input.approvalStatus === "APPROVED" &&
+    isHiringTeamPersonaBuilt({ profileJson: input.profileJson })
+  ) {
+    return { kind: "text", text: hiringTeamConfig.status.approved };
+  }
+  if (
+    profileJsonAwaitingSeekerInput(input.profileJson) ||
+    input.setupStatus === "FAILED"
+  ) {
+    return { kind: "text", text: hiringTeamConfig.status.awaitingDetails };
+  }
+  // Identified / Ready: no chip
+  return { kind: "none" };
 }
 
 function KindMark({ kind }: { kind: string }) {
@@ -1115,7 +1084,24 @@ async function HiringTeamSection({
   const roleCard = ({
     role,
     narrative,
-  }: (typeof organizedRoles)[number]) => (
+  }: (typeof organizedRoles)[number]) => {
+    const building =
+      role.setupStatus === "SYNTHESIZING" ||
+      jobs.some(
+        (job) =>
+          job.type === "HIRING_TEAM_BUILD" &&
+          job.targetId === role.id &&
+          (job.status === "PENDING" || job.status === "IN_PROGRESS"),
+      );
+    const chip = hiringTeamStatusChip({
+      setupStatus: role.setupStatus,
+      approvalStatus: role.approvalStatus,
+      staleAt: role.staleAt,
+      profileJson: role.profileJson,
+      building,
+    });
+    const roleBuilt = isHiringTeamPersonaBuilt(role);
+    return (
     <div
       key={role.id}
       className="rounded-md border border-edge p-4"
@@ -1125,9 +1111,18 @@ async function HiringTeamSection({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h4 className="text-sm font-semibold text-ink">{role.name}</h4>
-            <span className="text-xs text-subtle">
-              {hiringTeamStatusLabel(role.setupStatus, role.approvalStatus, role.staleAt)}
-            </span>
+            {chip.kind === "building" ? (
+              <span data-testid={`hiring-team-status-${role.id}`}>
+                <AppPendingIndicator label={chip.text ?? hiringTeamConfig.status.building} />
+              </span>
+            ) : chip.kind === "text" && chip.text ? (
+              <span
+                className="text-xs text-subtle"
+                data-testid={`hiring-team-status-${role.id}`}
+              >
+                {chip.text}
+              </span>
+            ) : null}
           </div>
           {canEdit ? (
             <HiringTeamRoleActions
@@ -1306,15 +1301,13 @@ async function HiringTeamSection({
             />
           </>
         ) : null}
-        {narrative?.modelNote ? (
-          <p className="text-sm text-warning">{narrative.modelNote}</p>
-        ) : null}
         {role.additionalContext ? (
           <p className="text-sm text-ink">{role.additionalContext}</p>
         ) : null}
         {canEdit ? (
           <div className="space-y-3 print:hidden">
             <div className="flex flex-wrap gap-3">
+              {roleBuilt ? (
               <ApplicationActionForm
                 action={approveApplicationRoleAction}
                 submitLabel="Approve"
@@ -1323,6 +1316,7 @@ async function HiringTeamSection({
                 <input type="hidden" name="campaignId" value={campaignId} />
                 <input type="hidden" name="personaId" value={role.id} />
               </ApplicationActionForm>
+              ) : null}
               <ApplicationActionForm
                 action={removeApplicationRoleAction}
                 submitLabel="Remove role"
@@ -1332,6 +1326,7 @@ async function HiringTeamSection({
                 <input type="hidden" name="campaignId" value={campaignId} />
                 <input type="hidden" name="personaId" value={role.id} />
               </ApplicationActionForm>
+              {roleBuilt ? (
               <ApplicationActionForm
                 action={saveRoleAsTemplateAction}
                 submitLabel="Save as template"
@@ -1341,6 +1336,7 @@ async function HiringTeamSection({
                 <input type="hidden" name="campaignId" value={campaignId} />
                 <input type="hidden" name="personaId" value={role.id} />
               </ApplicationActionForm>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -1348,6 +1344,7 @@ async function HiringTeamSection({
       </details>
     </div>
   );
+  };
   return (
     <details id="hiring-team" className="space-y-4 rounded-lg border border-edge bg-surface p-5" data-testid="hiring-team">
       {asPage ? <OpenDetailsOnMount /> : null}
@@ -1366,6 +1363,35 @@ async function HiringTeamSection({
           Saved templates are added only when you choose one.
         </p>
       </div>
+      {canEdit ? (
+        <ApplicationActionForm
+          action={addApplicationRoleAction}
+          submitLabel="Add Interviewer Title / Persona"
+          testId="add-hiring-team-role"
+        >
+          <input type="hidden" name="campaignId" value={campaignId} />
+          <label className="block text-sm">
+            <span className="font-medium text-ink">Name</span>
+            <input name="name" required className={fieldClass} />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-ink">Likely titles</span>
+            <textarea name="likelyTitles" rows={3} className={fieldClass} />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-ink">Department</span>
+            <input name="department" className={fieldClass} />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-ink">Why this role matters</span>
+            <textarea name="whyThisRoleMatters" rows={2} className={fieldClass} />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-ink">Notes</span>
+            <textarea name="notes" rows={2} className={fieldClass} />
+          </label>
+        </ApplicationActionForm>
+      ) : null}
       {roles.length === 0 ? (
         <p className="text-sm text-muted">No {vocab.persona.plural} yet.</p>
       ) : (
@@ -1397,31 +1423,6 @@ async function HiringTeamSection({
           testId="build-all-direct-roles"
         >
           <input type="hidden" name="campaignId" value={campaignId} />
-        </ApplicationActionForm>
-      ) : null}
-      {canEdit ? (
-        <ApplicationActionForm action={addApplicationRoleAction} submitLabel={`Add ${vocab.persona.singular}`} testId="add-hiring-team-role">
-          <input type="hidden" name="campaignId" value={campaignId} />
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Name</span>
-            <input name="name" required className={fieldClass} />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Likely titles</span>
-            <textarea name="likelyTitles" rows={3} className={fieldClass} />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Department</span>
-            <input name="department" className={fieldClass} />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Why this role matters</span>
-            <textarea name="whyThisRoleMatters" rows={2} className={fieldClass} />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Notes</span>
-            <textarea name="notes" rows={2} className={fieldClass} />
-          </label>
         </ApplicationActionForm>
       ) : null}
       {canEdit && templates.length > 0 ? (

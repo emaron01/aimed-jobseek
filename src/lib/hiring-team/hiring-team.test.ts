@@ -11,6 +11,28 @@ vi.mock("@/lib/ai", async (importOriginal) => {
     getPersonaAiProvider: () => ({ generateStructured }),
   };
 });
+
+vi.mock("@/lib/ai/paid-call-gate", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/ai/paid-call-gate")>();
+  return {
+    ...actual,
+    runPaidStructuredCall: async <T>(input: {
+      callProvider: () => Promise<T>;
+    }) => ({ data: await input.callProvider(), skipped: false }),
+    findPaidCallReceipt: async () => null,
+  };
+});
+
+vi.mock("@/lib/hiring-team/synthesize-outcome", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/hiring-team/synthesize-outcome")>();
+  return {
+    ...actual,
+    recordHiringTeamIncompleteSynthesize: vi.fn(async () => undefined),
+    readHiringTeamIncompleteSynthesize: vi.fn(async () => null),
+  };
+});
 import { readFileSync } from "node:fs";
 import {
   hiringTeamEvidenceExcerpts,
@@ -152,6 +174,180 @@ describe("hiring team evidence and selectors", () => {
         reportingLine: NORMAL_JOB_MODEL.reportingLine,
       }),
     ).toEqual(["Director of Engineering", "Hiring Manager"]);
+  });
+
+  it("keeps role-cap drops server-side and out of seeker-facing modelNote", () => {
+    const job = fixtureJob();
+    const evidenceText = evidenceTextFor({
+      job,
+      research: null,
+      includeResearch: false,
+    });
+    const distinctRoles = [
+      {
+        name: "Hiring Manager",
+        likelyTitles: ["Director of Engineering"],
+        department: "Engineering",
+        involvement: "DIRECT" as const,
+        whyInvolved: "The Senior Product Engineer reports to the Director of Engineering.",
+        evidence: [
+          {
+            claim: "The position reports to the Director of Engineering.",
+            kind: "FACT" as const,
+          },
+        ],
+      },
+      {
+        name: "Technical Recruiter",
+        likelyTitles: ["Technical Recruiter"],
+        department: "Talent",
+        involvement: "DIRECT" as const,
+        whyInvolved: "A posted Senior Product Engineer role is screened before it reaches the hiring manager.",
+        evidence: [
+          {
+            claim: "The opening is a full-time Senior Product Engineer position.",
+            kind: "FACT" as const,
+          },
+        ],
+      },
+      {
+        name: "Peer Product Engineer",
+        likelyTitles: ["Staff Product Engineer"],
+        department: "Engineering",
+        involvement: "DIRECT" as const,
+        whyInvolved: "A peer product engineer joins the panel for the Senior Product Engineer opening.",
+        evidence: [
+          {
+            claim: "The opening is a full-time Senior Product Engineer position.",
+            kind: "FACT" as const,
+          },
+        ],
+      },
+      {
+        name: "Skip-level Engineering Executive",
+        likelyTitles: ["VP of Engineering"],
+        department: "Engineering",
+        involvement: "DIRECT" as const,
+        whyInvolved: "The hiring manager's executive sponsors the Senior Product Engineer requisition.",
+        evidence: [
+          {
+            claim: "The position reports to the Director of Engineering.",
+            kind: "FACT" as const,
+          },
+        ],
+      },
+      {
+        name: "Reliability Lead",
+        likelyTitles: ["Reliability Lead"],
+        department: "Engineering",
+        involvement: "INDIRECT" as const,
+        whyInvolved: "The mission is to make warehouse robots reliable, so a reliability lead is affected by the hire.",
+        evidence: [
+          {
+            claim: "The mission of this role is to make warehouse robots reliable.",
+            kind: "FACT" as const,
+          },
+        ],
+      },
+      {
+        name: "Fleet Operations Partner",
+        likelyTitles: ["Fleet Operations Manager"],
+        department: "Operations",
+        involvement: "INDIRECT" as const,
+        whyInvolved: "Warehouse robot fleet operations depend on the Senior Product Engineer hire's delivery.",
+        evidence: [
+          {
+            claim: "The mission of this role is to make warehouse robots reliable.",
+            kind: "FACT" as const,
+          },
+        ],
+      },
+      {
+        name: "On-call Engineering Lead",
+        likelyTitles: ["On-call Lead"],
+        department: "Engineering",
+        involvement: "INDIRECT" as const,
+        whyInvolved: "On-call load for warehouse robots changes with the Senior Product Engineer hire.",
+        evidence: [
+          {
+            claim: "The mission of this role is to make warehouse robots reliable.",
+            kind: "FACT" as const,
+          },
+        ],
+      },
+      {
+        name: "Safety Compliance Reviewer",
+        likelyTitles: ["Safety Compliance Manager"],
+        department: "Compliance",
+        involvement: "INDIRECT" as const,
+        whyInvolved: "Safety compliance for warehouse robots is reviewed when this engineer ships changes.",
+        evidence: [
+          {
+            claim: "The mission of this role is to make warehouse robots reliable.",
+            kind: "FACT" as const,
+          },
+        ],
+      },
+      {
+        name: "Channel Partnerships Leader",
+        likelyTitles: ["Head of Channel Partnerships"],
+        department: "Sales",
+        involvement: "INDIRECT" as const,
+        whyInvolved: "Channel partnerships feel the product quality bar set by this engineering hire.",
+        evidence: [
+          {
+            claim: "The opening is a full-time Senior Product Engineer position.",
+            kind: "FACT" as const,
+          },
+        ],
+      },
+      {
+        name: "Finance Business Partner",
+        likelyTitles: ["Finance Business Partner"],
+        department: "Finance",
+        involvement: "INDIRECT" as const,
+        whyInvolved: "Finance partners on headcount and tooling cost for the Senior Product Engineer role.",
+        evidence: [
+          {
+            claim: "The opening is a full-time Senior Product Engineer position.",
+            kind: "FACT" as const,
+          },
+        ],
+      },
+      {
+        name: "Enterprise Risk and Security Stakeholder",
+        likelyTitles: ["Enterprise Risk Manager"],
+        department: "Risk",
+        involvement: "INDIRECT" as const,
+        whyInvolved: "Enterprise risk reviews security ownership tied to this engineering hire.",
+        evidence: [
+          {
+            claim: "The opening is a full-time Senior Product Engineer position.",
+            kind: "FACT" as const,
+          },
+        ],
+      },
+    ];
+    const guarded = applyHiringTeamIdentificationGuardrails({
+      roles: distinctRoles,
+      job,
+      evidenceText,
+    });
+    expect(guarded.roles.length).toBe(hiringTeamConfig.maxIdentifiedRoles);
+    expect(
+      guarded.dropped.some((item) =>
+        item.reason.includes(
+          `Exceeded the configured maximum of ${hiringTeamConfig.maxIdentifiedRoles} roles.`,
+        ),
+      ),
+    ).toBe(true);
+    const buildSource = readFileSync("src/lib/hiring-team/build.ts", "utf8");
+    expect(buildSource).not.toContain("guarded.dropped.map");
+    expect(buildSource).toContain("dropped: guarded.dropped");
+    const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
+    // modelNote stays stored for diagnostics but is never seeker-rendered.
+    expect(workspace).not.toContain("narrative?.modelNote");
+    expect(workspace).not.toMatch(/dropped\.map|profileJson\.dropped|identification.*dropped/i);
   });
 
   it("enforces reporting line, grounding, semantic dedupe, and stable keys on model output", () => {
@@ -329,6 +525,8 @@ describe("hiring team evidence and selectors", () => {
 
     isPersonaAiConfigured.mockReturnValue(false);
     const unavailable = await synthesizeHiringTeamRole({
+      organizationId: "org_test",
+      personaId: "persona_test",
       roleName: "Hiring Manager",
       likelyTitles: ["Director of Engineering"],
       department: "Engineering",
@@ -337,6 +535,7 @@ describe("hiring team evidence and selectors", () => {
       notes: null,
       excerpts: [],
       peers: [],
+      peerIdentities: [],
       jobLines: lines,
       evidenceText: "Reports to: Director of Engineering",
     });
@@ -387,6 +586,8 @@ describe("hiring team evidence and selectors", () => {
         },
       });
     const drafted = await synthesizeHiringTeamRole({
+      organizationId: "org_test",
+      personaId: "persona_test",
       roleName: "Hiring Manager",
       likelyTitles: ["Director of Engineering"],
       department: "Engineering",
@@ -395,17 +596,19 @@ describe("hiring team evidence and selectors", () => {
       notes: null,
       excerpts: [],
       peers: [],
+      peerIdentities: [],
       jobLines: lines,
       evidenceText: "Reports to: Director of Engineering",
     });
-    expect(generateStructured).toHaveBeenCalledTimes(1);
+    // First draft fails assess (restates job); one regenerate with rejection.
+    expect(generateStructured).toHaveBeenCalledTimes(2);
     expect(drafted.ok).toBe(true);
     if (drafted.ok) {
-      expect(drafted.narrative.overview.text).toContain("reporting line");
+      expect(drafted.narrative.overview.text).toContain("warehouse robot fleet");
     }
   });
 
-  it("keeps the last parseable hiring-team draft when quality still fails", async () => {
+  it("leaves the role awaiting details when quality still fails after regenerate", async () => {
     const lines = jobRequirementLines(fixtureJob());
     const restated = {
       data: {
@@ -428,6 +631,8 @@ describe("hiring team evidence and selectors", () => {
     isPersonaAiConfigured.mockReturnValue(true);
     generateStructured.mockResolvedValueOnce(restated).mockResolvedValueOnce(restated);
     const drafted = await synthesizeHiringTeamRole({
+      organizationId: "org_test",
+      personaId: "persona_test",
       roleName: "Hiring Manager",
       likelyTitles: ["Director of Engineering"],
       department: "Engineering",
@@ -436,12 +641,15 @@ describe("hiring team evidence and selectors", () => {
       notes: null,
       excerpts: [],
       peers: [],
+      peerIdentities: [],
       jobLines: lines,
       evidenceText: "Reports to: Director of Engineering",
     });
-    expect(drafted.ok).toBe(true);
-    if (drafted.ok) {
-      expect(drafted.narrative.overview.text).toContain("reporting line");
+    expect(generateStructured).toHaveBeenCalledTimes(2);
+    expect(drafted.ok).toBe(false);
+    if (!drafted.ok) {
+      expect(drafted.status).toBe("AWAITING_DETAILS");
+      expect(drafted.kind).toBe("INSUFFICIENT_INFORMATION");
     }
   });
 
@@ -760,14 +968,14 @@ describe.skipIf(!hasTestDatabase())("hiring team per application", () => {
     const edited = await prisma.persona.findFirst({ where: { id: manager!.id } });
     expect(edited?.name).toBe("Edited hiring manager");
 
-    await approveApplicationHiringTeamRole({
-      organizationId,
-      campaignId: appA.id,
-      personaId: manager!.id,
-    });
-    expect(
-      (await prisma.persona.findFirst({ where: { id: manager!.id } }))?.approvalStatus,
-    ).toBe("APPROVED");
+    // Approve requires a built narrative; identification-only roles stay unapproved.
+    await expect(
+      approveApplicationHiringTeamRole({
+        organizationId,
+        campaignId: appA.id,
+        personaId: manager!.id,
+      }),
+    ).rejects.toThrow(/Generate this .+ before approving/);
 
     expect(rolesA).toHaveLength(1);
     const addedForRebuild = await addApplicationHiringTeamRole({
@@ -832,6 +1040,62 @@ describe.skipIf(!hasTestDatabase())("hiring team per application", () => {
     });
     expect(savedTemplate?.templateKey).toBeNull();
     expect(savedTemplate?.name).toBe("Staff Engineer interviewer");
+  });
+
+  it("editing one built role marks only that role stale", async () => {
+    const campaign = await application(`Edit stale scope ${suffix}`);
+    await requirement(campaign.id, { disposition: "UNDISCLOSED" });
+    const edited = await prisma.persona.create({
+      data: {
+        organizationId,
+        productId,
+        campaignId: campaign.id,
+        name: "Hiring Manager",
+        suggestionKey: "hiring_manager_edit_stale",
+        targetTitles: ["Director of Engineering"],
+        whyThisPersonaMatters: "Owns the hire.",
+        setupStatus: "NEEDS_REVIEW",
+        approvalStatus: "NEEDS_REVIEW",
+        staleAt: null,
+        profileJson: {
+          involvement: "DIRECT",
+          narrative: { overview: { text: "Owns delivery of the fleet.", kind: "FACT" } },
+        },
+      },
+    });
+    const sibling = await prisma.persona.create({
+      data: {
+        organizationId,
+        productId,
+        campaignId: campaign.id,
+        name: "Recruiter",
+        suggestionKey: "recruiter_edit_stale",
+        targetTitles: ["Talent Acquisition Partner"],
+        whyThisPersonaMatters: "Runs the search.",
+        setupStatus: "NEEDS_REVIEW",
+        approvalStatus: "NEEDS_REVIEW",
+        staleAt: null,
+        profileJson: {
+          involvement: "DIRECT",
+          narrative: { overview: { text: "Runs the recruiting process.", kind: "FACT" } },
+        },
+      },
+    });
+    await updateApplicationHiringTeamRole({
+      organizationId,
+      campaignId: campaign.id,
+      personaId: edited.id,
+      name: "Hiring Manager",
+      likelyTitles: ["Director of Engineering", "VP Engineering"],
+      department: "Engineering",
+      whyThisRoleMatters: "Seeker clarified reporting ownership.",
+      notes: "Edited notes.",
+    });
+    const afterEdited = await prisma.persona.findUniqueOrThrow({ where: { id: edited.id } });
+    const afterSibling = await prisma.persona.findUniqueOrThrow({ where: { id: sibling.id } });
+    expect(afterEdited.staleAt).not.toBeNull();
+    expect(afterSibling.staleAt).toBeNull();
+    expect(afterSibling.name).toBe("Recruiter");
   });
 
   it("merges existing duplicate roles and keeps personas, edits, contacts, and outreach", async () => {

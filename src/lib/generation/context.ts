@@ -345,11 +345,9 @@ export async function loadApplicationGenerationContext(
   }
   if (persona) {
     const built =
-      persona.setupStatus === "NEEDS_REVIEW" ||
-      persona.setupStatus === "APPROVED" ||
-      (persona.profileJson &&
-        typeof persona.profileJson === "object" &&
-        Boolean((persona.profileJson as { narrative?: unknown }).narrative));
+      persona.profileJson &&
+      typeof persona.profileJson === "object" &&
+      Boolean((persona.profileJson as { narrative?: unknown }).narrative);
     addSource(sources, {
       id: `persona:${persona.id}`,
       text: [
