@@ -15,6 +15,7 @@ import {
   personViewListQuestions,
   type HarperInterviewerSection,
 } from "@/lib/consultation/harper-layout";
+import { personProfileCoachItemIds } from "@/lib/application-summary/coach";
 import { interviewConfig, outreachConfig, vocab } from "@/lib/product-config";
 import { useMemo, useState } from "react";
 
@@ -130,10 +131,7 @@ export function HarperPersonInlineProfile({
     !jobsActive;
 
   const profileCoachItemIds = useMemo(
-    () =>
-      (section?.likelyQuestions ?? [])
-        .map((item) => item.id?.trim() ?? "")
-        .filter(Boolean),
+    () => (section ? personProfileCoachItemIds(section) : []),
     [section],
   );
 
@@ -182,6 +180,7 @@ export function HarperPersonInlineProfile({
         personaBuilt={personaBuilt}
         personaId={personaId}
         showCoachAnswerForms
+        showRoleKindCoachSections
         coachQaItems={coachQaItems}
         jobsActive={jobsActive}
         showReply={showReply}
