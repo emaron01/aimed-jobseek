@@ -31,6 +31,7 @@ import {
   vocab,
 } from "@/lib/product-config";
 import { SubmitButton, AppButton, AppActionLink } from "@/components/ui";
+import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import {
   WORKSPACE_CARD_WRAP_CLASS,
   WORKSPACE_MESSAGE_WRAP_CLASS,
@@ -88,6 +89,10 @@ type InterviewStageRow = {
   type: keyof typeof interviewConfig.types;
   format: keyof typeof interviewConfig.formats;
   scheduledAt: string;
+  notesAfter?: string | null;
+  thankYouClarifyJson?: unknown;
+  interviewerContactId?: string | null;
+  personaId?: string | null;
 };
 
 const GENERATOR_KINDS: OutreachGeneratorKind[] = [
@@ -169,6 +174,28 @@ function interviewStageLabel(stage: InterviewStageRow): string {
     day: "numeric",
   }).format(date);
   return `${interviewConfig.types[stage.type]} · ${stamped}`;
+}
+
+function stageThankYouClarify(stage: InterviewStageRow): {
+  questions: Array<{ id: string; text: string }>;
+  needsAnswers: boolean;
+} {
+  const thankYouClarify =
+    stage.thankYouClarifyJson &&
+    typeof stage.thankYouClarifyJson === "object"
+      ? (stage.thankYouClarifyJson as {
+          questions?: Array<{ id: string; text: string }>;
+          answers?: Array<{ id: string; answer: string }>;
+          skipped?: boolean;
+        })
+      : null;
+  const questions =
+    thankYouClarify?.questions?.filter((item) => item.id && item.text) ?? [];
+  const needsAnswers =
+    questions.length > 0 &&
+    !thankYouClarify?.skipped &&
+    !(thankYouClarify?.answers?.some((item) => item.answer?.trim()) ?? false);
+  return { questions, needsAnswers };
 }
 
 export function contactOutreachReadyLabel(
@@ -502,6 +529,137 @@ export function ApplicationOutreachSection({
         </div>
       ) : null}
 
+      {canEdit
+        ? interviewStages
+            .filter(
+              (stage) =>
+                Boolean(stage.notesAfter?.trim()) &&
+                Boolean(stage.interviewerContactId),
+            )
+            .map((stage) => {
+              const clarify = stageThankYouClarify(stage);
+              const contactId = stage.interviewerContactId!;
+              const personaId =
+                stage.personaId ??
+                contacts.find((row) => row.contactId === contactId)?.personaId ??
+                roles[0]?.id ??
+                "";
+              return (
+                <div
+                  key={stage.id}
+                  className="space-y-3 rounded-md border border-edge bg-canvas p-4"
+                  data-testid={`outreach-stage-followup-${stage.id}`}
+                >
+                  <h3 className="text-sm font-semibold text-ink">
+                    {interviewStageLabel(stage)}
+                  </h3>
+                  {clarify.needsAnswers ? (
+                    <ApplicationActionForm
+                      action={generateOutreachAssetAction}
+                      submitLabel={
+                        interviewConfig.labels.answerThankYouQuestions
+                      }
+                      testId={`thank-you-answers-${stage.id}`}
+                    >
+                      <input type="hidden" name="campaignId" value={campaignId} />
+                      <input
+                        type="hidden"
+                        name="interviewStageId"
+                        value={stage.id}
+                      />
+                      <input type="hidden" name="contactId" value={contactId} />
+                      <input type="hidden" name="personaId" value={personaId} />
+                      <input type="hidden" name="type" value="EMAIL" />
+                      <input type="hidden" name="purpose" value="THANK_YOU" />
+                      <p className="text-sm text-muted">
+                        {interviewConfig.labels.thankYouClarifyHelp}
+                      </p>
+                      {clarify.questions.map((question) => (
+                        <label key={question.id} className="text-sm">
+                          {question.text}
+                          <input
+                            type="hidden"
+                            name="thankYouAnswerId"
+                            value={question.id}
+                          />
+                          <textarea
+                            name="thankYouAnswer"
+                            rows={2}
+                            className={fieldClass}
+                          />
+                        </label>
+                      ))}
+                    </ApplicationActionForm>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <ApplicationActionForm
+                      action={generateOutreachAssetAction}
+                      submitLabel={interviewConfig.labels.thankYouEmail}
+                      testId={`thank-you-email-${stage.id}`}
+                    >
+                      <input type="hidden" name="campaignId" value={campaignId} />
+                      <input
+                        type="hidden"
+                        name="interviewStageId"
+                        value={stage.id}
+                      />
+                      <input type="hidden" name="contactId" value={contactId} />
+                      <input type="hidden" name="personaId" value={personaId} />
+                      <input type="hidden" name="type" value="EMAIL" />
+                      <input type="hidden" name="purpose" value="THANK_YOU" />
+                      {clarify.needsAnswers ? (
+                        <input
+                          type="hidden"
+                          name="skipThankYouQuestions"
+                          value="1"
+                        />
+                      ) : null}
+                    </ApplicationActionForm>
+                    <ApplicationActionForm
+                      action={generateOutreachAssetAction}
+                      submitLabel={interviewConfig.labels.thankYouLinkedIn}
+                      testId={`thank-you-linkedin-${stage.id}`}
+                    >
+                      <input type="hidden" name="campaignId" value={campaignId} />
+                      <input
+                        type="hidden"
+                        name="interviewStageId"
+                        value={stage.id}
+                      />
+                      <input type="hidden" name="contactId" value={contactId} />
+                      <input type="hidden" name="personaId" value={personaId} />
+                      <input type="hidden" name="type" value="LINKEDIN_INMAIL" />
+                      <input type="hidden" name="purpose" value="THANK_YOU" />
+                      {clarify.needsAnswers ? (
+                        <input
+                          type="hidden"
+                          name="skipThankYouQuestions"
+                          value="1"
+                        />
+                      ) : null}
+                    </ApplicationActionForm>
+                    <ApplicationActionForm
+                      action={generateOutreachAssetAction}
+                      submitLabel={interviewConfig.labels.checkIn}
+                      testId={`check-in-${stage.id}`}
+                    >
+                      <input type="hidden" name="campaignId" value={campaignId} />
+                      <input
+                        type="hidden"
+                        name="interviewStageId"
+                        value={stage.id}
+                      />
+                      <input type="hidden" name="contactId" value={contactId} />
+                      <input type="hidden" name="personaId" value={personaId} />
+                      <input type="hidden" name="type" value="EMAIL" />
+                      <input type="hidden" name="purpose" value="CHECK_IN" />
+                    </ApplicationActionForm>
+                  </div>
+                </div>
+              );
+            })
+        : null}
+
       {canEdit && showAddContact ? (
         <AddContactForm
           campaignId={campaignId}
@@ -773,7 +931,7 @@ export function ApplicationOutreachSection({
                         />
                       ) : null}
                       {(pendingGenerate?.skipThankYouQuestions ??
-                        thankYouSelected) ? (
+                        false) ? (
                         <input
                           type="hidden"
                           name="skipThankYouQuestions"
@@ -874,7 +1032,8 @@ export function ApplicationOutreachSection({
                       value={lastSent.id}
                     />
                   ) : null}
-                  {thankYouSelected ? (
+                  {thankYouSelected &&
+                  pendingGenerate?.skipThankYouQuestions ? (
                     <input
                       type="hidden"
                       name="skipThankYouQuestions"

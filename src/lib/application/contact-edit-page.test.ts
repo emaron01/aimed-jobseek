@@ -33,7 +33,9 @@ describe("contact edit entry points", () => {
     expect(application).toContain("workspaceContactEditHref");
     expect(outreach).toContain("workspaceContactEditHref");
     expect(hiringTeam).toContain("workspaceContactEditHref");
-    expect(stage).toContain("workspaceContactEditHref");
+    // Batch B1: Stage Edit removed; interviewer name links to Harper instead.
+    expect(stage).not.toContain("workspaceContactEditHref");
+    expect(stage).toContain("workspaceHarperContactHref");
     expect(workspaceContactEditHref("c1", "camp_1")).toBe(
       "/contacts/c1/edit?campaignId=camp_1",
     );

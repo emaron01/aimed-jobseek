@@ -1,14 +1,15 @@
 "use client";
 
 import { AppButton } from "@/components/AppButton";
-import { AppActionLink } from "@/components/ui";
-import { workspaceInterviewLikelyQuestionsHref } from "@/lib/application/workspace-links";
 import { interviewConfig } from "@/lib/product-config";
 
-function openGainedInformation(stageId: string): void {
-  const section = document.getElementById(`gained-information-${stageId}`);
+function openPostInterviewNotes(stageId: string): void {
+  const section = document.getElementById(`post-interview-notes-${stageId}`);
   if (!section) {
-    throw new Error(`Interview notes #gained-information-${stageId} were not found.`);
+    throw new Error(`Post interview notes #post-interview-notes-${stageId} were not found.`);
+  }
+  if (section instanceof HTMLDetailsElement) {
+    section.open = true;
   }
   const field = section.querySelector("textarea");
   if (field instanceof HTMLTextAreaElement) field.focus();
@@ -16,7 +17,6 @@ function openGainedInformation(stageId: string): void {
 }
 
 export function InterviewStageOpenActions({
-  campaignId,
   stageId,
   interviewerContactId,
 }: {
@@ -30,29 +30,11 @@ export function InterviewStageOpenActions({
         type="button"
         variant="secondary"
         disabled={!interviewerContactId}
-        data-testid={`add-gained-information-${stageId}`}
-        onClick={() => openGainedInformation(stageId)}
+        data-testid={`post-interview-notes-${stageId}`}
+        onClick={() => openPostInterviewNotes(stageId)}
       >
-        {interviewConfig.labels.addNewlyGainedInformation}
+        {interviewConfig.labels.postInterviewNotes}
       </AppButton>
-      {interviewerContactId ? (
-        <AppActionLink
-          href={workspaceInterviewLikelyQuestionsHref(campaignId, interviewerContactId)}
-          variant="secondary"
-          data-testid={`review-open-questions-${stageId}`}
-        >
-          {interviewConfig.labels.reviewOpenQuestions}
-        </AppActionLink>
-      ) : (
-        <AppButton
-          type="button"
-          variant="secondary"
-          disabled
-          data-testid={`review-open-questions-${stageId}`}
-        >
-          {interviewConfig.labels.reviewOpenQuestions}
-        </AppButton>
-      )}
     </div>
   );
 }

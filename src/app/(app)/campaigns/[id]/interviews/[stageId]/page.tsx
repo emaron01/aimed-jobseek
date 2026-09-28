@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { InterviewStagePanel } from "@/components/InterviewStagePanel";
 import { PageHeader, TenantMissing, AppActionLink } from "@/components/ui";
 import { listApplicationContacts } from "@/lib/application/contacts";
-import { getApplicationSummaryView } from "@/lib/application-summary/service";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
 import { canOpenCampaignDetail } from "@/lib/campaign/visibility";
@@ -10,6 +9,7 @@ import { listInterviewStages, stageTypeLabel } from "@/lib/interview/stages";
 import { interviewConfig } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
+import { prisma } from "@/lib/prisma-client";
 
 type PageProps = { params: Promise<{ id: string; stageId: string }> };
 
@@ -19,54 +19,48 @@ export default async function InterviewStagePage({ params }: PageProps) {
   if (!organization) return <TenantMissing />;
   const { id, stageId } = await params;
   let stages: Awaited<ReturnType<typeof listInterviewStages>>;
-  let summary: Awaited<ReturnType<typeof getApplicationSummaryView>>;
   let memberships: Awaited<ReturnType<typeof listApplicationContacts>>;
+  let campaign: { ownerUserId: string; visibility: string } | null;
   try {
-    [stages, summary, memberships] = await Promise.all([
+    [stages, memberships, campaign] = await Promise.all([
       listInterviewStages({ organizationId: organization.id, campaignId: id }),
-      getApplicationSummaryView({ organizationId: organization.id, campaignId: id }),
       listApplicationContacts({ organizationId: organization.id, campaignId: id }),
+      prisma.campaign.findFirst({
+        where: { id, organizationId: organization.id },
+        select: { ownerUserId: true, visibility: true },
+      }),
     ]);
   } catch (error) {
     if (error instanceof TenantError) notFound();
     throw error;
   }
   const stage = stages.find((item) => item.id === stageId);
-  if (!stage) notFound();
+  if (!stage || !campaign) notFound();
   const membership = await getMembershipForCurrentUser(organization.id);
   if (
     !canOpenCampaignDetail({
       role: membership.membership.role,
       userId: user.id,
       campaign: {
-        ownerUserId: summary.campaign.ownerUserId,
-        visibility: summary.campaign.visibility,
+        ownerUserId: campaign.ownerUserId,
+        visibility: campaign.visibility,
       },
     })
   ) {
     notFound();
   }
 
-  const canEdit = summary.campaign.ownerUserId === user.id;
+  const canEdit = campaign.ownerUserId === user.id;
   const interviewer = stage.interviewers[0] ?? null;
-  const sectionKey = interviewer ? `contact:${interviewer.contactId}` : null;
-  const person = sectionKey
-    ? summary.people.find((item) => item.sectionKey === sectionKey)
-    : null;
-  const section = sectionKey
-    ? summary.guidance?.people.find((item) => item.sectionKey === sectionKey) ?? null
-    : null;
-  const notes = interviewer
-    ? summary.notesByContactId.get(interviewer.contactId) ?? []
-    : [];
-  const heading =
-    person?.heading
-    ?? (interviewer
-      ? [interviewer.contact.firstName, interviewer.contact.lastName]
-          .filter(Boolean)
-          .join(" ")
-          .trim()
-      : interviewConfig.labels.interviewer);
+  const roles = await prisma.persona.findMany({
+    where: {
+      organizationId: organization.id,
+      campaignId: id,
+      archivedAt: null,
+    },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true },
+  });
 
   return (
     <main className="application-summary mx-auto max-w-5xl space-y-6">
@@ -97,17 +91,7 @@ export default async function InterviewStagePage({ params }: PageProps) {
           personaId: row.chosenPersonaId,
           personaName: row.chosenPersona?.name ?? null,
         }))}
-        roles={summary.roles.map((role) => ({ id: role.id, name: role.name }))}
-        heading={heading}
-        sectionKey={sectionKey}
-        section={section}
-        notes={notes}
-        personaBuilt={person?.personaBuilt ?? false}
-        personaId={
-          person?.roleId
-          ?? memberships.find((row) => row.contactId === interviewer?.contactId)?.chosenPersonaId
-          ?? ""
-        }
+        roles={roles}
       />
     </main>
   );

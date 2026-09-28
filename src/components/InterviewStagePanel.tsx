@@ -1,14 +1,9 @@
 import {
-  addCheatSheetInterviewNoteAction,
   addInterviewInterviewerAction,
   assignExistingInterviewerAction,
 } from "@/app/actions/interview";
-import { AppActionLink } from "@/components/AppButton";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
-import { workspaceContactEditHref } from "@/lib/application/workspace-links";
-import { CheatSheetPersonBody } from "@/components/CheatSheetPersonBody";
-import type { CheatSheetNote } from "@/lib/application-summary/notes";
-import type { CheatSheetPersonSection } from "@/lib/application-summary/contract";
+import { workspaceHarperContactHref } from "@/lib/application/workspace-links";
 import { interviewConfig, outreachConfig, vocab } from "@/lib/product-config";
 
 type RoleOption = { id: string; name: string };
@@ -27,12 +22,6 @@ export function InterviewStagePanel({
   interviewerContactId,
   people,
   roles,
-  heading,
-  sectionKey,
-  section,
-  notes,
-  personaBuilt,
-  personaId,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -40,15 +29,11 @@ export function InterviewStagePanel({
   interviewerContactId: string | null;
   people: PersonOption[];
   roles: RoleOption[];
-  heading: string;
-  sectionKey: string | null;
-  section: CheatSheetPersonSection | null;
-  notes: CheatSheetNote[];
-  personaBuilt: boolean;
-  personaId: string;
 }) {
   const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
   const interviewer = people.find((person) => person.contactId === interviewerContactId);
+  const textLinkClass =
+    "text-sm font-medium text-ink underline decoration-ink underline-offset-2";
 
   return (
     <div className="space-y-4" data-testid={`interview-stage-panel-${stageId}`}>
@@ -56,19 +41,18 @@ export function InterviewStagePanel({
         <h3 className="font-medium text-ink">{interviewConfig.labels.interviewer}</h3>
         {interviewer ? (
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <p className="text-sm text-ink">
+            <a
+              href={workspaceHarperContactHref(campaignId, interviewer.contactId)}
+              className={textLinkClass}
+              data-testid={`harper-contact-link-${interviewer.contactId}`}
+            >
               {interviewer.name}
-              {interviewer.title ? ` · ${interviewer.title}` : ""}
-              {interviewer.personaName ? ` · ${interviewer.personaName}` : ""}
-            </p>
-            {canEdit ? (
-              <AppActionLink
-                href={workspaceContactEditHref(interviewer.contactId, campaignId)}
-                variant="chip"
-                data-testid={`edit-contact-${interviewer.contactId}`}
-              >
-                {outreachConfig.labels.editContact}
-              </AppActionLink>
+            </a>
+            {interviewer.title ? (
+              <span className="text-sm text-ink">· {interviewer.title}</span>
+            ) : null}
+            {interviewer.personaName ? (
+              <span className="text-sm text-ink">· {interviewer.personaName}</span>
             ) : null}
           </div>
         ) : (
@@ -166,46 +150,6 @@ export function InterviewStagePanel({
             </div>
           </details>
         </>
-      ) : null}
-
-      {sectionKey ? (
-        <section className="application-summary-section rounded-lg border border-edge bg-surface p-5">
-          <h3 className="text-lg font-semibold text-ink">{heading}</h3>
-          <div className="mt-4">
-            <CheatSheetPersonBody
-              campaignId={campaignId}
-              canEdit={canEdit}
-              sectionKey={sectionKey}
-              section={section}
-              notes={notes}
-              personaBuilt={personaBuilt}
-              personaId={personaId}
-            />
-          </div>
-        </section>
-      ) : (
-        <p className="text-sm text-muted">{interviewConfig.labels.noCheatSheetSection}</p>
-      )}
-
-      {canEdit && interviewerContactId ? (
-        <div id={`gained-information-${stageId}`}>
-          <ApplicationActionForm
-            action={addCheatSheetInterviewNoteAction}
-            submitLabel={interviewConfig.labels.addGainedInformation}
-            testId={`add-cheat-sheet-note-${stageId}`}
-          >
-            <input type="hidden" name="campaignId" value={campaignId} />
-            <input type="hidden" name="stageId" value={stageId} />
-            <input type="hidden" name="contactId" value={interviewerContactId} />
-            <label className="text-sm">
-              {interviewConfig.labels.gainedInformation}
-              <textarea name="note" rows={4} required className={fieldClass} />
-              <span className="mt-1 block text-xs text-muted">
-                {interviewConfig.labels.gainedInformationHelp}
-              </span>
-            </label>
-          </ApplicationActionForm>
-        </div>
       ) : null}
     </div>
   );

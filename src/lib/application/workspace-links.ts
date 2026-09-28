@@ -31,6 +31,18 @@ export function workspaceConsultationHref(campaignId?: string): string {
   );
 }
 
+/** Harper interviewer section on the consultation page. Fragment only — never show the id as text. */
+export function workspaceHarperContactHref(
+  campaignId: string,
+  contactId: string,
+): string {
+  const person = contactId.trim();
+  if (!person) {
+    throw new Error("Harper contact link is missing an interviewer.");
+  }
+  return `${workspaceConsultationHref(campaignId)}#${encodeURIComponent(`harper-contact:${person}`)}`;
+}
+
 export function workspaceConsultationHrefFromPathname(pathname: string): string {
   const match = pathname.match(/^\/campaigns\/([^/]+)/);
   const id = match?.[1]?.trim();

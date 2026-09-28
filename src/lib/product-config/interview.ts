@@ -20,6 +20,7 @@ export const interviewConfig = Object.freeze({
       "Paste an invitation email, or write notes about what they care about. This is saved on this person's Interview cheat sheet section.",
     addGainedInformation: "Add to cheat sheet",
     addNewlyGainedInformation: "Add newly gained information here",
+    postInterviewNotes: "Post Interview Notes",
     reviewOpenQuestions: "Review open questions for this interview",
     noInterviewer: "Choose who you are meeting.",
     noCheatSheetSection: "Generate this person's Interview cheat sheet section to prepare.",

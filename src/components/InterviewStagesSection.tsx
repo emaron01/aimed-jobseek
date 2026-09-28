@@ -1,13 +1,11 @@
-import { generateOutreachAssetAction } from "@/app/actions/application-outreach";
 import {
+  addCheatSheetInterviewNoteAction,
   createInterviewStageAction,
-  startInterviewGapConsultationAction,
   updateInterviewStageAction,
 } from "@/app/actions/interview";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { InterviewStagePanel } from "@/components/InterviewStagePanel";
 import { listApplicationContacts } from "@/lib/application/contacts";
-import { getApplicationSummaryView } from "@/lib/application-summary/service";
 import {
   listInterviewStages,
   openInterviewStage,
@@ -15,7 +13,6 @@ import {
 } from "@/lib/interview/stages";
 import { InterviewStageOpenActions } from "@/components/InterviewStageOpenActions";
 import { interviewConfig } from "@/lib/product-config";
-import { TenantError } from "@/lib/tenant/errors";
 import { AppActionLink } from "@/components/ui";
 import { workspaceInterviewStageHref } from "@/lib/application/workspace-links";
 
@@ -38,7 +35,6 @@ export async function InterviewStagesSection({
   organizationId,
   canEdit,
   roles,
-  contacts,
 }: {
   campaignId: string;
   organizationId: string;
@@ -46,13 +42,9 @@ export async function InterviewStagesSection({
   roles: RoleOption[];
   contacts: Array<{ contactId: string; personaId: string | null }>;
 }) {
-  const [stages, memberships, summary] = await Promise.all([
+  const [stages, memberships] = await Promise.all([
     listInterviewStages({ organizationId, campaignId }),
     listApplicationContacts({ organizationId, campaignId }),
-    getApplicationSummaryView({ organizationId, campaignId }).catch((error) => {
-      if (error instanceof TenantError) return null;
-      throw error;
-    }),
   ]);
   const people = memberships.map((row) => ({
     contactId: row.contactId,
@@ -128,54 +120,7 @@ export async function InterviewStagesSection({
       ) : (
         <div className="space-y-6">
           {stages.map((stage) => {
-            const interviewerPersona = (contactId: string) =>
-              contacts.find((row) => row.contactId === contactId)?.personaId ??
-              roles[0]?.id ??
-              "";
             const interviewer = stage.interviewers[0] ?? null;
-            const sectionKey = interviewer ? `contact:${interviewer.contactId}` : null;
-            const person = sectionKey
-              ? summary?.people.find((item) => item.sectionKey === sectionKey)
-              : null;
-            const section = sectionKey
-              ? summary?.guidance?.people.find((item) => item.sectionKey === sectionKey) ?? null
-              : null;
-            const notes = interviewer
-              ? summary?.notesByContactId.get(interviewer.contactId) ?? []
-              : [];
-            const heading =
-              person?.heading
-              ?? (interviewer
-                ? [interviewer.contact.firstName, interviewer.contact.lastName]
-                    .filter(Boolean)
-                    .join(" ")
-                    .trim()
-                : "");
-            const offer =
-              stage.consultationOfferJson &&
-              typeof stage.consultationOfferJson === "object"
-                ? (stage.consultationOfferJson as {
-                    text?: string;
-                    targetKey?: string;
-                  })
-                : null;
-            const thankYouClarify =
-              stage.thankYouClarifyJson &&
-              typeof stage.thankYouClarifyJson === "object"
-                ? (stage.thankYouClarifyJson as {
-                    questions?: Array<{ id: string; text: string }>;
-                    answers?: Array<{ id: string; answer: string }>;
-                    skipped?: boolean;
-                  })
-                : null;
-            const thankYouQuestions =
-              thankYouClarify?.questions?.filter((item) => item.id && item.text) ??
-              [];
-            const thankYouNeedsAnswers =
-              thankYouQuestions.length > 0 &&
-              !thankYouClarify?.skipped &&
-              !(thankYouClarify?.answers?.some((item) => item.answer?.trim()) ??
-                false);
             return (
               <article
                 key={stage.id}
@@ -187,7 +132,7 @@ export async function InterviewStagesSection({
                     {stageTypeLabel(stage.type)} ·{" "}
                     {interviewConfig.formats[stage.format]}
                   </h3>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {openStage?.id === stage.id ? (
                       <InterviewStageOpenActions
                         campaignId={campaignId}
@@ -216,225 +161,105 @@ export async function InterviewStagesSection({
                   interviewerContactId={interviewer?.contactId ?? null}
                   people={people}
                   roles={roles}
-                  heading={heading || interviewConfig.labels.interviewer}
-                  sectionKey={sectionKey}
-                  section={section}
-                  notes={notes}
-                  personaBuilt={person?.personaBuilt ?? false}
-                  personaId={person?.roleId ?? interviewerPersona(interviewer?.contactId ?? "")}
                 />
 
                 {canEdit ? (
-                  <>
-                    <ApplicationActionForm
-                      action={updateInterviewStageAction}
-                      submitLabel={interviewConfig.labels.saveStage}
-                      testId={`update-stage-${stage.id}`}
-                    >
-                      <input type="hidden" name="campaignId" value={campaignId} />
-                      <input type="hidden" name="stageId" value={stage.id} />
-                      <input
-                        type="hidden"
-                        name="scheduledAt"
-                        value={datetimeLocal(stage.scheduledAt)}
-                      />
-                      <input type="hidden" name="format" value={stage.format} />
-                      <label className="text-sm">
-                        {interviewConfig.labels.notesBefore}
-                        <textarea
-                          name="notesBefore"
-                          rows={2}
-                          className={fieldClass}
-                          defaultValue={stage.notesBefore ?? ""}
-                        />
-                      </label>
-                      <label className="text-sm">
-                        {interviewConfig.labels.notesAfter}
-                        <textarea
-                          name="notesAfter"
-                          rows={3}
-                          className={fieldClass}
-                          defaultValue={stage.notesAfter ?? ""}
-                        />
-                      </label>
-                      <label className="text-sm">
-                        {interviewConfig.labels.expectedDecision}
-                        <input
-                          name="expectedDecisionAt"
-                          type="date"
-                          className={fieldClass}
-                          defaultValue={dateInput(stage.expectedDecisionAt)}
-                        />
-                      </label>
-                      <label className="text-sm">
-                        {interviewConfig.labels.outcome}
-                        <select
-                          name="outcome"
-                          className={fieldClass}
-                          defaultValue={stage.outcome ?? ""}
-                        >
-                          <option value="">{interviewConfig.labels.noOutcome}</option>
-                          {Object.entries(interviewConfig.outcomes).map(
-                            ([value, label]) => (
-                              <option key={value} value={value}>
-                                {label}
-                              </option>
-                            ),
-                          )}
-                        </select>
-                      </label>
-                    </ApplicationActionForm>
-
-                    {stage.notesAfter && stage.interviewers[0] ? (
-                      <div className="space-y-3">
-                        {thankYouNeedsAnswers ? (
-                          <ApplicationActionForm
-                            action={generateOutreachAssetAction}
-                            submitLabel={
-                              interviewConfig.labels.answerThankYouQuestions
-                            }
-                            testId={`thank-you-answers-${stage.id}`}
-                          >
-                            <input type="hidden" name="campaignId" value={campaignId} />
-                            <input
-                              type="hidden"
-                              name="interviewStageId"
-                              value={stage.id}
-                            />
-                            <input
-                              type="hidden"
-                              name="contactId"
-                              value={stage.interviewers[0]!.contactId}
-                            />
-                            <input
-                              type="hidden"
-                              name="personaId"
-                              value={interviewerPersona(
-                                stage.interviewers[0]!.contactId,
-                              )}
-                            />
-                            <input type="hidden" name="type" value="EMAIL" />
-                            <input type="hidden" name="purpose" value="THANK_YOU" />
-                            <p className="text-sm text-muted">
-                              {interviewConfig.labels.thankYouClarifyHelp}
-                            </p>
-                            {thankYouQuestions.map((question) => (
-                              <label key={question.id} className="text-sm">
-                                {question.text}
-                                <input
-                                  type="hidden"
-                                  name="thankYouAnswerId"
-                                  value={question.id}
-                                />
-                                <textarea
-                                  name="thankYouAnswer"
-                                  rows={2}
-                                  className={fieldClass}
-                                />
-                              </label>
-                            ))}
-                          </ApplicationActionForm>
-                        ) : null}
-                        <div className="flex flex-wrap gap-2">
+                  <details
+                    id={`post-interview-notes-${stage.id}`}
+                    className="space-y-3 rounded-md border border-edge bg-canvas p-4"
+                    data-testid={`post-interview-notes-form-${stage.id}`}
+                  >
+                    <summary className="cursor-pointer text-sm font-medium text-ink">
+                      {interviewConfig.labels.postInterviewNotes}
+                    </summary>
+                    <div className="mt-3 space-y-3">
+                      {interviewer ? (
                         <ApplicationActionForm
-                          action={generateOutreachAssetAction}
-                          submitLabel={interviewConfig.labels.thankYouEmail}
-                          testId={`thank-you-email-${stage.id}`}
+                          action={addCheatSheetInterviewNoteAction}
+                          submitLabel={interviewConfig.labels.addGainedInformation}
+                          testId={`add-cheat-sheet-note-${stage.id}`}
                         >
                           <input type="hidden" name="campaignId" value={campaignId} />
-                          <input type="hidden" name="interviewStageId" value={stage.id} />
+                          <input type="hidden" name="stageId" value={stage.id} />
                           <input
                             type="hidden"
                             name="contactId"
-                            value={stage.interviewers[0]!.contactId}
+                            value={interviewer.contactId}
                           />
-                          <input
-                            type="hidden"
-                            name="personaId"
-                            value={interviewerPersona(stage.interviewers[0]!.contactId)}
-                          />
-                          <input type="hidden" name="type" value="EMAIL" />
-                          <input type="hidden" name="purpose" value="THANK_YOU" />
-                          {thankYouNeedsAnswers ? (
-                            <input
-                              type="hidden"
-                              name="skipThankYouQuestions"
-                              value="1"
+                          <label className="text-sm">
+                            {interviewConfig.labels.gainedInformation}
+                            <textarea
+                              name="note"
+                              rows={4}
+                              required
+                              className={fieldClass}
                             />
-                          ) : null}
+                            <span className="mt-1 block text-xs text-muted">
+                              {interviewConfig.labels.gainedInformationHelp}
+                            </span>
+                          </label>
                         </ApplicationActionForm>
-                        <ApplicationActionForm
-                          action={generateOutreachAssetAction}
-                          submitLabel={interviewConfig.labels.thankYouLinkedIn}
-                          testId={`thank-you-linkedin-${stage.id}`}
-                        >
-                          <input type="hidden" name="campaignId" value={campaignId} />
-                          <input type="hidden" name="interviewStageId" value={stage.id} />
-                          <input
-                            type="hidden"
-                            name="contactId"
-                            value={stage.interviewers[0]!.contactId}
-                          />
-                          <input
-                            type="hidden"
-                            name="personaId"
-                            value={interviewerPersona(stage.interviewers[0]!.contactId)}
-                          />
-                          <input type="hidden" name="type" value="LINKEDIN_INMAIL" />
-                          <input type="hidden" name="purpose" value="THANK_YOU" />
-                          {thankYouNeedsAnswers ? (
-                            <input
-                              type="hidden"
-                              name="skipThankYouQuestions"
-                              value="1"
-                            />
-                          ) : null}
-                        </ApplicationActionForm>
-                        <ApplicationActionForm
-                          action={generateOutreachAssetAction}
-                          submitLabel={interviewConfig.labels.checkIn}
-                          testId={`check-in-${stage.id}`}
-                        >
-                          <input type="hidden" name="campaignId" value={campaignId} />
-                          <input type="hidden" name="interviewStageId" value={stage.id} />
-                          <input
-                            type="hidden"
-                            name="contactId"
-                            value={stage.interviewers[0]!.contactId}
-                          />
-                          <input
-                            type="hidden"
-                            name="personaId"
-                            value={interviewerPersona(stage.interviewers[0]!.contactId)}
-                          />
-                          <input type="hidden" name="type" value="EMAIL" />
-                          <input type="hidden" name="purpose" value="CHECK_IN" />
-                        </ApplicationActionForm>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {offer?.text ? (
+                      ) : null}
                       <ApplicationActionForm
-                        action={startInterviewGapConsultationAction}
-                        submitLabel={interviewConfig.labels.startConsultation}
-                        testId={`consultation-offer-${stage.id}`}
+                        action={updateInterviewStageAction}
+                        submitLabel={interviewConfig.labels.saveStage}
+                        testId={`update-stage-${stage.id}`}
                       >
                         <input type="hidden" name="campaignId" value={campaignId} />
-                        <input type="hidden" name="focusNote" value={offer.text} />
-                        {offer.targetKey ? (
-                          <input
-                            type="hidden"
-                            name="focusTargetKey"
-                            value={offer.targetKey}
+                        <input type="hidden" name="stageId" value={stage.id} />
+                        <input
+                          type="hidden"
+                          name="scheduledAt"
+                          value={datetimeLocal(stage.scheduledAt)}
+                        />
+                        <input type="hidden" name="format" value={stage.format} />
+                        <label className="text-sm">
+                          {interviewConfig.labels.notesBefore}
+                          <textarea
+                            name="notesBefore"
+                            rows={2}
+                            className={fieldClass}
+                            defaultValue={stage.notesBefore ?? ""}
                           />
-                        ) : null}
-                        <p className="text-sm text-ink">
-                          {interviewConfig.labels.consultationOffer} {offer.text}
-                        </p>
+                        </label>
+                        <label className="text-sm">
+                          {interviewConfig.labels.notesAfter}
+                          <textarea
+                            name="notesAfter"
+                            rows={3}
+                            className={fieldClass}
+                            defaultValue={stage.notesAfter ?? ""}
+                          />
+                        </label>
+                        <label className="text-sm">
+                          {interviewConfig.labels.expectedDecision}
+                          <input
+                            name="expectedDecisionAt"
+                            type="date"
+                            className={fieldClass}
+                            defaultValue={dateInput(stage.expectedDecisionAt)}
+                          />
+                        </label>
+                        <label className="text-sm">
+                          {interviewConfig.labels.outcome}
+                          <select
+                            name="outcome"
+                            className={fieldClass}
+                            defaultValue={stage.outcome ?? ""}
+                          >
+                            <option value="">{interviewConfig.labels.noOutcome}</option>
+                            {Object.entries(interviewConfig.outcomes).map(
+                              ([value, label]) => (
+                                <option key={value} value={value}>
+                                  {label}
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        </label>
                       </ApplicationActionForm>
-                    ) : null}
-                  </>
+                    </div>
+                  </details>
                 ) : null}
               </article>
             );

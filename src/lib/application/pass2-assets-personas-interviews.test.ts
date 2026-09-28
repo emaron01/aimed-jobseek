@@ -1,10 +1,5 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import {
-  cheatSheetLikelyQuestionsElementId,
-  cheatSheetPersonQueryKey,
-} from "@/lib/application-summary/filter";
-import { workspaceInterviewLikelyQuestionsHref } from "@/lib/application/workspace-links";
 import { openInterviewStage } from "@/lib/interview/stages";
 import {
   applicationAssetConfig,
@@ -97,10 +92,8 @@ describe("interview stage open buttons", () => {
   const panel = source("src/components/InterviewStagePanel.tsx");
   const openActions = source("src/components/InterviewStageOpenActions.tsx");
   const notes = source("src/lib/application-summary/service.ts");
-  const body = source("src/components/CheatSheetPersonBody.tsx");
-  const filter = source("src/components/CheatSheetPeopleFilter.tsx");
 
-  it("places buttons on the earliest stage without an outcome", () => {
+  it("places Post Interview Notes on the earliest stage without an outcome", () => {
     expect(stages).toContain("openInterviewStage(stages)");
     expect(stages).toContain("InterviewStageOpenActions");
     expect(openInterviewStage([{ outcome: "ADVANCED" }, { outcome: null }])?.outcome).toBeNull();
@@ -108,32 +101,15 @@ describe("interview stage open buttons", () => {
       outcome: null,
     });
     expect(openInterviewStage([{ outcome: "COMPLETED" }])).toBeNull();
-    expect(interviewConfig.labels.addNewlyGainedInformation).toBe(
-      "Add newly gained information here",
-    );
-    expect(interviewConfig.labels.reviewOpenQuestions).toBe(
-      "Review open questions for this interview",
-    );
-    expect(openActions).toContain("addNewlyGainedInformation");
-    expect(openActions).toContain("reviewOpenQuestions");
+    expect(interviewConfig.labels.postInterviewNotes).toBe("Post Interview Notes");
+    expect(openActions).toContain("postInterviewNotes");
+    expect(openActions).not.toContain("reviewOpenQuestions");
+    expect(openActions).not.toContain("workspaceInterviewLikelyQuestionsHref");
     expect(openActions).toContain("disabled={!interviewerContactId}");
-    expect(openActions).toContain("workspaceInterviewLikelyQuestionsHref");
-    expect(panel).toContain("gained-information-${stageId}");
-    expect(panel).toContain("addCheatSheetInterviewNoteAction");
+    expect(stages).toContain("post-interview-notes-${stage.id}");
+    expect(stages).toContain("addCheatSheetInterviewNoteAction");
+    expect(panel).not.toContain("CheatSheetPersonBody");
     expect(notes).toContain("enqueueCheatSheetPersonSection");
     expect(notes).toContain('operation: "reassess"');
-    expect(body).toContain("cheatSheetLikelyQuestionsElementId");
-    expect(filter).toContain("initialPersonKey");
-    expect(cheatSheetLikelyQuestionsElementId("contact:abc")).toBe(
-      "contact:abc-likely-questions",
-    );
-    expect(cheatSheetPersonQueryKey("contact:abc")).toBe("contact:abc");
-    expect(cheatSheetPersonQueryKey("other")).toBeNull();
-    expect(workspaceInterviewLikelyQuestionsHref("camp_1", "ct_1")).toContain(
-      "person=contact%3Act_1",
-    );
-    expect(workspaceInterviewLikelyQuestionsHref("camp_1", "ct_1")).toContain(
-      "contact%3Act_1-likely-questions",
-    );
   });
 });
