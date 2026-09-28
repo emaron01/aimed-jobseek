@@ -1,9 +1,14 @@
 import { z } from "zod";
 
-export const CONSULTATION_PROMPT_VERSION = "26";
+export const CONSULTATION_PROMPT_VERSION = "27";
 
 export const WHY_THIS_COMPANY_TARGET_KEY = "why-this-company";
 export const PERSON_PREP_TARGET_PREFIX = "person-prep:";
+/** Batch D role-expertise questions under Where you stand (targetKey prefix). */
+export const ROLE_EXPERTISE_TARGET_PREFIX = "role-expertise:";
+export const CHRONOLOGY_TARGET_KEY = "chronology";
+/** Answers given on the Cheat Sheet (and former Stage coach items). */
+export const CHEAT_SHEET_TARGET_PREFIX = "cheatSheet:";
 
 export type InterviewerPrepPayload = {
   contactId: string;

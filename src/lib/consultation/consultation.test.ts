@@ -99,6 +99,7 @@ import {
   validateRepetitionAndMetaLanguage,
 } from "@/lib/consultation/output-quality";
 import {
+  buildConsultationCoachSystemInstructions,
   CONSULTATION_COACH_SYSTEM_INSTRUCTIONS,
   CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS,
   CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS,
@@ -1635,7 +1636,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("26");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("27");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("You coach; you do not interrogate");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("askedQuestions");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -1661,7 +1662,25 @@ describe("consultation evidence and questions", () => {
       "Mission statements, company taglines, and recruiting pitches are not gaps",
     );
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
-      "there are never more than 10",
+      `there are never more than ${consultationConfig.applicationQuestionLimit}`,
+    );
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).not.toContain(
+      "there are never more than 10.",
+    );
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
+      `or ${consultationConfig.applicationQuestionLimit} questions have been asked, set questions to [] and write closingNote`,
+    );
+    expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).not.toContain(
+      "or 10 questions have been asked, set questions to [] and write closingNote",
+    );
+    expect(buildConsultationCoachSystemInstructions(7)).toContain(
+      "there are never more than 7.",
+    );
+    expect(buildConsultationCoachSystemInstructions(7)).toContain(
+      "or 7 questions have been asked, set questions to [] and write closingNote",
+    );
+    expect(buildConsultationCoachSystemInstructions(7)).not.toContain(
+      `there are never more than ${consultationConfig.applicationQuestionLimit}.`,
     );
     expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(
       "Set companyMotivation to the part of the reply that states why they want to work at this company",
@@ -2141,19 +2160,22 @@ describe("consultation evidence and questions", () => {
     ).toBe(false);
   });
 
-  it("caps Harper questions at ten for the whole application", () => {
-    const askedQuestions = Array.from({ length: 10 }, (_, index) => ({
+  it("caps Harper questions at the application question limit", () => {
+    const askedQuestions = Array.from(
+      { length: consultationConfig.applicationQuestionLimit },
+      (_, index) => ({
       text: `Asked question number ${index + 1} about a distinct gap in this application.`,
-      answered: index < 8,
+      answered: index < consultationConfig.applicationQuestionLimit - 2,
       ignored: false,
       targetKey: `required:${index}`,
-      followUp: index === 9,
-    }));
+      followUp: index === consultationConfig.applicationQuestionLimit - 1,
+    }),
+    );
     const assessments = [
       {
-        key: "required:11",
+        key: "required:over-cap",
         kind: "REQUIRED" as const,
-        text: "A new remaining gap after ten questions",
+        text: "A new remaining gap after the application question limit",
         strength: "NONE" as const,
         supportingFactIds: [],
         strategy: "ACKNOWLEDGE" as const,
@@ -2172,8 +2194,8 @@ describe("consultation evidence and questions", () => {
       assessments,
       modelQuestions: [
         {
-          targetKey: "required:11",
-          text: "What is a new remaining story after ten questions?",
+          targetKey: "required:over-cap",
+          text: "What is a new remaining story after the question limit?",
           requirementInterpretation: null,
           hiringTeamRoleId: "sales-vp",
           whoCaresNote: "The VP of Sales still wants one more story.",
@@ -2186,11 +2208,11 @@ describe("consultation evidence and questions", () => {
       chronologyAsked: false,
       askedQuestions,
     });
-    expect(consultationConfig.applicationQuestionLimit).toBe(10);
+    expect(consultationConfig.applicationQuestionLimit).toBe(25);
     expect(round.questions).toHaveLength(0);
   });
 
-  it("keeps legacy repair off page load and jobs, and still enforces duplicates and the ten-question cap", () => {
+  it("keeps legacy repair off page load and jobs, and still enforces duplicates and the application question cap", () => {
     const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
     const process = readFileSync("src/lib/application-jobs/process.ts", "utf8");
     const service = readFileSync("src/lib/consultation/service.ts", "utf8");
@@ -2214,7 +2236,7 @@ describe("consultation evidence and questions", () => {
     expect(questions).toContain("consultationConfig.applicationQuestionLimit");
     expect(service).toContain("questionDuplicatesAsked");
     expect(service).toContain("consultationConfig.applicationQuestionLimit");
-    expect(consultationConfig.applicationQuestionLimit).toBe(10);
+    expect(consultationConfig.applicationQuestionLimit).toBe(25);
   });
 
   it("writes a confirmed-gap talk track that acknowledges, bridges, and says how to close it", async () => {
