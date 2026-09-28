@@ -2,7 +2,7 @@
 
 **Branch:** `checkpoint/harper-prep-hub`  
 **Docs commit (STEP 0):** `0145153`  
-**D1 commit:** _(filled after commit)_  
+**D1 commit:** `5b593705969a7f531cc75185ba5501453f0e84f8` (`5b59370`)  
 **Remote:** `https://github.com/emaron01/aimed-jobseek.git`
 
 ## 1. STEP 0 results
@@ -128,7 +128,7 @@ Nothing regenerates on page view (asserted in D1 tests + existing no-AI-on-view 
 ## 7. Commits / branch
 
 - STEP 0 docs: `0145153`
-- D1 implement: _(filled after commit)_
+- D1 implement: `5b593705969a7f531cc75185ba5501453f0e84f8`
 - Pushed: `checkpoint/harper-prep-hub` (not main)
 
 ## 8. Safety confirmation
