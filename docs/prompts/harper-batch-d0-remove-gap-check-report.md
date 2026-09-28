@@ -1,7 +1,7 @@
 # Harper Batch D0 — remove unused notes-after gap check
 
 **Branch:** `checkpoint/harper-prep-hub`  
-**Commit:** `cf4f81f9137ae85e277969cc13140a4dd19d4081` (`cf4f81f`)  
+**Commit:** `04318d01847dcb857ebfdf8fde3f43aea8a5abbc` (`04318d0`)  
 **Remote:** `https://github.com/emaron01/aimed-jobseek.git`  
 **Base:** reset from `origin/main` @ `8d572d5`
 
