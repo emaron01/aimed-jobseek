@@ -41,6 +41,35 @@ export function contactIdFromCheatSheetTarget(
   return contactId || null;
 }
 
+/** Item id after `cheatSheet:` — e.g. `contact:c1:likely:1`. */
+export function coachItemIdFromCheatSheetTarget(
+  targetKey: string | null | undefined,
+): string | null {
+  const key = targetKey?.trim() ?? "";
+  if (!key.startsWith(CHEAT_SHEET_TARGET_PREFIX)) return null;
+  const itemId = key.slice(CHEAT_SHEET_TARGET_PREFIX.length).trim();
+  return itemId || null;
+}
+
+/**
+ * Person-view QuestionList: keep person-prep (and any cheatSheet items not already
+ * shown under the profile's likelyQuestions). Profile-owned coach turns render once
+ * under CheatSheetCoachItems / QuestionCard in the profile.
+ */
+export function personViewListQuestions(input: {
+  questions: ConsultationQaItem[];
+  profileCoachItemIds: Iterable<string>;
+}): ConsultationQaItem[] {
+  const profileIds = new Set(
+    [...input.profileCoachItemIds].map((id) => id.trim()).filter(Boolean),
+  );
+  return input.questions.filter((item) => {
+    const coachId = coachItemIdFromCheatSheetTarget(item.targetKey);
+    if (!coachId) return true;
+    return !profileIds.has(coachId);
+  });
+}
+
 /**
  * Company-level cheat-sheet gaps (`cheatSheet:overview:gap:{n}`).
  * Every persona is at the same company — general prep under Where you stand.

@@ -10,11 +10,13 @@ import { QuestionList } from "@/components/ConsultationThread";
 import type { CheatSheetNote } from "@/lib/application-summary/notes";
 import type { CheatSheetPersonSection } from "@/lib/application-summary/contract";
 import {
+  coachItemIdFromCheatSheetTarget,
   harperContactAnchorId,
+  personViewListQuestions,
   type HarperInterviewerSection,
 } from "@/lib/consultation/harper-layout";
 import { interviewConfig, outreachConfig, vocab } from "@/lib/product-config";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 type RoleOption = { id: string; name: string };
 
@@ -127,6 +129,31 @@ export function HarperPersonInlineProfile({
     sessionStatus !== "PAUSED" &&
     !jobsActive;
 
+  const profileCoachItemIds = useMemo(
+    () =>
+      (section?.likelyQuestions ?? [])
+        .map((item) => item.id?.trim() ?? "")
+        .filter(Boolean),
+    [section],
+  );
+
+  const allInterviewerQuestions = interviewerSection?.questions;
+  const coachQaItems = useMemo(() => {
+    const questions = allInterviewerQuestions ?? [];
+    return questions.filter((item) => {
+      const coachId = coachItemIdFromCheatSheetTarget(item.targetKey);
+      return Boolean(coachId && profileCoachItemIds.includes(coachId));
+    });
+  }, [allInterviewerQuestions, profileCoachItemIds]);
+  const listQuestions = useMemo(
+    () =>
+      personViewListQuestions({
+        questions: allInterviewerQuestions ?? [],
+        profileCoachItemIds,
+      }),
+    [allInterviewerQuestions, profileCoachItemIds],
+  );
+
   return (
     <section
       id={harperContactAnchorId(contactId)}
@@ -154,14 +181,17 @@ export function HarperPersonInlineProfile({
         notes={notes}
         personaBuilt={personaBuilt}
         personaId={personaId}
-        showCoachAnswerForms={false}
+        showCoachAnswerForms
+        coachQaItems={coachQaItems}
+        jobsActive={jobsActive}
+        showReply={showReply}
       />
-      {interviewerSection && interviewerSection.questions.length > 0 ? (
+      {listQuestions.length > 0 ? (
         <div className="space-y-3" data-testid="harper-person-qa">
           <QuestionList
             campaignId={campaignId}
             canEdit={canEdit}
-            questions={interviewerSection.questions}
+            questions={listQuestions}
             showReply={showReply}
             pendingTarget={pendingTarget}
             jobsActive={jobsActive}

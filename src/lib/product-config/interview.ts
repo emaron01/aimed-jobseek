@@ -7,7 +7,7 @@ export const interviewConfig = Object.freeze({
   labels: {
     sectionTitle: "Interview stages",
     sectionHelp:
-      "Record each interview, choose the interviewer, and keep their cheat sheet section here as the archive for that conversation.",
+      "Record each interview: who you're meeting, when, and how. After each one, add your Post Interview Notes.",
     addStage: "Add stage",
     saveStage: "Save stage",
     interviewer: "Interviewer",

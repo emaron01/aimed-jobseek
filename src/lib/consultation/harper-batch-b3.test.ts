@@ -99,9 +99,11 @@ describe("Harper Batch B3 person view, search, Add Interview Contact, assign-onl
     const section = src("src/components/ConsultationSection.tsx");
 
     expect(personView).toContain("CheatSheetPersonBody");
-    expect(personView).toContain("showCoachAnswerForms={false}");
+    expect(personView).toContain("showCoachAnswerForms");
+    expect(personView).not.toContain("showCoachAnswerForms={false}");
     expect(personView).toContain('data-testid="harper-person-view"');
     expect(personView).toContain('data-testid="harper-person-qa"');
+    expect(personView).toContain("personViewListQuestions");
     expect(personView).toContain("QuestionList");
     expect(body).toContain("caresAbout");
     expect(body).toContain("positioningStatements");

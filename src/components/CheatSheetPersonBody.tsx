@@ -8,6 +8,7 @@ import { statedListItems } from "@/lib/application-summary/display";
 import { cheatSheetLikelyQuestionsElementId } from "@/lib/application-summary/filter";
 import type { CheatSheetNote } from "@/lib/application-summary/notes";
 import type { CheatSheetPersonSection } from "@/lib/application-summary/contract";
+import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
 import {
   applicationSummaryConfig,
   consultationConversationCopy,
@@ -42,6 +43,9 @@ export function CheatSheetPersonBody({
   personaBuilt,
   personaId,
   showCoachAnswerForms = true,
+  coachQaItems = [],
+  jobsActive = false,
+  showReply = true,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -50,8 +54,15 @@ export function CheatSheetPersonBody({
   notes: CheatSheetNote[];
   personaBuilt: boolean;
   personaId: string;
-  /** When false, likely questions display without the Cheat Sheet reply form (Harper person view). */
+  /**
+   * When false, coach items still display; answer forms only appear when
+   * this is true and jobsActive is false (Cheat Sheet default true).
+   */
   showCoachAnswerForms?: boolean;
+  /** Harper person view: existing ConsultationQaItems for profile coach items. */
+  coachQaItems?: ConsultationQaItem[];
+  jobsActive?: boolean;
+  showReply?: boolean;
 }) {
   if (!personaBuilt) {
     return (
@@ -147,6 +158,9 @@ export function CheatSheetPersonBody({
           campaignId={campaignId}
           canEdit={canEdit && showCoachAnswerForms}
           items={section.likelyQuestions}
+          qaItems={coachQaItems}
+          jobsActive={jobsActive}
+          showReply={showReply}
         />
       </div>
       <div>
