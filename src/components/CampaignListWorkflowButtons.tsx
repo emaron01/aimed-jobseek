@@ -17,7 +17,7 @@ export function CampaignListWorkflowButtons({
   campaignName,
   researchComplete,
   allowResearch = features.listBulkValidation,
-  allowScore = features.listBulkScoring,
+  allowScore = features.listBulkScoring && features.employerIcpFit,
 }: {
   listId: string;
   campaignId: string;

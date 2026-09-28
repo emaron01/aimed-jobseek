@@ -25,6 +25,7 @@ const ALL_OFF: Readonly<Record<FeatureFlag, boolean>> = Object.freeze({
   emailConnection: false,
   legacyEmailSequence: false,
   productLevelHiringTeam: false,
+  employerIcpFit: false,
 });
 
 const SURFACES: GatedSurface[] = [
@@ -35,6 +36,7 @@ const SURFACES: GatedSurface[] = [
   "legacyEmailSequence",
   "emailConnection",
   "productLevelHiringTeam",
+  "employerIcpFit",
 ];
 
 describe("gated surfaces default off", () => {
@@ -81,7 +83,9 @@ describe("pages and actions call the matching gate", () => {
     ["src/app/(app)/lists/page.tsx", "lists"],
     ["src/app/(app)/lists/[id]/page.tsx", "lists"],
     ["src/app/(app)/lists/[id]/score/page.tsx", "listBulkScoring"],
+    ["src/app/(app)/lists/[id]/score/page.tsx", "employerIcpFit"],
     ["src/app/(app)/scoring/[runId]/page.tsx", "listBulkScoring"],
+    ["src/app/(app)/scoring/[runId]/page.tsx", "employerIcpFit"],
     [
       "src/app/(app)/setup/[productId]/personas/new/page.tsx",
       "productLevelHiringTeam",
@@ -104,6 +108,14 @@ describe("pages and actions call the matching gate", () => {
     ],
     ["src/app/(app)/personas/page.tsx", "productLevelHiringTeam"],
     ["src/app/(app)/personas/new/page.tsx", "productLevelHiringTeam"],
+    ["src/app/(app)/icps/page.tsx", "employerIcpFit"],
+    ["src/app/(app)/icps/new/page.tsx", "employerIcpFit"],
+    ["src/app/(app)/setup/[productId]/icps/page.tsx", "employerIcpFit"],
+    ["src/app/(app)/setup/[productId]/icps/new/page.tsx", "employerIcpFit"],
+    [
+      "src/app/(app)/setup/[productId]/icps/[icpId]/page.tsx",
+      "employerIcpFit",
+    ],
     ["src/app/api/mailbox/microsoft/connect/route.ts", "emailConnection"],
     ["src/app/api/mailbox/microsoft/callback/route.ts", "emailConnection"],
     ["src/app/(app)/campaigns/[id]/[stage]/page.tsx", "legacyEmailSequence"],
@@ -167,6 +179,39 @@ describe("pages and actions call the matching gate", () => {
       "saveAndInterpretPersonaAction",
     ],
     ["src/app/actions.ts", "productLevelHiringTeam", "upsertPersonaAction"],
+    ["src/app/actions.ts", "employerIcpFit", "upsertIcpAction"],
+    ["src/app/actions.ts", "employerIcpFit", "deleteIcpAction"],
+    [
+      "src/app/actions/interpretation.ts",
+      "employerIcpFit",
+      "previewStarterTargetEmployerAction",
+    ],
+    [
+      "src/app/actions/interpretation.ts",
+      "employerIcpFit",
+      "approveStarterTargetEmployerAction",
+    ],
+    [
+      "src/app/actions/interpretation.ts",
+      "employerIcpFit",
+      "interpretIcpAction",
+    ],
+    [
+      "src/app/actions/interpretation.ts",
+      "employerIcpFit",
+      "updateIcpCriterionAction",
+    ],
+    [
+      "src/app/actions/application.ts",
+      "employerIcpFit",
+      "rescoreApplicationFitAction",
+    ],
+    [
+      "src/app/actions/application.ts",
+      "employerIcpFit",
+      "overrideApplicationFitAction",
+    ],
+    ["src/app/actions/scoring.ts", "employerIcpFit", "createScoringRunAction"],
   ];
 
   it.each(actionGates)("%s %s gates %s", (file, surface, action) => {

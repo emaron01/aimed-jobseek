@@ -3,6 +3,7 @@ import {
   type ProductCampaignReadiness,
 } from "@/lib/workflow/product-campaign-readiness";
 import { countedNoun, vocab } from "@/lib/product-config";
+import { isGatedSurfaceEnabled } from "@/lib/product-config/feature-access";
 
 export function formatProductSetupClause(
   productName: string,
@@ -39,10 +40,16 @@ export function buildHomeSetupLine(input: {
   const allReady = input.products.every((product) => product.readiness.ready);
   if (allReady) {
     const productCount = input.products.length;
-    const icpCount = input.totalIcps;
     const personaCount = input.totalPersonas;
+    const parts = [
+      `Setup complete · ${countedNoun(productCount, vocab.product)}`,
+    ];
+    if (isGatedSurfaceEnabled("employerIcpFit")) {
+      parts.push(countedNoun(input.totalIcps, vocab.icp));
+    }
+    parts.push(countedNoun(personaCount, vocab.persona));
     return {
-      text: `Setup complete · ${countedNoun(productCount, vocab.product)} · ${countedNoun(icpCount, vocab.icp)} · ${countedNoun(personaCount, vocab.persona)}`,
+      text: parts.join(" · "),
       href: "/products",
     };
   }

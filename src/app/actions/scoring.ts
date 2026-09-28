@@ -47,6 +47,7 @@ export async function createScoringRunAction(
 
   try {
     assertGatedAction("listBulkScoring");
+    assertGatedAction("employerIcpFit");
     const { listIcpCriteria } = await import("@/lib/interpretation/icp");
     const {
       criterionMaterialFingerprint,
@@ -127,6 +128,7 @@ export async function scoreContactsAction(
 
   try {
     assertGatedAction("listBulkScoring");
+    assertGatedAction("employerIcpFit");
     const summary = await runScoringForRun(scoringRunId, { forceRescore });
     revalidatePath(`/scoring/${scoringRunId}`);
     return {

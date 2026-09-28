@@ -21,6 +21,7 @@ import {
   truncateText,
 } from "@/lib/setup/product-overview";
 import { candidateProfileEditCopy, polishCopy, vocab } from "@/lib/product-config";
+import { isGatedSurfaceEnabled } from "@/lib/product-config/feature-access";
 
 type PageProps = {
   params: Promise<{ productId: string }>;
@@ -132,7 +133,9 @@ export default async function SetupProductPage({ params }: PageProps) {
       `Delete ${vocab.product.Singular} "${product.name}"?`,
       "",
       "This will also remove:",
-      `• ${c.icps} ${vocab.icp.singular}(s)`,
+      ...(isGatedSurfaceEnabled("employerIcpFit")
+        ? [`• ${c.icps} ${vocab.icp.singular}(s)`]
+        : []),
       `• ${c.personas} ${vocab.persona.Singular}(s) and their current criteria`,
       `• ${c.sources} ${vocab.product.singular} source(s)`,
       `• ${c.evidenceBundles} evidence bundle(s)`,
@@ -297,6 +300,7 @@ export default async function SetupProductPage({ params }: PageProps) {
           </div>
         </Panel>
 
+        {isGatedSurfaceEnabled("employerIcpFit") ? (
         <div data-print-hide>
         <Panel
           title={`2. ${vocab.icp.singular}`}
@@ -365,6 +369,7 @@ export default async function SetupProductPage({ params }: PageProps) {
           )}
         </Panel>
         </div>
+        ) : null}
       </div>
     </div>
   );

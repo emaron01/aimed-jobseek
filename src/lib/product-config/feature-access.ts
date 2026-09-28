@@ -22,7 +22,8 @@ export type GatedSurface =
   | "listBulkScoring"
   | "legacyEmailSequence"
   | "emailConnection"
-  | "productLevelHiringTeam";
+  | "productLevelHiringTeam"
+  | "employerIcpFit";
 
 export function isGatedSurfaceEnabled(
   surface: GatedSurface,
@@ -43,6 +44,8 @@ export function isGatedSurfaceEnabled(
       return flags.emailConnection;
     case "productLevelHiringTeam":
       return flags.productLevelHiringTeam;
+    case "employerIcpFit":
+      return flags.employerIcpFit;
   }
 }
 

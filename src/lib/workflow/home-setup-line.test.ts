@@ -48,8 +48,9 @@ describe("home setup line", () => {
       totalIcps: 2,
       totalPersonas: 8,
     });
+    // employerIcpFit is off by default — complete-line omits Target Employer counts.
     expect(line.text).toBe(
-      `Setup complete · ${countedNoun(2, vocab.product)} · ${countedNoun(2, vocab.icp)} · ${countedNoun(8, vocab.persona)}`,
+      `Setup complete · ${countedNoun(2, vocab.product)} · ${countedNoun(8, vocab.persona)}`,
     );
   });
 

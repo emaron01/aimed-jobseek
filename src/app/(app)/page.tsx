@@ -113,8 +113,9 @@ export default async function DashboardPage({
       </div>
       {!workflow.setupComplete ? (
         <p className="mb-4 text-sm text-subtle">
-          {vocab.campaign.Singular} creation unlocks after at least one {vocab.product.singular} is approved with {vocab.icp.aSingular} that has criteria. Voice samples are
-          optional. Existing {vocab.campaign.plural} stay available.
+          {vocab.campaign.Singular} creation unlocks after at least one{" "}
+          {vocab.product.singular} is approved. Voice samples are optional.
+          Existing {vocab.campaign.plural} stay available.
         </p>
       ) : null}
       {workflow.campaigns.length === 0 ? (

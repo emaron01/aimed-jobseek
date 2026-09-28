@@ -28,6 +28,7 @@ type PageProps = {
 
 export default async function ScoreListPage({ params, searchParams }: PageProps) {
   requireGatedPage("listBulkScoring");
+  requireGatedPage("employerIcpFit");
   const organization = await getCurrentOrganization();
   const { id } = await params;
   const campaignId = parseCampaignId((await searchParams).campaign);

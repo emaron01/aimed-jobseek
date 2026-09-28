@@ -6,12 +6,14 @@ import { cn } from "@/lib/utils";
 import { listIcps, listProducts } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { vocab } from "@/lib/product-config";
+import { requireGatedPage } from "@/lib/product-config/feature-access";
 
 export default async function IcpsPage({
   searchParams,
 }: {
   searchParams: Promise<{ product?: string }>;
 }) {
+  requireGatedPage("employerIcpFit");
   const organization = await getCurrentOrganization();
   const query = await searchParams;
   const productId = query.product?.trim() || null;

@@ -133,6 +133,7 @@ describe("feature flags", () => {
     expect(features.emailConnection).toBe(false);
     expect(features.legacyEmailSequence).toBe(false);
     expect(features.productLevelHiringTeam).toBe(false);
+    expect(features.employerIcpFit).toBe(false);
     expect(features.referralProgram).toBe(true);
     expect(features.teamSeats).toBe(false);
     expect(features.teamInvites).toBe(false);
@@ -144,6 +145,7 @@ describe("feature flags", () => {
     expect(FEATURE_FLAGS).toContain("teamSeats");
     expect(FEATURE_FLAGS).toContain("legacyEmailSequence");
     expect(FEATURE_FLAGS).toContain("productLevelHiringTeam");
+    expect(FEATURE_FLAGS).toContain("employerIcpFit");
   });
 });
 

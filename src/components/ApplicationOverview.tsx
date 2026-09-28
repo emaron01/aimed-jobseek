@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppCard, SectionHeader, StatusPill } from "@/components/design";
 import { applicationStepCopy, consultationConversationCopy } from "@/lib/product-config";
+import { features } from "@/lib/product-config/features";
 import type { ApplicationOverviewView } from "@/lib/application/overview";
 function appliedDateLabel(value: string): string {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -34,7 +35,9 @@ export function ApplicationOverview({
             label={applicationStepCopy.appliedAction}
             value={view.appliedAt ? appliedDateLabel(view.appliedAt) : null}
           />
-          <OverviewFact label={applicationStepCopy.factFit} value={view.fitLabel} />
+          {features.employerIcpFit ? (
+            <OverviewFact label={applicationStepCopy.factFit} value={view.fitLabel} />
+          ) : null}
           <OverviewFact label={applicationStepCopy.factLocation} value={view.location} />
           <OverviewFact
             label={applicationStepCopy.factWorkArrangement}

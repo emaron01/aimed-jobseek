@@ -18,7 +18,7 @@ import {
   storedProfileFromJson,
 } from "@/lib/product-research/review";
 import { PRODUCT_RESYNTHESIS_USER_CONTEXT_FLAG } from "@/lib/product-research/resynthesize-approved";
-import { vocab } from "@/lib/product-config";
+import { features, vocab } from "@/lib/product-config";
 
 type PageProps = {
   params: Promise<{ productId: string }>;
@@ -146,7 +146,11 @@ export default async function ProductResearchPage({ params }: PageProps) {
       <div data-print-hide>
         <PageHeader
           title={`Review ${product.name}`}
-          description={`Review the ${vocab.product.singular}. Approve it. Then define ${vocab.icp.plural}.`}
+          description={
+            features.employerIcpFit
+              ? `Review the ${vocab.product.singular}. Approve it. Then define ${vocab.icp.plural}.`
+              : `Review the ${vocab.product.singular}. Approve it.`
+          }
           actions={
             <AppActionLink
               href={`/setup/${product.id}`}

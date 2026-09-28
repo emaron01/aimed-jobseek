@@ -192,6 +192,7 @@ export async function upsertIcpAction(
   })();
 
   try {
+    assertGatedAction("employerIcpFit");
     const parsed = parseIcpFormData(formData);
     if (Object.keys(parsed.fieldErrors).length > 0) {
       const firstField = Object.keys(parsed.fieldErrors)[0] as
@@ -254,6 +255,7 @@ export async function deleteIcpAction(
   formData: FormData,
 ): Promise<CrudDeleteResult> {
   try {
+    assertGatedAction("employerIcpFit");
     await requireSetupDeletePermission();
     const id = requiredString(formData, "id");
     const productId = requiredString(formData, "productId");

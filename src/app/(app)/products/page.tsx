@@ -4,17 +4,26 @@ import { cn } from "@/lib/utils";
 import { ProductCatalogPanel } from "@/components/ProductCatalogPanel";
 import { listProductsWithCounts } from "@/lib/tenant/data";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
-import { vocab } from "@/lib/product-config";
+import { features, vocab } from "@/lib/product-config";
 
 export default async function ProductsPage() {
   const organization = await getCurrentOrganization();
+  const icpNextStep = features.employerIcpFit
+    ? ` After you approve it, define ${vocab.icp.plural}.`
+    : "";
+  const emptyIcpNextStep = features.employerIcpFit
+    ? `, then define the ${vocab.icp.plural} that belong to it`
+    : "";
+  const missingDescription = features.employerIcpFit
+    ? `Define ${vocab.product.aSingular}, then attach ${vocab.icp.plural} to it.`
+    : `Define ${vocab.product.aSingular}.`;
 
   if (!organization) {
     return (
       <div>
         <PageHeader
           title={vocab.product.Plural}
-          description={`Define ${vocab.product.aSingular}, then attach ${vocab.icp.plural} to it.`}
+          description={missingDescription}
         />
         <TenantMissing />
       </div>
@@ -27,7 +36,7 @@ export default async function ProductsPage() {
     <div>
       <PageHeader
         title={vocab.product.Plural}
-          description={`${vocab.product.ASingular} is the candidate record later ${vocab.campaign.plural} read from. After you approve it, define ${vocab.icp.plural}.`}
+          description={`${vocab.product.ASingular} is the candidate record later ${vocab.campaign.plural} read from.${icpNextStep}`}
         actions={
           <AppActionLink
             href="/products/new"
@@ -43,7 +52,7 @@ export default async function ProductsPage() {
       {products.length === 0 ? (
         <EmptyState
           title={`No ${vocab.product.plural} yet`}
-          description={`${vocab.product.ASingular} is built from your resume and other materials. Research it once, then define the ${vocab.icp.plural} that belong to it.`}
+          description={`${vocab.product.ASingular} is built from your resume and other materials. Research it once${emptyIcpNextStep}.`}
           actions={
             <AppActionLink
               href="/products/new"

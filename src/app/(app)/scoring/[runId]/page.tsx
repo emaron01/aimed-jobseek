@@ -78,6 +78,7 @@ export default async function ScoringReportPage({
   searchParams,
 }: PageProps) {
   requireGatedPage("listBulkScoring");
+  requireGatedPage("employerIcpFit");
   const organization = await getCurrentOrganization();
   const { runId } = await params;
   const query = await searchParams;

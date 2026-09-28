@@ -2,7 +2,7 @@ import {AppActionLink } from "@/components/ui";
 import { deleteProductAction } from "@/app/actions";
 import { ConfirmDeleteForm } from "@/components/ConfirmDeleteForm";
 import type { ProductWithCounts } from "@/lib/tenant/data";
-import { countedNoun, vocab } from "@/lib/product-config";
+import { countedNoun, features, vocab } from "@/lib/product-config";
 
 
 export function ProductCatalogPanel({
@@ -22,8 +22,10 @@ export function ProductCatalogPanel({
           <div>
             <p className="font-medium text-ink">{product.name}</p>
             <p className="mt-1 text-sm text-muted">
-              {product.approvalStatus.replaceAll("_", " ")} ·{" "}
-              {countedNoun(product._count.icps, vocab.icp)}
+              {product.approvalStatus.replaceAll("_", " ")}
+              {features.employerIcpFit
+                ? ` · ${countedNoun(product._count.icps, vocab.icp)}`
+                : ""}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -44,7 +46,11 @@ export function ProductCatalogPanel({
               hiddenFields={{ id: product.id }}
               triggerLabel="Delete"
               confirmTitle={`Delete ${vocab.product.Singular} "${product.name}"?`}
-              confirmBody={`This will remove this ${vocab.product.Singular} and its ${vocab.icp.plural} (${product._count.icps}), ${vocab.persona.Plural} (${product._count.personas}), and ${vocab.product.singular} research sources/drafts.\n${vocab.campaign.Plural} (${product._count.campaigns}) must be removed first if any exist.\nHistorical scoring snapshots will not be destroyed — the ${vocab.product.Singular} may be archived instead if scoring runs reference it.`}
+              confirmBody={
+                features.employerIcpFit
+                  ? `This will remove this ${vocab.product.Singular} and its ${vocab.icp.plural} (${product._count.icps}), ${vocab.persona.Plural} (${product._count.personas}), and ${vocab.product.singular} research sources/drafts.\n${vocab.campaign.Plural} (${product._count.campaigns}) must be removed first if any exist.\nHistorical scoring snapshots will not be destroyed — the ${vocab.product.Singular} may be archived instead if scoring runs reference it.`
+                  : `This will remove this ${vocab.product.Singular} and its ${vocab.persona.Plural} (${product._count.personas}), and ${vocab.product.singular} research sources/drafts.\n${vocab.campaign.Plural} (${product._count.campaigns}) must be removed first if any exist.\nHistorical scoring snapshots will not be destroyed — the ${vocab.product.Singular} may be archived instead if scoring runs reference it.`
+              }
               confirmButtonLabel={`Delete ${vocab.product.Singular}`}
               onSuccessNavigate={deleteSuccessNavigate}
             />

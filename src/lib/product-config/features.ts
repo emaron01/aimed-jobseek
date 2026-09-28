@@ -33,6 +33,11 @@ export const FEATURE_FLAGS = [
   "legacyEmailSequence",
   /** Product-level Hiring Team create/edit (roles are identified per application). */
   "productLevelHiringTeam",
+  /**
+   * Employer ICP / Target Employer profile setup, interpretation, list scoring
+   * against an ICP, and application Employer fit scoring/UI.
+   */
+  "employerIcpFit",
 ] as const;
 
 export type FeatureFlag = (typeof FEATURE_FLAGS)[number];
@@ -52,6 +57,7 @@ export const features: Readonly<Record<FeatureFlag, boolean>> = Object.freeze({
   emailConnection: false,
   legacyEmailSequence: false,
   productLevelHiringTeam: false,
+  employerIcpFit: false,
 });
 
 /** True when any list feature is visible (drives the Lists nav entry). */

@@ -177,9 +177,11 @@ export default async function ListDetailPage({
                     campaignName={campaign.name}
                     researchComplete={researchComplete}
                     allowResearch={features.listBulkValidation}
-                    allowScore={features.listBulkScoring}
+                    allowScore={
+                      features.listBulkScoring && features.employerIcpFit
+                    }
                   />
-                ) : features.listBulkScoring ? (
+                ) : features.listBulkScoring && features.employerIcpFit ? (
                   <AppActionLink
                     href={scoreHref}
                     variant="primary"
@@ -270,6 +272,7 @@ export default async function ListDetailPage({
         </Panel>
       </div>
 
+      {features.listBulkScoring && features.employerIcpFit ? (
       <div className="mb-6">
         <Panel
           title="Scoring History"
@@ -282,7 +285,7 @@ export default async function ListDetailPage({
                 ? `Only the ${vocab.list.singular} owner can create a scoring run.`
                 : listArchived
                 ? `Unarchive this ${vocab.list.singular} to score it.`
-                : features.listBulkScoring && readyProducts.length > 0 ? (
+                : readyProducts.length > 0 ? (
                 <Link href={scoreHref} className="underline">
                   Score this {vocab.list.singular}
                 </Link>
@@ -324,6 +327,7 @@ export default async function ListDetailPage({
           )}
         </Panel>
       </div>
+      ) : null}
 
       {companyGroups.totalContacts === 0 ? (
         <EmptyState

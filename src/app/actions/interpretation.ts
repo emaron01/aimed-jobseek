@@ -55,6 +55,7 @@ export async function previewStarterTargetEmployerAction(
   }
 
   try {
+    assertGatedAction("employerIcpFit");
     const organizationId = await requireOrganizationId();
     const draft = await previewStarterTargetEmployer({
       organizationId,
@@ -98,6 +99,7 @@ export async function approveStarterTargetEmployerAction(
   );
 
   try {
+    assertGatedAction("employerIcpFit");
     const organizationId = await requireOrganizationId();
     const { icpId } = await approveStarterTargetEmployer({
       organizationId,
@@ -141,6 +143,7 @@ export async function interpretIcpAction(
   }
 
   try {
+    assertGatedAction("employerIcpFit");
     const organizationId = await requireOrganizationId();
     const user = await getCurrentUser();
     await interpretIcpDefinition({
@@ -268,6 +271,7 @@ export async function updateIcpCriterionAction(
   formData: FormData,
 ): Promise<CriterionActionResult> {
   try {
+    assertGatedAction("employerIcpFit");
     const organizationId = await requireOrganizationId();
     const criterionId = String(formData.get("criterionId") || "").trim();
     const icpId = String(formData.get("icpId") || "").trim();
@@ -308,6 +312,7 @@ export async function updateIcpEvidenceClassAction(
   formData: FormData,
 ): Promise<CriterionActionResult> {
   try {
+    assertGatedAction("employerIcpFit");
     const organizationId = await requireOrganizationId();
     const criterionId = String(formData.get("criterionId") || "").trim();
     const icpId = String(formData.get("icpId") || "").trim();
@@ -350,6 +355,7 @@ export async function decideIcpTargetedSearchAction(
   formData: FormData,
 ): Promise<CriterionActionResult> {
   try {
+    assertGatedAction("employerIcpFit");
     const organizationId = await requireOrganizationId();
     const criterionId = String(formData.get("criterionId") || "").trim();
     const icpId = String(formData.get("icpId") || "").trim();
@@ -435,6 +441,7 @@ export async function updateIcpCriterionTierAction(
   formData: FormData,
 ): Promise<CriterionActionResult> {
   try {
+    assertGatedAction("employerIcpFit");
     const organizationId = await requireOrganizationId();
     const criterionId = String(formData.get("criterionId") || "").trim();
     const icpId = String(formData.get("icpId") || "").trim();

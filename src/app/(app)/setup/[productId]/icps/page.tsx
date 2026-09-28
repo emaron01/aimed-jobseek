@@ -9,6 +9,7 @@ import {
   TenantError,
 } from "@/lib/tenant/getCurrentOrganization";
 import { vocab } from "@/lib/product-config";
+import { requireGatedPage } from "@/lib/product-config/feature-access";
 
 type PageProps = {
   params: Promise<{ productId: string }>;
@@ -16,6 +17,7 @@ type PageProps = {
 
 /** Optional list when a product has multiple ICPs. */
 export default async function ListIcpsPage({ params }: PageProps) {
+  requireGatedPage("employerIcpFit");
   const organization = await getCurrentOrganization();
   const { productId } = await params;
 
