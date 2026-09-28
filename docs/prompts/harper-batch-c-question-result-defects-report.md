@@ -110,8 +110,7 @@ Employer names are **not** used for similarity. Two walk-throughs with different
 ## 7. Commit and branch
 
 - **Branch:** `checkpoint/harper-prep-hub` (updated from `main` at `7a0f6b5` before work; no merge to main)
-- **Commit:** *(filled after commit)*
-
+- **Commit:** `435fbb0c4e21cec38e0c06ab7569e4dbb606648c`
 ---
 
 ## 8. Scope confirmation
