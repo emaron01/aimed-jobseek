@@ -343,7 +343,7 @@ export async function ConsultationSection({
       id: `orphaned:${topic.targetKey}`,
       targetKey: topic.targetKey,
       text: topic.label,
-      strength: null as const,
+      strength: null,
       explanation: null,
       gapStatus: null,
       facts: [] as Array<{ id: string; label: string; detail: string | null }>,

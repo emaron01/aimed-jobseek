@@ -132,22 +132,27 @@ function jobLinesFromRequirement(job: {
     workArrangement: null,
     employmentType: null,
     seniority: null,
-    compensationRange: null,
     reportingLine: job.reportingLine,
     responsibilities: asStrings(job.responsibilities),
     requiredItems: asStrings(job.requiredItems),
     preferredItems: asStrings(job.preferredItems),
     scorecard: {
       mission: scorecard.mission?.text
-        ? { text: scorecard.mission.text, kind: "FACT" as const }
+        ? {
+            id: "mission",
+            text: scorecard.mission.text,
+            inferred: false,
+          }
         : null,
-      outcomes: (scorecard.outcomes ?? []).map((o) => ({
+      outcomes: (scorecard.outcomes ?? []).map((o, index) => ({
+        id: `outcome:${index}`,
         text: o.text ?? "",
-        kind: "FACT" as const,
+        inferred: false,
       })),
-      competencies: (scorecard.competencies ?? []).map((c) => ({
+      competencies: (scorecard.competencies ?? []).map((c, index) => ({
+        id: `competency:${index}`,
         text: c.text ?? "",
-        kind: "FACT" as const,
+        inferred: false,
       })),
     },
   };
@@ -209,7 +214,6 @@ function fixtureChecks(): CheckRow[] {
     workArrangement: parsed.workArrangement,
     employmentType: parsed.employmentType,
     seniority: parsed.seniority,
-    compensationRange: parsed.compensationRange,
     reportingLine: parsed.reportingLine,
     responsibilities: parsed.responsibilities,
     requiredItems: parsed.requiredItems,

@@ -20,7 +20,7 @@ export default async function InterviewStagePage({ params }: PageProps) {
   const { id, stageId } = await params;
   let stages: Awaited<ReturnType<typeof listInterviewStages>>;
   let memberships: Awaited<ReturnType<typeof listApplicationContacts>>;
-  let campaign: { ownerUserId: string; visibility: string } | null;
+  let campaign: { ownerUserId: string; visibility: "PERSONAL" | "SHARED" } | null;
   try {
     [stages, memberships, campaign] = await Promise.all([
       listInterviewStages({ organizationId: organization.id, campaignId: id }),
@@ -36,7 +36,9 @@ export default async function InterviewStagePage({ params }: PageProps) {
   }
   const stage = stages.find((item) => item.id === stageId);
   if (!stage || !campaign) notFound();
-  const membership = await getMembershipForCurrentUser(organization.id);
+  if (campaign.visibility !== "PERSONAL" && campaign.visibility !== "SHARED") {
+    notFound();
+  }  const membership = await getMembershipForCurrentUser(organization.id);
   if (
     !canOpenCampaignDetail({
       role: membership.membership.role,
