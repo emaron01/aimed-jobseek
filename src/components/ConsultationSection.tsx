@@ -28,6 +28,11 @@ import {
   type HarperInterviewerOrderItem,
 } from "@/lib/consultation/harper-layout";
 import {
+  additionalInterviewPrepQaForProfile,
+  orderedAnsweredHarperQuestions,
+  profilePrimaryQuestionTurnIdsFromInterviewerSection,
+} from "@/lib/consultation/additional-prep-qa";
+import {
   buildStandingGaps,
   qaItemForTargetKey,
   standingGapStatus,
@@ -382,6 +387,17 @@ export async function ConsultationSection({
     targetKey,
     questions,
   }));
+  const questionsByStandingTarget = new Map(
+    requirementQuestionsForUi.map((row) => [row.targetKey, row.questions]),
+  );
+  const answeredInHarperOrder = orderedAnsweredHarperQuestions({
+    dedicatedTopics: standingInline.dedicatedTopics,
+    standingRequirementRows: standingRequirementsForUi.map((row) => ({
+      targetKey: row.targetKey,
+      questions: questionsByStandingTarget.get(row.targetKey) ?? [],
+    })),
+    interviewers: qaLayout.interviewers,
+  });
   // Render-time invariant (tested): every contentful Harper item is placed.
   // STOP leftovers stay in standingInline.unmapped for the report — never "Other".
   void harperContentRenderCoverage({
@@ -441,6 +457,7 @@ export async function ConsultationSection({
     heading: string;
     personaId: string;
     personaBuilt: boolean;
+    involvement: "DIRECT" | "INDIRECT" | null;
     section: (NonNullable<typeof summaryView.guidance>["people"])[number] | null;
     notes: NonNullable<ReturnType<typeof summaryView.notesByContactId.get>>;
   }> = [];
@@ -454,6 +471,7 @@ export async function ConsultationSection({
       heading: person.heading,
       personaId: person.roleId,
       personaBuilt: person.personaBuilt,
+      involvement: person.involvement,
       section:
         guidancePeople.find((item) => item.sectionKey === person.sectionKey) ?? null,
       notes: summaryView.notesByContactId.get(person.contactId) ?? [],
@@ -469,6 +487,7 @@ export async function ConsultationSection({
       heading: section.heading,
       personaId: "",
       personaBuilt: false,
+      involvement: null,
       section: guidancePeople.find((item) => item.sectionKey === sectionKey) ?? null,
       notes: summaryView.notesByContactId.get(section.contactId) ?? [],
     });
@@ -477,12 +496,14 @@ export async function ConsultationSection({
     if (seenPeople.has(prep.contactId)) continue;
     seenPeople.add(prep.contactId);
     const sectionKey = `contact:${prep.contactId}`;
+    const role = summaryView.roles.find((item) => item.id === prep.personaId);
     harperPeople.push({
       contactId: prep.contactId,
       sectionKey,
       heading: prep.name || prep.roleName || interviewConfig.labels.interviewer,
       personaId: prep.personaId ?? "",
       personaBuilt: Boolean(prep.personaId),
+      involvement: role?.involvement ?? null,
       section: guidancePeople.find((item) => item.sectionKey === sectionKey) ?? null,
       notes: summaryView.notesByContactId.get(prep.contactId) ?? [],
     });
@@ -762,7 +783,18 @@ export async function ConsultationSection({
           </section>
         ) : null}
           </HarperStandingView>
-          {harperPeople.map((person) => (
+          {harperPeople.map((person) => {
+            const interviewerSection =
+              interviewerByContact.get(person.contactId) ?? null;
+            const additionalPrepEntries = additionalInterviewPrepQaForProfile({
+              involvement: person.involvement,
+              profilePrimaryQuestionTurnIds:
+                profilePrimaryQuestionTurnIdsFromInterviewerSection(
+                  interviewerSection,
+                ),
+              answeredInHarperOrder,
+            });
+            return (
             <HarperPersonViewShell
               key={person.sectionKey}
               sectionKey={person.sectionKey}
@@ -779,15 +811,15 @@ export async function ConsultationSection({
                   personaBuilt={person.personaBuilt}
                   personaId={person.personaId}
                   prepStarted={prepStartedByContact.has(person.contactId)}
-                  interviewerSection={
-                    interviewerByContact.get(person.contactId) ?? null
-                  }
+                  interviewerSection={interviewerSection}
                   sessionStatus={threadStatus}
                   jobsActive={consultationBusy}
+                  additionalPrepEntries={additionalPrepEntries}
                 />
               </div>
             </HarperPersonViewShell>
-          ))}
+            );
+          })}
         </HarperFilterProvider>
         {canEdit && session?.status === "IN_PROGRESS" && !failed ? (
           <div className="flex flex-wrap gap-3">

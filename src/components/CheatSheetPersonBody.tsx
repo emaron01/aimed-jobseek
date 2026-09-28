@@ -2,6 +2,7 @@ import {
   buildCheatSheetPersonaAction,
   generateApplicationSummaryAction,
 } from "@/app/actions/application-summary";
+import { AdditionalInterviewPrepQa } from "@/components/AdditionalInterviewPrepQa";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { CheatSheetCoachItems } from "@/components/CheatSheetCoachItems";
 import { statedListItems } from "@/lib/application-summary/display";
@@ -10,6 +11,7 @@ import type { NotesFromInterviewEntry } from "@/lib/application-summary/intervie
 import { notesFromInterviewsWithHeading } from "@/lib/application-summary/interview-notes";
 import type { CheatSheetNote } from "@/lib/application-summary/notes";
 import type { CheatSheetPersonSection } from "@/lib/application-summary/contract";
+import type { AdditionalPrepQaEntry } from "@/lib/consultation/additional-prep-qa";
 import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
 import {
   applicationSummaryConfig,
@@ -78,6 +80,7 @@ export function CheatSheetPersonBody({
   harperLinkContactId = null,
   interviewNotes = null,
   interviewNotesPersonName = null,
+  additionalPrepEntries = [],
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -103,6 +106,8 @@ export function CheatSheetPersonBody({
    */
   interviewNotes?: NotesFromInterviewEntry[] | null;
   interviewNotesPersonName?: string | null;
+  /** Batch B5: Direct-role secondary answered Q&A (display-only). */
+  additionalPrepEntries?: AdditionalPrepQaEntry[];
 }) {
   const useInterviewNotesSection = interviewNotes != null;
   const notesBlock = useInterviewNotesSection ? (
@@ -135,6 +140,10 @@ export function CheatSheetPersonBody({
           </ApplicationActionForm>
         ) : null}
         {notesBlock}
+        <AdditionalInterviewPrepQa
+          campaignId={campaignId}
+          entries={additionalPrepEntries}
+        />
       </div>
     );
   }
@@ -154,6 +163,10 @@ export function CheatSheetPersonBody({
           </ApplicationActionForm>
         ) : null}
         {notesBlock}
+        <AdditionalInterviewPrepQa
+          campaignId={campaignId}
+          entries={additionalPrepEntries}
+        />
       </div>
     );
   }
@@ -230,6 +243,10 @@ export function CheatSheetPersonBody({
           ))}
         </ul>
       </div>
+      <AdditionalInterviewPrepQa
+        campaignId={campaignId}
+        entries={additionalPrepEntries}
+      />
     </div>
   );
 }

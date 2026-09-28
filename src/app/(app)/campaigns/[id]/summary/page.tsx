@@ -23,6 +23,13 @@ import { loadCheatSheetCoachQaByContact } from "@/lib/application-summary/coach-
 import { statedListItems } from "@/lib/application-summary/display";
 import { compileNotesFromInterviewsWithPerson } from "@/lib/application-summary/interview-notes";
 import { getApplicationSummaryView } from "@/lib/application-summary/service";
+import {
+  additionalInterviewPrepQaForProfile,
+} from "@/lib/consultation/additional-prep-qa";
+import {
+  loadOrderedAnsweredHarperQuestions,
+  primaryTurnIdsForContact,
+} from "@/lib/consultation/harper-display-qa";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
 import { canOpenCampaignDetail } from "@/lib/campaign/visibility";
@@ -137,6 +144,11 @@ export default async function ApplicationSummaryPage({
     organizationId: organization.id,
     campaignId: id,
   });
+  const { answeredInHarperOrder, interviewerQuestionsByContactId } =
+    await loadOrderedAnsweredHarperQuestions({
+      organizationId: organization.id,
+      campaignId: id,
+    });
   const canGenerate = view.campaign.ownerUserId === user.id;
   const requirementScorecard = scorecard(view.requirement.scorecardJson);
   const summaryStatus = view.summary?.status ?? null;
@@ -265,6 +277,17 @@ export default async function ApplicationSummaryPage({
         const coachQaItems = person.contactId
           ? coachQaByContact.get(person.contactId) ?? []
           : [];
+        const additionalPrepEntries =
+          person.contactId && person.involvement === "DIRECT"
+            ? additionalInterviewPrepQaForProfile({
+                involvement: person.involvement,
+                profilePrimaryQuestionTurnIds: primaryTurnIdsForContact(
+                  interviewerQuestionsByContactId,
+                  person.contactId,
+                ),
+                answeredInHarperOrder,
+              })
+            : [];
         return (
           <CheatSheetPersonSection key={person.sectionKey} sectionKey={person.sectionKey}>
           <SummarySection id={person.sectionKey} title={person.heading}>
@@ -281,6 +304,7 @@ export default async function ApplicationSummaryPage({
               coachQaItems={coachQaItems}
               interviewNotes={person.contactId ? interviewNotes : null}
               interviewNotesPersonName={person.contactId ? person.heading : null}
+              additionalPrepEntries={additionalPrepEntries}
             />
           </SummarySection>
           </CheatSheetPersonSection>

@@ -4,11 +4,13 @@ import {
   addInterviewContactAction,
   startPersonPrepAction,
 } from "@/app/actions/interview";
+import { AdditionalInterviewPrepQa } from "@/components/AdditionalInterviewPrepQa";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { CheatSheetPersonBody } from "@/components/CheatSheetPersonBody";
 import { QuestionList } from "@/components/ConsultationThread";
 import type { CheatSheetNote } from "@/lib/application-summary/notes";
 import type { CheatSheetPersonSection } from "@/lib/application-summary/contract";
+import type { AdditionalPrepQaEntry } from "@/lib/consultation/additional-prep-qa";
 import {
   coachItemIdFromCheatSheetTarget,
   harperContactAnchorId,
@@ -107,6 +109,7 @@ export function HarperPersonInlineProfile({
   interviewerSection,
   sessionStatus,
   jobsActive,
+  additionalPrepEntries = [],
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -121,6 +124,7 @@ export function HarperPersonInlineProfile({
   interviewerSection: HarperInterviewerSection | null;
   sessionStatus: string;
   jobsActive: boolean;
+  additionalPrepEntries?: AdditionalPrepQaEntry[];
 }) {
   const [pendingTarget, setPendingTarget] = useState<string | null>(null);
   const showReply =
@@ -202,6 +206,10 @@ export function HarperPersonInlineProfile({
           />
         </div>
       ) : null}
+      <AdditionalInterviewPrepQa
+        campaignId={campaignId}
+        entries={additionalPrepEntries}
+      />
     </section>
   );
 }

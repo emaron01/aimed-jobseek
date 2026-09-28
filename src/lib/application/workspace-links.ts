@@ -43,6 +43,18 @@ export function workspaceHarperContactHref(
   return `${workspaceConsultationHref(campaignId)}?person=${encodeURIComponent(`contact:${person}`)}#${encodeURIComponent(`harper-contact:${person}`)}`;
 }
 
+/** Harper question on Where you stand / general — no person selected. */
+export function workspaceHarperStandingQuestionHref(
+  campaignId: string,
+  questionTurnId: string,
+): string {
+  const turnId = questionTurnId.trim();
+  if (!turnId) {
+    throw new Error("Harper standing question link is missing a question.");
+  }
+  return `${workspaceConsultationHref(campaignId)}#${encodeURIComponent(`harper-q:${turnId}`)}`;
+}
+
 /** Harper question card: select the person profile, then scroll to `#harper-q:{questionTurnId}`. */
 export function workspaceHarperQuestionHref(
   campaignId: string,
