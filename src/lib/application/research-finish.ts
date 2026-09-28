@@ -26,6 +26,7 @@ import {
 } from "@/lib/application/compensation-fit";
 import { prisma } from "@/lib/prisma-client";
 import { vocab } from "@/lib/product-config";
+import { isGatedSurfaceEnabled } from "@/lib/product-config/feature-access";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
 import type { ResearchCompanyResult } from "@/lib/tenant/company-research-service";
@@ -144,6 +145,7 @@ export async function scoreFit(input: {
   icpId: string | null;
   companyId: string;
 }): Promise<void> {
+  if (!isGatedSurfaceEnabled("employerIcpFit")) return;
   if (!input.icpId) return;
   const profile = await loadCriteria(input.organizationId, input.icpId);
   const research = await prisma.companyResearch.findFirst({
@@ -224,6 +226,7 @@ export async function markIdentityDependentsStale(input: {
   organizationId: string;
   campaignId: string;
 }): Promise<void> {
+  if (!isGatedSurfaceEnabled("employerIcpFit")) return;
   await prisma.applicationFit.updateMany({
     where: {
       organizationId: input.organizationId,
@@ -315,12 +318,14 @@ export async function finishApplicationAfterResearch(input: {
       identityConfirmation: "PENDING",
     },
   });
-  await scoreFit({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    icpId: input.icpId,
-    companyId: input.companyId,
-  });
+  if (isGatedSurfaceEnabled("employerIcpFit")) {
+    await scoreFit({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      icpId: input.icpId,
+      companyId: input.companyId,
+    });
+  }
   const { enqueueApplicationJob } = await import("@/lib/application-jobs/service");
   await enqueueApplicationJob({
     organizationId: input.organizationId,

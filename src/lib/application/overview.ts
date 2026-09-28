@@ -10,6 +10,7 @@ import {
   isApplicationProgress,
   outreachConfig,
 } from "@/lib/product-config";
+import { isGatedSurfaceEnabled } from "@/lib/product-config/feature-access";
 import type { ApplicationStepView } from "@/lib/application/step-progress";
 
 export type ApplicationStatusTone =
@@ -98,12 +99,14 @@ export async function getApplicationOverview(input: {
     appliedAt: campaign.appliedAt?.toISOString() ?? null,
     applicationProgress: campaign.applicationProgress,
   });
-  const fit = campaign.applicationFit
-    ? displayedFitBucket({
-        bucket: campaign.applicationFit.bucket,
-        overrideBucket: campaign.applicationFit.overrideBucket,
-      })
-    : null;
+  const fitEnabled = isGatedSurfaceEnabled("employerIcpFit");
+  const fit =
+    fitEnabled && campaign.applicationFit
+      ? displayedFitBucket({
+          bucket: campaign.applicationFit.bucket,
+          overrideBucket: campaign.applicationFit.overrideBucket,
+        })
+      : null;
   return {
     campaignId: campaign.id,
     campaignName: campaign.name,
@@ -114,7 +117,7 @@ export async function getApplicationOverview(input: {
     appliedAt: campaign.appliedAt?.toISOString() ?? null,
     nextStepText: nextStep.text ?? "",
     nextStepFailed: nextStep.failed,
-    fitLabel: fit ? formatFitBucketLabel(fit) : null,
+    fitLabel: fitEnabled && fit ? formatFitBucketLabel(fit) : null,
     location: campaign.jobRequirement?.location?.trim() || null,
     workArrangement: campaign.jobRequirement?.workArrangement?.trim() || null,
     compensation: campaign.jobRequirement?.compensationRange?.trim() || null,
