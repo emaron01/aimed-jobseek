@@ -72,7 +72,7 @@ Need input when `harperQuestion` is set (`CheatSheetCoachItems.tsx` / `coachItem
 ## 5. Commit / branch
 
 - Branch: `checkpoint/harper-prep-hub`
-- Commit: _(after push)_
+- Commit: `14b6fcd234cecefb166570237828ef8e91778685`
 - Not merged to main; main not pushed.
 
 ---
