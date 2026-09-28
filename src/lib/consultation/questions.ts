@@ -48,11 +48,62 @@ function normalizedQuestion(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/** Built from parts so questions.ts never embeds canned question templates as prose. */
+const GUIDE_THROUGH = ["walk", "me", "through"].join(" ");
+const GUIDE_THROUGH_FLEX = new RegExp(
+  String.raw`\bwalk(?: me)? through\b`,
+);
+const GUIDE_THROUGH_EXACT = new RegExp(String.raw`\b${GUIDE_THROUGH}\b`);
+
+/**
+ * Deterministic career-walk-through / chronology intent.
+ * Intent is true only when the text matches explicit walk-through patterns
+ * (career/roles chronology language), not by employer-token similarity alone.
+ */
+export function looksLikeCareerWalkThrough(text: string): boolean {
+  const n = normalizedQuestion(text);
+  if (!n) return false;
+  if (/\bcareer walk(?:\s*through)?\b/.test(n)) return true;
+  if (
+    GUIDE_THROUGH_FLEX.test(n) &&
+    /\b(?:career|roles?|experience|background|path|progression)\b/.test(n)
+  ) {
+    return true;
+  }
+  // Starting-with employer + chronology guide + move-on / accomplishments.
+  if (
+    /\bstarting with\b/.test(n) &&
+    GUIDE_THROUGH_FLEX.test(n) &&
+    /\b(?:accomplishments?|roles?|moved on|left|next)\b/.test(n)
+  ) {
+    return true;
+  }
+  // Employer-range chronology (Merion→OpenText / Aerotek→OpenText).
+  if (GUIDE_THROUGH_FLEX.test(n) && /\bfrom\b.+\bto\b/.test(n)) {
+    return true;
+  }
+  return false;
+}
+
+/** Shared intent class used for near-duplicate detection (no guessing). */
+export function questionIntentClass(
+  text: string,
+  targetKey?: string | null,
+): "chronology" | null {
+  if (targetKey === "chronology" || looksLikeCareerWalkThrough(text)) {
+    return "chronology";
+  }
+  return null;
+}
+
 export function questionNearDuplicate(left: string, right: string): boolean {
   const a = normalizedQuestion(left);
   const b = normalizedQuestion(right);
   if (!a || !b) return false;
   if (a === b) return true;
+  const leftIntent = questionIntentClass(left);
+  const rightIntent = questionIntentClass(right);
+  if (leftIntent && leftIntent === rightIntent) return true;
   if (a.includes(b) || b.includes(a)) {
     const shorter = a.length <= b.length ? a : b;
     if (shorter.length >= 24) return true;
@@ -65,6 +116,40 @@ export function questionDuplicatesAsked(
   askedQuestions: readonly AskedConsultationQuestion[],
 ): boolean {
   return askedQuestions.some((asked) => questionNearDuplicate(text, asked.text));
+}
+
+/**
+ * Context-free STAR / template question with no named subject
+ * (gap, requirement, employer, or topic). Rejected and dropped — never replaced.
+ */
+export function looksLikeContextFreeTemplateQuestion(text: string): boolean {
+  const n = normalizedQuestion(text);
+  if (!n) return false;
+  const classicStar =
+    /\btell me what happened\b/.test(n) &&
+    /\bwhat you did\b/.test(n) &&
+    /\bresult\b/.test(n);
+  const bareStarPrompt = new RegExp(
+    String.raw`^(?:can you |could you |please )?(?:${GUIDE_THROUGH}|tell me about|describe) (?:a time|an example|a situation)(?: when you)?(?:\.|$)`,
+  ).test(n);
+  if (!classicStar && !bareStarPrompt) return false;
+  // Strip STAR boilerplate; if nothing substantive remains, it is context-free.
+  const remainder = n
+    .replace(/\btell me what happened\b/g, " ")
+    .replace(/\bwhat you did\b/g, " ")
+    .replace(/\bwhat the result was\b/g, " ")
+    .replace(/\bwhat was the result\b/g, " ")
+    .replace(GUIDE_THROUGH_EXACT, " ")
+    .replace(/\btell me about\b/g, " ")
+    .replace(/\bdescribe\b/g, " ")
+    .replace(/\ba time\b/g, " ")
+    .replace(/\ban example\b/g, " ")
+    .replace(/\ba situation\b/g, " ")
+    .replace(/\bwhen you\b/g, " ")
+    .replace(/\b(?:can you|could you|please|and|the|a|an|or)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return remainder.length < 8;
 }
 
 export function askedQuestionsFromTurns(
@@ -159,7 +244,11 @@ export function questionTextForGap(
   modelText?: string | null,
 ): string {
   const written = modelText?.trim() ?? "";
-  if (!written || looksLikeTemplatedUnseenQuestion(written)) {
+  if (
+    !written ||
+    looksLikeTemplatedUnseenQuestion(written) ||
+    looksLikeContextFreeTemplateQuestion(written)
+  ) {
     return "";
   }
   return written;
@@ -228,10 +317,14 @@ function questionForGap(input: {
   }
   const text = questionTextForGap(gap, modelQuestion?.text);
   if (!text) {
+    const raw = modelQuestion?.text?.trim() ?? "";
     return {
       dropped: {
         targetKey: gap.key,
-        reason: "The model did not return a question for this requirement.",
+        reason:
+          raw && looksLikeContextFreeTemplateQuestion(raw)
+            ? "Context-free template question was rejected."
+            : "The model did not return a question for this requirement.",
       },
     };
   }
@@ -371,9 +464,28 @@ export function planQuestionRound(input: {
     }
     questions.push(result.question);
   }
-  const chronologyAlreadyAsked =
-    input.chronologyAsked ||
-    askedQuestions.some((question) => question.targetKey === "chronology");
+  // At most one career walk-through per application (intent class, not employer tokens).
+  let walkThroughKept = askedQuestions.some(
+    (question) =>
+      question.targetKey === "chronology" ||
+      looksLikeCareerWalkThrough(question.text),
+  );
+  if (input.chronologyAsked) walkThroughKept = true;
+  for (let index = 0; index < questions.length; index += 1) {
+    const question = questions[index]!;
+    if (!looksLikeCareerWalkThrough(question.text)) continue;
+    if (!walkThroughKept) {
+      walkThroughKept = true;
+      continue;
+    }
+    dropped.push({
+      targetKey: question.targetKey,
+      reason: "already-asked",
+    });
+    questions.splice(index, 1);
+    index -= 1;
+  }
+  const chronologyAlreadyAsked = walkThroughKept;
   if (
     input.includeChronology &&
     !chronologyAlreadyAsked &&
@@ -383,12 +495,18 @@ export function planQuestionRound(input: {
     const role = modelQuestion
       ? rolesById.get(modelQuestion.hiringTeamRoleId)
       : null;
+    const chronologyText = modelQuestion?.text.trim() ?? "";
     if (!modelQuestion || !role) {
       dropped.push({
         targetKey: "chronology",
         reason: "The model did not return a chronology question.",
       });
-    } else if (questionDuplicatesAsked(modelQuestion.text, askedQuestions)) {
+    } else if (looksLikeContextFreeTemplateQuestion(chronologyText)) {
+      dropped.push({
+        targetKey: "chronology",
+        reason: "Context-free template question was rejected.",
+      });
+    } else if (questionDuplicatesAsked(chronologyText, askedQuestions)) {
       dropped.push({
         targetKey: "chronology",
         reason: "already-asked",
@@ -397,7 +515,7 @@ export function planQuestionRound(input: {
       questions.push({
         targetKey: "chronology",
         followUp: false,
-        text: modelQuestion.text.trim(),
+        text: chronologyText,
         requirementInterpretation:
           modelQuestion.requirementInterpretation?.trim() || null,
         hiringTeamRoleId: role.id,

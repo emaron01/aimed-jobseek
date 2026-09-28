@@ -638,10 +638,10 @@ export async function polishAnswerWithQuality(input: {
       lastFailure = consultationConversationCopy.generationFailed;
       qualityFeedback = [
         whyThisCompany
-          ? "Write a first-person interview answer to why they want to work here using only the motivation. resumeBullet must be null. Do not copy the reply unchanged."
+          ? "Write a first-person interview answer to why they want to work here using only the motivation. resumeBullet must be null. Do not copy the reply unchanged. Do not describe the question or reframe the ask—answer it."
           : confirmedGap
-            ? "Write a first-person talk track for addressing this gap honestly. Do not invent experience. Do not copy the reply unchanged. Never refer to the person in third person."
-            : "The last interview answer or resume bullet copied the wording. Write polished first-person statements. You may use the supplied Personal Profile; do not copy the reply unchanged.",
+            ? "Write a first-person talk track for addressing this gap honestly. Do not invent experience. Do not copy the reply unchanged. Never refer to the person in third person. Do not describe the question itself."
+            : "The last interview answer or resume bullet copied, paraphrased, or meta-commented on the seeker reply. Write polished first-person statements that answer the question with experience. You may use the supplied Personal Profile; do not copy the reply unchanged; do not describe the question.",
       ];
       if (lastAttempt) {
         return {

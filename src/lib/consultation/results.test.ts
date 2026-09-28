@@ -4,6 +4,8 @@ import {
   consultationItemNeedsResultRepair,
   isExactSeekerAnswer,
   isJoinedSeekerAnswers,
+  isParaphrasedSeekerReply,
+  isQuestionMetaCommentary,
   isRawSeekerResult,
   isSeekerAnswerFragment,
   resultIgnoresLatestAnswer,
@@ -48,6 +50,20 @@ describe("Harper result quality", () => {
     expect(
       resultIgnoresLatestAnswer(harperInterview, [firstAnswer, secondAnswer]),
     ).toBe(false);
+  });
+
+  it("rejects paraphrased seeker replies and question meta-commentary as Harper results", () => {
+    const seeker =
+      "That company statement is not a skill. It should be an interview question about why I want to work here.";
+    const paraphrase =
+      "That company statement is not really a skill and should be an interview question about why I want to work here.";
+    const meta =
+      "Clarified that a company statement needed to be reframed as an interview question.";
+    expect(isParaphrasedSeekerReply(paraphrase, [seeker])).toBe(true);
+    expect(isQuestionMetaCommentary(meta)).toBe(true);
+    expect(isRawSeekerResult(paraphrase, [seeker])).toBe(true);
+    expect(isRawSeekerResult(meta, [seeker])).toBe(true);
+    expect(isRawSeekerResult(harperInterview, [seeker])).toBe(false);
   });
 
   it("flags a question whose result is raw replies or a leftover fragment", () => {

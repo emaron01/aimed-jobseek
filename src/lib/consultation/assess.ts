@@ -250,20 +250,22 @@ export function evidenceTargets(input: {
     }
   });
   input.scorecard.outcomes.forEach((item) => {
-    if (item.text.trim()) {
+    const trimmed = item.text.trim();
+    if (trimmed && !looksLikeCompanyPitch(trimmed)) {
       pushUniqueTarget(targets, {
         key: `outcome:${item.id}`,
         kind: "OUTCOME",
-        text: item.text.trim(),
+        text: trimmed,
       });
     }
   });
   input.scorecard.competencies.forEach((item) => {
-    if (item.text.trim()) {
+    const trimmed = item.text.trim();
+    if (trimmed && !looksLikeCompanyPitch(trimmed)) {
       pushUniqueTarget(targets, {
         key: `competency:${item.id}`,
         kind: "COMPETENCY",
-        text: item.text.trim(),
+        text: trimmed,
       });
     }
   });
@@ -278,11 +280,12 @@ export function evidenceTargets(input: {
     }
   }
   input.preferredItems.forEach((text, index) => {
-    if (text.trim()) {
+    const trimmed = text.trim();
+    if (trimmed && !looksLikeCompanyPitch(trimmed)) {
       pushUniqueTarget(targets, {
         key: `preferred:${index}`,
         kind: "PREFERRED",
-        text: text.trim(),
+        text: trimmed,
       });
     }
   });
@@ -588,12 +591,18 @@ const KIND_RANK: Record<EvidenceKind, number> = {
 };
 
 const COMPANY_PITCH_OPENERS =
-  /^(?:join us|come join(?: us)?|help us(?: to)?(?: build| protect| transform| shape| grow)|we(?:'re| are) (?:on a mission|building a|looking for people who))\b/i;
+  /^(?:join us|come join(?: us)?|help us(?: to)?(?: build| protect| transform| shape| grow)|we(?:'re| are) (?:on a mission|building a|looking for people who|committed to|passionate about)|our mission (?:is|was) to|be part of (?:a|our)|help (?:us )?build the future)\b/i;
 
 const COMPANY_PITCH_MARKERS = [
   /\bhelp protect the world\b/i,
   /\bworld(?:'s)? most valuable digital brands\b/i,
   /\bdefined by execution excellence\b/i,
+  /\bour mission (?:is|was) to\b/i,
+  /\bwe(?:'re| are) on a mission to\b/i,
+  /\bjoin (?:our|a) (?:mission|team|company) to\b/i,
+  /\btransform how (?:enterprises|companies|the world)\b/i,
+  /\bbuild(?:ing)? the future of\b/i,
+  /\bmost (?:innovative|trusted|valuable) (?:brands|companies|platforms)\b/i,
 ];
 
 /** Recruiting pitches and taglines are not skills the seeker can have experience with. */
@@ -601,7 +610,18 @@ export function looksLikeCompanyPitch(text: string): boolean {
   const trimmed = text.trim();
   if (!trimmed) return false;
   if (COMPANY_PITCH_OPENERS.test(trimmed)) return true;
-  return COMPANY_PITCH_MARKERS.some((pattern) => pattern.test(trimmed));
+  if (COMPANY_PITCH_MARKERS.some((pattern) => pattern.test(trimmed))) return true;
+  // Mission-like company statement: first-person plural purpose without a skill verb.
+  if (
+    /\b(?:we|our company|the company)\b/i.test(trimmed) &&
+    /\b(?:mission|purpose|vision|believe|exist to|here to)\b/i.test(trimmed) &&
+    !/\b(?:years?|experience|skill|proficien|ability to|manage|lead|own|deliver)\b/i.test(
+      trimmed,
+    )
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export function isCompanyMissionOrTagline(item: {

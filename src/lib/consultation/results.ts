@@ -39,6 +39,65 @@ export function isSeekerAnswerFragment(
   });
 }
 
+/** High-overlap restatement of a seeker reply without Harper polish framing. */
+export function isParaphrasedSeekerReply(
+  content: string,
+  seekerAnswers: readonly string[],
+): boolean {
+  const result = normalized(content);
+  if (!result) return false;
+  // Existing polish contract allows a short first-person frame around the reply.
+  if (/^in my words\b/.test(result)) return false;
+  const tokenize = (text: string) =>
+    new Set(
+      text
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((token) => token.length >= 4),
+    );
+  const resultTokens = tokenize(content);
+  if (resultTokens.size < 5) return false;
+  for (const answer of seekerAnswers) {
+    const a = normalized(answer);
+    if (a.length < 40) continue;
+    // Fixture / polish may label the raw reply ("result: …") without rewriting it.
+    if (/^result\b/.test(result) && result.includes(a)) continue;
+    const answerTokens = tokenize(answer);
+    if (answerTokens.size < 5) continue;
+    const lengthDelta =
+      Math.abs(result.length - a.length) / Math.max(result.length, a.length);
+    if (lengthDelta > 0.22) continue;
+    let intersection = 0;
+    for (const token of resultTokens) {
+      if (answerTokens.has(token)) intersection += 1;
+    }
+    const union = resultTokens.size + answerTokens.size - intersection;
+    if (union > 0 && intersection / union >= 0.85) return true;
+  }
+  return false;
+}
+
+/**
+ * Result talks about the question / framing instead of answering with experience.
+ * Example: "Clarified that a company statement needed to be reframed as an interview question."
+ */
+export function isQuestionMetaCommentary(content: string): boolean {
+  const text = normalized(content);
+  if (!text) return false;
+  const metaAboutQuestion =
+    /\b(clarified that|reframed|reframe|needed to be (?:an )?interview question|company statement|this (?:gap|question|requirement) (?:is|was|needed)|not (?:really )?a (?:skill|requirement)|should (?:be|have been) (?:asked|reframed))\b/.test(
+      text,
+    );
+  if (!metaAboutQuestion) return false;
+  // Allow genuine experience that happens to mention "question" in passing.
+  const hasExperienceSignal =
+    /\b(i (?:led|built|owned|ran|cut|grew|shipped|managed|closed)|my (?:team|role|work)|at \w+)\b/.test(
+      text,
+    );
+  return !hasExperienceSignal;
+}
+
 export function resultIgnoresLatestAnswer(
   content: string,
   seekerAnswers: readonly string[],
@@ -56,10 +115,12 @@ export function isRawSeekerResult(
   content: string,
   seekerAnswers: readonly string[],
 ): boolean {
+  if (isQuestionMetaCommentary(content)) return true;
   return (
     isExactSeekerAnswer(content, seekerAnswers) ||
     isJoinedSeekerAnswers(content, seekerAnswers) ||
-    isSeekerAnswerFragment(content, seekerAnswers)
+    isSeekerAnswerFragment(content, seekerAnswers) ||
+    isParaphrasedSeekerReply(content, seekerAnswers)
   );
 }
 
