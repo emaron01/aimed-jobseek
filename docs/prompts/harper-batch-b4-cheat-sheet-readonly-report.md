@@ -96,7 +96,7 @@ Deep-link person selection: `?person=contact:{id}` on Harper (`consultation/page
 ## 5. Commit / branch
 
 - Branch: `checkpoint/harper-prep-hub`
-- Commit: *(filled after commit)*
+- Commit: `fe6b95083bbefd43e554d7a60057759c8b8750ca`
 - Pushed checkpoint only; **main not merged or pushed**
 
 ---
