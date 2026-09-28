@@ -594,12 +594,13 @@ describe("Harper question-limit coach", () => {
 
   it("keeps Where you stand above the questions and has no Harper-page navigation", () => {
     // Batch A: standing moves above General / interviewer questions (plan report).
+    // Batch B3: interviewer Q&A lives in HarperPersonInlineProfile (person view).
     const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
     const render = section.slice(section.indexOf("return ("));
     expect(section).not.toContain("HarperSuggestionList");
     expect(section).toContain("consultation-standing-panel");
     expect(render.indexOf("consultation-standing-panel")).toBeLessThan(
-      render.indexOf("<ConsultationThread"),
+      render.indexOf("HarperPersonInlineProfile"),
     );
     expect(section).toContain("consultationConversationCopy.whereYouStand");
     const service = readFileSync("src/lib/consultation/service.ts", "utf8");

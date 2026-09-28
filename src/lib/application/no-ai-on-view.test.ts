@@ -163,6 +163,8 @@ describe("no AI on page view / skip unchanged / research cost", () => {
     const section = src("src/components/ConsultationSection.tsx");
     const thread = src("src/components/ConsultationThread.tsx");
     const standing = src("src/components/ConsultationStanding.tsx");
+    const personView = src("src/components/HarperPersonView.tsx");
+    const peopleFilter = src("src/components/HarperPeopleFilter.tsx");
 
     expect(page).toContain("ConsultationSection");
     expect(page).toContain("getApplicationWorkspaceLive");
@@ -180,6 +182,7 @@ describe("no AI on page view / skip unchanged / research cost", () => {
     expect(section).toContain("buildHarperQaLayout");
     expect(section).toContain("partitionGeneralQuestionsForStanding");
     expect(section).toContain("consultationBusy");
+    expect(section).toContain("getApplicationSummaryView");
     expect(page).toContain("jobs={live.jobs}");
 
     expect(thread).not.toContain("enqueueApplicationJob");
@@ -187,6 +190,10 @@ describe("no AI on page view / skip unchanged / research cost", () => {
     expect(standing).not.toContain("enqueueApplicationJob");
     expect(standing).not.toContain("runPaidStructuredCall");
     expect(standing).toContain("QuestionList");
+    expect(personView).not.toContain("enqueueApplicationJob");
+    expect(personView).not.toContain("runPaidStructuredCall");
+    expect(peopleFilter).not.toContain("enqueueApplicationJob");
+    expect(peopleFilter).not.toContain("runPaidStructuredCall");
   });
 
   it("Stage and Outreach page render enqueue no job and make no paid call", () => {

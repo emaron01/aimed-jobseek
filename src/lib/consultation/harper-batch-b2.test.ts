@@ -116,10 +116,12 @@ describe("Harper Batch B2 — Where you stand inline Q&A", () => {
     expect(
       partitioned.byRequirementKey.get("required:forecast")?.[0]?.seekerAnswers,
     ).toEqual([{ id: "a1", body: "I owned the weekly call." }]);
-    // overview:gap cheatSheet cannot be tied to a contact — STOP / report-only, no Other.
-    expect(partitioned.unmapped.map((item) => item.questionTurnId)).toEqual([
-      "q-cheat-overview",
+    // Batch B3: overview gaps under Where you stand (orphaned / no rating).
+    expect(partitioned.unmapped.map((item) => item.questionTurnId)).toEqual([]);
+    expect(partitioned.orphanedRequirementTopics.map((t) => t.targetKey)).toEqual([
+      "cheatSheet:overview:gap:1",
     ]);
+    expect(partitioned.orphanedRequirementTopics[0]?.label).toBe("Overview gap coach");
     expect(partitioned.dedicatedTopics.some((topic) => topic.kind === "requirement")).toBe(
       false,
     );
@@ -162,8 +164,9 @@ describe("Harper Batch B2 — Where you stand inline Q&A", () => {
 
     const render = section.slice(section.indexOf("return ("));
     expect(render.indexOf("consultation-standing-panel")).toBeLessThan(
-      render.indexOf("<ConsultationThread"),
+      render.indexOf("HarperPersonInlineProfile"),
     );
+    expect(section).toContain("HarperStandingView");
     expect(section).toContain("consultationConversationCopy.whereYouStand");
     expect(standing).toContain("consultation-standing-counts");
     expect(standing).toContain("consultation-standing-requirements");

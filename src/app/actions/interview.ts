@@ -7,9 +7,11 @@ import { requireCurrentUser } from "@/lib/auth/authz";
 import { refreshConsultationOffer } from "@/lib/interview/guide";
 import { addCheatSheetInterviewNote } from "@/lib/application-summary/service";
 import {
+  addInterviewContact,
   addInterviewStageInterviewer,
   assignExistingInterviewStageInterviewer,
   createInterviewStage,
+  startPersonPrepForContact,
   updateInterviewStage,
 } from "@/lib/interview/stages";
 import { workspaceProgressText } from "@/lib/product-config";
@@ -45,7 +47,9 @@ function parseOptionalDate(value: string): Date | null {
 
 function revalidate(campaign: string, stageId?: string) {
   revalidatePath(`/campaigns/${campaign}`);
+  revalidatePath(`/campaigns/${campaign}/consultation`);
   revalidatePath(`/campaigns/${campaign}/summary`);
+  revalidatePath(`/campaigns/${campaign}/interviews`);
   if (stageId) revalidatePath(`/campaigns/${campaign}/interviews/${stageId}`);
   revalidatePath("/");
 }
@@ -172,6 +176,63 @@ export async function addInterviewInterviewerAction(
     });
     revalidate(id, stageId);
     return { ok: true, message: "Interviewer added." };
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
+/** Harper: add a person expected to interview before any stage is scheduled. */
+export async function addInterviewContactAction(
+  _previous: InterviewActionResult | null,
+  formData: FormData,
+): Promise<InterviewActionResult> {
+  try {
+    const [user, organizationId] = await Promise.all([
+      requireCurrentUser(),
+      requireOrganizationId(),
+    ]);
+    const id = campaignId(formData);
+    await addInterviewContact({
+      organizationId,
+      campaignId: id,
+      userId: user.id,
+      firstName: String(formData.get("firstName") ?? ""),
+      lastName: String(formData.get("lastName") ?? ""),
+      title: String(formData.get("title") ?? ""),
+      email: String(formData.get("email") ?? "").trim() || null,
+      linkedinUrl: String(formData.get("linkedinUrl") ?? "").trim() || null,
+      linkedInProfileText: String(formData.get("linkedInProfileText") ?? ""),
+      personaId: String(formData.get("personaId") ?? "").trim() || null,
+    });
+    revalidate(id);
+    return { ok: true, message: "Interview contact added." };
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
+/** Harper: start interviewer prep for an existing contact (existing paid paths). */
+export async function startPersonPrepAction(
+  _previous: InterviewActionResult | null,
+  formData: FormData,
+): Promise<InterviewActionResult> {
+  try {
+    const [user, organizationId] = await Promise.all([
+      requireCurrentUser(),
+      requireOrganizationId(),
+    ]);
+    const id = campaignId(formData);
+    const contactId = String(formData.get("contactId") ?? "").trim();
+    if (!contactId) throw new TenantError("Choose a person first.");
+    await startPersonPrepForContact({
+      organizationId,
+      campaignId: id,
+      userId: user.id,
+      contactId,
+      personaId: String(formData.get("personaId") ?? "").trim() || null,
+    });
+    revalidate(id);
+    return { ok: true, message: "Interviewer prep started." };
   } catch (error) {
     return errorResult(error);
   }

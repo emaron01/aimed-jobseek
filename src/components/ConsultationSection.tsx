@@ -34,11 +34,22 @@ import {
   standingWorkIsComplete,
 } from "@/lib/consultation/standing";
 import { listPersonPreps } from "@/lib/interview/person-prep";
+import { getApplicationSummaryView } from "@/lib/application-summary/service";
 import { ConsultationKnowAboutMe } from "@/components/ConsultationKnowAboutMe";
 import { ConsultationStanding } from "@/components/ConsultationStanding";
-import { ConsultationThread } from "@/components/ConsultationThread";
-import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
+import {
+  HarperFilterProvider,
+  HarperPeopleFilter,
+  HarperPersonViewShell,
+  HarperSelectPersonLink,
+  HarperStandingView,
+} from "@/components/HarperPeopleFilter";
+import {
+  HarperAddInterviewContactForm,
+  HarperPersonInlineProfile,
+} from "@/components/HarperPersonView";
 import { OpenWorkspaceHashSection } from "@/components/OpenWorkspaceHashSection";
+import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
 import {
   WORKSPACE_CARD_WRAP_CLASS,
   WORKSPACE_MESSAGE_WRAP_CLASS,
@@ -132,7 +143,7 @@ export async function ConsultationSection({
   canEdit: boolean;
   jobs?: WorkspaceJobStatusView[];
 }) {
-  const [session, campaign, stages] = await Promise.all([
+  const [session, campaign, stages, summaryView] = await Promise.all([
     prisma.consultationSession.findFirst({
       where: { campaignId, organizationId },
       include: {
@@ -159,7 +170,12 @@ export async function ConsultationSection({
         },
       },
     }),
+    getApplicationSummaryView({ organizationId, campaignId }),
   ]);
+  const hiringRoles = summaryView.roles.map((role) => ({
+    id: role.id,
+    name: role.name,
+  }));
   const parsed = campaign?.product.profileJson
     ? parseCandidateProfileSafe(campaign.product.profileJson)
     : { ok: true as const, profile: emptyCandidateProfile() };
@@ -374,6 +390,100 @@ export async function ConsultationSection({
       orphanedRequirementTopics: standingInline.orphanedRequirementTopics,
     }),
   });
+  const prepStartedByContact = new Set(personPreps.map((prep) => prep.contactId));
+  const interviewerByContact = new Map(
+    qaLayout.interviewers.map((section) => [section.contactId, section]),
+  );
+  const filterOptionsByKey = new Map(
+    summaryView.people.map((person) => [
+      person.sectionKey,
+      {
+        sectionKey: person.sectionKey,
+        heading: person.heading,
+        personName: person.contactId ? person.heading : null,
+        personaName: person.roleName,
+        titles: person.titles,
+      },
+    ]),
+  );
+  for (const section of qaLayout.interviewers) {
+    const sectionKey = `contact:${section.contactId}`;
+    if (!filterOptionsByKey.has(sectionKey)) {
+      filterOptionsByKey.set(sectionKey, {
+        sectionKey,
+        heading: section.heading,
+        personName: section.heading,
+        personaName: "",
+        titles: [],
+      });
+    }
+  }
+  for (const prep of personPreps) {
+    const sectionKey = `contact:${prep.contactId}`;
+    if (!filterOptionsByKey.has(sectionKey)) {
+      filterOptionsByKey.set(sectionKey, {
+        sectionKey,
+        heading: prep.name || prep.roleName || interviewConfig.labels.interviewer,
+        personName: prep.name || null,
+        personaName: prep.roleName ?? "",
+        titles: prep.title ? [prep.title] : [],
+      });
+    }
+  }
+  const filterOptions = [...filterOptionsByKey.values()];
+  const guidancePeople = summaryView.guidance?.people ?? [];
+  const harperPeople: Array<{
+    contactId: string;
+    sectionKey: string;
+    heading: string;
+    personaId: string;
+    personaBuilt: boolean;
+    section: (NonNullable<typeof summaryView.guidance>["people"])[number] | null;
+    notes: NonNullable<ReturnType<typeof summaryView.notesByContactId.get>>;
+  }> = [];
+  const seenPeople = new Set<string>();
+  for (const person of summaryView.people) {
+    if (!person.contactId || seenPeople.has(person.contactId)) continue;
+    seenPeople.add(person.contactId);
+    harperPeople.push({
+      contactId: person.contactId,
+      sectionKey: person.sectionKey,
+      heading: person.heading,
+      personaId: person.roleId,
+      personaBuilt: person.personaBuilt,
+      section:
+        guidancePeople.find((item) => item.sectionKey === person.sectionKey) ?? null,
+      notes: summaryView.notesByContactId.get(person.contactId) ?? [],
+    });
+  }
+  for (const section of qaLayout.interviewers) {
+    if (seenPeople.has(section.contactId)) continue;
+    seenPeople.add(section.contactId);
+    const sectionKey = `contact:${section.contactId}`;
+    harperPeople.push({
+      contactId: section.contactId,
+      sectionKey,
+      heading: section.heading,
+      personaId: "",
+      personaBuilt: false,
+      section: guidancePeople.find((item) => item.sectionKey === sectionKey) ?? null,
+      notes: summaryView.notesByContactId.get(section.contactId) ?? [],
+    });
+  }
+  for (const prep of personPreps) {
+    if (seenPeople.has(prep.contactId)) continue;
+    seenPeople.add(prep.contactId);
+    const sectionKey = `contact:${prep.contactId}`;
+    harperPeople.push({
+      contactId: prep.contactId,
+      sectionKey,
+      heading: prep.name || prep.roleName || interviewConfig.labels.interviewer,
+      personaId: prep.personaId ?? "",
+      personaBuilt: Boolean(prep.personaId),
+      section: guidancePeople.find((item) => item.sectionKey === sectionKey) ?? null,
+      notes: summaryView.notesByContactId.get(prep.contactId) ?? [],
+    });
+  }
   const hasStanding =
     briefing?.success ||
     standingRequirementsForUi.length > 0 ||
@@ -427,15 +537,33 @@ export async function ConsultationSection({
             <AppPendingIndicator label={workspaceJobCopy.typing} />
           </p>
         ) : null}
+        <HarperFilterProvider options={filterOptions}>
+          <HarperPeopleFilter />
+          {canEdit ? (
+            <div className="mt-3">
+              <HarperAddInterviewContactForm
+                campaignId={campaignId}
+                roles={hiringRoles}
+              />
+            </div>
+          ) : null}
+          <HarperStandingView>
         {personPreps.length > 0 ? (
-          <div className="space-y-3" data-testid="person-prep-offers">
+          <div className="mt-3 space-y-3" data-testid="person-prep-offers">
             {personPreps.map((prep) => (
               <article
                 key={prep.contactId}
                 className="rounded-md border border-edge bg-canvas p-4"
               >
                 <h4 className="text-sm font-semibold text-ink">
-                  {interviewConfig.labels.personPrepOffer}: {prep.name || prep.roleName}
+                  <HarperSelectPersonLink
+                    sectionKey={`contact:${prep.contactId}`}
+                    className="text-left text-sm font-semibold text-ink underline decoration-ink underline-offset-2"
+                    testId={`harper-prep-card-${prep.contactId}`}
+                  >
+                    {interviewConfig.labels.personPrepOffer}:{" "}
+                    {prep.name || prep.roleName}
+                  </HarperSelectPersonLink>
                 </h4>
                 {prep.openingText ? (
                   <p className="mt-2 text-sm text-ink">{prep.openingText}</p>
@@ -457,7 +585,7 @@ export async function ConsultationSection({
         ) : null}
         {qualityNote ? (
           <div
-            className={`space-y-2 rounded-md border border-warning bg-warning-tint p-3 ${WORKSPACE_CARD_WRAP_CLASS}`}
+            className={`mt-3 space-y-2 rounded-md border border-warning bg-warning-tint p-3 ${WORKSPACE_CARD_WRAP_CLASS}`}
             data-testid="consultation-failed"
           >
             <p className={`text-sm text-warning ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
@@ -475,21 +603,21 @@ export async function ConsultationSection({
           </div>
         ) : null}
         {threadStatus === "SKIPPED" ? (
-          <p className="text-sm text-ink">
+          <p className="mt-3 text-sm text-ink">
             Consultation is skipped. Materials can still be generated from the{" "}
             {vocab.product.singular} alone.
           </p>
         ) : null}
         {threadStatus === "PAUSED" ? (
-          <p className="text-sm text-ink">Paused. Resume when you want to continue.</p>
+          <p className="mt-3 text-sm text-ink">Paused. Resume when you want to continue.</p>
         ) : null}
         {standingComplete && closingNote ? (
-          <p className="text-sm text-ink" data-testid="consultation-complete">
+          <p className="mt-3 text-sm text-ink" data-testid="consultation-complete">
             {stripInternalIdsFromDisplayText(closingNote)}
           </p>
         ) : null}
         {canEdit && !session && !consultationBusy ? (
-          <div className="flex flex-wrap gap-3">
+          <div className="mt-3 flex flex-wrap gap-3">
             <ApplicationActionForm
               action={startConsultationAction}
               submitLabel={consultationConversationCopy.start}
@@ -508,7 +636,7 @@ export async function ConsultationSection({
         ) : null}
         {hasStanding ? (
           <section
-            className="rounded-md border border-edge bg-canvas p-4"
+            className="mt-3 rounded-md border border-edge bg-canvas p-4"
             data-testid="consultation-standing-panel"
           >
             <h3 className="text-sm font-semibold text-ink">
@@ -627,17 +755,34 @@ export async function ConsultationSection({
             </div>
           </section>
         ) : null}
-        {session && !failed ? (
-          <ConsultationThread
-            campaignId={campaignId}
-            canEdit={canEdit}
-            sessionStatus={threadStatus}
-            jobsActive={consultationBusy}
-            turns={threadTurns}
-            statements={threadStatements}
-            interviewerSections={qaLayout.interviewers}
-          />
-        ) : null}
+          </HarperStandingView>
+          {harperPeople.map((person) => (
+            <HarperPersonViewShell
+              key={person.sectionKey}
+              sectionKey={person.sectionKey}
+            >
+              <div className="mt-3">
+                <HarperPersonInlineProfile
+                  campaignId={campaignId}
+                  canEdit={canEdit}
+                  contactId={person.contactId}
+                  heading={person.heading}
+                  sectionKey={person.sectionKey}
+                  section={person.section}
+                  notes={person.notes}
+                  personaBuilt={person.personaBuilt}
+                  personaId={person.personaId}
+                  prepStarted={prepStartedByContact.has(person.contactId)}
+                  interviewerSection={
+                    interviewerByContact.get(person.contactId) ?? null
+                  }
+                  sessionStatus={threadStatus}
+                  jobsActive={consultationBusy}
+                />
+              </div>
+            </HarperPersonViewShell>
+          ))}
+        </HarperFilterProvider>
         {canEdit && session?.status === "IN_PROGRESS" && !failed ? (
           <div className="flex flex-wrap gap-3">
             <ApplicationActionForm

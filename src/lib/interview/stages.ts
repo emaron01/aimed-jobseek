@@ -314,22 +314,10 @@ export async function assignExistingInterviewStageInterviewer(input: {
       data: { chosenPersonaId: personaId, roleConfirmed: true },
     });
   }
+  // Assign-only (Batch B3): prep / cheat-sheet / profile / persona build start on Harper.
   await replaceStageInterviewer({
     organizationId: input.organizationId,
     stageId: stage.id,
-    contactId: input.contactId,
-  });
-  const { offerPersonPrep } = await import("@/lib/interview/person-prep");
-  await offerPersonPrep({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    contactId: input.contactId,
-    personaId,
-  });
-  await enqueueInterviewerCheatSheetSection({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    userId: input.userId,
     contactId: input.contactId,
   });
   return { contactId: input.contactId, personaId };
@@ -393,6 +381,108 @@ export async function addInterviewStageInterviewer(input: {
     });
   }
   return added;
+}
+
+/**
+ * Harper "Add Interview Contact": create the campaign contact and start prep
+ * through the same seeker paths as Stage add-interviewer, without assigning a stage.
+ */
+export async function addInterviewContact(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  title: string;
+  email?: string | null;
+  linkedinUrl?: string | null;
+  linkedInProfileText?: string | null;
+  personaId?: string | null;
+}) {
+  await requireOwnedCampaign(input);
+  const added = await addApplicationContact({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    userId: input.userId,
+    firstName: input.firstName,
+    lastName: input.lastName,
+    title: input.title,
+    email: input.email,
+    linkedinUrl: input.linkedinUrl,
+    personaId: input.personaId,
+    confirmRole: true,
+  });
+  const pasted = input.linkedInProfileText?.trim() || "";
+  if (pasted) {
+    await saveLinkedInPaste({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      contactId: added.contactId,
+      pastedText: pasted,
+      personaId: added.personaId,
+    });
+  }
+  const { offerPersonPrep } = await import("@/lib/interview/person-prep");
+  await offerPersonPrep({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    contactId: added.contactId,
+    personaId: input.personaId,
+  });
+  if (!pasted) {
+    await enqueueInterviewerCheatSheetSection({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      userId: input.userId,
+      contactId: added.contactId,
+    });
+  }
+  return added;
+}
+
+/**
+ * Harper start-prep for an existing contact (offerPersonPrep + cheat-sheet section).
+ * Used when prep has not been started yet (`personPrepOfferedAt` unset).
+ */
+export async function startPersonPrepForContact(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  contactId: string;
+  personaId?: string | null;
+}) {
+  await requireOwnedCampaign(input);
+  const membership = await prisma.campaignContact.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      contactId: input.contactId,
+    },
+    select: { id: true, chosenPersonaId: true, personPrepOfferedAt: true },
+  });
+  if (!membership) {
+    throw new TenantError(
+      `${vocab.contact.Singular} was not found on this ${vocab.campaign.singular}.`,
+    );
+  }
+  if (membership.personPrepOfferedAt) {
+    return { contactId: input.contactId, alreadyStarted: true as const };
+  }
+  const personaId = input.personaId?.trim() || membership.chosenPersonaId;
+  const { offerPersonPrep } = await import("@/lib/interview/person-prep");
+  await offerPersonPrep({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    contactId: input.contactId,
+    personaId,
+  });
+  await enqueueInterviewerCheatSheetSection({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    userId: input.userId,
+    contactId: input.contactId,
+  });
+  return { contactId: input.contactId, alreadyStarted: false as const };
 }
 
 export function detectInterviewNoteGap(input: {

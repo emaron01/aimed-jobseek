@@ -569,9 +569,11 @@ describeDb("interview stages persistence", () => {
         type: "APPLICATION_SUMMARY",
       },
     });
+    // Batch B3: Use this interviewer is assign-only — no cheat-sheet enqueue.
     expect(jobs.some((job) => job.targetId === `contact:${existing.contactId}`)).toBe(
-      true,
+      false,
     );
+    // Stage "Add interviewer" still starts prep + cheat-sheet section.
     expect(jobs.some((job) => job.targetId === `contact:${added.contactId}`)).toBe(true);
     const reassessJobs = await prisma.applicationJob.findMany({
       where: { campaignId, type: "CONSULTATION" },

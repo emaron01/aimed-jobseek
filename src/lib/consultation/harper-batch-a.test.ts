@@ -118,19 +118,23 @@ describe("Harper Batch A layout", () => {
     const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
     const render = section.slice(section.indexOf("return ("));
     expect(render.indexOf("consultation-standing-panel")).toBeLessThan(
-      render.indexOf("<ConsultationThread"),
+      render.indexOf("HarperPersonInlineProfile"),
     );
-    // Batch B2: General questions partition into standing; Thread only gets interviewers.
+    // Batch B2: General questions partition into standing.
+    // Batch B3: interviewer Q&A moves into Harper person view.
     expect(section).toContain("partitionGeneralQuestionsForStanding");
     expect(section).toContain("dedicatedTopics={standingInline.dedicatedTopics}");
-    expect(section).toContain("interviewerSections={qaLayout.interviewers}");
+    expect(section).toContain("HarperPersonInlineProfile");
+    expect(section).toContain("interviewerSection=");
     expect(section).not.toContain("generalQuestions={qaLayout.general}");
     expect(section).toContain("buildHarperQaLayout");
 
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
     const standing = readFileSync("src/components/ConsultationStanding.tsx", "utf8");
+    const personView = readFileSync("src/components/HarperPersonView.tsx", "utf8");
     expect(thread).not.toContain("harper-general-questions");
-    expect(thread).toContain("harper-interviewer-section");
+    expect(personView).toContain("harper-person-view");
+    expect(personView).toContain("harperContactAnchorId");
     expect(standing).toContain("HARPER_GENERAL_ANCHOR");
     expect(standing).toContain("harper-standing-topics");
   });
@@ -143,15 +147,16 @@ describe("Harper Batch A layout", () => {
 
     const standing = readFileSync("src/components/ConsultationStanding.tsx", "utf8");
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
+    const personView = readFileSync("src/components/HarperPersonView.tsx", "utf8");
     expect(standing).toContain("id={HARPER_STANDING_ANCHOR}");
     // Batch B2: #harper-general aliases the standing topics root (no free-floating General list).
     expect(standing).toContain("id={HARPER_GENERAL_ANCHOR}");
-    expect(thread).toContain("id={harperContactAnchorId(section.contactId)}");
+    expect(personView).toContain("id={harperContactAnchorId(contactId)}");
     expect(thread).toContain("id={harperQuestionAnchorId(item.questionTurnId)}");
     // Ids may appear in attributes / fragments, never as rendered label text.
     expect(thread).not.toMatch(/>\s*\{[^}]*questionTurnId[^}]*\}\s*</);
     expect(thread).not.toMatch(/>\s*\{[^}]*contactId[^}]*\}\s*</);
-    expect(thread).toContain("{section.heading}");
+    expect(personView).toContain("{heading}");
     expect(thread).toContain("stripInternalIdsFromDisplayText(item.question)");
   });
 

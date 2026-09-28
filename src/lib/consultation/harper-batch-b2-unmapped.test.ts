@@ -215,10 +215,10 @@ describe("Harper B2 unmapped-items fix", () => {
     expect(layoutSrc).toContain("contactIdFromCheatSheetTarget");
   });
 
-  it("STOP cases: overview/role cheatSheet and null keys stay unmapped (no Other)", () => {
+  it("STOP cases: role cheatSheet and null keys stay unmapped; overview gaps render under standing", () => {
     const overview = question({
       questionTurnId: "q-ov",
-      question: "Overview gap?",
+      question: "Overview gap about the company?",
       targetKey: "cheatSheet:overview:gap:1",
       seekerAnswers: [{ id: "a", body: "Overview." }],
     });
@@ -247,12 +247,21 @@ describe("Harper B2 unmapped-items fix", () => {
       general: layout.general,
       requirementTargetKeys: [],
     });
+    // Batch B3: overview gaps under Where you stand like dropped requirements
+    expect(partitioned.orphanedRequirementTopics).toHaveLength(1);
+    expect(partitioned.orphanedRequirementTopics[0]?.targetKey).toBe(
+      "cheatSheet:overview:gap:1",
+    );
+    expect(partitioned.orphanedRequirementTopics[0]?.label).toBe(
+      "Overview gap about the company?",
+    );
+    expect(partitioned.orphanedRequirementTopics[0]?.questions[0]?.questionTurnId).toBe(
+      "q-ov",
+    );
     expect(partitioned.unmapped.map((q) => q.questionTurnId).sort()).toEqual([
       "q-null",
-      "q-ov",
       "q-role",
     ]);
-    expect(partitioned.orphanedRequirementTopics).toEqual([]);
     const coverage = harperContentRenderCoverage({
       questions: [overview, role, nullKey],
       renderedQuestionTurnIds: collectRenderedHarperQuestionTurnIds({
@@ -265,9 +274,17 @@ describe("Harper B2 unmapped-items fix", () => {
     expect(coverage.ok).toBe(false);
     expect(coverage.missing.map((q) => q.questionTurnId).sort()).toEqual([
       "q-null",
-      "q-ov",
       "q-role",
     ]);
+    expect(coverage.neededTurnIds).toContain("q-ov");
+    expect(
+      collectRenderedHarperQuestionTurnIds({
+        interviewers: layout.interviewers,
+        dedicatedTopics: partitioned.dedicatedTopics,
+        byRequirementKey: partitioned.byRequirementKey,
+        orphanedRequirementTopics: partitioned.orphanedRequirementTopics,
+      }),
+    ).toContain("q-ov");
   });
 
   it("rendering still enqueues no job and makes no paid call", () => {

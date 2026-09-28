@@ -48,7 +48,7 @@ describe("Harper Batch B1 Stage timeline and Outreach thank-you", () => {
     );
   });
 
-  it("Use this interviewer assigns without persona or contact-profile build", () => {
+  it("Use this interviewer assigns only — no prep, cheat sheet, persona, or contact profile", () => {
     expect(panel).toContain("assignExistingInterviewerAction");
     expect(panel).toContain("useInterviewer");
     const assignFn = assign.slice(
@@ -60,9 +60,9 @@ describe("Harper Batch B1 Stage timeline and Outreach thank-you", () => {
     expect(assignFn).not.toContain("queueHiringTeamBuild");
     expect(assignFn).not.toContain("CONTACT_PROFILE");
     expect(assignFn).not.toContain("HIRING_TEAM_BUILD");
-    // Prep paths kept (STOP on stripping): person_prep + cheat sheet section
-    expect(assignFn).toContain("offerPersonPrep");
-    expect(assignFn).toContain("enqueueInterviewerCheatSheetSection");
+    // Batch B3: assign-only; prep starts on Harper
+    expect(assignFn).not.toContain("offerPersonPrep");
+    expect(assignFn).not.toContain("enqueueInterviewerCheatSheetSection");
   });
 
   it("Post Interview Notes opens the notes form with the same fields", () => {

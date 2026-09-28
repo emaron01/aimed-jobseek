@@ -15,6 +15,8 @@ export const interviewConfig = Object.freeze({
     addNewInterviewer: "Add new interviewer",
     useInterviewer: "Use this interviewer",
     addInterviewer: "Add interviewer",
+    /** Harper: add a person expected to interview before a stage is scheduled. */
+    addInterviewContact: "Add Interview Contact",
     gainedInformation: "Newly gained information",
     gainedInformationHelp:
       "Paste an invitation email, or write notes about what they care about. This is saved on this person's Interview cheat sheet section.",

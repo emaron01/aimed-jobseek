@@ -41,6 +41,7 @@ export function CheatSheetPersonBody({
   notes,
   personaBuilt,
   personaId,
+  showCoachAnswerForms = true,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -49,6 +50,8 @@ export function CheatSheetPersonBody({
   notes: CheatSheetNote[];
   personaBuilt: boolean;
   personaId: string;
+  /** When false, likely questions display without the Cheat Sheet reply form (Harper person view). */
+  showCoachAnswerForms?: boolean;
 }) {
   if (!personaBuilt) {
     return (
@@ -142,7 +145,7 @@ export function CheatSheetPersonBody({
         </h3>
         <CheatSheetCoachItems
           campaignId={campaignId}
-          canEdit={canEdit}
+          canEdit={canEdit && showCoachAnswerForms}
           items={section.likelyQuestions}
         />
       </div>

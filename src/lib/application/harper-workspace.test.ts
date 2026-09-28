@@ -110,9 +110,11 @@ describe("workspace order and Harper start", () => {
     expect(layout).not.toContain("ConsultationSection");
     expect(consultationPage).toContain("ConsultationSection");
     expect(consultation).not.toContain("HarperSuggestionList");
-    expect(consultation).toContain("ConsultationThread");
-    expect(consultation.indexOf("ConsultationThread")).toBeLessThan(
-      consultation.indexOf("consultation-briefing"),
+    expect(consultation).toContain("HarperPersonInlineProfile");
+    expect(consultation).toContain("HarperStandingView");
+    const render = consultation.slice(consultation.indexOf("return ("));
+    expect(render.indexOf("consultation-standing-panel")).toBeLessThan(
+      render.indexOf("HarperPersonInlineProfile"),
     );
     expect(workspace).not.toContain("<ConsultationSection");
     expect(workspace).toContain("HiringTeamPersonPicker");

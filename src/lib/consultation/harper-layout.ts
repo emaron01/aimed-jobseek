@@ -41,6 +41,19 @@ export function contactIdFromCheatSheetTarget(
   return contactId || null;
 }
 
+/**
+ * Company-level cheat-sheet gaps (`cheatSheet:overview:gap:{n}`).
+ * Every persona is at the same company — general prep under Where you stand.
+ */
+export function isOverviewGapCheatSheetTarget(
+  targetKey: string | null | undefined,
+): boolean {
+  const key = targetKey?.trim() ?? "";
+  if (!key.startsWith(CHEAT_SHEET_TARGET_PREFIX)) return false;
+  const itemId = key.slice(CHEAT_SHEET_TARGET_PREFIX.length);
+  return itemId.startsWith("overview:gap:");
+}
+
 /** Requirement-like assessment keys that can appear under Where you stand. */
 export function isRequirementLikeTargetKey(targetKey: string): boolean {
   return /^(required|outcome|competency|preferred|mission):/.test(targetKey.trim());
@@ -240,6 +253,13 @@ export function partitionGeneralQuestionsForStanding(input: {
       continue;
     }
     if (key && isRequirementLikeTargetKey(key) && harperItemNeedsRender(item)) {
+      const list = orphanedByKey.get(key) ?? [];
+      list.push(item);
+      orphanedByKey.set(key, list);
+      continue;
+    }
+    // Overview gaps: same standing treatment as dropped requirements (no rating).
+    if (isOverviewGapCheatSheetTarget(key) && harperItemNeedsRender(item)) {
       const list = orphanedByKey.get(key) ?? [];
       list.push(item);
       orphanedByKey.set(key, list);
