@@ -49,7 +49,6 @@ export const interviewConfig = Object.freeze({
     thankYouLinkedIn: "Thank-you LinkedIn message",
     checkIn: "Check-in message",
     recordNotesFirst: "Record notes after the interview before generating this message.",
-    consultationOffer: "A new gap from these notes can be covered in a short consultation.",
     startConsultation: "Start a short consultation",
     personPrepOffer: "Prep for this interviewer",
     personPrepStart: "Start interviewer prep",

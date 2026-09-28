@@ -485,46 +485,6 @@ export async function startPersonPrepForContact(input: {
   return { contactId: input.contactId, alreadyStarted: false as const };
 }
 
-export function detectInterviewNoteGap(input: {
-  notesAfter: string;
-  assessments: Array<{ targetKey: string; text: string; strength: string }>;
-  scorecardCompetencies: Array<{ id: string; text: string }>;
-}): { targetKey: string; text: string } | null {
-  const notes = input.notesAfter.trim();
-  if (!notes) return null;
-  const noteTokens = new Set(
-    notes
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, " ")
-      .split(/\s+/)
-      .filter((token) => token.length >= 4),
-  );
-  const overlap = (text: string) =>
-    text
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, " ")
-      .split(/\s+/)
-      .filter((token) => token.length >= 4 && noteTokens.has(token)).length;
-
-  for (const assessment of input.assessments) {
-    if (assessment.strength === "STRONG") continue;
-    if (overlap(assessment.text) >= 2) {
-      return { targetKey: assessment.targetKey, text: assessment.text };
-    }
-  }
-  for (const competency of input.scorecardCompetencies) {
-    if (overlap(competency.text) >= 2) {
-      const existing = input.assessments.find(
-        (assessment) => assessment.targetKey === competency.id,
-      );
-      if (!existing || existing.strength !== "STRONG") {
-        return { targetKey: competency.id, text: competency.text };
-      }
-    }
-  }
-  return null;
-}
-
 export function stageTypeLabel(type: string): string {
   return type in interviewConfig.types
     ? interviewConfig.types[type as keyof typeof interviewConfig.types]

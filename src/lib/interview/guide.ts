@@ -29,7 +29,7 @@ import {
   type InterviewGuideContent,
 } from "./contract";
 import type { InterviewGuidePromptInput } from "./prompt";
-import { detectInterviewNoteGap, requireOwnedCampaign } from "./stages";
+import { requireOwnedCampaign } from "./stages";
 
 export type InterviewGuideSource = {
   id: string;
@@ -748,38 +748,6 @@ export async function getInterviewGuideView(input: {
       context.stage.guide.sourceHash !== context.sourceHash,
     sourceHash: context.sourceHash,
   };
-}
-
-export async function refreshConsultationOffer(input: {
-  organizationId: string;
-  campaignId: string;
-  stageId: string;
-}) {
-  const context = await loadGuideContext(input);
-  const notes = context.stage.notesAfter?.trim() ?? "";
-  const gap = detectInterviewNoteGap({
-    notesAfter: notes,
-    assessments:
-      context.stage.campaign.consultationSession?.assessments.map((item) => ({
-        targetKey: item.targetKey,
-        text: item.text,
-        strength: item.strength,
-      })) ?? [],
-    scorecardCompetencies: context.competencies,
-  });
-  await prisma.interviewStage.update({
-    where: { id: input.stageId },
-    data: {
-      consultationOfferJson: gap
-        ? {
-            targetKey: gap.targetKey,
-            text: gap.text,
-            offeredAt: new Date().toISOString(),
-          }
-        : Prisma.JsonNull,
-    },
-  });
-  return gap;
 }
 
 export function parseGuideContent(value: unknown): InterviewGuideContent | null {

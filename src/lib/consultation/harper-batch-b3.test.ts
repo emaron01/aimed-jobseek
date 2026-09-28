@@ -179,7 +179,7 @@ describe("Harper Batch B3 person view, search, Add Interview Contact, assign-onl
 
     const startFn = stages.slice(
       stages.indexOf("export async function startPersonPrepForContact"),
-      stages.indexOf("export function detectInterviewNoteGap"),
+      stages.indexOf("export function stageTypeLabel"),
     );
     expect(startFn).toContain("personPrepOfferedAt");
     expect(startFn).toContain("offerPersonPrep");

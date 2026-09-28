@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { startConsultation } from "@/lib/consultation/service";
 import { requireCurrentUser } from "@/lib/auth/authz";
-import { refreshConsultationOffer } from "@/lib/interview/guide";
 import { addCheatSheetInterviewNote } from "@/lib/application-summary/service";
 import {
   addInterviewContact,
@@ -127,13 +126,6 @@ export async function updateInterviewStageAction(
         ? String(formData.get("outcome") ?? "").trim() || null
         : undefined,
     });
-    if (formData.has("notesAfter") && updated.notesTextChanged) {
-      await refreshConsultationOffer({
-        organizationId,
-        campaignId: id,
-        stageId,
-      });
-    }
     if (updated.notesTextChanged) {
       await enqueueApplicationJob({
         organizationId,

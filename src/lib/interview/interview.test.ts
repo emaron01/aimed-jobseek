@@ -20,7 +20,6 @@ import {
   addInterviewStageInterviewer,
   assignExistingInterviewStageInterviewer,
   createInterviewStage,
-  detectInterviewNoteGap,
   updateInterviewStage,
 } from "@/lib/interview/stages";
 import { validateRepetitionAndMetaLanguage } from "@/lib/consultation/output-quality";
@@ -342,13 +341,6 @@ describe("interview guide rules", () => {
         interviewConfig.reminders.defaultCheckInBusinessDays,
       ).getTime(),
     );
-    expect(detectInterviewNoteGap({
-      notesAfter: "The hiring manager will focus on incident leadership.",
-      assessments: [
-        { targetKey: "c1", text: "incident leadership under pressure", strength: "NONE" },
-      ],
-      scorecardCompetencies: [],
-    })?.targetKey).toBe("c1");
   });
 
   it("keeps a failed guide generate on screen instead of remounting the page", () => {
