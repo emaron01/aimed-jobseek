@@ -57,7 +57,7 @@ Preserved: `notesTextChanged` → cheat-sheet enqueue in `updateInterviewStage` 
 ## 5. Commit / push
 
 - Branch pushed: `checkpoint/harper-prep-hub`
-- Commit: `cf4f81f9137ae85e277969cc13140a4dd19d4081`
+- Commit: `04318d01847dcb857ebfdf8fde3f43aea8a5abbc`
 - Did **not** merge to `main` or push `main`.
 
 ## 6. Nothing else changed
