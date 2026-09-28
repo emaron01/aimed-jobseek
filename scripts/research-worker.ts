@@ -11,7 +11,10 @@
  * Concurrency: RESEARCH_WORKER_CONCURRENCY applies to application jobs and
  * research runs together. CONSULTATION jobs are claimed first.
  */
-import { isResearchAiConfigured } from "@/lib/ai/config";
+import {
+  assertPersonaAiConfigured,
+  isResearchAiConfigured,
+} from "@/lib/ai/config";
 import { waitForResearchRunSchema } from "@/lib/research/schema-readiness";
 import { getResearchWorkerConcurrency } from "@/lib/research/config";
 import {
@@ -81,6 +84,7 @@ async function main(): Promise<void> {
   console.log(
     `[research-worker] research AI configured: ${isResearchAiConfigured()}`,
   );
+  assertPersonaAiConfigured();
   console.log(`[research-worker] concurrency: ${concurrency}`);
   await waitForResearchRunSchema();
   console.log("[research-worker] schema ready");
