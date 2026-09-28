@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { features } from "@/lib/product-config/features";
 import {
@@ -214,8 +215,6 @@ describe("employerIcpFit Phase A gate (flag off)", () => {
     );
 
     // Onboarding routes have no Target Employer / ICP UI.
-    const { readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
-    const { join } = require("node:path") as typeof import("node:path");
     const walk = (dir: string, out: string[] = []) => {
       for (const name of readdirSync(dir)) {
         const path = join(dir, name);
