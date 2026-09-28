@@ -73,13 +73,25 @@ function sectionKeyFromHarperHash(hash: string): string | null {
 
 export function HarperFilterProvider({
   options,
+  initialPersonKey = null,
   children,
 }: {
   options: CheatSheetFilterOption[];
+  /** From `?person=contact:{id}` so Edit/Answer links open the profile. */
+  initialPersonKey?: string | null;
   children: ReactNode;
 }) {
-  const [query, setQuery] = useState("");
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const initialKey = (() => {
+    const key = initialPersonKey?.trim() || null;
+    if (!key) return null;
+    return options.some((item) => item.sectionKey === key) ? key : null;
+  })();
+  const [query, setQuery] = useState(() => {
+    if (!initialKey) return "";
+    const option = options.find((item) => item.sectionKey === initialKey);
+    return option ? optionLabel(option) : "";
+  });
+  const [selectedKey, setSelectedKey] = useState<string | null>(initialKey);
 
   const selectOption = useCallback(
     (sectionKey: string) => {
@@ -91,9 +103,27 @@ export function HarperFilterProvider({
       setQuery(optionLabel(option));
       const contactId = contactIdFromSectionKey(sectionKey);
       if (contactId && typeof window !== "undefined") {
+        const hash = window.location.hash.replace(/^#/, "").trim();
+        let decoded = hash;
+        try {
+          decoded = decodeURIComponent(hash);
+        } catch {
+          decoded = hash;
+        }
+        // Keep a question/coach fragment when deep-linking; otherwise select the contact.
+        if (
+          decoded.startsWith("harper-q:") ||
+          decoded.startsWith("harper-coach:")
+        ) {
+          return;
+        }
         const nextHash = `#${encodeURIComponent(harperContactAnchorId(contactId))}`;
         if (window.location.hash !== nextHash) {
-          window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${nextHash}`);
+          window.history.replaceState(
+            null,
+            "",
+            `${window.location.pathname}${window.location.search}${nextHash}`,
+          );
         }
       }
     },
@@ -109,17 +139,18 @@ export function HarperFilterProvider({
   }, []);
 
   useEffect(() => {
-    const applyHash = () => {
-      const key = sectionKeyFromHarperHash(window.location.hash);
-      if (!key) return;
-      const option = options.find((item) => item.sectionKey === key);
-      if (!option) return;
-      setSelectedKey(key);
-      setQuery(optionLabel(option));
-      const id = harperContactAnchorId(contactIdFromSectionKey(key) ?? "");
+    const scrollToHashTarget = () => {
+      const raw = window.location.hash.replace(/^#/, "").trim();
+      if (!raw) return;
+      let decoded = raw;
+      try {
+        decoded = decodeURIComponent(raw);
+      } catch {
+        decoded = raw;
+      }
       let attempts = 0;
       const find = () => {
-        const target = document.getElementById(id);
+        const target = document.getElementById(decoded);
         if (target) {
           target.scrollIntoView({ block: "start" });
           return;
@@ -130,10 +161,54 @@ export function HarperFilterProvider({
       };
       find();
     };
+
+    const applyHash = () => {
+      const key = sectionKeyFromHarperHash(window.location.hash);
+      if (key) {
+        const option = options.find((item) => item.sectionKey === key);
+        if (option) {
+          setSelectedKey(key);
+          setQuery(optionLabel(option));
+        }
+      }
+      scrollToHashTarget();
+    };
     applyHash();
     window.addEventListener("hashchange", applyHash);
     return () => window.removeEventListener("hashchange", applyHash);
   }, [options]);
+
+  // Deep link with ?person= + #harper-q / #harper-coach: scroll after profile mounts.
+  useEffect(() => {
+    if (!initialKey || !selectedKey) return;
+    if (typeof window === "undefined") return;
+    const raw = window.location.hash.replace(/^#/, "").trim();
+    if (!raw) return;
+    let decoded = raw;
+    try {
+      decoded = decodeURIComponent(raw);
+    } catch {
+      decoded = raw;
+    }
+    if (
+      !decoded.startsWith("harper-q:") &&
+      !decoded.startsWith("harper-coach:")
+    ) {
+      return;
+    }
+    let attempts = 0;
+    const find = () => {
+      const target = document.getElementById(decoded);
+      if (target) {
+        target.scrollIntoView({ block: "start" });
+        return;
+      }
+      attempts += 1;
+      if (attempts > 20) return;
+      window.setTimeout(find, 50);
+    };
+    find();
+  }, [initialKey, selectedKey]);
 
   const value = useMemo<HarperFilterState>(
     () => ({

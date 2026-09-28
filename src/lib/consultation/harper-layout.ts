@@ -26,6 +26,14 @@ export function harperQuestionAnchorId(questionTurnId: string): string {
 }
 
 /**
+ * Stable URL fragment for a cheat-sheet coach item on Harper's person view
+ * (before or without a ConsultationTurn). Ids appear only in the fragment.
+ */
+export function harperCoachItemAnchorId(coachItemId: string): string {
+  return `harper-coach:${coachItemId}`;
+}
+
+/**
  * Coach item ids are `{sectionKey}:likely:1` etc. Person sections use
  * `contact:{contactId}` (`assignCoachItemIds` / `buildCheatSheetPeople`).
  * Returns null for overview gaps and legacy `role:` sections (no contact).

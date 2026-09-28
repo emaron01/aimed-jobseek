@@ -19,7 +19,9 @@ import {
 import { PrintApplicationSummaryButton } from "@/components/PrintApplicationSummaryButton";
 import { PageHeader, TenantMissing } from "@/components/ui";
 import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-status";
+import { loadCheatSheetCoachQaByContact } from "@/lib/application-summary/coach-qa";
 import { statedListItems } from "@/lib/application-summary/display";
+import { compileNotesFromInterviewsWithPerson } from "@/lib/application-summary/interview-notes";
 import { getApplicationSummaryView } from "@/lib/application-summary/service";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
@@ -131,6 +133,10 @@ export default async function ApplicationSummaryPage({
     organizationId: organization.id,
     campaignId: id,
   });
+  const coachQaByContact = await loadCheatSheetCoachQaByContact({
+    organizationId: organization.id,
+    campaignId: id,
+  });
   const canGenerate = view.campaign.ownerUserId === user.id;
   const requirementScorecard = scorecard(view.requirement.scorecardJson);
   const summaryStatus = view.summary?.status ?? null;
@@ -147,6 +153,14 @@ export default async function ApplicationSummaryPage({
     personName: person.contactId ? person.heading : null,
     personaName: person.roleName,
     titles: person.titles,
+  }));
+  const stagesForNotes = view.stages.map((stage) => ({
+    id: stage.id,
+    type: stage.type,
+    scheduledAt: stage.scheduledAt,
+    notesBefore: stage.notesBefore,
+    notesAfter: stage.notesAfter,
+    interviewerContactIds: stage.interviewers.map((row) => row.contactId),
   }));
 
   return (
@@ -241,6 +255,16 @@ export default async function ApplicationSummaryPage({
         const notes = person.contactId
           ? view.notesByContactId.get(person.contactId) ?? []
           : [];
+        const interviewNotes = person.contactId
+          ? compileNotesFromInterviewsWithPerson({
+              contactId: person.contactId,
+              gainedNotes: notes,
+              stages: stagesForNotes,
+            })
+          : [];
+        const coachQaItems = person.contactId
+          ? coachQaByContact.get(person.contactId) ?? []
+          : [];
         return (
           <CheatSheetPersonSection key={person.sectionKey} sectionKey={person.sectionKey}>
           <SummarySection id={person.sectionKey} title={person.heading}>
@@ -252,6 +276,11 @@ export default async function ApplicationSummaryPage({
               notes={notes}
               personaBuilt={person.personaBuilt}
               personaId={person.roleId}
+              showCoachAnswerForms={false}
+              harperLinkContactId={person.contactId}
+              coachQaItems={coachQaItems}
+              interviewNotes={person.contactId ? interviewNotes : null}
+              interviewNotesPersonName={person.contactId ? person.heading : null}
             />
           </SummarySection>
           </CheatSheetPersonSection>
@@ -311,7 +340,6 @@ export default async function ApplicationSummaryPage({
               {view.stages.map((stage) => (
                 <li key={stage.id}>
                   <span className="font-medium">{stageTypeLabel(stage.type)}</span>
-                  {stage.notesAfter ? `: ${stage.notesAfter}` : ""}
                 </li>
               ))}
             </ul>

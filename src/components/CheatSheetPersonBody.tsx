@@ -6,6 +6,8 @@ import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { CheatSheetCoachItems } from "@/components/CheatSheetCoachItems";
 import { statedListItems } from "@/lib/application-summary/display";
 import { cheatSheetLikelyQuestionsElementId } from "@/lib/application-summary/filter";
+import type { NotesFromInterviewEntry } from "@/lib/application-summary/interview-notes";
+import { notesFromInterviewsWithHeading } from "@/lib/application-summary/interview-notes";
 import type { CheatSheetNote } from "@/lib/application-summary/notes";
 import type { CheatSheetPersonSection } from "@/lib/application-summary/contract";
 import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
@@ -34,6 +36,33 @@ function TextList({ items }: { items: readonly string[] }) {
   );
 }
 
+function NotesFromInterviewsSection({
+  personName,
+  entries,
+}: {
+  personName: string;
+  entries: NotesFromInterviewEntry[];
+}) {
+  if (entries.length === 0) return null;
+  return (
+    <div data-testid="notes-from-interviews-with">
+      <h3 className="font-medium text-ink">
+        {notesFromInterviewsWithHeading(personName)}
+      </h3>
+      <ul className="mt-2 space-y-3 text-sm text-ink">
+        {entries.map((entry) => (
+          <li key={entry.id} data-testid={`interview-note-${entry.id}`}>
+            <p className="text-xs font-medium uppercase tracking-wide text-subtle">
+              {entry.interviewLabel} · {entry.kindLabel}
+            </p>
+            <p className="mt-1 whitespace-pre-wrap">{entry.text}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function CheatSheetPersonBody({
   campaignId,
   canEdit,
@@ -46,6 +75,9 @@ export function CheatSheetPersonBody({
   coachQaItems = [],
   jobsActive = false,
   showReply = true,
+  harperLinkContactId = null,
+  interviewNotes = null,
+  interviewNotesPersonName = null,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -63,7 +95,30 @@ export function CheatSheetPersonBody({
   coachQaItems?: ConsultationQaItem[];
   jobsActive?: boolean;
   showReply?: boolean;
+  /** Cheat Sheet read-only: Edit/Answer links open Harper for this contact. */
+  harperLinkContactId?: string | null;
+  /**
+   * Cheat Sheet Batch B4: compiled interview notes. When non-null, replaces the
+   * simple gained-information list (Harper still uses `notes`).
+   */
+  interviewNotes?: NotesFromInterviewEntry[] | null;
+  interviewNotesPersonName?: string | null;
 }) {
+  const useInterviewNotesSection = interviewNotes != null;
+  const notesBlock = useInterviewNotesSection ? (
+    <NotesFromInterviewsSection
+      personName={interviewNotesPersonName ?? ""}
+      entries={interviewNotes}
+    />
+  ) : notes.length > 0 ? (
+    <div>
+      <h3 className="font-medium text-ink">
+        {applicationSummaryConfig.sections.gainedInformation}
+      </h3>
+      <TextList items={notes.map((note) => note.text)} />
+    </div>
+  ) : null;
+
   if (!personaBuilt) {
     return (
       <div className="space-y-3" data-testid={`unbuilt-persona-${sectionKey}`}>
@@ -79,6 +134,7 @@ export function CheatSheetPersonBody({
             <input type="hidden" name="personaId" value={personaId} />
           </ApplicationActionForm>
         ) : null}
+        {notesBlock}
       </div>
     );
   }
@@ -97,14 +153,7 @@ export function CheatSheetPersonBody({
             <input type="hidden" name="sectionKey" value={sectionKey} />
           </ApplicationActionForm>
         ) : null}
-        {notes.length > 0 ? (
-          <div>
-            <h3 className="font-medium text-ink">
-              {applicationSummaryConfig.sections.gainedInformation}
-            </h3>
-            <TextList items={notes.map((note) => note.text)} />
-          </div>
-        ) : null}
+        {notesBlock}
       </div>
     );
   }
@@ -112,14 +161,7 @@ export function CheatSheetPersonBody({
   return (
     <div className="space-y-4">
       <CoachingDisclaimer />
-      {notes.length > 0 ? (
-        <div>
-          <h3 className="font-medium text-ink">
-            {applicationSummaryConfig.sections.gainedInformation}
-          </h3>
-          <TextList items={notes.map((note) => note.text)} />
-        </div>
-      ) : null}
+      {notesBlock}
       <div>
         <h3 className="font-medium text-ink">{applicationSummaryConfig.sections.caresAbout}</h3>
         <ul className="list-disc space-y-3 pl-5 text-sm text-ink">
@@ -161,6 +203,7 @@ export function CheatSheetPersonBody({
           qaItems={coachQaItems}
           jobsActive={jobsActive}
           showReply={showReply}
+          harperLinkContactId={harperLinkContactId}
         />
       </div>
       <div>

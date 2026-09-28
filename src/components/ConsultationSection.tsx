@@ -137,11 +137,14 @@ export async function ConsultationSection({
   organizationId,
   canEdit,
   jobs = [],
+  initialPersonKey = null,
 }: {
   campaignId: string;
   organizationId: string;
   canEdit: boolean;
   jobs?: WorkspaceJobStatusView[];
+  /** From summary Edit/Answer links: `?person=contact:{id}`. */
+  initialPersonKey?: string | null;
 }) {
   const [session, campaign, stages, summaryView] = await Promise.all([
     prisma.consultationSession.findFirst({
@@ -537,7 +540,10 @@ export async function ConsultationSection({
             <AppPendingIndicator label={workspaceJobCopy.typing} />
           </p>
         ) : null}
-        <HarperFilterProvider options={filterOptions}>
+        <HarperFilterProvider
+          options={filterOptions}
+          initialPersonKey={initialPersonKey}
+        >
           <HarperPeopleFilter />
           {canEdit ? (
             <div className="mt-3">

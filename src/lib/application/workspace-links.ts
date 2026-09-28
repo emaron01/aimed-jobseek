@@ -40,7 +40,41 @@ export function workspaceHarperContactHref(
   if (!person) {
     throw new Error("Harper contact link is missing an interviewer.");
   }
-  return `${workspaceConsultationHref(campaignId)}#${encodeURIComponent(`harper-contact:${person}`)}`;
+  return `${workspaceConsultationHref(campaignId)}?person=${encodeURIComponent(`contact:${person}`)}#${encodeURIComponent(`harper-contact:${person}`)}`;
+}
+
+/** Harper question card: select the person profile, then scroll to `#harper-q:{questionTurnId}`. */
+export function workspaceHarperQuestionHref(
+  campaignId: string,
+  contactId: string,
+  questionTurnId: string,
+): string {
+  const person = contactId.trim();
+  const turnId = questionTurnId.trim();
+  if (!person) {
+    throw new Error("Harper question link is missing an interviewer.");
+  }
+  if (!turnId) {
+    throw new Error("Harper question link is missing a question.");
+  }
+  return `${workspaceConsultationHref(campaignId)}?person=${encodeURIComponent(`contact:${person}`)}#${encodeURIComponent(`harper-q:${turnId}`)}`;
+}
+
+/** Harper coach item (no turn yet): select the person profile, then scroll to `#harper-coach:{itemId}`. */
+export function workspaceHarperCoachItemHref(
+  campaignId: string,
+  contactId: string,
+  coachItemId: string,
+): string {
+  const person = contactId.trim();
+  const itemId = coachItemId.trim();
+  if (!person) {
+    throw new Error("Harper coach link is missing an interviewer.");
+  }
+  if (!itemId) {
+    throw new Error("Harper coach link is missing a coach item.");
+  }
+  return `${workspaceConsultationHref(campaignId)}?person=${encodeURIComponent(`contact:${person}`)}#${encodeURIComponent(`harper-coach:${itemId}`)}`;
 }
 
 export function workspaceConsultationHrefFromPathname(pathname: string): string {
