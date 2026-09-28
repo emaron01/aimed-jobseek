@@ -8,8 +8,19 @@ import {
   WHY_THIS_COMPANY_TARGET_KEY,
   type AskedConsultationQuestion,
 } from "@/lib/consultation/contract";
+import {
+  looksLikeCareerWalkThrough,
+  looksLikeContextFreeTemplateQuestion,
+  questionIntentClass,
+} from "@/lib/consultation/question-detection";
 import { replyToTurnIdFromAnalysis, isIgnoredSeekerTurn } from "@/lib/consultation/qa-view";
 import { consultationConfig } from "@/lib/product-config/consultation";
+
+export {
+  looksLikeCareerWalkThrough,
+  looksLikeContextFreeTemplateQuestion,
+  questionIntentClass,
+} from "@/lib/consultation/question-detection";
 
 export type PlannedQuestion = {
   targetKey: string;
@@ -48,54 +59,6 @@ function normalizedQuestion(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-/** Built from parts so questions.ts never embeds canned question templates as prose. */
-const GUIDE_THROUGH = ["walk", "me", "through"].join(" ");
-const GUIDE_THROUGH_FLEX = new RegExp(
-  String.raw`\bwalk(?: me)? through\b`,
-);
-const GUIDE_THROUGH_EXACT = new RegExp(String.raw`\b${GUIDE_THROUGH}\b`);
-
-/**
- * Deterministic career-walk-through / chronology intent.
- * Intent is true only when the text matches explicit walk-through patterns
- * (career/roles chronology language), not by employer-token similarity alone.
- */
-export function looksLikeCareerWalkThrough(text: string): boolean {
-  const n = normalizedQuestion(text);
-  if (!n) return false;
-  if (/\bcareer walk(?:\s*through)?\b/.test(n)) return true;
-  if (
-    GUIDE_THROUGH_FLEX.test(n) &&
-    /\b(?:career|roles?|experience|background|path|progression)\b/.test(n)
-  ) {
-    return true;
-  }
-  // Starting-with employer + chronology guide + move-on / accomplishments.
-  if (
-    /\bstarting with\b/.test(n) &&
-    GUIDE_THROUGH_FLEX.test(n) &&
-    /\b(?:accomplishments?|roles?|moved on|left|next)\b/.test(n)
-  ) {
-    return true;
-  }
-  // Employer-range chronology (Merion→OpenText / Aerotek→OpenText).
-  if (GUIDE_THROUGH_FLEX.test(n) && /\bfrom\b.+\bto\b/.test(n)) {
-    return true;
-  }
-  return false;
-}
-
-/** Shared intent class used for near-duplicate detection (no guessing). */
-export function questionIntentClass(
-  text: string,
-  targetKey?: string | null,
-): "chronology" | null {
-  if (targetKey === "chronology" || looksLikeCareerWalkThrough(text)) {
-    return "chronology";
-  }
-  return null;
-}
-
 export function questionNearDuplicate(left: string, right: string): boolean {
   const a = normalizedQuestion(left);
   const b = normalizedQuestion(right);
@@ -116,40 +79,6 @@ export function questionDuplicatesAsked(
   askedQuestions: readonly AskedConsultationQuestion[],
 ): boolean {
   return askedQuestions.some((asked) => questionNearDuplicate(text, asked.text));
-}
-
-/**
- * Context-free STAR / template question with no named subject
- * (gap, requirement, employer, or topic). Rejected and dropped — never replaced.
- */
-export function looksLikeContextFreeTemplateQuestion(text: string): boolean {
-  const n = normalizedQuestion(text);
-  if (!n) return false;
-  const classicStar =
-    /\btell me what happened\b/.test(n) &&
-    /\bwhat you did\b/.test(n) &&
-    /\bresult\b/.test(n);
-  const bareStarPrompt = new RegExp(
-    String.raw`^(?:can you |could you |please )?(?:${GUIDE_THROUGH}|tell me about|describe) (?:a time|an example|a situation)(?: when you)?(?:\.|$)`,
-  ).test(n);
-  if (!classicStar && !bareStarPrompt) return false;
-  // Strip STAR boilerplate; if nothing substantive remains, it is context-free.
-  const remainder = n
-    .replace(/\btell me what happened\b/g, " ")
-    .replace(/\bwhat you did\b/g, " ")
-    .replace(/\bwhat the result was\b/g, " ")
-    .replace(/\bwhat was the result\b/g, " ")
-    .replace(GUIDE_THROUGH_EXACT, " ")
-    .replace(/\btell me about\b/g, " ")
-    .replace(/\bdescribe\b/g, " ")
-    .replace(/\ba time\b/g, " ")
-    .replace(/\ban example\b/g, " ")
-    .replace(/\ba situation\b/g, " ")
-    .replace(/\bwhen you\b/g, " ")
-    .replace(/\b(?:can you|could you|please|and|the|a|an|or)\b/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return remainder.length < 8;
 }
 
 export function askedQuestionsFromTurns(

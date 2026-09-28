@@ -48,6 +48,11 @@ import {
   consultationConversationCopy,
 } from "@/lib/product-config/consultation";
 import type { JobScorecard } from "@/lib/job-requirement/types";
+import { cscSeniorDirectorSalesParsed } from "@/lib/consultation/csc-senior-director-sales-fixture";
+import {
+  buildConsultationQaView,
+  needsMoreDetailFromAnalysis,
+} from "@/lib/consultation/qa-view";
 
 function src(path: string): string {
   return readFileSync(path, "utf8");
@@ -194,28 +199,27 @@ describe("Harper Batch C question and result defects", () => {
     ).toBe(false);
   });
 
-  it("8c: restated reply or question meta-commentary is rejected, regenerated within bound, never shown as Harper result", async () => {
+  it("8c: nearly-verbatim echo and question meta-commentary are rejected; polished coaching is not", async () => {
     const seeker =
-      "That company statement is not a skill. It should be an interview question about why I want to work here.";
+      "At Contoso I owned the Monday forecast ritual. I sat with managers on deal inspection until slip fell under ten percent.";
     const metaBullet =
       "Clarified that a company statement needed to be reframed as an interview question.";
-    const paraphrase =
-      "That company statement is not really a skill and should be an interview question about why I want to work here.";
+    const nearlyVerbatim =
+      "At Contoso I owned the Monday forecast ritual I sat with managers on deal inspection until slip fell under ten percent";
+    const polishedCoaching =
+      "At Contoso I installed a Monday forecast ritual and coached managers through weekly deal inspection until forecast slip fell under 10%.";
 
     expect(isQuestionMetaCommentary(metaBullet)).toBe(true);
-    expect(isParaphrasedSeekerReply(paraphrase, [seeker])).toBe(true);
+    expect(isParaphrasedSeekerReply(nearlyVerbatim, [seeker])).toBe(true);
+    expect(isParaphrasedSeekerReply(polishedCoaching, [seeker])).toBe(false);
     expect(isRawSeekerResult(metaBullet, [seeker])).toBe(true);
-    expect(isRawSeekerResult(paraphrase, [seeker])).toBe(true);
-    expect(
-      isRawSeekerResult(
-        "At Contoso I owned the Monday forecast ritual and cut slip by 20%.",
-        [seeker],
-      ),
-    ).toBe(false);
+    expect(isRawSeekerResult(nearlyVerbatim, [seeker])).toBe(true);
+    expect(isRawSeekerResult(polishedCoaching, [seeker])).toBe(false);
+    expect(isRawSeekerResult(seeker, [seeker])).toBe(true);
 
     generateStructured.mockResolvedValue({
       data: {
-        interviewAnswer: paraphrase,
+        interviewAnswer: nearlyVerbatim,
         resumeBullet: metaBullet,
         strengtheningNote: null,
       },
@@ -242,13 +246,11 @@ describe("Harper Batch C question and result defects", () => {
         consultationConversationCopy.generationFailed,
       );
     }
-    // Bounded to existing qualityRegenerationAttempts (initial + regenerations).
     expect(generateStructured.mock.calls.length).toBe(
       consultationConfig.qualityRegenerationAttempts + 1,
     );
-    // When result still fails: no Harper interview/bullet returned; UI shows generationFailed + Retry.
-    expect(consultationConversationCopy.generationFailed).toBe(
-      `${consultationConfig.displayName} could not finish this coaching. Retry.`,
+    expect(consultationConversationCopy.needsMoreDetailToShape).toBe(
+      "Add a bit more detail so Harper can shape this answer.",
     );
   });
 
@@ -304,16 +306,43 @@ describe("Harper Batch C question and result defects", () => {
     ).toBe(false);
   });
 
-  it("8e: career walk-throughs with different employers share chronology intent; only one per application", () => {
+  it("8e: career chronology walk-throughs share intent; behavioral walk-throughs do not", () => {
     const merion =
       "Starting with Merion, walk me through your key accomplishments there and why you moved on to OpenText.";
     const aerotek =
       "Starting with Aerotek, walk me through your key accomplishments there and why you moved on to OpenText.";
+    const career =
+      "Walk me through your career from Merion to OpenText and why you moved on from each role.";
     expect(looksLikeCareerWalkThrough(merion)).toBe(true);
     expect(looksLikeCareerWalkThrough(aerotek)).toBe(true);
+    expect(looksLikeCareerWalkThrough(career)).toBe(true);
+    expect(looksLikeCareerWalkThrough("Walk me through your career.")).toBe(
+      true,
+    );
+    expect(
+      looksLikeCareerWalkThrough(
+        "Walk me through your experience building a front-line management layer.",
+      ),
+    ).toBe(false);
+    expect(
+      looksLikeCareerWalkThrough(
+        "Walk me through how you went from an unreliable forecast to 5-10% accuracy.",
+      ),
+    ).toBe(false);
+    expect(
+      looksLikeCareerWalkThrough(
+        "Walk me through your background with MEDDIC.",
+      ),
+    ).toBe(false);
     expect(questionIntentClass(merion)).toBe("chronology");
     expect(questionIntentClass(aerotek, "required:other")).toBe("chronology");
     expect(questionNearDuplicate(merion, aerotek)).toBe(true);
+    expect(
+      questionNearDuplicate(
+        merion,
+        "Walk me through your experience building a front-line management layer.",
+      ),
+    ).toBe(false);
 
     const asked = [
       {
@@ -390,6 +419,33 @@ describe("Harper Batch C question and result defects", () => {
     expect(
       sameRound.questions.filter((q) => looksLikeCareerWalkThrough(q.text)),
     ).toHaveLength(1);
+
+    // Behavioral walk-through after a career walk-through is still planned.
+    const behavioralAfter = planQuestionRound({
+      assessments: [
+        gapAssessment({
+          key: "required:bench",
+          text: "Build a front-line management layer",
+        }),
+      ],
+      modelQuestions: [
+        {
+          targetKey: "required:bench",
+          text: "Walk me through your experience building a front-line management layer.",
+          requirementInterpretation: null,
+          hiringTeamRoleId: "hm",
+          whoCaresNote: "Not chronology.",
+        },
+      ],
+      hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
+      askedKeys: new Set(["chronology"]),
+      skippedKeys: new Set(),
+      askedQuestions: asked,
+      includeChronology: true,
+      chronologyAsked: true,
+    });
+    expect(behavioralAfter.questions).toHaveLength(1);
+    expect(behavioralAfter.questions[0]?.text).toMatch(/front-line management/i);
   });
 
   it("rejections stay within the existing quality regeneration bound (no unbounded replan)", async () => {
@@ -428,6 +484,117 @@ describe("Harper Batch C question and result defects", () => {
     });
     expect(generateStructured.mock.calls.length).toBe(
       consultationConfig.qualityRegenerationAttempts + 1,
+    );
+  });
+
+  it("FIX 3: failed polish keeps session READY, stores no Harper result, shows needs-more-detail copy", () => {
+    expect(consultationConversationCopy.needsMoreDetailToShape).toBe(
+      "Add a bit more detail so Harper can shape this answer.",
+    );
+    const service = src("src/lib/consultation/service.ts");
+    const thread = src("src/components/ConsultationThread.tsx");
+    expect(service).toContain("finishItemNeedsMoreDetail");
+    expect(service).toContain("needsMoreDetail: true");
+    expect(service).toContain('generationStatus: "READY"');
+    expect(thread).toContain("needsMoreDetailToShape");
+    expect(thread).toContain("consultation-needs-more-detail");
+    // processAnswerGeneration routes polish failure to item-level ready, not failGeneration.
+    expect(service).toContain("await finishItemNeedsMoreDetail({");
+    expect(service.split("await finishItemNeedsMoreDetail({").length - 1).toBeGreaterThanOrEqual(
+      2,
+    );
+  });
+
+  it("FIX 4: canned-question guard still covers questions.ts; detection lives in a separate module", () => {
+    const questions = src("src/lib/consultation/questions.ts");
+    const detection = src("src/lib/consultation/question-detection.ts");
+    expect(questions).not.toMatch(/Tell a story|Walk me through|concrete result/i);
+    expect(questions).not.toMatch(/Do you have experience with/i);
+    expect(questions).not.toContain("{requirement}");
+    expect(questions).not.toContain('["walk", "me", "through"].join');
+    expect(questions).toContain('from "@/lib/consultation/question-detection"');
+    expect(detection).toContain("looksLikeCareerWalkThrough");
+    expect(detection).toContain("looksLikeContextFreeTemplateQuestion");
+    expect(detection).not.toContain("planQuestionRound");
+    expect(detection).not.toContain("questionTextForGap");
+    expect(detection).toMatch(/Detection-only helpers/);
+  });
+
+  it("FIX 5: CSC Senior Director posting excludes only the mission pitch", () => {
+    const {
+      responsibilities,
+      requiredItems,
+      preferredItems,
+      scorecard,
+      additionalKeptExamples,
+    } = cscSeniorDirectorSalesParsed;
+
+    expect(looksLikeCompanyPitch(scorecard.mission.text)).toBe(true);
+    for (const text of [...responsibilities, ...requiredItems]) {
+      expect(looksLikeCompanyPitch(text)).toBe(false);
+    }
+    for (const item of scorecard.outcomes) {
+      expect(looksLikeCompanyPitch(item.text)).toBe(false);
+    }
+    for (const item of scorecard.competencies) {
+      expect(looksLikeCompanyPitch(item.text)).toBe(false);
+    }
+    for (const text of additionalKeptExamples) {
+      expect(looksLikeCompanyPitch(text)).toBe(false);
+    }
+
+    const targets = evidenceTargets({
+      scorecard,
+      requiredItems: [...requiredItems],
+      preferredItems: [...preferredItems],
+    });
+    expect(targets.some((t) => t.kind === "MISSION")).toBe(false);
+    expect(targets.some((t) => looksLikeCompanyPitch(t.text))).toBe(false);
+    for (const text of requiredItems) {
+      expect(targets.some((t) => t.text === text)).toBe(true);
+    }
+    expect(
+      targets.some((t) => t.text === scorecard.outcomes[0]!.text),
+    ).toBe(true);
+    expect(
+      targets.some((t) => t.text === scorecard.competencies[0]!.text),
+    ).toBe(true);
+  });
+
+  it("FIX 3 view: needsMoreDetail surfaces the exact copy without a Harper result", () => {
+    expect(needsMoreDetailFromAnalysis({ needsMoreDetail: true })).toBe(true);
+    expect(needsMoreDetailFromAnalysis({ gapDecision: "evidence" })).toBe(false);
+    const view = buildConsultationQaView({
+      turns: [
+        {
+          id: "q1",
+          speaker: "CONSULTANT",
+          body: "How do you forecast?",
+          targetKey: "required:forecast",
+          followUp: false,
+          sequence: 1,
+        },
+        {
+          id: "s1",
+          speaker: "SEEKER",
+          body: "I ran a Monday ritual.",
+          targetKey: "required:forecast",
+          followUp: false,
+          sequence: 2,
+          analysisJson: {
+            replyToTurnId: "q1",
+            gapDecision: "evidence",
+            needsMoreDetail: true,
+          },
+        },
+      ],
+      statements: [],
+    });
+    expect(view.questions[0]?.needsMoreDetail).toBe(true);
+    expect(view.questions[0]?.talkingPoint).toBeNull();
+    expect(view.questions[0]?.resumeBullet).toBeNull();
+    expect(view.questions[0]?.seekerAnswers[0]?.body).toBe(
+      "I ran a Monday ritual.",
     );
   });
 

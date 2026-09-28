@@ -1905,9 +1905,17 @@ describe("consultation evidence and questions", () => {
     const questions = readFileSync("src/lib/consultation/questions.ts", "utf8");
     const assessment = readFileSync("src/lib/consultation/assess.ts", "utf8");
     const writeBack = readFileSync("src/lib/consultation/write-back.ts", "utf8");
+    const detection = readFileSync(
+      "src/lib/consultation/question-detection.ts",
+      "utf8",
+    );
     expect(questions).not.toMatch(/Tell a story|Walk me through|concrete result/i);
     expect(questions).not.toMatch(/Do you have experience with/i);
     expect(questions).not.toContain("{requirement}");
+    // Detection patterns live in question-detection.ts by design (reject/classify only).
+    expect(questions).toContain("@/lib/consultation/question-detection");
+    expect(detection).toMatch(/Detection-only helpers/);
+    expect(detection).not.toContain("planQuestionRound");
     expect(assessment).not.toMatch(/Relevant evidence|No direct evidence|Strong match/i);
     expect(writeBack).not.toMatch(/split\([^)]*sentence|keyword/i);
     const copy = readFileSync("src/lib/product-config/consultation.ts", "utf8");

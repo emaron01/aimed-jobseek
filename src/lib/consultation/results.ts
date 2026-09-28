@@ -39,7 +39,7 @@ export function isSeekerAnswerFragment(
   });
 }
 
-/** High-overlap restatement of a seeker reply without Harper polish framing. */
+/** Nearly-verbatim restatement of a seeker reply (not polished coaching). */
 export function isParaphrasedSeekerReply(
   content: string,
   seekerAnswers: readonly string[],
@@ -56,24 +56,36 @@ export function isParaphrasedSeekerReply(
         .split(/\s+/)
         .filter((token) => token.length >= 4),
     );
+  const alphaNorm = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  const resultAlpha = alphaNorm(content);
   const resultTokens = tokenize(content);
-  if (resultTokens.size < 5) return false;
+  if (resultTokens.size < 5 || resultAlpha.length < 40) return false;
   for (const answer of seekerAnswers) {
     const a = normalized(answer);
     if (a.length < 40) continue;
     // Fixture / polish may label the raw reply ("result: …") without rewriting it.
     if (/^result\b/.test(result) && result.includes(a)) continue;
+    const answerAlpha = alphaNorm(answer);
+    if (!answerAlpha || answerAlpha.length < 40) continue;
+    if (resultAlpha === answerAlpha) return true;
+    const lengthDelta =
+      Math.abs(resultAlpha.length - answerAlpha.length) /
+      Math.max(resultAlpha.length, answerAlpha.length);
+    // Nearly verbatim only: tiny length change + near-identical token set.
+    if (lengthDelta > 0.08) continue;
     const answerTokens = tokenize(answer);
     if (answerTokens.size < 5) continue;
-    const lengthDelta =
-      Math.abs(result.length - a.length) / Math.max(result.length, a.length);
-    if (lengthDelta > 0.22) continue;
     let intersection = 0;
     for (const token of resultTokens) {
       if (answerTokens.has(token)) intersection += 1;
     }
     const union = resultTokens.size + answerTokens.size - intersection;
-    if (union > 0 && intersection / union >= 0.85) return true;
+    if (union > 0 && intersection / union >= 0.95) return true;
   }
   return false;
 }

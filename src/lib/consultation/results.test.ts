@@ -52,17 +52,21 @@ describe("Harper result quality", () => {
     ).toBe(false);
   });
 
-  it("rejects paraphrased seeker replies and question meta-commentary as Harper results", () => {
+  it("rejects nearly-verbatim seeker replies and question meta-commentary as Harper results", () => {
     const seeker =
       "That company statement is not a skill. It should be an interview question about why I want to work here.";
-    const paraphrase =
-      "That company statement is not really a skill and should be an interview question about why I want to work here.";
+    const nearlyVerbatim =
+      "That company statement is not a skill It should be an interview question about why I want to work here";
+    const polished =
+      "I treated the company mission as context for why I want the role, then answered with a Contoso forecast story.";
     const meta =
       "Clarified that a company statement needed to be reframed as an interview question.";
-    expect(isParaphrasedSeekerReply(paraphrase, [seeker])).toBe(true);
+    expect(isParaphrasedSeekerReply(nearlyVerbatim, [seeker])).toBe(true);
+    expect(isParaphrasedSeekerReply(polished, [seeker])).toBe(false);
     expect(isQuestionMetaCommentary(meta)).toBe(true);
-    expect(isRawSeekerResult(paraphrase, [seeker])).toBe(true);
+    expect(isRawSeekerResult(nearlyVerbatim, [seeker])).toBe(true);
     expect(isRawSeekerResult(meta, [seeker])).toBe(true);
+    expect(isRawSeekerResult(polished, [seeker])).toBe(false);
     expect(isRawSeekerResult(harperInterview, [seeker])).toBe(false);
   });
 

@@ -781,6 +781,48 @@ async function failGeneration(sessionId: string, message: string): Promise<void>
   });
 }
 
+/**
+ * Polish quality failed after bounded regen: keep the seeker answer, store no
+ * Harper result, leave the session READY, and ask for more detail on this item only.
+ */
+async function finishItemNeedsMoreDetail(input: {
+  sessionId: string;
+  turnId: string;
+  resultTurnId: string;
+  supersedeTurnIds: string[];
+  analysisJson: Record<string, unknown>;
+}): Promise<void> {
+  const turnIds = [
+    input.resultTurnId,
+    ...input.supersedeTurnIds.filter((id) => id && id !== input.resultTurnId),
+  ];
+  await prisma.$transaction([
+    prisma.consultationProposal.deleteMany({
+      where: { turnId: input.turnId, status: "PENDING" },
+    }),
+    prisma.consultationTurn.update({
+      where: { id: input.turnId },
+      data: {
+        analysisJson: {
+          ...input.analysisJson,
+          needsMoreDetail: true,
+        },
+      },
+    }),
+    prisma.consultationStatement.deleteMany({
+      where: {
+        sessionId: input.sessionId,
+        turnId: { in: turnIds },
+        kind: { in: ["INTERVIEW_ANSWER", "RESUME_BULLET"] },
+      },
+    }),
+    prisma.consultationSession.update({
+      where: { id: input.sessionId },
+      data: { generationStatus: "READY", generationError: null },
+    }),
+  ]);
+}
+
 function learnedNotesEvidence(
   campaignId: string,
   notes: string | null | undefined,
@@ -1591,16 +1633,47 @@ async function processAnswerGeneration(input: {
       usage: replyUsage,
     });
     if (!polished.ok) {
-      await failGeneration(input.sessionId, polished.message);
-      return { ok: false };
+      await finishItemNeedsMoreDetail({
+        sessionId: input.sessionId,
+        turnId: input.turnId,
+        resultTurnId: input.resultTurnId ?? input.turnId,
+        supersedeTurnIds: input.supersedeTurnIds ?? [],
+        analysisJson: {
+          ...analysisJson,
+          gapDecision: "evidence",
+        },
+      });
+      return {
+        ok: true,
+        followUpQuestion: null,
+        coaching: null,
+        missingStarElements: [],
+        wroteResult: false,
+        gapDecision: "evidence",
+        companyMotivation,
+      };
     }
     const interviewText = polished.data.interviewAnswer.trim();
     if (!interviewText) {
-      await failGeneration(
-        input.sessionId,
-        consultationConversationCopy.generationFailed,
-      );
-      return { ok: false };
+      await finishItemNeedsMoreDetail({
+        sessionId: input.sessionId,
+        turnId: input.turnId,
+        resultTurnId: input.resultTurnId ?? input.turnId,
+        supersedeTurnIds: input.supersedeTurnIds ?? [],
+        analysisJson: {
+          ...analysisJson,
+          gapDecision: "evidence",
+        },
+      });
+      return {
+        ok: true,
+        followUpQuestion: null,
+        coaching: null,
+        missingStarElements: [],
+        wroteResult: false,
+        gapDecision: "evidence",
+        companyMotivation,
+      };
     }
     const resultTurnId = input.resultTurnId ?? input.turnId;
     const supersedeTurnIds = (input.supersedeTurnIds ?? []).filter(
@@ -1616,6 +1689,7 @@ async function processAnswerGeneration(input: {
           analysisJson: {
             ...analysisJson,
             gapDecision: "evidence",
+            needsMoreDetail: false,
           },
         },
       }),
@@ -1781,14 +1855,48 @@ async function processAnswerGeneration(input: {
     usage: replyUsage,
   });
   if (!polished.ok) {
-    await failGeneration(input.sessionId, polished.message);
-    return { ok: false };
+    await finishItemNeedsMoreDetail({
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      resultTurnId: input.resultTurnId ?? input.turnId,
+      supersedeTurnIds: input.supersedeTurnIds ?? [],
+      analysisJson: {
+        ...analysisJson,
+        gapDecision: confirmedGap ? "no_evidence" : "evidence",
+      },
+    });
+    return {
+      ok: true,
+      followUpQuestion: null,
+      coaching: null,
+      missingStarElements: verified.missingStarElements,
+      wroteResult: false,
+      gapDecision: confirmedGap ? "no_evidence" : "evidence",
+      companyMotivation,
+    };
   }
   const interviewText = polished.data.interviewAnswer.trim();
   const bulletText = polished.data.resumeBullet?.trim() ?? "";
   if (!interviewText || (!confirmedGap && !bulletText)) {
-    await failGeneration(input.sessionId, consultationConversationCopy.generationFailed);
-    return { ok: false };
+    await finishItemNeedsMoreDetail({
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      resultTurnId: input.resultTurnId ?? input.turnId,
+      supersedeTurnIds: input.supersedeTurnIds ?? [],
+      analysisJson: {
+        ...analysisJson,
+        gapDecision: confirmedGap ? "no_evidence" : "evidence",
+      },
+    });
+    return {
+      ok: true,
+      followUpQuestion: null,
+      coaching: null,
+      missingStarElements: verified.missingStarElements,
+      wroteResult: false,
+      gapDecision: confirmedGap ? "no_evidence" : "evidence",
+      companyMotivation,
+    };
   }
   const operations: Prisma.PrismaPromise<unknown>[] = [
     prisma.consultationProposal.deleteMany({
@@ -1800,6 +1908,7 @@ async function processAnswerGeneration(input: {
         analysisJson: {
           ...analysisJson,
           gapDecision: confirmedGap ? "no_evidence" : "evidence",
+          needsMoreDetail: false,
         },
       },
     }),

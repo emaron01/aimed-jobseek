@@ -32,6 +32,11 @@ export type ConsultationQaItem = {
   talkingPoint: QaStatement | null;
   /** Seeker dismissed this question; show Ignored link until reopened. */
   ignored?: boolean;
+  /**
+   * Seeker answered but Harper could not shape a result after bounded regen.
+   * Show needs-more-detail copy; session stays READY; no Harper result stored.
+   */
+  needsMoreDetail?: boolean;
 };
 
 export type ConsultationQaView = {
@@ -126,6 +131,12 @@ export function replyToTurnIdFromAnalysis(value: unknown): string | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const id = (value as { replyToTurnId?: unknown }).replyToTurnId;
   return typeof id === "string" && id.trim() ? id.trim() : null;
+}
+
+/** Seeker turn analysis: Harper could not shape a result; seeker should add detail. */
+export function needsMoreDetailFromAnalysis(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return (value as { needsMoreDetail?: unknown }).needsMoreDetail === true;
 }
 
 /** Seeker dismissed a Harper question or gap (Ignore). */
@@ -417,6 +428,9 @@ export function buildConsultationQaView(input: {
           item.statements,
           "INTERVIEW_ANSWER",
           item.seekerAnswers.at(-1)?.id,
+        ),
+        needsMoreDetail: needsMoreDetailFromAnalysis(
+          item.seekerAnswers.at(-1)?.analysisJson,
         ),
       };
     })
