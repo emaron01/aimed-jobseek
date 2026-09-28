@@ -114,7 +114,7 @@ No new paid call types.
 ## 6. Commit / branch
 
 - Branch: `checkpoint/harper-prep-hub` (updated from `main` before work)
-- Commit hash: _(filled after commit)_
+- Commit hash: `5e9b0de3ab8a9f7ba36e0f0bafb7cfc1df6de563`
 - Pushed to `origin/checkpoint/harper-prep-hub`. **Did not merge or push `main`.**
 
 ---
