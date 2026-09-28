@@ -63,7 +63,7 @@ No forms in the section — text link `"Edit"` only.
 ## 6. Commit / branch
 
 - Branch: `checkpoint/harper-prep-hub` (updated from main before work)
-- Commit: *(filled after commit)*
+- Commit: `72dc5bb5f638cf1fa9fc12d7a1cebc41abd95487`
 - Pushed checkpoint only; **main not merged or pushed**
 
 ## 7. Unchanged scope
