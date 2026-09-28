@@ -901,46 +901,16 @@ export async function saveApplicationJobPosting(input: {
   }
   const requirement = await loadJobRequirementForEdit(input);
   await withJobRequirementProcessing(requirement, async () => {
-    const parsed = await interpretJobPosting(
-      posting,
-      {
-        organizationId: input.organizationId,
-        userId: input.userId,
-        campaignId: input.campaignId,
-        category: "INTERPRETATION",
-        operation: "JOB_REQUIREMENT_PARSE",
-      },
-      requirement.seekerLearnedNotes,
-    );
+    const parsed = await interpretJobPosting(posting, {
+      organizationId: input.organizationId,
+      userId: input.userId,
+      campaignId: input.campaignId,
+      category: "INTERPRETATION",
+      operation: "JOB_REQUIREMENT_PARSE",
+    });
     await persistInterpretedJobRequirement({
       requirement,
       rawText: posting,
-      parsed,
-    });
-  });
-}
-
-export async function regenerateApplicationJobRequirement(input: {
-  organizationId: string;
-  campaignId: string;
-  userId: string;
-}): Promise<void> {
-  const requirement = await loadJobRequirementForEdit(input);
-  await withJobRequirementProcessing(requirement, async () => {
-    const parsed = await interpretJobPosting(
-      requirement.rawText,
-      {
-        organizationId: input.organizationId,
-        userId: input.userId,
-        campaignId: input.campaignId,
-        category: "INTERPRETATION",
-        operation: "JOB_REQUIREMENT_PARSE",
-      },
-      requirement.seekerLearnedNotes,
-    );
-    await persistInterpretedJobRequirement({
-      requirement,
-      rawText: requirement.rawText,
       parsed,
     });
   });
@@ -961,25 +931,33 @@ export async function saveApplicationJobLearnedNotes(input: {
     where: { id: requirement.id },
     data: { seekerLearnedNotes: notes.length > 0 ? notes : null },
   });
-  await withJobRequirementProcessing(requirement, async () => {
-    const parsed = await interpretJobPosting(
-      requirement.rawText,
-      {
-        organizationId: input.organizationId,
-        userId: input.userId,
-        campaignId: input.campaignId,
-        category: "INTERPRETATION",
-        operation: "JOB_REQUIREMENT_PARSE",
-      },
-      notes.length > 0 ? notes : null,
-    );
-    await persistInterpretedJobRequirement({
-      requirement,
-      rawText: requirement.rawText,
-      parsed,
-    });
-  });
   const { enqueueApplicationJob } = await import("@/lib/application-jobs/service");
+  const { enqueueCheatSheetPersonSection } = await import(
+    "@/lib/application-summary/enqueue"
+  );
+  await enqueueApplicationJob({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    type: "APPLICATION_SUMMARY",
+    initiatedByUserId: input.userId,
+    payload: { userId: input.userId },
+  });
+  const memberships = await prisma.campaignContact.findMany({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      chosenPersonaId: { not: null },
+    },
+    select: { contactId: true },
+  });
+  for (const membership of memberships) {
+    await enqueueCheatSheetPersonSection({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      contactId: membership.contactId,
+      userId: input.userId,
+    });
+  }
   await enqueueApplicationJob({
     organizationId: input.organizationId,
     campaignId: input.campaignId,

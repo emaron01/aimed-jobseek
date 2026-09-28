@@ -99,13 +99,13 @@ describe("workflow audit fixes", () => {
     expect(actions).toContain("useConsultationResultAction");
   });
 
-  it("regenerates job requirements and queues Harper reassessment from notes", () => {
+  it("queues Harper reassessment from interview notes without job regenerate", () => {
     const application = readFileSync("src/lib/application/service.ts", "utf8");
     const interview = readFileSync("src/app/actions/interview.ts", "utf8");
     expect(application).toContain("saveApplicationJobLearnedNotes");
     expect(application).toContain("interpretJobPosting");
     expect(application).toContain('operation: "reassess"');
-    expect(interview).toContain("regenerateApplicationJobRequirement");
+    expect(interview).not.toContain("regenerateApplicationJobRequirement");
     expect(interview).toContain('operation: "reassess"');
   });
 

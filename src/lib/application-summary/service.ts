@@ -353,6 +353,7 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
     requirement: [
       campaign.jobRequirement.id,
       campaign.jobRequirement.updatedAt.toISOString(),
+      campaign.jobRequirement.seekerLearnedNotes,
     ],
     research: research
       ? [research.id, research.updatedAt.toISOString()]
@@ -377,6 +378,7 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
     interviewStages: campaign.interviewStages.map((stage) => [
       stage.id,
       stage.updatedAt.toISOString(),
+      stage.notesBefore,
       stage.notesAfter,
       stage.outcome,
       stage.guide?.updatedAt.toISOString() ?? null,
@@ -440,6 +442,20 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
     requirement.seekerLearnedNotes,
     "SEEKER",
   );
+  for (const stage of campaign.interviewStages) {
+    appendSource(
+      sources,
+      `interview:${stage.id}:notesBefore`,
+      stage.notesBefore,
+      "JOB",
+    );
+    appendSource(
+      sources,
+      `interview:${stage.id}:notesAfter`,
+      stage.notesAfter,
+      "JOB",
+    );
+  }
   for (const assessment of campaign.consultationSession?.assessments ?? []) {
     appendSource(
       sources,

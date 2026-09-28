@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
-import { regenerateApplicationJobRequirement } from "@/lib/application/service";
 import { startConsultation } from "@/lib/consultation/service";
 import { requireCurrentUser } from "@/lib/auth/authz";
 import { refreshConsultationOffer } from "@/lib/interview/guide";
@@ -132,11 +131,6 @@ export async function updateInterviewStageAction(
       });
     }
     if (updated.notesTextChanged) {
-      await regenerateApplicationJobRequirement({
-        organizationId,
-        campaignId: id,
-        userId: user.id,
-      });
       await enqueueApplicationJob({
         organizationId,
         campaignId: id,
