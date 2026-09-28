@@ -70,7 +70,7 @@ Harper-only (`showRoleKindCoachSections`, default **false** so Cheat Sheet uncha
 ## 5. Commit / branch
 
 - Branch: `checkpoint/harper-prep-hub`
-- Commit: _(after push)_
+- Commit: `9185503f74220a853943a606e972b8e4e3be2747`
 - Not merged to main; main not pushed.
 
 ---
