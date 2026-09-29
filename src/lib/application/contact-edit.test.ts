@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { hasTestDatabase } from "@/test/database";
 import {
@@ -229,6 +230,94 @@ describe.skipIf(!hasTestDatabase())("edit an existing application contact", () =
         where: { campaignId, type: "HIRING_TEAM_BUILD" },
       }),
     ).toBe(0);
+  });
+
+  it("shows no-changes only when the contact form submits nothing new", async () => {
+    const membership = await prisma.campaignContact.findUniqueOrThrow({
+      where: { id: membershipId },
+      include: { contact: true },
+    });
+    const persona = membership.chosenPersonaId ?? personaId;
+    const paste =
+      membership.linkedInProfileText?.trim() ||
+      "Christina Schivley leads Talent at CSC.";
+    if (!membership.linkedInProfileText?.trim()) {
+      await prisma.campaignContact.update({
+        where: { id: membershipId },
+        data: {
+          linkedInProfileText: paste,
+          individualProfileStatus: "COMPLETED",
+          individualProfileJson: {
+            caresAbout: [],
+            talkingPoints: [],
+            likelyToValue: [],
+            commonGround: [],
+            promptVersion: "4",
+          },
+        },
+      });
+    }
+    const contact = await prisma.contact.findUniqueOrThrow({
+      where: { id: contactId },
+    });
+    const nextEmail = `christina-email-only-${suffix}@csc.example`;
+
+    const emailOnly = await updateApplicationContact({
+      organizationId,
+      userId,
+      contactId,
+      campaignId,
+      firstName: contact.firstName ?? "Christina",
+      lastName: contact.lastName ?? "Schivley",
+      title: contact.title ?? "Head of Talent",
+      email: nextEmail,
+      linkedinUrl: contact.linkedinUrl,
+      personaId: persona,
+      pastedText: paste,
+    });
+    expect(emailOnly.nothingChanged).toBe(false);
+    expect(emailOnly.pasteQueued).toBe(false);
+
+    const afterEmail = await prisma.contact.findUniqueOrThrow({
+      where: { id: contactId },
+    });
+    const unchanged = await updateApplicationContact({
+      organizationId,
+      userId,
+      contactId,
+      campaignId,
+      firstName: afterEmail.firstName ?? "Christina",
+      lastName: afterEmail.lastName ?? "Schivley",
+      title: afterEmail.title ?? "Head of Talent",
+      email: afterEmail.email,
+      linkedinUrl: afterEmail.linkedinUrl,
+      personaId: persona,
+      pastedText: paste,
+    });
+    expect(unchanged.nothingChanged).toBe(true);
+    expect(unchanged.pasteQueued).toBe(false);
+    expect(unchanged.displayName).toContain("Christina");
+
+    const { saveLinkedInPaste } = await import("@/lib/contact-profile/service");
+    const samePaste = await saveLinkedInPaste({
+      organizationId,
+      campaignId,
+      contactId,
+      pastedText: paste,
+      personaId: persona,
+    });
+    expect(samePaste.queued).toBe(false);
+    expect(samePaste.displayName).toContain("Christina");
+
+    const editAction = readFileSync("src/app/actions/contact-edit.ts", "utf8");
+    expect(editAction).toContain("nothingChanged");
+    expect(editAction).toContain("unchangedContactProfileMessage");
+    expect(editAction).toContain('"Saved."');
+    const profileAction = readFileSync(
+      "src/app/actions/contact-profile.ts",
+      "utf8",
+    );
+    expect(profileAction).toContain("unchangedContactProfileMessage");
   });
 
   it("runs extraction, the individual profile, and cheat sheet regen when paste changes", async () => {

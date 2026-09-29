@@ -61,8 +61,8 @@ export async function updateApplicationContactAction(
       ok: true,
       message: result.pasteQueued
         ? workspaceProgressText("CONTACT_PROFILE")
-        : result.pasteUnchanged
-          ? unchangedContactProfileMessage(result.pasteDisplayName)
+        : result.nothingChanged
+          ? unchangedContactProfileMessage(result.displayName)
           : "Saved.",
     };
   } catch (error) {

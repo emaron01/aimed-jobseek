@@ -255,6 +255,20 @@ export function unchangedContactProfileMessage(displayName: string): string {
   return `No Changes To ${name}'s Profile`;
 }
 
+/**
+ * Serialization key for OUTREACH ApplicationJobs. Distinct contact, channel
+ * (type), purpose, or interview stage must not share a PENDING/IN_PROGRESS slot.
+ */
+export function outreachJobTargetId(input: {
+  type: OutreachAssetType;
+  personaId: string | null;
+  contactId: string | null;
+  purpose: "PROACTIVE" | "FOLLOW_UP" | "THANK_YOU" | "CHECK_IN";
+  interviewStageId?: string | null;
+}): string {
+  return outreachGroupKey(input);
+}
+
 export function outreachGroupKey(input: {
   type: OutreachAssetType;
   personaId: string | null;

@@ -94,6 +94,7 @@ describe("Caching Phase 2 batch 3 wiring", () => {
     );
     expect(generateFn).toContain("outreachGenerateWouldSkip");
     expect(generateFn).toContain("outreachUnchangedSkipMessage");
+    expect(generateFn).toContain("outreachJobTargetId");
 
     const contactActions = readFileSync(
       "src/app/actions/contact-profile.ts",
@@ -377,12 +378,27 @@ describe.skipIf(!hasTestDatabase())(
       await prisma.applicationJob.deleteMany({
         where: { campaignId, type: "OUTREACH" },
       });
+      const { outreachJobTargetId } = await import("@/lib/product-config");
+      const thankYouTarget = outreachJobTargetId({
+        type: "EMAIL",
+        personaId: "p1",
+        contactId: "ct-thank",
+        purpose: "THANK_YOU",
+        interviewStageId: "stage-1",
+      });
+      const proactiveTarget = outreachJobTargetId({
+        type: "EMAIL",
+        personaId: "p1",
+        contactId: "ct-other",
+        purpose: "PROACTIVE",
+      });
+      expect(thankYouTarget).not.toBe(proactiveTarget);
       const running = await prisma.applicationJob.create({
         data: {
           organizationId,
           campaignId,
           type: "OUTREACH",
-          targetId: "p1",
+          targetId: thankYouTarget,
           status: "IN_PROGRESS",
           startedAt: new Date(),
           workerHeartbeatAt: new Date(),
@@ -392,8 +408,8 @@ describe.skipIf(!hasTestDatabase())(
         organizationId,
         campaignId,
         type: "OUTREACH",
-        targetId: "p1",
-        payload: { purpose: "PROACTIVE", regenerationInstruction: "newer" },
+        targetId: proactiveTarget,
+        payload: { purpose: "PROACTIVE", personaId: "p1", contactId: "ct-other" },
       });
       expect(followUp.id).not.toBe(running.id);
       expect(followUp.status).toBe("PENDING");
@@ -401,10 +417,23 @@ describe.skipIf(!hasTestDatabase())(
         organizationId,
         campaignId,
         type: "OUTREACH",
-        targetId: "p1",
-        payload: { purpose: "CHECK_IN" },
+        targetId: proactiveTarget,
+        payload: { purpose: "PROACTIVE", personaId: "p1", contactId: "ct-other" },
       });
       expect(again.id).toBe(followUp.id);
+      const thankYouPending = await enqueueApplicationJob({
+        organizationId,
+        campaignId,
+        type: "OUTREACH",
+        targetId: thankYouTarget,
+        payload: {
+          purpose: "THANK_YOU",
+          personaId: "p1",
+          contactId: "ct-thank",
+          interviewStageId: "stage-1",
+        },
+      });
+      expect(thankYouPending.id).not.toBe(followUp.id);
     });
 
     it("thank-you clarify and contact profile: unchanged skip; change once; serialize contact", async () => {

@@ -18,6 +18,7 @@ import {
 import {
   applicationSummaryConfig,
   outreachConfig,
+  outreachJobTargetId,
   vocab,
   workspaceProgressText,
 } from "@/lib/product-config";
@@ -280,7 +281,13 @@ export async function generateOutreachAssetAction(
       organizationId,
       campaignId: id,
       type: "OUTREACH",
-      targetId: personaId || undefined,
+      targetId: outreachJobTargetId({
+        type,
+        personaId: personaId || null,
+        contactId,
+        purpose,
+        interviewStageId,
+      }),
       initiatedByUserId: user.id,
       payload: {
         userId: user.id,

@@ -115,6 +115,7 @@ export {
   outreachConfig,
   outreachGreeting,
   outreachGroupKey,
+  outreachJobTargetId,
   shouldIncludeRedirect,
   unchangedContactProfileMessage,
 } from "./outreach";

@@ -300,8 +300,8 @@ export async function updateApplicationContact(input: {
 }): Promise<{
   contactId: string;
   pasteQueued: boolean;
-  pasteUnchanged: boolean;
-  pasteDisplayName: string;
+  nothingChanged: boolean;
+  displayName: string;
 }> {
   const firstName = input.firstName.trim();
   const lastName = input.lastName.trim();
@@ -368,23 +368,32 @@ export async function updateApplicationContact(input: {
   }
   const linkedinUrl = input.linkedinUrl?.trim() || null;
   const titleChanged = title !== (contact.title ?? "");
+  const fieldsChanged =
+    firstName !== (contact.firstName ?? "") ||
+    lastName !== (contact.lastName ?? "") ||
+    titleChanged ||
+    email !== (contact.email ?? null) ||
+    linkedinUrl !== (contact.linkedinUrl ?? null);
 
-  await prisma.contact.update({
-    where: { id: contact.id },
-    data: {
-      firstName,
-      lastName,
-      title,
-      email,
-      normalizedEmail,
-      linkedinUrl,
-      ...(titleChanged
-        ? { previousTitle: contact.title, titleChangedAt: new Date() }
-        : {}),
-    },
-  });
+  if (fieldsChanged) {
+    await prisma.contact.update({
+      where: { id: contact.id },
+      data: {
+        firstName,
+        lastName,
+        title,
+        email,
+        normalizedEmail,
+        linkedinUrl,
+        ...(titleChanged
+          ? { previousTitle: contact.title, titleChangedAt: new Date() }
+          : {}),
+      },
+    });
+  }
 
   const nextPersonaId = input.personaId?.trim() || null;
+  let personaChanged = false;
   if (
     campaignId &&
     membership &&
@@ -398,13 +407,14 @@ export async function updateApplicationContact(input: {
       contactId: contact.id,
       personaId: nextPersonaId,
     });
+    personaChanged = true;
   }
 
   const pastedText = input.pastedText?.trim() || "";
   const existingPaste = membership?.linkedInProfileText?.trim() || "";
   let pasteQueued = false;
-  let pasteUnchanged = false;
-  let pasteDisplayName = "";
+  const displayName =
+    [firstName, lastName].filter(Boolean).join(" ") || vocab.contact.Singular;
   if (campaignId && pastedText && pastedText !== existingPaste) {
     const { saveLinkedInPaste } = await import("@/lib/contact-profile/service");
     const paste = await saveLinkedInPaste({
@@ -415,15 +425,19 @@ export async function updateApplicationContact(input: {
       personaId: nextPersonaId,
     });
     pasteQueued = paste.queued;
-    pasteUnchanged = !paste.queued;
-    pasteDisplayName = paste.displayName;
   }
+
+  const nothingChanged =
+    !fieldsChanged &&
+    !personaChanged &&
+    !pasteQueued &&
+    (!pastedText || pastedText === existingPaste);
 
   return {
     contactId: contact.id,
     pasteQueued,
-    pasteUnchanged,
-    pasteDisplayName,
+    nothingChanged,
+    displayName,
   };
 }
 

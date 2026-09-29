@@ -24,6 +24,7 @@ import {
   personPrepFocus,
   recordPersonPrepOpening,
 } from "@/lib/interview/person-prep";
+import { outreachJobTargetId } from "@/lib/product-config";
 import { prisma } from "@/lib/prisma-client";
 import { runWithTenantContext } from "@/lib/tenant/request-context";
 import { drainConsultationUnprocessedInput } from "@/lib/consultation/drain";
@@ -89,11 +90,27 @@ export async function processApplicationJob(
                 });
                 const deferred = payload.deferredOutreach;
                 if (deferred?.assetType && deferred.personaId) {
+                  const deferredPurpose =
+                    deferred.purpose === "FOLLOW_UP" ||
+                    deferred.purpose === "THANK_YOU" ||
+                    deferred.purpose === "CHECK_IN"
+                      ? deferred.purpose
+                      : "PROACTIVE";
+                  const deferredType = deferred.assetType as
+                    | "EMAIL"
+                    | "LINKEDIN_CONNECTION_NOTE"
+                    | "LINKEDIN_INMAIL";
                   await enqueueApplicationJob({
                     organizationId: job.organizationId,
                     campaignId: job.campaignId,
                     type: "OUTREACH",
-                    targetId: deferred.personaId,
+                    targetId: outreachJobTargetId({
+                      type: deferredType,
+                      personaId: deferred.personaId,
+                      contactId: deferred.contactId ?? null,
+                      purpose: deferredPurpose,
+                      interviewStageId: deferred.interviewStageId ?? null,
+                    }),
                     initiatedByUserId: job.initiatedByUserId,
                     payload: {
                       userId:
@@ -209,12 +226,16 @@ export async function processApplicationJob(
             break;
           case "OUTREACH":
             {
+              const personaId = (payload.personaId ?? "").trim();
+              if (!personaId) {
+                throw new Error("Outreach is missing a Hiring Team role.");
+              }
               const generated = await generateOutreachAsset({
               organizationId: job.organizationId,
               campaignId: job.campaignId,
               userId: payload.userId ?? job.initiatedByUserId ?? "",
               type: (payload.assetType ?? "EMAIL") as ApplicationAssetType,
-              personaId: payload.personaId ?? job.targetId ?? "",
+              personaId,
               contactId: payload.contactId ?? null,
               purpose:
                 payload.purpose === "FOLLOW_UP" ||

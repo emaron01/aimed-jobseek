@@ -391,10 +391,141 @@ describe.skipIf(!hasTestDatabase())("application job serialize same-key (databas
         campaignId,
         type,
         targetId: running.targetId,
-        payload: type === "OUTREACH" ? { purpose: "THANK_YOU" } : undefined,
+        payload: type === "OUTREACH" ? { purpose: "PROACTIVE" } : undefined,
       });
       expect(again.id).toBe(followUp.id);
     }
+  });
+
+  it("distinct OUTREACH outputs never share a serialization key", async () => {
+    await clearJobs();
+    const { outreachJobTargetId } = await import("@/lib/product-config");
+    const thankYouKey = outreachJobTargetId({
+      type: "EMAIL",
+      personaId: "persona-hm",
+      contactId: "contact-a",
+      purpose: "THANK_YOU",
+      interviewStageId: "stage-1",
+    });
+    const proactiveKey = outreachJobTargetId({
+      type: "EMAIL",
+      personaId: "persona-hm",
+      contactId: "contact-b",
+      purpose: "PROACTIVE",
+    });
+    expect(thankYouKey).not.toBe(proactiveKey);
+
+    const running = await prisma.applicationJob.create({
+      data: {
+        organizationId,
+        campaignId,
+        type: "OUTREACH",
+        targetId: thankYouKey,
+        status: "IN_PROGRESS",
+        startedAt: new Date(),
+        workerHeartbeatAt: new Date(),
+        payload: {
+          personaId: "persona-hm",
+          contactId: "contact-a",
+          purpose: "THANK_YOU",
+          assetType: "EMAIL",
+          interviewStageId: "stage-1",
+        },
+      },
+    });
+    const outreachFollowUp = await enqueueApplicationJob({
+      organizationId,
+      campaignId,
+      type: "OUTREACH",
+      targetId: proactiveKey,
+      payload: {
+        personaId: "persona-hm",
+        contactId: "contact-b",
+        purpose: "PROACTIVE",
+        assetType: "EMAIL",
+      },
+    });
+    expect(outreachFollowUp.id).not.toBe(running.id);
+    expect(outreachFollowUp.status).toBe("PENDING");
+    expect(outreachFollowUp.targetId).toBe(proactiveKey);
+
+    const thankYouPending = await enqueueApplicationJob({
+      organizationId,
+      campaignId,
+      type: "OUTREACH",
+      targetId: thankYouKey,
+      payload: {
+        personaId: "persona-hm",
+        contactId: "contact-a",
+        purpose: "THANK_YOU",
+        assetType: "EMAIL",
+        interviewStageId: "stage-1",
+        regenerationInstruction: "mention the follow-up",
+      },
+    });
+    expect(thankYouPending.id).not.toBe(outreachFollowUp.id);
+    expect(thankYouPending.status).toBe("PENDING");
+    expect(thankYouPending.targetId).toBe(thankYouKey);
+
+    const thankYouAgain = await enqueueApplicationJob({
+      organizationId,
+      campaignId,
+      type: "OUTREACH",
+      targetId: thankYouKey,
+      payload: {
+        personaId: "persona-hm",
+        contactId: "contact-a",
+        purpose: "THANK_YOU",
+        assetType: "EMAIL",
+        interviewStageId: "stage-1",
+      },
+    });
+    expect(thankYouAgain.id).toBe(thankYouPending.id);
+
+    expect(
+      await prisma.applicationJob.count({
+        where: { organizationId, campaignId, type: "OUTREACH", status: "PENDING" },
+      }),
+    ).toBe(2);
+  });
+
+  it("CONTACT_PROFILE jobs for different contacts never merge", async () => {
+    await clearJobs();
+    const running = await prisma.applicationJob.create({
+      data: {
+        organizationId,
+        campaignId,
+        type: "CONTACT_PROFILE",
+        targetId: "contact-one",
+        status: "IN_PROGRESS",
+        startedAt: new Date(),
+        workerHeartbeatAt: new Date(),
+      },
+    });
+    const other = await enqueueApplicationJob({
+      organizationId,
+      campaignId,
+      type: "CONTACT_PROFILE",
+      targetId: "contact-two",
+    });
+    expect(other.id).not.toBe(running.id);
+    expect(other.status).toBe("PENDING");
+    expect(other.targetId).toBe("contact-two");
+    const sameAgain = await enqueueApplicationJob({
+      organizationId,
+      campaignId,
+      type: "CONTACT_PROFILE",
+      targetId: "contact-two",
+    });
+    expect(sameAgain.id).toBe(other.id);
+    const followUpForRunning = await enqueueApplicationJob({
+      organizationId,
+      campaignId,
+      type: "CONTACT_PROFILE",
+      targetId: "contact-one",
+    });
+    expect(followUpForRunning.id).not.toBe(other.id);
+    expect(followUpForRunning.status).toBe("PENDING");
   });
 
   it("RESUME and COVER_LETTER create one PENDING follow-up while IN_PROGRESS", async () => {
