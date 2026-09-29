@@ -61,13 +61,28 @@ export async function writePresentationPlanAction(
     await requireCurrentUser();
     const id = campaignId(formData);
     const type = assetType(formData);
+    const adjustmentNote =
+      String(formData.get("adjustmentNote") ?? "").trim() || null;
+    const { presentationPlanWouldSkip } = await import(
+      "@/lib/application-assets/plan-service"
+    );
+    if (
+      await presentationPlanWouldSkip({
+        organizationId,
+        campaignId: id,
+        type,
+        adjustmentNote,
+      })
+    ) {
+      return { ok: true, message: applicationAssetConfig.labels.readyPlan };
+    }
     await enqueueApplicationJob({
       organizationId,
       campaignId: id,
       type,
       payload: {
         operation: "plan",
-        adjustmentNote: String(formData.get("adjustmentNote") ?? "").trim() || null,
+        adjustmentNote,
       },
     });
     revalidate(id);
@@ -108,6 +123,33 @@ export async function generateApplicationAssetAction(
     ]);
     const id = campaignId(formData);
     const type = assetType(formData);
+    const hiddenRoleIds = formData
+      .getAll("hiddenRoleId")
+      .map((value) => String(value).trim())
+      .filter(Boolean);
+    const regenerationInstruction =
+      String(formData.get("regenerationInstruction") ?? "").trim() || null;
+    const { applicationAssetGenerateWouldSkip } = await import(
+      "@/lib/application-assets/service"
+    );
+    if (
+      await applicationAssetGenerateWouldSkip({
+        organizationId,
+        campaignId: id,
+        userId: user.id,
+        type,
+        hiddenRoleIds,
+        regenerationInstruction,
+      })
+    ) {
+      return {
+        ok: true,
+        message:
+          type === "RESUME"
+            ? applicationAssetConfig.labels.unchangedResume
+            : applicationAssetConfig.labels.unchangedCoverLetter,
+      };
+    }
     await enqueueApplicationJob({
       organizationId,
       campaignId: id,
@@ -115,12 +157,8 @@ export async function generateApplicationAssetAction(
       initiatedByUserId: user.id,
       payload: {
         userId: user.id,
-        hiddenRoleIds: formData
-          .getAll("hiddenRoleId")
-          .map((value) => String(value).trim())
-          .filter(Boolean),
-        regenerationInstruction:
-          String(formData.get("regenerationInstruction") ?? "").trim() || null,
+        hiddenRoleIds,
+        regenerationInstruction,
       },
     });
     revalidate(id);

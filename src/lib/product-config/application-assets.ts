@@ -8,6 +8,8 @@ export const applicationAssetConfig = Object.freeze({
     sectionHelp: "Generate, review, approve, and download every version.",
     generate: "Generate",
     regenerate: "Regenerate",
+    unchangedResume: "No Changes To Resume",
+    unchangedCoverLetter: "No Changes To Cover Letter",
     approve: "Approve",
     downloadDocx: "Download DOCX",
     changeInstruction: `What should ${consultationConfig.displayName} change?`,

@@ -25,6 +25,10 @@ import {
   validateAssetClaimsWithModel,
 } from "./ai";
 import {
+  applicationAssetGenerationUnchanged,
+  assetGenerationFingerprint,
+} from "./paid-inputs";
+import {
   COVER_LETTER_ASSET_PROMPT_VERSION,
   RESUME_ASSET_PROMPT_VERSION,
   applicationAssetContentSchema,
@@ -700,6 +704,10 @@ export async function validateAssetContent(input: {
     claims,
     sources: input.context.sources,
     context: input.context,
+    assetType:
+      input.content.type === "RESUME" || input.content.type === "COVER_LETTER"
+        ? input.content.type
+        : undefined,
   });
   if (!modelValidation.ok) {
     return [...new Set([...errors, modelValidation.message])];
@@ -727,6 +735,64 @@ function coverLetterSalutation(context: ReadyApplicationGenerationContext): stri
   return context.hiringManagerContactName
     ? `Dear ${context.hiringManagerContactName},`
     : applicationAssetConfig.coverLetter.defaultSalutation;
+}
+
+/** True when Generate/Regenerate can skip enqueue (unchanged model inputs). */
+export async function applicationAssetGenerateWouldSkip(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  type: "RESUME" | "COVER_LETTER";
+  hiddenRoleIds?: string[];
+  regenerationInstruction?: string | null;
+}): Promise<boolean> {
+  const base = await loadApplicationGenerationContext(
+    input.campaignId,
+    input.userId,
+  );
+  if (base.organizationId !== input.organizationId) return false;
+  if (!base.requirement || !base.profile) return false;
+  const readyBase = base as ReadyApplicationGenerationContext;
+  const personaId =
+    input.type === "COVER_LETTER" ? readyBase.hiringManagerPersonaId : null;
+  const loadedContext = personaId
+    ? await loadApplicationGenerationContext(input.campaignId, input.userId, {
+        personaId,
+      })
+    : readyBase;
+  if (!loadedContext.profile || !loadedContext.requirement) return false;
+  const context = loadedContext as ReadyApplicationGenerationContext;
+  const hiddenRoleIds = [
+    ...new Set((input.hiddenRoleIds ?? []).map((id) => id.trim()).filter(Boolean)),
+  ];
+  const { acceptedPresentationPlan, condensedRoleIdsFromPlan } = await import(
+    "@/lib/application-assets/plan-service"
+  );
+  const acceptedPlan = await acceptedPresentationPlan({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    type: input.type,
+  });
+  // Without an accepted plan, generate would write one — do not skip enqueue.
+  if (!acceptedPlan) return false;
+  const condensedRoleIds = condensedRoleIdsFromPlan(acceptedPlan).filter(
+    (id) => !hiddenRoleIds.includes(id),
+  );
+  const fingerprint = assetGenerationFingerprint({
+    context,
+    type: input.type,
+    hiddenRoleIds,
+    condensedRoleIds,
+    salutation: coverLetterSalutation(context),
+    regenerationInstruction: input.regenerationInstruction ?? null,
+    qualityFeedback: [],
+  });
+  return applicationAssetGenerationUnchanged({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    type: input.type,
+    fingerprint,
+  });
 }
 
 async function saveVersion(input: {
@@ -879,6 +945,21 @@ export async function generateApplicationAsset(input: {
         });
       }
       continue;
+    }
+    // Worker second line: unchanged inputs keep the current version (no new draft).
+    if (generated.skipped) {
+      const latest = await prisma.applicationAsset.findFirst({
+        where: {
+          organizationId: input.organizationId,
+          campaignId: input.campaignId,
+          type: input.type,
+        },
+        orderBy: { version: "desc" },
+        select: { id: true, version: true },
+      });
+      if (latest) {
+        return { ok: true, assetId: latest.id, version: latest.version };
+      }
     }
     const content = sanitizeAssetContent(
       applyProfileContactHeader(

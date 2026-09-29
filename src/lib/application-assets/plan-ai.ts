@@ -14,6 +14,7 @@ import {
 } from "@/lib/application-assets/plan-contract";
 import { AiValidationError } from "@/lib/ai/errors";
 import { buildPresentationPlanMessages } from "@/lib/application-assets/plan-prompt";
+import { runGatedPresentationPlan } from "@/lib/application-assets/paid-inputs";
 import { applicationAssetConfig } from "@/lib/product-config";
 
 export async function writePresentationPlanWithModel(input: {
@@ -46,35 +47,50 @@ export async function writePresentationPlanWithModel(input: {
     };
   }
   try {
-    const messages = buildPresentationPlanMessages({
+    const planInput = {
       ...input,
       qualityFeedback: input.qualityFeedback ?? [],
-    });
-    const response =
-      input.type === "RESUME"
-        ? await getConsultationAiProvider().generateStructured({
-            ...structuredOutputRequest("resumePresentationPlan"),
-            ...(input.usage ? aiCallTracking(input.usage) : {}),
-            messages,
-            parseOutput: (raw) => ({
-              data: resumePresentationPlanSchema.parse(
-                normalizeResumePresentationPlan(raw),
-              ),
-              coercedFields: [],
-            }),
-          })
-        : await getConsultationAiProvider().generateStructured({
-            ...structuredOutputRequest("coverLetterPresentationPlan"),
-            ...(input.usage ? aiCallTracking(input.usage) : {}),
-            messages,
-            parseOutput: (raw) => ({
-              data: coverLetterPresentationPlanSchema.parse(
-                normalizeCoverLetterPresentationPlan(raw),
-              ),
-              coercedFields: [],
-            }),
-          });
-    return { ok: true, data: response.data };
+    };
+    const callProvider = async (): Promise<PresentationPlan> => {
+      const messages = buildPresentationPlanMessages(planInput);
+      const response =
+        input.type === "RESUME"
+          ? await getConsultationAiProvider().generateStructured({
+              ...structuredOutputRequest("resumePresentationPlan"),
+              ...(input.usage ? aiCallTracking(input.usage) : {}),
+              messages,
+              parseOutput: (raw) => ({
+                data: resumePresentationPlanSchema.parse(
+                  normalizeResumePresentationPlan(raw),
+                ),
+                coercedFields: [],
+              }),
+            })
+          : await getConsultationAiProvider().generateStructured({
+              ...structuredOutputRequest("coverLetterPresentationPlan"),
+              ...(input.usage ? aiCallTracking(input.usage) : {}),
+              messages,
+              parseOutput: (raw) => ({
+                data: coverLetterPresentationPlanSchema.parse(
+                  normalizeCoverLetterPresentationPlan(raw),
+                ),
+                coercedFields: [],
+              }),
+            });
+      return response.data;
+    };
+    const organizationId = input.usage?.organizationId;
+    const campaignId = input.usage?.campaignId?.trim();
+    if (organizationId && campaignId) {
+      const gated = await runGatedPresentationPlan({
+        organizationId,
+        campaignId,
+        planInput,
+        callProvider,
+      });
+      return { ok: true, data: gated.data };
+    }
+    return { ok: true, data: await callProvider() };
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
     const cause =

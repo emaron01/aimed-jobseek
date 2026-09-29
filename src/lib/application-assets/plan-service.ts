@@ -151,6 +151,80 @@ export async function writePresentationPlan(input: {
   return { ok: true, plan: written.data };
 }
 
+/** True when Ask-for-plan can skip enqueue (unchanged model inputs + usable receipt). */
+export async function presentationPlanWouldSkip(input: {
+  organizationId: string;
+  campaignId: string;
+  type: ApplicationPresentationPlanType;
+  adjustmentNote?: string | null;
+}): Promise<boolean> {
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    include: {
+      product: { select: { profileJson: true } },
+      jobRequirement: { select: { title: true, companyName: true } },
+      consultationSession: {
+        include: {
+          assessments: true,
+        },
+      },
+    },
+  });
+  if (!campaign) return false;
+  const parsed = campaign.product.profileJson
+    ? parseCandidateProfileSafe(campaign.product.profileJson)
+    : null;
+  if (!parsed?.ok) return false;
+  const asOf = new Date();
+  const stories = await prisma.profileStory.findMany({
+    where: { organizationId: input.organizationId, productId: campaign.productId },
+    select: { id: true, result: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const planInput = {
+    type: input.type,
+    application: {
+      title: campaign.jobRequirement?.title ?? campaign.name,
+      employer: campaign.jobRequirement?.companyName ?? null,
+    },
+    roles: parsed.profile.experience.map((role) => ({
+      id: role.id,
+      title: role.title,
+      employer: role.employer,
+      startDate: role.startDate,
+      endDate: role.endDate,
+      yearsSinceEnd: yearsSinceEnd(role.endDate, asOf),
+    })),
+    stories: stories.map((story) => ({ id: story.id, result: story.result })),
+    assessments: (campaign.consultationSession?.assessments ?? []).map((item) => ({
+      text: item.text,
+      strength: item.strength,
+      explanation: item.explanation ?? "",
+    })),
+    adjustmentNote: input.adjustmentNote ?? null,
+    qualityFeedback: [] as string[],
+  };
+  const {
+    PRESENTATION_PLAN_OPERATION,
+    presentationPlanFingerprint,
+    presentationPlanSubjectKey,
+  } = await import("@/lib/application-assets/paid-inputs");
+  const { findPaidCallReceipt } = await import("@/lib/ai/paid-call-gate");
+  const fingerprint = presentationPlanFingerprint(planInput);
+  const receipt = await findPaidCallReceipt({
+    organizationId: input.organizationId,
+    operation: PRESENTATION_PLAN_OPERATION,
+    subjectKey: presentationPlanSubjectKey(input.campaignId, input.type),
+  });
+  if (!receipt || receipt.inputHash !== fingerprint) return false;
+  try {
+    const stored = parsePlan(receipt.resultJson);
+    return stored.type === input.type;
+  } catch {
+    return false;
+  }
+}
+
 export async function acceptPresentationPlan(input: {
   organizationId: string;
   campaignId: string;

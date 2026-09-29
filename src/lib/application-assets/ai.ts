@@ -17,6 +17,11 @@ import type {
 import { emailFactSelectionResultSchema } from "@/lib/email-generation/fact-selection-contract";
 import { aiCallTracking } from "@/lib/usage/ai-call";
 import {
+  runGatedAssetClaimValidation,
+  runGatedCoverLetterAsset,
+  runGatedResumeAsset,
+} from "@/lib/application-assets/paid-inputs";
+import {
   assetClaimValidationSchema,
   coverLetterAssetContentSchema,
   emailAssetContentSchema,
@@ -40,7 +45,9 @@ import {
   type OutreachFactCandidate,
 } from "./prompt";
 
-type Result<T> = { ok: true; data: T } | { ok: false; message: string };
+type Result<T> =
+  | { ok: true; data: T; skipped: boolean }
+  | { ok: false; message: string };
 
 const UNCONFIGURED =
   "Application asset AI is not configured. Configure it, then retry.";
@@ -81,66 +88,86 @@ function failure(operation: string, error: unknown, message: string) {
   return { ok: false as const, message: `${message}${detail}` };
 }
 
-export function generateResumeWithModel(input: {
+export async function generateResumeWithModel(input: {
   context: ReadyApplicationGenerationContext;
   hiddenRoleIds: string[];
   condensedRoleIds: string[];
   regenerationInstruction: string | null;
   qualityFeedback: string[];
 }): Promise<Result<ResumeAssetContent>> {
-  if (!isAssetAiConfigured()) return Promise.resolve({ ok: false, message: UNCONFIGURED });
-  return getAssetAiProvider()
-    .generateStructured({
+  if (!isAssetAiConfigured()) return { ok: false, message: UNCONFIGURED };
+  const resumeInput = input;
+  const callProvider = async () => {
+    const response = await getAssetAiProvider().generateStructured({
       ...structuredOutputRequest("resumeAsset"),
       ...aiCallTracking(
         assetUsage(input.context, "APPLICATION_ASSET_GENERATION"),
       ),
-      messages: buildResumeAssetMessages(input),
+      messages: buildResumeAssetMessages(resumeInput),
       parseOutput: (raw) => ({
         data: resumeAssetContentSchema.parse(raw),
         coercedFields: [],
       }),
-    })
-    .then((response) => ({ ok: true as const, data: response.data }))
-    .catch((error) =>
-      failure("resumeAsset", error, "The resume could not be generated. Retry."),
-    );
+    });
+    return response.data;
+  };
+  try {
+    const gated = await runGatedResumeAsset({
+      organizationId: input.context.organizationId,
+      campaignId: input.context.campaign.id,
+      resumeInput,
+      callProvider,
+    });
+    return { ok: true, data: gated.data, skipped: gated.skipped };
+  } catch (error) {
+    return failure("resumeAsset", error, "The resume could not be generated. Retry.");
+  }
 }
 
-export function generateCoverLetterWithModel(input: {
+export async function generateCoverLetterWithModel(input: {
   context: ReadyApplicationGenerationContext;
   salutation: string;
   regenerationInstruction: string | null;
   qualityFeedback: string[];
 }): Promise<Result<CoverLetterAssetContent>> {
-  if (!isAssetAiConfigured()) return Promise.resolve({ ok: false, message: UNCONFIGURED });
-  return getAssetAiProvider()
-    .generateStructured({
+  if (!isAssetAiConfigured()) return { ok: false, message: UNCONFIGURED };
+  const coverInput = input;
+  const callProvider = async () => {
+    const response = await getAssetAiProvider().generateStructured({
       ...structuredOutputRequest("coverLetterAsset"),
       ...aiCallTracking(
         assetUsage(input.context, "APPLICATION_ASSET_GENERATION"),
       ),
-      messages: buildCoverLetterAssetMessages(input),
+      messages: buildCoverLetterAssetMessages(coverInput),
       parseOutput: (raw) => ({
         data: coverLetterAssetContentSchema.parse(raw),
         coercedFields: [],
       }),
-    })
-    .then((response) => ({ ok: true as const, data: response.data }))
-    .catch((error) =>
-      failure(
-        "coverLetterAsset",
-        error,
-        "The cover letter could not be generated. Retry.",
-      ),
+    });
+    return response.data;
+  };
+  try {
+    const gated = await runGatedCoverLetterAsset({
+      organizationId: input.context.organizationId,
+      campaignId: input.context.campaign.id,
+      coverInput,
+      callProvider,
+    });
+    return { ok: true, data: gated.data, skipped: gated.skipped };
+  } catch (error) {
+    return failure(
+      "coverLetterAsset",
+      error,
+      "The cover letter could not be generated. Retry.",
     );
+  }
 }
 
 async function selectOutreachFacts(
   input: OutreachGenerationInput,
 ): Promise<Result<OutreachFactCandidate[]>> {
   const candidates = outreachFactCandidates(input.context);
-  if (candidates.length === 0) return { ok: true, data: [] };
+  if (candidates.length === 0) return { ok: true, data: [], skipped: false };
   if (!isEmailFactsAiConfigured()) {
     return { ok: false, message: EMAIL_FACTS_UNCONFIGURED };
   }
@@ -164,7 +191,7 @@ async function selectOutreachFacts(
         coercedFields: [],
       }),
     });
-    if (response.data.noneRelevant) return { ok: true, data: [] };
+    if (response.data.noneRelevant) return { ok: true, data: [], skipped: false };
     const byId = new Map(
       candidates.map((candidate) => [candidate.candidateId, candidate]),
     );
@@ -173,6 +200,7 @@ async function selectOutreachFacts(
       data: response.data.selected
         .map((row) => byId.get(row.candidateId))
         .filter((row): row is OutreachFactCandidate => Boolean(row)),
+      skipped: false,
     };
   } catch (error) {
     return failure(
@@ -215,7 +243,7 @@ export async function generateOutreachWithModel(
           coercedFields: [],
         }),
       });
-      return { ok: true, data: response.data };
+      return { ok: true, data: response.data, skipped: false };
     }
     if (input.type === "LINKEDIN_CONNECTION_NOTE") {
       const response = await getEmailAiProvider().generateStructured({
@@ -227,7 +255,7 @@ export async function generateOutreachWithModel(
           coercedFields: [],
         }),
       });
-      return { ok: true, data: response.data };
+      return { ok: true, data: response.data, skipped: false };
     }
     const response = await getEmailAiProvider().generateStructured({
       ...structuredOutputRequest("outreachLinkedinInmailAsset"),
@@ -238,21 +266,23 @@ export async function generateOutreachWithModel(
         coercedFields: [],
       }),
     });
-    return { ok: true, data: response.data };
+    return { ok: true, data: response.data, skipped: false };
   } catch (error) {
     return failed(error);
   }
 }
 
-export function validateAssetClaimsWithModel(input: {
+export async function validateAssetClaimsWithModel(input: {
   claims: AssetClaim[];
   sources: ApplicationGenerationContext["sources"];
   context?: Pick<
     ReadyApplicationGenerationContext,
     "organizationId" | "userId" | "campaign"
   >;
+  /** When set, gate with PaidCallReceipt (resume/cover only — not outreach). */
+  assetType?: "RESUME" | "COVER_LETTER";
 }): Promise<Result<AssetClaimValidation>> {
-  if (!isAssetAiConfigured()) return Promise.resolve({ ok: false, message: UNCONFIGURED });
+  if (!isAssetAiConfigured()) return { ok: false, message: UNCONFIGURED };
   const tracking = input.context
     ? aiCallTracking({
         organizationId: input.context.organizationId,
@@ -262,8 +292,8 @@ export function validateAssetClaimsWithModel(input: {
         operation: "APPLICATION_ASSET_GENERATION",
       })
     : {};
-  return getAssetValidationAiProvider()
-    .generateStructured({
+  const callProvider = async () => {
+    const response = await getAssetValidationAiProvider().generateStructured({
       ...structuredOutputRequest("applicationAssetClaimValidation"),
       ...tracking,
       messages: buildAssetClaimValidationMessages(input),
@@ -271,13 +301,31 @@ export function validateAssetClaimsWithModel(input: {
         data: assetClaimValidationSchema.parse(raw),
         coercedFields: [],
       }),
-    })
-    .then((response) => ({ ok: true as const, data: response.data }))
-    .catch((error) =>
-      failure(
-        "applicationAssetClaimValidation",
-        error,
-        "The asset claim check could not be completed. Retry.",
-      ),
+    });
+    return response.data;
+  };
+  try {
+    if (
+      input.assetType &&
+      input.context?.organizationId &&
+      input.context.campaign.id
+    ) {
+      const gated = await runGatedAssetClaimValidation({
+        organizationId: input.context.organizationId,
+        campaignId: input.context.campaign.id,
+        assetType: input.assetType,
+        claims: input.claims,
+        sources: input.sources,
+        callProvider,
+      });
+      return { ok: true, data: gated.data, skipped: gated.skipped };
+    }
+    return { ok: true, data: await callProvider(), skipped: false };
+  } catch (error) {
+    return failure(
+      "applicationAssetClaimValidation",
+      error,
+      "The asset claim check could not be completed. Retry.",
     );
+  }
 }

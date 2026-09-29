@@ -352,6 +352,20 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     generateStructured.mockReset();
     isAssetAiConfigured.mockReturnValue(true);
     await prisma.applicationAsset.deleteMany({ where: { campaignId } });
+    // Phase 2 batch 2: gate receipts must not leak across tests with identical inputs.
+    await prisma.paidCallReceipt.deleteMany({
+      where: {
+        organizationId,
+        operation: {
+          in: [
+            "RESUME_ASSET",
+            "COVER_LETTER_ASSET",
+            "PRESENTATION_PLAN",
+            "ASSET_CLAIM_VALIDATION",
+          ],
+        },
+      },
+    });
     for (const type of ["RESUME", "COVER_LETTER"] as const) {
       await prisma.applicationPresentationPlan.upsert({
         where: { campaignId_type: { campaignId, type } },
@@ -500,12 +514,25 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
     };
   }
 
-  function installModel(input?: {
+  async function installModel(input?: {
     resumes?: ResumeAssetContent[];
     coverLetters?: CoverLetterAssetContent[];
     coverLetter?: CoverLetterAssetContent;
     violations?: Array<{ claimId: string; reason: string }>;
   }) {
+    await prisma.paidCallReceipt.deleteMany({
+      where: {
+        organizationId,
+        operation: {
+          in: [
+            "RESUME_ASSET",
+            "COVER_LETTER_ASSET",
+            "PRESENTATION_PLAN",
+            "ASSET_CLAIM_VALIDATION",
+          ],
+        },
+      },
+    });
     const resumes = [...(input?.resumes ?? [validResume()])];
     const coverLetters = [...(input?.coverLetters ?? [])];
     generateStructured.mockImplementation(
@@ -571,7 +598,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
       where: { campaignId_type: { campaignId, type: "RESUME" } },
       data: { status: "DRAFT", acceptedAt: null },
     });
-    installModel({ resumes: [validResume()] });
+    await installModel({ resumes: [validResume()] });
     const result = await generateApplicationAsset({
       organizationId,
       campaignId,
@@ -623,7 +650,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
       condensed: true,
       bullets: [],
     };
-    installModel({ resumes: [condensed] });
+    await installModel({ resumes: [condensed] });
     const result = await generateApplicationAsset({
       organizationId,
       campaignId,
@@ -665,7 +692,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
         "Led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
       ),
     };
-    installModel({ resumes: [paraphrased] });
+    await installModel({ resumes: [paraphrased] });
     const passed = await generateApplicationAsset({
       organizationId,
       campaignId,
@@ -690,7 +717,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
         "Led the rewrite of invoice generation that cut failed billing runs from 8% to under 1% over two quarters.",
       ),
     };
-    installModel({ resumes: [changed] });
+    await installModel({ resumes: [changed] });
     const stripped = await generateApplicationAsset({
       organizationId,
       campaignId,
@@ -717,7 +744,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
         supports: support("profile:not-real", "Managed 50 engineers."),
       },
     ];
-    installModel({ resumes: [invalid, invalid, invalid, invalid, invalid] });
+    await installModel({ resumes: [invalid, invalid, invalid, invalid, invalid] });
     const result = await generateApplicationAsset({
       organizationId,
       campaignId,
@@ -744,7 +771,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
   it("preserves exact roles and seeker hide choices", async () => {
     const hidden = validResume();
     hidden.experience[1]!.hidden = true;
-    installModel({ resumes: [hidden] });
+    await installModel({ resumes: [hidden] });
     const result = await generateApplicationAsset({
       organizationId,
       campaignId,
@@ -801,7 +828,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
         supports: support("job:posting", "Python"),
       },
     ];
-    installModel({ resumes: [invalid, invalid, invalid, invalid, invalid] });
+    await installModel({ resumes: [invalid, invalid, invalid, invalid, invalid] });
     const result = await generateApplicationAsset({
       organizationId,
       campaignId,
@@ -817,7 +844,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
   });
 
   it("uses the Hiring Manager roster name and cited research in the cover-letter opening", async () => {
-    installModel();
+    await installModel();
     const result = await generateApplicationAsset({
       organizationId,
       campaignId,
@@ -845,7 +872,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
   });
 
   it("regenerates a cover letter that restates a phrase without adding information", async () => {
-    installModel({
+    await installModel({
       coverLetters: [
         {
           type: "COVER_LETTER",
@@ -899,7 +926,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
   });
 
   it("allows job-posting language in a cover letter without regenerating", async () => {
-    installModel();
+    await installModel();
     generateStructured.mockImplementation(
       async (request: { schemaName: string; messages: Array<{ content: string }> }) => {
         if (request.schemaName === "application_resume") {
@@ -964,7 +991,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
       };
       return letter;
     };
-    installModel({
+    await installModel({
       coverLetters: [],
       coverLetter: undefined,
     });
@@ -1050,7 +1077,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
       signoff: "Sincerely,",
       signerName: "Alex Chen",
     };
-    installModel({
+    await installModel({
       coverLetters: [opening, opening, opening, opening, opening],
     });
     const result = await generateApplicationAsset({
@@ -1391,7 +1418,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
   });
 
   it("increments versions and keeps only one approved version per type", async () => {
-    installModel({ resumes: [validResume(), validResume()] });
+    await     installModel({ resumes: [validResume(), validResume()] });
     const first = await generateApplicationAsset({
       organizationId,
       campaignId,
@@ -1403,6 +1430,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
       campaignId,
       userId,
       type: "RESUME",
+      regenerationInstruction: "Tighten the summary.",
     });
     expect(first.ok && first.version).toBe(1);
     expect(second.ok && second.version).toBe(2);

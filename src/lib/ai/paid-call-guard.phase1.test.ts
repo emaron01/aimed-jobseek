@@ -108,19 +108,21 @@ describe("paid-call gate Phase 1 fingerprints and wiring", () => {
     expect(PERSONA_SYNTHESIS_PROMPT_VERSION).toBe("13");
   });
 
-  it("Phase 1 gate stays on hiring-team; Phase 2 batch 1 adds job parse + shell", () => {
+  it("Phase 1 gate stays on hiring-team; Phase 2 adds job parse, shell, resume/cover", () => {
     const ai = readFileSync("src/lib/hiring-team/ai.ts", "utf8");
     expect(ai).toContain("runPaidStructuredCall");
-    // Caching Phase 2 batch 1: job parse and cheat-sheet shell use the shared gate.
+    // Caching Phase 2: job parse, cheat-sheet shell, resume/cover use the shared gate.
     expect(readFileSync("src/lib/job-requirement/parse.ts", "utf8")).toContain(
       "runPaidStructuredCall",
     );
     expect(
       readFileSync("src/lib/application-summary/shell-gate.ts", "utf8"),
     ).toContain("runPaidStructuredCall");
+    expect(
+      readFileSync("src/lib/application-assets/paid-inputs.ts", "utf8"),
+    ).toContain("runPaidStructuredCall");
     for (const path of [
       "src/lib/consultation/ai.ts",
-      "src/lib/application-assets/ai.ts",
       "src/lib/email-generation/service.ts",
       "src/lib/research/provider.ts",
     ]) {

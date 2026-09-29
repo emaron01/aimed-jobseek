@@ -60,8 +60,8 @@ describe("application job serialize policy (source)", () => {
     expect(applicationJobAllowsFollowUpWhileRunning("HIRING_TEAM_BUILD")).toBe(true);
     expect(applicationJobAllowsFollowUpWhileRunning("APPLICATION_SUMMARY")).toBe(true);
     expect(applicationJobAllowsFollowUpWhileRunning("NEXT_STEP")).toBe(true);
-    expect(applicationJobAllowsFollowUpWhileRunning("RESUME")).toBe(false);
-    expect(applicationJobAllowsFollowUpWhileRunning("COVER_LETTER")).toBe(false);
+    expect(applicationJobAllowsFollowUpWhileRunning("RESUME")).toBe(true);
+    expect(applicationJobAllowsFollowUpWhileRunning("COVER_LETTER")).toBe(true);
     expect(applicationJobAllowsFollowUpWhileRunning("OUTREACH")).toBe(false);
     expect(applicationJobAllowsFollowUpWhileRunning("CONTACT_PROFILE")).toBe(false);
     expect(applicationJobAllowsFollowUpWhileRunning("INTERVIEW_GUIDE")).toBe(false);
@@ -332,8 +332,6 @@ describe.skipIf(!hasTestDatabase())("application job serialize same-key (databas
   it("non-serialized types return the running job and create no follow-up", async () => {
     await clearJobs();
     for (const type of [
-      "RESUME",
-      "COVER_LETTER",
       "OUTREACH",
       "CONTACT_PROFILE",
       "INTERVIEW_GUIDE",
@@ -343,7 +341,7 @@ describe.skipIf(!hasTestDatabase())("application job serialize same-key (databas
           organizationId,
           campaignId,
           type,
-          targetId: type === "RESUME" || type === "COVER_LETTER" ? null : `t-${type}`,
+          targetId: `t-${type}`,
           status: "IN_PROGRESS",
           startedAt: new Date(),
           workerHeartbeatAt: new Date(),
@@ -358,10 +356,58 @@ describe.skipIf(!hasTestDatabase())("application job serialize same-key (databas
       expect(again.id).toBe(running.id);
       expect(
         await prisma.applicationJob.count({
-          where: { organizationId, campaignId, type, status: "PENDING" },
+          where: {
+            organizationId,
+            campaignId,
+            type,
+            status: "PENDING",
+          },
         }),
       ).toBe(0);
     }
+  });
+
+  it("RESUME and COVER_LETTER create one PENDING follow-up while IN_PROGRESS", async () => {
+    await clearJobs();
+    for (const type of ["RESUME", "COVER_LETTER"] as const) {
+      const running = await prisma.applicationJob.create({
+        data: {
+          organizationId,
+          campaignId,
+          type,
+          targetId: null,
+          status: "IN_PROGRESS",
+          startedAt: new Date(),
+          workerHeartbeatAt: new Date(),
+        },
+      });
+      const followUp = await enqueueApplicationJob({
+        organizationId,
+        campaignId,
+        type,
+        targetId: null,
+      });
+      expect(followUp.id).not.toBe(running.id);
+      expect(followUp.status).toBe("PENDING");
+      const again = await enqueueApplicationJob({
+        organizationId,
+        campaignId,
+        type,
+        targetId: null,
+      });
+      expect(again.id).toBe(followUp.id);
+      expect(
+        await prisma.applicationJob.count({
+          where: {
+            organizationId,
+            campaignId,
+            type,
+            status: "PENDING",
+          },
+        }),
+      ).toBe(1);
+    }
+    await clearJobs();
   });
 
   it("deferredOutreach survives PENDING reuse", async () => {
@@ -557,6 +603,7 @@ describe.skipIf(!hasTestDatabase())("application job serialize same-key (databas
       type: "CONSULTATION",
       payload: { operation: "process_reply" },
     });
+    await pinClaimFirst(again.id);
     const againId = await claimNextApplicationJob();
     expect(againId).toBe(again.id);
     await processApplicationJob(again.id);

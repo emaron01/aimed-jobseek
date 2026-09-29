@@ -19,6 +19,8 @@ const SERIALIZED_APPLICATION_JOB_TYPES = new Set<ApplicationJobType>([
   "HIRING_TEAM_BUILD",
   "APPLICATION_SUMMARY",
   "NEXT_STEP",
+  "RESUME",
+  "COVER_LETTER",
 ]);
 
 export function applicationJobAllowsFollowUpWhileRunning(

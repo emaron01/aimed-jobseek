@@ -654,7 +654,19 @@ function AssetTypePanel({
               ? applicationAssetConfig.labels.regenerate
               : applicationAssetConfig.labels.generate}
           </SubmitButton>
-          <Status result={result} errorsOnly profileHref={profileHref} />
+          <Status
+            result={result}
+            errorsOnly={
+              !(
+                result?.ok &&
+                (result.message ===
+                  applicationAssetConfig.labels.unchangedResume ||
+                  result.message ===
+                    applicationAssetConfig.labels.unchangedCoverLetter)
+              )
+            }
+            profileHref={profileHref}
+          />
         </form>
       ) : null}
       {rows.length ? (
