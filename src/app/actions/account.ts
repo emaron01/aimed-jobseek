@@ -5,9 +5,24 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
 import { requireCurrentUser } from "@/lib/auth/authz";
 import { recordAdminAuditEvent } from "@/lib/auth/audit";
+import { resolveActiveOrganization } from "@/lib/auth/session";
 import { sendTransactionalEmail } from "@/lib/transactional-email/send";
 import { prisma } from "@/lib/prisma";
 import { assertRateLimit, RateLimitError } from "@/lib/auth/rate-limit";
+import { wipeOrganizationAccount } from "@/lib/account/wipe-organization";
+import {
+  ACCOUNT_DELETED_LOGIN_QUERY,
+  DELETE_MY_ACCOUNT_CONFIRM_MISMATCH_MESSAGE,
+  DELETE_MY_ACCOUNT_CONFIRM_PHRASE,
+  DELETE_MY_ACCOUNT_FAILURE_MESSAGE,
+  DELETE_MY_ACCOUNT_NO_ORG_MESSAGE,
+  DELETE_MY_ACCOUNT_OWNER_ONLY_MESSAGE,
+} from "@/lib/account/delete-my-account";
+
+export type AccountActionResult = {
+  ok: boolean;
+  message: string;
+};
 
 export async function logoutAction(): Promise<void> {
   // Capture actor before Better Auth invalidates the session cookie.
@@ -29,10 +44,63 @@ export async function logoutAction(): Promise<void> {
   redirect("/login");
 }
 
-export type AccountActionResult = {
-  ok: boolean;
-  message: string;
-};
+/**
+ * Self-serve account delete (lifecycle B4).
+ * OWNER of the active org only. Uses shared wipeOrganizationAccount.
+ * Does not call requireOrganization — must work while the account is read-only.
+ */
+export async function deleteMyAccountAction(
+  _prev: AccountActionResult | null,
+  formData: FormData,
+): Promise<AccountActionResult> {
+  const confirmation = String(formData.get("confirmation") || "");
+  if (confirmation !== DELETE_MY_ACCOUNT_CONFIRM_PHRASE) {
+    return {
+      ok: false,
+      message: DELETE_MY_ACCOUNT_CONFIRM_MISMATCH_MESSAGE,
+    };
+  }
+
+  try {
+    const user = await requireCurrentUser();
+    const ctx = await resolveActiveOrganization(user);
+    if (!ctx?.organization) {
+      return { ok: false, message: DELETE_MY_ACCOUNT_NO_ORG_MESSAGE };
+    }
+    if (ctx.membership.role !== "OWNER") {
+      return { ok: false, message: DELETE_MY_ACCOUNT_OWNER_ONLY_MESSAGE };
+    }
+
+    await wipeOrganizationAccount({
+      organizationId: ctx.organization.id,
+      reason: "self_serve",
+    });
+
+    await auth.api.signOut({
+      headers: await headers(),
+    });
+
+    redirect(`/login?${ACCOUNT_DELETED_LOGIN_QUERY}=1`);
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "digest" in error &&
+      typeof (error as { digest?: string }).digest === "string" &&
+      (error as { digest: string }).digest.startsWith("NEXT_REDIRECT")
+    ) {
+      throw error;
+    }
+    // next/navigation redirect mocks in tests throw Error("NEXT_REDIRECT:...")
+    if (error instanceof Error && error.message.startsWith("NEXT_REDIRECT")) {
+      throw error;
+    }
+    return {
+      ok: false,
+      message: DELETE_MY_ACCOUNT_FAILURE_MESSAGE,
+    };
+  }
+}
 
 export async function changePasswordAction(
   _prev: AccountActionResult | null,

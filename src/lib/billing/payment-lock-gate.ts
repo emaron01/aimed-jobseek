@@ -1,7 +1,10 @@
 /**
- * Layout gate (account lifecycle B3):
+ * Layout gate (account lifecycle B3 / B4):
  * - No billing-only route redirect — every page stays viewable.
- * - Server Actions outside exempt paths refused while read-only.
+ * - Product Server Action writes refused via requireOrganization →
+ *   assertWritableOnServerAction (OrganizationReadOnlyError).
+ * - Account-menu logout and self-serve delete must work from any page while
+ *   read-only, so this gate does not blanket-refuse all Server Actions.
  */
 import "server-only";
 
@@ -12,7 +15,6 @@ import {
   isPaymentLockPathExempt,
   PAYMENT_LOCK_ROUTE_EXEMPT_PREFIXES,
 } from "@/lib/billing/payment-lock";
-import { OrganizationReadOnlyError } from "@/lib/billing/account-read-only";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 
 function isPaymentLockRouteExempt(pathname: string): boolean {
@@ -22,8 +24,14 @@ function isPaymentLockRouteExempt(pathname: string): boolean {
 }
 
 /**
- * Read-only orgs: allow all GETs; refuse Server Actions outside billing /
- * support / account exemptions.
+ * Read-only orgs: allow all GETs.
+ *
+ * Server Action write refusal lives in requireOrganization →
+ * assertWritableOnServerAction (throws OrganizationReadOnlyError). The layout
+ * does not blanket-refuse every Server Action: account-menu logout and
+ * self-serve delete (B4) must work from any page while read-only, and billing
+ * portal actions from banners must too. Exempt path prefixes still short-circuit
+ * for billing / support / account pages.
  */
 export async function enforcePaymentLockGate(): Promise<void> {
   const organization = await getCurrentOrganization();
@@ -40,5 +48,5 @@ export async function enforcePaymentLockGate(): Promise<void> {
   if (!h.get(NEXT_ACTION_HEADER)) return;
   if (pathname && isPaymentLockPathExempt(pathname)) return;
 
-  throw new OrganizationReadOnlyError();
+  // Intentionally no throw: product writes are gated in requireOrganization.
 }

@@ -1,4 +1,5 @@
 import { anyListFeatureEnabled, features, vocab } from "@/lib/product-config";
+import { DELETE_MY_ACCOUNT_MENU_LABEL } from "@/lib/account/delete-my-account";
 /**
  * Pure menu/nav model for authenticated users.
  * Platform-only SUPER_ADMIN (no Organization) is a first-class case.
@@ -25,6 +26,7 @@ export type UserMenuLink = {
     | "organization_settings"
     | "platform_admin"
     | "support"
+    | "delete_my_account"
     | "log_out";
 };
 
@@ -134,6 +136,18 @@ export function buildUserMenuModel(
     href: "/support",
     label: "Support",
   });
+
+  // OWNER of the active org only — same section as Support / Log Out (B4).
+  if (
+    Boolean(organizationName) &&
+    (input.membershipRole ?? null) === "OWNER"
+  ) {
+    links.push({
+      id: "delete_my_account",
+      href: "#delete-my-account",
+      label: DELETE_MY_ACCOUNT_MENU_LABEL,
+    });
+  }
 
   links.push({
     id: "log_out",

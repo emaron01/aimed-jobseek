@@ -6,11 +6,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState, Suspense } from "react";
 import { authClient } from "@/lib/auth/client";
 import { vocab } from "@/lib/product-config";
+import {
+  ACCOUNT_DELETED_LOGIN_MESSAGE,
+  ACCOUNT_DELETED_LOGIN_QUERY,
+} from "@/lib/account/delete-my-account";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") || "/";
+  const accountDeleted =
+    searchParams.get(ACCOUNT_DELETED_LOGIN_QUERY) === "1";
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -49,6 +55,15 @@ function LoginForm() {
       <p className="mt-1 text-sm text-muted">
         Access your {vocab.campaign.singular} workspace.
       </p>
+      {accountDeleted ? (
+        <p
+          className="mt-4 rounded-md border border-edge bg-canvas px-3 py-2 text-sm text-ink"
+          role="status"
+          data-testid="account-deleted-notice"
+        >
+          {ACCOUNT_DELETED_LOGIN_MESSAGE}
+        </p>
+      ) : null}
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <label className="block text-sm">
           Email
