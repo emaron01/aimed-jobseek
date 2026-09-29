@@ -8,6 +8,7 @@ export const applicationSummaryConfig = Object.freeze({
     generate: "Generate cheat sheet",
     regenerate: "Regenerate cheat sheet",
     retry: "Retry cheat sheet",
+    unchanged: "No Changes To Cheat Sheet",
     print: "Print or save as PDF",
     printSection: "Print this section",
     filterPeople: `Find a person or ${vocab.persona.singular}`,

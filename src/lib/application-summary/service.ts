@@ -176,6 +176,54 @@ export async function personSectionInputsUnchanged(input: {
   return existingPerson.inputHash === inputHash;
 }
 
+/**
+ * True when clicking regenerate would not rebuild the shell overview or any
+ * person section (receipt + person input hashes all match).
+ */
+export async function applicationSummaryNothingToRebuild(input: {
+  organizationId: string;
+  campaignId: string;
+  sectionKey?: string | null;
+}): Promise<boolean> {
+  if (input.sectionKey) {
+    return personSectionInputsUnchanged({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      sectionKey: input.sectionKey,
+    });
+  }
+
+  const data = await loadSummaryData(input.organizationId, input.campaignId);
+  const existing = parsedGuidance(data.campaign.applicationSummary?.guidanceJson);
+  if (!existing?.overview) return false;
+
+  const {
+    APPLICATION_SUMMARY_SHELL_OPERATION,
+    applicationSummaryShellFingerprint,
+  } = await import("@/lib/application-summary/shell-gate");
+  const { findPaidCallReceipt } = await import("@/lib/ai/paid-call-gate");
+  const fingerprint = applicationSummaryShellFingerprint(
+    sourcesForShell(data.sources),
+  );
+  const receipt = await findPaidCallReceipt({
+    organizationId: input.organizationId,
+    operation: APPLICATION_SUMMARY_SHELL_OPERATION,
+    subjectKey: input.campaignId,
+  });
+  if (!receipt || receipt.inputHash !== fingerprint) return false;
+
+  for (const person of data.people) {
+    if (!person.contactId || !person.personaBuilt) continue;
+    const unchanged = await personSectionInputsUnchanged({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      sectionKey: person.sectionKey,
+    });
+    if (!unchanged) return false;
+  }
+  return true;
+}
+
 const SHELL_EXCLUDED_SOURCE_CATEGORIES = new Set([
   ...PER_PERSON_SOURCE_CATEGORIES,
   "ASSESSMENT",

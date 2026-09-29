@@ -71,6 +71,18 @@ export async function generateApplicationSummaryAction(
     const organizationId = await requireOrganizationId();
     const user = await requireCurrentUser();
     const sectionKey = String(formData.get("sectionKey") ?? "").trim() || undefined;
+    const { applicationSummaryNothingToRebuild } = await import(
+      "@/lib/application-summary/service"
+    );
+    if (
+      await applicationSummaryNothingToRebuild({
+        organizationId,
+        campaignId,
+        sectionKey,
+      })
+    ) {
+      return { ok: true, message: applicationSummaryConfig.actions.unchanged };
+    }
     await enqueueApplicationJob({
       organizationId,
       campaignId,

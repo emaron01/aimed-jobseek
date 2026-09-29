@@ -234,6 +234,7 @@ export const applicationWorkspaceCopy = Object.freeze({
   jobEditEmpty: "Paste the job posting before saving.",
   jobRegenerateFailed: "The job requirements could not be regenerated.",
   jobPostingSaved: "Job requirements were regenerated from the posting.",
+  jobPostingUnchanged: "No Changes To Job Posting",
   jobRegenerated: "Job requirements were regenerated.",
   jobEditTop: "Edit",
   jobLearnedTop: "Enter any new requirements you have learned here",

@@ -269,9 +269,12 @@ describe.skipIf(!hasTestDatabase())("job requirement learned notes and posting s
       async (_rawText: string, _usage?: unknown, notes?: string | null) => {
         expect(notes).toBeUndefined();
         return {
-          ...parsed,
-          title: "Replaced title",
-          requiredItems: [...parsed.requiredItems, "Security sales experience"],
+          data: {
+            ...parsed,
+            title: "Replaced title",
+            requiredItems: [...parsed.requiredItems, "Security sales experience"],
+          },
+          skipped: false,
         };
       },
     );

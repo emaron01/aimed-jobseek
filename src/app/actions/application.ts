@@ -297,7 +297,7 @@ export async function saveApplicationJobPostingAction(
     if (!campaignId) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }
-    await saveApplicationJobPosting({
+    const result = await saveApplicationJobPosting({
       organizationId,
       campaignId,
       userId: user.id,
@@ -305,7 +305,12 @@ export async function saveApplicationJobPostingAction(
     });
     revalidatePath(`/campaigns/${campaignId}`);
     revalidatePath(`/campaigns/${campaignId}/job`);
-    return { ok: true, message: applicationWorkspaceCopy.jobPostingSaved };
+    return {
+      ok: true,
+      message: result.skipped
+        ? applicationWorkspaceCopy.jobPostingUnchanged
+        : applicationWorkspaceCopy.jobPostingSaved,
+    };
   } catch (error) {
     return fail(error, applicationWorkspaceCopy.jobEditFailed);
   }

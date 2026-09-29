@@ -350,10 +350,9 @@ async function processConsultationJob(input: {
     }
     if (operation === "reassess") {
       if (input.gate === "seeker_background") {
-        const {
-          recordSeekerBackgroundReassessFingerprint,
-          seekerBackgroundReassessFingerprintChanged,
-        } = await import("@/lib/consultation/seeker-background-reassess");
+        const { seekerBackgroundReassessFingerprintChanged } = await import(
+          "@/lib/consultation/seeker-background-reassess"
+        );
         const { seekerBackgroundText } = await import(
           "@/lib/product-research/seeker-background"
         );
@@ -383,11 +382,7 @@ async function processConsultationJob(input: {
         await reassessConsultationStanding({
           organizationId: input.organizationId,
           campaignId: input.campaignId,
-        });
-        await recordSeekerBackgroundReassessFingerprint({
-          organizationId: input.organizationId,
-          campaignId: input.campaignId,
-          fingerprint: input.fingerprint ?? fingerprint,
+          seekerBackgroundFingerprint: input.fingerprint ?? fingerprint,
         });
         continue;
       }

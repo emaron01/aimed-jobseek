@@ -446,8 +446,11 @@ describe.skipIf(!hasTestDatabase())("learned notes cheat-sheet-only (db)", () =>
       NORMAL_JOB_POSTING,
     );
     interpretJobPosting.mockResolvedValue({
-      ...parsed,
-      title: "Updated by posting save",
+      data: {
+        ...parsed,
+        title: "Updated by posting save",
+      },
+      skipped: false,
     });
     const { saveApplicationJobPosting } = await import(
       "@/lib/application/service"

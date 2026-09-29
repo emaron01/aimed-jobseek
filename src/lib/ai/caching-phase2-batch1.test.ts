@@ -31,6 +31,11 @@ import {
   seekerBackgroundReassessFingerprint,
 } from "@/lib/consultation/seeker-background-reassess";
 import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
+import {
+  applicationSummaryConfig,
+  applicationWorkspaceCopy,
+  consultationConversationCopy,
+} from "@/lib/product-config";
 import { prisma } from "@/lib/prisma-client";
 import { hasTestDatabase } from "@/test/database";
 
@@ -201,6 +206,70 @@ describe("Caching Phase 2 batch 1 wiring", () => {
       expect(page).not.toContain("runPaidStructuredCall");
     }
   });
+
+  it("skip messages are exact and only returned when the gate skips", () => {
+    expect(applicationWorkspaceCopy.jobPostingUnchanged).toBe(
+      "No Changes To Job Posting",
+    );
+    expect(consultationConversationCopy.knowAboutMeUnchanged).toBe(
+      "No Changes To Your Background",
+    );
+    expect(applicationSummaryConfig.actions.unchanged).toBe(
+      "No Changes To Cheat Sheet",
+    );
+    expect(applicationWorkspaceCopy.jobPostingSaved).not.toBe(
+      applicationWorkspaceCopy.jobPostingUnchanged,
+    );
+    expect(consultationConversationCopy.knowAboutMeSaved).not.toBe(
+      consultationConversationCopy.knowAboutMeUnchanged,
+    );
+
+    const postingAction = readFileSync("src/app/actions/application.ts", "utf8");
+    const postingFn = postingAction.slice(
+      postingAction.indexOf("export async function saveApplicationJobPostingAction"),
+      postingAction.indexOf("export async function saveApplicationJobLearnedNotesAction"),
+    );
+    expect(postingFn).toContain("result.skipped");
+    expect(postingFn).toContain("jobPostingUnchanged");
+    expect(postingFn).toContain("jobPostingSaved");
+
+    const knowMe = readFileSync("src/app/actions/consultation.ts", "utf8");
+    const knowMeStart = knowMe.indexOf(
+      "export async function saveWhatYouShouldKnowAboutMeAction",
+    );
+    const knowMeFn = knowMe.slice(knowMeStart, knowMeStart + 2200);
+    expect(knowMeFn).toContain("enqueued");
+    expect(knowMeFn).toContain("knowAboutMeUnchanged");
+    expect(knowMeFn).toContain("knowAboutMeSaved");
+
+    const summaryAction = readFileSync(
+      "src/app/actions/application-summary.ts",
+      "utf8",
+    );
+    const summaryFn = summaryAction.slice(
+      summaryAction.indexOf("export async function generateApplicationSummaryAction"),
+      summaryAction.indexOf("export async function answerCheatSheetCoachAction"),
+    );
+    expect(summaryFn).toContain("applicationSummaryNothingToRebuild");
+    expect(summaryFn).toContain("applicationSummaryConfig.actions.unchanged");
+    expect(summaryFn).toContain('workspaceProgressText("APPLICATION_SUMMARY")');
+
+    const service = readFileSync("src/lib/consultation/service.ts", "utf8");
+    const reassess = service.slice(
+      service.indexOf("export async function reassessConsultationStanding"),
+      service.indexOf("async function processAnswerGeneration"),
+    );
+    expect(reassess).toContain("seekerBackgroundFingerprint");
+    expect(reassess).toContain("recordSeekerBackgroundReassessFingerprint");
+    const enqueueSrc = readFileSync(
+      "src/lib/consultation/seeker-background-reassess.ts",
+      "utf8",
+    );
+    const enqueueFn = enqueueSrc.slice(
+      enqueueSrc.indexOf("export async function enqueueSeekerBackgroundReassessIfChanged"),
+    );
+    expect(enqueueFn).not.toContain("recordSeekerBackgroundReassessFingerprint");
+  });
 });
 
 describe.skipIf(!hasTestDatabase())(
@@ -308,18 +377,20 @@ describe.skipIf(!hasTestDatabase())(
         operation: "JOB_REQUIREMENT_PARSE" as const,
       };
       const first = await interpretJobPosting(NORMAL_JOB_POSTING, usage);
-      expect(first.title).toBe(parsed.title);
+      expect(first.skipped).toBe(false);
+      expect(first.data.title).toBe(parsed.title);
       expect(generateStructured).toHaveBeenCalledTimes(1);
 
       const second = await interpretJobPosting(NORMAL_JOB_POSTING, usage);
-      expect(second.title).toBe(parsed.title);
+      expect(second.skipped).toBe(true);
+      expect(second.data.title).toBe(parsed.title);
       expect(generateStructured).toHaveBeenCalledTimes(1);
 
       const changed = await interpretJobPosting(
         `${NORMAL_JOB_POSTING}\nUpdated title line`,
         usage,
       );
-      expect(changed).toBeTruthy();
+      expect(changed.skipped).toBe(false);
       expect(generateStructured).toHaveBeenCalledTimes(2);
 
       // Worker-style retry after receipt: same fingerprint → no provider.
@@ -332,11 +403,11 @@ describe.skipIf(!hasTestDatabase())(
         operation: JOB_REQUIREMENT_PARSE_OPERATION,
         subjectKey: campaignId,
         inputFingerprint: fingerprint,
-        parseStored: (json) => json as typeof first,
+        parseStored: (json) => json as typeof first.data,
         isResultUsable: (stored) => Boolean(stored && typeof stored === "object"),
         callProvider: async () => {
           retryCalls += 1;
-          return first;
+          return first.data;
         },
       });
       expect(retryCalls).toBe(0);
@@ -407,7 +478,7 @@ describe.skipIf(!hasTestDatabase())(
       expect(retryCalls).toBe(0);
     });
 
-    it("know-about-me: unchanged text enqueues nothing; change enqueues once; worker retry skips", async () => {
+    it("know-about-me: enqueue does not record; failed reassess allows retry; success blocks re-save", async () => {
       await prisma.applicationJob.deleteMany({
         where: { campaignId, type: "CONSULTATION" },
       });
@@ -441,25 +512,62 @@ describe.skipIf(!hasTestDatabase())(
       expect(payload.fingerprint).toBe(
         seekerBackgroundReassessFingerprint({ text }),
       );
+      // Enqueue alone must not write the receipt (failed job can retry).
+      expect(
+        await prisma.paidCallReceipt.findUnique({
+          where: {
+            organizationId_operation_subjectKey: {
+              organizationId,
+              operation: SEEKER_BACKGROUND_REASSESS_OPERATION,
+              subjectKey: campaignId,
+            },
+          },
+        }),
+      ).toBeNull();
 
-      await recordSeekerBackgroundReassessFingerprint({
-        organizationId,
-        campaignId,
-        fingerprint: payload.fingerprint!,
+      // Simulate failed reassess: no receipt → re-save enqueues again.
+      await prisma.applicationJob.update({
+        where: { id: jobsAfterFirst[0]!.id },
+        data: {
+          status: "FAILED",
+          completedAt: new Date(),
+          error: "provider timeout",
+        },
       });
-
-      const second = await enqueueSeekerBackgroundReassessIfChanged({
+      const afterFail = await enqueueSeekerBackgroundReassessIfChanged({
         organizationId,
         campaignId,
         userId,
         text,
       });
-      expect(second).toBe(false);
+      expect(afterFail).toBe(true);
       expect(
         await prisma.applicationJob.count({
-          where: { campaignId, type: "CONSULTATION" },
+          where: { campaignId, type: "CONSULTATION", status: "PENDING" },
         }),
-      ).toBe(1);
+      ).toBeGreaterThanOrEqual(1);
+
+      // Successful record (post-reassess) → same text enqueues nothing.
+      await recordSeekerBackgroundReassessFingerprint({
+        organizationId,
+        campaignId,
+        fingerprint: payload.fingerprint!,
+      });
+      await prisma.applicationJob.deleteMany({
+        where: { campaignId, type: "CONSULTATION", status: "PENDING" },
+      });
+      const afterSuccess = await enqueueSeekerBackgroundReassessIfChanged({
+        organizationId,
+        campaignId,
+        userId,
+        text,
+      });
+      expect(afterSuccess).toBe(false);
+      expect(
+        await prisma.applicationJob.count({
+          where: { campaignId, type: "CONSULTATION", status: "PENDING" },
+        }),
+      ).toBe(0);
 
       const third = await enqueueSeekerBackgroundReassessIfChanged({
         organizationId,
@@ -479,6 +587,43 @@ describe.skipIf(!hasTestDatabase())(
         text,
       });
       expect(retry.changed).toBe(false);
+    });
+
+    it("know-about-me: pending same-input reassess does not create a duplicate job", async () => {
+      await prisma.applicationJob.deleteMany({
+        where: { campaignId, type: "CONSULTATION" },
+      });
+      await prisma.paidCallReceipt.deleteMany({
+        where: {
+          organizationId,
+          operation: SEEKER_BACKGROUND_REASSESS_OPERATION,
+          subjectKey: campaignId,
+        },
+      });
+      const text = "Duplicate-prevention background note for robotics.";
+      const first = await enqueueSeekerBackgroundReassessIfChanged({
+        organizationId,
+        campaignId,
+        userId,
+        text,
+      });
+      expect(first).toBe(true);
+      const second = await enqueueSeekerBackgroundReassessIfChanged({
+        organizationId,
+        campaignId,
+        userId,
+        text,
+      });
+      expect(second).toBe(true);
+      expect(
+        await prisma.applicationJob.count({
+          where: {
+            campaignId,
+            type: "CONSULTATION",
+            status: { in: ["PENDING", "IN_PROGRESS"] },
+          },
+        }),
+      ).toBe(1);
     });
   },
 );

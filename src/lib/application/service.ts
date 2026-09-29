@@ -894,26 +894,30 @@ export async function saveApplicationJobPosting(input: {
   campaignId: string;
   userId: string;
   rawText: string;
-}): Promise<void> {
+}): Promise<{ skipped: boolean }> {
   const posting = input.rawText.trim();
   if (!posting) {
     throw new TenantError(applicationWorkspaceCopy.jobEditEmpty);
   }
   const requirement = await loadJobRequirementForEdit(input);
+  let skipped = false;
   await withJobRequirementProcessing(requirement, async () => {
-    const parsed = await interpretJobPosting(posting, {
+    const result = await interpretJobPosting(posting, {
       organizationId: input.organizationId,
       userId: input.userId,
       campaignId: input.campaignId,
       category: "INTERPRETATION",
       operation: "JOB_REQUIREMENT_PARSE",
     });
+    skipped = result.skipped;
+    if (result.skipped) return;
     await persistInterpretedJobRequirement({
       requirement,
       rawText: posting,
-      parsed,
+      parsed: result.data,
     });
   });
+  return { skipped };
 }
 
 export async function saveApplicationJobLearnedNotes(input: {

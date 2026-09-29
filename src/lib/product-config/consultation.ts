@@ -114,6 +114,7 @@ export const consultationConversationCopy = Object.freeze({
     `Tell ${consultationConfig.displayName} background that is not already in your ${vocab.product.singular}, for example experience that was left off the resume. This is saved as a seeker-stated fact and applies to every application.`,
   knowAboutMeSave: "Save",
   knowAboutMeSaved: `${consultationConfig.displayName} saved this to your ${vocab.product.singular} and is reassessing where you stand.`,
+  knowAboutMeUnchanged: "No Changes To Your Background",
   knowAboutMeFailed: `This could not be saved to your ${vocab.product.singular}.`,
   knowAboutMeEmpty: `Write what ${consultationConfig.displayName} should know before saving.`,
   knowAboutMeTooLong: "This is too long. Shorten it and save again.",

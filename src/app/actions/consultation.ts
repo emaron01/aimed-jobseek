@@ -686,7 +686,7 @@ export async function saveWhatYouShouldKnowAboutMeAction(
     const { enqueueSeekerBackgroundReassessIfChanged } = await import(
       "@/lib/consultation/seeker-background-reassess"
     );
-    await enqueueSeekerBackgroundReassessIfChanged({
+    const enqueued = await enqueueSeekerBackgroundReassessIfChanged({
       organizationId,
       campaignId,
       userId: user.id,
@@ -695,7 +695,12 @@ export async function saveWhatYouShouldKnowAboutMeAction(
     revalidatePath(`/campaigns/${campaignId}`);
     revalidatePath(`/campaigns/${campaignId}/consultation`);
     revalidatePath(`/campaigns/${campaignId}/assets`);
-    return { ok: true, message: consultationConversationCopy.knowAboutMeSaved };
+    return {
+      ok: true,
+      message: enqueued
+        ? consultationConversationCopy.knowAboutMeSaved
+        : consultationConversationCopy.knowAboutMeUnchanged,
+    };
   } catch (error) {
     return fail(error, consultationConversationCopy.knowAboutMeFailed);
   }

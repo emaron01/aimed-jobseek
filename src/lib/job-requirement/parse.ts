@@ -81,7 +81,7 @@ export async function interpretJobPosting(
   rawText: string,
   usage?: AiCallUsageContext,
   seekerLearnedNotes?: string | null,
-): Promise<ParsedJobRequirement> {
+): Promise<{ data: ParsedJobRequirement; skipped: boolean }> {
   const posting = rawText.trim();
   if (!posting) {
     throw new TenantError(
@@ -100,12 +100,15 @@ export async function interpretJobPosting(
   });
   const organizationId = usage?.organizationId;
   if (!organizationId) {
-    return callJobParseProvider(posting, seekerLearnedNotes, usage);
+    return {
+      data: await callJobParseProvider(posting, seekerLearnedNotes, usage),
+      skipped: false,
+    };
   }
   const subjectKey =
     usage.campaignId?.trim() || `content:${fingerprint}`;
 
-  const { data } = await runPaidStructuredCall<ParsedJobRequirement>({
+  return runPaidStructuredCall<ParsedJobRequirement>({
     organizationId,
     operation: JOB_REQUIREMENT_PARSE_OPERATION,
     subjectKey,
@@ -115,7 +118,6 @@ export async function interpretJobPosting(
     callProvider: async () =>
       callJobParseProvider(posting, seekerLearnedNotes, usage),
   });
-  return data;
 }
 
 async function callJobParseProvider(

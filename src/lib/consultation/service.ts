@@ -44,6 +44,7 @@ import {
 import {
   recordLearningsReassessFingerprint,
 } from "@/lib/consultation/learnings";
+import { recordSeekerBackgroundReassessFingerprint } from "@/lib/consultation/seeker-background-reassess";
 import type { AiCallUsageContext } from "@/lib/ai/types";
 import {
   askedQuestionsFromTurns,
@@ -1689,6 +1690,8 @@ export async function startConsultation(input: {
 export async function reassessConsultationStanding(input: {
   organizationId: string;
   campaignId: string;
+  /** When set, record seeker-background receipt only after this reassess succeeds. */
+  seekerBackgroundFingerprint?: string;
 }): Promise<void> {
   await startConsultation({
     organizationId: input.organizationId,
@@ -1700,6 +1703,13 @@ export async function reassessConsultationStanding(input: {
     organizationId: input.organizationId,
     campaignId: input.campaignId,
   });
+  if (input.seekerBackgroundFingerprint) {
+    await recordSeekerBackgroundReassessFingerprint({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      fingerprint: input.seekerBackgroundFingerprint,
+    });
+  }
 }
 
 async function processAnswerGeneration(input: {

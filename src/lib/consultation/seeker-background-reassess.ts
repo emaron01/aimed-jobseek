@@ -1,5 +1,6 @@
 /**
  * Seeker "what you should know about me" reassess gate (Caching Phase 2 batch 1).
+ * Receipt is recorded only after a successful reassess (see reassessConsultationStanding).
  */
 import {
   findPaidCallReceipt,
