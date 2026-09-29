@@ -31,12 +31,30 @@ function asCoachItems(value: unknown): CheatSheetCoachItem[] {
   return value.flatMap((item) => {
     const row = asRecord(item);
     if (!row || typeof row.prompt !== "string") return [];
+    const tag =
+      row.interviewTypeTag === "screening" ||
+      row.interviewTypeTag === "chronological_walk_through" ||
+      row.interviewTypeTag === "focused_competency" ||
+      row.interviewTypeTag === "reference_check_prep"
+        ? row.interviewTypeTag
+        : undefined;
+    const framework =
+      row.answerFramework === "CAR" || row.answerFramework === "STAR"
+        ? row.answerFramework
+        : null;
     return [
       {
         id: typeof row.id === "string" ? row.id : undefined,
         prompt: row.prompt,
+        interviewTypeTag: tag,
         sampleAnswer: typeof row.sampleAnswer === "string" ? row.sampleAnswer : null,
         harperQuestion: typeof row.harperQuestion === "string" ? row.harperQuestion : null,
+        answerFramework: framework,
+        challenge: typeof row.challenge === "string" ? row.challenge : null,
+        situation: typeof row.situation === "string" ? row.situation : null,
+        task: typeof row.task === "string" ? row.task : null,
+        action: typeof row.action === "string" ? row.action : null,
+        result: typeof row.result === "string" ? row.result : null,
         supports: Array.isArray(row.supports)
           ? row.supports.filter(
               (support): support is { sourceId: string; quote: string } =>

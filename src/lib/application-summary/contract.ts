@@ -1,6 +1,10 @@
 import { z } from "zod";
+import {
+  ANSWER_FRAMEWORKS,
+  interviewTypeTagSchema,
+} from "@/lib/consultation/contract";
 
-export const APPLICATION_SUMMARY_PROMPT_VERSION = "12";
+export const APPLICATION_SUMMARY_PROMPT_VERSION = "13";
 
 export const CHEAT_SHEET_SECTION_KINDS = [
   "RECRUITER",
@@ -21,11 +25,37 @@ const guidanceItemSchema = z.object({
   supports: z.array(supportSchema).optional().default([]),
 });
 
+/** Model output for likely questions (OpenAI-strict flat parts + WHO tag). */
+export const cheatSheetCoachItemGenerateSchema = z.object({
+  prompt: z.string().trim().min(1),
+  interviewTypeTag: interviewTypeTagSchema,
+  sampleAnswer: z.string().nullable(),
+  harperQuestion: z.string().nullable(),
+  answerFramework: z.enum(ANSWER_FRAMEWORKS).nullable(),
+  challenge: z.string().nullable(),
+  situation: z.string().nullable(),
+  task: z.string().nullable(),
+  action: z.string().nullable(),
+  result: z.string().nullable(),
+  supports: z.array(supportSchema).optional().default([]),
+});
+
+/**
+ * Stored / displayed coach item. Tags and parts are optional so existing
+ * guidance without them still parses and displays.
+ */
 export const cheatSheetCoachItemSchema = z.object({
   id: z.string().trim().min(1).optional(),
   prompt: z.string().trim().min(1),
+  interviewTypeTag: interviewTypeTagSchema.optional(),
   sampleAnswer: z.string().nullable().optional(),
   harperQuestion: z.string().nullable().optional(),
+  answerFramework: z.enum(ANSWER_FRAMEWORKS).nullable().optional(),
+  challenge: z.string().nullable().optional(),
+  situation: z.string().nullable().optional(),
+  task: z.string().nullable().optional(),
+  action: z.string().nullable().optional(),
+  result: z.string().nullable().optional(),
   supports: z.array(supportSchema).optional().default([]),
 });
 
@@ -137,23 +167,26 @@ export const cheatSheetPersonSectionGenerateSchema = z.object({
   caresAbout: z.array(caresAboutItemSchema).min(1).max(6),
   positioningStatements: z.array(guidanceItemSchema).min(1).max(6),
   keyStatements: z.array(guidanceItemSchema).min(1).max(6),
-  likelyQuestions: z.array(cheatSheetCoachItemSchema).min(1).max(6),
+  likelyQuestions: z.array(cheatSheetCoachItemGenerateSchema).min(1).max(6),
   questionsToAsk: z.array(questionToAskSchema).min(1).max(6),
 });
 
 export const cheatSheetPersonSectionSchema = z.preprocess(
   coercePersonSection,
-  cheatSheetPersonSectionGenerateSchema.extend({
-    bestMaterial: z.array(guidanceItemSchema).optional().default([]),
-    storyIds: z.array(z.string()).optional().default([]),
-    recruiter: z.unknown().nullable().optional(),
-    hiringManager: z.unknown().nullable().optional(),
-    executive: z.unknown().nullable().optional(),
-    crossFunctional: z.unknown().nullable().optional(),
-    linkedinAddendum: z.unknown().nullable().optional(),
-    /** Hash of inputs used to generate this section; skip regen when unchanged. */
-    inputHash: z.string().optional(),
-  }),
+  cheatSheetPersonSectionGenerateSchema
+    .omit({ likelyQuestions: true })
+    .extend({
+      likelyQuestions: z.array(cheatSheetCoachItemSchema).min(1).max(6),
+      bestMaterial: z.array(guidanceItemSchema).optional().default([]),
+      storyIds: z.array(z.string()).optional().default([]),
+      recruiter: z.unknown().nullable().optional(),
+      hiringManager: z.unknown().nullable().optional(),
+      executive: z.unknown().nullable().optional(),
+      crossFunctional: z.unknown().nullable().optional(),
+      linkedinAddendum: z.unknown().nullable().optional(),
+      /** Hash of inputs used to generate this section; skip regen when unchanged. */
+      inputHash: z.string().optional(),
+    }),
 );
 
 export const applicationSummaryOverviewGenerateSchema = z.object({

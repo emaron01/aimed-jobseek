@@ -32,8 +32,15 @@ function mockCheatSheetGuidance(
   const answered = (id: string, prompt: string) => ({
     id,
     prompt,
-    sampleAnswer: body,
+    interviewTypeTag: "focused_competency" as const,
+    sampleAnswer: null,
     harperQuestion: null,
+    answerFramework: "CAR" as const,
+    challenge: "I faced failed jobs that were blocking delivery.",
+    situation: null,
+    task: null,
+    action: "I built a weekly operating cadence with the team.",
+    result: body,
     supports,
   });
   return {

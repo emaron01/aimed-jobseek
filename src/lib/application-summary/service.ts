@@ -21,6 +21,11 @@ import {
   findCoachItem,
   replaceCoachItem,
 } from "@/lib/application-summary/coach";
+import {
+  harperAlreadyAskedCareerWalkThrough,
+  normalizePersonSectionLikelyQuestions,
+  validatePersonSectionLikelyQuestions,
+} from "@/lib/application-summary/likely-questions";
 import { appendConfirmedFact } from "@/lib/consultation/write-back";
 import { polishAnswerWithQuality } from "@/lib/consultation/service";
 import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
@@ -721,16 +726,52 @@ export async function generateApplicationSummary(input: {
     ) {
       return;
     }
+    const consultantTurns = await prisma.consultationTurn.findMany({
+      where: {
+        session: { campaignId: input.campaignId, organizationId: input.organizationId },
+        speaker: "CONSULTANT",
+      },
+      select: { speaker: true, targetKey: true, body: true },
+    });
+    const harperAskedCareerWalkThrough =
+      harperAlreadyAskedCareerWalkThrough(consultantTurns);
+    let qualityFeedback: string[] = [];
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const generated = await generateCheatSheetPersonSectionGuidance({
         sources: personSources,
         person: personPayload(person),
+        qualityFeedback,
         usage,
       });
       if (!generated.ok) {
         if (attempt === 1) {
           if (!existing) await markSummaryFailed(input.campaignId, generated.message);
           throw new Error(generated.message);
+        }
+        continue;
+      }
+      const partIssues = validatePersonSectionLikelyQuestions(generated.data);
+      if (partIssues.length > 0) {
+        qualityFeedback = partIssues;
+        if (attempt === 1) {
+          const message = `${applicationSummaryConfig.title} could not be generated. Retry.`;
+          if (!existing) await markSummaryFailed(input.campaignId, message);
+          throw new Error(message);
+        }
+        continue;
+      }
+      const likelyQuestions = normalizePersonSectionLikelyQuestions({
+        likelyQuestions: generated.data.likelyQuestions,
+        harperAskedCareerWalkThrough,
+      });
+      if (likelyQuestions.length === 0) {
+        qualityFeedback = [
+          "Keep at least one likelyQuestions item that is not a duplicate career walk-through.",
+        ];
+        if (attempt === 1) {
+          const message = `${applicationSummaryConfig.title} could not be generated. Retry.`;
+          if (!existing) await markSummaryFailed(input.campaignId, message);
+          throw new Error(message);
         }
         continue;
       }
@@ -741,6 +782,7 @@ export async function generateApplicationSummary(input: {
           people: [
             {
               ...generated.data,
+              likelyQuestions,
               bestMaterial: [],
               storyIds: [],
             },
