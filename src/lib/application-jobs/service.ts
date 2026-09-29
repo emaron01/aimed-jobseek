@@ -1,5 +1,6 @@
 import type { ApplicationJob, ApplicationJobType, Prisma } from "@prisma/client";
 import { Prisma as PrismaNamespace } from "@prisma/client";
+import { assertOrganizationMaySpend } from "@/lib/billing/organization-spend";
 import { prisma } from "@/lib/prisma-client";
 import { hiringTeamConfig } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
@@ -214,6 +215,8 @@ export async function enqueueApplicationJob(input: {
   initiatedByUserId?: string | null;
   maxAttempts?: number;
 }): Promise<ApplicationJobView> {
+  await assertOrganizationMaySpend(input.organizationId);
+
   const campaign = await prisma.campaign.findFirst({
     where: { id: input.campaignId, organizationId: input.organizationId },
     select: { id: true },

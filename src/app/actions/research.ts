@@ -47,7 +47,12 @@ export type ResearchStartResult = {
   ok: boolean;
   message: string;
   runId?: string;
-  code?: "ACTIVE_RUN" | "NOTHING_TO_DO" | "INVALID_RETRY";
+  code?:
+    | "ACTIVE_RUN"
+    | "NOTHING_TO_DO"
+    | "INVALID_RETRY"
+    | "ORGANIZATION_MISSING"
+    | "SPEND_BLOCKED";
   activeRunId?: string;
   run?: ResearchRunView;
 };

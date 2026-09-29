@@ -35,6 +35,15 @@ vi.mock("@/lib/prisma-client", () => ({
   },
 }));
 
+vi.mock("@/lib/billing/organization-spend", () => ({
+  assertOrganizationMaySpend: vi.fn(async () => undefined),
+  checkOrganizationMaySpend: vi.fn(async () => ({ allowed: true })),
+  OrganizationMissingError: class OrganizationMissingError extends Error {
+    readonly code = "ORGANIZATION_MISSING";
+  },
+  ORGANIZATION_MISSING_TERMINAL_REASON: "Organization account is gone.",
+}));
+
 vi.mock("@/lib/tenant/company-research-service", () => ({
   getCompaniesNeedingResearchForContactList: vi.fn(),
   researchCompany,

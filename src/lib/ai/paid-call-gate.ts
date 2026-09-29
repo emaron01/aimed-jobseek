@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { PrismaClient, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma-client";
+import { assertOrganizationMaySpend } from "@/lib/billing/organization-spend";
 
 export type PaidCallOperation =
   | "HIRING_TEAM_IDENTIFY"
@@ -171,6 +172,9 @@ export async function runPaidStructuredCall<T>(input: {
   parseStored: (json: unknown) => T;
   callProvider: () => Promise<T>;
 }): Promise<{ data: T; skipped: boolean }> {
+  // Refuse before lock / provider / receipt write when org is gone or spend-locked.
+  await assertOrganizationMaySpend(input.organizationId);
+
   return withSubjectLock(
     input.organizationId,
     input.operation,

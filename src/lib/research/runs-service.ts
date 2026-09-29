@@ -5,6 +5,10 @@
 
 import type { Prisma, ResearchRun, ResearchRunStatus } from "@prisma/client";
 import { Prisma as PrismaNamespace } from "@prisma/client";
+import {
+  assertOrganizationMaySpend,
+  checkOrganizationMaySpend,
+} from "@/lib/billing/organization-spend";
 import { prisma } from "@/lib/prisma-client";
 import {
   getCompaniesNeedingResearchForContactList,
@@ -148,6 +152,8 @@ export async function enqueueApplicationResearch(input: {
   forceRefresh?: boolean;
   initiatedByUserId?: string | null;
 }): Promise<ResearchRunView> {
+  await assertOrganizationMaySpend(input.organizationId);
+
   const existing = await findActiveRunForCampaign(
     input.campaignId,
     input.organizationId,
@@ -282,7 +288,12 @@ export type CreateResearchRunResult =
   | { ok: true; run: ResearchRunView }
   | { ok: false; code: "ACTIVE_RUN"; activeRunId: string; message: string }
   | { ok: false; code: "NOTHING_TO_DO"; message: string }
-  | { ok: false; code: "INVALID_RETRY"; message: string };
+  | { ok: false; code: "INVALID_RETRY"; message: string }
+  | {
+      ok: false;
+      code: "ORGANIZATION_MISSING" | "SPEND_BLOCKED";
+      message: string;
+    };
 
 function isHeartbeatStale(
   run: Pick<ResearchRun, "workerHeartbeatAt" | "startedAt" | "createdAt">,
@@ -314,6 +325,15 @@ async function failStaleResearchRun(
 export async function createResearchRun(
   input: CreateResearchRunInput,
 ): Promise<CreateResearchRunResult> {
+  const spend = await checkOrganizationMaySpend(input.organizationId);
+  if (!spend.allowed) {
+    return {
+      ok: false,
+      code: spend.reason,
+      message: spend.message,
+    };
+  }
+
   const existing = await findActiveRunForList(
     input.contactListId,
     input.organizationId,
@@ -714,6 +734,26 @@ export async function processResearchRun(runId: string): Promise<void> {
     console.warn(
       `[research-run ${runId}] skipped: status is ${run.status}, expected IN_PROGRESS`,
     );
+    return;
+  }
+
+  const spend = await checkOrganizationMaySpend(run.organizationId);
+  if (!spend.allowed) {
+    console.warn(
+      `[research-run ${runId}] terminal: ${spend.reason} — ${spend.message}`,
+    );
+    await prisma.researchRun.update({
+      where: { id: run.id },
+      data: {
+        status: "FAILED",
+        lastError: spend.message,
+        completedAt: new Date(),
+        currentCompanyId: null,
+        currentCompanyName: null,
+        workerHeartbeatAt: new Date(),
+        pausedAt: null,
+      },
+    });
     return;
   }
 

@@ -14,6 +14,7 @@ import {
 } from "@/lib/application-assets/plan-service";
 import { generateOutreachAsset } from "@/lib/application-assets/outreach";
 import { generateApplicationSummary } from "@/lib/application-summary/service";
+import { checkOrganizationMaySpend } from "@/lib/billing/organization-spend";
 import { buildContactIndividualProfile } from "@/lib/contact-profile/service";
 import {
   rebuildApplicationHiringTeamRole,
@@ -50,6 +51,21 @@ export async function processApplicationJob(
       error: "Application job was not found.",
     };
   }
+
+  const spend = await checkOrganizationMaySpend(job.organizationId);
+  if (!spend.allowed) {
+    // Terminal FAILED — spend/missing messages are not retryable provider failures.
+    await failApplicationJob({ jobId: job.id, message: spend.message });
+    return {
+      ok: false,
+      jobId: job.id,
+      type: job.type,
+      campaignId: job.campaignId,
+      durationMs: Date.now() - started,
+      error: spend.message,
+    };
+  }
+
   const payload = readJobPayload(job.payload);
   try {
     await runWithTenantContext(
