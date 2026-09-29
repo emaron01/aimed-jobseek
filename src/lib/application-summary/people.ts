@@ -3,6 +3,7 @@ import {
   APPLICATION_SUMMARY_PROMPT_VERSION,
   type CheatSheetSectionKind,
 } from "@/lib/application-summary/contract";
+import type { CareerStage } from "@/lib/consultation/career-stage";
 
 export type CheatSheetPersonInput = {
   sectionKey: string;
@@ -26,11 +27,13 @@ export function cheatSheetPersonSectionInputHash(input: {
     sectionKind: string;
   };
   sources: Array<{ id: string; text: string }>;
+  careerStage: CareerStage;
 }): string {
   return createHash("sha256")
     .update(
       JSON.stringify({
         promptVersion: APPLICATION_SUMMARY_PROMPT_VERSION,
+        careerStage: input.careerStage,
         person: input.person,
         sources: input.sources.map((source) => ({
           id: source.id,

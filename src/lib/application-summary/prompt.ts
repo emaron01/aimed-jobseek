@@ -1,5 +1,6 @@
 import type { AiMessage } from "@/lib/ai/types";
 import { APPLICATION_SUMMARY_PROMPT_VERSION } from "@/lib/application-summary/contract";
+import type { CareerStage } from "@/lib/consultation/career-stage";
 import { APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content";
 import { consultationConfig } from "@/lib/product-config";
 
@@ -15,6 +16,7 @@ export function buildApplicationSummaryGuidanceMessages(input: {
     sectionKind: string;
   }>;
   mode: "shell" | "person";
+  careerStage?: CareerStage;
   qualityFeedback?: string[];
 }): AiMessage[] {
   return [
@@ -30,6 +32,9 @@ ${APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS}`,
         consultantName: consultationConfig.displayName,
         allowedSources: input.sources,
         mode: input.mode,
+        ...(input.mode === "person" && input.careerStage
+          ? { careerStage: input.careerStage }
+          : {}),
       }),
     },
     {

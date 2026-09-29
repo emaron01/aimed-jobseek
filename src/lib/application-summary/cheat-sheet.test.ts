@@ -16,7 +16,7 @@ const item = { text: spoken, supports: [] };
 describe("Interview Cheat Sheet", () => {
   it("renames the surface through the vocabulary module", () => {
     expect(applicationSummaryConfig.title).toBe("Interview cheat sheet");
-    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("13");
+    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("14");
     expect(JSON.stringify(applicationSummaryConfig)).not.toContain("Application Summary");
   });
 

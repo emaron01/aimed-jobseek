@@ -36,6 +36,7 @@ describe("Harper context finish", () => {
         story: { situation: null, task: null, action: null, result: null },
         declinedFollowUp: false,
         strengtheningNeeds: [],
+        careerStage: "early_career",
         profileItems,
       })[1]!.content,
     );
@@ -58,6 +59,7 @@ describe("Harper context finish", () => {
     const messages = buildConsultationCoachMessages({
       targets: [{ key: "comp", kind: "COMPETENCY", text: "Ownership" }],
       profileItems,
+      careerStage: "early_career",
       hiringTeam: [],
       seekerStatedFacts: [],
       companyResearch: {
@@ -85,7 +87,7 @@ describe("Harper context finish", () => {
   });
 
   it("bumps the consultation prompt version", () => {
-    expect(CONSULTATION_PROMPT_VERSION).toBe("30");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("31");
   });
 
   it("passes whyThisCompany into polish messages", () => {
@@ -96,6 +98,7 @@ describe("Harper context finish", () => {
         declinedFollowUp: false,
         whyThisCompany: true,
         strengtheningNeeds: [],
+        careerStage: "early_career",
         profileItems,
       })[2]!.content,
     );

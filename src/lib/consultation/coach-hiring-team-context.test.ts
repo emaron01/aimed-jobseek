@@ -118,6 +118,7 @@ describe("Coach Hiring Team context", () => {
           itemType: "ACHIEVEMENT",
         },
       ],
+      careerStage: "early_career",
       hiringTeam: [roleWithPerson()],
       seekerStatedFacts: [],
       companyResearch: {
@@ -175,6 +176,7 @@ describe("Coach Hiring Team context", () => {
     const prepMessages = buildConsultationCoachMessages({
       targets: [{ key: "forecasting", kind: "REQUIRED", text: "Forecasting" }],
       profileItems: [],
+      careerStage: "early_career",
       hiringTeam: [roleWithPerson()],
       seekerStatedFacts: [],
       companyResearch: null,
@@ -201,6 +203,7 @@ describe("Coach Hiring Team context", () => {
       buildConsultationCoachMessages({
         targets: [],
         profileItems: [],
+        careerStage: "early_career",
         hiringTeam: [
           {
             id: "role_2",

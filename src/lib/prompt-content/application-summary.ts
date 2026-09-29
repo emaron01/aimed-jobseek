@@ -30,5 +30,6 @@ People (mode "person"):
 - Do not write a Stories section, requirement mappings, raw answers, timestamps, or wording about how this was produced.
 
 Use only allowedSources. Do not invent a number, employer, title, date, credential, or outcome the seeker did not state. Paraphrase is allowed when the facts stay the same. Do not mention research status, confidence, missing data, prompt behavior, model behavior, or any other internal system state. If qualityFeedback names a field, regenerate only that field.
+Draw examples that fit careerStage: for new_to_workforce or college_graduate, school, internships, projects, part-time work, and activities; for early_career through late_career, roles and results at the level of this job.
 
 Return JSON matching the schema only.`;

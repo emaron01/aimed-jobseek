@@ -35,6 +35,10 @@ import {
 } from "@/lib/contact-profile/contract";
 import { parseLinkedInExtracted } from "@/lib/contact-profile/service";
 import { profileEvidenceItems } from "@/lib/consultation/assess";
+import {
+  deriveCareerStage,
+  type CareerStage,
+} from "@/lib/consultation/career-stage";
 import { prisma } from "@/lib/prisma-client";
 import { isHiringTeamPersonaBuilt } from "@/lib/hiring-team/build";
 import {
@@ -122,6 +126,16 @@ export function sourcesForPersonSection(input: {
   });
 }
 
+function careerStageFromProfileJson(profileJson: unknown): CareerStage {
+  const parsed = profileJson
+    ? parseCandidateProfileSafe(profileJson)
+    : null;
+  if (!parsed?.ok) {
+    return deriveCareerStage({ experience: [], education: [] });
+  }
+  return deriveCareerStage(parsed.profile);
+}
+
 export async function personSectionInputsUnchanged(input: {
   organizationId: string;
   campaignId: string;
@@ -146,9 +160,11 @@ export async function personSectionInputsUnchanged(input: {
       : []
     ).map((note) => note.id),
   });
+  const careerStage = careerStageFromProfileJson(data.campaign.product.profileJson);
   const inputHash = cheatSheetPersonSectionInputHash({
     person: personPayload(person),
     sources: personSources,
+    careerStage,
   });
   return existingPerson.inputHash === inputHash;
 }
@@ -712,9 +728,11 @@ export async function generateApplicationSummary(input: {
         : []
       ).map((note) => note.id),
     });
+    const careerStage = careerStageFromProfileJson(data.campaign.product.profileJson);
     const inputHash = cheatSheetPersonSectionInputHash({
       person: personPayload(person),
       sources: personSources,
+      careerStage,
     });
     const existingPerson = existing?.people.find(
       (item) => item.sectionKey === person.sectionKey,
@@ -740,6 +758,7 @@ export async function generateApplicationSummary(input: {
       const generated = await generateCheatSheetPersonSectionGuidance({
         sources: personSources,
         person: personPayload(person),
+        careerStage,
         qualityFeedback,
         usage,
       });
@@ -1092,6 +1111,7 @@ export async function answerCheatSheetCoachItem(input: {
     ],
     declinedFollowUp: false,
     strengtheningNeeds: [],
+    careerStage: deriveCareerStage(profileParsed.profile),
     profileItems: profileEvidenceItems(profileParsed.profile),
     usage: {
       organizationId: input.organizationId,

@@ -1,4 +1,5 @@
 import type { AiMessage } from "@/lib/ai/types";
+import type { CareerStage } from "@/lib/consultation/career-stage";
 import {
   CONSULTATION_PROMPT_VERSION,
   type AskedConsultationQuestion,
@@ -45,6 +46,7 @@ export function buildConsultationCoachMessages(input: {
     endDate?: string | null;
     roleId?: string | null;
   }>;
+  careerStage: CareerStage;
   hiringTeam: CoachHiringTeamRole[];
   seekerStatedFacts: SeekerStatedFactPayload[];
   companyResearch: CoachCompanyResearch | null;
@@ -61,6 +63,7 @@ export function buildConsultationCoachMessages(input: {
       role: "user",
       content: JSON.stringify({
         consultantName: consultationConfig.displayName,
+        careerStage: input.careerStage,
         personalProfileItems: input.profileItems,
         seekerStatedFacts: input.seekerStatedFacts,
         companyResearch: input.companyResearch,
@@ -160,6 +163,7 @@ export function buildConsultationPolishMessages(input: {
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
   supportingEvidence?: string[];
   voiceSamples?: Array<{ label: string; sampleText: string }>;
+  careerStage: CareerStage;
   profileItems: Array<{
     id: string;
     kind: string;
@@ -178,6 +182,7 @@ export function buildConsultationPolishMessages(input: {
       role: "user",
       content: JSON.stringify({
         consultantName: consultationConfig.displayName,
+        careerStage: input.careerStage,
         interviewAnswerMetaLanguage:
           consultationConfig.interviewAnswerMetaLanguage,
         interviewAnswerMaxWords: consultationConfig.interviewAnswerMaxWords,

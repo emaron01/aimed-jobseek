@@ -6,6 +6,7 @@ import {
   isConsultationAiConfigured,
   isConsultationReplyAiConfigured,
 } from "@/lib/ai";
+import type { CareerStage } from "@/lib/consultation/career-stage";
 import {
   consultationPlanSchema,
   consultationExtractSchema,
@@ -52,6 +53,7 @@ export async function planConsultationWithModel(input: {
     endDate?: string | null;
     roleId?: string | null;
   }>;
+  careerStage: CareerStage;
   hiringTeam: CoachHiringTeamRole[];
   seekerStatedFacts: SeekerStatedFactPayload[];
   companyResearch: CoachCompanyResearch | null;
@@ -168,6 +170,7 @@ export async function polishAnswerWithModel(input: {
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
   supportingEvidence?: string[];
   voiceSamples?: Array<{ label: string; sampleText: string }>;
+  careerStage: CareerStage;
   profileItems: Array<{
     id: string;
     kind: string;

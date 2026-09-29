@@ -369,8 +369,16 @@ describe.skipIf(!hasTestDatabase())("learned notes cheat-sheet-only (db)", () =>
         text: "data hygiene",
       },
     ];
-    const hashA = cheatSheetPersonSectionInputHash({ person, sources });
-    const hashB = cheatSheetPersonSectionInputHash({ person, sources });
+    const hashA = cheatSheetPersonSectionInputHash({
+      person,
+      sources,
+      careerStage: "early_career",
+    });
+    const hashB = cheatSheetPersonSectionInputHash({
+      person,
+      sources,
+      careerStage: "early_career",
+    });
     expect(hashA).toBe(hashB);
     const hashC = cheatSheetPersonSectionInputHash({
       person,
@@ -381,6 +389,7 @@ describe.skipIf(!hasTestDatabase())("learned notes cheat-sheet-only (db)", () =>
           text: "different learning",
         },
       ],
+      careerStage: "early_career",
     });
     expect(hashC).not.toBe(hashA);
 

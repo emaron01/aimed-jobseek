@@ -10,6 +10,7 @@ import {
   cheatSheetPersonSectionGenerateSchema,
 } from "@/lib/application-summary/contract";
 import { buildApplicationSummaryGuidanceMessages } from "@/lib/application-summary/prompt";
+import type { CareerStage } from "@/lib/consultation/career-stage";
 import { applicationSummaryConfig } from "@/lib/product-config";
 
 type PersonInput = {
@@ -71,6 +72,7 @@ export async function generateApplicationSummaryShell(input: {
 export async function generateCheatSheetPersonSectionGuidance(input: {
   sources: Array<{ id: string; text: string; category: string }>;
   person: PersonInput;
+  careerStage: CareerStage;
   qualityFeedback?: string[];
   usage?: AiCallUsageContext;
 }): Promise<
@@ -86,6 +88,7 @@ export async function generateCheatSheetPersonSectionGuidance(input: {
         sources: input.sources,
         people: [input.person],
         mode: "person",
+        careerStage: input.careerStage,
         qualityFeedback: input.qualityFeedback,
       }),
       parseOutput: (raw) => ({

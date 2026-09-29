@@ -142,6 +142,7 @@ describe("workflow audit fixes", () => {
         story: { situation: null, task: null, action: null, result: null },
         declinedFollowUp: false,
         strengtheningNeeds: [],
+        careerStage: "early_career",
         profileItems: [],
         voiceSamples: [{ label: "Email", sampleText: "I keep the ask short." }],
       })[1]!.content,

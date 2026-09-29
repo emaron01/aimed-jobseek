@@ -114,6 +114,7 @@ describe("no AI on page view / skip unchanged / research cost", () => {
         sectionKind: "HIRING_MANAGER",
       },
       sources: [{ id: "job:title", text: "Engineer" }],
+      careerStage: "early_career",
     });
     const hashB = cheatSheetPersonSectionInputHash({
       person: {
@@ -126,6 +127,7 @@ describe("no AI on page view / skip unchanged / research cost", () => {
         sectionKind: "HIRING_MANAGER",
       },
       sources: [{ id: "job:title", text: "Engineer" }],
+      careerStage: "early_career",
     });
     const hashC = cheatSheetPersonSectionInputHash({
       person: {
@@ -138,6 +140,7 @@ describe("no AI on page view / skip unchanged / research cost", () => {
         sectionKind: "HIRING_MANAGER",
       },
       sources: [{ id: "job:title", text: "Staff Engineer" }],
+      careerStage: "early_career",
     });
     expect(hashA).toBe(hashB);
     expect(hashA).not.toBe(hashC);

@@ -14,6 +14,7 @@ import {
   type EvidenceAssessment,
   type EvidenceTarget,
 } from "@/lib/consultation/assess";
+import { deriveCareerStage, type CareerStage } from "@/lib/consultation/career-stage";
 import {
   CONSULTATION_PROMPT_VERSION,
   WHY_THIS_COMPANY_TARGET_KEY,
@@ -587,6 +588,7 @@ export async function polishAnswerWithQuality(input: {
   strengtheningNeeds: string[];
   seekerAnswers?: string[];
   firstName?: string | null;
+  careerStage?: CareerStage;
   profileItems: ReturnType<typeof profileEvidenceItems>;
   target?: EvidenceTarget | null;
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
@@ -612,6 +614,9 @@ export async function polishAnswerWithQuality(input: {
       .filter(Boolean);
   const confirmedGap = input.confirmedGap === true;
   const whyThisCompany = input.whyThisCompany === true;
+  const careerStage =
+    input.careerStage ??
+    deriveCareerStage({ experience: [], education: [] });
   const voiceSamples = await voiceSamplesForUsage(input.usage);
   let lastFailure: string = consultationConversationCopy.generationFailed;
   let qualityFeedback: string[] = [];
@@ -641,6 +646,7 @@ export async function polishAnswerWithQuality(input: {
       targetStrength: input.targetStrength ?? null,
       supportingEvidence: input.supportingEvidence ?? [],
       voiceSamples,
+      careerStage,
       profileItems: input.profileItems,
       usage: input.usage,
     });
@@ -1113,6 +1119,7 @@ async function planAndStoreRound(input: {
     const plan = await planConsultationWithModel({
       targets: input.targets,
       profileItems,
+      careerStage: deriveCareerStage(input.profile),
       seekerStatedFacts,
       askedQuestions,
       hiringTeam: input.roles,
@@ -1678,6 +1685,7 @@ async function processAnswerGeneration(input: {
       strengtheningNeeds: [],
       seekerAnswers: [companyMotivation],
       firstName: profileFirstName(input.profile),
+      careerStage: deriveCareerStage(input.profile),
       profileItems,
       target: input.target,
       targetStrength,
@@ -1904,6 +1912,7 @@ async function processAnswerGeneration(input: {
       .map((answer) => answer.trim())
       .filter(Boolean),
     firstName: profileFirstName(input.profile),
+    careerStage: deriveCareerStage(input.profile),
     profileItems,
     target: input.target,
     targetStrength,
@@ -2846,6 +2855,7 @@ async function declineConsultationFollowUp(input: {
     declinedFollowUp: true,
     confirmedGap,
     firstName: profileFirstName(profile),
+    careerStage: deriveCareerStage(profile),
     strengtheningNeeds: analyzed.missingStarElements,
     profileItems: profileEvidenceItems(profile),
     usage: consultationUsage(
@@ -3216,6 +3226,7 @@ export async function regenerateConsultationStatement(input: {
     declinedFollowUp: analyzed?.followUpDeclined ?? false,
     confirmedGap,
     firstName: profileFirstName(profile),
+    careerStage: deriveCareerStage(profile),
     strengtheningNeeds: analyzed?.missingStarElements ?? [],
     profileItems: profileEvidenceItems(profile),
     usage: consultationUsage(
