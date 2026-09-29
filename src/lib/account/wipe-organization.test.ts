@@ -22,6 +22,32 @@ describe("account wipe source seams", () => {
     expect(src).not.toContain("PLATFORM_ORGANIZATION_DELETED");
   });
 
+  it("orphan purge runs inside the same transaction as organization.delete", () => {
+    const src = readFileSync(
+      resolve("src/lib/account/wipe-organization.ts"),
+      "utf8",
+    );
+    const txStart = src.indexOf("prisma.$transaction");
+    const orgDelete = src.indexOf("tx.organization.delete", txStart);
+    const purgeCall = src.indexOf(
+      "purgeOrphanedTenantUsersAfterOrgDelete",
+      txStart,
+    );
+    const txEnd = src.indexOf("{ timeout: 120_000 }", txStart);
+    expect(txStart).toBeGreaterThan(0);
+    expect(orgDelete).toBeGreaterThan(txStart);
+    expect(purgeCall).toBeGreaterThan(orgDelete);
+    expect(purgeCall).toBeLessThan(txEnd);
+    expect(src).toMatch(
+      /purgeOrphanedTenantUsersAfterOrgDelete\(\s*memberUserIds,\s*tx/,
+    );
+    // Must not call orphan purge after the transaction closes.
+    const afterTx = src.slice(txEnd);
+    expect(afterTx).not.toMatch(
+      /purgeOrphanedTenantUsersAfterOrgDelete\s*\(/,
+    );
+  });
+
   it("anonymous wipe log shape has only at and reason", () => {
     const src = readFileSync(
       resolve("src/lib/account/wipe-organization.ts"),
@@ -573,6 +599,7 @@ describe.skipIf(!hasDatabase)(
         lastName: "Owner",
       });
       expect(again.created).toBe(true);
+      expect(again.user.id).not.toBe(seeded.userId);
       expect(again.organization!.id).not.toBe(seeded.orgId);
       expect(
         await prisma.campaign.count({
@@ -584,6 +611,80 @@ describe.skipIf(!hasDatabase)(
           where: { organizationId: again.organization!.id },
         }),
       ).toBe(0);
+    });
+
+    it("orphan purge failure rolls back the whole wipe; retry completes fully", async () => {
+      if (!ready) return;
+      const { wipeOrganizationAccount } = await import(
+        "@/lib/account/wipe-organization"
+      );
+      const tag = `${suffix}_rollback`;
+      const email = `wipe-rollback-${tag}@example.test`;
+      const authId = `auth_wipe_rollback_${tag}`;
+      await createAuthUser(email, authId);
+      const { provisionIndividualWorkspace } = await import(
+        "@/lib/auth/provision"
+      );
+      const provisioned = await provisionIndividualWorkspace({
+        authUserId: authId,
+        email,
+        firstName: "Roll",
+        lastName: "Back",
+        companyName: `Rollback ${tag}`,
+      });
+      const orgId = provisioned.organization!.id;
+      const userId = provisioned.user.id;
+      const product = await prisma.product.create({
+        data: {
+          organizationId: orgId,
+          name: `Keep on rollback ${tag}`,
+          profileJson: { tag },
+        },
+      });
+
+      // Restrict FK blocks user.delete after org cascade — forces purge failure.
+      const recon = await prisma.providerSpendReconciliation.create({
+        data: {
+          provider: "test",
+          periodStart: new Date("2026-01-01T00:00:00.000Z"),
+          periodEnd: new Date("2026-01-31T00:00:00.000Z"),
+          providerReportedUsd: 1,
+          estimatedUsd: 1,
+          notes: `wipe-rollback-${tag}`,
+          createdByUserId: userId,
+        },
+      });
+
+      await expect(
+        wipeOrganizationAccount({ organizationId: orgId, reason: "admin" }),
+      ).rejects.toThrow();
+
+      expect(await prisma.organization.findUnique({ where: { id: orgId } })).toBeTruthy();
+      expect(await prisma.product.findUnique({ where: { id: product.id } })).toBeTruthy();
+      expect(await prisma.user.findUnique({ where: { id: userId } })).toBeTruthy();
+      expect(await prisma.authUser.findUnique({ where: { id: authId } })).toBeTruthy();
+      expect(
+        await prisma.organizationMembership.count({
+          where: { organizationId: orgId, userId },
+        }),
+      ).toBe(1);
+
+      await prisma.providerSpendReconciliation.delete({
+        where: { id: recon.id },
+      });
+
+      const retry = await wipeOrganizationAccount({
+        organizationId: orgId,
+        reason: "admin",
+      });
+      expect(retry.alreadyWiped).toBe(false);
+      expect(retry.purgedUserIds).toContain(userId);
+      expect(await prisma.organization.findUnique({ where: { id: orgId } })).toBeNull();
+      expect(await prisma.user.findUnique({ where: { id: userId } })).toBeNull();
+      expect(await prisma.authUser.findUnique({ where: { id: authId } })).toBeNull();
+      expect(
+        await prisma.authAccount.findFirst({ where: { userId: authId } }),
+      ).toBeNull();
     });
 
     it("marks pending and in-progress jobs/runs FAILED before org delete; nothing re-created", async () => {

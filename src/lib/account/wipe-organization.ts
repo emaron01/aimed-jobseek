@@ -249,7 +249,7 @@ export async function wipeOrganizationAccount(input: {
     m.user.emailNormalized,
   ]);
 
-  await prisma.$transaction(
+  const purged = await prisma.$transaction(
     async (tx) => {
       await markInFlightWorkFailedForWipe(org.id, tx);
       await deletePersonalLeftoversForWipe(
@@ -261,15 +261,18 @@ export async function wipeOrganizationAccount(input: {
         tx,
       );
       await tx.organization.delete({ where: { id: org.id } });
+      const orphanPurge = await purgeOrphanedTenantUsersAfterOrgDelete(
+        memberUserIds,
+        tx,
+      );
       await recordAnonymousAccountWipe({
         reason: input.reason,
         client: tx,
       });
+      return orphanPurge;
     },
     { timeout: 120_000 },
   );
-
-  const purged = await purgeOrphanedTenantUsersAfterOrgDelete(memberUserIds);
 
   return {
     organizationId: org.id,
