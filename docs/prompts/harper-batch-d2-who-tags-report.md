@@ -1,7 +1,7 @@
 # Harper Batch D2 — WHO interview-type tags
 
 **Branch:** `checkpoint/harper-prep-hub`  
-**Commit:** _(filled after commit)_  
+**Commit:** `aceba2651e58ffba89c98c44ea211df734f70cf9` (`aceba26`)  
 **Remote:** `https://github.com/emaron01/aimed-jobseek.git`  
 **Base:** merged from `origin/main` at `f54001c` (already up to date)
 
@@ -67,7 +67,7 @@ Confirmed Harper/Cheat Sheet components and consultation/summary pages do not co
 
 ## 7. Commit / branch
 
-- Commit: _(filled after commit)_
+- Commit: `aceba2651e58ffba89c98c44ea211df734f70cf9`
 - Pushed: `checkpoint/harper-prep-hub` (not main)
 
 ## 8. Safety
