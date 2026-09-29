@@ -31,6 +31,7 @@ import {
   WHY_THIS_COMPANY_TARGET_KEY,
   isConsultationExtractAnswer,
   isConsultationExtractFeedback,
+  type ApplicationLearningsForCoach,
   type CoachHiringTeamRole,
   type ConsultationExtractResult,
   type InterviewerPrepPayload,
@@ -38,8 +39,11 @@ import {
 } from "@/lib/consultation/contract";
 import {
   loadCoachCompanyResearch,
-  loadCoachHiringTeam,
+  loadCoachHiringTeamWithLearnings,
 } from "@/lib/consultation/hiring-team-context";
+import {
+  recordLearningsReassessFingerprint,
+} from "@/lib/consultation/learnings";
 import type { AiCallUsageContext } from "@/lib/ai/types";
 import {
   askedQuestionsFromTurns,
@@ -1081,9 +1085,15 @@ async function planAndStoreRound(input: {
   };
   targets: EvidenceTarget[];
   roles: CoachHiringTeamRole[];
+  applicationLearningsPendingHiringManager?: ApplicationLearningsForCoach | null;
   focusTargetKey?: string | null;
   focusGuidance?: string[];
   interviewerPrep?: InterviewerPrepPayload | null;
+  /**
+   * Learnings reassess (Batch D7): additive only — may exceed the initial 25-cap;
+   * never mutates answered questions, APPROVED statements, or role-expertise turns.
+   */
+  additiveReassess?: boolean;
 }): Promise<QuestionRoundPlan["questions"]> {
   await prisma.consultationSession.update({
     where: { id: input.sessionId },
@@ -1144,6 +1154,8 @@ async function planAndStoreRound(input: {
       seekerStatedFacts,
       askedQuestions,
       hiringTeam: input.roles,
+      applicationLearningsPendingHiringManager:
+        input.applicationLearningsPendingHiringManager ?? null,
       companyResearch,
       usage: consultationUsage(
         input.organizationId,
@@ -1221,12 +1233,37 @@ async function planAndStoreRound(input: {
   const voicedAssessments = assessments.map((assessment) => ({
     ...assessment,
   }));
-  const voicedQuestions = questions
-    .filter((question) => !questionDuplicatesAsked(question.text, askedQuestions))
-    .slice(
-      0,
-      Math.max(0, consultationConfig.applicationQuestionLimit - askedQuestions.length),
-    );
+  // Additive reassess (Batch D7): skip the initial 25-cap so new gap questions
+  // may be added beyond 25. Never rewrite or delete answered questions —
+  // only non-duplicate texts are added as new consultant turns.
+  const nonDuplicate = questions.filter(
+    (question) => !questionDuplicatesAsked(question.text, askedQuestions),
+  );
+  const voicedQuestions = input.additiveReassess
+    ? nonDuplicate
+    : nonDuplicate.slice(
+        0,
+        Math.max(
+          0,
+          consultationConfig.applicationQuestionLimit - askedQuestions.length,
+        ),
+      );
+  // Additive lock: never mutate APPROVED statements or existing role-expertise /
+  // answered consultant turns. planAndStoreRound only inserts new CONSULTANT turns.
+  let approvedBefore = 0;
+  let roleExpertiseBefore = 0;
+  if (input.additiveReassess) {
+    approvedBefore = await prisma.consultationStatement.count({
+      where: { sessionId: input.sessionId, status: "APPROVED" },
+    });
+    roleExpertiseBefore = await prisma.consultationTurn.count({
+      where: {
+        sessionId: input.sessionId,
+        speaker: "CONSULTANT",
+        targetKey: { startsWith: "role-expertise:" },
+      },
+    });
+  }
   const briefing = {
     overall: plan.data.briefing.overall,
     strongestAngles: plan.data.briefing.strongestAngles,
@@ -1249,6 +1286,28 @@ async function planAndStoreRound(input: {
         interviewTypeTag: question.interviewTypeTag,
       },
     });
+  }
+  if (input.additiveReassess) {
+    const approvedAfter = await prisma.consultationStatement.count({
+      where: { sessionId: input.sessionId, status: "APPROVED" },
+    });
+    const roleExpertiseAfter = await prisma.consultationTurn.count({
+      where: {
+        sessionId: input.sessionId,
+        speaker: "CONSULTANT",
+        targetKey: { startsWith: "role-expertise:" },
+      },
+    });
+    if (approvedBefore !== approvedAfter) {
+      throw new Error(
+        "Additive reassess must not change APPROVED statement count.",
+      );
+    }
+    if (roleExpertiseBefore > roleExpertiseAfter) {
+      throw new Error(
+        "Additive reassess must not remove role-expertise questions.",
+      );
+    }
   }
   await prisma.consultationSession.update({
     where: { id: input.sessionId },
@@ -1548,6 +1607,7 @@ export async function startConsultation(input: {
   focusTargetKey?: string | null;
   interviewerPrep?: InterviewerPrepPayload | null;
   forceReassess?: boolean;
+  additiveReassess?: boolean;
 }): Promise<void> {
   const { campaign, requirement, profile } = await requireApplication(
     input.organizationId,
@@ -1597,7 +1657,11 @@ export async function startConsultation(input: {
     whyThisCompany: campaign.whyThisCompany,
     profile,
   });
-  const roles = await loadCoachHiringTeam(input.organizationId, input.campaignId);
+  const { roles, applicationLearningsPendingHiringManager } =
+    await loadCoachHiringTeamWithLearnings(
+      input.organizationId,
+      input.campaignId,
+    );
   try {
     await planAndStoreRound({
       organizationId: input.organizationId,
@@ -1609,8 +1673,10 @@ export async function startConsultation(input: {
       requirement,
       targets,
       roles,
+      applicationLearningsPendingHiringManager,
       focusTargetKey,
       interviewerPrep: input.interviewerPrep,
+      additiveReassess: input.additiveReassess === true,
     });
   } catch (error) {
     const message =
@@ -1628,6 +1694,11 @@ export async function reassessConsultationStanding(input: {
     organizationId: input.organizationId,
     campaignId: input.campaignId,
     forceReassess: true,
+    additiveReassess: true,
+  });
+  await recordLearningsReassessFingerprint({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
   });
 }
 
@@ -3152,7 +3223,11 @@ export async function skipConsultationQuestion(input: {
     await queueAssetsWhenConsultationEnds(session.id);
     return;
   }
-  const roles = await loadCoachHiringTeam(input.organizationId, input.campaignId);
+  const { roles, applicationLearningsPendingHiringManager } =
+    await loadCoachHiringTeamWithLearnings(
+      input.organizationId,
+      input.campaignId,
+    );
   const next = await planAndStoreRound({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
@@ -3163,6 +3238,7 @@ export async function skipConsultationQuestion(input: {
     requirement,
     targets: targetsFromRequirement(requirement),
     roles,
+    applicationLearningsPendingHiringManager,
   });
   await finishIfPlanningIsComplete(session.id, next);
 }
@@ -3873,7 +3949,11 @@ export async function continueConsultationPlanning(input: {
     await queueAssetsWhenConsultationEnds(session.id);
     return;
   }
-  const roles = await loadCoachHiringTeam(input.organizationId, input.campaignId);
+  const { roles, applicationLearningsPendingHiringManager } =
+    await loadCoachHiringTeamWithLearnings(
+      input.organizationId,
+      input.campaignId,
+    );
   const next = await planAndStoreRound({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
@@ -3884,6 +3964,7 @@ export async function continueConsultationPlanning(input: {
     requirement,
     targets: targetsFromRequirement(requirement),
     roles,
+    applicationLearningsPendingHiringManager,
   });
   await finishIfPlanningIsComplete(session.id, next);
 }
@@ -3997,7 +4078,11 @@ export async function flagConsultationInaccuracy(input: {
     profile,
   });
   askedKeys.delete(draft.turn.targetKey);
-  const roles = await loadCoachHiringTeam(input.organizationId, input.campaignId);
+  const { roles, applicationLearningsPendingHiringManager } =
+    await loadCoachHiringTeamWithLearnings(
+      input.organizationId,
+      input.campaignId,
+    );
   await planAndStoreRound({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
@@ -4008,6 +4093,7 @@ export async function flagConsultationInaccuracy(input: {
     requirement,
     targets: targetsFromRequirement(requirement),
     roles,
+    applicationLearningsPendingHiringManager,
     focusTargetKey: draft.turn.targetKey,
     focusGuidance: [
       "The seeker said the last polished result was not accurate. Ask what is wrong before rewriting.",

@@ -11,6 +11,7 @@ import {
   consultationPlanSchema,
   consultationExtractSchema,
   consultationPolishSchema,
+  type ApplicationLearningsForCoach,
   type AskedConsultationQuestion,
   type CoachCompanyResearch,
   type CoachHiringTeamRole,
@@ -57,6 +58,7 @@ export async function planConsultationWithModel(input: {
   careerStage: CareerStage;
   recentRoles: RecentRole[];
   hiringTeam: CoachHiringTeamRole[];
+  applicationLearningsPendingHiringManager?: ApplicationLearningsForCoach | null;
   seekerStatedFacts: SeekerStatedFactPayload[];
   companyResearch: CoachCompanyResearch | null;
   askedQuestions: AskedConsultationQuestion[];

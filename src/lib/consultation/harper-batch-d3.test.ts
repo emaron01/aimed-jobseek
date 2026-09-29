@@ -72,7 +72,7 @@ describe("Harper Batch D3 — CAR/STAR polish parts", () => {
   });
 
   it("bumps prompt version and uses the PO polish parts instruction", () => {
-    expect(CONSULTATION_PROMPT_VERSION).toBe("32");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("33");
     expect(CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS).toContain(
       'When confirmedGap is false and whyThisCompany is false: turn the person\'s answers into interview answer parts and one resume bullet.',
     );

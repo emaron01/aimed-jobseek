@@ -27,6 +27,7 @@ import {
   validatePersonSectionLikelyQuestions,
 } from "@/lib/application-summary/likely-questions";
 import { appendConfirmedFact } from "@/lib/consultation/write-back";
+import { isApplicationLearningsSourceId } from "@/lib/consultation/learnings";
 import { polishAnswerWithQuality } from "@/lib/consultation/service";
 import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
 import {
@@ -48,7 +49,6 @@ import {
   interviewerContactIdsFrom,
   personSectionNeedsGeneration,
 } from "@/lib/application-summary/people";
-import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { enqueueCheatSheetPersonSection } from "@/lib/application-summary/enqueue";
 import { listPersonPreps } from "@/lib/interview/person-prep";
 import {
@@ -87,7 +87,10 @@ export function sourcesForPersonSection(input: {
   contactId: string | null;
   roleId: string;
   noteIds: string[];
+  /** When false, shared application learnings are excluded (cost guard / HM-only). */
+  includeApplicationLearnings?: boolean;
 }): SummarySource[] {
+  const includeLearnings = input.includeApplicationLearnings !== false;
   return input.sources.filter((source) => {
     if (source.category === "PERSONA") {
       return source.id.startsWith(`persona:${input.roleId}:`);
@@ -121,6 +124,9 @@ export function sourcesForPersonSection(input: {
         input.contactId != null &&
         source.id.startsWith(`person-prep:${input.contactId}:`)
       );
+    }
+    if (isApplicationLearningsSourceId(source.id)) {
+      return includeLearnings;
     }
     return !PER_PERSON_SOURCE_CATEGORIES.has(source.category);
   });
@@ -159,6 +165,7 @@ export async function personSectionInputsUnchanged(input: {
       ? data.notesByContactId.get(person.contactId) ?? []
       : []
     ).map((note) => note.id),
+    includeApplicationLearnings: person.sectionKind === "HIRING_MANAGER",
   });
   const careerStage = careerStageFromProfileJson(data.campaign.product.profileJson);
   const inputHash = cheatSheetPersonSectionInputHash({
@@ -727,6 +734,7 @@ export async function generateApplicationSummary(input: {
         ? data.notesByContactId.get(person.contactId) ?? []
         : []
       ).map((note) => note.id),
+      includeApplicationLearnings: person.sectionKind === "HIRING_MANAGER",
     });
     const careerStage = careerStageFromProfileJson(data.campaign.product.profileJson);
     const inputHash = cheatSheetPersonSectionInputHash({
@@ -983,13 +991,13 @@ export async function addCheatSheetInterviewNote(input: {
     contactId: input.contactId,
     userId: input.userId,
   });
-  await enqueueApplicationJob({
+  const { enqueueLearningsReassessIfChanged } = await import(
+    "@/lib/consultation/learnings"
+  );
+  await enqueueLearningsReassessIfChanged({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
-    type: "CONSULTATION",
-    targetId: "reassess",
-    initiatedByUserId: input.userId,
-    payload: { operation: "reassess" },
+    userId: input.userId,
   });
   return notes;
 }

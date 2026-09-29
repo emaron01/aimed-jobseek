@@ -51,7 +51,7 @@ export type IdentificationGuardrailResult = {
 };
 
 const JOB_SOURCE = "job-requirement";
-const HIRING_MANAGER_KEY = "hiring_manager";
+export const HIRING_MANAGER_KEY = "hiring_manager";
 
 function slug(value: string): string {
   const key = value

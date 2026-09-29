@@ -127,11 +127,13 @@ export async function updateInterviewStageAction(
         : undefined,
     });
     if (updated.notesTextChanged) {
-      await enqueueApplicationJob({
+      const { enqueueLearningsReassessIfChanged } = await import(
+        "@/lib/consultation/learnings"
+      );
+      await enqueueLearningsReassessIfChanged({
         organizationId,
         campaignId: id,
-        type: "CONSULTATION",
-        payload: { operation: "reassess" },
+        userId: user.id,
       });
     }
     revalidate(id, stageId);

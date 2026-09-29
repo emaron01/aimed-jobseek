@@ -1,5 +1,6 @@
 import { parseCheatSheetNotes } from "@/lib/application-summary/notes";
 import type {
+  ApplicationLearningsForCoach,
   CoachCompanyResearch,
   CoachGeneralPersona,
   CoachHiringTeamPerson,
@@ -8,6 +9,10 @@ import type {
   CoachPersonLinkedIn,
   CoachPersonPersona,
 } from "@/lib/consultation/contract";
+import {
+  isHiringManagerRole,
+  loadApplicationLearnings,
+} from "@/lib/consultation/learnings";
 import {
   individualProfileRecordSchema,
   interviewerWorkExperience,
@@ -136,22 +141,110 @@ function personName(contact: {
   return name || trimmed(contact.email) || "This interviewer";
 }
 
+function toCoachApplicationLearnings(
+  learnings: Awaited<ReturnType<typeof loadApplicationLearnings>>,
+): ApplicationLearningsForCoach | null {
+  const seekerLearnedNotes = learnings.seekerLearnedNotes?.trim() || null;
+  const stageNotes = learnings.stages
+    .map((stage) => ({
+      stageId: stage.id,
+      notesBefore: stage.notesBefore?.trim() || null,
+      notesAfter: stage.notesAfter?.trim() || null,
+    }))
+    .filter((stage) => stage.notesBefore || stage.notesAfter);
+  const newlyGained = learnings.newlyGained.map((note) => ({
+    contactId: note.contactId,
+    id: note.id,
+    text: note.text,
+    stageId: note.stageId,
+  }));
+  if (!seekerLearnedNotes && stageNotes.length === 0 && newlyGained.length === 0) {
+    return null;
+  }
+  return { seekerLearnedNotes, stageNotes, newlyGained };
+}
+
+/**
+ * Attach application learnings to the Hiring Manager by default; other people get
+ * them as background only. When no HM role exists, learnings stay pending on the
+ * application until an HM role exists.
+ */
+export function attachLearningsToHiringTeam(input: {
+  roles: CoachHiringTeamRole[];
+  learnings: ApplicationLearningsForCoach | null;
+}): {
+  roles: CoachHiringTeamRole[];
+  applicationLearningsPendingHiringManager: ApplicationLearningsForCoach | null;
+} {
+  const payload = input.learnings;
+  if (!payload) {
+    return { roles: input.roles, applicationLearningsPendingHiringManager: null };
+  }
+  const hmRoles = input.roles.filter((role) => isHiringManagerRole(role));
+  if (hmRoles.length === 0) {
+    return {
+      roles: input.roles,
+      applicationLearningsPendingHiringManager: payload,
+    };
+  }
+  const hmRoleIds = new Set(hmRoles.map((role) => role.id));
+  const roles = input.roles.map((role) => {
+    if (!hmRoleIds.has(role.id)) {
+      return {
+        ...role,
+        people: role.people.map((person) => ({
+          ...person,
+          applicationLearnings: null,
+          applicationLearningsBackground: payload,
+        })),
+      };
+    }
+    return {
+      ...role,
+      applicationLearnings: payload,
+      people: role.people.map((person) => ({
+        ...person,
+        applicationLearnings: payload,
+        applicationLearningsBackground: null,
+      })),
+    };
+  });
+  return { roles, applicationLearningsPendingHiringManager: null };
+}
+
 /**
  * Hiring Team context for the Coach call: every role's built general persona, plus
  * each matched person's own persona and evidence as a separate entry. A person's
  * information is never merged into or replaced by the general persona.
+ * Application learnings attach to the Hiring Manager (Batch D7).
  */
 export async function loadCoachHiringTeam(
   organizationId: string,
   campaignId: string,
 ): Promise<CoachHiringTeamRole[]> {
-  const [roles, memberships, stages] = await Promise.all([
+  const { roles } = await loadCoachHiringTeamWithLearnings(
+    organizationId,
+    campaignId,
+  );
+  return roles;
+}
+
+/** Full coach hiring-team load including pending learnings when no HM exists. */
+export async function loadCoachHiringTeamWithLearnings(
+  organizationId: string,
+  campaignId: string,
+): Promise<{
+  roles: CoachHiringTeamRole[];
+  applicationLearningsPendingHiringManager: ApplicationLearningsForCoach | null;
+}> {
+  const [roles, memberships, stages, learningsRaw] = await Promise.all([
     prisma.persona.findMany({
       where: { organizationId, campaignId, archivedAt: null },
       orderBy: { createdAt: "asc" },
       select: {
         id: true,
         name: true,
+        suggestionKey: true,
         targetTitles: true,
         whyThisPersonaMatters: true,
         definition: true,
@@ -206,6 +299,7 @@ export async function loadCoachHiringTeam(
         interviewers: { select: { contactId: true } },
       },
     }),
+    loadApplicationLearnings(organizationId, campaignId),
   ]);
   const stagesByContactId = new Map<string, CoachPersonInterviewStage[]>();
   for (const stage of stages) {
@@ -258,17 +352,22 @@ export async function loadCoachHiringTeam(
     list.push(person);
     peopleByRoleId.set(roleId, list);
   }
-  return roles.map((role) => {
+  const baseRoles: CoachHiringTeamRole[] = roles.map((role) => {
     const built = isHiringTeamPersonaBuilt(role);
     return {
       id: role.id,
       name: role.name,
       likelyTitles: parseStringArray(role.targetTitles),
       whyThisRoleMatters: role.whyThisPersonaMatters,
+      suggestionKey: role.suggestionKey,
       personaBuilt: built,
       persona: built ? generalPersona(role) : null,
       people: peopleByRoleId.get(role.id) ?? [],
     };
+  });
+  return attachLearningsToHiringTeam({
+    roles: baseRoles,
+    learnings: toCoachApplicationLearnings(learningsRaw),
   });
 }
 

@@ -2,6 +2,7 @@ import type { AiMessage } from "@/lib/ai/types";
 import type { CareerStage } from "@/lib/consultation/career-stage";
 import {
   CONSULTATION_PROMPT_VERSION,
+  type ApplicationLearningsForCoach,
   type AskedConsultationQuestion,
   type CoachCompanyResearch,
   type CoachHiringTeamRole,
@@ -50,6 +51,8 @@ export function buildConsultationCoachMessages(input: {
   careerStage: CareerStage;
   recentRoles: RecentRole[];
   hiringTeam: CoachHiringTeamRole[];
+  /** When no Hiring Manager role exists yet — learnings stay on the application. */
+  applicationLearningsPendingHiringManager?: ApplicationLearningsForCoach | null;
   seekerStatedFacts: SeekerStatedFactPayload[];
   companyResearch: CoachCompanyResearch | null;
   askedQuestions: AskedConsultationQuestion[];
@@ -85,8 +88,27 @@ export function buildConsultationCoachMessages(input: {
           whyThisRoleMatters: role.whyThisRoleMatters,
           personaBuilt: role.personaBuilt,
           generalPersona: role.persona,
-          people: role.people,
+          applicationLearnings: role.applicationLearnings ?? null,
+          people: role.people.map((person) => ({
+            contactId: person.contactId,
+            name: person.name,
+            title: person.title,
+            employer: person.employer,
+            linkedInUrl: person.linkedInUrl,
+            roleConfirmed: person.roleConfirmed,
+            persona: person.persona,
+            linkedIn: person.linkedIn,
+            recordedNotes: person.recordedNotes,
+            interviewStages: person.interviewStages,
+            prepOpening: person.prepOpening,
+            interviewLearnings: person.interviewLearnings,
+            applicationLearnings: person.applicationLearnings ?? null,
+            applicationLearningsBackground:
+              person.applicationLearningsBackground ?? null,
+          })),
         })),
+        applicationLearningsPendingHiringManager:
+          input.applicationLearningsPendingHiringManager ?? null,
       }),
     },
     {

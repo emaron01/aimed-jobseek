@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONSULTATION_PROMPT_VERSION = "32";
+export const CONSULTATION_PROMPT_VERSION = "33";
 
 export const WHY_THIS_COMPANY_TARGET_KEY = "why-this-company";
 export const PERSON_PREP_TARGET_PREFIX = "person-prep:";
@@ -258,6 +258,22 @@ export type CoachPersonInterviewStage = {
   notesAfter: string | null;
 };
 
+/** Application interview learnings for coach HM routing (Batch D7). */
+export type ApplicationLearningsForCoach = {
+  seekerLearnedNotes: string | null;
+  stageNotes: Array<{
+    stageId: string;
+    notesBefore: string | null;
+    notesAfter: string | null;
+  }>;
+  newlyGained: Array<{
+    contactId: string;
+    id: string;
+    text: string;
+    stageId: string | null;
+  }>;
+};
+
 export type CoachHiringTeamPerson = {
   contactId: string;
   name: string;
@@ -271,6 +287,13 @@ export type CoachHiringTeamPerson = {
   interviewStages: CoachPersonInterviewStage[];
   prepOpening: string | null;
   interviewLearnings: string[];
+  /**
+   * Primary application learnings — set only on the matched Hiring Manager person.
+   * Never merge into persona or linkedIn.
+   */
+  applicationLearnings?: ApplicationLearningsForCoach | null;
+  /** Same learnings as background only — set on non-HM matched people. */
+  applicationLearningsBackground?: ApplicationLearningsForCoach | null;
 };
 
 /**
@@ -282,7 +305,10 @@ export type CoachHiringTeamRole = {
   name: string;
   likelyTitles: string[];
   whyThisRoleMatters: string | null;
+  suggestionKey?: string | null;
   personaBuilt: boolean;
   persona: CoachGeneralPersona | null;
   people: CoachHiringTeamPerson[];
+  /** Primary application learnings on the Hiring Manager role (with or without people). */
+  applicationLearnings?: ApplicationLearningsForCoach | null;
 };

@@ -935,6 +935,10 @@ export async function saveApplicationJobLearnedNotes(input: {
   const { enqueueCheatSheetPersonSection } = await import(
     "@/lib/application-summary/enqueue"
   );
+  const {
+    enqueueLearningsReassessIfChanged,
+    hiringManagerContactIds,
+  } = await import("@/lib/consultation/learnings");
   await enqueueApplicationJob({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
@@ -942,27 +946,23 @@ export async function saveApplicationJobLearnedNotes(input: {
     initiatedByUserId: input.userId,
     payload: { userId: input.userId },
   });
-  const memberships = await prisma.campaignContact.findMany({
-    where: {
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      chosenPersonaId: { not: null },
-    },
-    select: { contactId: true },
+  // Cost guard (D7): rebuild only Hiring Manager person sections for application learnings.
+  const hmContactIds = await hiringManagerContactIds({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
   });
-  for (const membership of memberships) {
+  for (const contactId of hmContactIds) {
     await enqueueCheatSheetPersonSection({
       organizationId: input.organizationId,
       campaignId: input.campaignId,
-      contactId: membership.contactId,
+      contactId,
       userId: input.userId,
     });
   }
-  await enqueueApplicationJob({
+  await enqueueLearningsReassessIfChanged({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
-    type: "CONSULTATION",
-    payload: { operation: "reassess" },
+    userId: input.userId,
   });
 }
 

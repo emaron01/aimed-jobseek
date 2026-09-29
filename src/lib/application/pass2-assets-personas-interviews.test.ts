@@ -110,6 +110,6 @@ describe("interview stage open buttons", () => {
     expect(stages).toContain("addCheatSheetInterviewNoteAction");
     expect(panel).not.toContain("CheatSheetPersonBody");
     expect(notes).toContain("enqueueCheatSheetPersonSection");
-    expect(notes).toContain('operation: "reassess"');
+    expect(notes).toContain("enqueueLearningsReassessIfChanged");
   });
 });

@@ -75,7 +75,7 @@ describe("no AI on page view / skip unchanged / research cost", () => {
     expect(interviewAction).toContain("updated.notesTextChanged");
     expect(interviewAction).not.toContain("regenerateApplicationJobRequirement");
     expect(interviewAction).toMatch(
-      /if \(updated\.notesTextChanged\)[\s\S]*CONSULTATION/,
+      /if \(updated\.notesTextChanged\)[\s\S]*enqueueLearningsReassessIfChanged/,
     );
 
     expect(contactProfile).toContain("queued: false");

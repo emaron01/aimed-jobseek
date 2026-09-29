@@ -263,7 +263,7 @@ describe("Harper Batch D6 — role-expertise + recentRoles", () => {
   });
 
   it("bumps consultation prompt version and adds the recentRoles coach line", () => {
-    expect(CONSULTATION_PROMPT_VERSION).toBe("32");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("33");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(COACH_RECENT_ROLES_LINE);
     expect(ROLE_EXPERTISE_PROMPT_VERSION).toBe("1");
     expect(ROLE_EXPERTISE_SYSTEM_INSTRUCTIONS).toContain(

@@ -262,7 +262,7 @@ describe("Coach Hiring Team context", () => {
       "Never merge a person into the generalPersona",
     );
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
-      "never apply one person's details to another",
+      "never apply one person's private details to another",
     );
   });
 });
