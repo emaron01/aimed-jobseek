@@ -16,7 +16,7 @@ vi.mock("@/lib/billing/stripe", () => ({
   }),
 }));
 
-import { cancelStripeSubscriptionForOrgDelete } from "@/lib/platform/orgs";
+import { cancelStripeSubscriptionForOrgDelete } from "@/lib/billing/cancel-stripe-for-org-delete";
 
 describe("cancelStripeSubscriptionForOrgDelete", () => {
   beforeEach(() => {
@@ -35,7 +35,7 @@ describe("cancelStripeSubscriptionForOrgDelete", () => {
     expect(stripeState.retrieve).not.toHaveBeenCalled();
   });
 
-  it("skips when Stripe is not configured", async () => {
+  it("refuses when Stripe is not configured and a subscription id exists", async () => {
     stripeState.configured = false;
     await expect(
       cancelStripeSubscriptionForOrgDelete("sub_123"),

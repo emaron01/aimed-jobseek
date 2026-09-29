@@ -29,14 +29,29 @@ describe("platform role gates", () => {
   });
 });
 
-describe("platform org delete purges orphaned identities", () => {
-  it("deleteOrganization cancels Stripe then purges orphaned identities", () => {
+describe("platform org delete uses shared full wipe", () => {
+  it("deleteOrganization calls wipeOrganizationAccount with reason admin", () => {
     const src = readFileSync(resolve("src/lib/platform/orgs.ts"), "utf8");
+    expect(src).toContain("wipeOrganizationAccount");
+    expect(src).toContain('reason: "admin"');
+    expect(src).not.toContain("PLATFORM_ORGANIZATION_DELETED");
     expect(src).toContain("cancelStripeSubscriptionForOrgDelete");
-    expect(src).toContain("subscriptions.cancel");
-    expect(src).toContain("resource_missing");
-    expect(src).toContain("purgeOrphanedTenantUsersAfterOrgDelete");
-    expect(src).toContain("PLATFORM_ORGANIZATION_DELETED");
+    const wipe = readFileSync(
+      resolve("src/lib/account/wipe-organization.ts"),
+      "utf8",
+    );
+    expect(wipe).toContain("cancelStripeSubscriptionForOrgDelete");
+    expect(wipe).toContain("markInFlightWorkFailedForWipe");
+    expect(wipe).toContain("purgeOrphanedTenantUsersAfterOrgDelete");
+    expect(wipe).toContain("recordAnonymousAccountWipe");
+    expect(wipe).toContain("ACCOUNT_WIPE_LOG_SETTING_KEY");
+    expect(wipe).not.toContain("PLATFORM_ORGANIZATION_DELETED");
+    const cancel = readFileSync(
+      resolve("src/lib/billing/cancel-stripe-for-org-delete.ts"),
+      "utf8",
+    );
+    expect(cancel).toContain("subscriptions.cancel");
+    expect(cancel).toContain("resource_missing");
     const purge = readFileSync(
       resolve("src/lib/auth/purge-identity.ts"),
       "utf8",

@@ -26,6 +26,7 @@ import {
   getPlanDefinition,
 } from "@/lib/billing/plans";
 import { getStripe, stripeConfigured } from "@/lib/billing/stripe";
+import { cancelStripeSubscriptionForOrgDelete } from "@/lib/billing/cancel-stripe-for-org-delete";
 import { createOrganizationInvitationAsPlatform } from "@/lib/org/signup";
 
 export type PlatformBillingMode = "COMPED" | "BILLED";
@@ -581,151 +582,29 @@ export async function unsuspendOrganization(input: {
   });
 }
 
-/**
- * Failsafe: cancel Stripe subscription before org hard-delete.
- * Already-canceled / missing subscriptions are treated as success.
- * No subscription id → skip (Comped / never billed).
- * Stripe not configured while a subscription id exists → refuse (do not
- * delete locally while Stripe may keep billing).
- */
-export async function cancelStripeSubscriptionForOrgDelete(
-  stripeSubscriptionId: string | null | undefined,
-): Promise<{
-  skipped: boolean;
-  canceled: boolean;
-  alreadyCanceled: boolean;
-  subscriptionId: string | null;
-}> {
-  if (!stripeSubscriptionId) {
-    return {
-      skipped: true,
-      canceled: false,
-      alreadyCanceled: false,
-      subscriptionId: null,
-    };
-  }
-  if (!stripeConfigured()) {
-    throw new Error(
-      "Cannot delete this organization: a Stripe subscription is linked but STRIPE_SECRET_KEY is not configured. Configure Stripe (or cancel the subscription in the Stripe Dashboard) before deleting.",
-    );
-  }
-
-  const stripe = getStripe();
-  try {
-    const existing = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-    if (existing.status === "canceled") {
-      return {
-        skipped: false,
-        canceled: false,
-        alreadyCanceled: true,
-        subscriptionId: stripeSubscriptionId,
-      };
-    }
-    await stripe.subscriptions.cancel(stripeSubscriptionId);
-    return {
-      skipped: false,
-      canceled: true,
-      alreadyCanceled: false,
-      subscriptionId: stripeSubscriptionId,
-    };
-  } catch (error) {
-    const code =
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      typeof (error as { code?: unknown }).code === "string"
-        ? (error as { code: string }).code
-        : "";
-    // Already gone in Stripe — safe to proceed with local delete.
-    if (code === "resource_missing") {
-      return {
-        skipped: false,
-        canceled: false,
-        alreadyCanceled: true,
-        subscriptionId: stripeSubscriptionId,
-      };
-    }
-    throw error;
-  }
-}
+export { cancelStripeSubscriptionForOrgDelete };
 
 /**
- * Hard-delete an organization and all cascading tenant data.
- * Cancels the Stripe subscription first when one is linked (failsafe); already
- * canceled / missing subs still proceed. The Stripe Customer (cus_…) is left
- * in place on purpose — accumulating customers is harmless and avoids wiping
- * Stripe history; only the subscription is canceled. Audit is written so the
- * event retains org id/name after the row is gone. Then purge org-only tenant
- * Users and their Better Auth identities so the email can be reused on a clean
- * signup.
+ * Super Admin hard-delete: shared full account wipe (lifecycle B1).
+ * Confirmation and Super Admin auth live in deleteOrganizationAction.
+ * Does not write identifying AdminAuditEvent rows (anonymous PlatformSetting log only).
  */
 export async function deleteOrganization(input: {
   organizationId: string;
   actorUserId: string;
 }): Promise<{ id: string; name: string }> {
-  const org = await prisma.organization.findUnique({
-    where: { id: input.organizationId },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      billingProfile: {
-        select: { stripeSubscriptionId: true, stripeCustomerId: true },
-      },
-    },
+  void input.actorUserId;
+  const { wipeOrganizationAccount } = await import(
+    "@/lib/account/wipe-organization"
+  );
+  const result = await wipeOrganizationAccount({
+    organizationId: input.organizationId,
+    reason: "admin",
   });
-  if (!org) {
+  if (result.alreadyWiped || !result.organizationName) {
     throw new Error("Organization not found.");
   }
-
-  const stripeCancel = await cancelStripeSubscriptionForOrgDelete(
-    org.billingProfile?.stripeSubscriptionId,
-  );
-
-  const members = await prisma.organizationMembership.findMany({
-    where: { organizationId: org.id },
-    select: { userId: true },
-  });
-  const memberUserIds = members.map((m) => m.userId);
-
-  await recordAdminAuditEvent({
-    action: "PLATFORM_ORGANIZATION_DELETED",
-    actorUserId: input.actorUserId,
-    organizationId: org.id,
-    metadata: {
-      organizationId: org.id,
-      organizationName: org.name,
-      organizationSlug: org.slug,
-      actorUserId: input.actorUserId,
-      memberUserIds,
-      stripeCustomerId: org.billingProfile?.stripeCustomerId ?? null,
-      stripeSubscriptionId: org.billingProfile?.stripeSubscriptionId ?? null,
-      stripeCancel,
-    },
-  });
-
-  await prisma.organization.delete({
-    where: { id: org.id },
-  });
-
-  const { purgeOrphanedTenantUsersAfterOrgDelete } = await import(
-    "@/lib/auth/purge-identity"
-  );
-  const purged = await purgeOrphanedTenantUsersAfterOrgDelete(memberUserIds);
-  if (purged.purgedUserIds.length > 0) {
-    await recordAdminAuditEvent({
-      action: "PLATFORM_ORGANIZATION_DELETED",
-      actorUserId: input.actorUserId,
-      organizationId: org.id,
-      metadata: {
-        phase: "identity_purge",
-        organizationId: org.id,
-        purgedUserIds: purged.purgedUserIds,
-      },
-    });
-  }
-
-  return { id: org.id, name: org.name };
+  return { id: result.organizationId, name: result.organizationName };
 }
 
 export async function updateOrganizationUsagePolicyAsPlatform(input: {
