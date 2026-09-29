@@ -1545,13 +1545,19 @@ function askedAndSkipped(
   const skippedKeys = new Set<string>();
   for (const turn of turns) {
     if (turn.speaker === "CONSULTANT" && turn.targetKey) askedKeys.add(turn.targetKey);
-    if (turn.speaker === "SEEKER" && turn.skipped && turn.targetKey) {
-      const declinedFollowUp =
-        turn.analysisJson &&
-        typeof turn.analysisJson === "object" &&
-        (turn.analysisJson as { followUpDeclined?: unknown })
-          .followUpDeclined === true;
-      if (!declinedFollowUp) skippedKeys.add(turn.targetKey);
+    if (turn.speaker === "SEEKER" && turn.targetKey) {
+      const ignored = isIgnoredSeekerTurn(turn);
+      // Ignore always covers the gap (Skip = later still uses skipped:true without ignored).
+      if (ignored) {
+        skippedKeys.add(turn.targetKey);
+      } else if (turn.skipped) {
+        const declinedFollowUp =
+          turn.analysisJson &&
+          typeof turn.analysisJson === "object" &&
+          (turn.analysisJson as { followUpDeclined?: unknown })
+            .followUpDeclined === true;
+        if (!declinedFollowUp) skippedKeys.add(turn.targetKey);
+      }
     }
     if (
       turn.speaker === "SEEKER" &&

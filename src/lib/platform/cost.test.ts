@@ -115,6 +115,47 @@ describe("estimateEventCostUsd", () => {
     );
     expect(usd).toBe(0);
   });
+
+  it("resolves openai-responses events to the matching openai model rate", () => {
+    const at = new Date("2026-06-01T00:00:00.000Z");
+    const openai = resolveRate("openai", "gpt-5.6-luna", at, RATES);
+    const responses = resolveRate("openai-responses", "gpt-5.6-luna", at, RATES);
+    const compatible = resolveRate("openai-compatible", "gpt-5.6-luna", at, RATES);
+    expect(openai).not.toBeNull();
+    expect(responses).toEqual(openai);
+    expect(compatible).toEqual(openai);
+    const usd = estimateEventCostUsd(
+      {
+        provider: "openai-responses",
+        model: "gpt-5.6-luna",
+        inputTokens: 1_000_000,
+        outputTokens: 500_000,
+        webSearchCalls: 3,
+        occurredAt: at,
+      },
+      RATES,
+    );
+    expect(usd).toBeCloseTo(0.83, 6);
+  });
+
+  it("still prices historical INTERVIEW_GUIDE usage events by provider and model", () => {
+    // Operation is not part of rate lookup; leftover INTERVIEW_GUIDE rows remain readable.
+    expect(readFileSync(resolve("prisma/schema.prisma"), "utf8")).toContain(
+      "INTERVIEW_GUIDE",
+    );
+    const usd = estimateEventCostUsd(
+      {
+        provider: "openai-responses",
+        model: "gpt-5.6-luna",
+        inputTokens: 1_000_000,
+        outputTokens: 0,
+        webSearchCalls: 0,
+        occurredAt: new Date("2026-06-01T00:00:00.000Z"),
+      },
+      RATES,
+    );
+    expect(usd).toBeCloseTo(0.2, 6);
+  });
 });
 
 describe("resolveRate history", () => {

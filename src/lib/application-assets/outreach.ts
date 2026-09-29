@@ -904,7 +904,7 @@ export async function generateOutreachAsset(input: {
               campaignId: input.campaignId,
               userId: input.userId,
               category: "ASSET_GENERATION",
-              operation: "INTERVIEW_GUIDE",
+              operation: "APPLICATION_ASSET_GENERATION",
             },
           });
           if (!generated.ok) {

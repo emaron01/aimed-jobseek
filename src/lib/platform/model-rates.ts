@@ -227,13 +227,25 @@ export async function upsertAiModelRate(input: {
 /**
  * Pick latest effectiveFrom <= at for provider+model; else provider+`*` / default; else null.
  */
+/**
+ * Map adapter/provider role strings onto the billing provider used in AiModelRate
+ * rows. Read-path only — does not change what is sent to providers or written on events.
+ */
+export function billingProviderForRateLookup(
+  provider: string | null | undefined,
+): string {
+  const p = (provider ?? "").trim().toLowerCase();
+  if (p === "openai-responses" || p === "openai-compatible") return "openai";
+  return p;
+}
+
 export function resolveRate(
   provider: string | null | undefined,
   model: string | null | undefined,
   at: Date,
   rates: AiModelRateRow[],
 ): AiModelRateRow | null {
-  const p = (provider ?? "").trim().toLowerCase();
+  const p = billingProviderForRateLookup(provider);
   const m = (model ?? "").trim();
   const atMs = at.getTime();
 

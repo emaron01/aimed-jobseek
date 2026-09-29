@@ -223,4 +223,17 @@ describe("no AI on page view / skip unchanged / research cost", () => {
     expect(outreach).not.toContain("enqueueApplicationJob");
     expect(outreach).not.toContain("runPaidStructuredCall");
   });
+
+  it("workspace and campaign page loads do not merge hiring-team roles", () => {
+    const workspace = src("src/components/ApplicationWorkspace.tsx");
+    const campaignPage = src("src/app/(app)/campaigns/[id]/page.tsx");
+    const sync = src("src/lib/hiring-team/build.ts");
+
+    expect(workspace).not.toContain("mergeExistingHiringTeamRoles");
+    expect(campaignPage).not.toContain("mergeExistingHiringTeamRoles");
+    expect(sync).toContain("mergeExistingHiringTeamRoles");
+    expect(sync).toMatch(
+      /export async function syncApplicationHiringTeam[\s\S]*mergeExistingHiringTeamRoles/,
+    );
+  });
 });

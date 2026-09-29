@@ -22,7 +22,6 @@ import {
   workspaceProfileHref,
 } from "@/lib/application/workspace-links";
 import { listApplicationContacts } from "@/lib/application/contacts";
-import { mergeExistingHiringTeamRoles } from "@/lib/hiring-team/merge-existing";
 import { isHiringTeamPersonaBuilt } from "@/lib/hiring-team/build";
 import { profileJsonAwaitingSeekerInput } from "@/lib/hiring-team/synthesize-outcome";
 import { AppPendingIndicator } from "@/components/AppButton";
@@ -264,7 +263,6 @@ export async function ApplicationWorkspace({
   focus?: ApplicationWorkspaceFocus;
 }) {
   await ensureIdentityVerification({ organizationId, campaignId });
-  await mergeExistingHiringTeamRoles({ organizationId, campaignId });
   const requirement = await prisma.jobRequirement.findFirst({
     where: { campaignId, organizationId },
     include: {

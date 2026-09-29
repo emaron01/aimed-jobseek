@@ -403,6 +403,23 @@ describe("application step colors", () => {
     expect(marker).toContain("tracker-step-marker-static");
   });
 
+  it("shows the full application name wrapped to two lines with a hover title", () => {
+    const tracker = readFileSync(
+      "src/components/ApplicationSidebarTracker.tsx",
+      "utf8",
+    );
+    expect(tracker).toContain("title={tracker.campaignName}");
+    expect(tracker).toContain("{tracker.campaignName}");
+    expect(tracker).toContain("line-clamp-2");
+    expect(tracker).toContain("break-words");
+    expect(tracker).toContain("min-w-0");
+    const nameBlock = tracker.slice(
+      tracker.indexOf("title={tracker.campaignName}"),
+      tracker.indexOf("{tracker.campaignName}") + "{tracker.campaignName}".length,
+    );
+    expect(nameBlock).not.toMatch(/\btruncate\b/);
+  });
+
   it("never writes NEW-only pills, ids, or timestamps, and migrates seen by bumping version only", () => {
     const facts: ApplicationStepFactInput = {
       ...idle,

@@ -253,7 +253,7 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   interviewThankYouClarifyingQuestions: {
     schemaName: "interview_thank_you_clarifying_questions",
     schema: interviewThankYouClarifyingQuestionsSchema,
-    usageOperations: ["INTERVIEW_GUIDE"],
+    usageOperations: ["APPLICATION_ASSET_GENERATION"],
   },
   prospectReplyClassification: {
     schemaName: "prospect_reply_classification",

@@ -260,6 +260,17 @@ describe("outreach greetings and claims", () => {
       "utf8",
     );
     expect(outreachSource).not.toContain("Thank-you questions could not be written");
+    expect(outreachSource).toContain('operation: "APPLICATION_ASSET_GENERATION"');
+    expect(outreachSource).not.toMatch(
+      /generateInterviewThankYouClarifyingQuestions[\s\S]*operation:\s*"INTERVIEW_GUIDE"/,
+    );
+    const schemas = readFileSync(
+      "src/lib/ai/structured-output-schemas.ts",
+      "utf8",
+    );
+    expect(schemas).toMatch(
+      /interviewThankYouClarifyingQuestions:[\s\S]*usageOperations:\s*\["APPLICATION_ASSET_GENERATION"\]/,
+    );
   });
 
   it("rejects messages that mention applying after Interviewing", () => {

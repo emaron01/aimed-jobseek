@@ -238,7 +238,10 @@ export function ApplicationSidebarTracker({
 
   return (
     <div className="border-b border-on-nav/15 px-3 py-3">
-      <p className="truncate text-sm font-semibold text-on-nav" title={tracker.campaignName}>
+      <p
+        className="min-w-0 break-words text-sm font-semibold text-on-nav line-clamp-2"
+        title={tracker.campaignName}
+      >
         {tracker.campaignName}
       </p>
       <p className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-on-nav/70">
