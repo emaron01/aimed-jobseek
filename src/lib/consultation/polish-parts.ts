@@ -84,7 +84,18 @@ export function resultStatesOutcome(result: string): boolean {
   return words.length >= 4;
 }
 
-/** Detect framework names or part labels leaked into polished fields. */
+/**
+ * Detect framework names or part labels leaked into polished fields.
+ *
+ * Rejects only:
+ * (a) part labels used as labels/headings — Challenge|Situation|Task|Action|Result
+ *     followed by a colon, or alone as a line heading;
+ * (b) explicit method references — "(the) STAR|CAR method|format|framework|technique"
+ *     (case-insensitive).
+ *
+ * Does not reject bare star/stars/car/cars (any case), or ordinary sentence uses of
+ * challenge, situation, task, action, or result.
+ */
 export function containsFrameworkOrPartLabel(text: string): boolean {
   const value = text.trim();
   if (!value) return false;
@@ -95,9 +106,46 @@ export function containsFrameworkOrPartLabel(text: string): boolean {
   ) {
     return true;
   }
-  // Uppercase acronyms only so ordinary words like "car" / "star" do not fail.
-  if (/\bCAR\b/.test(value) || /\bSTAR\b/.test(value)) return true;
+  if (/(?:^|\n)\s*(?:Challenge|Situation|Task|Action|Result)\s*$/im.test(value)) {
+    return true;
+  }
+  if (
+    /\b(?:the\s+)?(?:STAR|CAR)\s+(?:method|format|framework|technique)\b/i.test(
+      value,
+    )
+  ) {
+    return true;
+  }
   return false;
+}
+
+/**
+ * Canonical reader for ConsultationStatement.groundingJson (Batch D3 parts).
+ * Accepts the additive parts object, or legacy `[]` / unknown shapes (returns null).
+ */
+export function parseAnswerPartsGrounding(
+  value: unknown,
+): AnswerPartsGrounding | null {
+  if (value == null) return null;
+  if (Array.isArray(value)) return null;
+  if (typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  const framework = row.answerFramework;
+  if (framework !== "CAR" && framework !== "STAR") return null;
+  const action = typeof row.action === "string" ? row.action.trim() : "";
+  const result = typeof row.result === "string" ? row.result.trim() : "";
+  if (!action || !result) return null;
+  if (framework === "CAR") {
+    const challenge =
+      typeof row.challenge === "string" ? row.challenge.trim() : "";
+    if (!challenge) return null;
+    return { answerFramework: "CAR", challenge, action, result };
+  }
+  const situation =
+    typeof row.situation === "string" ? row.situation.trim() : "";
+  const task = typeof row.task === "string" ? row.task.trim() : "";
+  if (!situation || !task) return null;
+  return { answerFramework: "STAR", situation, task, action, result };
 }
 
 function blankPartFeedback(field: string): string {

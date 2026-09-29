@@ -98,6 +98,7 @@ import {
   validateInterviewAnswerQuality,
   validateRepetitionAndMetaLanguage,
 } from "@/lib/consultation/output-quality";
+import { parseAnswerPartsGrounding } from "@/lib/consultation/polish-parts";
 import {
   buildConsultationCoachSystemInstructions,
   CONSULTATION_COACH_SYSTEM_INSTRUCTIONS,
@@ -2696,6 +2697,17 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       statementId: statements[0]!.id,
       content: statements[0]!.content,
     });
+    const approvedStatement = await prisma.consultationStatement.findUnique({
+      where: { id: statements[0]!.id },
+    });
+    expect(approvedStatement?.status).toBe("APPROVED");
+    expect(parseAnswerPartsGrounding(statements[0]!.groundingJson)).toEqual(
+      parseAnswerPartsGrounding(approvedStatement?.groundingJson),
+    );
+    expect(
+      parseAnswerPartsGrounding(approvedStatement?.groundingJson)
+        ?.answerFramework,
+    ).toBe("CAR");
     const polishedStory = await prisma.profileStory.findFirst({
       where: { consultationTurnId: seeker!.id },
     });

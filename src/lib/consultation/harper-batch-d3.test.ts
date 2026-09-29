@@ -23,6 +23,7 @@ import {
   composeInterviewAnswerFromParts,
   containsFrameworkOrPartLabel,
   normalizePolishAnswer,
+  parseAnswerPartsGrounding,
   resultStatesOutcome,
   validatePolishPartsQuality,
 } from "@/lib/consultation/polish-parts";
@@ -211,24 +212,30 @@ describe("Harper Batch D3 — CAR/STAR polish parts", () => {
     }
   });
 
-  it("rejects fields that contain a part label or framework name", () => {
-    expect(containsFrameworkOrPartLabel("Challenge: I faced a gap.")).toBe(
-      true,
-    );
-    expect(containsFrameworkOrPartLabel("Situation: We were short-staffed.")).toBe(
-      true,
-    );
-    expect(containsFrameworkOrPartLabel("I used the STAR method here.")).toBe(
-      true,
-    );
-    expect(containsFrameworkOrPartLabel("This follows CAR structure.")).toBe(
-      true,
-    );
-    expect(
-      containsFrameworkOrPartLabel(
-        "I faced a reliability gap and rewrote the path.",
-      ),
-    ).toBe(false);
+  it("rejects only label/heading and explicit method references; allows ordinary words", () => {
+    for (const pass of [
+      "we reached a four-star rating",
+      "I won the Rising Star award",
+      "I negotiated car rental partnerships",
+      "I made the STAR Club two years running",
+      "the challenge was a 30% staffing gap",
+      "the result was a calmer unit",
+      "I faced a reliability gap and rewrote the path.",
+    ]) {
+      expect(containsFrameworkOrPartLabel(pass)).toBe(false);
+    }
+
+    for (const fail of [
+      "Challenge: the unit was short-staffed",
+      "Result: patients were discharged sooner",
+      "Situation: We were short-staffed.",
+      "Using the STAR method, I stabilized the unit.",
+      "Here is my answer in CAR format",
+      "I used the STAR method here.",
+      "This follows the CAR framework.",
+    ]) {
+      expect(containsFrameworkOrPartLabel(fail)).toBe(true);
+    }
 
     expect(
       validatePolishPartsQuality({
@@ -244,6 +251,49 @@ describe("Harper Batch D3 — CAR/STAR polish parts", () => {
         maxWords: consultationConfig.interviewAnswerMaxWords,
       }).some((issue) => /CAR|STAR|label/i.test(issue)),
     ).toBe(true);
+  });
+
+  it("parseAnswerPartsGrounding accepts parts shape and legacy empty array", () => {
+    expect(parseAnswerPartsGrounding([])).toBeNull();
+    expect(parseAnswerPartsGrounding({})).toBeNull();
+    expect(parseAnswerPartsGrounding(null)).toBeNull();
+    expect(
+      parseAnswerPartsGrounding({
+        answerFramework: "CAR",
+        challenge: "I faced a staffing gap on the unit.",
+        action: "I rebalanced assignments across the shift.",
+        result: "The unit stayed calm through the night.",
+      }),
+    ).toEqual({
+      answerFramework: "CAR",
+      challenge: "I faced a staffing gap on the unit.",
+      action: "I rebalanced assignments across the shift.",
+      result: "The unit stayed calm through the night.",
+    });
+    expect(
+      parseAnswerPartsGrounding({
+        answerFramework: "STAR",
+        situation: "The evening shift was short-staffed.",
+        task: "I owned guest recovery for the floor.",
+        action: "I reassigned hosts and checked every table.",
+        result: "Guests stayed and the floor ran smoothly.",
+      }),
+    ).toMatchObject({ answerFramework: "STAR" });
+  });
+
+  it("approve path preserves groundingJson (does not wipe parts)", () => {
+    const service = src("src/lib/consultation/service.ts");
+    const approveStart = service.indexOf(
+      "export async function approveConsultationStatement",
+    );
+    expect(approveStart).toBeGreaterThan(-1);
+    const approveBody = service.slice(approveStart, approveStart + 2200);
+    const updateStart = approveBody.indexOf(
+      "prisma.consultationStatement.update",
+    );
+    const updateBlock = approveBody.slice(updateStart, updateStart + 500);
+    expect(updateBlock).toContain('status: "APPROVED"');
+    expect(updateBlock).not.toContain("groundingJson");
   });
 
   it("composes parts in order, respects max words, and stores grounding", () => {
