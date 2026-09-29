@@ -49,6 +49,21 @@ export function looksLikeCareerWalkThrough(text: string): boolean {
   return false;
 }
 
+/**
+ * True when a career walk-through has already been asked on this application
+ * (coach chronology, role-expertise, or any consultant turn that looks like one).
+ */
+export function careerWalkThroughAlreadyAsked(
+  turns: Array<{ speaker: string; targetKey: string | null; body: string }>,
+): boolean {
+  return turns.some(
+    (turn) =>
+      turn.speaker === "CONSULTANT" &&
+      (turn.targetKey === "chronology" ||
+        looksLikeCareerWalkThrough(turn.body)),
+  );
+}
+
 /** Shared intent class used for near-duplicate detection (no guessing). */
 export function questionIntentClass(
   text: string,

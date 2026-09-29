@@ -15,6 +15,17 @@ import {
   type EvidenceTarget,
 } from "@/lib/consultation/assess";
 import { deriveCareerStage, type CareerStage } from "@/lib/consultation/career-stage";
+import { careerWalkThroughAlreadyAsked } from "@/lib/consultation/question-detection";
+import { deriveRecentRoles } from "@/lib/consultation/recent-roles";
+import {
+  countAllCountedCoachingQuestions,
+  countNonRoleExpertiseQuestions,
+  generateRoleExpertiseWithModel,
+  hasUsableRoleExpertiseReceipt,
+  roleExpertiseFillRange,
+  storeRoleExpertiseQuestions,
+  type RoleExpertiseJobInputs,
+} from "@/lib/consultation/role-expertise";
 import {
   CONSULTATION_PROMPT_VERSION,
   WHY_THIS_COMPANY_TARGET_KEY,
@@ -1059,6 +1070,13 @@ async function planAndStoreRound(input: {
   requirement: {
     seniority: string | null;
     title: string | null;
+    companyName?: string | null;
+    location?: string | null;
+    workArrangement?: string | null;
+    requiredItems?: unknown;
+    preferredItems?: unknown;
+    responsibilities?: unknown;
+    scorecardJson?: unknown;
     seekerLearnedNotes?: string | null;
   };
   targets: EvidenceTarget[];
@@ -1071,6 +1089,8 @@ async function planAndStoreRound(input: {
     where: { id: input.sessionId },
     data: { generationStatus: "GENERATING", generationError: null },
   });
+  const careerStage = deriveCareerStage(input.profile);
+  const recentRoles = deriveRecentRoles(input.profile, new Date(), careerStage);
   const [existingTurns, interviewStages, companyResearch] = await Promise.all([
     loadSessionTurns(input.sessionId),
     prisma.interviewStage.findMany({
@@ -1119,7 +1139,8 @@ async function planAndStoreRound(input: {
     const plan = await planConsultationWithModel({
       targets: input.targets,
       profileItems,
-      careerStage: deriveCareerStage(input.profile),
+      careerStage,
+      recentRoles,
       seekerStatedFacts,
       askedQuestions,
       hiringTeam: input.roles,
@@ -1262,7 +1283,120 @@ async function planAndStoreRound(input: {
       intent: "CLOSING",
     });
   }
+  if (!input.interviewerPrep) {
+    await maybeFillRoleExpertiseAfterGapPlan({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      sessionId: input.sessionId,
+      profile: input.profile,
+      requirement: input.requirement,
+      careerStage,
+      recentRoles,
+      profileItems,
+    });
+  }
   return voicedQuestions;
+}
+
+async function maybeFillRoleExpertiseAfterGapPlan(input: {
+  organizationId: string;
+  campaignId: string;
+  sessionId: string;
+  profile: ReturnType<typeof parseCandidateProfile>;
+  requirement: {
+    seniority: string | null;
+    title: string | null;
+    companyName?: string | null;
+    location?: string | null;
+    workArrangement?: string | null;
+    requiredItems?: unknown;
+    preferredItems?: unknown;
+    responsibilities?: unknown;
+    scorecardJson?: unknown;
+  };
+  careerStage: CareerStage;
+  recentRoles: ReturnType<typeof deriveRecentRoles>;
+  profileItems: ReturnType<typeof profileEvidenceItems>;
+}): Promise<void> {
+  const turns = await loadSessionTurns(input.sessionId);
+  const asked = askedQuestionsFromTurns(turns);
+  const counted = countAllCountedCoachingQuestions(asked);
+  if (counted >= 20) return;
+
+  const G = countNonRoleExpertiseQuestions(asked);
+  const { minCount, maxCount } = roleExpertiseFillRange(G);
+  if (maxCount === 0) return;
+
+  const job: RoleExpertiseJobInputs = {
+    title: input.requirement.title ?? null,
+    companyName: input.requirement.companyName ?? null,
+    seniority: input.requirement.seniority ?? null,
+    location: input.requirement.location ?? null,
+    workArrangement: input.requirement.workArrangement ?? null,
+    requiredItems: input.requirement.requiredItems ?? [],
+    preferredItems: input.requirement.preferredItems ?? [],
+    responsibilities: input.requirement.responsibilities ?? [],
+    scorecardJson: input.requirement.scorecardJson ?? {},
+  };
+
+  const usable = await hasUsableRoleExpertiseReceipt({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    job,
+    minCount,
+    maxCount,
+  });
+  // Still run generate when receipt exists — gate skips the provider call.
+  // Skip only when counted already has enough role-expertise from a prior fill
+  // for this job (usable receipt AND already at/above min fill stored).
+  const existingRoleExpertise = asked.filter((item) =>
+    item.targetKey?.startsWith("role-expertise:"),
+  ).length;
+  if (usable && existingRoleExpertise >= minCount) return;
+
+  const generated = await generateRoleExpertiseWithModel({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    job,
+    minCount,
+    maxCount,
+    askedQuestions: asked,
+    chronologyAlreadyAsked: careerWalkThroughAlreadyAsked(turns),
+    recentRoles: input.recentRoles,
+    careerStage: input.careerStage,
+    profileItems: input.profileItems,
+    usage: consultationUsage(
+      input.organizationId,
+      input.campaignId,
+      "CONSULTATION",
+    ),
+  });
+  if (!generated.ok) {
+    console.error(
+      JSON.stringify({
+        event: "role_expertise_fill_failed",
+        message: generated.message,
+        keptAfterPartial: null,
+      }),
+    );
+    return;
+  }
+  if (generated.keptAfterPartial != null) {
+    console.info(
+      JSON.stringify({
+        event: "role_expertise_fill_partial",
+        kept: generated.keptAfterPartial,
+        minCount,
+        maxCount,
+        skipped: generated.skipped,
+      }),
+    );
+  }
+  await storeRoleExpertiseQuestions({
+    organizationId: input.organizationId,
+    sessionId: input.sessionId,
+    questions: generated.questions,
+  });
 }
 
 async function finishIfPlanningIsComplete(

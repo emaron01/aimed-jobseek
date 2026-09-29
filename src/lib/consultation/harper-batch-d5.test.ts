@@ -72,7 +72,7 @@ function profile(input: {
 
 describe("Harper Batch D5 — career stage", () => {
   it("bumps prompt versions for career-stage instructions", () => {
-    expect(CONSULTATION_PROMPT_VERSION).toBe("31");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("32");
     expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("14");
   });
 
@@ -302,6 +302,7 @@ describe("Harper Batch D5 — career stage", () => {
         targets: [],
         profileItems: [],
         careerStage: "mid_career",
+        recentRoles: [],
         hiringTeam: [],
         seekerStatedFacts: [],
         companyResearch: null,

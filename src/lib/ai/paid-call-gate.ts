@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma-client";
 
 export type PaidCallOperation =
   | "HIRING_TEAM_IDENTIFY"
-  | "HIRING_TEAM_SYNTHESIZE";
+  | "HIRING_TEAM_SYNTHESIZE"
+  | "ROLE_EXPERTISE_QUESTIONS";
 
 /** Same hashing approach as cheatSheetPersonSectionInputHash. */
 export function fingerprintPaidCallInputs(canonical: unknown): string {

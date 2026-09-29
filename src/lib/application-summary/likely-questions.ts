@@ -17,6 +17,7 @@ import {
   looksLikeCareerWalkThrough,
   resolveInterviewTypeTag,
 } from "@/lib/consultation/questions";
+import { careerWalkThroughAlreadyAsked } from "@/lib/consultation/question-detection";
 
 const WHO_TAG_ORDER: InterviewTypeTag[] = [
   "screening",
@@ -51,15 +52,11 @@ export function sortLikelyQuestionsByWhoTag(
     .map((entry) => entry.item);
 }
 
+/** Shared one-walk-through check across coach, role-expertise, and Cheat Sheet. */
 export function harperAlreadyAskedCareerWalkThrough(
   turns: Array<{ speaker: string; targetKey: string | null; body: string }>,
 ): boolean {
-  return turns.some(
-    (turn) =>
-      turn.speaker === "CONSULTANT" &&
-      (turn.targetKey === CHRONOLOGY_TARGET_KEY ||
-        looksLikeCareerWalkThrough(turn.body)),
-  );
+  return careerWalkThroughAlreadyAsked(turns);
 }
 
 function partsGroundingFromItem(

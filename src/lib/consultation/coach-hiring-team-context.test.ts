@@ -119,6 +119,7 @@ describe("Coach Hiring Team context", () => {
         },
       ],
       careerStage: "early_career",
+      recentRoles: [],
       hiringTeam: [roleWithPerson()],
       seekerStatedFacts: [],
       companyResearch: {
@@ -177,6 +178,7 @@ describe("Coach Hiring Team context", () => {
       targets: [{ key: "forecasting", kind: "REQUIRED", text: "Forecasting" }],
       profileItems: [],
       careerStage: "early_career",
+      recentRoles: [],
       hiringTeam: [roleWithPerson()],
       seekerStatedFacts: [],
       companyResearch: null,
@@ -204,6 +206,7 @@ describe("Coach Hiring Team context", () => {
         targets: [],
         profileItems: [],
         careerStage: "early_career",
+        recentRoles: [],
         hiringTeam: [
           {
             id: "role_2",

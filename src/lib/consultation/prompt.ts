@@ -8,6 +8,7 @@ import {
   type InterviewerPrepPayload,
   type SeekerStatedFactPayload,
 } from "@/lib/consultation/contract";
+import type { RecentRole } from "@/lib/consultation/recent-roles";
 import {
   CONSULTATION_COACH_SYSTEM_INSTRUCTIONS,
   CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS,
@@ -47,6 +48,7 @@ export function buildConsultationCoachMessages(input: {
     roleId?: string | null;
   }>;
   careerStage: CareerStage;
+  recentRoles: RecentRole[];
   hiringTeam: CoachHiringTeamRole[];
   seekerStatedFacts: SeekerStatedFactPayload[];
   companyResearch: CoachCompanyResearch | null;
@@ -64,6 +66,7 @@ export function buildConsultationCoachMessages(input: {
       content: JSON.stringify({
         consultantName: consultationConfig.displayName,
         careerStage: input.careerStage,
+        recentRoles: input.recentRoles,
         personalProfileItems: input.profileItems,
         seekerStatedFacts: input.seekerStatedFacts,
         companyResearch: input.companyResearch,

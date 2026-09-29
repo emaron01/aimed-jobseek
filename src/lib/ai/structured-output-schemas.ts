@@ -21,6 +21,7 @@ import {
   consultationExtractSchema,
   consultationPolishSchema,
 } from "@/lib/consultation/contract";
+import { roleExpertiseResultSchema } from "@/lib/consultation/role-expertise";
 import { hiringTeamIdentificationSchema } from "@/lib/hiring-team/contract";
 import {
   applicationSummaryGuidanceGenerateSchema,
@@ -175,6 +176,11 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
     schemaName: "consultation_polish",
     schema: consultationPolishSchema,
     usageOperations: ["CONSULTATION_REPLY"],
+  },
+  roleExpertiseQuestions: {
+    schemaName: "role_expertise_questions",
+    schema: roleExpertiseResultSchema,
+    usageOperations: ["CONSULTATION"],
   },
   applicationSummaryGuidance: {
     schemaName: "application_summary_guidance",

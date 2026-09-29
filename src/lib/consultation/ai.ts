@@ -20,6 +20,7 @@ import {
   type InterviewerPrepPayload,
   type SeekerStatedFactPayload,
 } from "@/lib/consultation/contract";
+import type { RecentRole } from "@/lib/consultation/recent-roles";
 import {
   buildConsultationCoachMessages,
   buildConsultationExtractMessages,
@@ -54,6 +55,7 @@ export async function planConsultationWithModel(input: {
     roleId?: string | null;
   }>;
   careerStage: CareerStage;
+  recentRoles: RecentRole[];
   hiringTeam: CoachHiringTeamRole[];
   seekerStatedFacts: SeekerStatedFactPayload[];
   companyResearch: CoachCompanyResearch | null;

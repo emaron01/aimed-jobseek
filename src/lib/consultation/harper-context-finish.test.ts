@@ -60,6 +60,7 @@ describe("Harper context finish", () => {
       targets: [{ key: "comp", kind: "COMPETENCY", text: "Ownership" }],
       profileItems,
       careerStage: "early_career",
+      recentRoles: [],
       hiringTeam: [],
       seekerStatedFacts: [],
       companyResearch: {
@@ -87,7 +88,7 @@ describe("Harper context finish", () => {
   });
 
   it("bumps the consultation prompt version", () => {
-    expect(CONSULTATION_PROMPT_VERSION).toBe("31");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("32");
   });
 
   it("passes whyThisCompany into polish messages", () => {
