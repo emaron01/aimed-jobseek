@@ -675,18 +675,22 @@ export async function saveWhatYouShouldKnowAboutMeAction(
     if (!campaign) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }
+    const backgroundText = String(formData.get("background") ?? "");
     await saveSeekerStatedBackground({
       organizationId,
       productId: campaign.productId,
       userId: user.id,
       campaignId,
-      text: String(formData.get("background") ?? ""),
+      text: backgroundText,
     });
-    await enqueueApplicationJob({
+    const { enqueueSeekerBackgroundReassessIfChanged } = await import(
+      "@/lib/consultation/seeker-background-reassess"
+    );
+    await enqueueSeekerBackgroundReassessIfChanged({
       organizationId,
       campaignId,
-      type: "CONSULTATION",
-      payload: { operation: "reassess" },
+      userId: user.id,
+      text: backgroundText,
     });
     revalidatePath(`/campaigns/${campaignId}`);
     revalidatePath(`/campaigns/${campaignId}/consultation`);

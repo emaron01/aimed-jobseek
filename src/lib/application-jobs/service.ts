@@ -164,6 +164,8 @@ export function mergeApplicationJobPayload(
   if (incoming.assetType !== undefined) merged.assetType = incoming.assetType;
   if (incoming.purpose !== undefined) merged.purpose = incoming.purpose;
   if (incoming.planType !== undefined) merged.planType = incoming.planType;
+  if (incoming.gate !== undefined) merged.gate = incoming.gate;
+  if (incoming.fingerprint !== undefined) merged.fingerprint = incoming.fingerprint;
 
   const existingOps = consultationPlanningOperationsFromPayload(existing);
   const incomingOps = consultationPlanningOperationsFromPayload(incoming);

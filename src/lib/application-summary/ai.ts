@@ -10,6 +10,7 @@ import {
   cheatSheetPersonSectionGenerateSchema,
 } from "@/lib/application-summary/contract";
 import { buildApplicationSummaryGuidanceMessages } from "@/lib/application-summary/prompt";
+import { runGatedApplicationSummaryShell } from "@/lib/application-summary/shell-gate";
 import type { CareerStage } from "@/lib/consultation/career-stage";
 import { applicationSummaryConfig } from "@/lib/product-config";
 
@@ -39,7 +40,9 @@ export async function generateApplicationSummaryShell(input: {
   | { ok: false; message: string }
 > {
   if (!isConsultationAiConfigured()) return unavailable();
-  try {
+  const organizationId = input.usage?.organizationId;
+  const campaignId = input.usage?.campaignId?.trim();
+  const callProvider = async () => {
     const response = await getConsultationAiProvider().generateStructured({
       ...structuredOutputRequest("applicationSummaryShell"),
       ...(input.usage ? aiCallTracking(input.usage) : {}),
@@ -54,7 +57,19 @@ export async function generateApplicationSummaryShell(input: {
         coercedFields: [],
       }),
     });
-    return { ok: true, data: response.data };
+    return response.data;
+  };
+  try {
+    if (organizationId && campaignId) {
+      const gated = await runGatedApplicationSummaryShell({
+        organizationId,
+        campaignId,
+        sources: input.sources,
+        callProvider,
+      });
+      return { ok: true, data: gated.data };
+    }
+    return { ok: true, data: await callProvider() };
   } catch (error) {
     console.error(
       JSON.stringify({

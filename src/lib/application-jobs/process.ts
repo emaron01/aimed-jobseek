@@ -151,6 +151,8 @@ export async function processApplicationJob(
               campaignId: job.campaignId,
               operations: consultationPlanningOperationsFromPayload(payload),
               contactId: payload.contactId ?? job.targetId,
+              gate: payload.gate,
+              fingerprint: payload.fingerprint,
             });
             break;
           case "RESUME":
@@ -331,6 +333,8 @@ async function processConsultationJob(input: {
   campaignId: string;
   operations: string[];
   contactId?: string | null;
+  gate?: string;
+  fingerprint?: string;
 }): Promise<void> {
   // Answers first: incomplete SEEKER turns from the DB (DECISION 1).
   await drainConsultationUnprocessedInput({
@@ -345,6 +349,48 @@ async function processConsultationJob(input: {
       continue;
     }
     if (operation === "reassess") {
+      if (input.gate === "seeker_background") {
+        const {
+          recordSeekerBackgroundReassessFingerprint,
+          seekerBackgroundReassessFingerprintChanged,
+        } = await import("@/lib/consultation/seeker-background-reassess");
+        const { seekerBackgroundText } = await import(
+          "@/lib/product-research/seeker-background"
+        );
+        const { parseCandidateProfileSafe } = await import(
+          "@/lib/product-research/candidate-profile"
+        );
+        const campaign = await prisma.campaign.findFirst({
+          where: {
+            id: input.campaignId,
+            organizationId: input.organizationId,
+          },
+          select: { product: { select: { profileJson: true } } },
+        });
+        const parsed = campaign?.product.profileJson
+          ? parseCandidateProfileSafe(campaign.product.profileJson)
+          : null;
+        const text =
+          parsed?.ok === true ? seekerBackgroundText(parsed.profile) : "";
+        const { changed, fingerprint } =
+          await seekerBackgroundReassessFingerprintChanged({
+            organizationId: input.organizationId,
+            campaignId: input.campaignId,
+            text,
+          });
+        // Worker second line: unchanged background → no paid reassess.
+        if (!changed) continue;
+        await reassessConsultationStanding({
+          organizationId: input.organizationId,
+          campaignId: input.campaignId,
+        });
+        await recordSeekerBackgroundReassessFingerprint({
+          organizationId: input.organizationId,
+          campaignId: input.campaignId,
+          fingerprint: input.fingerprint ?? fingerprint,
+        });
+        continue;
+      }
       await reassessConsultationStanding({
         organizationId: input.organizationId,
         campaignId: input.campaignId,

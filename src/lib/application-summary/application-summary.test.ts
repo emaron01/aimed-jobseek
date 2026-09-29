@@ -490,6 +490,15 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
   });
 
   it("stores failure with no substitute guidance and supports retry", async () => {
+    // Phase 2 shell gate: clear prior receipt/overview so this retry path hits the provider.
+    await prisma.paidCallReceipt.deleteMany({
+      where: {
+        organizationId,
+        operation: "APPLICATION_SUMMARY_SHELL",
+        subjectKey: campaignId,
+      },
+    });
+    await prisma.applicationSummary.deleteMany({ where: { campaignId } });
     generateStructured
       .mockRejectedValueOnce(new Error("provider timeout"))
       .mockRejectedValueOnce(new Error("provider timeout"));
@@ -509,6 +518,15 @@ describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
   });
 
   it("generates overview without person sections, then one interviewer section on demand", async () => {
+    // Phase 2 shell gate: force a paid shell call so mode capture is asserted.
+    await prisma.paidCallReceipt.deleteMany({
+      where: {
+        organizationId,
+        operation: "APPLICATION_SUMMARY_SHELL",
+        subjectKey: campaignId,
+      },
+    });
+    await prisma.applicationSummary.deleteMany({ where: { campaignId } });
     await generateApplicationSummary({ organizationId, campaignId, userId });
     expect(capturedMode).toBe("shell");
     expect(capturedPeopleCount).toBe(0);

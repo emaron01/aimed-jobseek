@@ -843,6 +843,41 @@ export async function generateApplicationSummary(input: {
     throw new Error(message);
   }
 
+  const shellSources = sourcesForShell(data.sources);
+  // Worker second line: unchanged shell inputs → keep overview, no paid call.
+  if (existing?.overview) {
+    const {
+      APPLICATION_SUMMARY_SHELL_OPERATION,
+      applicationSummaryShellFingerprint,
+    } = await import("@/lib/application-summary/shell-gate");
+    const { findPaidCallReceipt } = await import("@/lib/ai/paid-call-gate");
+    const fingerprint = applicationSummaryShellFingerprint(shellSources);
+    const receipt = await findPaidCallReceipt({
+      organizationId: input.organizationId,
+      operation: APPLICATION_SUMMARY_SHELL_OPERATION,
+      subjectKey: input.campaignId,
+    });
+    if (receipt && receipt.inputHash === fingerprint) {
+      await prisma.applicationSummary.update({
+        where: { campaignId: input.campaignId },
+        data: {
+          status: "READY",
+          sourceHash: data.sourceHash,
+          generationError: null,
+          promptVersion: APPLICATION_SUMMARY_PROMPT_VERSION,
+        },
+      });
+      await enqueueMissingInterviewerCheatSheetSections({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        userId: actorId,
+        people: data.people,
+        existingPeople: existing.people,
+      });
+      return;
+    }
+  }
+
   await prisma.applicationSummary.upsert({
     where: { campaignId: input.campaignId },
     create: {
@@ -861,7 +896,7 @@ export async function generateApplicationSummary(input: {
   });
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const generated = await generateApplicationSummaryShell({
-      sources: sourcesForShell(data.sources),
+      sources: shellSources,
       usage,
     });
     if (!generated.ok) {

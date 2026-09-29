@@ -18,6 +18,10 @@ export type ApplicationJobPayload = {
    * Drain-only ops (process_reply / answer / reply / edit_answer) are never stored here.
    */
   operations?: string[];
+  /** Phase 2 gate: optional reason a reassess was enqueued (e.g. seeker_background). */
+  gate?: string;
+  /** Phase 2 gate: fingerprint recorded at enqueue for worker second-line skip. */
+  fingerprint?: string;
   userId?: string;
   personaId?: string;
   contactId?: string | null;

@@ -6,7 +6,10 @@ export type PaidCallOperation =
   | "HIRING_TEAM_IDENTIFY"
   | "HIRING_TEAM_SYNTHESIZE"
   | "ROLE_EXPERTISE_QUESTIONS"
-  | "CONSULTATION_LEARNINGS_REASSESS";
+  | "CONSULTATION_LEARNINGS_REASSESS"
+  | "JOB_REQUIREMENT_PARSE"
+  | "APPLICATION_SUMMARY_SHELL"
+  | "CONSULTATION_SEEKER_BACKGROUND_REASSESS";
 
 /** Same hashing approach as cheatSheetPersonSectionInputHash. */
 export function fingerprintPaidCallInputs(canonical: unknown): string {
