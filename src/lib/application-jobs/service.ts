@@ -21,6 +21,8 @@ const SERIALIZED_APPLICATION_JOB_TYPES = new Set<ApplicationJobType>([
   "NEXT_STEP",
   "RESUME",
   "COVER_LETTER",
+  "OUTREACH",
+  "CONTACT_PROFILE",
 ]);
 
 export function applicationJobAllowsFollowUpWhileRunning(

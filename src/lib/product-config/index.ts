@@ -116,5 +116,6 @@ export {
   outreachGreeting,
   outreachGroupKey,
   shouldIncludeRedirect,
+  unchangedContactProfileMessage,
 } from "./outreach";
 export type { OutreachAssetType } from "./outreach";

@@ -22,6 +22,11 @@ import {
   runGatedResumeAsset,
 } from "@/lib/application-assets/paid-inputs";
 import {
+  runGatedOutreachAsset,
+  runGatedOutreachClaimValidation,
+  runGatedOutreachFactSelection,
+} from "@/lib/application-assets/outreach-paid-inputs";
+import {
   assetClaimValidationSchema,
   coverLetterAssetContentSchema,
   emailAssetContentSchema,
@@ -164,7 +169,10 @@ export async function generateCoverLetterWithModel(input: {
 }
 
 async function selectOutreachFacts(
-  input: OutreachGenerationInput,
+  input: OutreachGenerationInput & {
+    contactId: string | null;
+    personaId: string | null;
+  },
 ): Promise<Result<OutreachFactCandidate[]>> {
   const candidates = outreachFactCandidates(input.context);
   if (candidates.length === 0) return { ok: true, data: [], skipped: false };
@@ -172,36 +180,38 @@ async function selectOutreachFacts(
     return { ok: false, message: EMAIL_FACTS_UNCONFIGURED };
   }
   try {
-    const response = await getEmailFactsAiProvider().generateStructured({
-      ...structuredOutputRequest("emailCompanyFactSelection"),
-      ...aiCallTracking(
-        assetUsage(
-          input.context,
-          "EMAIL_COMPANY_FACT_SELECTION",
-          "EMAIL_GENERATION",
-        ),
-      ),
-      messages: buildOutreachFactSelectionMessages({
-        context: input.context,
-        purpose: input.purpose,
-        candidates,
-      }),
-      parseOutput: (raw) => ({
-        data: emailFactSelectionResultSchema.parse(raw),
-        coercedFields: [],
-      }),
+    const gated = await runGatedOutreachFactSelection({
+      organizationId: input.context.organizationId,
+      campaignId: input.context.campaign.id,
+      personaId: input.personaId,
+      contactId: input.contactId,
+      purpose: input.purpose,
+      context: input.context,
+      candidates,
+      callProvider: async () => {
+        const response = await getEmailFactsAiProvider().generateStructured({
+          ...structuredOutputRequest("emailCompanyFactSelection"),
+          ...aiCallTracking(
+            assetUsage(
+              input.context,
+              "EMAIL_COMPANY_FACT_SELECTION",
+              "EMAIL_GENERATION",
+            ),
+          ),
+          messages: buildOutreachFactSelectionMessages({
+            context: input.context,
+            purpose: input.purpose,
+            candidates,
+          }),
+          parseOutput: (raw) => ({
+            data: emailFactSelectionResultSchema.parse(raw),
+            coercedFields: [],
+          }),
+        });
+        return response.data;
+      },
     });
-    if (response.data.noneRelevant) return { ok: true, data: [], skipped: false };
-    const byId = new Map(
-      candidates.map((candidate) => [candidate.candidateId, candidate]),
-    );
-    return {
-      ok: true,
-      data: response.data.selected
-        .map((row) => byId.get(row.candidateId))
-        .filter((row): row is OutreachFactCandidate => Boolean(row)),
-      skipped: false,
-    };
+    return { ok: true, data: gated.data, skipped: gated.skipped };
   } catch (error) {
     return failure(
       "outreachFactSelection",
@@ -212,17 +222,22 @@ async function selectOutreachFacts(
 }
 
 export async function generateOutreachWithModel(
-  input: OutreachGenerationInput,
+  input: OutreachGenerationInput & {
+    contactId: string | null;
+    personaId: string | null;
+    interviewStageId?: string | null;
+  },
 ): Promise<Result<ApplicationAssetContent>> {
   if (!isEmailAiConfigured()) {
     return { ok: false, message: EMAIL_UNCONFIGURED };
   }
   const selected = await selectOutreachFacts(input);
   if (!selected.ok) return selected;
-  const messages = buildOutreachAssetMessages({
+  const generationInput = {
     ...input,
     selectedFacts: selected.data,
-  });
+  };
+  const messages = buildOutreachAssetMessages(generationInput);
   const tracking = aiCallTracking(
     assetUsage(input.context, "EMAIL_GENERATION", "EMAIL_GENERATION"),
   );
@@ -232,7 +247,7 @@ export async function generateOutreachWithModel(
       error,
       "The outreach message could not be generated. Retry.",
     );
-  try {
+  const callProvider = async (): Promise<ApplicationAssetContent> => {
     if (input.type === "EMAIL") {
       const response = await getEmailAiProvider().generateStructured({
         ...structuredOutputRequest("outreachEmailAsset"),
@@ -243,7 +258,7 @@ export async function generateOutreachWithModel(
           coercedFields: [],
         }),
       });
-      return { ok: true, data: response.data, skipped: false };
+      return response.data;
     }
     if (input.type === "LINKEDIN_CONNECTION_NOTE") {
       const response = await getEmailAiProvider().generateStructured({
@@ -255,7 +270,7 @@ export async function generateOutreachWithModel(
           coercedFields: [],
         }),
       });
-      return { ok: true, data: response.data, skipped: false };
+      return response.data;
     }
     const response = await getEmailAiProvider().generateStructured({
       ...structuredOutputRequest("outreachLinkedinInmailAsset"),
@@ -266,7 +281,19 @@ export async function generateOutreachWithModel(
         coercedFields: [],
       }),
     });
-    return { ok: true, data: response.data, skipped: false };
+    return response.data;
+  };
+  try {
+    const gated = await runGatedOutreachAsset({
+      organizationId: input.context.organizationId,
+      campaignId: input.context.campaign.id,
+      personaId: input.personaId,
+      contactId: input.contactId,
+      interviewStageId: input.interviewStageId,
+      generationInput,
+      callProvider,
+    });
+    return { ok: true, data: gated.data, skipped: gated.skipped };
   } catch (error) {
     return failed(error);
   }
@@ -279,8 +306,16 @@ export async function validateAssetClaimsWithModel(input: {
     ReadyApplicationGenerationContext,
     "organizationId" | "userId" | "campaign"
   >;
-  /** When set, gate with PaidCallReceipt (resume/cover only — not outreach). */
+  /** When set, gate with PaidCallReceipt (resume/cover). */
   assetType?: "RESUME" | "COVER_LETTER";
+  /** When set, gate outreach claim validation per contact/channel/purpose. */
+  outreachGate?: {
+    assetType: OutreachGenerationInput["type"];
+    purpose: OutreachGenerationInput["purpose"];
+    personaId: string | null;
+    contactId: string | null;
+    interviewStageId?: string | null;
+  };
 }): Promise<Result<AssetClaimValidation>> {
   if (!isAssetAiConfigured()) return { ok: false, message: UNCONFIGURED };
   const tracking = input.context
@@ -314,6 +349,25 @@ export async function validateAssetClaimsWithModel(input: {
         organizationId: input.context.organizationId,
         campaignId: input.context.campaign.id,
         assetType: input.assetType,
+        claims: input.claims,
+        sources: input.sources,
+        callProvider,
+      });
+      return { ok: true, data: gated.data, skipped: gated.skipped };
+    }
+    if (
+      input.outreachGate &&
+      input.context?.organizationId &&
+      input.context.campaign.id
+    ) {
+      const gated = await runGatedOutreachClaimValidation({
+        organizationId: input.context.organizationId,
+        campaignId: input.context.campaign.id,
+        personaId: input.outreachGate.personaId,
+        contactId: input.outreachGate.contactId,
+        interviewStageId: input.outreachGate.interviewStageId,
+        assetType: input.outreachGate.assetType,
+        purpose: input.outreachGate.purpose,
         claims: input.claims,
         sources: input.sources,
         callProvider,

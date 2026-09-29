@@ -3,6 +3,7 @@ import { AiValidationError } from "@/lib/ai/errors";
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import type { AiCallUsageContext } from "@/lib/ai/types";
 import { aiCallTracking } from "@/lib/usage/ai-call";
+import { runGatedInterviewThankYouClarify } from "@/lib/interview/thank-you-paid-inputs";
 import {
   interviewClarifyingQuestionsSchema,
   interviewGuideContentSchema,
@@ -70,13 +71,16 @@ export function generateInterviewClarifyingQuestions(input: {
 export function generateInterviewThankYouClarifyingQuestions(input: {
   notes: string;
   qualityFeedback: string[];
+  organizationId: string;
+  campaignId: string;
+  stageId: string;
   usage?: AiCallUsageContext;
 }): Promise<Result<InterviewThankYouClarifyingQuestions>> {
   if (!isAssetAiConfigured()) {
     return Promise.resolve({ ok: false, message: UNCONFIGURED });
   }
-  return getAssetAiProvider()
-    .generateStructured({
+  const callProvider = async () => {
+    const response = await getAssetAiProvider().generateStructured({
       ...structuredOutputRequest("interviewThankYouClarifyingQuestions"),
       ...(input.usage ? aiCallTracking(input.usage) : {}),
       messages: buildInterviewThankYouClarifyingMessages(input),
@@ -84,8 +88,18 @@ export function generateInterviewThankYouClarifyingQuestions(input: {
         data: interviewThankYouClarifyingQuestionsSchema.parse(raw),
         coercedFields: [],
       }),
-    })
-    .then((response) => ({ ok: true as const, data: response.data }))
+    });
+    return response.data;
+  };
+  return runGatedInterviewThankYouClarify({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    stageId: input.stageId,
+    notes: input.notes,
+    qualityFeedback: input.qualityFeedback,
+    callProvider,
+  })
+    .then((gated) => ({ ok: true as const, data: gated.data }))
     .catch((error) =>
       failure(
         "interviewThankYouClarifyingQuestions",

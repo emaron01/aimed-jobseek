@@ -62,8 +62,8 @@ describe("application job serialize policy (source)", () => {
     expect(applicationJobAllowsFollowUpWhileRunning("NEXT_STEP")).toBe(true);
     expect(applicationJobAllowsFollowUpWhileRunning("RESUME")).toBe(true);
     expect(applicationJobAllowsFollowUpWhileRunning("COVER_LETTER")).toBe(true);
-    expect(applicationJobAllowsFollowUpWhileRunning("OUTREACH")).toBe(false);
-    expect(applicationJobAllowsFollowUpWhileRunning("CONTACT_PROFILE")).toBe(false);
+    expect(applicationJobAllowsFollowUpWhileRunning("OUTREACH")).toBe(true);
+    expect(applicationJobAllowsFollowUpWhileRunning("CONTACT_PROFILE")).toBe(true);
     expect(applicationJobAllowsFollowUpWhileRunning("INTERVIEW_GUIDE")).toBe(false);
     const service = readFileSync("src/lib/application-jobs/service.ts", "utf8");
     expect(service).toContain("SERIALIZED_APPLICATION_JOB_TYPES");
@@ -331,11 +331,7 @@ describe.skipIf(!hasTestDatabase())("application job serialize same-key (databas
 
   it("non-serialized types return the running job and create no follow-up", async () => {
     await clearJobs();
-    for (const type of [
-      "OUTREACH",
-      "CONTACT_PROFILE",
-      "INTERVIEW_GUIDE",
-    ] as const) {
+    for (const type of ["INTERVIEW_GUIDE"] as const) {
       const running = await prisma.applicationJob.create({
         data: {
           organizationId,
@@ -364,6 +360,40 @@ describe.skipIf(!hasTestDatabase())("application job serialize same-key (databas
           },
         }),
       ).toBe(0);
+    }
+  });
+
+  it("OUTREACH and CONTACT_PROFILE serialize one PENDING follow-up while running", async () => {
+    await clearJobs();
+    for (const type of ["OUTREACH", "CONTACT_PROFILE"] as const) {
+      const running = await prisma.applicationJob.create({
+        data: {
+          organizationId,
+          campaignId,
+          type,
+          targetId: `t-${type}`,
+          status: "IN_PROGRESS",
+          startedAt: new Date(),
+          workerHeartbeatAt: new Date(),
+        },
+      });
+      const followUp = await enqueueApplicationJob({
+        organizationId,
+        campaignId,
+        type,
+        targetId: running.targetId,
+        payload: type === "OUTREACH" ? { purpose: "PROACTIVE" } : undefined,
+      });
+      expect(followUp.id).not.toBe(running.id);
+      expect(followUp.status).toBe("PENDING");
+      const again = await enqueueApplicationJob({
+        organizationId,
+        campaignId,
+        type,
+        targetId: running.targetId,
+        payload: type === "OUTREACH" ? { purpose: "THANK_YOU" } : undefined,
+      });
+      expect(again.id).toBe(followUp.id);
     }
   });
 

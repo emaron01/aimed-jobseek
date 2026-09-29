@@ -6,7 +6,7 @@ import {
   queueIndividualProfileBuild,
   saveLinkedInPaste,
 } from "@/lib/contact-profile/service";
-import { outreachConfig, vocab } from "@/lib/product-config";
+import { outreachConfig, unchangedContactProfileMessage, vocab } from "@/lib/product-config";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
 
@@ -35,7 +35,7 @@ export async function saveLinkedInPasteAction(
     if (!campaignId || !contactId) {
       return { ok: false, message: `${vocab.contact.Singular} was not found.` };
     }
-    await saveLinkedInPaste({
+    const saved = await saveLinkedInPaste({
       organizationId,
       campaignId,
       contactId,
@@ -43,7 +43,12 @@ export async function saveLinkedInPasteAction(
       personaId: String(formData.get("personaId") ?? "").trim() || null,
     });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: outreachConfig.labels.saveLinkedIn };
+    return {
+      ok: true,
+      message: saved.queued
+        ? outreachConfig.labels.saveLinkedIn
+        : unchangedContactProfileMessage(saved.displayName),
+    };
   } catch (error) {
     return fail(error, "The LinkedIn profile could not be saved.");
   }
@@ -61,9 +66,18 @@ export async function buildIndividualProfileAction(
     if (!campaignId || !contactId) {
       return { ok: false, message: `${vocab.contact.Singular} was not found.` };
     }
-    await queueIndividualProfileBuild({ organizationId, campaignId, contactId });
+    const queued = await queueIndividualProfileBuild({
+      organizationId,
+      campaignId,
+      contactId,
+    });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: outreachConfig.labels.buildIndividual };
+    return {
+      ok: true,
+      message: queued.queued
+        ? outreachConfig.labels.buildIndividual
+        : unchangedContactProfileMessage(queued.displayName),
+    };
   } catch (error) {
     return fail(error, "The individual profile could not be started.");
   }

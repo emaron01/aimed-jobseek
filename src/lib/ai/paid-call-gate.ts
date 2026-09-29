@@ -13,7 +13,13 @@ export type PaidCallOperation =
   | "PRESENTATION_PLAN"
   | "RESUME_ASSET"
   | "COVER_LETTER_ASSET"
-  | "ASSET_CLAIM_VALIDATION";
+  | "ASSET_CLAIM_VALIDATION"
+  | "OUTREACH_FACT_SELECTION"
+  | "OUTREACH_ASSET"
+  | "OUTREACH_CLAIM_VALIDATION"
+  | "INTERVIEW_THANK_YOU_CLARIFY"
+  | "CONTACT_PROFILE_EXTRACT"
+  | "CONTACT_PROFILE_SYNTHESIZE";
 
 /** Same hashing approach as cheatSheetPersonSectionInputHash. */
 export function fingerprintPaidCallInputs(canonical: unknown): string {

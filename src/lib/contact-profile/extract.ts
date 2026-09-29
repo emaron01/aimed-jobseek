@@ -2,14 +2,16 @@ import { getPersonaAiProvider, isPersonaAiConfigured } from "@/lib/ai";
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import type { AiCallUsageContext } from "@/lib/ai/types";
 import {
-  CONTACT_PROFILE_PROMPT_VERSION,
   LINKEDIN_PASTE_SOURCE,
   interviewerExtractionSchema,
   linkedInExtractedSchema,
   type InterviewerExtractionResult,
   type LinkedInExtracted,
 } from "@/lib/contact-profile/contract";
-import { INTERVIEWER_EXTRACTION_INSTRUCTIONS } from "@/lib/prompt-content/interviewer-extraction";
+import {
+  buildInterviewerExtractionMessages,
+  runGatedContactProfileExtract,
+} from "@/lib/contact-profile/paid-inputs";
 import { aiCallTracking } from "@/lib/usage/ai-call";
 
 const UNCONFIGURED =
@@ -70,11 +72,14 @@ export function interviewerExtractFromModel(
  * LinkedIn page, a bio, a team page, or notes; nothing depends on headings.
  */
 export async function extractInterviewerFacts(input: {
+  organizationId: string;
+  campaignId: string;
+  contactId: string;
   pastedText: string;
   contactName: string;
   usage?: AiCallUsageContext;
 }): Promise<
-  { ok: true; data: LinkedInExtracted } | { ok: false; message: string }
+  { ok: true; data: LinkedInExtracted; skipped: boolean } | { ok: false; message: string }
 > {
   const text = input.pastedText.trim();
   if (!text) {
@@ -84,28 +89,29 @@ export async function extractInterviewerFacts(input: {
     return { ok: false, message: UNCONFIGURED };
   }
   try {
-    const response = await getPersonaAiProvider().generateStructured({
-      ...structuredOutputRequest("interviewerExtraction"),
-      ...(input.usage ? aiCallTracking(input.usage) : {}),
-      messages: [
-        {
-          role: "system",
-          content: `Prompt version: ${CONTACT_PROFILE_PROMPT_VERSION}\n\n${INTERVIEWER_EXTRACTION_INSTRUCTIONS}`,
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            personName: input.contactName,
+    const gated = await runGatedContactProfileExtract({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      contactId: input.contactId,
+      pastedText: text,
+      contactName: input.contactName,
+      callProvider: async () => {
+        const response = await getPersonaAiProvider().generateStructured({
+          ...structuredOutputRequest("interviewerExtraction"),
+          ...(input.usage ? aiCallTracking(input.usage) : {}),
+          messages: buildInterviewerExtractionMessages({
             pastedText: text,
+            contactName: input.contactName,
           }),
-        },
-      ],
-      parseOutput: (raw) => ({
-        data: interviewerExtractionSchema.parse(raw),
-        coercedFields: [],
-      }),
+          parseOutput: (raw) => ({
+            data: interviewerExtractionSchema.parse(raw),
+            coercedFields: [],
+          }),
+        });
+        return interviewerExtractFromModel(response.data);
+      },
     });
-    return { ok: true, data: interviewerExtractFromModel(response.data) };
+    return { ok: true, data: gated.data, skipped: gated.skipped };
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
     console.error(

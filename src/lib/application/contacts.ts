@@ -297,7 +297,12 @@ export async function updateApplicationContact(input: {
   linkedinUrl?: string | null;
   personaId?: string | null;
   pastedText?: string | null;
-}): Promise<{ contactId: string; pasteQueued: boolean }> {
+}): Promise<{
+  contactId: string;
+  pasteQueued: boolean;
+  pasteUnchanged: boolean;
+  pasteDisplayName: string;
+}> {
   const firstName = input.firstName.trim();
   const lastName = input.lastName.trim();
   const title = input.title.trim();
@@ -398,19 +403,28 @@ export async function updateApplicationContact(input: {
   const pastedText = input.pastedText?.trim() || "";
   const existingPaste = membership?.linkedInProfileText?.trim() || "";
   let pasteQueued = false;
+  let pasteUnchanged = false;
+  let pasteDisplayName = "";
   if (campaignId && pastedText && pastedText !== existingPaste) {
     const { saveLinkedInPaste } = await import("@/lib/contact-profile/service");
-    await saveLinkedInPaste({
+    const paste = await saveLinkedInPaste({
       organizationId: input.organizationId,
       campaignId,
       contactId: contact.id,
       pastedText,
       personaId: nextPersonaId,
     });
-    pasteQueued = true;
+    pasteQueued = paste.queued;
+    pasteUnchanged = !paste.queued;
+    pasteDisplayName = paste.displayName;
   }
 
-  return { contactId: contact.id, pasteQueued };
+  return {
+    contactId: contact.id,
+    pasteQueued,
+    pasteUnchanged,
+    pasteDisplayName,
+  };
 }
 
 export async function updateApplicationContactRole(input: {

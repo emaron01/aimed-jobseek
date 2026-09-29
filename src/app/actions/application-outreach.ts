@@ -239,6 +239,43 @@ export async function generateOutreachAssetAction(
         };
       }
     }
+    const contactId = String(formData.get("contactId") ?? "").trim() || null;
+    const interviewStageId =
+      String(formData.get("interviewStageId") ?? "").trim() || null;
+    const followUpToAssetId =
+      String(formData.get("followUpToAssetId") ?? "").trim() || null;
+    const regenerationInstruction =
+      String(formData.get("regenerationInstruction") ?? "").trim() || null;
+    const skipThankYouQuestions =
+      String(formData.get("skipThankYouQuestions") ?? "") === "1" ||
+      (purpose === "THANK_YOU" && Boolean(regenerationInstruction));
+    const thankYouAnswers = formData
+      .getAll("thankYouAnswerId")
+      .map((raw, index) => ({
+        id: String(raw),
+        answer: String(formData.getAll("thankYouAnswer")[index] ?? ""),
+      }));
+    const { outreachGenerateWouldSkip, outreachUnchangedSkipMessage } =
+      await import("@/lib/application-assets/outreach");
+    if (
+      await outreachGenerateWouldSkip({
+        organizationId,
+        campaignId: id,
+        userId: user.id,
+        type,
+        personaId,
+        contactId,
+        purpose,
+        followUpToAssetId,
+        interviewStageId,
+        emailLength,
+        regenerationInstruction,
+        skipThankYouQuestions,
+        thankYouAnswers,
+      })
+    ) {
+      return { ok: true, message: outreachUnchangedSkipMessage(purpose) };
+    }
     await enqueueApplicationJob({
       organizationId,
       campaignId: id,
@@ -249,25 +286,14 @@ export async function generateOutreachAssetAction(
         userId: user.id,
         assetType: type,
         personaId,
-        contactId: String(formData.get("contactId") ?? "").trim() || undefined,
+        contactId: contactId || undefined,
         purpose,
-        followUpToAssetId:
-          String(formData.get("followUpToAssetId") ?? "").trim() || null,
-        interviewStageId:
-          String(formData.get("interviewStageId") ?? "").trim() || null,
+        followUpToAssetId,
+        interviewStageId,
         emailLength,
-        regenerationInstruction:
-          String(formData.get("regenerationInstruction") ?? "").trim() || null,
-        skipThankYouQuestions:
-          String(formData.get("skipThankYouQuestions") ?? "") === "1" ||
-          (purpose === "THANK_YOU" &&
-            Boolean(
-              String(formData.get("regenerationInstruction") ?? "").trim(),
-            )),
-        thankYouAnswers: formData.getAll("thankYouAnswerId").map((raw, index) => ({
-          id: String(raw),
-          answer: String(formData.getAll("thankYouAnswer")[index] ?? ""),
-        })),
+        regenerationInstruction,
+        skipThankYouQuestions,
+        thankYouAnswers,
       },
     });
     revalidate(id);

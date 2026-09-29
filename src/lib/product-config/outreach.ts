@@ -70,6 +70,9 @@ export const outreachConfig = Object.freeze({
     saveLinkedIn: "Save pasted profile",
     buildIndividual: "Generate individual profile",
     rebuildIndividual: "Regenerate individual profile",
+    unchangedOutreach: "No Changes To Outreach",
+    unchangedThankYouNote: "No Changes To Thank-You Note",
+    unchangedCheckIn: "No Changes To Check-In",
     commonGround: "Common ground",
     individualProfile: "Individual profile",
     remindersTitle: "Follow-up reminders",
@@ -244,6 +247,12 @@ export function shouldIncludeRedirect(input: {
 }): boolean {
   if (!input.hasContact) return true;
   return !input.roleConfirmed;
+}
+
+/** Seeker message when contact profile rebuild is skipped (unchanged paste inputs). */
+export function unchangedContactProfileMessage(displayName: string): string {
+  const name = displayName.trim() || vocab.contact.Singular;
+  return `No Changes To ${name}'s Profile`;
 }
 
 export function outreachGroupKey(input: {

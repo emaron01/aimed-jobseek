@@ -37,7 +37,11 @@ export async function saveLinkedInPaste(input: {
   contactId: string;
   pastedText: string;
   personaId?: string | null;
-}): Promise<{ suggestedPersonaId: string | null; queued: boolean }> {
+}): Promise<{
+  suggestedPersonaId: string | null;
+  queued: boolean;
+  displayName: string;
+}> {
   const text = input.pastedText.trim();
   if (!text) throw new TenantError(outreachConfig.labels.pasteProfileRequired);
   const membership = await prisma.campaignContact.findFirst({
@@ -53,6 +57,10 @@ export async function saveLinkedInPaste(input: {
       `${vocab.contact.Singular} was not found on this ${vocab.campaign.singular}.`,
     );
   }
+  const displayName =
+    [membership.contact.firstName, membership.contact.lastName]
+      .filter(Boolean)
+      .join(" ") || vocab.contact.Singular;
   const override = input.personaId?.trim() || null;
   const nextPersonaId =
     override ?? (await matchedPersonaId(input, membership.contact.title));
@@ -62,7 +70,7 @@ export async function saveLinkedInPaste(input: {
     membership.individualProfileStatus === "COMPLETED" &&
     membership.individualProfileJson != null
   ) {
-    return { suggestedPersonaId: nextPersonaId, queued: false };
+    return { suggestedPersonaId: nextPersonaId, queued: false, displayName };
   }
   await prisma.campaignContact.update({
     where: { id: membership.id },
@@ -82,7 +90,7 @@ export async function saveLinkedInPaste(input: {
     targetId: membership.contactId,
   });
   // Cheat sheet section is queued once after CONTACT_PROFILE finishes.
-  return { suggestedPersonaId: nextPersonaId, queued: true };
+  return { suggestedPersonaId: nextPersonaId, queued: true, displayName };
 }
 
 /**
@@ -138,16 +146,53 @@ export async function queueIndividualProfileBuild(input: {
   organizationId: string;
   campaignId: string;
   contactId: string;
-}): Promise<void> {
+}): Promise<{ queued: boolean; displayName: string }> {
   const membership = await prisma.campaignContact.findFirst({
     where: {
       organizationId: input.organizationId,
       campaignId: input.campaignId,
       contactId: input.contactId,
     },
+    include: {
+      contact: true,
+      chosenPersona: true,
+    },
   });
   if (!membership?.linkedInProfileText) {
     throw new TenantError(outreachConfig.labels.pasteProfileRequired);
+  }
+  const displayName =
+    [membership.contact.firstName, membership.contact.lastName]
+      .filter(Boolean)
+      .join(" ") || vocab.contact.Singular;
+  const extracted = parseLinkedInExtracted(membership.linkedInExtractedJson);
+  if (
+    extracted &&
+    membership.individualProfileStatus === "COMPLETED" &&
+    membership.individualProfileJson != null
+  ) {
+    const role = membership.chosenPersona;
+    const narrative =
+      role && isHiringTeamPersonaBuilt(role)
+        ? (role.profileJson as { narrative?: unknown }).narrative ?? null
+        : null;
+    const { contactProfileBuildUnchanged } = await import(
+      "@/lib/contact-profile/paid-inputs"
+    );
+    if (
+      await contactProfileBuildUnchanged({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        contactId: input.contactId,
+        pastedText: membership.linkedInProfileText,
+        contactName: displayName,
+        extracted,
+        roleName: role?.name ?? null,
+        roleNarrative: narrative,
+      })
+    ) {
+      return { queued: false, displayName };
+    }
   }
   await prisma.campaignContact.update({
     where: { id: membership.id },
@@ -162,6 +207,7 @@ export async function queueIndividualProfileBuild(input: {
     type: "CONTACT_PROFILE",
     targetId: input.contactId,
   });
+  return { queued: true, displayName };
 }
 
 export async function buildContactIndividualProfile(input: {
@@ -192,6 +238,9 @@ export async function buildContactIndividualProfile(input: {
     .filter(Boolean)
     .join(" ");
   const read = await extractInterviewerFacts({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    contactId: input.contactId,
     pastedText: membership.linkedInProfileText,
     contactName,
     usage: {
@@ -232,6 +281,9 @@ export async function buildContactIndividualProfile(input: {
       ? (role.profileJson as { narrative?: unknown }).narrative ?? null
       : null;
   const generated = await generateIndividualProfileWithModel({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    contactId: input.contactId,
     contactName,
     extracted,
     profileText: membership.linkedInProfileText,

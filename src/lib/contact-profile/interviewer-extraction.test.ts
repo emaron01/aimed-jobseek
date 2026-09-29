@@ -18,6 +18,17 @@ vi.mock("@/lib/ai", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/contact-profile/paid-inputs", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/contact-profile/paid-inputs")>();
+  return {
+    ...actual,
+    runGatedContactProfileExtract: async (input: {
+      callProvider: () => Promise<unknown>;
+    }) => ({ data: await input.callProvider(), skipped: false }),
+  };
+});
+
 const LINKEDIN_PASTE = `Dana Reyes
 VP Revenue Operations at Northline
 About
@@ -179,14 +190,23 @@ describe("interviewer extraction from any pasted text", () => {
       "@/lib/contact-profile/extract"
     );
     const linkedIn = await extractInterviewerFacts({
+      organizationId: "org-test",
+      campaignId: "camp-test",
+      contactId: "contact-dana",
       pastedText: LINKEDIN_PASTE,
       contactName: "Dana Reyes",
     });
     const bio = await extractInterviewerFacts({
+      organizationId: "org-test",
+      campaignId: "camp-test",
+      contactId: "contact-erik",
       pastedText: BIO_PASTE,
       contactName: "Erik Chen",
     });
     const team = await extractInterviewerFacts({
+      organizationId: "org-test",
+      campaignId: "camp-test",
+      contactId: "contact-christina",
       pastedText: TEAM_PAGE_PASTE,
       contactName: "Christina Schivley",
     });
@@ -226,6 +246,9 @@ describe("interviewer extraction from any pasted text", () => {
       "@/lib/contact-profile/extract"
     );
     const thin = await extractInterviewerFacts({
+      organizationId: "org-test",
+      campaignId: "camp-test",
+      contactId: "contact-thin",
       pastedText: "Christina works at CSC.",
       contactName: "Christina",
     });

@@ -7,7 +7,7 @@ import {
   workspaceApplicationContactsHref,
   workspaceContactEditHref,
 } from "@/lib/application/workspace-links";
-import { vocab, workspaceProgressText } from "@/lib/product-config";
+import { vocab, workspaceProgressText, unchangedContactProfileMessage } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 
@@ -61,7 +61,9 @@ export async function updateApplicationContactAction(
       ok: true,
       message: result.pasteQueued
         ? workspaceProgressText("CONTACT_PROFILE")
-        : "Saved.",
+        : result.pasteUnchanged
+          ? unchangedContactProfileMessage(result.pasteDisplayName)
+          : "Saved.",
     };
   } catch (error) {
     if (error instanceof TenantError) {

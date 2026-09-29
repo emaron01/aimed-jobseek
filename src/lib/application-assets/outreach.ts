@@ -467,6 +467,13 @@ export async function validateOutreachContent(input: {
   priorMessages?: Array<{ subject: string | null; body: string }>;
   stageNotes?: string | null;
   mentionApplied?: boolean;
+  outreachGate?: {
+    assetType: "EMAIL" | "LINKEDIN_CONNECTION_NOTE" | "LINKEDIN_INMAIL";
+    purpose: "PROACTIVE" | "FOLLOW_UP" | "THANK_YOU" | "CHECK_IN";
+    personaId: string | null;
+    contactId: string | null;
+    interviewStageId?: string | null;
+  };
 }): Promise<string[]> {
   if (
     input.content.type !== "EMAIL" &&
@@ -572,6 +579,7 @@ export async function validateOutreachContent(input: {
     claims: citedClaims,
     sources: input.context.sources,
     context: input.context,
+    outreachGate: input.outreachGate,
   });
   if (!modelValidation.ok) return [modelValidation.message];
   return [
@@ -888,6 +896,9 @@ export async function generateOutreachAsset(input: {
           const generated = await generateInterviewThankYouClarifyingQuestions({
             notes: interviewStageNotes,
             qualityFeedback: [],
+            organizationId: input.organizationId,
+            campaignId: input.campaignId,
+            stageId: interviewStageId,
             usage: {
               organizationId: input.organizationId,
               campaignId: input.campaignId,
@@ -1061,6 +1072,9 @@ export async function generateOutreachAsset(input: {
       mentionApplied,
       regenerationInstruction: input.regenerationInstruction ?? null,
       qualityFeedback: [],
+      contactId,
+      personaId,
+      interviewStageId,
     });
     if (!generated.ok) {
       console.error(
@@ -1076,6 +1090,31 @@ export async function generateOutreachAsset(input: {
         return { ok: false, message: generated.message, violations: feedback };
       }
       continue;
+    }
+    // Worker second line: unchanged inputs keep the current version (no new draft).
+    if (generated.skipped) {
+      const groupKey = outreachGroupKey({
+        type: input.type as
+          | "EMAIL"
+          | "LINKEDIN_CONNECTION_NOTE"
+          | "LINKEDIN_INMAIL",
+        personaId,
+        contactId,
+        purpose: input.purpose,
+        interviewStageId,
+      });
+      const latest = await prisma.applicationAsset.findFirst({
+        where: {
+          organizationId: input.organizationId,
+          campaignId: input.campaignId,
+          groupKey,
+        },
+        orderBy: { version: "desc" },
+        select: { id: true, version: true },
+      });
+      if (latest) {
+        return { ok: true, assetId: latest.id, version: latest.version };
+      }
     }
     const content = replaceEmDashesDeep(generated.data);
     const saved = await saveOutreachVersion({
@@ -1097,6 +1136,248 @@ export async function generateOutreachAsset(input: {
     message: lastOutreachMessage(feedback),
     violations: feedback,
   };
+}
+
+/**
+ * True when Generate/Regenerate can skip enqueue (unchanged model inputs and a
+ * current draft already exists). Clarifying-question-only thank-you paths that
+ * already have a matching receipt also skip.
+ */
+export async function outreachGenerateWouldSkip(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  type: ApplicationAssetType;
+  personaId: string;
+  contactId?: string | null;
+  purpose: ApplicationOutreachPurpose;
+  followUpToAssetId?: string | null;
+  interviewStageId?: string | null;
+  emailLength?: EmailLength | null;
+  regenerationInstruction?: string | null;
+  skipThankYouQuestions?: boolean;
+  thankYouAnswers?: Array<{ id: string; answer: string }>;
+}): Promise<boolean> {
+  if (!isOutreachAssetType(input.type)) return false;
+  const personaId = input.personaId.trim();
+  if (!personaId) return false;
+  const contactId = input.contactId?.trim() || null;
+  const interviewStageId = input.interviewStageId?.trim() || null;
+  const interviewPurpose =
+    input.purpose === "THANK_YOU" || input.purpose === "CHECK_IN";
+
+  if (interviewPurpose) {
+    if (!interviewStageId || !contactId) return false;
+    const stage = await prisma.interviewStage.findFirst({
+      where: {
+        id: interviewStageId,
+        campaignId: input.campaignId,
+        organizationId: input.organizationId,
+      },
+      select: { notesAfter: true, thankYouClarifyJson: true },
+    });
+    if (!stage) return false;
+    const resolvedNotes = resolveInterviewThankYouNotes({
+      notesAfter: stage.notesAfter,
+      regenerationInstruction: input.regenerationInstruction,
+    });
+    if (!resolvedNotes.notes) return false;
+    if (input.purpose === "THANK_YOU") {
+      const stored = parseThankYouClarify(stage.thankYouClarifyJson);
+      const answers =
+        input.thankYouAnswers?.filter((row) => row.answer.trim()) ??
+        stored.answers;
+      const skipped =
+        Boolean(input.skipThankYouQuestions) ||
+        stored.skipped ||
+        resolvedNotes.usedInstruction;
+      if (
+        !notesDescribeConversation(resolvedNotes.notes) &&
+        !skipped &&
+        answers.length === 0
+      ) {
+        const { interviewThankYouClarifyUnchanged } = await import(
+          "@/lib/interview/thank-you-paid-inputs"
+        );
+        return interviewThankYouClarifyUnchanged({
+          organizationId: input.organizationId,
+          campaignId: input.campaignId,
+          stageId: interviewStageId,
+          notes: resolvedNotes.notes,
+          qualityFeedback: [],
+        });
+      }
+    }
+  }
+
+  const base = await loadApplicationGenerationContext(
+    input.campaignId,
+    input.userId,
+    { personaId },
+  );
+  if (base.organizationId !== input.organizationId) return false;
+  if (!base.requirement || !base.profile || !base.persona) return false;
+  let context = base as ReadyApplicationGenerationContext;
+  let confirmedHiringManagerRole = false;
+  let roleConfirmed = false;
+  let contact: { firstName: string | null } | null = null;
+  if (contactId) {
+    const membership = await prisma.campaignContact.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        contactId,
+      },
+      include: {
+        contact: { select: { firstName: true } },
+        chosenPersona: { select: { suggestionKey: true } },
+      },
+    });
+    if (!membership) return false;
+    contact = membership.contact;
+    roleConfirmed = membership.roleConfirmed;
+    confirmedHiringManagerRole =
+      membership.chosenPersona?.suggestionKey === "hiring_manager" ||
+      (membership.chosenPersonaId === personaId &&
+        context.persona?.suggestionKey === "hiring_manager");
+    if (membership.individualProfileJson) {
+      context = {
+        ...context,
+        sources: [
+          ...context.sources,
+          {
+            id: `contact:${contactId}:individual-profile`,
+            text: JSON.stringify(membership.individualProfileJson),
+            category: "PERSONA",
+            url: null,
+          },
+        ],
+      };
+    }
+  }
+
+  let interviewStageNotes: string | null = null;
+  if (interviewPurpose && interviewStageId) {
+    const stage = await prisma.interviewStage.findFirst({
+      where: {
+        id: interviewStageId,
+        campaignId: input.campaignId,
+        organizationId: input.organizationId,
+      },
+      select: { notesAfter: true, thankYouClarifyJson: true },
+    });
+    if (!stage) return false;
+    const resolvedNotes = resolveInterviewThankYouNotes({
+      notesAfter: stage.notesAfter,
+      regenerationInstruction: input.regenerationInstruction,
+    });
+    interviewStageNotes = resolvedNotes.notes;
+    if (input.purpose === "THANK_YOU") {
+      const stored = parseThankYouClarify(stage.thankYouClarifyJson);
+      const answers =
+        input.thankYouAnswers?.filter((row) => row.answer.trim()) ??
+        stored.answers;
+      if (answers.length > 0) {
+        interviewStageNotes = [
+          interviewStageNotes,
+          ...answers.map((row) => row.answer),
+        ]
+          .filter(Boolean)
+          .join("\n");
+        context = withThankYouAnswerSources(context, interviewStageId, answers);
+      }
+    }
+  }
+
+  let priorMessage: { subject: string | null; body: string } | null = null;
+  if (input.purpose === "FOLLOW_UP") {
+    if (!input.followUpToAssetId?.trim()) return false;
+    const prior = await prisma.applicationAsset.findFirst({
+      where: {
+        id: input.followUpToAssetId,
+        campaignId: input.campaignId,
+        organizationId: input.organizationId,
+        sentAt: { not: null },
+      },
+    });
+    if (!prior) return false;
+    const parsed = applicationAssetContentSchema.safeParse(prior.contentJson);
+    if (!parsed.success) return false;
+    priorMessage = composeOutreachText(parsed.data);
+  }
+
+  const channel = input.type === "EMAIL" ? "email" : "linkedin";
+  const greeting = outreachGreeting({
+    channel,
+    firstName: contact ? contactFirstName(contact) : null,
+  });
+  const signerName = context.profile.identity.name?.text ?? "";
+  if (input.type === "EMAIL" && !signerName) return false;
+  const emailLength =
+    input.type === "EMAIL" ? input.emailLength ?? "MEDIUM" : null;
+  const mentionApplied = !isApplicationInterviewingOrLater(
+    context.campaign.applicationProgress,
+  );
+  const includeRedirect = interviewPurpose
+    ? false
+    : shouldIncludeRedirect({
+        hasContact: Boolean(contact),
+        roleConfirmed,
+      });
+
+  const {
+    outreachAssetFingerprint,
+    outreachAssetGenerationUnchanged,
+    selectedOutreachFactsIfUnchanged,
+  } = await import("@/lib/application-assets/outreach-paid-inputs");
+
+  const selectedFacts = await selectedOutreachFactsIfUnchanged({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    personaId,
+    contactId,
+    purpose: input.purpose,
+    context,
+  });
+  // Without a matching fact-selection receipt (when candidates exist), generation
+  // would pay for facts first — do not skip enqueue.
+  if (selectedFacts === null) return false;
+
+  const fingerprint = outreachAssetFingerprint({
+    context,
+    type: input.type,
+    greeting,
+    signerName,
+    confirmedHiringManagerRole,
+    includeRedirect,
+    purpose: input.purpose,
+    emailLength,
+    priorMessage,
+    interviewStageNotes,
+    mentionApplied,
+    regenerationInstruction: input.regenerationInstruction ?? null,
+    qualityFeedback: [],
+    selectedFacts,
+  });
+
+  return outreachAssetGenerationUnchanged({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    type: input.type,
+    personaId,
+    contactId,
+    purpose: input.purpose,
+    interviewStageId,
+    fingerprint,
+  });
+}
+
+export function outreachUnchangedSkipMessage(
+  purpose: ApplicationOutreachPurpose,
+): string {
+  if (purpose === "THANK_YOU") return outreachConfig.labels.unchangedThankYouNote;
+  if (purpose === "CHECK_IN") return outreachConfig.labels.unchangedCheckIn;
+  return outreachConfig.labels.unchangedOutreach;
 }
 
 function lastOutreachMessage(feedback: string[]): string {
