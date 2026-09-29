@@ -60,6 +60,11 @@ import {
 import {
   isRawSeekerResult,
 } from "@/lib/consultation/results";
+import {
+  normalizePolishAnswer,
+  validatePolishPartsQuality,
+  type AnswerPartsGrounding,
+} from "@/lib/consultation/polish-parts";
 import { nextConsultationStatus } from "@/lib/consultation/state";
 import {
   harperCoachingVoiceViolations,
@@ -560,6 +565,13 @@ async function extractAnswerWithQuality(input: {
   };
 }
 
+function interviewAnswerGroundingJson(
+  grounding: AnswerPartsGrounding | null,
+): Prisma.InputJsonValue {
+  if (!grounding) return [];
+  return grounding as Prisma.InputJsonValue;
+}
+
 export async function polishAnswerWithQuality(input: {
   answer: string;
   story: {
@@ -580,7 +592,18 @@ export async function polishAnswerWithQuality(input: {
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
   supportingEvidence?: string[];
   usage?: AiCallUsageContext;
-}) {
+}): Promise<
+  | {
+      ok: true;
+      data: {
+        interviewAnswer: string;
+        resumeBullet: string | null;
+        strengtheningNote: string | null;
+        answerPartsGrounding: AnswerPartsGrounding | null;
+      };
+    }
+  | { ok: false; message: string }
+> {
   const seekerAnswers =
     input.seekerAnswers?.map((answer) => answer.trim()).filter(Boolean) ??
     input.answer
@@ -592,10 +615,15 @@ export async function polishAnswerWithQuality(input: {
   const voiceSamples = await voiceSamplesForUsage(input.usage);
   let lastFailure: string = consultationConversationCopy.generationFailed;
   let qualityFeedback: string[] = [];
-  let lastAcceptable: Extract<
-    Awaited<ReturnType<typeof polishAnswerWithModel>>,
-    { ok: true }
-  > | null = null;
+  let lastAcceptable: {
+    ok: true;
+    data: {
+      interviewAnswer: string;
+      resumeBullet: string | null;
+      strengtheningNote: string | null;
+      answerPartsGrounding: AnswerPartsGrounding | null;
+    };
+  } | null = null;
   for (
     let attempt = 0;
     attempt <= consultationConfig.qualityRegenerationAttempts;
@@ -620,10 +648,34 @@ export async function polishAnswerWithQuality(input: {
       lastFailure = polished.message;
       continue;
     }
-    const interviewText = polished.data.interviewAnswer.trim();
+    const lastAttempt =
+      attempt === consultationConfig.qualityRegenerationAttempts;
+    const partIssues = validatePolishPartsQuality({
+      data: polished.data,
+      whyThisCompany,
+      confirmedGap,
+      maxWords: consultationConfig.interviewAnswerMaxWords,
+    });
+    if (partIssues.length > 0) {
+      lastFailure = consultationConversationCopy.generationFailed;
+      qualityFeedback = partIssues;
+      if (lastAttempt) {
+        return {
+          ok: false as const,
+          message: lastFailure,
+        };
+      }
+      continue;
+    }
+    const normalized = normalizePolishAnswer({
+      data: polished.data,
+      whyThisCompany,
+      confirmedGap,
+    });
+    const interviewText = normalized.interviewAnswer.trim();
     const bulletText = whyThisCompany
       ? ""
-      : polished.data.resumeBullet?.trim() ?? "";
+      : normalized.resumeBullet?.trim() ?? "";
     const interviewRaw = Boolean(
       interviewText && isRawSeekerResult(interviewText, seekerAnswers),
     );
@@ -633,8 +685,6 @@ export async function polishAnswerWithQuality(input: {
         bulletText &&
         isRawSeekerResult(bulletText, seekerAnswers),
     );
-    const lastAttempt =
-      attempt === consultationConfig.qualityRegenerationAttempts;
     if (interviewRaw || bulletRaw) {
       lastFailure = consultationConversationCopy.generationFailed;
       qualityFeedback = [
@@ -653,11 +703,11 @@ export async function polishAnswerWithQuality(input: {
       continue;
     }
     const accepted = {
-      ...polished,
+      ok: true as const,
       data: {
-        ...polished.data,
+        ...normalized,
         resumeBullet:
-          confirmedGap || whyThisCompany ? null : polished.data.resumeBullet,
+          confirmedGap || whyThisCompany ? null : normalized.resumeBullet,
       },
     };
     const empty = whyThisCompany
@@ -1710,14 +1760,18 @@ async function processAnswerGeneration(input: {
           kind: "INTERVIEW_ANSWER",
           content: interviewText,
           strengtheningNote: null,
-          groundingJson: [],
+          groundingJson: interviewAnswerGroundingJson(
+            polished.data.answerPartsGrounding,
+          ),
           promptVersion: CONSULTATION_PROMPT_VERSION,
         },
         update: {
           status: "DRAFT",
           content: interviewText,
           strengtheningNote: null,
-          groundingJson: [],
+          groundingJson: interviewAnswerGroundingJson(
+            polished.data.answerPartsGrounding,
+          ),
           promptVersion: CONSULTATION_PROMPT_VERSION,
           generation: { increment: 1 },
           approvedAt: null,
@@ -1941,6 +1995,7 @@ async function processAnswerGeneration(input: {
       kind: "INTERVIEW_ANSWER" as const,
       content: interviewText,
       note: polished.data.strengtheningNote?.trim() || null,
+      grounding: polished.data.answerPartsGrounding,
     },
     ...(confirmedGap || !polished.data.resumeBullet || !bulletText
       ? []
@@ -1949,6 +2004,7 @@ async function processAnswerGeneration(input: {
             kind: "RESUME_BULLET" as const,
             content: bulletText,
             note: null,
+            grounding: null as AnswerPartsGrounding | null,
           },
         ]),
   ];
@@ -1980,14 +2036,20 @@ async function processAnswerGeneration(input: {
           kind: statement.kind,
           content: statement.content,
           strengtheningNote: statement.note,
-          groundingJson: [],
+          groundingJson:
+            statement.kind === "INTERVIEW_ANSWER"
+              ? interviewAnswerGroundingJson(statement.grounding)
+              : [],
           promptVersion: CONSULTATION_PROMPT_VERSION,
         },
         update: {
           status: "DRAFT",
           content: statement.content,
           strengtheningNote: statement.note,
-          groundingJson: [],
+          groundingJson:
+            statement.kind === "INTERVIEW_ANSWER"
+              ? interviewAnswerGroundingJson(statement.grounding)
+              : [],
           promptVersion: CONSULTATION_PROMPT_VERSION,
           generation: { increment: 1 },
           approvedAt: null,
@@ -2802,12 +2864,14 @@ async function declineConsultationFollowUp(input: {
     kind: "INTERVIEW_ANSWER" | "RESUME_BULLET";
     value: { text: string };
     strengtheningNote: string | null;
+    grounding: AnswerPartsGrounding | null;
   }> = [];
   if (polished.data.interviewAnswer.trim()) {
     statements.push({
       kind: "INTERVIEW_ANSWER",
       value: { text: polished.data.interviewAnswer.trim() },
       strengtheningNote: polished.data.strengtheningNote?.trim() || null,
+      grounding: polished.data.answerPartsGrounding,
     });
   }
   if (!confirmedGap && polished.data.resumeBullet?.trim()) {
@@ -2815,6 +2879,7 @@ async function declineConsultationFollowUp(input: {
       kind: "RESUME_BULLET",
       value: { text: polished.data.resumeBullet.trim() },
       strengtheningNote: null,
+      grounding: null,
     });
   }
   await prisma.$transaction([
@@ -2858,14 +2923,20 @@ async function declineConsultationFollowUp(input: {
           kind: statement.kind,
           content: statement.value.text.trim(),
           strengtheningNote: statement.strengtheningNote,
-          groundingJson: [],
+          groundingJson:
+            statement.kind === "INTERVIEW_ANSWER"
+              ? interviewAnswerGroundingJson(statement.grounding)
+              : [],
           promptVersion: CONSULTATION_PROMPT_VERSION,
         },
         update: {
           status: "DRAFT",
           content: statement.value.text.trim(),
           strengtheningNote: statement.strengtheningNote,
-          groundingJson: [],
+          groundingJson:
+            statement.kind === "INTERVIEW_ANSWER"
+              ? interviewAnswerGroundingJson(statement.grounding)
+              : [],
           promptVersion: CONSULTATION_PROMPT_VERSION,
           generation: { increment: 1 },
           approvedAt: null,
@@ -3178,7 +3249,10 @@ export async function regenerateConsultationStatement(input: {
           statement.kind === "INTERVIEW_ANSWER"
             ? polished.data.strengtheningNote?.trim() || null
             : null,
-        groundingJson: [],
+        groundingJson:
+          statement.kind === "INTERVIEW_ANSWER"
+            ? interviewAnswerGroundingJson(polished.data.answerPartsGrounding)
+            : [],
         promptVersion: CONSULTATION_PROMPT_VERSION,
         generation: { increment: 1 },
         approvedAt: null,
@@ -3282,7 +3356,6 @@ export async function approveConsultationStatement(input: {
       data: {
         status: "APPROVED",
         content,
-        groundingJson: [],
         approvedAt: now,
       },
     }),

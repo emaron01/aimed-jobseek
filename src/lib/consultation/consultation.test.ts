@@ -298,7 +298,13 @@ function installConsultationModelFixture() {
       if (payload.whyThisCompany) {
         return {
           data: {
+            answerFramework: null,
             interviewAnswer: `I want to work here because ${answerText}`,
+            challenge: null,
+            situation: null,
+            task: null,
+            action: null,
+            result: null,
             resumeBullet: null,
             strengtheningNote: null,
           },
@@ -307,8 +313,14 @@ function installConsultationModelFixture() {
       if (payload.confirmedGap) {
         return {
           data: {
+            answerFramework: null,
             interviewAnswer:
               "I have not done that work yet. The closest related experience I have is the reliability work I already own, and I would close the gap in this role by ramping on the missing piece in the first weeks.",
+            challenge: null,
+            situation: null,
+            task: null,
+            action: null,
+            result: null,
             resumeBullet: null,
             strengtheningNote: null,
           },
@@ -322,7 +334,14 @@ function installConsultationModelFixture() {
       ) {
         return {
           data: {
-            interviewAnswer: "In my words, I owned the reliability rewrite without citing internal ids.",
+            answerFramework: "CAR" as const,
+            interviewAnswer: null,
+            challenge: "I owned a reliability rewrite at Northwind.",
+            situation: null,
+            task: null,
+            action: "I rewrote the failing path without citing internal ids.",
+            result:
+              "Failed runs fell and the payments path held through the next releases.",
             resumeBullet: "Owned the reliability rewrite.",
             strengtheningNote: null,
           },
@@ -334,7 +353,13 @@ function installConsultationModelFixture() {
       ) {
         return {
           data: {
-            interviewAnswer: "copy me exactly",
+            answerFramework: "CAR" as const,
+            interviewAnswer: null,
+            challenge: "copy me exactly",
+            situation: null,
+            task: null,
+            action: "copy me exactly",
+            result: "copy me exactly with more outcome words here now",
             resumeBullet: "copy me exactly",
             strengtheningNote: null,
           },
@@ -346,9 +371,14 @@ function installConsultationModelFixture() {
       ) {
         return {
           data: {
-            interviewAnswer:
-              "I cut failed runs from 8% to 1%. The starting point was 8%.",
-            resumeBullet: "I cut failed runs from 8% to 1%.",
+            answerFramework: "CAR" as const,
+            interviewAnswer: null,
+            challenge: "I inherited failed runs at 8%.",
+            situation: null,
+            task: null,
+            action: "I rewrote the failing path.",
+            result: "I cut failed runs from 8% to 1% across the releases.",
+            resumeBullet: "Cut failed runs from 8% to 1%.",
             strengtheningNote: null,
           },
         };
@@ -359,6 +389,7 @@ function installConsultationModelFixture() {
           .map((item) => item.trim())
           .filter(Boolean)
           .at(-1) ?? answerText;
+      const metric = text.match(/\d+%/)?.[0] ?? null;
       const supported = (payload.supportingEvidence ?? []).join(" ").trim();
       if (
         (payload.targetStrength === "PARTIAL" && supported) ||
@@ -367,7 +398,14 @@ function installConsultationModelFixture() {
         const evidence = supported || "owned production payments reliability";
         return {
           data: {
-            interviewAnswer: `I already had this in my profile: ${evidence}. ${text}`,
+            answerFramework: "CAR" as const,
+            interviewAnswer: null,
+            challenge: `I already had this in my profile: ${evidence}.`,
+            situation: null,
+            task: null,
+            action: `I built on that with ${text}`,
+            result:
+              "That closed the gap for this role and the story held in interview prep.",
             resumeBullet: `${evidence}; ${text}`,
             strengtheningNote: null,
           },
@@ -375,8 +413,20 @@ function installConsultationModelFixture() {
       }
       return {
         data: {
-          interviewAnswer: `In my words, ${text}`,
-          resumeBullet: `Result: ${text}`,
+          answerFramework: "CAR" as const,
+          interviewAnswer: null,
+          challenge:
+            "I faced a production reliability problem that was blocking delivery.",
+          situation: null,
+          task: null,
+          action:
+            "I rewrote the failing path with the team and tracked the releases.",
+          result: metric
+            ? `Failed jobs fell by ${metric} and the pipeline held afterward.`
+            : "That changed the outcome for the team and the work held afterward.",
+          resumeBullet: metric
+            ? `Stabilized the failing path; failures improved around ${metric}.`
+            : "Stabilized the failing path and held the releases.",
           strengtheningNote: payload.declinedFollowUp
             ? `The ${payload.strengtheningNeeds?.[0] ?? "ACTION"} would be stronger with more detail about what you personally did.`
             : null,
@@ -1650,7 +1700,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("29");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("30");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("You coach; you do not interrogate");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("askedQuestions");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -2351,8 +2401,16 @@ describe("consultation evidence and questions", () => {
 
     generateStructured.mockImplementation(async () => ({
       data: {
-        interviewAnswer: "The seeker reduced failed invoice runs from eight percent to one percent.",
-        resumeBullet: "Reduced failed invoice runs from eight percent to one percent.",
+        answerFramework: "CAR" as const,
+        interviewAnswer: null,
+        challenge: "The seeker faced failed invoice runs.",
+        situation: null,
+        task: null,
+        action: "The seeker rewrote the failing path.",
+        result:
+          "The seeker reduced failed invoice runs from eight percent to one percent.",
+        resumeBullet:
+          "Reduced failed invoice runs from eight percent to one percent.",
         strengtheningNote: null,
       },
     }));
@@ -4283,8 +4341,14 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       ) {
         return {
           data: {
-            interviewAnswer:
-              "In my words, I owned the reliability rewrite without citing internal ids.",
+            answerFramework: "CAR" as const,
+            interviewAnswer: null,
+            challenge: "I owned a reliability rewrite at Northwind.",
+            situation: null,
+            task: null,
+            action: "I rewrote the failing path without citing internal ids.",
+            result:
+              "Failed runs fell and the payments path held through the next releases.",
             resumeBullet: "Owned the reliability rewrite.",
             strengtheningNote: null,
           },
@@ -4292,8 +4356,14 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       }
       return {
         data: {
-          interviewAnswer:
-            "In my words, I owned consult_turn_1_fact_0 at Northwind.",
+          answerFramework: "CAR" as const,
+          interviewAnswer: null,
+          challenge: "I owned consult_turn_1_fact_0 at Northwind.",
+          situation: null,
+          task: null,
+          action: "I rewrote the failing payments path.",
+          result:
+            "Failed runs fell and the payments path held through the next releases.",
           resumeBullet: "Owned the reliability rewrite.",
           strengtheningNote: null,
         },

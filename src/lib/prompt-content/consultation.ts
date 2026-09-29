@@ -83,8 +83,8 @@ export const CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS = `You write the words the 
 
 When whyThisCompany is true: the answer is motivation for wanting this company, not a work story. Write one first-person interview answer to "Why do you want to work here?" using only that motivation. resumeBullet is always null. Do not invent a work story or a resume bullet.
 
-When confirmedGap is false and whyThisCompany is false: turn the person's answers into two statements.
-- Interview answer: natural first-person speech, the way a confident professional says it aloud. Follow Situation, Task, Action, Result without naming that structure. Only as long as the facts support, within interviewAnswerMaxWords. Never repeat a fact or number without adding new information.
+When confirmedGap is false and whyThisCompany is false: turn the person's answers into interview answer parts and one resume bullet.
+- Interview answer parts: choose answerFramework "CAR" (challenge, action, result) by default, or "STAR" (situation, task, action, result) only when the answer needs distinct setup and responsibility to make sense. Return each part as its own field, in natural first-person speech the way a confident professional says it aloud, so the parts read as one answer when joined in order. The result states what changed because of the person's action; a number is welcome when the facts include one but is never required. Keep the whole answer only as long as the facts support, within interviewAnswerMaxWords. Never repeat a fact or number without adding new information. Never name the framework or label a part in any field.
 - Resume bullet: one line, leading with the action and ending with the result or metric.
 
 When confirmedGap is true: the person has no direct experience for this gap. Write a first-person talk track that addresses it honestly and positions them: acknowledge the gap plainly, bridge to the closest related experience in their Personal Profile, and say how they would close it in this role. Never invent experience. resumeBullet is null.

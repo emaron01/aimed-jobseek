@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONSULTATION_PROMPT_VERSION = "29";
+export const CONSULTATION_PROMPT_VERSION = "30";
 
 export const WHY_THIS_COMPANY_TARGET_KEY = "why-this-company";
 export const PERSON_PREP_TARGET_PREFIX = "person-prep:";
@@ -100,8 +100,23 @@ export const consultationExtractSchema = z.object({
   companyMotivation: z.string().nullable(),
 });
 
+/** Interview answer frameworks (internal only — never shown to the seeker). */
+export const ANSWER_FRAMEWORKS = ["CAR", "STAR"] as const;
+export type AnswerFramework = (typeof ANSWER_FRAMEWORKS)[number];
+
+/**
+ * Flat polish schema (OpenAI strict root object). Exceptions use interviewAnswer;
+ * non-exceptions use answerFramework plus that framework's parts. Empty/null
+ * combinations are rejected in the polish quality loop.
+ */
 export const consultationPolishSchema = z.object({
-  interviewAnswer: z.string(),
+  answerFramework: z.enum(ANSWER_FRAMEWORKS).nullable(),
+  interviewAnswer: z.string().nullable(),
+  challenge: z.string().nullable(),
+  situation: z.string().nullable(),
+  task: z.string().nullable(),
+  action: z.string().nullable(),
+  result: z.string().nullable(),
   resumeBullet: z.string().nullable(),
   strengtheningNote: z.string().nullable(),
 });
@@ -117,6 +132,14 @@ export type ConsultationExtractAnswer = ConsultationExtractResult & {
   gapDecision: "evidence" | "no_evidence" | "incomplete";
 };
 export type ConsultationPolishResult = z.infer<typeof consultationPolishSchema>;
+
+export function isConsultationPolishPartsResult(
+  value: ConsultationPolishResult,
+): value is ConsultationPolishResult & {
+  answerFramework: AnswerFramework;
+} {
+  return value.answerFramework === "CAR" || value.answerFramework === "STAR";
+}
 
 export function isConsultationExtractAnswer(
   value: ConsultationExtractResult,
