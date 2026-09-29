@@ -73,7 +73,7 @@ Confirmed Harper and Cheat Sheet components do not render `answerFramework`, par
 
 ## 7. Commit / branch
 
-- Commit: _(filled after commit)_
+- Commit: `a84af8e19588064e735bab6762ffabc7edc28b93`
 - Pushed: `checkpoint/harper-prep-hub` (not main)
 
 ## 8. Safety
