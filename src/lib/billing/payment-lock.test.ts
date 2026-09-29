@@ -201,7 +201,6 @@ describe("payment lock route gate", () => {
     const gate = readFileSync("src/lib/billing/payment-lock-gate.ts", "utf8");
     const lock = readFileSync("src/lib/billing/payment-lock.ts", "utf8");
     expect(gate).not.toContain('redirect("/settings/billing")');
-    expect(gate).toContain("OrganizationReadOnlyError");
     expect(lock).toContain("PAYMENT_LOCK_ROUTE_EXEMPT_PREFIXES");
     expect(lock).toContain('"/settings/billing"');
     expect(lock).toContain('"/onboarding/eula"');
@@ -215,12 +214,20 @@ describe("payment lock route gate", () => {
       "src/lib/tenant/getCurrentOrganization.ts",
       "utf8",
     );
+    const spend = readFileSync(
+      "src/lib/billing/organization-spend.ts",
+      "utf8",
+    );
+    // B4: layout gate no longer blanket-throws so logout/delete work from any
+    // page while read-only. Write refusal remains on requireOrganization.
     expect(gate).toContain("NEXT_ACTION_HEADER");
-    expect(gate).toContain("OrganizationReadOnlyError");
+    expect(gate).toContain("requireOrganization");
+    expect(gate).not.toContain("throw new OrganizationReadOnlyError");
     expect(org).toContain("NEXT_ACTION_HEADER");
     expect(org).toContain("assertOrganizationWritable");
     expect(org).toContain("outside a request scope");
     expect(org).toContain("throw error");
+    expect(spend).toContain("OrganizationReadOnlyError");
   });
 
   it("assert uses spendBlocked / read-only for writes", () => {

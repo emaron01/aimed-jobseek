@@ -4,9 +4,111 @@ import { AppButton } from "@/components/AppButton";
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { logoutAction } from "@/app/actions/account";
+import { useActionState } from "react";
+import { logoutAction, deleteMyAccountAction } from "@/app/actions/account";
 import { switchActiveOrganizationAction } from "@/app/actions/workspace";
 import type { UserMenuModel } from "@/lib/auth/user-menu";
+import {
+  DELETE_MY_ACCOUNT_BUTTON_LABEL,
+  DELETE_MY_ACCOUNT_CONFIRM_BODY,
+  DELETE_MY_ACCOUNT_CONFIRM_PHRASE,
+  DELETE_MY_ACCOUNT_MENU_LABEL,
+} from "@/lib/account/delete-my-account";
+
+function DeleteMyAccountMenuItem() {
+  const [open, setOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  const [state, formAction, pending] = useActionState(
+    deleteMyAccountAction,
+    null,
+  );
+  const titleId = useId();
+  const inputId = useId();
+  const matches = confirmation === DELETE_MY_ACCOUNT_CONFIRM_PHRASE;
+
+  if (!open && confirmation) {
+    setConfirmation("");
+  }
+
+  return (
+    <div data-testid="user-menu-delete_my_account-wrap">
+      {!open ? (
+        <AppButton
+          type="button"
+          variant="secondary"
+          role="menuitem"
+          data-testid="user-menu-delete_my_account"
+          className="w-full !justify-start !px-4 !py-2 text-danger hover:bg-canvas"
+          onClick={() => setOpen(true)}
+        >
+          {DELETE_MY_ACCOUNT_MENU_LABEL}
+        </AppButton>
+      ) : (
+        <div
+          className="space-y-3 border-t border-edge bg-danger-tint/40 px-4 py-3"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          data-testid="delete-my-account-confirm"
+        >
+          <p id={titleId} className="text-sm text-ink">
+            {DELETE_MY_ACCOUNT_CONFIRM_BODY}
+          </p>
+          <form action={formAction} className="space-y-3">
+            <label htmlFor={inputId} className="block text-sm text-ink">
+              Type{" "}
+              <span className="font-mono font-semibold">
+                {DELETE_MY_ACCOUNT_CONFIRM_PHRASE}
+              </span>{" "}
+              to confirm
+              <input
+                id={inputId}
+                name="confirmation"
+                value={confirmation}
+                onChange={(e) => setConfirmation(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 font-mono text-sm"
+                data-testid="delete-my-account-confirm-input"
+              />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <AppButton
+                type="submit"
+                variant="danger"
+                disabled={!matches || pending}
+                data-testid="delete-my-account-submit"
+              >
+                {pending ? "Deleting…" : DELETE_MY_ACCOUNT_BUTTON_LABEL}
+              </AppButton>
+              <AppButton
+                type="button"
+                variant="secondary"
+                disabled={pending}
+                data-testid="delete-my-account-cancel"
+                onClick={() => {
+                  setOpen(false);
+                  setConfirmation("");
+                }}
+              >
+                Cancel
+              </AppButton>
+            </div>
+          </form>
+          {state && !state.ok ? (
+            <p
+              className="text-sm text-danger"
+              role="alert"
+              data-testid="delete-my-account-error"
+            >
+              {state.message}
+            </p>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function UserMenu({ model }: { model: UserMenuModel }) {
   const [open, setOpen] = useState(false);
@@ -140,7 +242,10 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
 
           <div className="py-1">
             {model.links
-              .filter((link) => link.id !== "log_out")
+              .filter(
+                (link) =>
+                  link.id !== "log_out" && link.id !== "delete_my_account",
+              )
               .map((link) => (
                 <Link
                   key={link.id}
@@ -157,6 +262,9 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
                   {link.label}
                 </Link>
               ))}
+            {model.links.some((link) => link.id === "delete_my_account") ? (
+              <DeleteMyAccountMenuItem />
+            ) : null}
           </div>
 
           <div className="border-t border-edge p-1">
