@@ -53,6 +53,7 @@ export async function loadOrderedAnsweredHarperQuestions(input: {
             sequence: true,
             analysisJson: true,
             intent: true,
+            questionContextJson: true,
           },
         },
         statements: {
@@ -109,6 +110,7 @@ export async function loadOrderedAnsweredHarperQuestions(input: {
       sequence: turn.sequence,
       analysisJson: turn.analysisJson,
       intent: turn.intent,
+      questionContextJson: turn.questionContextJson,
     })),
     statements: session.statements.map((statement) => ({
       id: statement.id,

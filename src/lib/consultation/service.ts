@@ -359,6 +359,7 @@ async function addTurn(input: {
     requirementInterpretation: string | null;
     hiringTeamRoleId: string;
     whoCaresNote: string;
+    interviewTypeTag: string;
   };
   intent?: string | null;
 }) {
@@ -1167,6 +1168,7 @@ async function planAndStoreRound(input: {
         requirementInterpretation: question.requirementInterpretation,
         hiringTeamRoleId: question.hiringTeamRoleId,
         whoCaresNote: question.whoCaresNote,
+        interviewTypeTag: question.interviewTypeTag,
       },
     });
   }
@@ -2219,6 +2221,7 @@ function toQaTurns(
     sequence: number;
     analysisJson?: unknown;
     intent?: string | null;
+    questionContextJson?: unknown;
   }>,
 ): QaTurn[] {
   return turns.map((turn) => ({
@@ -2230,6 +2233,7 @@ function toQaTurns(
     sequence: turn.sequence,
     analysisJson: turn.analysisJson,
     intent: turn.intent,
+    questionContextJson: turn.questionContextJson,
   }));
 }
 

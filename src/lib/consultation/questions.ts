@@ -5,8 +5,10 @@ import {
   sameRequirementMeaning,
 } from "@/lib/consultation/assess";
 import {
+  CHRONOLOGY_TARGET_KEY,
   WHY_THIS_COMPANY_TARGET_KEY,
   type AskedConsultationQuestion,
+  type InterviewTypeTag,
 } from "@/lib/consultation/contract";
 import {
   looksLikeCareerWalkThrough,
@@ -29,7 +31,26 @@ export type PlannedQuestion = {
   requirementInterpretation: string | null;
   hiringTeamRoleId: string;
   whoCaresNote: string;
+  interviewTypeTag: InterviewTypeTag;
 };
+
+/** Topic-driven WHO tags; model tag is kept for every other question. */
+export function resolveInterviewTypeTag(input: {
+  targetKey: string;
+  text: string;
+  modelTag: InterviewTypeTag;
+}): InterviewTypeTag {
+  if (
+    input.targetKey === CHRONOLOGY_TARGET_KEY ||
+    looksLikeCareerWalkThrough(input.text)
+  ) {
+    return "chronological_walk_through";
+  }
+  if (input.targetKey === WHY_THIS_COMPANY_TARGET_KEY) {
+    return "screening";
+  }
+  return input.modelTag;
+}
 
 export type DroppedQuestion = {
   targetKey: string;
@@ -225,6 +246,7 @@ function questionForGap(input: {
         requirementInterpretation: string | null;
         hiringTeamRoleId: string;
         whoCaresNote: string;
+        interviewTypeTag: InterviewTypeTag;
       }
     | undefined;
   hiringTeam: Array<{ id: string; name: string }>;
@@ -257,15 +279,28 @@ function questionForGap(input: {
       },
     };
   }
+  if (!modelQuestion) {
+    return {
+      dropped: {
+        targetKey: gap.key,
+        reason: "The model did not return a question for this requirement.",
+      },
+    };
+  }
   return {
     question: {
       targetKey: gap.key,
       followUp: false,
       text,
       requirementInterpretation:
-        modelQuestion?.requirementInterpretation?.trim() || null,
+        modelQuestion.requirementInterpretation?.trim() || null,
       hiringTeamRoleId: role.id,
-      whoCaresNote: modelQuestion?.whoCaresNote.trim() || "",
+      whoCaresNote: modelQuestion.whoCaresNote.trim() || "",
+      interviewTypeTag: resolveInterviewTypeTag({
+        targetKey: gap.key,
+        text,
+        modelTag: modelQuestion.interviewTypeTag,
+      }),
     },
   };
 }
@@ -339,6 +374,7 @@ export function planQuestionRound(input: {
     requirementInterpretation: string | null;
     hiringTeamRoleId: string;
     whoCaresNote: string;
+    interviewTypeTag: InterviewTypeTag;
   }>;
   hiringTeam: Array<{ id: string; name: string }>;
   askedKeys: ReadonlySet<string>;
@@ -449,6 +485,11 @@ export function planQuestionRound(input: {
           modelQuestion.requirementInterpretation?.trim() || null,
         hiringTeamRoleId: role.id,
         whoCaresNote: modelQuestion.whoCaresNote.trim(),
+        interviewTypeTag: resolveInterviewTypeTag({
+          targetKey: "chronology",
+          text: chronologyText,
+          modelTag: modelQuestion.interviewTypeTag,
+        }),
       });
     }
   }

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONSULTATION_PROMPT_VERSION = "28";
+export const CONSULTATION_PROMPT_VERSION = "29";
 
 export const WHY_THIS_COMPANY_TARGET_KEY = "why-this-company";
 export const PERSON_PREP_TARGET_PREFIX = "person-prep:";
@@ -9,6 +9,16 @@ export const ROLE_EXPERTISE_TARGET_PREFIX = "role-expertise:";
 export const CHRONOLOGY_TARGET_KEY = "chronology";
 /** Answers given on the Cheat Sheet (and former Stage coach items). */
 export const CHEAT_SHEET_TARGET_PREFIX = "cheatSheet:";
+
+/** WHO interview types (Geoff Smart). Internal only — never shown to the seeker. */
+export const INTERVIEW_TYPE_TAGS = [
+  "screening",
+  "chronological_walk_through",
+  "focused_competency",
+  "reference_check_prep",
+] as const;
+export type InterviewTypeTag = (typeof INTERVIEW_TYPE_TAGS)[number];
+export const interviewTypeTagSchema = z.enum(INTERVIEW_TYPE_TAGS);
 
 export type InterviewerPrepPayload = {
   contactId: string;
@@ -52,6 +62,7 @@ export const consultationPlanSchema = z.object({
       requirementInterpretation: z.string().nullable(),
       hiringTeamRoleId: z.string(),
       whoCaresNote: z.string(),
+      interviewTypeTag: interviewTypeTagSchema,
     }),
   ),
 });

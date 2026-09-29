@@ -68,6 +68,7 @@ describe("generated content is not rejected", () => {
           requirementInterpretation: "Lead enterprise sales",
           hiringTeamRoleId: "hm",
           whoCaresNote: "Needs a story.",
+        interviewTypeTag: "focused_competency" as const,
         },
       ],
       hiringTeam: [{ id: "hm", name: "Hiring Manager" }],

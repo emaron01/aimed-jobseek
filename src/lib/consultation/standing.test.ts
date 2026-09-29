@@ -72,6 +72,7 @@ describe("Harper core loop standing", () => {
         requirementInterpretation: null,
         hiringTeamRoleId: "hm",
         whoCaresNote: "The Hiring Manager needs this story.",
+      interviewTypeTag: "focused_competency" as const,
       })),
       hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
       askedKeys: new Set(),

@@ -70,6 +70,7 @@ describe("Harper Batch A standing Answer / Ignore / reopen", () => {
           requirementInterpretation: null,
           hiringTeamRoleId: "hm",
           whoCaresNote: "HM needs the channel story.",
+        interviewTypeTag: "focused_competency" as const,
         },
         {
           targetKey: "required:b",
@@ -77,6 +78,7 @@ describe("Harper Batch A standing Answer / Ignore / reopen", () => {
           requirementInterpretation: null,
           hiringTeamRoleId: "hm",
           whoCaresNote: "HM needs the forecast story.",
+        interviewTypeTag: "focused_competency" as const,
         },
       ],
       hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
@@ -194,6 +196,7 @@ describe("Harper Batch A standing Answer / Ignore / reopen", () => {
           requirementInterpretation: null,
           hiringTeamRoleId: "hm",
           whoCaresNote: "HM needs this.",
+        interviewTypeTag: "focused_competency" as const,
         },
       ],
       hiringTeam: [{ id: "hm", name: "Hiring Manager" }],

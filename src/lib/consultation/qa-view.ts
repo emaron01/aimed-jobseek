@@ -1,3 +1,7 @@
+import {
+  INTERVIEW_TYPE_TAGS,
+  type InterviewTypeTag,
+} from "@/lib/consultation/contract";
 import { consultationConversationCopy } from "@/lib/product-config/consultation";
 
 export type QaTurn = {
@@ -9,6 +13,7 @@ export type QaTurn = {
   sequence: number;
   analysisJson?: unknown;
   intent?: string | null;
+  questionContextJson?: unknown;
 };
 
 export type QaStatement = {
@@ -30,6 +35,11 @@ export type ConsultationQaItem = {
   statements: QaStatement[];
   resumeBullet: QaStatement | null;
   talkingPoint: QaStatement | null;
+  /**
+   * WHO interview type from questionContextJson. Null for older turns.
+   * Never shown to the seeker.
+   */
+  interviewTypeTag?: InterviewTypeTag | null;
   /** Seeker dismissed this question; show Ignored link until reopened. */
   ignored?: boolean;
   /**
@@ -38,6 +48,16 @@ export type ConsultationQaItem = {
    */
   needsMoreDetail?: boolean;
 };
+
+export function interviewTypeTagFromQuestionContext(
+  value: unknown,
+): InterviewTypeTag | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const tag = (value as { interviewTypeTag?: unknown }).interviewTypeTag;
+  return INTERVIEW_TYPE_TAGS.includes(tag as InterviewTypeTag)
+    ? (tag as InterviewTypeTag)
+    : null;
+}
 
 export type ConsultationQaView = {
   questions: ConsultationQaItem[];
@@ -123,6 +143,9 @@ function emptyItem(turn: QaTurn): ConsultationQaItem {
     statements: [],
     resumeBullet: null,
     talkingPoint: null,
+    interviewTypeTag: interviewTypeTagFromQuestionContext(
+      turn.questionContextJson,
+    ),
     ignored: false,
   };
 }

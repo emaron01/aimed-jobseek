@@ -100,6 +100,7 @@ describe("sales leadership years calculation", () => {
           requirementInterpretation: null,
           hiringTeamRoleId: "hm",
           whoCaresNote: "The Hiring Manager needs exact months to calculate tenure.",
+        interviewTypeTag: "focused_competency" as const,
         },
       ],
       hiringTeam: [{ id: "hm", name: "Hiring Manager" }],

@@ -158,7 +158,37 @@ function isOpenQuestion(item: ConsultationQaItem): boolean {
   return consultationQuestionAcceptsReply(item);
 }
 
-/** Open questions first, then answered — stable by original order within each group. */
+const WHO_TAG_ORDER = [
+  "screening",
+  "chronological_walk_through",
+  "focused_competency",
+  "reference_check_prep",
+] as const;
+
+function whoTagRank(item: ConsultationQaItem): number {
+  const tag = item.interviewTypeTag ?? "focused_competency";
+  const index = WHO_TAG_ORDER.indexOf(tag);
+  return index >= 0 ? index : WHO_TAG_ORDER.indexOf("focused_competency");
+}
+
+/** Stable WHO order within a list (missing tag sorts as focused_competency). */
+export function sortQuestionsByWhoTag(
+  questions: ConsultationQaItem[],
+): ConsultationQaItem[] {
+  return questions
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) => {
+      const rank = whoTagRank(left.item) - whoTagRank(right.item);
+      if (rank !== 0) return rank;
+      return left.index - right.index;
+    })
+    .map((entry) => entry.item);
+}
+
+/**
+ * Open questions first, then answered. Within each group, WHO tag order
+ * (screening → chronological_walk_through → focused_competency → reference_check_prep).
+ */
 export function sortQuestionsOpenFirst(
   questions: ConsultationQaItem[],
 ): ConsultationQaItem[] {
@@ -168,7 +198,7 @@ export function sortQuestionsOpenFirst(
     if (isOpenQuestion(item)) open.push(item);
     else answered.push(item);
   }
-  return [...open, ...answered];
+  return [...sortQuestionsByWhoTag(open), ...sortQuestionsByWhoTag(answered)];
 }
 
 /**

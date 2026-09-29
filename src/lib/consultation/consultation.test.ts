@@ -204,6 +204,7 @@ function installConsultationModelFixture() {
           requirementInterpretation: null,
           hiringTeamRoleId: hiringRole.id,
           whoCaresNote: `${hiringRole.name} needs to hear concrete evidence tied to this requirement.`,
+        interviewTypeTag: "focused_competency" as const,
         })),
         {
           targetKey: "chronology",
@@ -211,6 +212,7 @@ function installConsultationModelFixture() {
           requirementInterpretation: null,
           hiringTeamRoleId: hiringRole.id,
           whoCaresNote: `${hiringRole.name} needs to understand the progression of your work.`,
+        interviewTypeTag: "focused_competency" as const,
         },
       ].filter(
         (question) =>
@@ -753,6 +755,7 @@ describe("consultation evidence and questions", () => {
       requirementInterpretation: null,
       hiringTeamRoleId: "hm",
       whoCaresNote: "The Hiring Manager needs concrete evidence of the outcome.",
+    interviewTypeTag: "focused_competency" as const,
     }));
     modelQuestions.push({
       targetKey: "chronology",
@@ -760,6 +763,7 @@ describe("consultation evidence and questions", () => {
       requirementInterpretation: null,
       hiringTeamRoleId: "hm",
       whoCaresNote: "The Hiring Manager needs to understand the progression of your work.",
+    interviewTypeTag: "focused_competency" as const,
     });
     const round = planQuestionRound({
       assessments,
@@ -873,6 +877,7 @@ describe("consultation evidence and questions", () => {
           requirementInterpretation: "Security or brand-protection sales motion.",
           hiringTeamRoleId: "hm",
           whoCaresNote: "The Hiring manager needs a concrete sales motion, not the posting line.",
+        interviewTypeTag: "focused_competency" as const,
         },
       ],
       hiringTeam,
@@ -965,6 +970,7 @@ describe("consultation evidence and questions", () => {
           requirementInterpretation: null,
           hiringTeamRoleId: "hm",
           whoCaresNote: "",
+        interviewTypeTag: "focused_competency" as const,
         },
       ],
       hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
@@ -1054,6 +1060,7 @@ describe("consultation evidence and questions", () => {
           requirementInterpretation: null,
           hiringTeamRoleId: "hm",
           whoCaresNote: "Should never be asked.",
+        interviewTypeTag: "focused_competency" as const,
         },
         {
           targetKey: "required:pitch",
@@ -1061,6 +1068,7 @@ describe("consultation evidence and questions", () => {
           requirementInterpretation: null,
           hiringTeamRoleId: "hm",
           whoCaresNote: "Should never be asked.",
+        interviewTypeTag: "focused_competency" as const,
         },
         {
           targetKey: "required:channel",
@@ -1068,6 +1076,7 @@ describe("consultation evidence and questions", () => {
           requirementInterpretation: "Partner and channel leadership, not direct-only selling.",
           hiringTeamRoleId: "hm",
           whoCaresNote: "The Hiring Manager needs a partner-motion story.",
+        interviewTypeTag: "focused_competency" as const,
         },
       ],
       hiringTeam,
@@ -1212,6 +1221,7 @@ describe("consultation evidence and questions", () => {
           requirementInterpretation: "Partner and channel leadership.",
           hiringTeamRoleId: "hm",
           whoCaresNote: "The Hiring Manager needs a partner-motion story.",
+        interviewTypeTag: "focused_competency" as const,
         },
         {
           targetKey: "required:domain",
@@ -1219,6 +1229,7 @@ describe("consultation evidence and questions", () => {
           requirementInterpretation: "Brand-protection or digital-risk selling.",
           hiringTeamRoleId: "hm",
           whoCaresNote: "The Hiring Manager needs the closest domain-adjacent sale.",
+        interviewTypeTag: "focused_competency" as const,
         },
         {
           targetKey: "competency:bench",
@@ -1226,6 +1237,7 @@ describe("consultation evidence and questions", () => {
           requirementInterpretation: "How the manager bench was built and what changed.",
           hiringTeamRoleId: "hm",
           whoCaresNote: "The Hiring Manager needs the people-development story behind the forecast.",
+        interviewTypeTag: "focused_competency" as const,
         },
       ],
       hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
@@ -1548,6 +1560,7 @@ describe("consultation evidence and questions", () => {
         requirementInterpretation: null,
         hiringTeamRoleId: "hm",
         whoCaresNote: "The Hiring Manager needs to understand your Python experience.",
+      interviewTypeTag: "focused_competency" as const,
       }],
       hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
       askedKeys: new Set(),
@@ -1565,6 +1578,7 @@ describe("consultation evidence and questions", () => {
           requirementInterpretation: null,
           hiringTeamRoleId: "hm",
           whoCaresNote: "The Hiring Manager needs to verify the duration of your Python experience.",
+        interviewTypeTag: "focused_competency" as const,
         }],
         hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
         askedKeys: new Set(),
@@ -1636,7 +1650,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("28");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("29");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("You coach; you do not interrogate");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("askedQuestions");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -1984,6 +1998,7 @@ describe("consultation evidence and questions", () => {
           hiringTeamRoleId: "sales-vp",
           whoCaresNote:
             "The VP of Sales needs to hear how you make defensible account-priority decisions.",
+        interviewTypeTag: "focused_competency" as const,
         },
       ],
       hiringTeam: [{ id: "sales-vp", name: "VP of Sales" }],
@@ -2075,6 +2090,7 @@ describe("consultation evidence and questions", () => {
           requirementInterpretation: null,
           hiringTeamRoleId: "hm",
           whoCaresNote: "The Hiring Manager needs this story.",
+        interviewTypeTag: "focused_competency" as const,
         },
       ],
       hiringTeam: [{ id: "hm", name: "Hiring Manager" }],
@@ -2142,6 +2158,7 @@ describe("consultation evidence and questions", () => {
           requirementInterpretation: null,
           hiringTeamRoleId: "sales-vp",
           whoCaresNote: "The VP of Sales needs a forecast example.",
+        interviewTypeTag: "focused_competency" as const,
         },
         {
           targetKey: "chronology",
@@ -2149,6 +2166,7 @@ describe("consultation evidence and questions", () => {
           requirementInterpretation: null,
           hiringTeamRoleId: "sales-vp",
           whoCaresNote: "The VP needs the career walk-through.",
+        interviewTypeTag: "focused_competency" as const,
         },
       ],
       hiringTeam: [{ id: "sales-vp", name: "VP of Sales" }],
@@ -2207,6 +2225,7 @@ describe("consultation evidence and questions", () => {
           requirementInterpretation: null,
           hiringTeamRoleId: "sales-vp",
           whoCaresNote: "The VP of Sales still wants one more story.",
+        interviewTypeTag: "focused_competency" as const,
         },
       ],
       hiringTeam: [{ id: "sales-vp", name: "VP of Sales" }],

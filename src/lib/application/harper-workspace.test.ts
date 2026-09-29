@@ -172,6 +172,7 @@ describe("why this company", () => {
           requirementInterpretation: null,
           hiringTeamRoleId: "role_1",
           whoCaresNote: "The hiring manager needs to hear your motivation.",
+        interviewTypeTag: "focused_competency" as const,
         },
       ],
       hiringTeam: [{ id: "role_1", name: "Hiring Manager" }],
