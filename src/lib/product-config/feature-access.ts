@@ -1,4 +1,3 @@
-import { notFound } from "next/navigation";
 import { TenantError } from "@/lib/tenant/errors";
 import {
   anyListFeatureEnabled,
@@ -49,9 +48,15 @@ export function isGatedSurfaceEnabled(
   }
 }
 
-/** Pages of a disabled feature render as not found. */
+/**
+ * Pages of a disabled feature render as not found.
+ * next/navigation is required lazily so Node workers (tsx --conditions=react-server)
+ * can load product-config without pulling App Router client runtime.
+ */
 export function requireGatedPage(surface: GatedSurface): void {
   if (!isGatedSurfaceEnabled(surface)) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync page gate; keep next out of worker load graph
+    const { notFound } = require("next/navigation") as typeof import("next/navigation");
     notFound();
   }
 }

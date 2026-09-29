@@ -90,9 +90,11 @@ function runTsxProbe(probe: string): {
   env.DATABASE_URL =
     "postgresql://boundary:boundary@127.0.0.1:1/boundary?connect_timeout=1&pool_timeout=1&socket_timeout=1";
 
+  // Match research:worker:render — react-server condition must not pull Next
+  // App Router client runtime (createContext is absent on the RSC React build).
   const result = spawnSync(
     process.execPath,
-    ["--import", "tsx", "-e", probe],
+    ["--import", "tsx", "--conditions=react-server", "-e", probe],
     {
       cwd: ROOT,
       encoding: "utf8",
@@ -109,13 +111,17 @@ function runTsxProbe(probe: string): {
     };
   }
 
-  const fallback = spawnSync("npx", ["tsx", "-e", probe], {
-    cwd: ROOT,
-    encoding: "utf8",
-    env,
-    timeout: 45_000,
-    shell: true,
-  });
+  const fallback = spawnSync(
+    "npx",
+    ["tsx", "--conditions=react-server", "-e", probe],
+    {
+      cwd: ROOT,
+      encoding: "utf8",
+      env,
+      timeout: 45_000,
+      shell: true,
+    },
+  );
   return {
     status: fallback.status,
     stdout: fallback.stdout || "",
@@ -157,6 +163,18 @@ console.log("WORKER_SERVICE_OK", HEARTBEAT_STALE_MS, researchWorkerShutdown.requ
     const result = runTsxProbe(probe);
     expect(result.stderr).not.toMatch(/server-only/i);
     expect(result.stdout).toContain("WORKER_SERVICE_OK");
+    expect(result.status).toBe(0);
+  });
+
+  it("application job process graph loads under react-server without createContext crash", () => {
+    const probe = `
+import { processApplicationJob } from "./src/lib/application-jobs/process.ts";
+console.log("PROCESS_OK", typeof processApplicationJob);
+`;
+    const result = runTsxProbe(probe);
+    expect(result.stderr).not.toMatch(/createContext is not a function/);
+    expect(result.stderr).not.toMatch(/server-only/i);
+    expect(result.stdout).toContain("PROCESS_OK function");
     expect(result.status).toBe(0);
   });
 

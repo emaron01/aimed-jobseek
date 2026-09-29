@@ -4,7 +4,7 @@ import {
   type HiringTeamJobEvidence,
   type HiringTeamResearchEvidence,
 } from "@/lib/hiring-team/evidence";
-import { hiringTeamConfig } from "@/lib/product-config";
+import { hiringTeamConfig } from "@/lib/product-config/hiring-team";
 
 export type Involvement = "DIRECT" | "INDIRECT";
 export type ClaimKind = "FACT" | "INFERENCE";
