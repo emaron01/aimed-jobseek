@@ -92,8 +92,12 @@ describe("company research fingerprint gate (source)", () => {
     expect(service).toContain("options?.force");
 
     const gate = readFileSync("src/lib/ai/paid-call-gate.ts", "utf8");
-    expect(gate).toContain("pg_advisory_xact_lock");
+    expect(gate).toContain("pg_try_advisory_lock");
+    expect(gate).toContain("paidCallLockDatabaseUrl");
+    expect(gate).toContain("connection_limit");
+    expect(gate).not.toContain("pg_advisory_xact_lock");
     expect(gate).not.toContain("subjectLocks");
+    expect(gate).not.toMatch(/\$transaction\s*\(/);
 
     const actions = readFileSync("src/app/actions/application.ts", "utf8");
     expect(actions).toContain("skippedUnchanged");
