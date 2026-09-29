@@ -67,10 +67,12 @@ export const consultationConversationCopy = Object.freeze({
   collapseEvidence: "Collapse evidence",
   expandAllEvidence: "Expand all",
   collapseAllEvidence: "Collapse all",
-  shareSomeDetails: "Share some details",
+  shareSomeDetails: "Save Answer",
   shareSomeDetailsHelp:
     "Add anything you have about this gap. Harper will use your Personal Profile and this note.",
-  threadReply: "Reply",
+  threadReply: "Save Answer",
+  /** Exact notice while Harper is working on seeker answers. */
+  processingCanTakeMinutes: "This process can take several minutes.",
   addAnotherReply: "Add another reply",
   answerGap: "Answer",
   ignoredGap: "Ignored",

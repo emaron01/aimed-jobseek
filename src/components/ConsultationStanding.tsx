@@ -10,6 +10,7 @@ import {
   QuestionList,
   ResultActions,
 } from "@/components/ConsultationThread";
+import { useHarperDraft } from "@/components/HarperDraftStore";
 import { useMemo, useState } from "react";
 import {
   consultationConversationCopy,
@@ -63,6 +64,73 @@ export type StandingRequirementQuestions = {
   targetKey: string;
   questions: ConsultationQaItem[];
 };
+
+function GapShareDetailsForm({
+  campaignId,
+  targetKey,
+  enabled,
+}: {
+  campaignId: string;
+  targetKey: string;
+  enabled: boolean;
+}) {
+  const draft = useHarperDraft(`gap:${targetKey}`);
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm">
+        <span className="sr-only">
+          {consultationConversationCopy.shareSomeDetails}
+        </span>
+        <textarea
+          name="answer"
+          required
+          rows={4}
+          value={draft.value}
+          disabled={!enabled}
+          onChange={(event) => draft.setValue(event.target.value)}
+          className={fieldClass}
+          form={`harper-gap-${targetKey}`}
+          data-testid={`share-gap-details-box-${targetKey}`}
+        />
+        <span className="mt-1 block text-xs text-muted">
+          {consultationConversationCopy.shareSomeDetailsHelp}
+        </span>
+      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <ApplicationActionForm
+          action={replyConsultationAction}
+          submitLabel={consultationConversationCopy.shareSomeDetails}
+          pendingLabel={consultationConversationCopy.thinking}
+          testId={`share-gap-details-${targetKey}`}
+          compact
+          formClassName="inline-flex"
+          formId={`harper-gap-${targetKey}`}
+          onSubmitStart={(formData) => {
+            const answer = String(formData.get("answer") ?? "").trim();
+            if (!answer) return false;
+            draft.clear();
+          }}
+        >
+          <input type="hidden" name="campaignId" value={campaignId} />
+          <input type="hidden" name="targetKey" value={targetKey} />
+          <input type="hidden" name="answer" value={draft.value} />
+        </ApplicationActionForm>
+        <ApplicationActionForm
+          action={ignoreConsultationQuestionAction}
+          submitLabel={consultationConversationCopy.ignoreQuestion}
+          pendingLabel={consultationConversationCopy.thinking}
+          testId={`ignore-gap-${targetKey}`}
+          variant="secondary"
+          compact
+          formClassName="inline-flex"
+        >
+          <input type="hidden" name="campaignId" value={campaignId} />
+          <input type="hidden" name="targetKey" value={targetKey} />
+        </ApplicationActionForm>
+      </div>
+    </div>
+  );
+}
 
 function ReopenIgnoredLink({
   campaignId,
@@ -146,8 +214,8 @@ export function ConsultationStanding({
   const showReply =
     canEdit &&
     sessionStatus !== "SKIPPED" &&
-    sessionStatus !== "PAUSED" &&
-    !jobsActive;
+    sessionStatus !== "PAUSED";
+  const repliesEnabled = showReply && !jobsActive;
   const allOpen =
     requirements.length > 0 &&
     requirements.every((item) => openIds.has(item.id) || item.facts.length === 0);
@@ -166,7 +234,10 @@ export function ConsultationStanding({
     setOpenIds(open ? new Set(expandable.map((item) => item.id)) : new Set());
   }
 
-  function renderQuestionList(questions: ConsultationQaItem[]) {
+  function renderQuestionList(
+    questions: ConsultationQaItem[],
+    topicLabel?: string,
+  ) {
     if (questions.length === 0) return null;
     return (
       <div className="mt-3 space-y-3">
@@ -177,6 +248,7 @@ export function ConsultationStanding({
           showReply={showReply}
           pendingTarget={pendingTarget}
           jobsActive={jobsActive}
+          suppressQuestionTextWhenMatchesLabel={topicLabel}
           onSubmitStart={(replyKey, answer) => {
             setPendingTarget(replyKey);
             void answer;
@@ -265,39 +337,11 @@ export function ConsultationStanding({
                 canEdit &&
                 acceptingReplies ? (
                   <div className="mt-2 space-y-2">
-                    <ApplicationActionForm
-                      action={replyConsultationAction}
-                      submitLabel={consultationConversationCopy.shareSomeDetails}
-                      pendingLabel={consultationConversationCopy.thinking}
-                      testId={`share-gap-details-${gap.targetKey}`}
-                    >
-                      <input type="hidden" name="campaignId" value={campaignId} />
-                      <input type="hidden" name="targetKey" value={gap.targetKey} />
-                      <label className="block text-sm">
-                        <span className="font-medium text-ink">
-                          {consultationConversationCopy.shareSomeDetails}
-                        </span>
-                        <textarea
-                          name="answer"
-                          required
-                          rows={4}
-                          className={fieldClass}
-                        />
-                        <span className="mt-1 block text-xs text-muted">
-                          {consultationConversationCopy.shareSomeDetailsHelp}
-                        </span>
-                      </label>
-                    </ApplicationActionForm>
-                    <ApplicationActionForm
-                      action={ignoreConsultationQuestionAction}
-                      submitLabel={consultationConversationCopy.ignoreQuestion}
-                      pendingLabel={consultationConversationCopy.thinking}
-                      testId={`ignore-gap-${gap.targetKey}`}
-                      variant="secondary"
-                    >
-                      <input type="hidden" name="campaignId" value={campaignId} />
-                      <input type="hidden" name="targetKey" value={gap.targetKey} />
-                    </ApplicationActionForm>
+                    <GapShareDetailsForm
+                      campaignId={campaignId}
+                      targetKey={gap.targetKey}
+                      enabled={repliesEnabled}
+                    />
                   </div>
                 ) : null}
               </li>
@@ -332,17 +376,24 @@ export function ConsultationStanding({
         className="space-y-4"
         data-testid="harper-standing-topics"
       >
-        {dedicatedTopics.map((topic) => (
+        {dedicatedTopics.map((topic) => {
+          const labelMatchesQuestion = topic.questions.some(
+            (question) => question.question.trim() === topic.label.trim(),
+          );
+          return (
           <div
             key={topic.targetKey}
             className="min-w-0 space-y-2 overflow-hidden text-sm text-ink"
             data-testid={`standing-topic-${topic.kind}`}
             data-standing-target={topic.targetKey}
           >
-            <h4 className="text-sm font-semibold text-ink">{topic.label}</h4>
-            {renderQuestionList(topic.questions)}
+            {!labelMatchesQuestion ? (
+              <h4 className="text-sm font-semibold text-ink">{topic.label}</h4>
+            ) : null}
+            {renderQuestionList(topic.questions, topic.label)}
           </div>
-        ))}
+          );
+        })}
         <ul className="space-y-3" data-testid="consultation-standing-requirements">
           {requirements.map((item) => {
             const open = openIds.has(item.id);

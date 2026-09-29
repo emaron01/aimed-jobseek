@@ -339,6 +339,6 @@ describe.skipIf(!hasTestDatabase())("cheat sheet Harper reply persistence", () =
       | null
       | undefined;
     expect(hiringManager?.gaps?.[0]?.sampleAnswer).toBe(sample);
-    expect(consultationConversationCopy.threadReply).toBe("Reply");
+    expect(consultationConversationCopy.threadReply).toBe("Save Answer");
   });
 });

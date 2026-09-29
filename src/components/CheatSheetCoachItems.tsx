@@ -178,7 +178,7 @@ export function CheatSheetCoachItems({
                         <input type="hidden" name="campaignId" value={campaignId} />
                         <input type="hidden" name="itemId" value={item.id ?? ""} />
                         <label className="block text-sm">
-                          <span className="font-medium text-ink">
+                          <span className="sr-only">
                             {consultationConversationCopy.threadReply}
                           </span>
                           <textarea

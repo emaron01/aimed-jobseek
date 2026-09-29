@@ -130,8 +130,7 @@ export function HarperPersonInlineProfile({
   const showReply =
     canEdit &&
     sessionStatus !== "SKIPPED" &&
-    sessionStatus !== "PAUSED" &&
-    !jobsActive;
+    sessionStatus !== "PAUSED";
 
   const profileCoachItemIds = useMemo(
     () =>

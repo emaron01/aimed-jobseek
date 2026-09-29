@@ -42,6 +42,7 @@ import { listPersonPreps } from "@/lib/interview/person-prep";
 import { getApplicationSummaryView } from "@/lib/application-summary/service";
 import { ConsultationKnowAboutMe } from "@/components/ConsultationKnowAboutMe";
 import { ConsultationStanding } from "@/components/ConsultationStanding";
+import { HarperDraftProvider } from "@/components/HarperDraftStore";
 import {
   HarperFilterProvider,
   HarperPeopleFilter,
@@ -557,10 +558,16 @@ export async function ConsultationSection({
         <WorkspaceJobRefresh campaignId={campaignId} />
         <WorkspaceProgress jobs={jobs} type="CONSULTATION" stayAndWatch />
         {consultationBusy ? (
-          <p className="text-sm text-muted" data-testid="harper-typing">
-            <AppPendingIndicator label={workspaceJobCopy.typing} />
-          </p>
+          <div className="space-y-1 text-sm text-muted" data-testid="harper-typing">
+            <p>
+              <AppPendingIndicator label={workspaceJobCopy.typing} />
+            </p>
+            <p data-testid="harper-processing-minutes">
+              {consultationConversationCopy.processingCanTakeMinutes}
+            </p>
+          </div>
         ) : null}
+        <HarperDraftProvider>
         <HarperFilterProvider
           options={filterOptions}
           initialPersonKey={initialPersonKey}
@@ -689,8 +696,7 @@ export async function ConsultationSection({
                   canEdit={canEdit}
                   acceptingReplies={
                     threadStatus !== "SKIPPED" &&
-                    threadStatus !== "PAUSED" &&
-                    !consultationBusy
+                    threadStatus !== "PAUSED"
                   }
                   sessionStatus={threadStatus}
                   jobsActive={consultationBusy}
@@ -821,6 +827,7 @@ export async function ConsultationSection({
             );
           })}
         </HarperFilterProvider>
+        </HarperDraftProvider>
         {canEdit && session?.status === "IN_PROGRESS" && !failed ? (
           <div className="flex flex-wrap gap-3">
             <ApplicationActionForm

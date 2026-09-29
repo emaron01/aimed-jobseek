@@ -123,8 +123,13 @@ describe("Harper Batch A standing Answer / Ignore / reopen", () => {
     expect(standing).toContain("ignore-gap-");
     expect(standing).toContain("ignoreConsultationQuestionAction");
     expect(standing).toContain("QuestionList");
+    // Share copy lives in GapShareDetailsForm (extracted for draft/scroll UX);
+    // the open-gap guard still mounts that form when no inline question exists.
     expect(standing).toMatch(
-      /!gap\.answerableQuestionTurnId[\s\S]*shareSomeDetails/,
+      /!gap\.answerableQuestionTurnId[\s\S]*GapShareDetailsForm/,
+    );
+    expect(standing).toContain(
+      "submitLabel={consultationConversationCopy.shareSomeDetails}",
     );
     expect(consultationConversationCopy.ignoreQuestion).toBe("Ignore");
     expect(harperQuestionAnchorId("turn-1")).toBe("harper-q:turn-1");

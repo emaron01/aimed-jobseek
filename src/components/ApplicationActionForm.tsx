@@ -30,6 +30,8 @@ export async function runApplicationFormAction(
   }
 }
 
+const SM_BUTTON_CLASS = "!px-2.5 !py-1.5 !text-xs";
+
 export function ApplicationActionForm({
   action,
   submitLabel,
@@ -39,6 +41,10 @@ export function ApplicationActionForm({
   variant = "primary",
   hideSubmit = false,
   disableFieldsWhilePending = false,
+  preserveScroll = true,
+  compact = false,
+  formClassName = "space-y-3",
+  formId,
   children,
 }: {
   action: (
@@ -48,11 +54,17 @@ export function ApplicationActionForm({
   submitLabel: string;
   pendingLabel?: string;
   testId: string;
-  onSubmitStart?: (formData: FormData) => void;
+  onSubmitStart?: (formData: FormData) => void | false;
   variant?: AppButtonVariant;
   hideSubmit?: boolean;
   /** When true, disables all form fields (including textareas) while the action runs. */
   disableFieldsWhilePending?: boolean;
+  /** Keep viewport position after a successful router.refresh (Harper Q&A). */
+  preserveScroll?: boolean;
+  /** Smaller seeker action buttons (Harper question row). */
+  compact?: boolean;
+  formClassName?: string;
+  formId?: string;
   children: ReactNode;
 }) {
   const [state, setState] = useState<ActionResult | null>(null);
@@ -62,16 +74,36 @@ export function ApplicationActionForm({
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    onSubmitStart?.(formData);
+    if (onSubmitStart?.(formData) === false) return;
     setPending(true);
+    const scrollX = typeof window !== "undefined" ? window.scrollX : 0;
+    const scrollY = typeof window !== "undefined" ? window.scrollY : 0;
     try {
       const result = await runApplicationFormAction(action, state, formData);
       setState(result);
-      if (result.ok) router.refresh();
+      if (result.ok) {
+        router.refresh();
+        if (preserveScroll && typeof window !== "undefined") {
+          const restore = () => window.scrollTo(scrollX, scrollY);
+          requestAnimationFrame(() => {
+            restore();
+            requestAnimationFrame(restore);
+            window.setTimeout(restore, 0);
+            window.setTimeout(restore, 50);
+          });
+        }
+      }
     } finally {
       setPending(false);
     }
   }
+
+  const buttonClass = [
+    hideSubmit ? "sr-only" : undefined,
+    compact ? SM_BUTTON_CLASS : undefined,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const fields = (
     <>
@@ -86,7 +118,7 @@ export function ApplicationActionForm({
         variant={variant}
         pending={pending}
         pendingLabel={pendingLabel}
-        className={hideSubmit ? "sr-only" : undefined}
+        className={buttonClass || undefined}
       >
         {submitLabel}
       </AppButton>
@@ -94,7 +126,12 @@ export function ApplicationActionForm({
   );
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3" data-testid={testId}>
+    <form
+      id={formId}
+      onSubmit={onSubmit}
+      className={formClassName}
+      data-testid={testId}
+    >
       {disableFieldsWhilePending ? (
         <fieldset
           disabled={pending}

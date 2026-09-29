@@ -202,9 +202,13 @@ describe("Harper Batch B3 person view, search, Add Interview Contact, assign-onl
 
   it("reply forms wait on Harper analyzing in the person view", () => {
     const personView = src("src/components/HarperPersonView.tsx");
+    const thread = src("src/components/ConsultationThread.tsx");
     expect(personView).toContain("jobsActive");
-    expect(personView).toContain("!jobsActive");
+    expect(personView).toContain("jobsActive={jobsActive}");
     expect(personView).toContain("showReply=");
+    // Gate lives in QuestionList (actionsEnabled) so forms stay mounted while busy
+    // and unsaved drafts survive — person view still passes jobsActive through.
+    expect(thread).toContain("actionsEnabled = showReply && !jobsActive");
     const section = src("src/components/ConsultationSection.tsx");
     expect(section).toContain("jobsActive={consultationBusy}");
   });

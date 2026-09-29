@@ -3818,7 +3818,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     expect(
       CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS,
     ).toContain("personalProfileItems is the person's full Personal Profile");
-    expect(consultationConversationCopy.shareSomeDetails).toBe("Share some details");
+    expect(consultationConversationCopy.shareSomeDetails).toBe("Save Answer");
 
     await answerConsultationQuestion({
       organizationId,
