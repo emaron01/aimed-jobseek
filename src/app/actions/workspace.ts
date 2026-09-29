@@ -7,11 +7,10 @@ import {
   requireCurrentUser,
   setActiveOrganization,
 } from "@/lib/auth/session";
-import { billingPlanLabel } from "@/lib/billing/billing-state";
+import { billingPlanLabel, formatBillingDate } from "@/lib/billing/billing-state";
 import { createBillingPortalSession } from "@/lib/billing/create-portal-session";
-import { markSubscriptionCanceled } from "@/lib/billing/sync-subscription";
+import { scheduleSubscriptionCancelAtPeriodEnd } from "@/lib/billing/schedule-cancel-at-period-end";
 import { listOwnedBilledOrganizationsAsideFrom } from "@/lib/org/workspaces";
-import { cancelStripeSubscriptionForOrgDelete } from "@/lib/platform/orgs";
 import { prisma } from "@/lib/prisma";
 
 export type WorkspaceActionResult = { ok: boolean; message: string };
@@ -104,8 +103,8 @@ export async function openOwnedOrgBillingPortalAction(
 }
 
 /**
- * Cancel the live Stripe subscription on an owned personal org.
- * Explicit user confirm required — never silent. Does not delete org data.
+ * Schedule cancel-at-period-end on an owned personal org (B3).
+ * Seeker keeps full access until currentPeriodEnd; immediate cancel is wipe/Comped only.
  */
 export async function cancelOwnedOrgSubscriptionAction(
   _prev: WorkspaceActionResult | null,
@@ -135,29 +134,36 @@ export async function cancelOwnedOrgSubscriptionAction(
       message: "No active subscription found on that workspace.",
     };
   }
+  if (!target.stripeSubscriptionId) {
+    return {
+      ok: false,
+      message: "No active subscription found on that workspace.",
+    };
+  }
 
   try {
-    await cancelStripeSubscriptionForOrgDelete(target.stripeSubscriptionId);
-    await markSubscriptionCanceled({
+    const scheduled = await scheduleSubscriptionCancelAtPeriodEnd({
       organizationId: target.organizationId,
-      subscriptionId: target.stripeSubscriptionId,
+      stripeSubscriptionId: target.stripeSubscriptionId,
     });
+    const endLabel = scheduled.currentPeriodEnd
+      ? formatBillingDate(scheduled.currentPeriodEnd)
+      : "the end of your billing period";
+    revalidatePath("/", "layout");
+    revalidatePath("/settings/billing");
+    return {
+      ok: true,
+      message: `${billingPlanLabel(target.planCode)} for "${target.name}" will end on ${endLabel}. You'll keep full access until then.`,
+    };
   } catch (error) {
     return {
       ok: false,
       message:
         error instanceof Error
           ? error.message
-          : "Could not cancel the Stripe subscription.",
+          : "Could not schedule subscription cancellation.",
     };
   }
-
-  revalidatePath("/", "layout");
-  revalidatePath("/settings/billing");
-  return {
-    ok: true,
-    message: `${billingPlanLabel(target.planCode)} subscription for "${target.name}" was canceled. Your data in that workspace remains until you delete it.`,
-  };
 }
 
 export async function readDismissedPersonalBillingOrgIds(): Promise<

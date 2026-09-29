@@ -33,12 +33,13 @@ describe("workspace switcher + personal billing notice", () => {
     expect(accept).not.toContain("markSubscriptionCanceled");
   });
 
-  it("cancel of owned Standard is explicit and updates local billing", () => {
+  it("cancel of owned Standard schedules cancel-at-period-end", () => {
     const src = readFileSync("src/app/actions/workspace.ts", "utf8");
     expect(src).toContain("cancelOwnedOrgSubscriptionAction");
     expect(src).toContain('confirm !== "CANCEL"');
-    expect(src).toContain("cancelStripeSubscriptionForOrgDelete");
-    expect(src).toContain("markSubscriptionCanceled");
+    expect(src).toContain("scheduleSubscriptionCancelAtPeriodEnd");
+    expect(src).not.toContain("cancelStripeSubscriptionForOrgDelete");
+    expect(src).not.toContain("markSubscriptionCanceled");
   });
 });
 
@@ -49,14 +50,15 @@ describe("payment lock is per-organization", () => {
     const lock = readFileSync("src/lib/billing/payment-lock.ts", "utf8");
 
     expect(gate).toContain("getCurrentOrganization");
-    expect(gate).toContain(
-      "getOrganizationPaymentLockState(organization.id)",
-    );
-    expect(layout).toContain(
-      "getOrganizationPaymentLockState(organization.id)",
-    );
+    expect(gate).toContain("getOrganizationPaymentLockState");
+    expect(gate).toContain("organization.id");
+    expect(gate).not.toContain('redirect("/settings/billing")');
+    expect(layout).toContain("getOrganizationPaymentLockState");
+    expect(layout).toContain("organization.id");
+    expect(layout).toContain("accountReadOnly");
     expect(lock).toContain("getOrganizationPaymentLockState");
     expect(lock).toContain("organizationId: string");
     expect(lock).toContain("assertOrganizationNotPaymentLocked");
+    expect(lock).toContain("isOrganizationReadOnly");
   });
 });

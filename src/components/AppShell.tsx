@@ -13,6 +13,10 @@ import {
   buildUserMenuModel,
   type MembershipRoleForMenu,
 } from "@/lib/auth/user-menu";
+import {
+  accountCancelScheduledMessage,
+  ACCOUNT_READ_ONLY_BANNER_MESSAGE,
+} from "@/lib/billing/account-read-only";
 import { billingPlanLabel } from "@/lib/billing/billing-state";
 import { planAllowsReferrals } from "@/lib/billing/plans";
 import { features } from "@/lib/product-config";
@@ -25,12 +29,18 @@ import { prisma } from "@/lib/prisma";
 export async function AppShell({
   children,
   paymentLocked = false,
-  pastDueReadOnly = false,
+  accountReadOnly = false,
+  cancelAtPeriodEnd = false,
+  currentPeriodEnd = null,
 }: {
   children: React.ReactNode;
+  /** @deprecated B3 removes billing-only shell; always false. */
   paymentLocked?: boolean;
-  /** PAST_DUE grace: views allowed, all writes blocked. */
-  pastDueReadOnly?: boolean;
+  /** Post-period read-only window (B3). */
+  accountReadOnly?: boolean;
+  /** Cancel scheduled; full access until period end. */
+  cancelAtPeriodEnd?: boolean;
+  currentPeriodEnd?: Date | null;
 }) {
   const user = await getCurrentUser();
   const organization = user ? await getCurrentOrganization() : null;
@@ -65,7 +75,7 @@ export async function AppShell({
           (membershipCtx?.membership.role as
             | MembershipRoleForMenu
             | undefined) ?? null,
-        paymentLocked,
+        paymentLocked: false,
         workspaces: workspaces.map((w) => ({
           organizationId: w.organizationId,
           name: w.name,
@@ -77,7 +87,7 @@ export async function AppShell({
   const sidebarItems = buildSidebarNavItems({
     hasOrganization: Boolean(organization),
     isPlatformOperator: user ? isPlatformOperator(user.platformRole) : false,
-    paymentLocked,
+    paymentLocked: false,
   });
 
   let personalBillingNoticeOrgs: Array<{
@@ -102,6 +112,8 @@ export async function AppShell({
     }
   }
 
+  void paymentLocked;
+
   return (
     <div className="flex min-h-screen bg-surface text-ink">
       <Sidebar items={sidebarItems} />
@@ -112,24 +124,29 @@ export async function AppShell({
             features.referralProgram && planAllowsReferrals(billingPlanCode)
           }
         />
-        {pastDueReadOnly && !paymentLocked ? (
+        {accountReadOnly ? (
           <div
             role="status"
             className="border-b border-warning bg-warning-tint px-4 py-2.5 text-sm text-warning"
-            data-testid="past-due-readonly-banner"
+            data-testid="account-readonly-banner"
           >
             <p>
-              Payment is past due — your workspace is read-only. You can view
-              everything, but you cannot change setup data or use research,
-              email generation, or sending.{" "}
+              {ACCOUNT_READ_ONLY_BANNER_MESSAGE}{" "}
               <Link
                 href="/settings/billing"
                 className="font-medium underline underline-offset-2"
               >
-                Update billing
-              </Link>{" "}
-              to restore access.
+                Renew subscription
+              </Link>
             </p>
+          </div>
+        ) : cancelAtPeriodEnd && currentPeriodEnd ? (
+          <div
+            role="status"
+            className="border-b border-border bg-panel px-4 py-2.5 text-sm text-ink"
+            data-testid="cancel-at-period-end-banner"
+          >
+            <p>{accountCancelScheduledMessage(currentPeriodEnd)}</p>
           </div>
         ) : null}
         {personalBillingNoticeOrgs.length > 0 ? (

@@ -31,9 +31,10 @@ import {
 import { loadEffectiveBillingCatalog } from "@/lib/billing/effective-catalog";
 import { resolveCatalogEntitlementsForStatus } from "@/lib/billing/billing-catalog";
 import {
-  getOrganizationPaymentLockState,
-  paymentLockUserMessage,
-} from "@/lib/billing/payment-lock";
+  ACCOUNT_READ_ONLY_BANNER_MESSAGE,
+  accountCancelScheduledMessage,
+} from "@/lib/billing/account-read-only";
+import { getOrganizationPaymentLockState } from "@/lib/billing/payment-lock";
 import { BillingCheckoutRefresh } from "@/components/billing/BillingCheckoutRefresh";
 import { BuyCompanyCreditsButton } from "@/components/billing/BuyCompanyCreditsButton";
 import { ConvertTrialNowButton } from "@/components/billing/ConvertTrialNowButton";
@@ -106,11 +107,16 @@ export default async function OrganizationBillingSettingsPage({
     }),
   ]);
 
-  const paymentLocked = lockState.locked;
+  const paymentLocked = false;
   const spendBlocked = lockState.spendBlocked;
+  const accountReadOnly = lockState.readOnly;
+  const cancelScheduled =
+    Boolean(lockState.profile?.cancelAtPeriodEnd) &&
+    !accountReadOnly &&
+    Boolean(lockState.profile?.currentPeriodEnd);
 
   if (!mayViewBilling) {
-    if (paymentLocked || spendBlocked) {
+    if (spendBlocked) {
       return (
         <div className="mx-auto max-w-lg space-y-4" data-testid="billing-member-lock">
           <PageHeader title={polishCopy.billingTitle} />
@@ -174,9 +180,9 @@ export default async function OrganizationBillingSettingsPage({
 
   const canOpenPortal = Boolean(billing?.stripeCustomerId);
   const showPortal =
-    canOpenPortal && (hasLiveSubscription || paymentLocked || spendBlocked);
+    canOpenPortal && (hasLiveSubscription || spendBlocked);
   const showResubscribe =
-    paymentLocked && isOwner && !hasLiveSubscription && !isComped;
+    spendBlocked && isOwner && !hasLiveSubscription && !isComped;
 
   const creditsDisabledReason = !isOwner
     ? "Only the organization owner can buy credits."
@@ -272,53 +278,25 @@ export default async function OrganizationBillingSettingsPage({
         />
       </div>
 
-      {spendBlocked && lockState.profile ? (
+      {cancelScheduled && lockState.profile?.currentPeriodEnd ? (
+        <div
+          role="status"
+          className="rounded-md border border-border bg-panel px-4 py-3 text-sm text-ink"
+          data-testid="billing-cancel-at-period-end"
+        >
+          <p>
+            {accountCancelScheduledMessage(lockState.profile.currentPeriodEnd)}
+          </p>
+        </div>
+      ) : null}
+
+      {spendBlocked ? (
         <div
           role="alert"
           className="space-y-3 rounded-md border border-warning bg-warning-tint px-4 py-3 text-sm text-warning"
           data-testid="billing-payment-lock-banner"
         >
-          <p className="font-medium">
-            {paymentLockUserMessage(lockState.profile)}
-          </p>
-          {billingStatus === "CANCELED" ? (
-            <>
-              <p>
-                For 30 days from cancellation
-                {billing?.canceledAt
-                  ? ` (${formatBillingDate(billing.canceledAt)})`
-                  : ""}
-                , we keep your {vocab.contact.plural}, {vocab.campaign.plural}, research,
-                drafts, send history, and{" "}
-                <span className="font-medium">opt-out / suppression list</span>.
-                Resubscribe in that window and all of it unlocks with this
-                workspace.
-              </p>
-              <p>
-                After 30 days we permanently delete that {vocab.contact.singular} and{" "}
-                {vocab.outreach.singular} data — including suppressions. Your account,{" "}
-                {vocab.product.plural}, {vocab.icp.plural}, {vocab.persona.plural}, voice,
-                signature, billing, and credit packs stay so you can return and rebuild{" "}
-                {vocab.campaign.plural}.
-              </p>
-            </>
-          ) : billingStatus === "PAST_DUE" && !paymentLocked ? (
-            <p>
-              You can still open {vocab.campaign.plural}, {vocab.contact.plural}, and setup pages to view
-              your work, but the workspace is read-only — no setup changes,
-              research, email generation, or sending until payment succeeds.
-              Stripe may retry the charge automatically; you can also update your
-              card in the billing portal.
-              {billing?.gracePeriodEndsAt
-                ? ` If payment is still unpaid after ${formatBillingDate(billing.gracePeriodEndsAt)}, access narrows to this billing page only.`
-                : ""}
-            </p>
-          ) : (
-            <p>
-              Your {vocab.product.plural}, {vocab.icp.plural}, {vocab.persona.plural}, and account stay on this workspace.
-              Resubscribe or update payment to unlock the {vocab.product.singular} again.
-            </p>
-          )}
+          <p className="font-medium">{ACCOUNT_READ_ONLY_BANNER_MESSAGE}</p>
           {!isAdmin ? (
             <p>
               Ask an organization admin to update billing — members cannot start

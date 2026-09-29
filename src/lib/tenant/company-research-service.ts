@@ -55,7 +55,11 @@ import {
   assertUsageAllowed,
   UsageQuotaError,
 } from "@/lib/usage/quota-service";
-import { PaymentLockError, assertOrganizationNotPaymentLocked } from "@/lib/billing/payment-lock";
+import {
+  PaymentLockError,
+  assertOrganizationNotPaymentLocked,
+} from "@/lib/billing/payment-lock";
+import { OrganizationReadOnlyError } from "@/lib/billing/account-read-only";
 import { TenantError } from "@/lib/tenant/errors";
 import { getTenantContext } from "@/lib/tenant/request-context";
 
@@ -1041,7 +1045,8 @@ export async function researchCompany(
     } catch (error) {
       if (
         error instanceof UsageQuotaError ||
-        error instanceof PaymentLockError
+        error instanceof PaymentLockError ||
+        error instanceof OrganizationReadOnlyError
       ) {
         return {
           skipped: true,
@@ -1069,7 +1074,8 @@ export async function researchCompany(
     } catch (error) {
       if (
         error instanceof UsageQuotaError ||
-        error instanceof PaymentLockError
+        error instanceof PaymentLockError ||
+        error instanceof OrganizationReadOnlyError
       ) {
         return {
           skipped: true,
@@ -1315,7 +1321,8 @@ export async function updateManualCompanyResearch(input: {
     } catch (error) {
       if (
         error instanceof UsageQuotaError ||
-        error instanceof PaymentLockError
+        error instanceof PaymentLockError ||
+        error instanceof OrganizationReadOnlyError
       ) {
         throw new TenantError(error.message);
       }
@@ -1333,7 +1340,8 @@ export async function updateManualCompanyResearch(input: {
     } catch (error) {
       if (
         error instanceof UsageQuotaError ||
-        error instanceof PaymentLockError
+        error instanceof PaymentLockError ||
+        error instanceof OrganizationReadOnlyError
       ) {
         throw new TenantError(error.message);
       }

@@ -27,12 +27,16 @@ describe("contact outbound purge policy", () => {
     expect(schema).toContain("PLATFORM_CONTACT_OUTBOUND_PURGED");
   });
 
-  it("billing copy names opt-out / suppression removal", () => {
+  it("billing copy describes read-only retention (B3), not selective suppression purge", () => {
     const billing = readFileSync(
       "src/app/(app)/settings/billing/page.tsx",
       "utf8",
     );
-    expect(billing).toMatch(/opt-out|suppression/i);
+    // Account lifecycle B3 replaced cancel/past-due lock copy with read-only
+    // + 30-day full retention messaging (selective contact purge is B6).
+    expect(billing).toContain("ACCOUNT_READ_ONLY_BANNER_MESSAGE");
+    expect(billing).toContain("accountCancelScheduledMessage");
+    expect(billing).not.toMatch(/opt-out|suppression/i);
   });
 
   it("extends credit packs on CANCELED → live sync", () => {

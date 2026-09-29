@@ -21,10 +21,10 @@ export default async function AppLayout({
 
   return (
     <AppShell
-      paymentLocked={lockState?.locked ?? false}
-      pastDueReadOnly={
-        Boolean(lockState?.spendBlocked) && !Boolean(lockState?.locked)
-      }
+      paymentLocked={false}
+      accountReadOnly={Boolean(lockState?.readOnly)}
+      cancelAtPeriodEnd={Boolean(lockState?.profile?.cancelAtPeriodEnd)}
+      currentPeriodEnd={lockState?.profile?.currentPeriodEnd ?? null}
     >
       {children}
     </AppShell>

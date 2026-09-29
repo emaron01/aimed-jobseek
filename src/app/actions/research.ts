@@ -52,7 +52,8 @@ export type ResearchStartResult = {
     | "NOTHING_TO_DO"
     | "INVALID_RETRY"
     | "ORGANIZATION_MISSING"
-    | "SPEND_BLOCKED";
+    | "SPEND_BLOCKED"
+    | "READ_ONLY";
   activeRunId?: string;
   run?: ResearchRunView;
 };

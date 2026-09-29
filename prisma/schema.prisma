@@ -931,11 +931,13 @@ model OrganizationBillingProfile {
   maxSeats                       Int                @default(1)
   currentPeriodEnd               DateTime?
   trialEndsAt                    DateTime?
-  /// After payment failure: lock when now >= gracePeriodEndsAt (7-day grace).
+  /// After payment failure: legacy field; B3 uses readOnlyStartedAt instead of route lock.
   gracePeriodEndsAt              DateTime?
   lockReason                     BillingLockReason?
   cancelAtPeriodEnd              Boolean            @default(false)
   canceledAt                     DateTime?
+  /// Set when the paid period ends without payment; starts the 30-day wipe clock. Null = not read-only.
+  readOnlyStartedAt              DateTime?
   createdAt                      DateTime           @default(now())
   updatedAt                      DateTime           @updatedAt
 

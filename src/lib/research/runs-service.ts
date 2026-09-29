@@ -291,7 +291,7 @@ export type CreateResearchRunResult =
   | { ok: false; code: "INVALID_RETRY"; message: string }
   | {
       ok: false;
-      code: "ORGANIZATION_MISSING" | "SPEND_BLOCKED";
+      code: "ORGANIZATION_MISSING" | "SPEND_BLOCKED" | "READ_ONLY";
       message: string;
     };
 

@@ -1,25 +1,25 @@
 /**
- * Shared organization spend guard (account lifecycle B2).
+ * Shared organization spend / writable guard (account lifecycle B2 + B3).
  *
- * Single place that answers: does this organization exist, and may it spend?
- * Today "may spend" uses existing payment-lock spend rules (FREE/COMPED always
- * allowed). Batch B3 will add read-only here without scattering new checks.
+ * Single place: does this organization exist, and may it spend / write?
+ * B3: "may spend" / "may write" is false while read-only (FREE/COMPED never).
  *
  * Node-safe (no server-only) for workers.
  */
 import { prisma } from "@/lib/prisma-client";
 import {
-  PaymentLockError,
-  getOrganizationPaymentLockState,
-  paymentLockUserMessage,
-} from "@/lib/billing/payment-lock";
+  ACCOUNT_READ_ONLY_ACTION_MESSAGE,
+  OrganizationReadOnlyError,
+} from "@/lib/billing/account-read-only";
+import { getOrganizationPaymentLockState } from "@/lib/billing/payment-lock";
 
 export const ORGANIZATION_MISSING_TERMINAL_REASON =
   "Organization account is gone.";
 
 export type OrganizationSpendDenialReason =
   | "ORGANIZATION_MISSING"
-  | "SPEND_BLOCKED";
+  | "SPEND_BLOCKED"
+  | "READ_ONLY";
 
 export type OrganizationSpendCheck =
   | { allowed: true }
@@ -32,7 +32,6 @@ export type OrganizationSpendCheck =
 
 /**
  * Thrown when the organization row is gone (wiped / never existed).
- * Distinct from PaymentLockError so callers can branch if needed.
  */
 export class OrganizationMissingError extends Error {
   readonly code = "ORGANIZATION_MISSING" as const;
@@ -83,15 +82,15 @@ export async function checkOrganizationMaySpend(
 
   return {
     allowed: false,
-    reason: "SPEND_BLOCKED",
-    message: paymentLockUserMessage(profile, now),
+    reason: "READ_ONLY",
+    message: ACCOUNT_READ_ONLY_ACTION_MESSAGE,
     lockReason: profile.lockReason ?? profile.billingStatus,
   };
 }
 
 /**
- * Throw when the organization is missing or may not spend.
- * Spend-blocked → PaymentLockError (same typed outcome as today's payment lock).
+ * Throw when the organization is missing or may not spend (paid AI / jobs).
+ * Read-only → OrganizationReadOnlyError (exact seeker message).
  * Missing → OrganizationMissingError.
  */
 export async function assertOrganizationMaySpend(
@@ -103,5 +102,21 @@ export async function assertOrganizationMaySpend(
   if (check.reason === "ORGANIZATION_MISSING") {
     throw new OrganizationMissingError(check.message);
   }
-  throw new PaymentLockError(check.message, check.lockReason);
+  throw new OrganizationReadOnlyError(check.message);
 }
+
+/**
+ * Writable check for non-paid product writes (Server Actions via requireOrganization).
+ * Same read-only rule as may-spend today; B3 keeps one decision place.
+ */
+export async function assertOrganizationWritable(
+  organizationId: string,
+  now: Date = new Date(),
+): Promise<void> {
+  await assertOrganizationMaySpend(organizationId, now);
+}
+
+export {
+  ACCOUNT_READ_ONLY_ACTION_MESSAGE,
+  OrganizationReadOnlyError,
+} from "@/lib/billing/account-read-only";

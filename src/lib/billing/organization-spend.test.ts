@@ -4,8 +4,9 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PaymentLockError } from "@/lib/billing/payment-lock";
+import { OrganizationReadOnlyError } from "@/lib/billing/account-read-only";
 import {
+  ACCOUNT_READ_ONLY_ACTION_MESSAGE,
   ORGANIZATION_MISSING_TERMINAL_REASON,
   OrganizationMissingError,
   assertOrganizationMaySpend,
@@ -192,8 +193,8 @@ describe.skipIf(!hasDatabase)(
       const denied = await checkOrganizationMaySpend(blocked.orgId);
       expect(denied.allowed).toBe(false);
       if (!denied.allowed) {
-        expect(denied.reason).toBe("SPEND_BLOCKED");
-        expect(denied.message.length).toBeGreaterThan(0);
+        expect(denied.reason).toBe("READ_ONLY");
+        expect(denied.message).toBe(ACCOUNT_READ_ONLY_ACTION_MESSAGE);
       }
 
       const missing = await checkOrganizationMaySpend(`missing_org_${suffix}`);
@@ -248,7 +249,7 @@ describe.skipIf(!hasDatabase)(
           isResultUsable: () => true,
           callProvider,
         }),
-      ).rejects.toBeInstanceOf(PaymentLockError);
+      ).rejects.toBeInstanceOf(OrganizationReadOnlyError);
       expect(providerCalls).toBe(0);
       expect(
         await prisma.paidCallReceipt.count({
@@ -477,7 +478,7 @@ describe.skipIf(!hasDatabase)(
           campaignId,
           type: "NEXT_STEP",
         }),
-      ).rejects.toBeInstanceOf(PaymentLockError);
+      ).rejects.toBeInstanceOf(OrganizationReadOnlyError);
 
       const list = await prisma.contactList.create({
         data: {
@@ -493,8 +494,8 @@ describe.skipIf(!hasDatabase)(
       });
       expect(research.ok).toBe(false);
       if (!research.ok) {
-        expect(research.code).toBe("SPEND_BLOCKED");
-        expect(research.message.length).toBeGreaterThan(0);
+        expect(research.code).toBe("READ_ONLY");
+        expect(research.message).toBe(ACCOUNT_READ_ONLY_ACTION_MESSAGE);
       }
 
       await expect(
@@ -503,7 +504,7 @@ describe.skipIf(!hasDatabase)(
           campaignId,
           companyId: "nope",
         }),
-      ).rejects.toBeInstanceOf(PaymentLockError);
+      ).rejects.toBeInstanceOf(OrganizationReadOnlyError);
     });
 
     it("after full wipe, enqueue and paid call cannot recreate org data", async () => {

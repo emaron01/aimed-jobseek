@@ -11,9 +11,9 @@ import {
 import { isDevTenantBypassEnabled, getAuthEnv } from "@/lib/auth/config";
 import {
   NEXT_ACTION_HEADER,
-  assertOrganizationNotPaymentLocked,
   isPaymentLockPathExempt,
 } from "@/lib/billing/payment-lock";
+import { assertOrganizationWritable } from "@/lib/billing/organization-spend";
 import { TenantError } from "@/lib/tenant/errors";
 
 export { TenantError };
@@ -66,7 +66,7 @@ async function assertWritableOnServerAction(
   if (!h.get(NEXT_ACTION_HEADER)) return;
   const pathname = h.get("x-pathname")?.trim() || "";
   if (pathname && isPaymentLockPathExempt(pathname)) return;
-  await assertOrganizationNotPaymentLocked(organizationId);
+  await assertOrganizationWritable(organizationId);
 }
 
 export async function requireOrganization(): Promise<Organization> {

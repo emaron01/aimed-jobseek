@@ -212,6 +212,8 @@ export async function syncOrganizationFromStripeSubscription(input: {
       gracePeriodEndsAt: true,
       canceledAt: true,
       maxSeats: true,
+      readOnlyStartedAt: true,
+      planCode: true,
     },
   });
   const defaultMax = defaultMaxSeatsForPlan(planCode);
@@ -235,6 +237,14 @@ export async function syncOrganizationFromStripeSubscription(input: {
     previous?.billingStatus === "CANCELED" &&
     (billingStatus === "ACTIVE" || billingStatus === "TRIALING") &&
     previous.canceledAt != null;
+
+  const entitled =
+    billingStatus === "ACTIVE" ||
+    billingStatus === "TRIALING" ||
+    // Mid-period past_due: still entitled until period end (B3 decision 1/7).
+    (billingStatus === "PAST_DUE" &&
+      item.currentPeriodEnd != null &&
+      item.currentPeriodEnd.getTime() > Date.now());
 
   await prisma.organizationBillingProfile.upsert({
     where: { organizationId },
@@ -261,6 +271,7 @@ export async function syncOrganizationFromStripeSubscription(input: {
       canceledAt: unixToDate(subscription.canceled_at),
       lockReason: lockFields.lockReason,
       gracePeriodEndsAt: lockFields.gracePeriodEndsAt,
+      readOnlyStartedAt: null,
     },
     update: {
       planCode,
@@ -287,6 +298,33 @@ export async function syncOrganizationFromStripeSubscription(input: {
       gracePeriodEndsAt: lockFields.gracePeriodEndsAt,
     },
   });
+
+  if (entitled) {
+    const { clearOrganizationReadOnly } = await import(
+      "@/lib/billing/enter-read-only"
+    );
+    await clearOrganizationReadOnly({ organizationId });
+  } else if (
+    billingStatus === "CANCELED" ||
+    (billingStatus === "PAST_DUE" &&
+      item.currentPeriodEnd != null &&
+      item.currentPeriodEnd.getTime() <= Date.now()) ||
+    (billingStatus === "UNPAID" && Boolean(subscription.id))
+  ) {
+    const { enterOrganizationReadOnly } = await import(
+      "@/lib/billing/enter-read-only"
+    );
+    await enterOrganizationReadOnly({
+      organizationId,
+      billingStatus:
+        billingStatus === "PAST_DUE"
+          ? "PAST_DUE"
+          : billingStatus === "UNPAID"
+            ? "UNPAID"
+            : "CANCELED",
+      canceledAt: unixToDate(subscription.canceled_at),
+    });
+  }
 
   if (resubscribeAfterCancel && previous.canceledAt) {
     const { extendCompanyResearchCreditsAfterCancelLapse } = await import(
@@ -347,7 +385,7 @@ export async function syncSubscriptionById(input: {
   };
 }
 
-/** Mark local billing canceled without re-mirroring plan/price from Stripe. */
+/** Mark local billing canceled and enter read-only (period ended / subscription deleted). */
 export async function markSubscriptionCanceled(input: {
   organizationId: string;
   subscriptionId: string;
@@ -369,19 +407,12 @@ export async function markSubscriptionCanceled(input: {
         ? unixToDate(input.canceledAt)
         : null;
 
-  await prisma.organizationBillingProfile.update({
-    where: { organizationId: input.organizationId },
-    data: {
-      billingStatus: "CANCELED",
-      cancelAtPeriodEnd: false,
-      // Prefer Stripe's cancellation timestamp so the 30-day purge clock is accurate.
-      canceledAt: canceledAt ?? new Date(),
-      lockReason: "CANCELED",
-      gracePeriodEndsAt: null,
-      stripeDiscountPercentOff: null,
-      stripeDiscountAmountOffCents: null,
-      stripeCouponId: null,
-      stripeEffectiveUnitAmountCents: profile.stripePriceUnitAmountCents,
-    },
+  const { enterOrganizationReadOnly } = await import(
+    "@/lib/billing/enter-read-only"
+  );
+  await enterOrganizationReadOnly({
+    organizationId: input.organizationId,
+    billingStatus: "CANCELED",
+    canceledAt: canceledAt ?? new Date(),
   });
 }

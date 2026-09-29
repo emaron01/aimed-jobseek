@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/auth/authz";
+import { OrganizationReadOnlyError } from "@/lib/billing/account-read-only";
 import {
   PaymentLockError,
   assertOrganizationNotPaymentLocked,
@@ -44,7 +45,10 @@ export async function POST() {
       rewardPercent: result.rewardPercent,
     });
   } catch (error) {
-    if (error instanceof PaymentLockError) {
+    if (
+      error instanceof PaymentLockError ||
+      error instanceof OrganizationReadOnlyError
+    ) {
       return NextResponse.json(
         { error: error.message, code: error.code },
         { status: 403 },

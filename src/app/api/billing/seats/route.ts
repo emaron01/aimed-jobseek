@@ -6,6 +6,7 @@ import {
   removeSeatFromSubscription,
   type SeatChangeDirection,
 } from "@/lib/billing/add-seat";
+import { OrganizationReadOnlyError } from "@/lib/billing/account-read-only";
 import {
   PaymentLockError,
   assertOrganizationNotPaymentLocked,
@@ -46,7 +47,10 @@ export async function GET(request: Request) {
     }
     return NextResponse.json({ preview: result.preview });
   } catch (error) {
-    if (error instanceof PaymentLockError) {
+    if (
+      error instanceof PaymentLockError ||
+      error instanceof OrganizationReadOnlyError
+    ) {
       return NextResponse.json(
         { error: error.message, code: error.code },
         { status: 403 },
@@ -116,7 +120,10 @@ export async function POST(request: Request) {
     revalidatePath("/settings/billing");
     return NextResponse.json({ seatQuantity: result.seatQuantity });
   } catch (error) {
-    if (error instanceof PaymentLockError) {
+    if (
+      error instanceof PaymentLockError ||
+      error instanceof OrganizationReadOnlyError
+    ) {
       return NextResponse.json(
         { error: error.message, code: error.code },
         { status: 403 },

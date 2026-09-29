@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
+  isOrganizationReadOnly,
   isPaymentLocked,
   isSpendBlocked,
   isPastDueInGrace,
@@ -8,65 +9,24 @@ import {
   paymentLockUserMessage,
   PAYMENT_LOCK_GRACE_MS,
 } from "@/lib/billing/payment-lock";
+import {
+  ACCOUNT_READ_ONLY_ACTION_MESSAGE,
+  ACCOUNT_READ_ONLY_BANNER_MESSAGE,
+  accountCancelScheduledMessage,
+} from "@/lib/billing/account-read-only";
+import { formatBillingDate } from "@/lib/billing/billing-state";
 import { BILLING_PLAN_COMPED, BILLING_PLAN_STANDARD } from "@/lib/billing/plans";
 
-describe("isPaymentLocked entitlement matrix", () => {
+describe("B3 read-only entitlement matrix", () => {
   const now = new Date("2026-09-14T12:00:00.000Z");
 
-  it("allows FREE / COMPED, ACTIVE, TRIALING", () => {
-    expect(
-      isPaymentLocked(
-        {
-          planCode: BILLING_PLAN_COMPED,
-          billingStatus: "FREE",
-        },
-        now,
-      ),
-    ).toBe(false);
-    expect(
-      isPaymentLocked(
-        {
-          planCode: BILLING_PLAN_STANDARD,
-          billingStatus: "ACTIVE",
-          stripeSubscriptionId: "sub_x",
-        },
-        now,
-      ),
-    ).toBe(false);
-    expect(
-      isPaymentLocked(
-        {
-          planCode: BILLING_PLAN_STANDARD,
-          billingStatus: "TRIALING",
-          stripeSubscriptionId: "sub_x",
-        },
-        now,
-      ),
-    ).toBe(false);
-  });
-
-  it("locks CANCELED immediately (even without lockReason)", () => {
+  it("never route-locks (isPaymentLocked always false)", () => {
     expect(
       isPaymentLocked(
         {
           planCode: BILLING_PLAN_STANDARD,
           billingStatus: "CANCELED",
-          stripeSubscriptionId: "sub_x",
-          lockReason: null,
-          gracePeriodEndsAt: null,
-        },
-        now,
-      ),
-    ).toBe(true);
-  });
-
-  it("does not lock pre-checkout UNPAID; locks Stripe-mapped UNPAID with sub id", () => {
-    expect(
-      isPaymentLocked(
-        {
-          planCode: BILLING_PLAN_STANDARD,
-          billingStatus: "UNPAID",
-          stripeSubscriptionId: null,
+          readOnlyStartedAt: now,
         },
         now,
       ),
@@ -75,43 +35,84 @@ describe("isPaymentLocked entitlement matrix", () => {
       isPaymentLocked(
         {
           planCode: BILLING_PLAN_STANDARD,
-          billingStatus: "UNPAID",
+          billingStatus: "PAST_DUE",
           stripeSubscriptionId: "sub_x",
+          gracePeriodEndsAt: new Date("2026-09-10T12:00:00.000Z"),
         },
         now,
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it("PAST_DUE grace is read-only: writes blocked, routes open until grace ends", () => {
-    const inGrace = {
+  it("FREE / COMPED never read-only", () => {
+    expect(
+      isOrganizationReadOnly({
+        planCode: BILLING_PLAN_COMPED,
+        billingStatus: "FREE",
+        readOnlyStartedAt: now,
+      }),
+    ).toBe(false);
+    expect(
+      isOrganizationReadOnly({
+        planCode: "FREE",
+        billingStatus: "FREE",
+        readOnlyStartedAt: now,
+      }),
+    ).toBe(false);
+    expect(
+      isSpendBlocked({
+        planCode: BILLING_PLAN_COMPED,
+        billingStatus: "CANCELED",
+      }),
+    ).toBe(false);
+  });
+
+  it("ACTIVE / TRIALING / cancel-at-period-end are not read-only", () => {
+    expect(
+      isOrganizationReadOnly({
+        planCode: BILLING_PLAN_STANDARD,
+        billingStatus: "ACTIVE",
+        cancelAtPeriodEnd: true,
+        currentPeriodEnd: new Date("2026-10-01T00:00:00.000Z"),
+      }),
+    ).toBe(false);
+    expect(
+      isSpendBlocked({
+        planCode: BILLING_PLAN_STANDARD,
+        billingStatus: "ACTIVE",
+        cancelAtPeriodEnd: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("mid-period PAST_DUE is not read-only (service through period end)", () => {
+    const pastDue = {
       planCode: BILLING_PLAN_STANDARD,
       billingStatus: "PAST_DUE" as const,
       stripeSubscriptionId: "sub_x",
-      lockReason: "PAYMENT_FAILED" as const,
-      gracePeriodEndsAt: new Date("2026-09-28T12:00:00.000Z"),
-    };
-    expect(isPastDueInGrace(inGrace, now)).toBe(true);
-    expect(isPaymentLocked(inGrace, now)).toBe(false);
-    expect(isSpendBlocked(inGrace, now)).toBe(true);
-
-    const afterGrace = {
-      ...inGrace,
-      gracePeriodEndsAt: new Date("2026-09-10T12:00:00.000Z"),
-    };
-    expect(isPastDueInGrace(afterGrace, now)).toBe(false);
-    expect(isPaymentLocked(afterGrace, now)).toBe(true);
-    expect(isSpendBlocked(afterGrace, now)).toBe(true);
-
-    // Grace not written yet — still in grace (heal starts the clock); writes blocked.
-    const pendingGrace = {
-      planCode: BILLING_PLAN_STANDARD,
-      billingStatus: "PAST_DUE" as const,
-      stripeSubscriptionId: "sub_x",
+      currentPeriodEnd: new Date("2026-09-28T12:00:00.000Z"),
       gracePeriodEndsAt: null,
     };
-    expect(isPaymentLocked(pendingGrace, now)).toBe(false);
-    expect(isSpendBlocked(pendingGrace, now)).toBe(true);
+    expect(isPastDueInGrace(pastDue, now)).toBe(false);
+    expect(isOrganizationReadOnly(pastDue)).toBe(false);
+    expect(isSpendBlocked(pastDue, now)).toBe(false);
+  });
+
+  it("readOnlyStartedAt or legacy CANCELED blocks spend/writes", () => {
+    expect(
+      isOrganizationReadOnly({
+        planCode: BILLING_PLAN_STANDARD,
+        billingStatus: "ACTIVE",
+        readOnlyStartedAt: now,
+      }),
+    ).toBe(true);
+    expect(
+      isSpendBlocked({
+        planCode: BILLING_PLAN_STANDARD,
+        billingStatus: "CANCELED",
+        stripeSubscriptionId: "sub_x",
+      }),
+    ).toBe(true);
   });
 });
 
@@ -146,7 +147,7 @@ describe("nextPaymentLockFields", () => {
     ).toEqual({ lockReason: "CANCELED", gracePeriodEndsAt: null });
   });
 
-  it("starts PAST_DUE grace once and preserves it on later syncs", () => {
+  it("PAST_DUE no longer starts a 14-day route-lock grace", () => {
     const first = nextPaymentLockFields({
       previous: {
         billingStatus: "ACTIVE",
@@ -157,49 +158,32 @@ describe("nextPaymentLockFields", () => {
       now,
     });
     expect(first.lockReason).toBe("PAYMENT_FAILED");
-    expect(first.gracePeriodEndsAt?.getTime()).toBe(
-      now.getTime() + PAYMENT_LOCK_GRACE_MS,
-    );
+    expect(first.gracePeriodEndsAt).toBeNull();
     expect(PAYMENT_LOCK_GRACE_MS).toBe(14 * 24 * 60 * 60 * 1000);
-
-    const later = new Date("2026-09-16T12:00:00.000Z");
-    const second = nextPaymentLockFields({
-      previous: {
-        billingStatus: "PAST_DUE",
-        lockReason: "PAYMENT_FAILED",
-        gracePeriodEndsAt: first.gracePeriodEndsAt,
-      },
-      billingStatus: "PAST_DUE",
-      now: later,
-    });
-    expect(second.gracePeriodEndsAt?.getTime()).toBe(
-      first.gracePeriodEndsAt?.getTime(),
-    );
   });
 });
 
-describe("paymentLockUserMessage", () => {
-  it("mentions billing for canceled orgs", () => {
+describe("seeker read-only messages", () => {
+  it("uses exact action and banner copy", () => {
+    expect(ACCOUNT_READ_ONLY_ACTION_MESSAGE).toBe(
+      "Your account is read-only. Renew your subscription to make changes.",
+    );
+    expect(ACCOUNT_READ_ONLY_BANNER_MESSAGE).toBe(
+      "Your subscription has ended, so your account is read-only. Renew within 30 days to keep everything. After that, your account and data are permanently deleted.",
+    );
     expect(
       paymentLockUserMessage({
         planCode: BILLING_PLAN_STANDARD,
         billingStatus: "CANCELED",
       }),
-    ).toMatch(/Billing/i);
+    ).toBe(ACCOUNT_READ_ONLY_ACTION_MESSAGE);
   });
 
-  it("describes full read-only during PAST_DUE grace", () => {
-    const now = new Date("2026-09-14T12:00:00.000Z");
-    expect(
-      paymentLockUserMessage(
-        {
-          planCode: BILLING_PLAN_STANDARD,
-          billingStatus: "PAST_DUE",
-          gracePeriodEndsAt: new Date("2026-09-28T12:00:00.000Z"),
-        },
-        now,
-      ),
-    ).toMatch(/read-only/i);
+  it("formats cancel-scheduled message with billing date", () => {
+    const periodEnd = new Date("2026-10-15T12:00:00.000Z");
+    expect(accountCancelScheduledMessage(periodEnd)).toBe(
+      `Your subscription ends on ${formatBillingDate(periodEnd)}. You'll keep full access until then.`,
+    );
   });
 });
 
@@ -210,37 +194,46 @@ describe("payment lock route gate", () => {
     expect(layout.indexOf("enforcePaymentLockGate")).toBeGreaterThan(
       layout.indexOf("enforceSelfServeCheckoutGate"),
     );
+    expect(layout).toContain("accountReadOnly");
   });
 
-  it("redirects locked orgs to billing only", () => {
+  it("does not redirect read-only orgs to billing-only shell", () => {
     const gate = readFileSync("src/lib/billing/payment-lock-gate.ts", "utf8");
     const lock = readFileSync("src/lib/billing/payment-lock.ts", "utf8");
-    expect(gate).toContain('redirect("/settings/billing")');
+    expect(gate).not.toContain('redirect("/settings/billing")');
+    expect(gate).toContain("OrganizationReadOnlyError");
     expect(lock).toContain("PAYMENT_LOCK_ROUTE_EXEMPT_PREFIXES");
     expect(lock).toContain('"/settings/billing"');
-    // Must stay open while locked or billing↔EULA redirect-loops.
     expect(lock).toContain('"/onboarding/eula"');
+    expect(lock).toContain('"/support"');
+    expect(lock).toContain('"/settings/account"');
   });
 
-  it("grace refuses Server Actions without redirecting views", () => {
+  it("refuses Server Actions without redirecting views", () => {
     const gate = readFileSync("src/lib/billing/payment-lock-gate.ts", "utf8");
     const org = readFileSync(
       "src/lib/tenant/getCurrentOrganization.ts",
       "utf8",
     );
     expect(gate).toContain("NEXT_ACTION_HEADER");
-    expect(gate).toContain("PaymentLockError");
+    expect(gate).toContain("OrganizationReadOnlyError");
     expect(org).toContain("NEXT_ACTION_HEADER");
-    expect(org).toContain("assertOrganizationNotPaymentLocked");
-    // headers() catch only swallows out-of-request-scope, not all errors.
+    expect(org).toContain("assertOrganizationWritable");
     expect(org).toContain("outside a request scope");
     expect(org).toContain("throw error");
   });
 
-  it("assert uses spendBlocked so PAST_DUE grace cannot write or research", () => {
+  it("assert uses spendBlocked / read-only for writes", () => {
     const lock = readFileSync("src/lib/billing/payment-lock.ts", "utf8");
     expect(lock).toContain("spendBlocked");
     expect(lock).toContain("isSpendBlocked");
     expect(lock).toContain("isWritesBlocked");
+    expect(lock).toContain("isOrganizationReadOnly");
+  });
+
+  it("AppShell shows exact read-only banner", () => {
+    const shell = readFileSync("src/components/AppShell.tsx", "utf8");
+    expect(shell).toContain("ACCOUNT_READ_ONLY_BANNER_MESSAGE");
+    expect(shell).toContain("account-readonly-banner");
   });
 });

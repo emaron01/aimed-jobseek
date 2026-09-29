@@ -25,6 +25,16 @@ import {
   syncSubscriptionById,
 } from "@/lib/billing/sync-subscription";
 
+/** Stripe Invoice → subscription id (API shape moved under parent.subscription_details). */
+function subscriptionIdFromInvoice(invoice: Stripe.Invoice): string | null {
+  const details = invoice.parent?.subscription_details;
+  if (!details) return null;
+  const sub = details.subscription;
+  if (typeof sub === "string") return sub;
+  if (sub && typeof sub === "object" && "id" in sub) return sub.id;
+  return null;
+}
+
 export async function handleStripeWebhookEvent(
   event: Stripe.Event,
 ): Promise<{ duplicate: boolean; handled: boolean }> {
@@ -101,6 +111,26 @@ export async function handleStripeWebhookEvent(
           canceledAt: subscription.canceled_at,
         });
         synced = true;
+      }
+      break;
+    }
+    case "invoice.payment_failed": {
+      // Renewal failure: sync subscription so period-end unpaid → read-only (B3).
+      const invoice = event.data.object as Stripe.Invoice;
+      const subscriptionId = subscriptionIdFromInvoice(invoice);
+      if (subscriptionId) {
+        const result = await syncSubscriptionById({ subscriptionId });
+        synced = Boolean(result);
+      }
+      break;
+    }
+    case "invoice.paid": {
+      // Successful payment / renewal — clear read-only when subscription is entitled.
+      const invoice = event.data.object as Stripe.Invoice;
+      const subscriptionId = subscriptionIdFromInvoice(invoice);
+      if (subscriptionId) {
+        const result = await syncSubscriptionById({ subscriptionId });
+        synced = Boolean(result);
       }
       break;
     }

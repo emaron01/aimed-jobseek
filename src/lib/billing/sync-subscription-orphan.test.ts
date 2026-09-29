@@ -91,10 +91,14 @@ describe("stripe sync after org hard-delete", () => {
     );
     expect(webhook).toContain('case "customer.subscription.deleted"');
     expect(webhook).toContain("markSubscriptionCanceled");
-    const deletedBlock = webhook.slice(
-      webhook.indexOf('case "customer.subscription.deleted"'),
-      webhook.indexOf("default:"),
-    );
+    // Scope only the deleted case — later invoice.* cases intentionally sync.
+    const deletedStart = webhook.indexOf('case "customer.subscription.deleted"');
+    const invoiceFailed = webhook.indexOf('case "invoice.payment_failed"');
+    const deletedEnd =
+      invoiceFailed > deletedStart
+        ? invoiceFailed
+        : webhook.indexOf("default:", deletedStart);
+    const deletedBlock = webhook.slice(deletedStart, deletedEnd);
     expect(deletedBlock).not.toContain("syncSubscriptionById");
     expect(deletedBlock).toContain("findOrganizationIdForSubscription");
     const sync = readFileSync("src/lib/billing/sync-subscription.ts", "utf8");

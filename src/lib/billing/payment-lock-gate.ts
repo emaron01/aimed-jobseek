@@ -1,20 +1,18 @@
 /**
- * Route-level payment lock:
- * - Full lock: redirect to /settings/billing (views closed).
- * - PAST_DUE grace: views stay open; Server Actions refused (read-only).
+ * Layout gate (account lifecycle B3):
+ * - No billing-only route redirect — every page stays viewable.
+ * - Server Actions outside exempt paths refused while read-only.
  */
 import "server-only";
 
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import {
   NEXT_ACTION_HEADER,
-  PaymentLockError,
   getOrganizationPaymentLockState,
   isPaymentLockPathExempt,
-  paymentLockUserMessage,
   PAYMENT_LOCK_ROUTE_EXEMPT_PREFIXES,
 } from "@/lib/billing/payment-lock";
+import { OrganizationReadOnlyError } from "@/lib/billing/account-read-only";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 
 function isPaymentLockRouteExempt(pathname: string): boolean {
@@ -24,8 +22,8 @@ function isPaymentLockRouteExempt(pathname: string): boolean {
 }
 
 /**
- * Locked orgs → billing only.
- * Grace orgs → allow GETs; refuse Server Actions outside billing pay paths.
+ * Read-only orgs: allow all GETs; refuse Server Actions outside billing /
+ * support / account exemptions.
  */
 export async function enforcePaymentLockGate(): Promise<void> {
   const organization = await getCurrentOrganization();
@@ -35,23 +33,12 @@ export async function enforcePaymentLockGate(): Promise<void> {
   const pathname = h.get("x-pathname")?.trim() || "";
   if (pathname && isPaymentLockRouteExempt(pathname)) return;
 
-  const { locked, spendBlocked, profile } =
-    await getOrganizationPaymentLockState(organization.id);
-
-  if (locked) {
-    if (!pathname || !isPaymentLockRouteExempt(pathname)) {
-      redirect("/settings/billing");
-    }
-    return;
-  }
-
-  // PAST_DUE grace (and any spendBlocked without full route lock): read-only.
-  if (!spendBlocked || !profile) return;
+  const { spendBlocked } = await getOrganizationPaymentLockState(
+    organization.id,
+  );
+  if (!spendBlocked) return;
   if (!h.get(NEXT_ACTION_HEADER)) return;
   if (pathname && isPaymentLockPathExempt(pathname)) return;
 
-  throw new PaymentLockError(
-    paymentLockUserMessage(profile),
-    profile.lockReason ?? profile.billingStatus,
-  );
+  throw new OrganizationReadOnlyError();
 }
