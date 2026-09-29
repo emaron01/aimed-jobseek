@@ -8,6 +8,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@/lib/prisma-client";
 import { getAuthEnv } from "@/lib/auth/config-core";
 import { getBetterAuthIpAddressOptions } from "@/lib/auth/ip-config";
+import { authTrustedOrigins } from "@/lib/auth/trusted-origins";
 import { provisionIndividualWorkspace } from "@/lib/auth/provision-service";
 import { recordAdminAuditEvent } from "@/lib/auth/audit-service";
 import { sendTransactionalEmail } from "@/lib/transactional-email/send-service";
@@ -307,7 +308,7 @@ export const auth = betterAuth({
       },
     },
   },
-  trustedOrigins: [authEnv.appUrl, authEnv.baseUrl],
+  trustedOrigins: authTrustedOrigins(),
 });
 
 export type AuthSession = typeof auth.$Infer.Session;
