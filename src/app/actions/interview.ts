@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { startConsultation } from "@/lib/consultation/service";
 import { requireCurrentUser } from "@/lib/auth/authz";
 import { addCheatSheetInterviewNote } from "@/lib/application-summary/service";
@@ -13,7 +12,6 @@ import {
   startPersonPrepForContact,
   updateInterviewStage,
 } from "@/lib/interview/stages";
-import { workspaceProgressText } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 
@@ -284,45 +282,6 @@ export async function addCheatSheetInterviewNoteAction(
     });
     revalidate(id, stageId || undefined);
     return { ok: true, message: "Saved to the cheat sheet." };
-  } catch (error) {
-    return errorResult(error);
-  }
-}
-
-export async function generateInterviewGuideAction(
-  _previous: InterviewActionResult | null,
-  formData: FormData,
-): Promise<InterviewActionResult> {
-  try {
-    const [user, organizationId] = await Promise.all([
-      requireCurrentUser(),
-      requireOrganizationId(),
-    ]);
-    const id = campaignId(formData);
-    const stageId = String(formData.get("stageId") ?? "").trim();
-    if (!stageId) throw new TenantError("Interview stage is required.");
-    const skip = String(formData.get("skipQuestions") ?? "") === "1";
-    const answers = formData.getAll("answerId").map((raw, index) => ({
-      id: String(raw),
-      answer: String(formData.getAll("answer")[index] ?? ""),
-    }));
-    await enqueueApplicationJob({
-      organizationId,
-      campaignId: id,
-      type: "INTERVIEW_GUIDE",
-      targetId: stageId,
-      initiatedByUserId: user.id,
-      payload: {
-        userId: user.id,
-        stageId,
-        skipQuestions: skip,
-        answers: answers.filter((row) => row.answer.trim()),
-        regenerationInstruction:
-          String(formData.get("regenerationInstruction") ?? "").trim() || null,
-      },
-    });
-    revalidate(id, stageId);
-    return { ok: true, message: workspaceProgressText("INTERVIEW_GUIDE") };
   } catch (error) {
     return errorResult(error);
   }

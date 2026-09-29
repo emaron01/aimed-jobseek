@@ -29,13 +29,9 @@ describe("Harper Batch D0 — remove unused notes-after gap check", () => {
   });
 
   it("removes refreshConsultationOffer, detectInterviewNoteGap, and offer copy", () => {
-    const guide = src("src/lib/interview/guide.ts");
     const stages = src("src/lib/interview/stages.ts");
     const interviewConfig = src("src/lib/product-config/interview.ts");
 
-    expect(guide).not.toContain("refreshConsultationOffer");
-    expect(guide).not.toContain("detectInterviewNoteGap");
-    expect(guide).not.toContain("consultationOfferJson");
     expect(stages).not.toContain("detectInterviewNoteGap");
     expect(stages).not.toContain("consultationOfferJson");
     expect(interviewConfig).not.toContain("consultationOffer");
@@ -47,7 +43,6 @@ describe("Harper Batch D0 — remove unused notes-after gap check", () => {
   it("nothing in src reads consultationOfferJson", () => {
     const paths = [
       "src/app/actions/interview.ts",
-      "src/lib/interview/guide.ts",
       "src/lib/interview/stages.ts",
       "src/lib/product-config/interview.ts",
       "src/components/InterviewStagesSection.tsx",

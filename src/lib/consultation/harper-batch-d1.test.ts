@@ -4,16 +4,16 @@ import { cheatSheetSectionKind } from "@/lib/application-summary/people";
 import { APPLICATION_SUMMARY_PROMPT_VERSION } from "@/lib/application-summary/contract";
 import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
 import { CONTACT_PROFILE_PROMPT_VERSION } from "@/lib/contact-profile/contract";
-import { INTERVIEW_GUIDE_PROMPT_VERSION } from "@/lib/interview/contract";
 import {
   APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS,
   COMPANY_RESEARCH_SYSTEM_INSTRUCTIONS,
   CONSULTATION_COACH_SYSTEM_INSTRUCTIONS,
   CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS,
   CONTACT_INDIVIDUAL_PROFILE_INSTRUCTIONS,
-  INTERVIEW_GUIDE_SYSTEM_INSTRUCTIONS,
+  INTERVIEW_THANK_YOU_CLARIFY_SYSTEM_INSTRUCTIONS,
 } from "@/lib/prompt-content";
 import { RESEARCH_PROMPT_VERSION } from "@/lib/research/config";
+import { INTERVIEW_THANK_YOU_CLARIFY_PROMPT_VERSION } from "@/lib/interview/contract";
 
 function src(path: string): string {
   return readFileSync(path, "utf8");
@@ -57,7 +57,7 @@ describe("Harper Batch D1 — role-agnostic prompts", () => {
     );
   });
 
-  it("contact, company research, cheat sheet, and interview guide use approved text", () => {
+  it("contact, company research, cheat sheet, and thank-you clarify use approved text", () => {
     expect(CONTACT_PROFILE_PROMPT_VERSION).toBe("4");
     expect(CONTACT_INDIVIDUAL_PROFILE_INSTRUCTIONS).toContain(
       '"Jordan is big on hands-on training: they built the onboarding program at two employers and coached every new lead through it."',
@@ -78,9 +78,9 @@ describe("Harper Batch D1 — role-agnostic prompts", () => {
       "Role scope: write for this job's actual role and industry. Never introduce methods, tools, frameworks, or metrics that are not in the supplied sources.",
     );
 
-    expect(INTERVIEW_GUIDE_PROMPT_VERSION).toBe("6");
-    expect(INTERVIEW_GUIDE_SYSTEM_INSTRUCTIONS).toContain(
-      "Role scope: write for this job's actual role and industry. Never introduce methods, tools, frameworks, or metrics that are not in the supplied sources.",
+    expect(INTERVIEW_THANK_YOU_CLARIFY_PROMPT_VERSION).toBe("1");
+    expect(INTERVIEW_THANK_YOU_CLARIFY_SYSTEM_INSTRUCTIONS).toContain(
+      "thank-you message",
     );
   });
 
@@ -91,7 +91,7 @@ describe("Harper Batch D1 — role-agnostic prompts", () => {
       CONTACT_INDIVIDUAL_PROFILE_INSTRUCTIONS,
       COMPANY_RESEARCH_SYSTEM_INSTRUCTIONS,
       APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS,
-      INTERVIEW_GUIDE_SYSTEM_INSTRUCTIONS,
+      INTERVIEW_THANK_YOU_CLARIFY_SYSTEM_INSTRUCTIONS,
     ];
     for (const prompt of prompts) {
       const lower = prompt.toLowerCase();

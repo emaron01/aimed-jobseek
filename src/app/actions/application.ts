@@ -121,7 +121,7 @@ export async function retryApplicationResearchAction(
     if (!campaignId) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }
-    await retryApplicationResearch({
+    const result = await retryApplicationResearch({
       organizationId,
       campaignId,
       ...(formData.has("notes")
@@ -130,6 +130,9 @@ export async function retryApplicationResearchAction(
     });
     revalidatePath(`/campaigns/${campaignId}`);
     revalidatePath(`/campaigns/${campaignId}/company`);
+    if (result.skippedUnchanged) {
+      return { ok: true, message: applicationResearchCopy.unchanged };
+    }
     return { ok: true, message: applicationResearchCopy.retriedQueued };
   } catch (error) {
     return fail(error, "Employer research could not be retried.");

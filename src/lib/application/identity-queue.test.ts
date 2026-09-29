@@ -240,7 +240,7 @@ describe("next-step card quality", () => {
 });
 
 describe("generation paths move to the worker", () => {
-  it("queues consultation, assets, outreach, guides, summary, and next step", () => {
+  it("queues consultation, assets, outreach, summary, and next step", () => {
     const consult = readFileSync("src/app/actions/consultation.ts", "utf8");
     const assets = readFileSync("src/app/actions/application-assets.ts", "utf8");
     const outreach = readFileSync("src/app/actions/application-outreach.ts", "utf8");
@@ -250,7 +250,8 @@ describe("generation paths move to the worker", () => {
     expect(consult).toContain('type: "CONSULTATION"');
     expect(assets).toContain("enqueueApplicationJob");
     expect(outreach).toContain('type: "OUTREACH"');
-    expect(interview).toContain('type: "INTERVIEW_GUIDE"');
+    expect(interview).not.toContain('type: "INTERVIEW_GUIDE"');
+    expect(interview).not.toContain("generateInterviewGuideAction");
     expect(summary).toContain('type: "APPLICATION_SUMMARY"');
     expect(next).toContain('type: "NEXT_STEP"');
     expect(next).toContain("enqueueApplicationJob");

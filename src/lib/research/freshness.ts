@@ -3,7 +3,7 @@ import type {
   CompanyResearch as PrismaCompanyResearch,
 } from "@prisma/client";
 
-type CompanyResearchContent = {
+export type CompanyResearchContent = {
   companySummary?: unknown;
   whatTheySell?: unknown;
   estimatedAov?: unknown;

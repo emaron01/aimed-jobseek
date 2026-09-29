@@ -55,16 +55,15 @@ describe("Harper Batch D4 — Cheat Sheet WHO tags + CAR/STAR parts", () => {
     vi.restoreAllMocks();
   });
 
-  it("STEP 1: interview guide is generated but rendered nowhere after Batches B1–B5", () => {
-    const guide = src("src/lib/interview/guide.ts");
+  it("STEP 1: interview guide generation and rendering are removed after Batches B1–B5", () => {
+    expect(() => src("src/lib/interview/guide.ts")).toThrow();
     const process = src("src/lib/application-jobs/process.ts");
     const action = src("src/app/actions/interview.ts");
-    expect(guide).toContain("generateInterviewGuideWithModel");
-    expect(guide).toContain("contentJson: generated.data");
     expect(process).toContain('case "INTERVIEW_GUIDE"');
-    expect(process).toContain("requestInterviewGuide");
-    expect(action).toContain("generateInterviewGuideAction");
-    expect(action).toContain('type: "INTERVIEW_GUIDE"');
+    expect(process).not.toContain("requestInterviewGuide");
+    expect(process).toContain("Guide generation was removed");
+    expect(action).not.toContain("generateInterviewGuideAction");
+    expect(action).not.toContain('type: "INTERVIEW_GUIDE"');
 
     for (const path of [
       "src/components/ApplicationWorkspace.tsx",

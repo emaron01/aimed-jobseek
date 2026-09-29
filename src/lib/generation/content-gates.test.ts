@@ -25,7 +25,7 @@ describe("generated content is not rejected", () => {
     expect(plan).toContain("if (!plan.ok)");
     expect(plan).toContain("failGeneration");
     expect(plan).not.toContain("mentionsInternalSystemState");
-    expect(readFileSync("src/lib/interview/guide.ts", "utf8")).not.toContain(
+    expect(readFileSync("src/lib/interview/ai.ts", "utf8")).not.toContain(
       "logQualityRejection",
     );
     expect(readFileSync("src/lib/application-assets/service.ts", "utf8")).not.toContain(

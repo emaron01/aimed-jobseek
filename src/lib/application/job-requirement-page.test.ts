@@ -147,10 +147,6 @@ describe("job requirements page", () => {
         needle: "requirement.scorecardJson",
       },
       {
-        path: "src/lib/interview/guide.ts",
-        needle: "jobRequirement?.scorecardJson",
-      },
-      {
         path: "src/app/(app)/campaigns/[id]/summary/page.tsx",
         needle: "view.requirement.scorecardJson",
       },

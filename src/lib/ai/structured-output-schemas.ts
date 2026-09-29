@@ -46,8 +46,6 @@ import {
   interviewerExtractionSchema,
 } from "@/lib/contact-profile/contract";
 import {
-  interviewClarifyingQuestionsSchema,
-  interviewGuideContentSchema,
   interviewThankYouClarifyingQuestionsSchema,
 } from "@/lib/interview/contract";
 
@@ -251,16 +249,6 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
     schemaName: "application_asset_claim_validation",
     schema: assetClaimValidationSchema,
     usageOperations: ["APPLICATION_ASSET_GENERATION"],
-  },
-  interviewClarifyingQuestions: {
-    schemaName: "interview_clarifying_questions",
-    schema: interviewClarifyingQuestionsSchema,
-    usageOperations: ["INTERVIEW_GUIDE"],
-  },
-  interviewGuide: {
-    schemaName: "interview_stage_guide",
-    schema: interviewGuideContentSchema,
-    usageOperations: ["INTERVIEW_GUIDE"],
   },
   interviewThankYouClarifyingQuestions: {
     schemaName: "interview_thank_you_clarifying_questions",

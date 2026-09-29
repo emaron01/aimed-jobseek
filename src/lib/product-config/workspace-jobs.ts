@@ -101,8 +101,6 @@ export function workspaceProgressText(
         : `Writing the ${applicationAssetConfig.labels.coverLetter}…`;
     case "OUTREACH":
       return "Writing this message…";
-    case "INTERVIEW_GUIDE":
-      return "Writing the interview guide…";
     case "APPLICATION_SUMMARY":
       return `Writing the ${applicationSummaryConfig.title}…`;
     case "NEXT_STEP":
@@ -137,8 +135,6 @@ export function workspaceReadyText(
         : `${applicationAssetConfig.labels.coverLetter} is ready.`;
     case "OUTREACH":
       return "The message is ready.";
-    case "INTERVIEW_GUIDE":
-      return "The interview guide is ready.";
     case "APPLICATION_SUMMARY":
       return `${applicationSummaryConfig.title} is ready.`;
     case "NEXT_STEP":

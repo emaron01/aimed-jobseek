@@ -1,19 +1,10 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   addBusinessDays,
   checkInDueAt,
   thankYouDueAt,
 } from "@/lib/cadence/application-reminders";
-import {
-  limitClarifyingQuestions,
-  missingGuideMaterial,
-  parseClarifyingQuestions,
-  rolesMissingLeaveReason,
-  validateInterviewGuideContent,
-  type InterviewGuideContent,
-} from "@/lib/interview/guide";
-import { buildInterviewGuideMessages } from "@/lib/interview/prompt";
 import { addApplicationContact } from "@/lib/application/contacts";
 import { addCheatSheetInterviewNote } from "@/lib/application-summary/service";
 import {
@@ -22,280 +13,14 @@ import {
   createInterviewStage,
   updateInterviewStage,
 } from "@/lib/interview/stages";
-import { validateRepetitionAndMetaLanguage } from "@/lib/consultation/output-quality";
 import { interviewConfig } from "@/lib/product-config";
 import { redirectLineErrors, thankYouNotesErrors } from "@/lib/application-assets/outreach";
 import { hasTestDatabase } from "@/test/database";
+import { prisma } from "@/lib/prisma-client";
+import { validateRepetitionAndMetaLanguage } from "@/lib/consultation/output-quality";
 
-function claim(id: string, text: string, sourceId?: string): InterviewGuideContent["purpose"] {
-  return {
-    id,
-    text,
-    supports: sourceId
-      ? [{ sourceId, quote: text.slice(0, Math.min(12, text.length)) }]
-      : [],
-  };
-}
-
-describe("interview guide rules", () => {
-  it("allows the same metric in different sections and rejects it inside one section", () => {
-    const talkingPoint = "Lead with the 2 production incidents you owned at Northwind.";
-    const exampleAnswer =
-      "I owned 2 production incidents at Northwind and wrote the runbook the on-call team still uses.";
-    const repeatedInside =
-      "Lead with the 2 production incidents. Repeat the 2 production incidents without adding information.";
-    expect(
-      validateRepetitionAndMetaLanguage({ text: talkingPoint, field: "talkingPoints" }),
-    ).toEqual([]);
-    expect(
-      validateRepetitionAndMetaLanguage({ text: exampleAnswer, field: "exampleAnswer" }),
-    ).toEqual([]);
-    expect(
-      validateRepetitionAndMetaLanguage({
-        text: repeatedInside,
-        field: "talkingPoints",
-      }).some((issue) => issue.message.includes("repeated the same number")),
-    ).toBe(true);
-  });
-
-  it("limits clarifying questions to three and allows skip", () => {
-    const questions = [
-      { id: "q1", text: "Who are you meeting?" },
-      { id: "q2", text: "What did the recruiter ask you to prepare?" },
-      { id: "q3", text: "Why did you leave Contoso Health?" },
-      { id: "q4", text: "What else should change the guide?" },
-    ];
-    expect(limitClarifyingQuestions(questions)).toHaveLength(
-      interviewConfig.clarifyingQuestionLimit,
-    );
-    expect(missingGuideMaterial({
-      interviewerCount: 0,
-      notesBefore: null,
-      priorNotes: [],
-      stageType: "RECRUITER_SCREEN",
-      rolesMissingLeaveReason: [],
-    }).length).toBeGreaterThan(0);
-    expect(
-      parseClarifyingQuestions({ questions: questions.slice(0, 2) }),
-    ).toHaveLength(2);
-    const guideSource = readFileSync("src/lib/interview/guide.ts", "utf8");
-    expect(guideSource).not.toContain("Clarifying questions could not be written");
-  });
-
-  it("requires chronological preparation and rejects an invented leave reason", () => {
-    const experience = [
-      {
-        id: "role_2",
-        employer: "Contoso Health",
-        title: "Software Engineer",
-        endDate: "2020-12",
-        reasonForLeaving: null,
-      },
-    ];
-    expect(rolesMissingLeaveReason(experience)).toEqual([
-      { roleId: "role_2", label: "Software Engineer at Contoso Health" },
-    ]);
-    const invented: InterviewGuideContent = {
-      purpose: claim("p", "This stage decides fit."),
-      interviewers: [],
-      talkingPoints: [claim("t1", "Use the billing rewrite.")],
-      chronologicalWalkthrough: [
-        {
-          roleId: "role_2",
-          employer: "Contoso Health",
-          title: "Software Engineer",
-          accomplishments: [claim("a1", "Built the member-identity API.")],
-          reasonForLeaving: "I wanted a new challenge in robotics.",
-          reasonUnknown: false,
-        },
-      ],
-    };
-    const inventedErrors = validateInterviewGuideContent({
-      content: invented,
-      sources: [],
-      stageType: "HIRING_MANAGER",
-      interviewerIds: [],
-      experience,
-      priorNoteSourceIds: [],
-      approvedStatementIds: [],
-      approvedStoryIds: [],
-    });
-    expect(
-      inventedErrors.some((error) => error.toLowerCase().includes("invent")),
-    ).toBe(true);
-
-    const unknown: InterviewGuideContent = {
-      ...invented,
-      chronologicalWalkthrough: [
-        {
-          roleId: "role_2",
-          employer: "Contoso Health",
-          title: "Software Engineer",
-          accomplishments: [claim("a1", "Built the member-identity API.")],
-          reasonForLeaving: "",
-          reasonUnknown: true,
-        },
-      ],
-    };
-    expect(
-      validateInterviewGuideContent({
-        content: unknown,
-        sources: [],
-        stageType: "HIRING_MANAGER",
-        interviewerIds: [],
-        experience,
-        priorNoteSourceIds: [],
-        approvedStatementIds: [],
-        approvedStoryIds: [],
-      }).filter((error) => error.toLowerCase().includes("invent")),
-    ).toEqual([]);
-  });
-
-  it("rejects first-person narration and allows labeled example answers", () => {
-    const narrating: InterviewGuideContent = {
-      purpose: claim("p", "I can lead incident response for this stage."),
-      interviewers: [],
-      talkingPoints: [claim("t1", "Use the billing rewrite.")],
-    };
-    expect(
-      validateInterviewGuideContent({
-        content: narrating,
-        sources: [],
-        stageType: "RECRUITER_SCREEN",
-        interviewerIds: [],
-        experience: [],
-        priorNoteSourceIds: [],
-        approvedStatementIds: [],
-        approvedStoryIds: [],
-      }).some((error) => error.toLowerCase().includes("second person")),
-    ).toBe(true);
-
-    const withExample: InterviewGuideContent = {
-      purpose: claim("p", "This stage decides whether you can lead incidents."),
-      interviewers: [
-        {
-          contactId: "contact_priya",
-          roleId: "persona_recruiter",
-          whoTheyAre: claim("w", "Priya screens for production reliability."),
-          whatTheyEvaluate: claim("e", "She will evaluate your incident ownership."),
-          likelyQuestions: [
-            {
-              question: claim("q", "Tell me about a production incident you led."),
-              answerMaterial: claim(
-                "a",
-                "Use your invoice rewrite and on-call week.",
-              ),
-              exampleAnswer: claim(
-                "x",
-                "I led the rewrite of invoice generation that cut failed billing runs.",
-              ),
-              statementIds: [],
-              storyIds: [],
-            },
-          ],
-          questionsToAsk: [claim("ask", "What does success look like in the first quarter?")],
-        },
-      ],
-      talkingPoints: [claim("t1", "Lead with your invoice rewrite.")],
-    };
-    expect(
-      validateInterviewGuideContent({
-        content: withExample,
-        sources: [],
-        stageType: "RECRUITER_SCREEN",
-        interviewerIds: ["contact_priya"],
-        experience: [],
-        priorNoteSourceIds: [],
-        approvedStatementIds: [],
-        approvedStoryIds: [],
-      }).filter((error) => error.toLowerCase().includes("second person")),
-    ).toEqual([]);
-  });
-
-  it("requires earlier-stage notes to change the next guide", () => {
-    const content: InterviewGuideContent = {
-      purpose: claim("p", "This stage decides technical fit."),
-      interviewers: [],
-      talkingPoints: [claim("t1", "Prepare production stories.")],
-    };
-    const withoutCite = validateInterviewGuideContent({
-      content,
-      sources: [
-        {
-          id: "interview:s1:notesAfter",
-          text: "The hiring manager will focus on incident leadership.",
-          category: "APPLICATION",
-        },
-      ],
-      stageType: "HIRING_MANAGER",
-      interviewerIds: [],
-      experience: [],
-      priorNoteSourceIds: ["interview:s1:notesAfter"],
-      approvedStatementIds: [],
-      approvedStoryIds: [],
-    });
-    expect(withoutCite.some((error) => error.includes("earlier stage"))).toBe(true);
-
-    const withCite: InterviewGuideContent = {
-      purpose: claim("p", "This stage decides technical fit."),
-      interviewers: [],
-      talkingPoints: [
-        claim(
-          "t1",
-          "The hiring manager will focus on incident leadership.",
-          "interview:s1:notesAfter",
-        ),
-      ],
-    };
-    const messages = buildInterviewGuideMessages({
-      stageType: "HIRING_MANAGER",
-      format: "VIDEO",
-      scheduledAt: "2026-10-01T15:00:00.000Z",
-      notesBefore: null,
-      notesAfter: null,
-      expectedDecisionAt: null,
-      interviewers: [],
-      priorStageNotes: [
-        {
-          stageId: "s1",
-          type: "RECRUITER_SCREEN",
-          notesAfter: "The hiring manager will focus on incident leadership.",
-        },
-      ],
-      clarifyingAnswers: [],
-      profileRoles: [],
-      approvedStatements: [],
-      approvedStories: [],
-      scorecardCompetencies: [],
-      consultationGaps: [],
-      personas: [],
-      sources: [],
-      qualityFeedback: [],
-    });
-    expect(messages.map((message) => message.content).join("\n")).toContain(
-      "incident leadership",
-    );
-    expect(
-      validateInterviewGuideContent({
-        content: withCite,
-        sources: [
-          {
-            id: "interview:s1:notesAfter",
-            text: "The hiring manager will focus on incident leadership.",
-            category: "APPLICATION",
-          },
-        ],
-        stageType: "RECRUITER_SCREEN",
-        interviewerIds: [],
-        experience: [],
-        priorNoteSourceIds: ["interview:s1:notesAfter"],
-        approvedStatementIds: [],
-        approvedStoryIds: [],
-      }),
-    ).toEqual([]);
-  });
-
-  it("requires thank-you messages to use notes and never include a redirect", () => {
+describe("interview thank-you and stages (guide removed)", () => {
+  it("keeps thank-you note quality rules", () => {
     const notes = "The hiring manager will focus on incident leadership.";
     expect(
       thankYouNotesErrors({
@@ -329,74 +54,110 @@ describe("interview guide rules", () => {
       scheduledAt: scheduled,
       businessDays: interviewConfig.reminders.defaultCheckInBusinessDays,
     });
-    expect(withDecision.toISOString().startsWith("2026-10-09")).toBe(true);
+    expect(withDecision.toISOString()).toBe("2026-10-09T00:00:00.000Z");
     const withoutDecision = checkInDueAt({
       expectedDecisionAt: null,
       scheduledAt: scheduled,
       businessDays: interviewConfig.reminders.defaultCheckInBusinessDays,
     });
-    expect(withoutDecision.getTime()).toBe(
+    expect(withoutDecision.toISOString()).toBe(
       addBusinessDays(
         scheduled,
         interviewConfig.reminders.defaultCheckInBusinessDays,
-      ).getTime(),
+      ).toISOString(),
     );
   });
 
-  it("keeps a failed guide generate on screen instead of remounting the page", () => {
-    const action = readFileSync("src/app/actions/interview.ts", "utf8");
-    expect(action).toContain("enqueueApplicationJob");
-    expect(action).toContain("revalidate(id, stageId)");
+  it("repetition quality helper still rejects repeated metrics in one field", () => {
+    const repeatedInside =
+      "Lead with the 2 production incidents. Repeat the 2 production incidents without adding information.";
+    expect(
+      validateRepetitionAndMetaLanguage({
+        text: repeatedInside,
+        field: "talkingPoints",
+      }).some((issue) => issue.message.includes("repeated the same number")),
+    ).toBe(true);
   });
 
-  it("prints the guide without navigation or controls", () => {
-    const page = readFileSync(
-      "src/app/(app)/campaigns/[id]/interviews/[stageId]/page.tsx",
+  it("removes guide generation, view, parse, and action wiring", () => {
+    expect(() => readFileSync("src/lib/interview/guide.ts", "utf8")).toThrow();
+    const process = readFileSync("src/lib/application-jobs/process.ts", "utf8");
+    expect(process).toContain('case "INTERVIEW_GUIDE"');
+    expect(process).not.toContain("requestInterviewGuide");
+    expect(process).toContain("Guide generation was removed");
+    const action = readFileSync("src/app/actions/interview.ts", "utf8");
+    expect(action).not.toContain("generateInterviewGuideAction");
+    expect(action).not.toContain('type: "INTERVIEW_GUIDE"');
+    const ai = readFileSync("src/lib/interview/ai.ts", "utf8");
+    expect(ai).toContain("generateInterviewThankYouClarifyingQuestions");
+    expect(ai).not.toContain("generateInterviewGuideWithModel");
+    expect(ai).not.toContain("generateInterviewClarifyingQuestions");
+    const prompt = readFileSync("src/lib/interview/prompt.ts", "utf8");
+    expect(prompt).toContain("buildInterviewThankYouClarifyingMessages");
+    expect(prompt).not.toContain("buildInterviewGuideMessages");
+    const schemas = readFileSync(
+      "src/lib/ai/structured-output-schemas.ts",
       "utf8",
     );
-    const css = readFileSync("src/app/globals.css", "utf8");
-    expect(page).toContain('className="application-summary');
-    expect(page).toContain("print:hidden");
-    expect(css).toContain(".application-summary button");
-    expect(css).toContain("nav,");
+    expect(schemas).toContain("interviewThankYouClarifyingQuestions");
+    expect(schemas).not.toContain("interviewGuide:");
+    expect(schemas).not.toContain("interviewClarifyingQuestions:");
+    const prismaSchema = readFileSync("prisma/schema.prisma", "utf8");
+    expect(prismaSchema).toContain("INTERVIEW_GUIDE");
+    expect(prismaSchema).toContain("model InterviewStageGuide");
+    for (const path of [
+      "src/components/ApplicationWorkspace.tsx",
+      "src/components/CheatSheetPersonBody.tsx",
+      "src/components/ConsultationSection.tsx",
+      "src/components/HarperPersonView.tsx",
+      "src/app/actions/interview.ts",
+    ]) {
+      const text = readFileSync(path, "utf8");
+      expect(text).not.toContain("getInterviewGuideView");
+      expect(text).not.toContain("parseGuideContent");
+      expect(text).not.toContain("generateInterviewGuideAction");
+      expect(text).not.toContain("requestInterviewGuide");
+    }
   });
 });
 
-const describeDb = hasTestDatabase() ? describe : describe.skip;
-
-describeDb("interview stages persistence", () => {
-  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  let prisma: import("@prisma/client").PrismaClient;
+describe.skipIf(!hasTestDatabase())("interview stages without guide", () => {
+  const suffix = Date.now().toString(36);
   let organizationId = "";
   let userId = "";
   let campaignId = "";
   let recruiterRoleId = "";
 
   beforeAll(async () => {
-    const { PrismaClient } = await import("@prisma/client");
-    const { createIndividualWorkspace } = await import("@/lib/org/signup");
-    prisma = new PrismaClient();
-    const workspace = await createIndividualWorkspace({
-      email: `interview-${suffix}@example.test`,
-      name: "Interview Seeker",
-    });
-    organizationId = workspace.organization.id;
-    userId = workspace.user.id;
-    const product = await prisma.product.create({
+    const org = await prisma.organization.create({
       data: {
-        organizationId,
-        name: `Profile ${suffix}`,
-        approvalStatus: "APPROVED",
+        name: `[TEST] Interview ${suffix}`,
+        slug: `interview-${suffix}`,
       },
     });
+    organizationId = org.id;
+    const user = await prisma.user.create({
+      data: {
+        email: `interview-${suffix}@example.test`,
+        emailNormalized: `interview-${suffix}@example.test`,
+      },
+    });
+    userId = user.id;
+    const product = await prisma.product.create({
+      data: { organizationId, name: `Interview Product ${suffix}` },
+    });
     const icp = await prisma.icp.create({
-      data: { organizationId, productId: product.id, name: `ICP ${suffix}` },
+      data: {
+        organizationId,
+        productId: product.id,
+        name: `Interview ICP ${suffix}`,
+      },
     });
     const campaign = await prisma.campaign.create({
       data: {
         organizationId,
         ownerUserId: userId,
-        name: `Interview ${suffix}`,
+        name: `Interview App ${suffix}`,
         productId: product.id,
         icpId: icp.id,
       },
@@ -477,7 +238,7 @@ describeDb("interview stages persistence", () => {
     expect(updated?.outcome).toBe("ADVANCED");
   });
 
-  it("assigns an existing or new interviewer, stores LinkedIn and notes on the cheat sheet, and does not create a stage guide", async () => {
+  it("assigns interviewers and cheat-sheet notes without creating a guide job", async () => {
     const existing = await addApplicationContact({
       organizationId,
       campaignId,
@@ -529,12 +290,6 @@ describeDb("interview stages persistence", () => {
       personaId: recruiterRoleId,
       linkedInProfileText: linkedInText,
     });
-    const membership = await prisma.campaignContact.findFirst({
-      where: { campaignId, contactId: added.contactId },
-    });
-    expect(membership?.linkedInProfileText).toBe(linkedInText);
-    expect(membership?.chosenPersonaId).toBe(recruiterRoleId);
-
     await addCheatSheetInterviewNote({
       organizationId,
       campaignId,
@@ -543,40 +298,52 @@ describeDb("interview stages persistence", () => {
       stageId: newStage.id,
       text: "Invitation: they want to hear about enterprise motion.",
     });
-    const noted = await prisma.campaignContact.findFirst({
-      where: { campaignId, contactId: added.contactId },
-    });
-    expect(JSON.stringify(noted?.cheatSheetNotesJson)).toContain(
-      "Invitation: they want to hear about enterprise motion.",
-    );
-
     expect(
       await prisma.interviewStageGuide.count({
         where: { stageId: { in: [existingStage.id, newStage.id] } },
       }),
     ).toBe(0);
-    const jobs = await prisma.applicationJob.findMany({
-      where: {
-        campaignId,
-        type: "APPLICATION_SUMMARY",
-      },
-    });
-    // Batch B3: Use this interviewer is assign-only — no cheat-sheet enqueue.
-    expect(jobs.some((job) => job.targetId === `contact:${existing.contactId}`)).toBe(
-      false,
-    );
-    // Stage "Add interviewer" still starts prep + cheat-sheet section.
-    expect(jobs.some((job) => job.targetId === `contact:${added.contactId}`)).toBe(true);
-    const reassessJobs = await prisma.applicationJob.findMany({
-      where: { campaignId, type: "CONSULTATION" },
-    });
-    expect(
-      reassessJobs.some((job) => JSON.stringify(job.payload).includes("reassess")),
-    ).toBe(true);
     expect(
       await prisma.applicationJob.count({
         where: { campaignId, type: "INTERVIEW_GUIDE" },
       }),
+    ).toBe(0);
+  });
+
+  it("terminal INTERVIEW_GUIDE handler completes orphan jobs without a paid call", async () => {
+    const stage = await createInterviewStage({
+      organizationId,
+      campaignId,
+      userId,
+      type: "RECRUITER_SCREEN",
+      scheduledAt: new Date("2026-10-04T15:00:00.000Z"),
+      format: "VIDEO",
+    });
+    const job = await prisma.applicationJob.create({
+      data: {
+        organizationId,
+        campaignId,
+        type: "INTERVIEW_GUIDE",
+        status: "PENDING",
+        targetId: stage.id,
+        payload: { userId, stageId: stage.id },
+      },
+    });
+    await prisma.applicationJob.update({
+      where: { id: job.id },
+      data: { status: "IN_PROGRESS", startedAt: new Date() },
+    });
+    const { processApplicationJob } = await import(
+      "@/lib/application-jobs/process"
+    );
+    const result = await processApplicationJob(job.id);
+    expect(result.ok).toBe(true);
+    const finished = await prisma.applicationJob.findUnique({
+      where: { id: job.id },
+    });
+    expect(finished?.status).toBe("COMPLETED");
+    expect(
+      await prisma.interviewStageGuide.count({ where: { stageId: stage.id } }),
     ).toBe(0);
   });
 });

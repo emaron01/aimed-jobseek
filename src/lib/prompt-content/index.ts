@@ -19,11 +19,7 @@ export { PERSONA_SYNTHESIS_SYSTEM_INSTRUCTIONS } from "./persona-synthesis";
 export { HIRING_TEAM_IDENTIFICATION_SYSTEM_INSTRUCTIONS } from "./hiring-team-identification";
 export { CONTACT_INDIVIDUAL_PROFILE_INSTRUCTIONS } from "./contact-individual-profile";
 export { APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS } from "./application-summary";
-export {
-  INTERVIEW_CLARIFY_SYSTEM_INSTRUCTIONS,
-  INTERVIEW_GUIDE_SYSTEM_INSTRUCTIONS,
-  INTERVIEW_THANK_YOU_CLARIFY_SYSTEM_INSTRUCTIONS,
-} from "./interview-guide";
+export { INTERVIEW_THANK_YOU_CLARIFY_SYSTEM_INSTRUCTIONS } from "./interview-guide";
 export {
   buildConsultationCoachSystemInstructions,
   CONSULTATION_COACH_SYSTEM_INSTRUCTIONS,

@@ -199,6 +199,7 @@ export const applicationResearchCopy = Object.freeze({
   saveEmployer: "Save employer and research",
   savedQueued: "Researching this employer…",
   retriedQueued: "Researching this employer again…",
+  unchanged: "No Changes To Company Research",
 });
 
 export const applicationWorkspaceCopy = Object.freeze({

@@ -38,6 +38,12 @@ import {
   type ResearchFailureInfo,
 } from "@/lib/research/failure-classification";
 import { isDevTenantBypassEnabled } from "@/lib/auth/config-core";
+import {
+  COMPANY_RESEARCH_UNCHANGED_REASON,
+  companyResearchFingerprint,
+  companyResearchFingerprintUnchanged,
+  runGatedCompanyResearch,
+} from "@/lib/research/company-research-paid-inputs";
 import { recordUsageEvent } from "@/lib/usage/events-service";
 import {
   companyHasActiveResearchSlot,
@@ -908,6 +914,35 @@ export async function researchCompany(
     return { skipped: true, reason: "fresh", research: latest };
   }
 
+  const fingerprint = companyResearchFingerprint({
+    name: company.name,
+    website: company.website,
+    normalizedDomain: company.normalizedDomain,
+    industry: company.industry,
+    employeeCount: company.employeeCount,
+    location: company.location,
+    seekerSuppliedNotes: options?.seekerSuppliedNotes,
+    depthPolicy: researchPolicy,
+    evidenceTargets: options?.evidenceTargets,
+  });
+
+  // forceRefresh ignores the freshness window, not identical inputs.
+  if (
+    isSuccessfulResearch(latest) &&
+    (await companyResearchFingerprintUnchanged({
+      organizationId,
+      companyId: company.id,
+      fingerprint,
+      research: latest,
+    }))
+  ) {
+    return {
+      skipped: true,
+      reason: COMPANY_RESEARCH_UNCHANGED_REASON,
+      research: latest,
+    };
+  }
+
   const priorSuccessful = isSuccessfulResearch(latest) ? latest : null;
   const alreadyHasActiveSlot = await companyHasActiveResearchSlot(
     organizationId,
@@ -1077,21 +1112,40 @@ export async function researchCompany(
   }
 
   try {
-    const result = (await provider.research({
+    const gated = await runGatedCompanyResearch({
       organizationId,
       companyId: company.id,
-      name: company.name,
-      website: company.website,
-      normalizedDomain: company.normalizedDomain,
-      industry: company.industry,
-      employeeCount: company.employeeCount,
-      location: company.location,
-      depthPolicy: researchPolicy,
-      evidenceTargets: options?.evidenceTargets,
-      seekerSuppliedNotes: options?.seekerSuppliedNotes,
-      campaignId: options?.campaignId ?? null,
-      userId: user?.id ?? null,
-    })) as CompanyResearchResult | AutomatedCompanyResearchResult;
+      fingerprint,
+      callProvider: async () =>
+        (await provider.research({
+          organizationId,
+          companyId: company.id,
+          name: company.name,
+          website: company.website,
+          normalizedDomain: company.normalizedDomain,
+          industry: company.industry,
+          employeeCount: company.employeeCount,
+          location: company.location,
+          depthPolicy: researchPolicy,
+          evidenceTargets: options?.evidenceTargets,
+          seekerSuppliedNotes: options?.seekerSuppliedNotes,
+          campaignId: options?.campaignId ?? null,
+          userId: user?.id ?? null,
+        })) as CompanyResearchResult,
+    });
+
+    if (gated.skipped) {
+      const current = await getLatestCompanyResearch(company.id);
+      if (isSuccessfulResearch(current)) {
+        return {
+          skipped: true,
+          reason: COMPANY_RESEARCH_UNCHANGED_REASON,
+          research: current,
+        };
+      }
+    }
+
+    const result = gated.data as CompanyResearchResult | AutomatedCompanyResearchResult;
 
     const provenance =
       "provenance" in result && result.provenance

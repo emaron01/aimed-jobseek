@@ -5,19 +5,10 @@ import type { AiCallUsageContext } from "@/lib/ai/types";
 import { aiCallTracking } from "@/lib/usage/ai-call";
 import { runGatedInterviewThankYouClarify } from "@/lib/interview/thank-you-paid-inputs";
 import {
-  interviewClarifyingQuestionsSchema,
-  interviewGuideContentSchema,
   interviewThankYouClarifyingQuestionsSchema,
-  type InterviewClarifyingQuestions,
-  type InterviewGuideContent,
   type InterviewThankYouClarifyingQuestions,
 } from "./contract";
-import {
-  buildInterviewClarifyingMessages,
-  buildInterviewGuideMessages,
-  buildInterviewThankYouClarifyingMessages,
-  type InterviewGuidePromptInput,
-} from "./prompt";
+import { buildInterviewThankYouClarifyingMessages } from "./prompt";
 
 type Result<T> = { ok: true; data: T } | { ok: false; message: string };
 
@@ -28,7 +19,7 @@ function failure(operation: string, error: unknown, message: string): Result<nev
   const issues = error instanceof AiValidationError ? error.issues : undefined;
   console.error(
     JSON.stringify({
-      event: "interview_guide_ai_failed",
+      event: "interview_thank_you_ai_failed",
       operation,
       message: error instanceof Error ? error.message : "unknown",
       issues,
@@ -38,34 +29,6 @@ function failure(operation: string, error: unknown, message: string): Result<nev
     ? ` ${issues.map((issue) => `${issue.path}: ${issue.code}`).join("; ")}`
     : "";
   return { ok: false, message: `${message}${detail}` };
-}
-
-export function generateInterviewClarifyingQuestions(input: {
-  missing: string[];
-  qualityFeedback: string[];
-  usage?: AiCallUsageContext;
-}): Promise<Result<InterviewClarifyingQuestions>> {
-  if (!isAssetAiConfigured()) {
-    return Promise.resolve({ ok: false, message: UNCONFIGURED });
-  }
-  return getAssetAiProvider()
-    .generateStructured({
-      ...structuredOutputRequest("interviewClarifyingQuestions"),
-      ...(input.usage ? aiCallTracking(input.usage) : {}),
-      messages: buildInterviewClarifyingMessages(input),
-      parseOutput: (raw) => ({
-        data: interviewClarifyingQuestionsSchema.parse(raw),
-        coercedFields: [],
-      }),
-    })
-    .then((response) => ({ ok: true as const, data: response.data }))
-    .catch((error) =>
-      failure(
-        "interviewClarifyingQuestions",
-        error,
-        "Clarifying questions could not be generated. Retry.",
-      ),
-    );
 }
 
 export function generateInterviewThankYouClarifyingQuestions(input: {
@@ -105,41 +68,6 @@ export function generateInterviewThankYouClarifyingQuestions(input: {
         "interviewThankYouClarifyingQuestions",
         error,
         "Thank-you questions could not be generated. Retry.",
-      ),
-    );
-}
-
-export function generateInterviewGuideWithModel(
-  input: InterviewGuidePromptInput & { usage?: AiCallUsageContext },
-): Promise<Result<InterviewGuideContent>> {
-  if (!isAssetAiConfigured()) {
-    return Promise.resolve({ ok: false, message: UNCONFIGURED });
-  }
-  return getAssetAiProvider()
-    .generateStructured({
-      ...structuredOutputRequest("interviewGuide"),
-      ...(input.usage ? aiCallTracking(input.usage) : {}),
-      messages: buildInterviewGuideMessages(input),
-      parseOutput: (raw) => {
-        const payload =
-          raw && typeof raw === "object" && !Array.isArray(raw)
-            ? { ...(raw as Record<string, unknown>) }
-            : {};
-        if (!Array.isArray(payload.chronologicalWalkthrough)) {
-          payload.chronologicalWalkthrough = [];
-        }
-        return {
-          data: interviewGuideContentSchema.parse(payload),
-          coercedFields: [],
-        };
-      },
-    })
-    .then((response) => ({ ok: true as const, data: response.data }))
-    .catch((error) =>
-      failure(
-        "interviewGuide",
-        error,
-        "The interview guide could not be generated. Retry.",
       ),
     );
 }

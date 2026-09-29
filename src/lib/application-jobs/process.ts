@@ -19,7 +19,6 @@ import {
   rebuildApplicationHiringTeamRole,
   syncApplicationHiringTeam,
 } from "@/lib/hiring-team/build";
-import { requestInterviewGuide } from "@/lib/interview/guide";
 import {
   personPrepFocus,
   recordPersonPrepOpening,
@@ -254,21 +253,7 @@ export async function processApplicationJob(
             }
             break;
           case "INTERVIEW_GUIDE":
-            if (!payload.stageId && !job.targetId) {
-              throw new Error("Interview guide is missing a stage.");
-            }
-            {
-              const generated = await requestInterviewGuide({
-                organizationId: job.organizationId,
-                campaignId: job.campaignId,
-                userId: payload.userId ?? job.initiatedByUserId ?? "",
-                stageId: payload.stageId ?? job.targetId ?? "",
-                skipQuestions: Boolean(payload.skipQuestions),
-                answers: payload.answers ?? [],
-                regenerationInstruction: payload.regenerationInstruction ?? null,
-              });
-              if (generated.status === "FAILED") throw new Error(generated.message);
-            }
+            // Guide generation was removed; complete orphan jobs with no paid call.
             break;
           case "APPLICATION_SUMMARY":
             await generateApplicationSummary({

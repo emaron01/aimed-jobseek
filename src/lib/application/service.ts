@@ -600,7 +600,7 @@ export async function retryApplicationResearch(input: {
   organizationId: string;
   campaignId: string;
   notes?: string;
-}): Promise<void> {
+}): Promise<{ skippedUnchanged: boolean }> {
   if (input.notes !== undefined) {
     await saveApplicationCompanyResearchNotes({
       organizationId: input.organizationId,
@@ -640,12 +640,54 @@ export async function retryApplicationResearch(input: {
       employerSkipReason: null,
     },
   });
+
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: { companyResearchNotes: true },
+  });
+  const company = await prisma.company.findFirst({
+    where: { id: companyId, organizationId: input.organizationId },
+  });
+  if (company) {
+    const { getResearchPolicy } = await import("@/lib/usage/policy-service");
+    const { getLatestCompanyResearch } = await import(
+      "@/lib/tenant/company-research-service"
+    );
+    const {
+      companyResearchFingerprint,
+      companyResearchFingerprintUnchanged,
+    } = await import("@/lib/research/company-research-paid-inputs");
+    const policy = await getResearchPolicy(input.organizationId);
+    const latest = await getLatestCompanyResearch(company.id);
+    const fingerprint = companyResearchFingerprint({
+      name: company.name,
+      website: company.website,
+      normalizedDomain: company.normalizedDomain,
+      industry: company.industry,
+      employeeCount: company.employeeCount,
+      location: company.location,
+      seekerSuppliedNotes: campaign?.companyResearchNotes,
+      depthPolicy: policy,
+    });
+    if (
+      await companyResearchFingerprintUnchanged({
+        organizationId: input.organizationId,
+        companyId: company.id,
+        fingerprint,
+        research: latest,
+      })
+    ) {
+      return { skippedUnchanged: true };
+    }
+  }
+
   await queueApplicationResearch({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
     companyId,
     forceRefresh: true,
   });
+  return { skippedUnchanged: false };
 }
 
 export function readApplicationFitStale(input: {
