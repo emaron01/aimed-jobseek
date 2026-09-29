@@ -1,7 +1,7 @@
 # Harper Batch D4 — Cheat Sheet WHO tags + CAR/STAR parts
 
 **Branch:** `checkpoint/harper-prep-hub`  
-**Commit:** _(filled after commit)_  
+**Commit:** `9de053a9747acd3c18895c5e7977434a101fb9bd` (`9de053a`)  
 **Remote:** `https://github.com/emaron01/aimed-jobseek.git`  
 **Base:** merged from `origin/main` at `1885536` (already up to date)
 
