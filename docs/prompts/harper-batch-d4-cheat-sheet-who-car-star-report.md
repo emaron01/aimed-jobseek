@@ -71,7 +71,7 @@ Cheat Sheet / Harper components do not render `interviewTypeTag`, `answerFramewo
 
 ## 7. Commit / branch
 
-- Commit: _(filled after commit)_
+- Commit: `9de053a9747acd3c18895c5e7977434a101fb9bd`
 - Pushed: `checkpoint/harper-prep-hub` (not main)
 
 ## 8. Safety
