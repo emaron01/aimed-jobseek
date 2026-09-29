@@ -1,7 +1,7 @@
 # Harper Batch D3 fix — label check + groundingJson on approve
 
 **Branch:** `checkpoint/harper-prep-hub`  
-**Commit:** _(filled after commit)_  
+**Commit:** `7d5bd837bb545794493be707940674496dbd47c4` (`7d5bd83`)  
 **Remote:** `https://github.com/emaron01/aimed-jobseek.git`
 
 ## 1. ITEM 1 — label check
@@ -55,7 +55,7 @@
 
 ## 5. Commit / branch
 
-- Commit: _(filled after commit)_
+- Commit: `7d5bd837bb545794493be707940674496dbd47c4`
 - Pushed: `checkpoint/harper-prep-hub` (not main)
 
 ## 6. Safety
