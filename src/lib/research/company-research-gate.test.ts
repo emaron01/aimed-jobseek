@@ -91,6 +91,10 @@ describe("company research fingerprint gate (source)", () => {
     expect(service).toContain("COMPANY_RESEARCH_UNCHANGED_REASON");
     expect(service).toContain("options?.force");
 
+    const gate = readFileSync("src/lib/ai/paid-call-gate.ts", "utf8");
+    expect(gate).toContain("pg_advisory_xact_lock");
+    expect(gate).not.toContain("subjectLocks");
+
     const actions = readFileSync("src/app/actions/application.ts", "utf8");
     expect(actions).toContain("skippedUnchanged");
     expect(actions).toContain("applicationResearchCopy.unchanged");
