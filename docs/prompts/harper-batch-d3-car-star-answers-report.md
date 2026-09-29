@@ -1,7 +1,7 @@
 # Harper Batch D3 — CAR/STAR polish answer parts
 
 **Branch:** `checkpoint/harper-prep-hub`  
-**Commit:** _(filled after commit)_  
+**Commit:** `a84af8e19588064e735bab6762ffabc7edc28b93` (`a84af8e`)  
 **Remote:** `https://github.com/emaron01/aimed-jobseek.git`  
 **Base:** merged from `origin/main` (already up to date at `f54001c`)
 
