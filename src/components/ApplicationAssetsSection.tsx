@@ -808,6 +808,13 @@ export function ApplicationAssetsSection({
         {applicationAssetConfig.labels.sectionTitle}
       </summary>
       <div className="mt-4 space-y-4">
+        <p
+          role="note"
+          data-testid="assets-proofread-notice"
+          className="rounded-md border border-warning bg-warning-tint px-4 py-3 text-sm font-bold text-warning"
+        >
+          {applicationAssetConfig.labels.proofreadNotice}
+        </p>
         <p className="text-sm text-muted">
           {applicationAssetConfig.labels.sectionHelp}
         </p>

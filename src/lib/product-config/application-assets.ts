@@ -6,6 +6,8 @@ export const applicationAssetConfig = Object.freeze({
     coverLetter: "Cover letter",
     sectionTitle: "Resume and cover letter",
     sectionHelp: "Generate, review, approve, and download every version.",
+    proofreadNotice:
+      "Proofread your resume and cover letter before you send them. Harper is AI and can make mistakes.",
     generate: "Generate",
     regenerate: "Regenerate",
     unchangedResume: "No Changes To Resume",
