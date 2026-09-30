@@ -9,6 +9,7 @@ import {
 import { AppActionLink } from "@/components/AppButton";
 import { CheatSheetSection } from "@/components/CheatSheetCollapsible";
 import { CheatSheetPersonBody } from "@/components/CheatSheetPersonBody";
+import { HarperDraftProvider } from "@/components/HarperDraftStore";
 import {
   CheatSheetFilterProvider,
   CheatSheetPeopleFilter,
@@ -235,6 +236,7 @@ export default async function ApplicationSummaryPage({
       </CheatSheetSection>
       </CheatSheetSharedSection>
 
+      <HarperDraftProvider>
       {view.people.map((person) => {
         const section =
           guidance?.people.find((item) => item.sectionKey === person.sectionKey) ?? null;
@@ -288,6 +290,7 @@ export default async function ApplicationSummaryPage({
           </CheatSheetPersonSection>
         );
       })}
+      </HarperDraftProvider>
 
       <CheatSheetSharedSection>
       <CheatSheetSection id="company" title={applicationSummaryConfig.sections.company}>
