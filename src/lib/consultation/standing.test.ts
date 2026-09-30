@@ -345,8 +345,9 @@ describe("Harper core loop standing", () => {
     expect(section).not.toContain("storyPlan.map");
     expect(section).toContain("buildStandingGaps");
     expect(section).toContain("qaItemForTargetKey");
-    expect(standingUi).toContain("consultationGapStatusCopy");
-    expect(standingUi).toContain("gapStatus");
+    // Gap Open/Closed/Confirmed labels removed from UI (standing-structure Item 2);
+    // rating is Strong/Partial/None only. Share form retained on entries without questions.
+    expect(standingUi).toContain("evidenceStrengthLabels");
     expect(standingUi).toContain("shareSomeDetails");
     expect(standingUi).toContain("replyConsultationAction");
     expect(standingUi).not.toContain("consultationConversationCopy.whereYouStand");

@@ -293,7 +293,11 @@ function questionAnsweredBy(turns: QaTurn[], seeker: QaTurn): QaTurn | null {
   );
 }
 
-function primaryFor(turns: QaTurn[], consultant: QaTurn): QaTurn {
+/**
+ * Walk the reply chain from a consultant turn (primary or follow-up) to the
+ * primary Harper question card that owns it.
+ */
+export function primaryFor(turns: QaTurn[], consultant: QaTurn): QaTurn {
   const pinnedId = replyToTurnIdFromAnalysis(consultant.analysisJson);
   if (pinnedId && pinnedId !== consultant.id) {
     const pinned = turns.find((turn) => turn.id === pinnedId);
@@ -323,6 +327,42 @@ function primaryFor(turns: QaTurn[], consultant: QaTurn): QaTurn {
           isPrimaryHarperQuestion(turn) && turn.sequence < consultant.sequence,
       ) ?? consultant
   );
+}
+
+/**
+ * Primary question turn id for a seeker reply. Prefer the recorded replyToTurnId
+ * (follow-up or primary), walked through primaryFor — never the first replyable
+ * card that merely shares a targetKey.
+ */
+export function primaryQuestionTurnIdForSeekerReply(input: {
+  turns: QaTurn[];
+  seeker: Pick<QaTurn, "analysisJson" | "sequence" | "targetKey">;
+  hintQuestionTurnId?: string | null;
+}): string | null {
+  const pinnedId =
+    replyToTurnIdFromAnalysis(input.seeker.analysisJson) ??
+    (input.hintQuestionTurnId?.trim() || null);
+  if (pinnedId) {
+    const asked = input.turns.find(
+      (turn) => turn.id === pinnedId && turn.speaker === "CONSULTANT",
+    );
+    if (asked) return primaryFor(input.turns, asked).id;
+    const asPrimary = input.turns.find(
+      (turn) => turn.id === pinnedId && isPrimaryHarperQuestion(turn),
+    );
+    if (asPrimary) return asPrimary.id;
+  }
+  const answered = questionAnsweredBy(input.turns, {
+    id: "",
+    speaker: "SEEKER",
+    body: "",
+    targetKey: input.seeker.targetKey,
+    followUp: false,
+    sequence: input.seeker.sequence,
+    analysisJson: input.seeker.analysisJson,
+  });
+  if (!answered) return null;
+  return primaryFor(input.turns, answered).id;
 }
 
 function seekerAnsweredThis(turns: QaTurn[], consultant: QaTurn): boolean {

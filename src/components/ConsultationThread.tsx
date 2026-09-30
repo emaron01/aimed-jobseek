@@ -395,10 +395,17 @@ function QuestionCard({
             {stripInternalIdsFromDisplayText(item.followUp.text)}
           </p>
         ) : null}
+        {!item.ignored ? (
+          <SeekerRepliesSection
+            campaignId={campaignId}
+            canEdit={canEdit && actionsEnabled}
+            answers={item.seekerAnswers}
+          />
+        ) : null}
         {hasResult && !item.ignored ? (
           <>
-            {item.resumeBullet ? <ResultBody statement={item.resumeBullet} /> : null}
             {item.talkingPoint ? <ResultBody statement={item.talkingPoint} /> : null}
+            {item.resumeBullet ? <ResultBody statement={item.resumeBullet} /> : null}
             {canEdit ? (
               <ResultActions
                 campaignId={campaignId}
@@ -415,13 +422,6 @@ function QuestionCard({
           >
             {consultationConversationCopy.needsMoreDetailToShape}
           </p>
-        ) : null}
-        {!item.ignored ? (
-          <SeekerRepliesSection
-            campaignId={campaignId}
-            canEdit={canEdit && actionsEnabled}
-            answers={item.seekerAnswers}
-          />
         ) : null}
         {canAnswer ? (
           <QuestionReplyForm
@@ -586,8 +586,7 @@ export function ConsultationThread({
   // Keep reply surfaces mounted while jobs run so unsaved drafts survive.
   const showReply =
     canEdit &&
-    sessionStatus !== "SKIPPED" &&
-    sessionStatus !== "PAUSED";
+    sessionStatus !== "SKIPPED";
 
   if (interviewers.length === 0) {
     return null;

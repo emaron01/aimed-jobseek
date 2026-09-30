@@ -123,7 +123,9 @@ describe("Harper Batch A layout", () => {
     // Batch B2: General questions partition into standing.
     // Batch B3: interviewer Q&A moves into Harper person view.
     expect(section).toContain("partitionGeneralQuestionsForStanding");
-    expect(section).toContain("dedicatedTopics={standingInline.dedicatedTopics}");
+    // Unified standing list (standing-structure): entries built from dedicatedTopics + requirements.
+    expect(section).toContain("buildStandingListEntries");
+    expect(section).toContain("entries={standingEntries}");
     expect(section).toContain("HarperPersonInlineProfile");
     expect(section).toContain("interviewerSection=");
     expect(section).not.toContain("generalQuestions={qaLayout.general}");
@@ -166,7 +168,7 @@ describe("Harper Batch A layout", () => {
     expect(standing).not.toContain("AppButton");
     expect(thread).not.toContain("AppButton");
     expect(standing).toMatch(
-      /<a[\s\S]*data-testid=\{`toggle-evidence-\$\{item\.id\}`\}[\s\S]*expandEvidence/,
+      /<a[\s\S]*data-testid=\{`toggle-evidence-\$\{entry\.id\}`\}[\s\S]*expandEvidence/,
     );
     expect(thread).toMatch(
       /<a[\s\S]*data-testid="consultation-toggle-replies"[\s\S]*showYourReplies/,
@@ -190,13 +192,12 @@ describe("Harper Batch A layout", () => {
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
     expect(thread).toContain("!jobsActive");
     expect(thread).toContain("sessionStatus !== \"SKIPPED\"");
-    expect(thread).toContain("sessionStatus !== \"PAUSED\"");
+    // PAUSED no longer blocks replies (standing-structure Item 4) — server reopens.
     expect(thread).toContain("showReply={showReply}");
 
     const standing = readFileSync("src/components/ConsultationStanding.tsx", "utf8");
     expect(standing).toContain("acceptingReplies");
     expect(standing).toContain("canEdit && acceptingReplies");
-    // Batch B2: inline QuestionList under standing also gates on jobsActive / sessionStatus.
     expect(standing).toContain("!jobsActive");
     expect(standing).toContain("showReply={showReply}");
 

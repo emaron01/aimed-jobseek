@@ -70,6 +70,8 @@ import {
   parseConsultationReplyTarget,
   replyToTurnIdFromAnalysis,
   resolveReplyableQaItem,
+  primaryQuestionTurnIdForSeekerReply,
+  primaryFor,
   type ConsultationQaItem,
   type QaStatement,
   type QaTurn,
@@ -2668,10 +2670,10 @@ export async function recordConsultationReply(input: {
   const session = await prisma.consultationSession.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
-  if (!session || session.status === "SKIPPED" || session.status === "PAUSED") {
+  if (!session || session.status === "SKIPPED") {
     throw new TenantError(consultationConversationCopy.notAcceptingReplies);
   }
-  if (session.status === "DONE") {
+  if (session.status === "DONE" || session.status === "PAUSED") {
     await prisma.consultationSession.update({
       where: { id: session.id },
       data: { status: "IN_PROGRESS" },
@@ -2778,7 +2780,7 @@ export async function processConsultationReply(input: {
   forceDecision?: boolean;
 }): Promise<void> {
   const answer = input.answer?.trim() ?? "";
-  const session = await prisma.consultationSession.findFirst({
+  let session = await prisma.consultationSession.findFirst({
     where: {
       organizationId: input.organizationId,
       ...(input.sessionId
@@ -2786,8 +2788,15 @@ export async function processConsultationReply(input: {
         : { campaignId: input.campaignId }),
     },
   });
-  if (!session || session.status === "SKIPPED" || session.status === "PAUSED") {
+  if (!session || session.status === "SKIPPED") {
     throw new TenantError(consultationConversationCopy.notAcceptingReplies);
+  }
+  if (session.status === "PAUSED" || session.status === "DONE") {
+    await prisma.consultationSession.update({
+      where: { id: session.id },
+      data: { status: "IN_PROGRESS" },
+    });
+    session = { ...session, status: "IN_PROGRESS" };
   }
   let { turns, view } = await loadSessionQaView(session.id);
   if (input.turnId) {
@@ -2831,16 +2840,36 @@ export async function processConsultationReply(input: {
     seekerTurn = turns.find((turn) => turn.id === recorded.turnId);
   }
   if (!seekerTurn) replyCouldNotBeRecorded();
-  const item =
-    view.questions.find((question) => question.questionTurnId === questionTurnId) ??
-    resolveReplyableQaItem(
-      view,
-      questionTurnId
-        ? `question:${questionTurnId}`
-        : targetKey || input.targetKey || "",
-    );
+  const qaTurns = toQaTurns(turns);
+  const pinnedPrimaryId = primaryQuestionTurnIdForSeekerReply({
+    turns: qaTurns,
+    seeker: seekerTurn,
+    hintQuestionTurnId: input.questionTurnId ?? questionTurnId,
+  });
+  if (pinnedPrimaryId) {
+    questionTurnId = pinnedPrimaryId;
+  }
+  // When the seeker recorded which turn they answered, never fall back to the
+  // first replyable card that merely shares a targetKey.
+  const item = pinnedPrimaryId
+    ? view.questions.find(
+        (question) => question.questionTurnId === pinnedPrimaryId,
+      ) ?? null
+    : view.questions.find(
+        (question) => question.questionTurnId === questionTurnId,
+      ) ??
+      resolveReplyableQaItem(
+        view,
+        questionTurnId
+          ? `question:${questionTurnId}`
+          : targetKey || input.targetKey || "",
+      );
   const question = item
     ? consultantForQaItem(turns, item)
+    : pinnedPrimaryId
+      ? turns.find(
+          (turn) => turn.id === pinnedPrimaryId && turn.speaker === "CONSULTANT",
+        ) ?? null
     : turns.find((turn) => turn.id === questionTurnId && turn.speaker === "CONSULTANT") ??
       [...turns]
         .reverse()
@@ -2856,14 +2885,16 @@ export async function processConsultationReply(input: {
     (question
       ? view.questions.find(
           (questionItem) => questionItem.questionTurnId === question.id,
-        ) ?? null
-      : view.questions.find(
+        ) ??
+        view.questions.find(
           (questionItem) =>
-            questionItem.targetKey ===
-            (targetKey.startsWith("question:") ? "" : targetKey),
-        ) ?? null);
+            questionItem.questionTurnId === primaryFor(qaTurns, question).id,
+        ) ??
+        null
+      : null);
   if (question) {
-    questionTurnId = resolvedItem?.questionTurnId ?? question.id;
+    questionTurnId =
+      resolvedItem?.questionTurnId ?? primaryFor(qaTurns, question).id;
   }
   const assessmentKey =
     question?.targetKey ??
@@ -3683,8 +3714,14 @@ export async function recordConsultationAnswerEdit(input: {
   if (!turn || turn.session.campaignId !== input.campaignId) {
     throw new TenantError(consultationConversationCopy.replyFailed);
   }
-  if (turn.session.status === "SKIPPED" || turn.session.status === "PAUSED") {
+  if (turn.session.status === "SKIPPED") {
     throw new TenantError(consultationConversationCopy.notAcceptingReplies);
+  }
+  if (turn.session.status === "PAUSED" || turn.session.status === "DONE") {
+    await prisma.consultationSession.update({
+      where: { id: turn.sessionId },
+      data: { status: "IN_PROGRESS" },
+    });
   }
   const replyToTurnId = replyToTurnIdFromAnalysis(turn.analysisJson);
   const prior =
@@ -3746,7 +3783,7 @@ export async function listIncompleteConsultationSeekerTurns(input: {
     },
     select: { id: true, status: true },
   });
-  if (!session || session.status === "SKIPPED" || session.status === "PAUSED") {
+  if (!session || session.status === "SKIPPED") {
     return [];
   }
   const turns = await prisma.consultationTurn.findMany({

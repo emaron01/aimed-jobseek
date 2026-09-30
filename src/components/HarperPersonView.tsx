@@ -129,8 +129,7 @@ export function HarperPersonInlineProfile({
   const [pendingTarget, setPendingTarget] = useState<string | null>(null);
   const showReply =
     canEdit &&
-    sessionStatus !== "SKIPPED" &&
-    sessionStatus !== "PAUSED";
+    sessionStatus !== "SKIPPED";
 
   const profileCoachItemIds = useMemo(
     () =>

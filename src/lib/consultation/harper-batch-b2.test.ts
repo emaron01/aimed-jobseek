@@ -151,8 +151,9 @@ describe("Harper Batch B2 — Where you stand inline Q&A", () => {
     expect(chrono[0]?.label).toBe(consultationConversationCopy.careerWalkThroughTarget);
 
     const standing = readFileSync("src/components/ConsultationStanding.tsx", "utf8");
-    expect(standing).toContain('data-testid={`standing-topic-${topic.kind}`}');
-    expect(standing).toContain("dedicatedTopics.map");
+    // Unified list: each topic/requirement is one standing entry (standing-structure Item 2).
+    expect(standing).toContain("consultation-standing-entry");
+    expect(standing).toContain("entries.map");
     expect(standing).not.toContain("Other prep");
     expect(standing).not.toContain("Role expertise coming soon");
   });
@@ -169,14 +170,14 @@ describe("Harper Batch B2 — Where you stand inline Q&A", () => {
     expect(section).toContain("HarperStandingView");
     expect(section).toContain("consultationConversationCopy.whereYouStand");
     expect(standing).toContain("consultation-standing-counts");
-    expect(standing).toContain("consultation-standing-requirements");
+    expect(standing).toContain("consultation-standing-list");
     expect(standing).toContain("evidenceStrengthLabels.STRONG");
     expect(evidenceStrengthLabels.STRONG).toBe("Strong");
     expect(thread).not.toContain("harper-general-questions");
     expect(thread).not.toContain("consultationConversationCopy.generalQuestions");
     expect(section).not.toContain("generalQuestions={qaLayout.general}");
-    expect(section).toContain("dedicatedTopics={standingInline.dedicatedTopics}");
-    expect(section).toContain("requirementQuestions=");
+    expect(section).toContain("buildStandingListEntries");
+    expect(section).toContain("entries={standingEntries}");
   });
 
   it("keeps Batch A inline behaviors: Share/Ignore/Ignored, Expand evidence, Show replies, Edit-after-click", () => {
@@ -188,7 +189,7 @@ describe("Harper Batch B2 — Where you stand inline Q&A", () => {
     expect(standing).toContain("reopenIgnored");
     expect(standing).not.toContain("answerGap");
     expect(standing).toMatch(
-      /<a[\s\S]*data-testid=\{`toggle-evidence-\$\{item\.id\}`\}[\s\S]*expandEvidence/,
+      /<a[\s\S]*data-testid=\{`toggle-evidence-\$\{entry\.id\}`\}[\s\S]*expandEvidence/,
     );
     expect(thread).toMatch(
       /<a[\s\S]*data-testid="consultation-toggle-replies"[\s\S]*showYourReplies/,
@@ -221,7 +222,7 @@ describe("Harper Batch B2 — Where you stand inline Q&A", () => {
     const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
 
     expect(standing).toContain('sessionStatus !== "SKIPPED"');
-    expect(standing).toContain('sessionStatus !== "PAUSED"');
+    // PAUSED no longer blocks replies (standing-structure Item 4).
     expect(standing).toContain("!jobsActive");
     expect(standing).toContain("showReply={showReply}");
     expect(thread).toContain("!jobsActive");
@@ -254,7 +255,7 @@ describe("Harper Batch B2 — Where you stand inline Q&A", () => {
     );
 
     const standing = readFileSync("src/components/ConsultationStanding.tsx", "utf8");
-    expect(standing).toContain("dedicatedTopics.map");
+    expect(standing).toContain("entries.map");
     expect(standing).not.toMatch(/role-expertise[\s\S]{0,40}coming/i);
   });
 });

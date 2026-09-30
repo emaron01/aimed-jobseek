@@ -298,7 +298,9 @@ describe("Harper question-limit coach", () => {
     const repliesIndex = repliesMatch?.index ?? -1;
     const followUpIndex = card.indexOf("consultation-follow-up");
     expect(resultIndex).toBeGreaterThan(-1);
-    expect(repliesIndex).toBeGreaterThan(resultIndex);
+    // Standing structure (Item 2): Your reply before Interview answer / Resume bullet.
+    expect(repliesIndex).toBeGreaterThan(-1);
+    expect(resultIndex).toBeGreaterThan(repliesIndex);
     expect(followUpIndex).toBeGreaterThan(-1);
     expect(followUpIndex).toBeLessThan(repliesIndex);
     expect(card).not.toMatch(

@@ -138,7 +138,8 @@ describe("Harper B2 unmapped-items fix", () => {
 
     const standing = readFileSync("src/components/ConsultationStanding.tsx", "utf8");
     expect(standing).toContain('strength: "STRONG" | "PARTIAL" | "NONE" | null');
-    expect(standing).toContain("item.strength ?");
+    // Unified list always shows Strong/Partial/None from entry.strength.
+    expect(standing).toContain("evidenceStrengthLabels[entry.strength]");
     expect(standing).not.toContain("Other prep");
   });
 

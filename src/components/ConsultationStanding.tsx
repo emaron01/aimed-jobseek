@@ -6,15 +6,11 @@ import {
   replyConsultationAction,
 } from "@/app/actions/consultation";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
-import {
-  QuestionList,
-  ResultActions,
-} from "@/components/ConsultationThread";
+import { QuestionList } from "@/components/ConsultationThread";
 import { useHarperDraft } from "@/components/HarperDraftStore";
 import { useMemo, useState } from "react";
 import {
   consultationConversationCopy,
-  consultationGapStatusCopy,
   evidenceStrengthLabels,
 } from "@/lib/product-config";
 import { stripInternalIdsFromDisplayText } from "@/lib/consultation/evidence-display";
@@ -23,41 +19,30 @@ import {
   HARPER_STANDING_ANCHOR,
   type StandingInlineTopic,
 } from "@/lib/consultation/harper-layout";
-import type { ConsultationGapStatus } from "@/lib/consultation/standing";
-import type { ConsultationQaItem, QaStatement } from "@/lib/consultation/qa-view";
+import type { StandingListEntry } from "@/lib/consultation/standing-entries";
+import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
 
 const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
 const textLinkClass =
   "cursor-pointer text-sm font-medium text-ink underline decoration-ink underline-offset-2";
 
+/** @deprecated Prefer StandingListEntry; kept for call-site typing during transition. */
 export type StandingRequirement = {
   id: string;
   targetKey: string;
   text: string;
-  /** null = dropped from standing after reassess — show topic without a rating. */
   strength: "STRONG" | "PARTIAL" | "NONE" | null;
+  kind?:
+    | "REQUIRED"
+    | "OUTCOME"
+    | "COMPETENCY"
+    | "MISSION"
+    | "PREFERRED"
+    | null;
   explanation: string | null;
-  gapStatus: ConsultationGapStatus | null;
+  gapStatus?: string | null;
   facts: Array<{ id: string; label: string; detail: string | null }>;
   experience: string | null;
-};
-
-export type StandingGapView = {
-  targetKey: string;
-  label: string;
-  status: ConsultationGapStatus;
-  talkTrack: string | null;
-  harperNote?: string | null;
-  questionTurnId: string | null;
-  /**
-   * When set, the open question is rendered inline under this requirement —
-   * no Answer jump link (Batch B2).
-   */
-  answerableQuestionTurnId: string | null;
-  ignored: boolean;
-  resumeBullet: QaStatement | null;
-  talkingPoint: QaStatement | null;
-  statements: QaStatement[];
 };
 
 export type StandingRequirementQuestions = {
@@ -76,7 +61,7 @@ function GapShareDetailsForm({
 }) {
   const draft = useHarperDraft(`gap:${targetKey}`);
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-testid={`standing-share-form-${targetKey}`}>
       <label className="block text-sm">
         <span className="sr-only">
           {consultationConversationCopy.shareSomeDetails}
@@ -166,6 +151,10 @@ function ReopenIgnoredLink({
   );
 }
 
+/**
+ * One Where you stand list: summary counts + each requirement/topic once
+ * (rating Strong/Partial/None only), with questions, replies, and results inline.
+ */
 export function ConsultationStanding({
   campaignId,
   canEdit,
@@ -173,11 +162,16 @@ export function ConsultationStanding({
   sessionStatus,
   jobsActive,
   overall,
-  gaps,
+  entries,
+  /** @deprecated Ignored — entries replace gaps / dual lists. */
+  gaps: _gaps,
   careerRecap,
-  requirements,
-  dedicatedTopics = [],
-  requirementQuestions = [],
+  /** @deprecated Prefer `entries`. */
+  requirements: _requirements,
+  /** @deprecated Prefer `entries`. */
+  dedicatedTopics: _dedicatedTopics,
+  /** @deprecated Prefer `entries`. */
+  requirementQuestions: _requirementQuestions,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -185,41 +179,38 @@ export function ConsultationStanding({
   sessionStatus: string;
   jobsActive: boolean;
   overall: string | null;
-  gaps: StandingGapView[];
-  careerRecap: string | null;
-  requirements: StandingRequirement[];
-  /** why-this-company / chronology / role-expertise topics with questions. */
+  entries: StandingListEntry[];
+  gaps?: unknown[];
+  careerRecap?: string | null;
+  requirements?: StandingRequirement[];
   dedicatedTopics?: StandingInlineTopic[];
-  /** Gap / requirement questions keyed for inline render under each requirement. */
   requirementQuestions?: StandingRequirementQuestions[];
 }) {
+  void _gaps;
+  void _requirements;
+  void _dedicatedTopics;
+  void _requirementQuestions;
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
   const [pendingTarget, setPendingTarget] = useState<string | null>(null);
   const counts = useMemo(() => {
-    return requirements.reduce(
+    return entries.reduce(
       (acc, item) => {
-        if (item.strength) acc[item.strength] += 1;
+        acc[item.strength] += 1;
         return acc;
       },
       { STRONG: 0, PARTIAL: 0, NONE: 0 },
     );
-  }, [requirements]);
-  const questionsByRequirement = useMemo(() => {
-    const map = new Map<string, ConsultationQaItem[]>();
-    for (const row of requirementQuestions) {
-      map.set(row.targetKey, row.questions);
-    }
-    return map;
-  }, [requirementQuestions]);
+  }, [entries]);
+  // PAUSED no longer blocks replies — server reopens to IN_PROGRESS on submit.
   const showReply =
     canEdit &&
-    sessionStatus !== "SKIPPED" &&
-    sessionStatus !== "PAUSED";
+    acceptingReplies &&
+    sessionStatus !== "SKIPPED";
   const repliesEnabled = showReply && !jobsActive;
+  const expandable = entries.filter((item) => item.facts.length > 0);
   const allOpen =
-    requirements.length > 0 &&
-    requirements.every((item) => openIds.has(item.id) || item.facts.length === 0);
-  const expandable = requirements.filter((item) => item.facts.length > 0);
+    expandable.length > 0 &&
+    expandable.every((item) => openIds.has(item.id));
 
   function toggle(id: string) {
     setOpenIds((current) => {
@@ -232,30 +223,6 @@ export function ConsultationStanding({
 
   function setAll(open: boolean) {
     setOpenIds(open ? new Set(expandable.map((item) => item.id)) : new Set());
-  }
-
-  function renderQuestionList(
-    questions: ConsultationQaItem[],
-    topicLabel?: string,
-  ) {
-    if (questions.length === 0) return null;
-    return (
-      <div className="mt-3 space-y-3">
-        <QuestionList
-          campaignId={campaignId}
-          canEdit={canEdit}
-          questions={questions}
-          showReply={showReply}
-          pendingTarget={pendingTarget}
-          jobsActive={jobsActive}
-          suppressQuestionTextWhenMatchesLabel={topicLabel}
-          onSubmitStart={(replyKey, answer) => {
-            setPendingTarget(replyKey);
-            void answer;
-          }}
-        />
-      </div>
-    );
   }
 
   return (
@@ -278,76 +245,6 @@ export function ConsultationStanding({
           {evidenceStrengthLabels.PARTIAL} {counts.PARTIAL},{" "}
           {evidenceStrengthLabels.NONE} {counts.NONE}
         </p>
-        {gaps.length > 0 ? (
-          <ul className="list-disc space-y-3 pl-5 text-sm text-ink">
-            {gaps.map((gap) => (
-              <li
-                key={gap.targetKey}
-                data-testid={`consultation-gap-${gap.ignored ? "ignored" : gap.status}`}
-                data-gap-target={gap.targetKey}
-              >
-                <p>
-                  <span className="font-medium">{gap.label}</span>
-                  <span className="ml-2 rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink">
-                    {gap.ignored
-                      ? consultationConversationCopy.gapIgnored
-                      : consultationGapStatusCopy[gap.status]}
-                  </span>
-                </p>
-                {gap.talkTrack ? (
-                  <p className="mt-1 whitespace-pre-wrap">
-                    {stripInternalIdsFromDisplayText(gap.talkTrack)}
-                  </p>
-                ) : null}
-                {gap.harperNote ? (
-                  <p
-                    className="mt-1 whitespace-pre-wrap text-ink"
-                    data-testid={`harper-coaching-note-${gap.targetKey}`}
-                  >
-                    {stripInternalIdsFromDisplayText(gap.harperNote)}
-                  </p>
-                ) : null}
-                {gap.resumeBullet ? (
-                  <p className="mt-1 whitespace-pre-wrap text-muted">
-                    {stripInternalIdsFromDisplayText(gap.resumeBullet.content)}
-                  </p>
-                ) : null}
-                {gap.statements.length > 0 && canEdit && !gap.ignored ? (
-                  <ResultActions
-                    campaignId={campaignId}
-                    statements={gap.statements}
-                    testId={`consultation-gap-result-${gap.targetKey}`}
-                  />
-                ) : null}
-                {gap.ignored && canEdit && acceptingReplies ? (
-                  <ReopenIgnoredLink
-                    campaignId={campaignId}
-                    targetKey={
-                      gap.questionTurnId
-                        ? `question:${gap.questionTurnId}`
-                        : gap.targetKey
-                    }
-                    testId={`reopen-ignored-gap-${gap.targetKey}`}
-                  />
-                ) : null}
-                {/* Batch B2: Answer jump link removed — question renders inline under the requirement. */}
-                {!gap.ignored &&
-                gap.status === "open" &&
-                !gap.answerableQuestionTurnId &&
-                canEdit &&
-                acceptingReplies ? (
-                  <div className="mt-2 space-y-2">
-                    <GapShareDetailsForm
-                      campaignId={campaignId}
-                      targetKey={gap.targetKey}
-                      enabled={repliesEnabled}
-                    />
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        ) : null}
         {careerRecap ? (
           <p className="text-sm text-ink" data-testid="consultation-career-recap">
             {stripInternalIdsFromDisplayText(careerRecap)}
@@ -376,66 +273,51 @@ export function ConsultationStanding({
         className="space-y-4"
         data-testid="harper-standing-topics"
       >
-        {dedicatedTopics.map((topic) => {
-          const labelMatchesQuestion = topic.questions.some(
-            (question) => question.question.trim() === topic.label.trim(),
-          );
-          return (
-          <div
-            key={topic.targetKey}
-            className="min-w-0 space-y-2 overflow-hidden text-sm text-ink"
-            data-testid={`standing-topic-${topic.kind}`}
-            data-standing-target={topic.targetKey}
-          >
-            {!labelMatchesQuestion ? (
-              <h4 className="text-sm font-semibold text-ink">{topic.label}</h4>
-            ) : null}
-            {renderQuestionList(topic.questions, topic.label)}
-          </div>
-          );
-        })}
-        <ul className="space-y-3" data-testid="consultation-standing-requirements">
-          {requirements.map((item) => {
-            const open = openIds.has(item.id);
-            const inlineQuestions = questionsByRequirement.get(item.targetKey) ?? [];
+        <ul className="space-y-4" data-testid="consultation-standing-list">
+          {entries.map((entry) => {
+            const open = openIds.has(entry.id);
+            const labelMatchesQuestion = entry.questions.some(
+              (question) => question.question.trim() === entry.label.trim(),
+            );
+            const ignoredQuestion = entry.questions.find((item) => item.ignored);
             return (
               <li
-                key={item.id}
-                className="min-w-0 space-y-1 overflow-hidden text-sm text-ink"
-                data-testid="consultation-standing-requirement"
-                data-strength={item.strength}
-                data-standing-target={item.targetKey}
+                key={entry.id}
+                className="min-w-0 space-y-2 overflow-hidden text-sm text-ink"
+                data-testid="consultation-standing-entry"
+                data-standing-target={entry.targetKey}
+                data-strength={entry.strength}
               >
+                {/* a. Label + rating only (no Open/Closed/Confirmed) */}
                 <div>
-                  <span className="font-medium break-words">{item.text}</span>
-                  {item.gapStatus ? (
-                    <span className="ml-2 rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink">
-                      {consultationGapStatusCopy[item.gapStatus]}
-                    </span>
-                  ) : item.strength ? (
-                    <span className="ml-2 rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink">
-                      {evidenceStrengthLabels[item.strength]}
-                    </span>
+                  {!labelMatchesQuestion || entry.questions.length !== 1 ? (
+                    <span className="font-medium break-words">{entry.label}</span>
                   ) : null}
+                  <span className="ml-2 rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink">
+                    {evidenceStrengthLabels[entry.strength]}
+                  </span>
                 </div>
-                {item.explanation ? (
+                {/* b. Reason + expand evidence */}
+                {entry.explanation ? (
                   <p className="break-words whitespace-pre-wrap">
-                    {stripInternalIdsFromDisplayText(item.explanation)}
+                    {stripInternalIdsFromDisplayText(entry.explanation)}
                   </p>
                 ) : null}
-                {item.experience ? (
-                  <p className="break-words text-xs text-subtle">{item.experience}</p>
+                {entry.experience ? (
+                  <p className="break-words text-xs text-subtle">
+                    {entry.experience}
+                  </p>
                 ) : null}
-                {item.facts.length > 0 ? (
+                {entry.facts.length > 0 ? (
                   <div>
                     <a
-                      href={`#harper-evidence-${item.id}`}
+                      href={`#harper-evidence-${entry.id}`}
                       className={textLinkClass}
                       onClick={(event) => {
                         event.preventDefault();
-                        toggle(item.id);
+                        toggle(entry.id);
                       }}
-                      data-testid={`toggle-evidence-${item.id}`}
+                      data-testid={`toggle-evidence-${entry.id}`}
                     >
                       {open
                         ? consultationConversationCopy.collapseEvidence
@@ -443,9 +325,11 @@ export function ConsultationStanding({
                     </a>
                     {open ? (
                       <ul className="mt-2 space-y-1">
-                        {item.facts.map((fact) => (
+                        {entry.facts.map((fact) => (
                           <li key={fact.id} className="min-w-0 overflow-hidden">
-                            <p className="break-words font-medium text-ink">{fact.label}</p>
+                            <p className="break-words font-medium text-ink">
+                              {fact.label}
+                            </p>
                             {fact.detail ? (
                               <p className="break-words whitespace-pre-wrap text-muted">
                                 {fact.detail}
@@ -457,7 +341,45 @@ export function ConsultationStanding({
                     ) : null}
                   </div>
                 ) : null}
-                {renderQuestionList(inlineQuestions)}
+                {/* c–f. Questions, replies, results, answer form */}
+                {entry.questions.length > 0 ? (
+                  <div className="mt-3 space-y-3">
+                    <QuestionList
+                      campaignId={campaignId}
+                      canEdit={canEdit}
+                      questions={entry.questions}
+                      showReply={showReply}
+                      pendingTarget={pendingTarget}
+                      jobsActive={jobsActive}
+                      suppressQuestionTextWhenMatchesLabel={
+                        labelMatchesQuestion ? entry.label : null
+                      }
+                      onSubmitStart={(replyKey, answer) => {
+                        setPendingTarget(replyKey);
+                        void answer;
+                      }}
+                    />
+                  </div>
+                ) : null}
+                {ignoredQuestion && canEdit && acceptingReplies ? (
+                  <ReopenIgnoredLink
+                    campaignId={campaignId}
+                    targetKey={`question:${ignoredQuestion.questionTurnId}`}
+                    testId={`reopen-ignored-gap-${entry.targetKey}`}
+                  />
+                ) : null}
+                {entry.showShareForm &&
+                canEdit &&
+                acceptingReplies &&
+                !ignoredQuestion ? (
+                  <div className="mt-2 space-y-2">
+                    <GapShareDetailsForm
+                      campaignId={campaignId}
+                      targetKey={entry.targetKey}
+                      enabled={repliesEnabled}
+                    />
+                  </div>
+                ) : null}
               </li>
             );
           })}

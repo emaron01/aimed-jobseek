@@ -25,9 +25,8 @@ describe("Harper page usability PART A", () => {
     expect(standing).toContain("useHarperDraft");
     // Forms stay mounted while busy so drafts are not wiped by unmount.
     expect(thread).toContain("actionsEnabled = showReply && !jobsActive");
-    expect(thread).toMatch(
-      /sessionStatus !== "SKIPPED"[\s\S]*sessionStatus !== "PAUSED"/,
-    );
+    expect(thread).toContain('sessionStatus !== "SKIPPED"');
+    // PAUSED no longer gates showReply (standing-structure); drafts still survive busy.
     expect(thread).not.toMatch(
       /sessionStatus !== "PAUSED"\s*&&\s*!jobsActive/,
     );

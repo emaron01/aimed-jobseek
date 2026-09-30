@@ -117,17 +117,13 @@ describe("Harper Batch A standing Answer / Ignore / reopen", () => {
 
   it("shows Share+Ignore for gaps without questions; Answer jump removed when question is inline (B2)", () => {
     const standing = readFileSync("src/components/ConsultationStanding.tsx", "utf8");
-    expect(standing).toContain("answerableQuestionTurnId");
     expect(standing).not.toContain("consultationConversationCopy.answerGap");
     expect(standing).toContain("share-gap-details-");
     expect(standing).toContain("ignore-gap-");
     expect(standing).toContain("ignoreConsultationQuestionAction");
     expect(standing).toContain("QuestionList");
-    // Share copy lives in GapShareDetailsForm (extracted for draft/scroll UX);
-    // the open-gap guard still mounts that form when no inline question exists.
-    expect(standing).toMatch(
-      /!gap\.answerableQuestionTurnId[\s\S]*GapShareDetailsForm/,
-    );
+    // Unified standing: share form mounts when entry.showShareForm (no inline questions).
+    expect(standing).toMatch(/entry\.showShareForm[\s\S]*GapShareDetailsForm/);
     expect(standing).toContain(
       "submitLabel={consultationConversationCopy.shareSomeDetails}",
     );
@@ -252,9 +248,10 @@ describe("Harper Batch A standing Answer / Ignore / reopen", () => {
         ?.answerableViaQuestion,
     ).toBe(false);
     const standing = readFileSync("src/components/ConsultationStanding.tsx", "utf8");
-    expect(standing).toContain("answerableQuestionTurnId");
-    expect(standing).toContain("!gap.answerableQuestionTurnId");
-    expect(standing).toContain("gap.ignored");
+    // Unified standing: share form when entry has no questions; ignore reopen retained.
+    expect(standing).toContain("entry.showShareForm");
+    expect(standing).toContain("GapShareDetailsForm");
+    expect(standing).toContain("ignoredQuestion");
   });
 
   it("ignore and reopen service paths make no paid plan call", () => {

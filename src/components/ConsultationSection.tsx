@@ -1,6 +1,4 @@
 import {
-  completeConsultationAction,
-  pauseConsultationAction,
   resumeConsultationAction,
   retryConsultationAction,
   skipConsultationAction,
@@ -15,10 +13,7 @@ import {
 import {
   buildConsultationQaView,
   consultationHasUnansweredQuestions,
-  consultationQuestionAcceptsReply,
-  isTargetCurrentlyIgnored,
   latestClosingNote,
-  latestCoachingNoteForTarget,
 } from "@/lib/consultation/qa-view";
 import {
   buildHarperQaLayout,
@@ -38,6 +33,7 @@ import {
   standingGapStatus,
   standingWorkIsComplete,
 } from "@/lib/consultation/standing";
+import { buildStandingListEntries } from "@/lib/consultation/standing-entries";
 import { listPersonPreps } from "@/lib/interview/person-prep";
 import { getApplicationSummaryView } from "@/lib/application-summary/service";
 import { ConsultationKnowAboutMe } from "@/components/ConsultationKnowAboutMe";
@@ -301,6 +297,12 @@ export async function ConsultationSection({
         id: item.id,
         targetKey: item.targetKey,
         text: item.text,
+        kind: item.kind as
+          | "REQUIRED"
+          | "OUTCOME"
+          | "COMPETENCY"
+          | "MISSION"
+          | "PREFERRED",
         strength: item.strength as "STRONG" | "PARTIAL" | "NONE",
         explanation: item.explanation
           ? stripInternalIdsFromDisplayText(item.explanation)
@@ -368,7 +370,14 @@ export async function ConsultationSection({
       id: `orphaned:${topic.targetKey}`,
       targetKey: topic.targetKey,
       text: topic.label,
-      strength: null,
+      kind: null as
+        | "REQUIRED"
+        | "OUTCOME"
+        | "COMPETENCY"
+        | "MISSION"
+        | "PREFERRED"
+        | null,
+      strength: null as "STRONG" | "PARTIAL" | "NONE" | null,
       explanation: null,
       gapStatus: null,
       facts: [] as Array<{ id: string; label: string; detail: string | null }>,
@@ -391,6 +400,20 @@ export async function ConsultationSection({
   const questionsByStandingTarget = new Map(
     requirementQuestionsForUi.map((row) => [row.targetKey, row.questions]),
   );
+  const standingEntries = buildStandingListEntries({
+    requirements: standingRequirementsForUi.map((row) => ({
+      id: row.id,
+      targetKey: row.targetKey,
+      text: row.text,
+      strength: row.strength,
+      kind: row.kind,
+      explanation: row.explanation,
+      experience: row.experience,
+      facts: row.facts,
+    })),
+    dedicatedTopics: standingInline.dedicatedTopics,
+    questionsByTargetKey: questionsByStandingTarget,
+  });
   const answeredInHarperOrder = orderedAnsweredHarperQuestions({
     dedicatedTopics: standingInline.dedicatedTopics,
     standingRequirementRows: standingRequirementsForUi.map((row) => ({
@@ -689,15 +712,13 @@ export async function ConsultationSection({
                 </div>
               ) : null}
               {session &&
-              (standingRequirementsForUi.length > 0 ||
-                standingInline.dedicatedTopics.length > 0) ? (
+              (standingEntries.length > 0 ||
+                standingInline.dedicatedTopics.length > 0 ||
+                standingRequirementsForUi.length > 0) ? (
                 <ConsultationStanding
                   campaignId={campaignId}
                   canEdit={canEdit}
-                  acceptingReplies={
-                    threadStatus !== "SKIPPED" &&
-                    threadStatus !== "PAUSED"
-                  }
+                  acceptingReplies={threadStatus !== "SKIPPED"}
                   sessionStatus={threadStatus}
                   jobsActive={consultationBusy}
                   overall={
@@ -705,80 +726,8 @@ export async function ConsultationSection({
                       ? stripInternalIdsFromDisplayText(briefing.data.overall)
                       : null
                   }
-                  gaps={standingGaps.map((gap) => {
-                    const item = qaItemForTargetKey(
-                      qaView.questions,
-                      gap.targetKey,
-                    );
-                    const ignored =
-                      Boolean(item?.ignored) ||
-                      isTargetCurrentlyIgnored(threadTurns, gap.targetKey);
-                    const answerableQuestionTurnId =
-                      item &&
-                      !item.ignored &&
-                      consultationQuestionAcceptsReply(item)
-                        ? item.questionTurnId
-                        : null;
-                    const harperNote = latestCoachingNoteForTarget(
-                      threadTurns,
-                      gap.targetKey,
-                    );
-                    return {
-                      ...gap,
-                      talkTrack: gap.talkTrack
-                        ? stripInternalIdsFromDisplayText(gap.talkTrack)
-                        : null,
-                      harperNote: harperNote
-                        ? stripInternalIdsFromDisplayText(harperNote)
-                        : null,
-                      questionTurnId: item?.questionTurnId ?? null,
-                      answerableQuestionTurnId,
-                      ignored,
-                      resumeBullet: item?.resumeBullet
-                        ? {
-                            ...item.resumeBullet,
-                            content: stripInternalIdsFromDisplayText(
-                              item.resumeBullet.content,
-                            ),
-                            strengtheningNote: item.resumeBullet
-                              .strengtheningNote
-                              ? stripInternalIdsFromDisplayText(
-                                  item.resumeBullet.strengtheningNote,
-                                )
-                              : null,
-                          }
-                        : null,
-                      talkingPoint: item?.talkingPoint
-                        ? {
-                            ...item.talkingPoint,
-                            content: stripInternalIdsFromDisplayText(
-                              item.talkingPoint.content,
-                            ),
-                            strengtheningNote: item.talkingPoint
-                              .strengtheningNote
-                              ? stripInternalIdsFromDisplayText(
-                                  item.talkingPoint.strengtheningNote,
-                                )
-                              : null,
-                          }
-                        : null,
-                      statements: (item?.statements ?? []).map((statement) => ({
-                        ...statement,
-                        content: stripInternalIdsFromDisplayText(
-                          statement.content,
-                        ),
-                        strengtheningNote: statement.strengtheningNote
-                          ? stripInternalIdsFromDisplayText(
-                              statement.strengtheningNote,
-                            )
-                          : null,
-                      })),
-                    };
-                  })}
+                  entries={standingEntries}
                   careerRecap={null}
-                  requirements={standingRequirementsForUi}
-                  dedicatedTopics={standingInline.dedicatedTopics}
-                  requirementQuestions={requirementQuestionsForUi}
                 />
               ) : (
                 <p className="text-sm text-muted">
@@ -828,31 +777,6 @@ export async function ConsultationSection({
           })}
         </HarperFilterProvider>
         </HarperDraftProvider>
-        {canEdit && session?.status === "IN_PROGRESS" && !failed ? (
-          <div className="flex flex-wrap gap-3">
-            <ApplicationActionForm
-              action={pauseConsultationAction}
-              submitLabel="Pause"
-              testId="pause-consultation"
-            >
-              <input type="hidden" name="campaignId" value={campaignId} />
-            </ApplicationActionForm>
-            <ApplicationActionForm
-              action={completeConsultationAction}
-              submitLabel="Done"
-              testId="done-consultation"
-            >
-              <input type="hidden" name="campaignId" value={campaignId} />
-            </ApplicationActionForm>
-            <ApplicationActionForm
-              action={skipConsultationAction}
-              submitLabel="Skip the rest"
-              testId="skip-consultation-open"
-            >
-              <input type="hidden" name="campaignId" value={campaignId} />
-            </ApplicationActionForm>
-          </div>
-        ) : null}
         {canEdit && (threadStatus === "PAUSED" || threadStatus === "SKIPPED") ? (
           <ApplicationActionForm
             action={resumeConsultationAction}
