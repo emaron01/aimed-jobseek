@@ -4166,12 +4166,29 @@ export async function saveEditedConsultationStatement(input: {
     where: { id: input.statementId, organizationId: input.organizationId },
   });
   if (!statement) throw new TenantError("That polished statement was not found.");
-  await prisma.consultationStatement.update({
-    where: { id: statement.id },
-    data: {
-      content,
-    },
-  });
+  const profileField =
+    statement.status === "APPROVED" && statement.kind === "INTERVIEW_ANSWER"
+      ? { interviewAnswer: content }
+      : statement.status === "APPROVED" && statement.kind === "RESUME_BULLET"
+        ? { resumeBullet: content }
+        : null;
+  await prisma.$transaction([
+    prisma.consultationStatement.update({
+      where: { id: statement.id },
+      data: { content },
+    }),
+    ...(profileField
+      ? [
+          prisma.profileStory.updateMany({
+            where: {
+              organizationId: input.organizationId,
+              consultationTurnId: statement.turnId,
+            },
+            data: profileField,
+          }),
+        ]
+      : []),
+  ]);
 }
 
 export async function recordConsultationAnswerEdit(input: {

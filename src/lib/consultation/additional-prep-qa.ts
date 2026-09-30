@@ -99,6 +99,24 @@ export function orderedAnsweredHarperQuestions(input: {
  * except those already shown as this profile's own primary content.
  * Indirect / unknown involvement → empty (no heading).
  */
+/** Same selection as additionalInterviewPrepQaForProfile, as the Harper cards themselves. */
+export function additionalInterviewPrepQuestionsForProfile(input: {
+  involvement: "DIRECT" | "INDIRECT" | null | undefined;
+  profilePrimaryQuestionTurnIds: Iterable<string>;
+  answeredInHarperOrder: ConsultationQaItem[];
+}): ConsultationQaItem[] {
+  if (input.involvement !== "DIRECT") return [];
+  const exclude = new Set(
+    [...input.profilePrimaryQuestionTurnIds]
+      .map((id) => id.trim())
+      .filter(Boolean),
+  );
+  return input.answeredInHarperOrder.filter((item) => {
+    if (exclude.has(item.questionTurnId)) return false;
+    return Boolean(consultationItemDisplayAnswer(item));
+  });
+}
+
 export function additionalInterviewPrepQaForProfile(input: {
   involvement: "DIRECT" | "INDIRECT" | null | undefined;
   /** Question turn ids already rendered in this profile's primary slots. */

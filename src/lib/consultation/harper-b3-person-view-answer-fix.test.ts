@@ -143,19 +143,18 @@ describe("Harper B3 person-view answer fix and Stage help", () => {
     expect([answered, prep].filter(harperItemNeedsRender)).toHaveLength(2);
   });
 
-  it("Cheat Sheet page is read-only for coach answers (Batch B4); Harper keeps forms", () => {
+  it("Cheat Sheet and Harper share the coach answer forms", () => {
     const page = src("src/app/(app)/campaigns/[id]/summary/page.tsx");
     const body = src("src/components/CheatSheetPersonBody.tsx");
     const coach = src("src/components/CheatSheetCoachItems.tsx");
     const personView = src("src/components/HarperPersonView.tsx");
     expect(page).toContain("CheatSheetPersonBody");
-    expect(page).toContain("showCoachAnswerForms={false}");
-    expect(page).toContain("harperLinkContactId");
+    expect(page).not.toContain("showCoachAnswerForms={false}");
+    expect(page).not.toContain("harperLinkContactId");
     expect(body).toContain("showCoachAnswerForms = true");
-    expect(body).toContain("harperLinkContactId");
-    // Shared widget still has Harper answer forms; CS uses read-only links.
+    expect(body).not.toContain("harperLinkContactId");
+    expect(coach).toContain("QuestionList");
     expect(coach).toContain("answerCheatSheetCoachAction");
-    expect(coach).toContain("readOnlyLinks");
     expect(personView).toContain("showCoachAnswerForms");
     expect(personView).not.toContain("showCoachAnswerForms={false}");
   });

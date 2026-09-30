@@ -22,7 +22,7 @@ import {
   type HarperInterviewerOrderItem,
 } from "@/lib/consultation/harper-layout";
 import {
-  additionalInterviewPrepQaForProfile,
+  additionalInterviewPrepQuestionsForProfile,
   orderedAnsweredHarperQuestions,
   profilePrimaryQuestionTurnIdsFromInterviewerSection,
 } from "@/lib/consultation/additional-prep-qa";
@@ -746,7 +746,7 @@ export async function ConsultationSection({
           {harperPeople.map((person) => {
             const interviewerSection =
               interviewerByContact.get(person.contactId) ?? null;
-            const additionalPrepEntries = additionalInterviewPrepQaForProfile({
+            const additionalPrepQuestions = additionalInterviewPrepQuestionsForProfile({
               involvement: person.involvement,
               profilePrimaryQuestionTurnIds:
                 profilePrimaryQuestionTurnIdsFromInterviewerSection(
@@ -774,7 +774,7 @@ export async function ConsultationSection({
                   interviewerSection={interviewerSection}
                   sessionStatus={threadStatus}
                   jobsActive={consultationBusy}
-                  additionalPrepEntries={additionalPrepEntries}
+                  additionalPrepQuestions={additionalPrepQuestions}
                 />
               </div>
             </HarperPersonViewShell>

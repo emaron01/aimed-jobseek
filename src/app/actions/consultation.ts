@@ -38,6 +38,13 @@ import { TenantError } from "@/lib/tenant/errors";
 
 export type ConsultationActionResult = { ok: boolean; message: string };
 
+/** Harper and the Cheat Sheet read the same statements, so both routes refresh. */
+function revalidateHarperAndCheatSheet(campaignId: string) {
+  revalidatePath(`/campaigns/${campaignId}`);
+  revalidatePath(`/campaigns/${campaignId}/summary`);
+  revalidatePath(`/campaigns/${campaignId}/consultation`);
+}
+
 function seekerFacingActionMessage(message: string, fallback: string): string {
   const trimmed = message.trim();
   if (
@@ -253,7 +260,7 @@ export async function skipConsultationQuestionAction(
       return { ok: false, message: consultationConversationCopy.replyFailed };
     }
     await skipConsultationQuestion({ organizationId, campaignId, targetKey });
-    revalidatePath(`/campaigns/${campaignId}`);
+    revalidateHarperAndCheatSheet(campaignId);
     return { ok: true, message: "Question skipped." };
   } catch (error) {
     return fail(error, "The question could not be skipped.");
@@ -273,7 +280,7 @@ export async function ignoreConsultationQuestionAction(
       return { ok: false, message: consultationConversationCopy.replyFailed };
     }
     await ignoreConsultationQuestion({ organizationId, campaignId, targetKey });
-    revalidatePath(`/campaigns/${campaignId}`);
+    revalidateHarperAndCheatSheet(campaignId);
     return { ok: true, message: "Ignored." };
   } catch (error) {
     return fail(error, "The question could not be ignored.");
@@ -297,7 +304,7 @@ export async function reopenIgnoredConsultationTargetAction(
       campaignId,
       targetKey,
     });
-    revalidatePath(`/campaigns/${campaignId}`);
+    revalidateHarperAndCheatSheet(campaignId);
     return { ok: true, message: "Reopened." };
   } catch (error) {
     return fail(error, "That item could not be reopened.");
@@ -443,7 +450,7 @@ export async function saveEditedConsultationStatementAction(
       statementId,
       content: String(formData.get("content") ?? ""),
     });
-    if (campaignId) revalidatePath(`/campaigns/${campaignId}`);
+    if (campaignId) revalidateHarperAndCheatSheet(campaignId);
     return { ok: true, message: applicationAssetConfig.labels.saveNewVersion };
   } catch (error) {
     return fail(error, "The polished statement could not be saved.");
@@ -474,7 +481,7 @@ export async function replyConsultationAction(
       intent: "REPLY",
     });
     if (recorded.unchanged) {
-      revalidatePath(`/campaigns/${campaignId}`);
+      revalidateHarperAndCheatSheet(campaignId);
       return {
         ok: true,
         message: consultationConversationCopy.answerUnchanged,
@@ -486,7 +493,7 @@ export async function replyConsultationAction(
       type: "CONSULTATION",
       payload: { operation: "process_reply" },
     });
-    revalidatePath(`/campaigns/${campaignId}`);
+    revalidateHarperAndCheatSheet(campaignId);
     return { ok: true, message: consultationConversationCopy.thinking };
   } catch (error) {
     return fail(error, consultationConversationCopy.replyFailed);
@@ -521,8 +528,7 @@ export async function editConsultationAnswerAction(
       type: "CONSULTATION",
       payload: { operation: "process_reply" },
     });
-    revalidatePath(`/campaigns/${campaignId}`);
-    revalidatePath(`/campaigns/${campaignId}/consultation`);
+    revalidateHarperAndCheatSheet(campaignId);
     return { ok: true, message: consultationConversationCopy.thinking };
   } catch (error) {
     return fail(error, consultationConversationCopy.replyFailed);
@@ -566,7 +572,7 @@ export async function approveConsultationQaResultAction(
           }),
         );
       }
-      revalidatePath(`/campaigns/${campaignId}`);
+      revalidateHarperAndCheatSheet(campaignId);
     }
     return { ok: true, message: consultationConversationCopy.confirmed };
   } catch (error) {
@@ -587,7 +593,7 @@ export async function regenerateConsultationQaResultAction(
       return { ok: false, message: "That polished statement was not found." };
     }
     await regenerateConsultationQaResult({ organizationId, statementIds });
-    if (campaignId) revalidatePath(`/campaigns/${campaignId}`);
+    if (campaignId) revalidateHarperAndCheatSheet(campaignId);
     return { ok: true, message: "Polished statement regenerated." };
   } catch (error) {
     return fail(error, "The result could not be regenerated.");

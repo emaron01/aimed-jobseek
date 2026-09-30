@@ -30,21 +30,20 @@ describe("Harper Batch B4 Cheat Sheet read-only", () => {
     "src/app/(app)/campaigns/[id]/consultation/page.tsx",
   );
 
-  it("Cheat Sheet page renders no answering or reply form for coach items", () => {
-    expect(page).toContain("showCoachAnswerForms={false}");
-    expect(page).toContain("harperLinkContactId={person.contactId}");
-    expect(page).not.toContain("answerCheatSheetCoachAction");
-    expect(coach).toContain("readOnlyLinks");
-    expect(coach).toContain("harperLinkContactId");
-    // Forms remain in the shared component for Harper person view only.
+  it("Cheat Sheet page answers coach items inline with Harper's question list", () => {
+    expect(page).not.toContain("showCoachAnswerForms={false}");
+    expect(page).not.toContain("harperLinkContactId");
+    expect(coach).toContain("QuestionList");
+    expect(coach).toContain("answerCheatSheetCoachAction");
+    expect(coach).not.toContain("workspaceHarperQuestionHref");
+    expect(coach).not.toContain("workspaceHarperCoachItemHref");
     expect(personView).toContain("showCoachAnswerForms");
     expect(personView).not.toContain("harperLinkContactId");
     expect(personView).not.toContain("showCoachAnswerForms={false}");
   });
 
-  it("answered question shows Edit link to #harper-q:{questionTurnId}", () => {
-    expect(coach).toContain("workspaceHarperQuestionHref");
-    expect(coach).toContain("consultationConversationCopy.editAnswer");
+  it("answered question uses Harper's question anchor, not a link off the Cheat Sheet", () => {
+    expect(coach).not.toContain("workspaceHarperQuestionHref");
     expect(consultationConversationCopy.editAnswer).toBe("Edit");
     expect(harperQuestionAnchorId("turn-42")).toBe("harper-q:turn-42");
     const href = workspaceHarperQuestionHref("camp_1", "ct_1", "turn-42");
@@ -53,9 +52,8 @@ describe("Harper Batch B4 Cheat Sheet read-only", () => {
     expect(href).toContain("harper-q%3Aturn-42");
   });
 
-  it("unanswered question needing input shows Answer link to harper-coach anchor; anchor exists on Harper", () => {
-    expect(coach).toContain("workspaceHarperCoachItemHref");
-    expect(coach).toContain("consultationConversationCopy.answerGap");
+  it("unanswered coach item keeps the Harper anchor and answers in place", () => {
+    expect(coach).not.toContain("workspaceHarperCoachItemHref");
     expect(consultationConversationCopy.answerGap).toBe("Answer");
     expect(harperCoachItemAnchorId("contact:c1:likely:1")).toBe(
       "harper-coach:contact:c1:likely:1",

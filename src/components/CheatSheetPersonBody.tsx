@@ -12,7 +12,6 @@ import type { NotesFromInterviewEntry } from "@/lib/application-summary/intervie
 import { notesFromInterviewsWithHeading } from "@/lib/application-summary/interview-notes";
 import type { CheatSheetNote } from "@/lib/application-summary/notes";
 import type { CheatSheetPersonSection } from "@/lib/application-summary/contract";
-import type { AdditionalPrepQaEntry } from "@/lib/consultation/additional-prep-qa";
 import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
 import { ADDITIONAL_INTERVIEW_PREP_QA_HEADING } from "@/lib/consultation/additional-prep-qa";
 import {
@@ -83,10 +82,9 @@ export function CheatSheetPersonBody({
   coachQaItems = [],
   jobsActive = false,
   showReply = true,
-  harperLinkContactId = null,
   interviewNotes = null,
   interviewNotesPersonName = null,
-  additionalPrepEntries = [],
+  additionalPrepQuestions = [],
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -104,16 +102,14 @@ export function CheatSheetPersonBody({
   coachQaItems?: ConsultationQaItem[];
   jobsActive?: boolean;
   showReply?: boolean;
-  /** Cheat Sheet read-only: Edit/Answer links open Harper for this contact. */
-  harperLinkContactId?: string | null;
   /**
    * Cheat Sheet Batch B4: compiled interview notes. When non-null, replaces the
    * simple gained-information list (Harper still uses `notes`).
    */
   interviewNotes?: NotesFromInterviewEntry[] | null;
   interviewNotesPersonName?: string | null;
-  /** Batch B5: Direct-role secondary answered Q&A (display-only). */
-  additionalPrepEntries?: AdditionalPrepQaEntry[];
+  /** Direct-role Harper questions that are not this person's primary cards. */
+  additionalPrepQuestions?: ConsultationQaItem[];
 }) {
   const useInterviewNotesSection = interviewNotes != null;
   const notesBlock = useInterviewNotesSection ? (
@@ -131,14 +127,17 @@ export function CheatSheetPersonBody({
     </CheatSheetSubsection>
   ) : null;
   const additionalPrepBlock =
-    additionalPrepEntries.length > 0 ? (
+    additionalPrepQuestions.length > 0 ? (
       <CheatSheetSubsection
         id={`${sectionKey}-additional-prep`}
         title={ADDITIONAL_INTERVIEW_PREP_QA_HEADING}
       >
         <AdditionalInterviewPrepQa
           campaignId={campaignId}
-          entries={additionalPrepEntries}
+          questions={additionalPrepQuestions}
+          canEdit={canEdit}
+          showReply={showReply}
+          jobsActive={jobsActive}
           showHeading={false}
         />
       </CheatSheetSubsection>
@@ -232,7 +231,6 @@ export function CheatSheetPersonBody({
           qaItems={coachQaItems}
           jobsActive={jobsActive}
           showReply={showReply}
-          harperLinkContactId={harperLinkContactId}
         />
       </CheatSheetSubsection>
       <CheatSheetSubsection

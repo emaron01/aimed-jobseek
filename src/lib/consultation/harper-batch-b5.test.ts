@@ -173,11 +173,11 @@ describe("Harper Batch B5 Additional Interview Prep Q&A", () => {
     const page = src("src/app/(app)/campaigns/[id]/summary/page.tsx");
     const section = src("src/components/ConsultationSection.tsx");
     expect(personView).toContain("AdditionalInterviewPrepQa");
-    expect(personView).toContain("additionalPrepEntries");
+    expect(personView).toContain("additionalPrepQuestions");
     expect(body).toContain("AdditionalInterviewPrepQa");
-    expect(page).toContain("additionalPrepEntries");
+    expect(page).toContain("additionalPrepQuestions");
     expect(page).toContain('person.involvement === "DIRECT"');
-    expect(section).toContain("additionalInterviewPrepQaForProfile");
+    expect(section).toContain("additionalInterviewPrepQuestionsForProfile");
     expect(section).toContain("involvement: person.involvement");
   });
 
@@ -195,20 +195,19 @@ describe("Harper Batch B5 Additional Interview Prep Q&A", () => {
     expect(onlySelf).toEqual([]);
 
     const component = src("src/components/AdditionalInterviewPrepQa.tsx");
-    expect(component).toContain("if (entries.length === 0) return null");
+    expect(component).toContain("if (questions.length === 0) return null");
     expect(component).toContain("ADDITIONAL_INTERVIEW_PREP_QA_HEADING");
-    expect(component).not.toContain("ApplicationActionForm");
-    expect(component).not.toContain("textarea");
-    expect(component).not.toContain("replyConsultationAction");
-    expect(component).toContain("consultationConversationCopy.editAnswer");
+    expect(component).toContain("QuestionList");
+    expect(component).not.toContain("workspaceHarperQuestionHref");
+    expect(component).not.toContain("workspaceHarperCoachItemHref");
     expect(consultationConversationCopy.editAnswer).toBe("Edit");
   });
 
-  it("Edit links target the one Harper question (standing or person)", () => {
+  it("additional prep does not link out to Harper; href helpers still address one question", () => {
     const component = src("src/components/AdditionalInterviewPrepQa.tsx");
-    expect(component).toContain("workspaceHarperQuestionHref");
-    expect(component).toContain("workspaceHarperStandingQuestionHref");
-    expect(component).toContain("workspaceHarperCoachItemHref");
+    expect(component).not.toContain("workspaceHarperQuestionHref");
+    expect(component).not.toContain("workspaceHarperStandingQuestionHref");
+    expect(component).not.toContain("workspaceHarperCoachItemHref");
     expect(workspaceHarperStandingQuestionHref("camp_1", "q-why")).toContain(
       "harper-q%3Aq-why",
     );
@@ -228,10 +227,9 @@ describe("Harper Batch B5 Additional Interview Prep Q&A", () => {
     expect(consultationItemDisplayAnswer(why)).toBe("Mission fit and product.");
     expect(consultationItemIsAnswered(unanswered)).toBe(false);
     const component = src("src/components/AdditionalInterviewPrepQa.tsx");
-    // Display-only: Edit is an <a>, not a form that writes answers.
-    expect(component).toMatch(/<a\s[\s\S]*editAnswer/);
+    expect(component).toContain("QuestionList");
     expect(component).not.toContain("answerCheatSheetCoachAction");
-    expect(component).not.toContain("editConsultationAnswerAction");
+    expect(component).not.toContain("editHrefForEntry");
   });
 
   it("render invariant still counts each item once at its primary place", () => {
@@ -279,8 +277,8 @@ describe("Harper Batch B5 Additional Interview Prep Q&A", () => {
     const body = src("src/components/CheatSheetPersonBody.tsx");
     const filter = src("src/components/CheatSheetPeopleFilter.tsx");
     expect(page).toContain("loadOrderedAnsweredHarperQuestions");
-    expect(page).toContain("additionalInterviewPrepQaForProfile");
-    expect(body).toContain("additionalPrepEntries");
+    expect(page).toContain("additionalInterviewPrepQuestionsForProfile");
+    expect(body).toContain("additionalPrepQuestions");
     // Print uses the same person body inside summary sections.
     expect(filter).toContain("CheatSheetPrintButton");
     expect(page).toContain("CheatSheetPrintButton");

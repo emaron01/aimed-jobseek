@@ -127,17 +127,30 @@ export async function answerCheatSheetCoachAction(
       requireOrganizationId(),
       requireCurrentUser(),
     ]);
-    await answerCheatSheetCoachItem({
+    const recorded = await answerCheatSheetCoachItem({
       organizationId,
       campaignId,
       userId: user.id,
       itemId,
       answer,
     });
-    revalidatePath(`/campaigns/${campaignId}/summary`);
+    if (!recorded.unchanged) {
+      await enqueueApplicationJob({
+        organizationId,
+        campaignId,
+        type: "CONSULTATION",
+        payload: { operation: "process_reply" },
+      });
+    }
     revalidatePath(`/campaigns/${campaignId}`);
-    revalidatePath(`/campaigns/${campaignId}/assets`);
-    return { ok: true, message: "Saved." };
+    revalidatePath(`/campaigns/${campaignId}/summary`);
+    revalidatePath(`/campaigns/${campaignId}/consultation`);
+    return {
+      ok: true,
+      message: recorded.unchanged
+        ? consultationConversationCopy.answerUnchanged
+        : consultationConversationCopy.thinking,
+    };
   } catch (error) {
     if (error instanceof TenantError) {
       return { ok: false, message: error.message };

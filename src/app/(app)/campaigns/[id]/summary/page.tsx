@@ -23,7 +23,7 @@ import { statedListItems } from "@/lib/application-summary/display";
 import { compileNotesFromInterviewsWithPerson } from "@/lib/application-summary/interview-notes";
 import { getApplicationSummaryView } from "@/lib/application-summary/service";
 import {
-  additionalInterviewPrepQaForProfile,
+  additionalInterviewPrepQuestionsForProfile,
 } from "@/lib/consultation/additional-prep-qa";
 import {
   loadOrderedAnsweredHarperQuestions,
@@ -251,9 +251,9 @@ export default async function ApplicationSummaryPage({
         const coachQaItems = person.contactId
           ? coachQaByContact.get(person.contactId) ?? []
           : [];
-        const additionalPrepEntries =
+        const additionalPrepQuestions =
           person.contactId && person.involvement === "DIRECT"
-            ? additionalInterviewPrepQaForProfile({
+            ? additionalInterviewPrepQuestionsForProfile({
                 involvement: person.involvement,
                 profilePrimaryQuestionTurnIds: primaryTurnIdsForContact(
                   interviewerQuestionsByContactId,
@@ -262,6 +262,11 @@ export default async function ApplicationSummaryPage({
                 answeredInHarperOrder,
               })
             : [];
+        const consultationBusy = live.jobs.some(
+          (job) =>
+            job.type === "CONSULTATION" &&
+            (job.status === "PENDING" || job.status === "IN_PROGRESS"),
+        );
         return (
           <CheatSheetPersonSection key={person.sectionKey} sectionKey={person.sectionKey}>
           <CheatSheetSection id={person.sectionKey} title={person.heading}>
@@ -273,12 +278,11 @@ export default async function ApplicationSummaryPage({
               notes={notes}
               personaBuilt={person.personaBuilt}
               personaId={person.roleId}
-              showCoachAnswerForms={false}
-              harperLinkContactId={person.contactId}
               coachQaItems={coachQaItems}
+              jobsActive={consultationBusy}
               interviewNotes={person.contactId ? interviewNotes : null}
               interviewNotesPersonName={person.contactId ? person.heading : null}
-              additionalPrepEntries={additionalPrepEntries}
+              additionalPrepQuestions={additionalPrepQuestions}
             />
           </CheatSheetSection>
           </CheatSheetPersonSection>

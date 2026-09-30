@@ -19,16 +19,14 @@ import {
 import {
   assignCoachItemIds,
   findCoachItem,
-  replaceCoachItem,
 } from "@/lib/application-summary/coach";
 import {
   harperAlreadyAskedCareerWalkThrough,
   normalizePersonSectionLikelyQuestions,
   validatePersonSectionLikelyQuestions,
 } from "@/lib/application-summary/likely-questions";
-import { appendConfirmedFact } from "@/lib/consultation/write-back";
 import { isApplicationLearningsSourceId } from "@/lib/consultation/learnings";
-import { polishAnswerWithQuality } from "@/lib/consultation/service";
+import { recordConsultationReply } from "@/lib/consultation/service";
 import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
 import {
   individualProfileRecordSchema,
@@ -54,7 +52,6 @@ import { listPersonPreps } from "@/lib/interview/person-prep";
 import {
   applicationSummaryConfig,
   consultationConfig,
-  consultationConversationCopy,
   sanitizeWorkspaceFailure,
   vocab,
 } from "@/lib/product-config";
@@ -1114,7 +1111,7 @@ export async function answerCheatSheetCoachItem(input: {
   userId: string;
   itemId: string;
   answer: string;
-}): Promise<void> {
+}): Promise<{ unchanged: boolean }> {
   const answer = input.answer.trim();
   if (!answer) {
     throw new TenantError("Write an answer, or skip the question.");
@@ -1131,20 +1128,13 @@ export async function answerCheatSheetCoachItem(input: {
   }
   const guidance = assignCoachItemIds(parsed.data);
   const item = findCoachItem(guidance, input.itemId);
-  if (!item?.harperQuestion?.trim()) {
+  const questionText = item?.harperQuestion?.trim() || item?.prompt.trim() || "";
+  if (!item || !questionText) {
     throw new TenantError(
       `${consultationConfig.displayName} is not asking for an answer on this item.`,
     );
   }
   const product = data.campaign.product;
-  const profileParsed = product.profileJson
-    ? parseCandidateProfileSafe(product.profileJson)
-    : null;
-  if (!profileParsed?.ok) {
-    throw new TenantError(
-      `The ${vocab.product.singular} could not be read, so this was not saved.`,
-    );
-  }
   const session =
     data.campaign.consultationSession ??
     (await prisma.consultationSession.create({
@@ -1152,155 +1142,46 @@ export async function answerCheatSheetCoachItem(input: {
         organizationId: input.organizationId,
         campaignId: input.campaignId,
         productId: product.id,
-        status: "DONE",
+        status: "IN_PROGRESS",
         generationStatus: "READY",
         promptVersion: CONSULTATION_PROMPT_VERSION,
       },
     }));
-  const lastTurn = await prisma.consultationTurn.findFirst({
-    where: { sessionId: session.id },
-    orderBy: { sequence: "desc" },
-    select: { sequence: true },
-  });
-  const nextSequence = (lastTurn?.sequence ?? 0) + 1;
   const targetKey = `cheatSheet:${input.itemId}`;
-  const questionTurn = await prisma.consultationTurn.create({
-    data: {
-      organizationId: input.organizationId,
-      sessionId: session.id,
-      sequence: nextSequence,
-      speaker: "CONSULTANT",
-      body: item.harperQuestion.trim(),
-      targetKey,
-    },
-  });
-  const seekerTurn = await prisma.consultationTurn.create({
-    data: {
-      organizationId: input.organizationId,
-      sessionId: session.id,
-      sequence: nextSequence + 1,
-      speaker: "SEEKER",
-      body: answer,
-      targetKey,
-      seekerAuthored: true,
-      analysisJson: { replyToTurnId: questionTurn.id, status: "READY" },
-    },
-  });
-  const polished = await polishAnswerWithQuality({
-    answer,
-    story: {
-      situation: answer,
-      task: item.prompt,
-      action: answer,
-      result: answer,
-    },
-    sources: [
-      { id: `answer:${seekerTurn.id}`, text: answer },
-      ...profileEvidenceItems(profileParsed.profile)
-        .filter((entry) => entry.kind === "FACT")
-        .map((entry) => ({ id: entry.id, text: entry.text })),
-    ],
-    declinedFollowUp: false,
-    strengtheningNeeds: [],
-    careerStage: deriveCareerStage(profileParsed.profile),
-    profileItems: profileEvidenceItems(profileParsed.profile),
-    usage: {
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      category: "CONSULTATION",
-      operation: "CONSULTATION_REPLY",
-      metadata: { step: "cheat_sheet_sample_polish", attempt: 1 },
-    },
-  });
-  if (!polished.ok) {
-    throw new TenantError(polished.message);
-  }
-  const sampleAnswer = polished.data.interviewAnswer.trim();
-  if (!sampleAnswer) {
-    throw new TenantError(consultationConversationCopy.generationFailed);
-  }
-  const nextProfile = appendConfirmedFact(profileParsed.profile, {
-    id: `cheatSheet:${input.itemId}`,
-    text: answer,
-    turnId: seekerTurn.id,
-  });
-  const existingStory = await prisma.profileStory.findFirst({
+  const existingQuestion = await prisma.consultationTurn.findFirst({
     where: {
-      organizationId: input.organizationId,
-      consultationTurnId: seekerTurn.id,
+      sessionId: session.id,
+      speaker: "CONSULTANT",
+      targetKey,
     },
     select: { id: true },
   });
-  const now = new Date();
-  const storyData = {
-    situation: answer,
-    task: item.prompt,
-    action: answer,
-    result: answer,
-    competencyLinks: [] as Prisma.InputJsonValue,
-    verbatimAnswer: answer,
-    interviewAnswer: sampleAnswer,
-    interviewAnswerApprovedAt: now,
-    resumeBullet: polished.data.resumeBullet?.trim() || null,
-    resumeBulletApprovedAt: polished.data.resumeBullet?.trim()
-      ? now
-      : null,
-    seekerAuthored: true,
-  };
-  const nextGuidance = replaceCoachItem(guidance, input.itemId, {
-    ...item,
-    sampleAnswer,
-    harperQuestion: null,
-    supports: [
-      ...item.supports,
-      { sourceId: `answer:${seekerTurn.id}`, quote: answer },
-    ],
-  });
-  await prisma.$transaction([
-    prisma.product.update({
-      where: { id: product.id },
-      data: { profileJson: nextProfile as unknown as Prisma.InputJsonValue },
-    }),
-    existingStory
-      ? prisma.profileStory.update({
-          where: { id: existingStory.id },
-          data: storyData,
-        })
-      : prisma.profileStory.create({
-          data: {
-            organizationId: input.organizationId,
-            productId: product.id,
-            consultationTurnId: seekerTurn.id,
-            ...storyData,
-          },
-        }),
-    prisma.consultationStatement.upsert({
-      where: {
-        turnId_kind: { turnId: seekerTurn.id, kind: "INTERVIEW_ANSWER" },
-      },
-      create: {
+  if (!existingQuestion) {
+    const lastTurn = await prisma.consultationTurn.findFirst({
+      where: { sessionId: session.id },
+      orderBy: { sequence: "desc" },
+      select: { sequence: true },
+    });
+    await prisma.consultationTurn.create({
+      data: {
         organizationId: input.organizationId,
         sessionId: session.id,
-        turnId: seekerTurn.id,
-        kind: "INTERVIEW_ANSWER",
-        content: sampleAnswer,
-        status: "APPROVED",
-        groundingJson: [],
-        promptVersion: CONSULTATION_PROMPT_VERSION,
-        approvedAt: now,
+        sequence: (lastTurn?.sequence ?? 0) + 1,
+        speaker: "CONSULTANT",
+        body: questionText,
+        targetKey,
+        followUp: false,
       },
-      update: {
-        content: sampleAnswer,
-        status: "APPROVED",
-        groundingJson: [],
-        approvedAt: now,
-      },
-    }),
-    prisma.applicationSummary.update({
-      where: { campaignId: input.campaignId },
-      data: { guidanceJson: jsonGuidance(nextGuidance) },
-    }),
-  ]);
+    });
+  }
+  const recorded = await recordConsultationReply({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    targetKey,
+    answer,
+    intent: "REPLY",
+  });
+  return { unchanged: recorded.unchanged === true };
 }
 
 export async function resolveApplicationSummaryFlag(input: {

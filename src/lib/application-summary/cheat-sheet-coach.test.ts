@@ -18,7 +18,6 @@ import {
   coachItemIsComplete,
   collectCoachItems,
   prepareInstructionViolations,
-  replaceCoachItem,
   seekerThirdPersonViolations,
 } from "@/lib/application-summary/coach";
 import { applicationSummaryGuidanceSchema } from "@/lib/application-summary/contract";
@@ -295,50 +294,114 @@ describe.skipIf(!hasTestDatabase())("cheat sheet Harper reply persistence", { ti
     await prisma.$disconnect();
   });
 
-  it("writes a sample answer from the reply and saves it to the Personal Profile and story bank", async () => {
-    const sample =
-      "I developed a front-line manager who skipped deal inspection. I sat in on two forecast calls, named the gaps, and that manager hit commit the next quarter.";
-    polishAnswerWithQuality.mockResolvedValue({
-      ok: true,
-      data: {
-        interviewAnswer: sample,
-        resumeBullet:
-          "Coached a front-line manager to inspect deals before forecast.",
-        strengtheningNote: null,
-      },
-    });
+  it("records a coach reply as a draft through the Harper reply path", async () => {
+    const reply =
+      "I had a manager who was not inspecting deals. I sat in on two calls, showed him what good looked like, and his commit started landing.";
     const item = collectCoachItems(coachGuidance()).find((row) => row.harperQuestion);
     expect(item?.id).toBeTruthy();
-    await answerCheatSheetCoachItem({
+    const recorded = await answerCheatSheetCoachItem({
       organizationId,
       campaignId,
       userId,
       itemId: item!.id!,
-      answer:
-        "I had a manager who was not inspecting deals. I sat in on two calls, showed him what good looked like, and his commit started landing.",
+      answer: reply,
     });
+    expect(recorded.unchanged).toBe(false);
+    expect(polishAnswerWithQuality).not.toHaveBeenCalled();
+    const session = await prisma.consultationSession.findFirst({
+      where: { campaignId },
+    });
+    expect(session).toBeTruthy();
+    const turns = await prisma.consultationTurn.findMany({
+      where: { sessionId: session!.id },
+      orderBy: { sequence: "asc" },
+    });
+    expect(turns.map((turn) => turn.speaker)).toEqual(["CONSULTANT", "SEEKER"]);
+    expect(turns[0]?.targetKey).toBe(`cheatSheet:${item!.id}`);
+    expect(turns[0]?.body).toBe(item!.harperQuestion);
+    expect(turns[1]?.body).toBe(reply);
+    const statements = await prisma.consultationStatement.findMany({
+      where: { sessionId: session!.id },
+    });
+    expect(statements.some((row) => row.status === "APPROVED")).toBe(false);
+    const stories = await prisma.profileStory.findMany({
+      where: { organizationId, productId },
+    });
+    expect(stories).toEqual([]);
+    const product = await prisma.product.findUnique({ where: { id: productId } });
+    expect(JSON.stringify(product?.profileJson)).not.toContain(
+      "I had a manager who was not inspecting deals",
+    );
     const summary = await prisma.applicationSummary.findUnique({
       where: { campaignId },
     });
     const next = applicationSummaryGuidanceSchema.parse(summary?.guidanceJson);
     const updated = collectCoachItems(next).find((row) => row.id === item!.id);
-    expect(updated?.sampleAnswer).toBe(sample);
-    expect(updated?.harperQuestion).toBeNull();
-    const product = await prisma.product.findUnique({ where: { id: productId } });
-    expect(JSON.stringify(product?.profileJson)).toContain("I had a manager who was not inspecting deals");
-    const story = await prisma.profileStory.findFirst({
-      where: { organizationId, productId },
-      orderBy: { createdAt: "desc" },
-    });
-    expect(story?.verbatimAnswer).toContain("I had a manager who was not inspecting deals");
-    expect(story?.interviewAnswer).toBe(sample);
-    expect(story?.interviewAnswerApprovedAt).not.toBeNull();
-    const replaced = replaceCoachItem(next, item!.id!, updated!);
-    const hiringManager = replaced.people[0]?.hiringManager as
-      | { gaps?: Array<{ sampleAnswer?: string | null }> }
-      | null
-      | undefined;
-    expect(hiringManager?.gaps?.[0]?.sampleAnswer).toBe(sample);
+    expect(updated?.harperQuestion).toBe(item!.harperQuestion);
+    expect(updated?.sampleAnswer).toBe(item!.sampleAnswer);
+    const action = readFileSync("src/app/actions/application-summary.ts", "utf8");
+    expect(action).toContain('payload: { operation: "process_reply" }');
     expect(consultationConversationCopy.threadReply).toBe("Save Answer");
+  });
+
+  it("editing an approved statement updates ProfileStory with no job", async () => {
+    const session = await prisma.consultationSession.findFirst({
+      where: { campaignId },
+    });
+    const turn = await prisma.consultationTurn.findFirst({
+      where: { sessionId: session!.id, speaker: "SEEKER" },
+    });
+    const statement = await prisma.consultationStatement.create({
+      data: {
+        organizationId,
+        sessionId: session!.id,
+        turnId: turn!.id,
+        kind: "INTERVIEW_ANSWER",
+        status: "APPROVED",
+        content: "Original approved answer.",
+        promptVersion: "1",
+        groundingJson: [],
+        approvedAt: new Date(),
+      },
+    });
+    await prisma.profileStory.create({
+      data: {
+        organizationId,
+        productId,
+        consultationTurnId: turn!.id,
+        situation: "A forecast slipped.",
+        task: "Inspect the deal.",
+        action: "I sat in on the call.",
+        result: "The commit landed.",
+        competencyLinks: [],
+        interviewAnswer: "Original approved answer.",
+        interviewAnswerApprovedAt: new Date(),
+        seekerAuthored: true,
+      },
+    });
+    const { saveEditedConsultationStatement } = await import(
+      "@/lib/consultation/service"
+    );
+    await saveEditedConsultationStatement({
+      organizationId,
+      statementId: statement.id,
+      content: "Corrected approved answer.",
+    });
+    const story = await prisma.profileStory.findFirst({
+      where: { organizationId, consultationTurnId: turn!.id },
+    });
+    const saved = await prisma.consultationStatement.findUnique({
+      where: { id: statement.id },
+    });
+    expect(saved?.content).toBe("Corrected approved answer.");
+    expect(saved?.status).toBe("APPROVED");
+    expect(story?.interviewAnswer).toBe("Corrected approved answer.");
+    const action = readFileSync("src/app/actions/consultation.ts", "utf8");
+    const fn = action.slice(
+      action.indexOf("export async function saveEditedConsultationStatementAction"),
+      action.indexOf("export async function replyConsultationAction"),
+    );
+    expect(fn).not.toContain("enqueueApplicationJob");
+    expect(fn).toContain("revalidateHarperAndCheatSheet");
   });
 });

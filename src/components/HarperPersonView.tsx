@@ -10,7 +10,7 @@ import { CheatSheetPersonBody } from "@/components/CheatSheetPersonBody";
 import { QuestionList } from "@/components/ConsultationThread";
 import type { CheatSheetNote } from "@/lib/application-summary/notes";
 import type { CheatSheetPersonSection } from "@/lib/application-summary/contract";
-import type { AdditionalPrepQaEntry } from "@/lib/consultation/additional-prep-qa";
+import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
 import {
   coachItemIdFromCheatSheetTarget,
   harperContactAnchorId,
@@ -109,7 +109,7 @@ export function HarperPersonInlineProfile({
   interviewerSection,
   sessionStatus,
   jobsActive,
-  additionalPrepEntries = [],
+  additionalPrepQuestions = [],
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -124,7 +124,7 @@ export function HarperPersonInlineProfile({
   interviewerSection: HarperInterviewerSection | null;
   sessionStatus: string;
   jobsActive: boolean;
-  additionalPrepEntries?: AdditionalPrepQaEntry[];
+  additionalPrepQuestions?: ConsultationQaItem[];
 }) {
   const [pendingTarget, setPendingTarget] = useState<string | null>(null);
   const showReply =
@@ -206,7 +206,10 @@ export function HarperPersonInlineProfile({
       ) : null}
       <AdditionalInterviewPrepQa
         campaignId={campaignId}
-        entries={additionalPrepEntries}
+        questions={additionalPrepQuestions}
+        canEdit={canEdit}
+        showReply={showReply}
+        jobsActive={jobsActive}
       />
     </section>
   );

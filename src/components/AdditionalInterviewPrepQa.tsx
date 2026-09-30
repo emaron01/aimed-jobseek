@@ -1,86 +1,52 @@
-import {
-  workspaceHarperCoachItemHref,
-  workspaceHarperQuestionHref,
-  workspaceHarperStandingQuestionHref,
-} from "@/lib/application/workspace-links";
-import {
-  ADDITIONAL_INTERVIEW_PREP_QA_HEADING,
-  type AdditionalPrepQaEntry,
-} from "@/lib/consultation/additional-prep-qa";
-import { coachItemIdFromCheatSheetTarget } from "@/lib/consultation/harper-layout";
-import { consultationConversationCopy } from "@/lib/product-config";
+"use client";
 
-function editHrefForEntry(
-  campaignId: string,
-  entry: AdditionalPrepQaEntry,
-): string {
-  const coachId = coachItemIdFromCheatSheetTarget(entry.targetKey);
-  if (entry.primaryContactId) {
-    if (coachId && !entry.questionTurnId) {
-      return workspaceHarperCoachItemHref(
-        campaignId,
-        entry.primaryContactId,
-        coachId,
-      );
-    }
-    return workspaceHarperQuestionHref(
-      campaignId,
-      entry.primaryContactId,
-      entry.questionTurnId,
-    );
-  }
-  return workspaceHarperStandingQuestionHref(campaignId, entry.questionTurnId);
-}
+import { useState } from "react";
+import { QuestionList } from "@/components/ConsultationThread";
+import { ADDITIONAL_INTERVIEW_PREP_QA_HEADING } from "@/lib/consultation/additional-prep-qa";
+import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
 
 /**
- * Display-only mirror of answered Harper Q&A for Direct roles (Batch B5).
- * No forms — Edit links to the single primary question on Harper.
+ * Answered Harper questions that are not this person's primary cards.
+ * Same QuestionList as Harper, so approve, edit, skip, and ignore stay one workflow.
  */
 export function AdditionalInterviewPrepQa({
   campaignId,
-  entries,
+  questions,
+  canEdit,
+  showReply = true,
+  jobsActive = false,
   showHeading = true,
 }: {
   campaignId: string;
-  entries: AdditionalPrepQaEntry[];
+  questions: ConsultationQaItem[];
+  canEdit: boolean;
+  showReply?: boolean;
+  jobsActive?: boolean;
   /** Cheat Sheet supplies the collapsible heading. Harper keeps this heading. */
   showHeading?: boolean;
 }) {
-  if (entries.length === 0) return null;
+  const [pendingTarget, setPendingTarget] = useState<string | null>(null);
+  if (questions.length === 0) return null;
   return (
-    <div
-      className="space-y-3"
-      data-testid="additional-interview-prep-qa"
-    >
+    <div className="space-y-3" data-testid="additional-interview-prep-qa">
       {showHeading ? (
         <h3 className="font-medium text-ink">
           {ADDITIONAL_INTERVIEW_PREP_QA_HEADING}
         </h3>
       ) : null}
-      <ul className="space-y-4">
-        {entries.map((entry) => (
-          <li
-            key={entry.questionTurnId}
-            className="rounded-md border border-edge bg-canvas p-4"
-            data-testid={`additional-prep-qa-${entry.questionTurnId}`}
-            data-additional-prep-question={entry.questionTurnId}
-          >
-            <p className="text-sm font-medium text-ink">{entry.question}</p>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-ink">
-              {entry.answer}
-            </p>
-            <p className="mt-3 print:hidden">
-              <a
-                href={editHrefForEntry(campaignId, entry)}
-                className="text-sm font-medium text-ink underline decoration-ink underline-offset-2"
-                data-testid={`additional-prep-qa-edit-${entry.questionTurnId}`}
-              >
-                {consultationConversationCopy.editAnswer}
-              </a>
-            </p>
-          </li>
-        ))}
-      </ul>
+      <div className="space-y-4">
+        <QuestionList
+          campaignId={campaignId}
+          canEdit={canEdit}
+          questions={questions}
+          showReply={showReply}
+          pendingTarget={pendingTarget}
+          jobsActive={jobsActive}
+          onSubmitStart={(replyKey) => {
+            setPendingTarget(replyKey);
+          }}
+        />
+      </div>
     </div>
   );
 }
