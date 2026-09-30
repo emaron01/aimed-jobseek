@@ -123,15 +123,42 @@ export function resultIgnoresLatestAnswer(
   return hits.length <= 1;
 }
 
+/**
+ * Substantial interview/resume prose the seeker (or Harper) wrote as a real
+ * answer — not meta commentary, fragments, or raw notes. Used so a cleanup that
+ * is nearly identical to a complete seeker reply is still accepted as Harper's
+ * draft (the echo rule only blocks non-answers).
+ */
+export function isCompleteAnswerResult(content: string): boolean {
+  const text = content.trim();
+  if (!text) return false;
+  if (isQuestionMetaCommentary(text)) return false;
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length < 30) return false;
+  const experienceOrOutcome =
+    /\b(i |i'm |i've |i'd |my |we |our |across my career|most recently|i built|i led|i ran|i owned|i grew|i cut|i closed|i coached|i partnered|i delivered|i worked|result|outcome|became|increased|reduced)\b/i.test(
+      text,
+    );
+  return experienceOrOutcome;
+}
+
+/**
+ * Reject non-answers shown as Harper's result: question meta-commentary,
+ * joined raw replies, fragments, and short/incomplete echoes.
+ * Do not reject a complete answer merely because it matches the seeker's reply
+ * (including punctuation-only differences that would otherwise look like a fragment).
+ */
 export function isRawSeekerResult(
   content: string,
   seekerAnswers: readonly string[],
 ): boolean {
   if (isQuestionMetaCommentary(content)) return true;
+  // Concatenated raw replies are never Harper's polished result.
+  if (isJoinedSeekerAnswers(content, seekerAnswers)) return true;
+  if (isCompleteAnswerResult(content)) return false;
+  if (isSeekerAnswerFragment(content, seekerAnswers)) return true;
   return (
     isExactSeekerAnswer(content, seekerAnswers) ||
-    isJoinedSeekerAnswers(content, seekerAnswers) ||
-    isSeekerAnswerFragment(content, seekerAnswers) ||
     isParaphrasedSeekerReply(content, seekerAnswers)
   );
 }

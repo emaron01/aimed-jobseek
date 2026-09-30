@@ -187,12 +187,22 @@ function HarperPageSection({
       <AppButton
         type="button"
         variant="secondary"
-        className="!h-auto w-full !flex-col !items-start !justify-start !rounded-none !border-0 !bg-transparent !px-4 !py-3 !shadow-none hover:!bg-canvas active:!bg-canvas"
+        className="!h-auto w-full !flex-col !items-start !justify-start !rounded-none !border-0 !border-b !border-primary/20 !bg-primary/10 !px-4 !py-3 !shadow-none hover:!bg-primary/15 active:!bg-primary/15"
         aria-expanded={open}
         data-testid={`${testId}-heading`}
         onClick={onToggle}
       >
-        <h3 className="text-sm font-semibold text-ink">{title}</h3>
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-primary">
+          <span
+            aria-hidden="true"
+            className="inline-block text-primary"
+            data-testid={`${testId}-indicator`}
+            data-harper-section-indicator={open ? "open" : "collapsed"}
+          >
+            {open ? "▼" : "▶"}
+          </span>
+          {title}
+        </h3>
         <p
           className="mt-1 text-sm font-normal text-muted"
           data-testid={`${testId}-description`}

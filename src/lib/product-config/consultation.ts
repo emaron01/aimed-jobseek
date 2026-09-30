@@ -91,6 +91,8 @@ export const consultationConversationCopy = Object.freeze({
   seekerSpeaker: "You",
   yourAnswer: "Your answer",
   yourReply: "Your reply",
+  followUpReplyHint:
+    "To answer Harper's follow-up, open Your reply, add the details she's asking for, and save.",
   editAnswer: "Edit",
   saveAnswer: "Save",
   showYourReplies: "Show your replies",

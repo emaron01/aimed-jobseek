@@ -1971,6 +1971,7 @@ async function processAnswerGeneration(input: {
         where: {
           sessionId: input.sessionId,
           turnId: { in: [resultTurnId, ...supersedeTurnIds] },
+          status: "DRAFT",
           kind: "RESUME_BULLET",
         },
       }),
@@ -1981,6 +1982,7 @@ async function processAnswerGeneration(input: {
           where: {
             sessionId: input.sessionId,
             turnId: { in: supersedeTurnIds },
+            status: "DRAFT",
             kind: "INTERVIEW_ANSWER",
           },
         }),
@@ -2209,6 +2211,7 @@ async function processAnswerGeneration(input: {
         where: {
           sessionId: input.sessionId,
           turnId: { in: supersedeTurnIds },
+          status: "DRAFT",
           kind: { in: ["INTERVIEW_ANSWER", "RESUME_BULLET"] },
         },
       }),

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   consultationItemNeedsResultRepair,
+  isCompleteAnswerResult,
   isExactSeekerAnswer,
   isJoinedSeekerAnswers,
   isParaphrasedSeekerReply,
@@ -64,10 +65,28 @@ describe("Harper result quality", () => {
     expect(isParaphrasedSeekerReply(nearlyVerbatim, [seeker])).toBe(true);
     expect(isParaphrasedSeekerReply(polished, [seeker])).toBe(false);
     expect(isQuestionMetaCommentary(meta)).toBe(true);
+    // Meta / non-answer echoes stay rejected; complete polished coaching does not.
     expect(isRawSeekerResult(nearlyVerbatim, [seeker])).toBe(true);
     expect(isRawSeekerResult(meta, [seeker])).toBe(true);
     expect(isRawSeekerResult(polished, [seeker])).toBe(false);
     expect(isRawSeekerResult(harperInterview, [seeker])).toBe(false);
+  });
+
+  it("accepts a complete seeker answer as Harper's draft even when cleanup matches the reply", () => {
+    const complete =
+      "Enterprise demand generation works best when Marketing and Sales share a precise view of priority accounts. Across my career, most recently at Login VSI and OpenText, I built cross-functional partnerships with Marketing so both teams chased the same accounts and pipeline converted faster.";
+    const nearlyIdentical =
+      "Enterprise demand generation works best when Marketing and Sales share a precise view of priority accounts. Across my career, most recently at Login VSI and OpenText, I built cross-functional partnerships with Marketing so both teams chased the same accounts and pipeline converted faster";
+    expect(isCompleteAnswerResult(complete)).toBe(true);
+    expect(isRawSeekerResult(complete, [complete])).toBe(false);
+    expect(isRawSeekerResult(nearlyIdentical, [complete])).toBe(false);
+    expect(
+      isRawSeekerResult(
+        "Clarified that a company statement needed to be reframed as an interview question.",
+        [complete],
+      ),
+    ).toBe(true);
+    expect(isRawSeekerResult(fragment, [firstAnswer, secondAnswer])).toBe(true);
   });
 
   it("flags a question whose result is raw replies or a leftover fragment", () => {

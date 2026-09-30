@@ -127,6 +127,15 @@ function latestOfKind(
 ): QaStatement | null {
   const matches = statements.filter((statement) => statement.kind === kind);
   if (matches.length === 0) return null;
+  // APPROVED always wins — a later reply must never hide an approved answer.
+  const approved = matches.filter((statement) => statement.status === "APPROVED");
+  if (approved.length > 0) {
+    return (
+      [...approved]
+        .sort((left, right) => statementTime(left) - statementTime(right))
+        .at(-1) ?? null
+    );
+  }
   const preferred = preferredTurnId
     ? matches.filter((statement) => statement.turnId === preferredTurnId)
     : [];

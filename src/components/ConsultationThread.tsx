@@ -515,9 +515,17 @@ function QuestionCard({
       )}
       <div className="mt-3 space-y-3">
         {item.followUp && !item.ignored ? (
-          <p className={`text-sm text-ink ${wrapClass}`} data-testid="consultation-follow-up">
-            {stripInternalIdsFromDisplayText(item.followUp.text)}
-          </p>
+          <div className="space-y-2" data-testid="consultation-follow-up-block">
+            <p className={`text-sm text-ink ${wrapClass}`} data-testid="consultation-follow-up">
+              {stripInternalIdsFromDisplayText(item.followUp.text)}
+            </p>
+            <p
+              className="text-sm text-muted"
+              data-testid="consultation-follow-up-hint"
+            >
+              {consultationConversationCopy.followUpReplyHint}
+            </p>
+          </div>
         ) : null}
         {!item.ignored ? (
           <SeekerRepliesSection
