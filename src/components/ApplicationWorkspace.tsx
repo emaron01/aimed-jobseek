@@ -23,6 +23,11 @@ import {
 } from "@/lib/application/workspace-links";
 import { listApplicationContacts } from "@/lib/application/contacts";
 import { isHiringTeamPersonaBuilt } from "@/lib/hiring-team/build";
+import {
+  APPROVED_PERSONA_DETAILS_CLASS,
+  hiringTeamPersonaIsApproved,
+  NEEDS_REVIEW_PERSONA_DETAILS_CLASS,
+} from "@/lib/hiring-team/review-group";
 import { profileJsonAwaitingSeekerInput } from "@/lib/hiring-team/synthesize-outcome";
 import { AppPendingIndicator } from "@/components/AppButton";
 import { getApplicationResearchStatus } from "@/lib/application/research-status";
@@ -63,6 +68,7 @@ import {
 } from "@/components/ApplicationOutreachSections";
 import { isOutreachAssetType } from "@/lib/product-config";
 import { HiringTeamDisclosureGroup } from "@/components/HiringTeamDisclosureGroup";
+import { HiringTeamReviewGroup } from "@/components/HiringTeamReviewGroup";
 import { HiringTeamPersonPicker } from "@/components/HiringTeamPersonPicker";
 import { HiringTeamRoleActions } from "@/components/HiringTeamRoleActions";
 import {
@@ -1019,8 +1025,12 @@ function hiringTeamStatusChip(input: {
     return { kind: "text", text: hiringTeamConfig.status.stale };
   }
   if (
-    input.approvalStatus === "APPROVED" &&
-    isHiringTeamPersonaBuilt({ profileJson: input.profileJson })
+    hiringTeamPersonaIsApproved({
+      approvalStatus: input.approvalStatus,
+      staleAt: input.staleAt,
+      profileJson: input.profileJson,
+      building: input.building,
+    })
   ) {
     return { kind: "text", text: hiringTeamConfig.status.approved };
   }
@@ -1078,6 +1088,29 @@ async function HiringTeamSection({
   const indirectRoles = organizedRoles.filter(
     ({ narrative }) => narrative?.involvement === "INDIRECT",
   );
+  function roleIsBuilding(role: (typeof roles)[number]) {
+    return (
+      role.setupStatus === "SYNTHESIZING" ||
+      jobs.some(
+        (job) =>
+          job.type === "HIRING_TEAM_BUILD" &&
+          job.targetId === role.id &&
+          (job.status === "PENDING" || job.status === "IN_PROGRESS"),
+      )
+    );
+  }
+  function roleIsApproved(item: (typeof organizedRoles)[number]) {
+    return hiringTeamPersonaIsApproved({
+      approvalStatus: item.role.approvalStatus,
+      staleAt: item.role.staleAt,
+      profileJson: item.role.profileJson,
+      building: roleIsBuilding(item.role),
+    });
+  }
+  const approvedDirect = directRoles.filter(roleIsApproved);
+  const reviewDirect = directRoles.filter((item) => !roleIsApproved(item));
+  const approvedIndirect = indirectRoles.filter(roleIsApproved);
+  const reviewIndirect = indirectRoles.filter((item) => !roleIsApproved(item));
 
   const roleCard = ({
     role,
@@ -1099,6 +1132,12 @@ async function HiringTeamSection({
       building,
     });
     const roleBuilt = isHiringTeamPersonaBuilt(role);
+    const approvedPersona = hiringTeamPersonaIsApproved({
+      approvalStatus: role.approvalStatus,
+      staleAt: role.staleAt,
+      profileJson: role.profileJson,
+      building,
+    });
     return (
     <div
       key={role.id}
@@ -1260,7 +1299,15 @@ async function HiringTeamSection({
           </ApplicationActionForm>
         ) : null}
       </div>
-      <details className="mt-4 border-t border-edge pt-4">
+      <details
+        className={
+          approvedPersona
+            ? APPROVED_PERSONA_DETAILS_CLASS
+            : NEEDS_REVIEW_PERSONA_DETAILS_CLASS
+        }
+        data-testid={`hiring-team-details-${role.id}`}
+        data-persona-review={approvedPersona ? "approved" : "needs-review"}
+      >
       <summary className="cursor-pointer text-sm font-medium text-ink">
         {hiringTeamDetailsTitle(role.name)}
       </summary>
@@ -1394,24 +1441,52 @@ async function HiringTeamSection({
         <p className="text-sm text-muted">No {vocab.persona.plural} yet.</p>
       ) : (
         <div className="space-y-5">
-          <HiringTeamDisclosureGroup
-            groupKey="direct"
-            title={hiringTeamConfig.sections.direct}
+          <HiringTeamReviewGroup
+            title={hiringTeamConfig.status.approved}
+            testId="hiring-team-group-approved"
           >
-            {directRoles.map(roleCard)}
-          </HiringTeamDisclosureGroup>
-          <HiringTeamDisclosureGroup
-            groupKey="indirect"
-            title={hiringTeamConfig.sections.indirect}
+            {approvedDirect.length > 0 ? (
+              <HiringTeamDisclosureGroup
+                groupKey="direct"
+                title={hiringTeamConfig.sections.direct}
+              >
+                {approvedDirect.map(roleCard)}
+              </HiringTeamDisclosureGroup>
+            ) : null}
+            {approvedIndirect.length > 0 ? (
+              <HiringTeamDisclosureGroup
+                groupKey="indirect"
+                title={hiringTeamConfig.sections.indirect}
+              >
+                {approvedIndirect.map(roleCard)}
+              </HiringTeamDisclosureGroup>
+            ) : null}
+          </HiringTeamReviewGroup>
+          <HiringTeamReviewGroup
+            title={hiringTeamConfig.needsReviewGroup}
+            testId="hiring-team-group-needs-review"
           >
-            {indirectRoles.length > 0 ? (
-              indirectRoles.map(roleCard)
-            ) : (
-              <p className="text-sm text-subtle">
-                No indirect {vocab.persona.plural.toLowerCase()}.
-              </p>
-            )}
-          </HiringTeamDisclosureGroup>
+            {reviewDirect.length > 0 ? (
+              <HiringTeamDisclosureGroup
+                groupKey="direct"
+                title={hiringTeamConfig.sections.direct}
+              >
+                {reviewDirect.map(roleCard)}
+              </HiringTeamDisclosureGroup>
+            ) : null}
+            <HiringTeamDisclosureGroup
+              groupKey="indirect"
+              title={hiringTeamConfig.sections.indirect}
+            >
+              {reviewIndirect.length > 0 ? (
+                reviewIndirect.map(roleCard)
+              ) : indirectRoles.length === 0 ? (
+                <p className="text-sm text-subtle">
+                  No indirect {vocab.persona.plural.toLowerCase()}.
+                </p>
+              ) : null}
+            </HiringTeamDisclosureGroup>
+          </HiringTeamReviewGroup>
         </div>
       )}
       {canEdit ? (

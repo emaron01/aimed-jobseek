@@ -35,6 +35,7 @@ export const hiringTeamConfig = {
   },
   addPersonTitle: "Add a Person",
   detailsLabel: "Details",
+  needsReviewGroup: "Needs review",
   assumptionIntro: `${consultationConfig.displayName} guessed these ${vocab.persona.plural} from the job posting and company research. They are assumptions. Confirm or correct them.`,
   addPersonNote:
     "When you know who will be interviewing you for this role, add them to their Hiring Team role.",

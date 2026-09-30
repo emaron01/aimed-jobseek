@@ -74,6 +74,16 @@ export async function listInterviewStages(input: {
   });
 }
 
+export type StageSetupNewInterviewer = {
+  firstName: string;
+  lastName: string;
+  title: string;
+  email?: string | null;
+  linkedinUrl?: string | null;
+  linkedInProfileText?: string | null;
+  personaId?: string | null;
+};
+
 export async function createInterviewStage(input: {
   organizationId: string;
   campaignId: string;
@@ -83,6 +93,8 @@ export async function createInterviewStage(input: {
   format: string;
   notesBefore?: string | null;
   expectedDecisionAt?: Date | null;
+  interviewerContactIds?: string[];
+  newInterviewers?: StageSetupNewInterviewer[];
 }) {
   if (!isInterviewStageType(input.type)) {
     throw new TenantError("Interview stage type is invalid.");
@@ -122,6 +134,19 @@ export async function createInterviewStage(input: {
       where: { id: campaign.id },
       data: { applicationProgress: "INTERVIEWING" },
     });
+  }
+  try {
+    await assignInterviewersDuringStageSetup({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      userId: input.userId,
+      stageId: stage.id,
+      interviewerContactIds: input.interviewerContactIds ?? [],
+      newInterviewers: input.newInterviewers ?? [],
+    });
+  } catch (error) {
+    await prisma.interviewStage.delete({ where: { id: stage.id } });
+    throw error;
   }
   return stage;
 }
@@ -252,17 +277,11 @@ async function requireStage(input: {
   return stage;
 }
 
-async function replaceStageInterviewer(input: {
+async function attachStageInterviewer(input: {
   organizationId: string;
   stageId: string;
   contactId: string;
 }) {
-  await prisma.interviewStageInterviewer.deleteMany({
-    where: {
-      stageId: input.stageId,
-      contactId: { not: input.contactId },
-    },
-  });
   await prisma.interviewStageInterviewer.upsert({
     where: {
       stageId_contactId: {
@@ -279,6 +298,20 @@ async function replaceStageInterviewer(input: {
   });
 }
 
+async function replaceStageInterviewer(input: {
+  organizationId: string;
+  stageId: string;
+  contactId: string;
+}) {
+  await prisma.interviewStageInterviewer.deleteMany({
+    where: {
+      stageId: input.stageId,
+      contactId: { not: input.contactId },
+    },
+  });
+  await attachStageInterviewer(input);
+}
+
 export { enqueueInterviewerCheatSheetSection } from "@/lib/application-summary/enqueue";
 
 export async function assignExistingInterviewStageInterviewer(input: {
@@ -288,6 +321,8 @@ export async function assignExistingInterviewStageInterviewer(input: {
   stageId: string;
   contactId: string;
   personaId?: string | null;
+  /** Setup can assign several people. The saved-stage control still replaces. */
+  keepOtherInterviewers?: boolean;
 }) {
   await requireOwnedCampaign(input);
   const stage = await requireStage(input);
@@ -315,12 +350,71 @@ export async function assignExistingInterviewStageInterviewer(input: {
     });
   }
   // Assign-only (Batch B3): prep / cheat-sheet / profile / persona build start on Harper.
-  await replaceStageInterviewer({
-    organizationId: input.organizationId,
-    stageId: stage.id,
-    contactId: input.contactId,
-  });
+  if (input.keepOtherInterviewers) {
+    await attachStageInterviewer({
+      organizationId: input.organizationId,
+      stageId: stage.id,
+      contactId: input.contactId,
+    });
+  } else {
+    await replaceStageInterviewer({
+      organizationId: input.organizationId,
+      stageId: stage.id,
+      contactId: input.contactId,
+    });
+  }
   return { contactId: input.contactId, personaId };
+}
+
+/**
+ * Optional interviewers chosen on the create-stage form. Assignment only:
+ * no interviewer prep, no cheat-sheet enqueue, no profile job.
+ */
+export async function assignInterviewersDuringStageSetup(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  stageId: string;
+  interviewerContactIds: string[];
+  newInterviewers: StageSetupNewInterviewer[];
+}) {
+  const contactIds: string[] = [];
+  for (const contactId of input.interviewerContactIds) {
+    const id = contactId.trim();
+    if (id && !contactIds.includes(id)) contactIds.push(id);
+  }
+  for (const person of input.newInterviewers) {
+    const added = await addApplicationContact({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      userId: input.userId,
+      firstName: person.firstName,
+      lastName: person.lastName,
+      title: person.title,
+      email: person.email,
+      linkedinUrl: person.linkedinUrl,
+      personaId: person.personaId,
+      confirmRole: true,
+    });
+    const pasted = person.linkedInProfileText?.trim() || "";
+    if (pasted) {
+      await prisma.campaignContact.update({
+        where: { id: added.campaignContactId },
+        data: { linkedInProfileText: pasted },
+      });
+    }
+    if (!contactIds.includes(added.contactId)) contactIds.push(added.contactId);
+  }
+  for (const contactId of contactIds) {
+    await assignExistingInterviewStageInterviewer({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      userId: input.userId,
+      stageId: input.stageId,
+      contactId,
+      keepOtherInterviewers: true,
+    });
+  }
 }
 
 export async function addInterviewStageInterviewer(input: {

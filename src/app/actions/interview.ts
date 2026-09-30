@@ -11,6 +11,7 @@ import {
   createInterviewStage,
   startPersonPrepForContact,
   updateInterviewStage,
+  type StageSetupNewInterviewer,
 } from "@/lib/interview/stages";
 import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
@@ -42,6 +43,63 @@ function parseOptionalDate(value: string): Date | null {
   return parseDateTime(raw);
 }
 
+function readStageSetupInterviewers(formData: FormData): {
+  interviewerContactIds: string[];
+  newInterviewers: StageSetupNewInterviewer[];
+} {
+  const interviewerContactIds = formData
+    .getAll("contactId")
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+  const firstNames = formData.getAll("newInterviewerFirstName").map((value) => String(value));
+  const lastNames = formData.getAll("newInterviewerLastName").map((value) => String(value));
+  const titles = formData.getAll("newInterviewerTitle").map((value) => String(value));
+  const emails = formData.getAll("newInterviewerEmail").map((value) => String(value));
+  const linkedins = formData.getAll("newInterviewerLinkedinUrl").map((value) => String(value));
+  const pastes = formData.getAll("newInterviewerProfileText").map((value) => String(value));
+  const personas = formData.getAll("newInterviewerPersonaId").map((value) => String(value));
+  const count = Math.max(
+    firstNames.length,
+    lastNames.length,
+    titles.length,
+    emails.length,
+    linkedins.length,
+    pastes.length,
+    personas.length,
+  );
+  const newInterviewers: StageSetupNewInterviewer[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const firstName = (firstNames[index] ?? "").trim();
+    const lastName = (lastNames[index] ?? "").trim();
+    const title = (titles[index] ?? "").trim();
+    const email = (emails[index] ?? "").trim();
+    const linkedinUrl = (linkedins[index] ?? "").trim();
+    const linkedInProfileText = (pastes[index] ?? "").trim();
+    const personaId = (personas[index] ?? "").trim();
+    if (
+      !firstName &&
+      !lastName &&
+      !title &&
+      !email &&
+      !linkedinUrl &&
+      !linkedInProfileText &&
+      !personaId
+    ) {
+      continue;
+    }
+    newInterviewers.push({
+      firstName,
+      lastName,
+      title,
+      email: email || null,
+      linkedinUrl: linkedinUrl || null,
+      linkedInProfileText: linkedInProfileText || null,
+      personaId: personaId || null,
+    });
+  }
+  return { interviewerContactIds, newInterviewers };
+}
+
 function revalidate(campaign: string, stageId?: string) {
   revalidatePath(`/campaigns/${campaign}`);
   revalidatePath(`/campaigns/${campaign}/consultation`);
@@ -71,6 +129,7 @@ export async function createInterviewStageAction(
       requireOrganizationId(),
     ]);
     const id = campaignId(formData);
+    const setupInterviewers = readStageSetupInterviewers(formData);
     await createInterviewStage({
       organizationId,
       campaignId: id,
@@ -82,6 +141,8 @@ export async function createInterviewStageAction(
       expectedDecisionAt: parseOptionalDate(
         String(formData.get("expectedDecisionAt") ?? ""),
       ),
+      interviewerContactIds: setupInterviewers.interviewerContactIds,
+      newInterviewers: setupInterviewers.newInterviewers,
     });
     revalidate(id);
     return { ok: true, message: "Interview stage added." };

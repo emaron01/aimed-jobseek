@@ -82,6 +82,7 @@ export default async function InterviewStagePage({ params }: PageProps) {
         canEdit={canEdit}
         stageId={stage.id}
         interviewerContactId={interviewer?.contactId ?? null}
+        interviewerContactIds={stage.interviewers.map((row) => row.contactId)}
         people={memberships.map((row) => ({
           contactId: row.contactId,
           name:

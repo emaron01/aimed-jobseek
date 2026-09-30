@@ -3,12 +3,12 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
 import { AppButton } from "@/components/AppButton";
+import { CheatSheetCollapseProvider } from "@/components/CheatSheetCollapsible";
 import { PrintApplicationSummaryButton } from "@/components/PrintApplicationSummaryButton";
 import {
   cheatSheetPrintSectionId,
@@ -69,24 +69,6 @@ export function CheatSheetFilterProvider({
   const [selectedKey, setSelectedKey] = useState<string | null>(
     initialOption ? initialOption.sectionKey : null,
   );
-  useEffect(() => {
-    if (!initialKey) return;
-    const hash = window.location.hash.replace(/^#/, "");
-    if (!hash) return;
-    const id = decodeURIComponent(hash);
-    let attempts = 0;
-    const find = () => {
-      const target = document.getElementById(id);
-      if (target) {
-        target.scrollIntoView({ block: "start" });
-        return;
-      }
-      attempts += 1;
-      if (attempts > 20) return;
-      window.setTimeout(find, 50);
-    };
-    find();
-  }, [initialKey]);
   const value = useMemo<FilterState>(
     () => ({
       query,
@@ -113,7 +95,7 @@ export function CheatSheetFilterProvider({
   );
   return (
     <CheatSheetFilterContext.Provider value={value}>
-      {children}
+      <CheatSheetCollapseProvider>{children}</CheatSheetCollapseProvider>
     </CheatSheetFilterContext.Provider>
   );
 }

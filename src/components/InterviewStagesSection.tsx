@@ -4,7 +4,10 @@ import {
   updateInterviewStageAction,
 } from "@/app/actions/interview";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
-import { InterviewStagePanel } from "@/components/InterviewStagePanel";
+import {
+  InterviewStagePanel,
+  InterviewStageSetupInterviewers,
+} from "@/components/InterviewStagePanel";
 import { listApplicationContacts } from "@/lib/application/contacts";
 import {
   listInterviewStages,
@@ -111,6 +114,7 @@ export async function InterviewStagesSection({
               {interviewConfig.labels.notesBefore}
               <textarea name="notesBefore" rows={2} className={fieldClass} />
             </label>
+            <InterviewStageSetupInterviewers people={people} roles={roles} />
           </div>
         </ApplicationActionForm>
       ) : null}
@@ -159,6 +163,7 @@ export async function InterviewStagesSection({
                   canEdit={canEdit}
                   stageId={stage.id}
                   interviewerContactId={interviewer?.contactId ?? null}
+                  interviewerContactIds={stage.interviewers.map((row) => row.contactId)}
                   people={people}
                   roles={roles}
                 />

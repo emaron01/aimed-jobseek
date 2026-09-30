@@ -3,6 +3,7 @@ import {
   generateApplicationSummaryAction,
 } from "@/app/actions/application-summary";
 import { AdditionalInterviewPrepQa } from "@/components/AdditionalInterviewPrepQa";
+import { CheatSheetSubsection } from "@/components/CheatSheetCollapsible";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { CheatSheetCoachItems } from "@/components/CheatSheetCoachItems";
 import { statedListItems } from "@/lib/application-summary/display";
@@ -13,6 +14,7 @@ import type { CheatSheetNote } from "@/lib/application-summary/notes";
 import type { CheatSheetPersonSection } from "@/lib/application-summary/contract";
 import type { AdditionalPrepQaEntry } from "@/lib/consultation/additional-prep-qa";
 import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
+import { ADDITIONAL_INTERVIEW_PREP_QA_HEADING } from "@/lib/consultation/additional-prep-qa";
 import {
   applicationSummaryConfig,
   consultationConversationCopy,
@@ -40,28 +42,32 @@ function TextList({ items }: { items: readonly string[] }) {
 
 function NotesFromInterviewsSection({
   personName,
+  sectionKey,
   entries,
 }: {
   personName: string;
+  sectionKey: string;
   entries: NotesFromInterviewEntry[];
 }) {
   if (entries.length === 0) return null;
   return (
-    <div data-testid="notes-from-interviews-with">
-      <h3 className="font-medium text-ink">
-        {notesFromInterviewsWithHeading(personName)}
-      </h3>
-      <ul className="mt-2 space-y-3 text-sm text-ink">
-        {entries.map((entry) => (
-          <li key={entry.id} data-testid={`interview-note-${entry.id}`}>
-            <p className="text-xs font-medium uppercase tracking-wide text-subtle">
-              {entry.interviewLabel} · {entry.kindLabel}
-            </p>
-            <p className="mt-1 whitespace-pre-wrap">{entry.text}</p>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <CheatSheetSubsection
+      id={`${sectionKey}-notes`}
+      title={notesFromInterviewsWithHeading(personName)}
+    >
+      <div data-testid="notes-from-interviews-with">
+        <ul className="space-y-3 text-sm text-ink">
+          {entries.map((entry) => (
+            <li key={entry.id} data-testid={`interview-note-${entry.id}`}>
+              <p className="text-xs font-medium uppercase tracking-wide text-subtle">
+                {entry.interviewLabel} · {entry.kindLabel}
+              </p>
+              <p className="mt-1 whitespace-pre-wrap">{entry.text}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </CheatSheetSubsection>
   );
 }
 
@@ -113,16 +119,30 @@ export function CheatSheetPersonBody({
   const notesBlock = useInterviewNotesSection ? (
     <NotesFromInterviewsSection
       personName={interviewNotesPersonName ?? ""}
+      sectionKey={sectionKey}
       entries={interviewNotes}
     />
   ) : notes.length > 0 ? (
-    <div>
-      <h3 className="font-medium text-ink">
-        {applicationSummaryConfig.sections.gainedInformation}
-      </h3>
+    <CheatSheetSubsection
+      id={`${sectionKey}-notes`}
+      title={applicationSummaryConfig.sections.gainedInformation}
+    >
       <TextList items={notes.map((note) => note.text)} />
-    </div>
+    </CheatSheetSubsection>
   ) : null;
+  const additionalPrepBlock =
+    additionalPrepEntries.length > 0 ? (
+      <CheatSheetSubsection
+        id={`${sectionKey}-additional-prep`}
+        title={ADDITIONAL_INTERVIEW_PREP_QA_HEADING}
+      >
+        <AdditionalInterviewPrepQa
+          campaignId={campaignId}
+          entries={additionalPrepEntries}
+          showHeading={false}
+        />
+      </CheatSheetSubsection>
+    ) : null;
 
   if (!personaBuilt) {
     return (
@@ -140,10 +160,7 @@ export function CheatSheetPersonBody({
           </ApplicationActionForm>
         ) : null}
         {notesBlock}
-        <AdditionalInterviewPrepQa
-          campaignId={campaignId}
-          entries={additionalPrepEntries}
-        />
+        {additionalPrepBlock}
       </div>
     );
   }
@@ -163,10 +180,7 @@ export function CheatSheetPersonBody({
           </ApplicationActionForm>
         ) : null}
         {notesBlock}
-        <AdditionalInterviewPrepQa
-          campaignId={campaignId}
-          entries={additionalPrepEntries}
-        />
+        {additionalPrepBlock}
       </div>
     );
   }
@@ -175,8 +189,10 @@ export function CheatSheetPersonBody({
     <div className="space-y-4">
       <CoachingDisclaimer />
       {notesBlock}
-      <div>
-        <h3 className="font-medium text-ink">{applicationSummaryConfig.sections.caresAbout}</h3>
+      <CheatSheetSubsection
+        id={`${sectionKey}-cares-about`}
+        title={applicationSummaryConfig.sections.caresAbout}
+      >
         <ul className="list-disc space-y-3 pl-5 text-sm text-ink">
           {section.caresAbout.map((item, index) => (
             <li key={`${index}:${item.text}`}>
@@ -192,23 +208,23 @@ export function CheatSheetPersonBody({
             </li>
           ))}
         </ul>
-      </div>
-      <div>
-        <h3 className="font-medium text-ink">
-          {applicationSummaryConfig.sections.positioningStatements}
-        </h3>
+      </CheatSheetSubsection>
+      <CheatSheetSubsection
+        id={`${sectionKey}-positioning`}
+        title={applicationSummaryConfig.sections.positioningStatements}
+      >
         <TextList items={section.positioningStatements.map((item) => item.text)} />
-      </div>
-      <div>
-        <h3 className="font-medium text-ink">
-          {applicationSummaryConfig.sections.keyStatements}
-        </h3>
+      </CheatSheetSubsection>
+      <CheatSheetSubsection
+        id={`${sectionKey}-key-statements`}
+        title={applicationSummaryConfig.sections.keyStatements}
+      >
         <TextList items={section.keyStatements.map((item) => item.text)} />
-      </div>
-      <div id={cheatSheetLikelyQuestionsElementId(sectionKey)}>
-        <h3 className="font-medium text-ink">
-          {applicationSummaryConfig.sections.likelyQuestions}
-        </h3>
+      </CheatSheetSubsection>
+      <CheatSheetSubsection
+        id={cheatSheetLikelyQuestionsElementId(sectionKey)}
+        title={applicationSummaryConfig.sections.likelyQuestions}
+      >
         <CheatSheetCoachItems
           campaignId={campaignId}
           canEdit={canEdit && showCoachAnswerForms}
@@ -218,11 +234,11 @@ export function CheatSheetPersonBody({
           showReply={showReply}
           harperLinkContactId={harperLinkContactId}
         />
-      </div>
-      <div>
-        <h3 className="font-medium text-ink">
-          {applicationSummaryConfig.sections.questionsToAsk}
-        </h3>
+      </CheatSheetSubsection>
+      <CheatSheetSubsection
+        id={`${sectionKey}-questions-to-ask`}
+        title={applicationSummaryConfig.sections.questionsToAsk}
+      >
         <ul className="list-disc space-y-3 pl-5 text-sm text-ink">
           {section.questionsToAsk.map((item, index) => (
             <li key={`${index}:${item.text}`}>
@@ -242,11 +258,8 @@ export function CheatSheetPersonBody({
             </li>
           ))}
         </ul>
-      </div>
-      <AdditionalInterviewPrepQa
-        campaignId={campaignId}
-        entries={additionalPrepEntries}
-      />
+      </CheatSheetSubsection>
+      {additionalPrepBlock}
     </div>
   );
 }

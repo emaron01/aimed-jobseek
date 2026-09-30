@@ -77,6 +77,8 @@ export const consultationConversationCopy = Object.freeze({
   collapseEvidence: "Collapse evidence",
   expandAllEvidence: "Expand all",
   collapseAllEvidence: "Collapse all",
+  expandAllApproved: "Expand all approved",
+  collapseAllApproved: "Collapse all approved",
   showApprovedAnswer: "Show approved answer",
   hideApprovedAnswer: "Hide approved answer",
   shareSomeDetails: "Save Answer",

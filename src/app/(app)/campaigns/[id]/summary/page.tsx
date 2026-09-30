@@ -7,6 +7,7 @@ import {
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
 import { AppActionLink } from "@/components/AppButton";
+import { CheatSheetSection } from "@/components/CheatSheetCollapsible";
 import { CheatSheetPersonBody } from "@/components/CheatSheetPersonBody";
 import {
   CheatSheetFilterProvider,
@@ -15,7 +16,6 @@ import {
   CheatSheetPrintButton,
   CheatSheetSharedSection,
 } from "@/components/CheatSheetPeopleFilter";
-import { PrintApplicationSummaryButton } from "@/components/PrintApplicationSummaryButton";
 import { PageHeader, TenantMissing } from "@/components/ui";
 import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-status";
 import { loadCheatSheetCoachQaByContact } from "@/lib/application-summary/coach-qa";
@@ -78,30 +78,6 @@ function TextList({ items }: { items: readonly string[] }) {
         <li key={`${index}:${item}`}>{item}</li>
       ))}
     </ul>
-  );
-}
-
-function SummarySection({
-  id,
-  title,
-  children,
-}: {
-  id: string;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section
-      id={id}
-      data-print-id={id}
-      className="application-summary-section break-inside-avoid rounded-lg border border-edge bg-surface p-6"
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <h2 className="text-xl font-semibold text-ink">{title}</h2>
-        <PrintApplicationSummaryButton sectionId={id} />
-      </div>
-      <div className="mt-4 space-y-4">{children}</div>
-    </section>
   );
 }
 
@@ -225,7 +201,7 @@ export default async function ApplicationSummaryPage({
       </div>
 
       <CheatSheetSharedSection>
-      <SummarySection id="overview" title={applicationSummaryConfig.sections.overview}>
+      <CheatSheetSection id="overview" title={applicationSummaryConfig.sections.overview}>
         {!guidance?.overview ? (
           <p className="text-sm text-muted">
             {summaryStatus === "FAILED"
@@ -256,7 +232,7 @@ export default async function ApplicationSummaryPage({
             </div>
           </>
         )}
-      </SummarySection>
+      </CheatSheetSection>
       </CheatSheetSharedSection>
 
       {view.people.map((person) => {
@@ -288,7 +264,7 @@ export default async function ApplicationSummaryPage({
             : [];
         return (
           <CheatSheetPersonSection key={person.sectionKey} sectionKey={person.sectionKey}>
-          <SummarySection id={person.sectionKey} title={person.heading}>
+          <CheatSheetSection id={person.sectionKey} title={person.heading}>
             <CheatSheetPersonBody
               campaignId={id}
               canEdit={canGenerate}
@@ -304,13 +280,13 @@ export default async function ApplicationSummaryPage({
               interviewNotesPersonName={person.contactId ? person.heading : null}
               additionalPrepEntries={additionalPrepEntries}
             />
-          </SummarySection>
+          </CheatSheetSection>
           </CheatSheetPersonSection>
         );
       })}
 
       <CheatSheetSharedSection>
-      <SummarySection id="company" title={applicationSummaryConfig.sections.company}>
+      <CheatSheetSection id="company" title={applicationSummaryConfig.sections.company}>
         <div>
           <h3 className="font-medium text-ink">What they do</h3>
           <p className="mt-1 whitespace-pre-wrap text-sm text-ink">
@@ -324,9 +300,9 @@ export default async function ApplicationSummaryPage({
         {statedListItems(lines(view.research?.hiringSignals)).length > 0 ? (
           <TextList items={lines(view.research?.hiringSignals)} />
         ) : null}
-      </SummarySection>
+      </CheatSheetSection>
 
-      <SummarySection id="position" title={applicationSummaryConfig.sections.position}>
+      <CheatSheetSection id="position" title={applicationSummaryConfig.sections.position}>
         <dl className="grid gap-4 sm:grid-cols-2">
           {[
             ["Title", view.requirement.title],
@@ -351,9 +327,9 @@ export default async function ApplicationSummaryPage({
           <h3 className="font-medium text-ink">Key outcomes</h3>
           <TextList items={requirementScorecard.outcomes.map((item) => item.text)} />
         </div>
-      </SummarySection>
+      </CheatSheetSection>
 
-      <SummarySection id="stages" title={applicationSummaryConfig.sections.interviewStages}>
+      <CheatSheetSection id="stages" title={applicationSummaryConfig.sections.interviewStages}>
         {view.stages.length === 0 ? (
           <p className="text-sm text-subtle">No interview stages yet.</p>
         ) : (
@@ -378,7 +354,7 @@ export default async function ApplicationSummaryPage({
             })()}
           </>
         )}
-      </SummarySection>
+      </CheatSheetSection>
       </CheatSheetSharedSection>
     </main>
     </CheatSheetFilterProvider>

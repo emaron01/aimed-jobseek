@@ -106,12 +106,17 @@ body {
     line-height: 1.45;
   }
 
-  .application-summary button,
+  .application-summary button:not(.cheat-sheet-collapsible-heading),
   .application-summary form,
   nav,
   header,
   [data-print-hide] {
     display: none !important;
+  }
+
+  .application-summary .cheat-sheet-collapsible-body,
+  .application-summary button.cheat-sheet-collapsible-heading {
+    display: block !important;
   }
 
   .application-summary-section {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import {
   addApplicationContactAction,
   buildOutreachPersonaThenGenerateAction,
@@ -1170,6 +1170,9 @@ function OutreachMessageCard({
   const contact =
     contacts.find((row) => row.contactId === asset.contactId) ?? null;
   const [copied, setCopied] = useState<string | null>(null);
+  const [askSent, setAskSent] = useState(false);
+  const sentFormRef = useRef<HTMLFormElement>(null);
+  const sentDateRef = useRef<HTMLInputElement>(null);
   const handoff = composed
     ? outreachEmailHandoff({
         to: contact?.email ?? "",
@@ -1180,10 +1183,22 @@ function OutreachMessageCard({
   const regenerateKind: OutreachGeneratorKind =
     asset.purpose === "THANK_YOU" ? "INTERVIEW_THANK_YOU" : asset.type;
 
+  function promptIfUnsent() {
+    if (asset.sentAt) return;
+    setAskSent(true);
+  }
+
+  function openEmailOption(href: string | null | undefined) {
+    if (!href) return;
+    openEmailClientHref(href);
+    promptIfUnsent();
+  }
+
   async function copy(label: string, value: string) {
     try {
       await navigator.clipboard.writeText(value);
       setCopied(label);
+      promptIfUnsent();
     } catch (error) {
       setCopied(null);
       console.error(
@@ -1193,6 +1208,13 @@ function OutreachMessageCard({
         }),
       );
     }
+  }
+
+  function confirmSentToday() {
+    if (sentDateRef.current) {
+      sentDateRef.current.value = todayInputValue();
+    }
+    sentFormRef.current?.requestSubmit();
   }
 
   return (
@@ -1227,26 +1249,21 @@ function OutreachMessageCard({
           <AppButton
             type="button"
             variant="secondary"
-            onClick={() =>
-              handoff.outlookWeb.href &&
-              openEmailClientHref(handoff.outlookWeb.href)
-            }
+            onClick={() => openEmailOption(handoff.outlookWeb.href)}
           >
             {outreachConfig.labels.openOutlookWeb}
           </AppButton>
           <AppButton
             type="button"
             variant="secondary"
-            onClick={() => openEmailClientHref(handoff.outlookDesktop.href)}
+            onClick={() => openEmailOption(handoff.outlookDesktop.href)}
           >
             {outreachConfig.labels.openOutlookDesktop}
           </AppButton>
           <AppButton
             type="button"
             variant="secondary"
-            onClick={() =>
-              handoff.gmailWeb.href && openEmailClientHref(handoff.gmailWeb.href)
-            }
+            onClick={() => openEmailOption(handoff.gmailWeb.href)}
           >
             {outreachConfig.labels.openGmail}
           </AppButton>
@@ -1329,12 +1346,18 @@ function OutreachMessageCard({
         </form>
       ) : null}
       {canEdit && !asset.sentAt ? (
-        <form action={sentAction} className="flex flex-wrap items-end gap-2">
+        <form
+          ref={sentFormRef}
+          action={sentAction}
+          className="flex flex-wrap items-end gap-2"
+          data-testid={`outreach-mark-sent-${asset.id}`}
+        >
           <input type="hidden" name="campaignId" value={campaignId} />
           <input type="hidden" name="assetId" value={asset.id} />
           <label className="text-sm">
             <span className="font-medium text-ink">Sent date</span>
             <input
+              ref={sentDateRef}
               type="date"
               name="sentAt"
               defaultValue={todayInputValue()}
@@ -1343,6 +1366,35 @@ function OutreachMessageCard({
           </label>
           <SubmitButton>{outreachConfig.labels.markSent}</SubmitButton>
         </form>
+      ) : null}
+      {canEdit && askSent && !asset.sentAt ? (
+        <div
+          role="dialog"
+          aria-labelledby={`did-you-send-title-${asset.id}`}
+          className="space-y-2 rounded-md border border-edge bg-canvas p-3"
+          data-testid={`did-you-send-${asset.id}`}
+        >
+          <p id={`did-you-send-title-${asset.id}`} className="text-sm font-medium text-ink">
+            {outreachConfig.labels.didYouSendPrompt}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <AppButton
+              type="button"
+              data-testid={`did-you-send-yes-${asset.id}`}
+              onClick={confirmSentToday}
+            >
+              {outreachConfig.labels.didYouSendYes}
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="secondary"
+              data-testid={`did-you-send-not-yet-${asset.id}`}
+              onClick={() => setAskSent(false)}
+            >
+              {outreachConfig.labels.didYouSendNotYet}
+            </AppButton>
+          </div>
+        </div>
       ) : null}
     </article>
   );

@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import {
+  APPROVED_STATUS_BADGE_CLASS,
+  collapsedApprovedQuestionLabel,
+} from "@/lib/consultation/approved-collapse";
+import {
   approveConsultationQaResultAction,
   editConsultationAnswerAction,
   regenerateConsultationQaResultAction,
@@ -55,8 +59,13 @@ export function ResultActions({
   const draft = statements.filter((statement) => statement.status !== "APPROVED");
   if (draft.length === 0) {
     return (
-      <p className="mt-3 text-sm text-success" data-testid={`${testId}-approved`}>
-        {consultationStatementLabels.APPROVED}
+      <p className="mt-3" data-testid={`${testId}-approved`}>
+        <span
+          className={APPROVED_STATUS_BADGE_CLASS}
+          data-testid={`${testId}-approved-badge`}
+        >
+          {consultationStatementLabels.APPROVED}
+        </span>
       </p>
     );
   }
@@ -99,20 +108,24 @@ export function ResultActions({
 }
 
 function ResultBody({ statement }: { statement: QaStatement }) {
-  const statusLabel =
-    statement.status === "APPROVED"
-      ? consultationStatementLabels.APPROVED
-      : statement.status === "DRAFT"
-        ? consultationStatementLabels.DRAFT
-        : null;
+  const draft = statement.status === "DRAFT";
   return (
     <div
       className="mt-3 min-w-0 space-y-1 overflow-hidden border-t border-edge pt-3"
       data-testid={`consultation-statement-${statement.kind}`}
     >
-      <p className="text-xs font-medium uppercase tracking-wide text-subtle">
-        {consultationStatementLabels[statement.kind]}
-        {statusLabel ? ` · ${statusLabel}` : ""}
+      <p className="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-subtle">
+        <span>{consultationStatementLabels[statement.kind]}</span>
+        {statement.status === "APPROVED" ? (
+          <span
+            className={APPROVED_STATUS_BADGE_CLASS}
+            data-testid="consultation-approved-badge-expanded"
+          >
+            {consultationStatementLabels.APPROVED}
+          </span>
+        ) : draft ? (
+          <span>{` · ${consultationStatementLabels.DRAFT}`}</span>
+        ) : null}
       </p>
       {statement.strengtheningNote ? (
         <p className={`text-sm text-ink ${wrapClass}`} data-testid="consultation-strengthening-note">
@@ -347,6 +360,8 @@ function QuestionCard({
   onSubmitStart,
   collapseWhenApproved = false,
   collapseWhenIgnored = false,
+  approvedExpanded = false,
+  onApprovedExpandedChange,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -359,17 +374,33 @@ function QuestionCard({
   collapseWhenApproved?: boolean;
   /** Section 2: ignored items start collapsed with the Ignored reopen link. */
   collapseWhenIgnored?: boolean;
+  /** Lifted with the page-level Collapse/Expand all approved control. */
+  approvedExpanded?: boolean;
+  onApprovedExpandedChange?: (questionTurnId: string, expanded: boolean) => void;
 }) {
   const hasResult = Boolean(item.resumeBullet || item.talkingPoint);
   const approved =
     item.talkingPoint?.status === "APPROVED" ||
     item.resumeBullet?.status === "APPROVED";
-  const [expanded, setExpanded] = useState(
+  const approvedControlled =
+    collapseWhenApproved &&
+    approved &&
+    !item.ignored &&
+    Boolean(onApprovedExpandedChange);
+  const [localExpanded, setLocalExpanded] = useState(
     !(
-      (collapseWhenApproved && approved && !item.ignored) ||
+      (collapseWhenApproved && approved && !item.ignored && !approvedControlled) ||
       (collapseWhenIgnored && item.ignored)
     ),
   );
+  const expanded = approvedControlled ? approvedExpanded : localExpanded;
+  function setExpanded(next: boolean) {
+    if (approvedControlled) {
+      onApprovedExpandedChange?.(item.questionTurnId, next);
+      return;
+    }
+    setLocalExpanded(next);
+  }
   const unanswered = !hasResult && !item.ignored;
   const canAnswer =
     canEdit &&
@@ -450,9 +481,11 @@ function QuestionCard({
         data-harper-collapsed="approved"
       >
         <div className="flex flex-wrap items-center gap-2 text-sm text-ink">
-          <span className="min-w-0 flex-1 break-words">{oneLinePreview}</span>
+          <span className="min-w-0 flex-1 break-words">
+            {collapsedApprovedQuestionLabel(stripInternalIdsFromDisplayText(item.question))}
+          </span>
           <span
-            className="rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink"
+            className={APPROVED_STATUS_BADGE_CLASS}
             data-testid="consultation-approved-badge"
           >
             {consultationStatementLabels.APPROVED}
@@ -688,6 +721,8 @@ export function QuestionList({
   suppressQuestionTextWhenMatchesLabel,
   collapseWhenApproved = false,
   collapseWhenIgnored = false,
+  approvedExpandedIds,
+  onApprovedExpandedChange,
   onSubmitStart,
 }: {
   campaignId: string;
@@ -700,6 +735,8 @@ export function QuestionList({
   suppressQuestionTextWhenMatchesLabel?: string | null;
   collapseWhenApproved?: boolean;
   collapseWhenIgnored?: boolean;
+  approvedExpandedIds?: ReadonlySet<string>;
+  onApprovedExpandedChange?: (questionTurnId: string, expanded: boolean) => void;
   onSubmitStart: (replyKey: string, answer: string) => void;
 }) {
   const actionsEnabled = showReply && !jobsActive;
@@ -724,6 +761,8 @@ export function QuestionList({
             }
             collapseWhenApproved={collapseWhenApproved}
             collapseWhenIgnored={collapseWhenIgnored}
+            approvedExpanded={approvedExpandedIds?.has(item.questionTurnId) ?? false}
+            onApprovedExpandedChange={onApprovedExpandedChange}
             onSubmitStart={(answer) => {
               onSubmitStart(consultationReplyTargetKey(item.questionTurnId), answer);
             }}

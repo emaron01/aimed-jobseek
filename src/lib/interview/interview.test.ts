@@ -310,6 +310,82 @@ describe.skipIf(!hasTestDatabase())("interview stages without guide", () => {
     ).toBe(0);
   });
 
+  it("assigns optional interviewers during stage creation without starting prep", async () => {
+    const existing = await addApplicationContact({
+      organizationId,
+      campaignId,
+      userId,
+      firstName: "Jordan",
+      lastName: "Lee",
+      title: "Technical Recruiter",
+      email: `jordan-setup-${suffix}@acme.example`,
+      personaId: recruiterRoleId,
+      confirmRole: true,
+    });
+    const stage = await createInterviewStage({
+      organizationId,
+      campaignId,
+      userId,
+      type: "HIRING_MANAGER",
+      scheduledAt: new Date("2026-10-05T15:00:00.000Z"),
+      format: "VIDEO",
+      interviewerContactIds: [existing.contactId],
+      newInterviewers: [
+        {
+          firstName: "Mina",
+          lastName: "Ortiz",
+          title: "Technical Recruiter",
+          email: `mina-setup-${suffix}@acme.example`,
+          personaId: recruiterRoleId,
+          linkedInProfileText: "Mina Ortiz, technical recruiter.",
+        },
+      ],
+    });
+    const rows = await prisma.interviewStageInterviewer.findMany({
+      where: { stageId: stage.id },
+      select: { contactId: true },
+    });
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.contactId)).toContain(existing.contactId);
+    const memberships = await prisma.campaignContact.findMany({
+      where: { campaignId, contactId: { in: rows.map((row) => row.contactId) } },
+    });
+    expect(memberships).toHaveLength(2);
+    for (const membership of memberships) {
+      expect(membership.personPrepOfferedAt).toBeNull();
+      expect(membership.personPrepStatus).toBeNull();
+    }
+    const mina = memberships.find(
+      (membership) => membership.contactId !== existing.contactId,
+    );
+    expect(mina?.linkedInProfileText).toBe("Mina Ortiz, technical recruiter.");
+    expect(
+      await prisma.applicationJob.count({
+        where: {
+          campaignId,
+          targetId: { in: rows.map((row) => row.contactId) },
+        },
+      }),
+    ).toBe(0);
+
+    await assignExistingInterviewStageInterviewer({
+      organizationId,
+      campaignId,
+      userId,
+      stageId: stage.id,
+      contactId: existing.contactId,
+      personaId: recruiterRoleId,
+    });
+    const afterSave = await prisma.interviewStageInterviewer.findMany({
+      where: { stageId: stage.id },
+    });
+    expect(afterSave.map((row) => row.contactId)).toEqual([existing.contactId]);
+    const afterPrep = await prisma.campaignContact.findFirst({
+      where: { campaignId, contactId: existing.contactId },
+    });
+    expect(afterPrep?.personPrepOfferedAt).toBeNull();
+  });
+
   it("terminal INTERVIEW_GUIDE handler completes orphan jobs without a paid call", async () => {
     const stage = await createInterviewStage({
       organizationId,

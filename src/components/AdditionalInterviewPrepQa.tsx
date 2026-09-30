@@ -39,9 +39,12 @@ function editHrefForEntry(
 export function AdditionalInterviewPrepQa({
   campaignId,
   entries,
+  showHeading = true,
 }: {
   campaignId: string;
   entries: AdditionalPrepQaEntry[];
+  /** Cheat Sheet supplies the collapsible heading. Harper keeps this heading. */
+  showHeading?: boolean;
 }) {
   if (entries.length === 0) return null;
   return (
@@ -49,9 +52,11 @@ export function AdditionalInterviewPrepQa({
       className="space-y-3"
       data-testid="additional-interview-prep-qa"
     >
-      <h3 className="font-medium text-ink">
-        {ADDITIONAL_INTERVIEW_PREP_QA_HEADING}
-      </h3>
+      {showHeading ? (
+        <h3 className="font-medium text-ink">
+          {ADDITIONAL_INTERVIEW_PREP_QA_HEADING}
+        </h3>
+      ) : null}
       <ul className="space-y-4">
         {entries.map((entry) => (
           <li

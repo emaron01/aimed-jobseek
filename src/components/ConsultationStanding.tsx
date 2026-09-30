@@ -23,6 +23,12 @@ import {
   type StandingInlineTopic,
 } from "@/lib/consultation/harper-layout";
 import {
+  approvedAnswersAreAllExpanded,
+  approvedCollapseControlLabel,
+  collectApprovedQuestionIds,
+  nextApprovedExpandedIds,
+} from "@/lib/consultation/approved-collapse";
+import {
   HARPER_SECTION_IDS,
   partitionHarperThreeSections,
   type HarperPageSectionId,
@@ -232,6 +238,8 @@ function StandingRequirementList({
   openIds,
   toggle,
   collapseWhenApproved,
+  approvedExpandedIds,
+  onApprovedExpandedChange,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -245,6 +253,8 @@ function StandingRequirementList({
   openIds: Set<string>;
   toggle: (id: string) => void;
   collapseWhenApproved: boolean;
+  approvedExpandedIds?: ReadonlySet<string>;
+  onApprovedExpandedChange?: (questionTurnId: string, expanded: boolean) => void;
 }) {
   return (
     <ul className="space-y-4" data-testid="consultation-standing-list">
@@ -319,6 +329,8 @@ function StandingRequirementList({
                   pendingTarget={pendingTarget}
                   jobsActive={jobsActive}
                   collapseWhenApproved={collapseWhenApproved}
+                  approvedExpandedIds={approvedExpandedIds}
+                  onApprovedExpandedChange={onApprovedExpandedChange}
                   suppressQuestionTextWhenMatchesLabel={
                     labelMatchesQuestion ? entry.label : null
                   }
@@ -409,7 +421,36 @@ export function ConsultationStanding({
       ]),
   );
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  const [expandedApproved, setExpandedApproved] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [pendingTarget, setPendingTarget] = useState<string | null>(null);
+  const approvedIds = useMemo(
+    () =>
+      collectApprovedQuestionIds({
+        standingEntries: sections.standingEntries,
+        bestPracticeQuestions: sections.bestPracticeQuestions,
+      }),
+    [sections.bestPracticeQuestions, sections.standingEntries],
+  );
+  const allApprovedExpanded = approvedAnswersAreAllExpanded(
+    approvedIds,
+    expandedApproved,
+  );
+
+  function changeApprovedExpanded(
+    action:
+      | { type: "toggle-all" }
+      | { type: "set"; id: string; expanded: boolean },
+  ) {
+    setExpandedApproved((current) =>
+      nextApprovedExpandedIds(approvedIds, current, action),
+    );
+    if (action.type === "toggle-all" && !allApprovedExpanded) {
+      ensureSectionOpen(HARPER_SECTION_IDS.standing);
+      ensureSectionOpen(HARPER_SECTION_IDS.bestPractice);
+    }
+  }
 
   const requirementEntries = sections.standingEntries.filter(
     (entry) => entry.kind !== "TOPIC",
@@ -497,6 +538,21 @@ export function ConsultationStanding({
       className="space-y-4"
       data-testid="consultation-evidence"
     >
+      {approvedIds.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          <a
+            href="#harper-toggle-all-approved"
+            className={textLinkClass}
+            data-testid="consultation-toggle-all-approved"
+            onClick={(event) => {
+              event.preventDefault();
+              changeApprovedExpanded({ type: "toggle-all" });
+            }}
+          >
+            {approvedCollapseControlLabel(allApprovedExpanded)}
+          </a>
+        </div>
+      ) : null}
       <HarperPageSection
         sectionId={HARPER_SECTION_IDS.standing}
         title={consultationConversationCopy.whereYouStand}
@@ -556,6 +612,10 @@ export function ConsultationStanding({
             openIds={openIds}
             toggle={toggle}
             collapseWhenApproved
+            approvedExpandedIds={expandedApproved}
+            onApprovedExpandedChange={(id, expanded) => {
+              changeApprovedExpanded({ type: "set", id, expanded });
+            }}
           />
         </div>
       </HarperPageSection>
@@ -609,6 +669,10 @@ export function ConsultationStanding({
               pendingTarget={pendingTarget}
               jobsActive={jobsActive}
               collapseWhenApproved
+              approvedExpandedIds={expandedApproved}
+              onApprovedExpandedChange={(id, expanded) => {
+                changeApprovedExpanded({ type: "set", id, expanded });
+              }}
               onSubmitStart={(replyKey, answer) => {
                 setPendingTarget(replyKey);
                 void answer;
