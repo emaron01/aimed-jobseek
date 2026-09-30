@@ -1,5 +1,6 @@
 import {
   INTERVIEW_TYPE_TAGS,
+  ROLE_EXPERTISE_TARGET_PREFIX,
   type InterviewTypeTag,
 } from "@/lib/consultation/contract";
 import { consultationConversationCopy } from "@/lib/product-config/consultation";
@@ -217,7 +218,18 @@ export function consultationQuestionAcceptsReply(
   item: ConsultationQaItem,
 ): boolean {
   if (item.ignored) return false;
-  return item.followUp != null || (!item.resumeBullet && !item.talkingPoint);
+  if (item.followUp != null) return true;
+  // Role-expertise suggested drafts attach to the question turn with no seeker
+  // reply yet — still open so the seeker can reply and refine (Batch D6).
+  if (
+    item.seekerAnswers.length === 0 &&
+    !item.resumeBullet &&
+    item.talkingPoint?.status === "DRAFT" &&
+    Boolean(item.targetKey?.startsWith(ROLE_EXPERTISE_TARGET_PREFIX))
+  ) {
+    return true;
+  }
+  return !item.resumeBullet && !item.talkingPoint;
 }
 
 export function findConsultationQaItem(
@@ -412,7 +424,11 @@ export function buildConsultationQaView(input: {
   };
 
   for (const turn of turns) {
-    if (isPrimaryHarperQuestion(turn)) ensure(turn);
+    if (!isPrimaryHarperQuestion(turn)) continue;
+    const item = ensure(turn);
+    // Role-expertise suggested answers (Batch D6) are DRAFT INTERVIEW_ANSWER
+    // statements on the CONSULTANT question turn — not on a seeker reply.
+    item.statements.push(...(byTurn.get(turn.id) ?? []));
   }
 
   for (const seeker of turns) {
