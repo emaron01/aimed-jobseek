@@ -2910,10 +2910,18 @@ export async function processConsultationReply(input: {
     : null;
   const resultTurnId =
     resolvedItem?.seekerAnswers.at(-1)?.id ?? seekerTurnId;
-  const supersedeTurnIds =
+  const priorSeekerIds =
     resolvedItem?.seekerAnswers
       .map((entry) => entry.id)
       .filter((turnId) => turnId !== resultTurnId) ?? [];
+  // Role-expertise suggested answers live on the CONSULTANT question turn.
+  // When a seeker reply produces a new polished result, supersede that draft.
+  const supersedeTurnIds = [
+    ...priorSeekerIds,
+    ...(questionTurnId && questionTurnId !== resultTurnId
+      ? [questionTurnId]
+      : []),
+  ];
   const followUpCount = questionTurnId
     ? consultationFollowUpCount(toQaTurns(turns), questionTurnId)
     : turns.filter(

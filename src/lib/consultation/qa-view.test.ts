@@ -13,6 +13,7 @@ import {
 import {
   consultationConfig,
   consultationConversationCopy,
+  consultationStatementLabels,
   polishCopy,
 } from "@/lib/product-config";
 
@@ -634,5 +635,130 @@ describe("Harper question-limit coach", () => {
     expect(consultationConversationCopy.replyFailed).toBe(
       "The reply could not be sent.",
     );
+  });
+});
+
+describe("role-expertise suggested answers under the question", () => {
+  const roleQuestion = {
+    id: "q-role",
+    speaker: "CONSULTANT" as const,
+    body: "Describe how you partner with Marketing to improve demand generation for an enterprise sales organization.",
+    targetKey: "role-expertise:partner-marketing",
+    followUp: false,
+    sequence: 1,
+  };
+
+  const suggestedDraft = {
+    id: "st-suggest",
+    turnId: "q-role",
+    kind: "INTERVIEW_ANSWER" as const,
+    status: "DRAFT" as const,
+    content:
+      "I partnered with Marketing to build a shared demand plan that lifted pipeline quality.",
+    strengtheningNote: null,
+  };
+
+  it("shows a stored suggested answer as Interview answer · Draft with Edit and Approve", () => {
+    const view = buildConsultationQaView({
+      turns: [roleQuestion],
+      statements: [suggestedDraft],
+    });
+    const item = view.questions[0]!;
+    expect(item.question).toBe(roleQuestion.body);
+    expect(item.talkingPoint?.content).toBe(suggestedDraft.content);
+    expect(item.talkingPoint?.kind).toBe("INTERVIEW_ANSWER");
+    expect(item.talkingPoint?.status).toBe("DRAFT");
+    expect(item.statements.some((statement) => statement.id === "st-suggest")).toBe(
+      true,
+    );
+    expect(consultationStatementLabels.INTERVIEW_ANSWER).toBe("Interview answer");
+    expect(consultationStatementLabels.DRAFT).toBe("Draft");
+    expect(consultationConversationCopy.approve).toBe("Approve");
+    expect(consultationConversationCopy.editAnswer).toBe("Edit");
+    expect(consultationQuestionAcceptsReply(item)).toBe(true);
+
+    const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
+    expect(thread).toContain("consultationStatementLabels[statement.kind]");
+    expect(thread).toContain('statement.status === "DRAFT"');
+    expect(thread).toContain("consultationConversationCopy.approve");
+    expect(thread).toContain("consultationConversationCopy.editAnswer");
+    expect(thread).toContain("ResultActions");
+    expect(thread).toContain("consultation-reply-box");
+  });
+
+  it("marks an approved suggested answer as Approved", () => {
+    const view = buildConsultationQaView({
+      turns: [roleQuestion],
+      statements: [{ ...suggestedDraft, status: "APPROVED" }],
+    });
+    const item = view.questions[0]!;
+    expect(item.talkingPoint?.status).toBe("APPROVED");
+    expect(consultationStatementLabels.APPROVED).toBe("Approved");
+    expect(consultationQuestionAcceptsReply(item)).toBe(false);
+
+    const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
+    const resultActions = thread.slice(thread.indexOf("export function ResultActions"));
+    expect(resultActions).toContain('statement.status !== "APPROVED"');
+    expect(resultActions).toContain("consultationStatementLabels.APPROVED");
+  });
+
+  it("prefers a refined seeker-turn answer after a reply", () => {
+    const view = buildConsultationQaView({
+      turns: [
+        roleQuestion,
+        {
+          id: "s-refine",
+          speaker: "SEEKER" as const,
+          body: "At CSC I led weekly Marketing syncs that cut CAC.",
+          targetKey: roleQuestion.targetKey,
+          followUp: false,
+          sequence: 2,
+          analysisJson: { replyToTurnId: roleQuestion.id },
+        },
+      ],
+      statements: [
+        suggestedDraft,
+        {
+          id: "st-refined",
+          turnId: "s-refine",
+          kind: "INTERVIEW_ANSWER" as const,
+          status: "DRAFT" as const,
+          content: "At CSC I led weekly Marketing syncs that cut CAC.",
+          strengtheningNote: null,
+          createdAt: "2026-09-29T12:00:00.000Z",
+        },
+      ],
+    });
+    const item = view.questions[0]!;
+    expect(item.seekerAnswers.map((answer) => answer.body)).toEqual([
+      "At CSC I led weekly Marketing syncs that cut CAC.",
+    ]);
+    expect(item.talkingPoint?.content).toBe(
+      "At CSC I led weekly Marketing syncs that cut CAC.",
+    );
+    expect(item.talkingPoint?.id).toBe("st-refined");
+    expect(consultationQuestionAcceptsReply(item)).toBe(false);
+
+    const service = readFileSync("src/lib/consultation/service.ts", "utf8");
+    expect(service).toContain(
+      "Role-expertise suggested answers live on the CONSULTANT question turn.",
+    );
+    expect(service).toContain("questionTurnId !== resultTurnId");
+  });
+
+  it("still renders the question and answer box when no suggested answer exists", () => {
+    const view = buildConsultationQaView({
+      turns: [roleQuestion],
+      statements: [],
+    });
+    const item = view.questions[0]!;
+    expect(item.question).toBe(roleQuestion.body);
+    expect(item.talkingPoint).toBeNull();
+    expect(item.resumeBullet).toBeNull();
+    expect(consultationQuestionAcceptsReply(item)).toBe(true);
+
+    const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
+    expect(thread).toContain("consultation-reply-box");
+    expect(thread).toContain("consultationQuestionAcceptsReply(item)");
   });
 });
