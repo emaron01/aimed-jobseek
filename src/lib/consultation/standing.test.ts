@@ -350,11 +350,10 @@ describe("Harper core loop standing", () => {
     expect(standingUi).toContain("evidenceStrengthLabels");
     expect(standingUi).toContain("shareSomeDetails");
     expect(standingUi).toContain("replyConsultationAction");
-    expect(standingUi).not.toContain("consultationConversationCopy.whereYouStand");
-    expect(section).toContain("consultationConversationCopy.whereYouStand");
-    expect(section.split("consultationConversationCopy.whereYouStand").length).toBe(
-      2,
-    );
+    // Three-section page: section title lives on the collapsible heading in Standing.
+    expect(standingUi).toContain("consultationConversationCopy.whereYouStand");
+    expect(section).toContain("consultationConversationCopy.pageIntro");
+    expect(section).not.toContain("consultationConversationCopy.whereYouStand");
     expect(section).toContain("latestClosingNote");
     expect(section).not.toContain("prepareExistingConsultationSession");
     expect(section).not.toContain("shouldEnqueueConsultationStandingRegen");

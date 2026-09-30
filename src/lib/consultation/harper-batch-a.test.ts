@@ -165,7 +165,11 @@ describe("Harper Batch A layout", () => {
   it("renders Expand evidence and Show your replies as links, not buttons", () => {
     const standing = readFileSync("src/components/ConsultationStanding.tsx", "utf8");
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
-    expect(standing).not.toContain("AppButton");
+    // Section collapse headings use AppButton; evidence / replies toggles stay links.
+    expect(standing).toContain("AppButton");
+    expect(standing).toMatch(
+      /<AppButton[\s\S]*aria-expanded=\{open\}[\s\S]*data-testid=\{`\$\{testId\}-heading`\}/,
+    );
     expect(thread).not.toContain("AppButton");
     expect(standing).toMatch(
       /<a[\s\S]*data-testid=\{`toggle-evidence-\$\{entry\.id\}`\}[\s\S]*expandEvidence/,

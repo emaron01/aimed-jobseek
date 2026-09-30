@@ -159,7 +159,10 @@ export async function ConsultationSection({
     }),
     prisma.campaign.findFirst({
       where: { id: campaignId, organizationId },
-      select: { product: { select: { profileJson: true } } },
+      select: {
+        product: { select: { profileJson: true } },
+        jobRequirement: { select: { title: true } },
+      },
     }),
     prisma.interviewStage.findMany({
       where: { campaignId, organizationId },
@@ -693,13 +696,16 @@ export async function ConsultationSection({
         ) : null}
         {hasStanding ? (
           <section
-            className="mt-3 rounded-md border border-edge bg-canvas p-4"
+            className="mt-3 space-y-4"
             data-testid="consultation-standing-panel"
           >
-            <h3 className="text-sm font-semibold text-ink">
-              {consultationConversationCopy.whereYouStand}
-            </h3>
-            <div className="mt-4 space-y-4">
+            <p
+              className={`text-sm text-ink ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
+              data-testid="harper-page-intro"
+            >
+              {consultationConversationCopy.pageIntro}
+            </p>
+            <div className="space-y-4">
               {briefing?.success ? (
                 <div className="space-y-2" data-testid="consultation-briefing">
                   <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
@@ -721,6 +727,7 @@ export async function ConsultationSection({
                   acceptingReplies={threadStatus !== "SKIPPED"}
                   sessionStatus={threadStatus}
                   jobsActive={consultationBusy}
+                  jobTitle={campaign?.jobRequirement?.title ?? null}
                   overall={
                     briefing?.success
                       ? stripInternalIdsFromDisplayText(briefing.data.overall)

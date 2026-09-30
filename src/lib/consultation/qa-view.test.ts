@@ -605,7 +605,9 @@ describe("Harper question-limit coach", () => {
     expect(render.indexOf("consultation-standing-panel")).toBeLessThan(
       render.indexOf("HarperPersonInlineProfile"),
     );
-    expect(section).toContain("consultationConversationCopy.whereYouStand");
+    expect(section).toContain("consultationConversationCopy.pageIntro");
+    const standing = readFileSync("src/components/ConsultationStanding.tsx", "utf8");
+    expect(standing).toContain("consultationConversationCopy.whereYouStand");
     const service = readFileSync("src/lib/consultation/service.ts", "utf8");
     expect(service).not.toContain("async function continueAfterAnsweredRound");
     const actions = readFileSync("src/app/actions/consultation.ts", "utf8");

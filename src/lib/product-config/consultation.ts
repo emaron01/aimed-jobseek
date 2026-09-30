@@ -62,11 +62,23 @@ export const consultationStatementLabels = Object.freeze({
 
 export const consultationConversationCopy = Object.freeze({
   whereYouStand: "Where you stand",
+  whereYouStandDescription:
+    "How your experience matches this job, requirement by requirement.",
+  needsMoreInfoTitle: "Questions that need more information",
+  needsMoreInfoDescription:
+    "Harper needs a little more from you on these. Your answers fill the gaps in Where you stand.",
+  bestPracticeTitlePrefix: "Best-practice interview questions for a ",
+  bestPracticeDescription:
+    "Questions a hiring manager for this role commonly asks, with Harper's suggested answers drawn from your profile. Edit them to make them yours, then approve.",
+  pageIntro:
+    "Harper helps you prepare the answers you'll use throughout this application. What you approve here is what she uses to build your resume, cover letter, outreach, and interview cheat sheets. Answer what you can, skip what you can't, review her suggestions, and approve what best represents your background in a professional way. When it's time to interview, your cheat sheet brings it all together.",
   generalQuestions: "General questions",
   expandEvidence: "Expand evidence",
   collapseEvidence: "Collapse evidence",
   expandAllEvidence: "Expand all",
   collapseAllEvidence: "Collapse all",
+  showApprovedAnswer: "Show approved answer",
+  hideApprovedAnswer: "Hide approved answer",
   shareSomeDetails: "Save Answer",
   shareSomeDetailsHelp:
     "Add anything you have about this gap. Harper will use your Personal Profile and this note.",
@@ -126,3 +138,8 @@ export const consultationConversationCopy = Object.freeze({
   nextStepModelUnavailable: `${consultationConfig.displayName} could not write the next step. Retry when you are ready.`,
   nextStepRetry: "Retry next step",
 });
+
+export function bestPracticeInterviewTitle(jobTitle: string | null | undefined): string {
+  const title = jobTitle?.trim() || "this role";
+  return `${consultationConversationCopy.bestPracticeTitlePrefix}${title}`;
+}

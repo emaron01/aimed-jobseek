@@ -345,6 +345,8 @@ function QuestionCard({
   actionsEnabled,
   pending,
   onSubmitStart,
+  collapseWhenApproved = false,
+  collapseWhenIgnored = false,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -353,8 +355,21 @@ function QuestionCard({
   actionsEnabled: boolean;
   pending: boolean;
   onSubmitStart: (answer: string) => void;
+  /** Section 1 / 3: approved answers start as one line with an Approved badge. */
+  collapseWhenApproved?: boolean;
+  /** Section 2: ignored items start collapsed with the Ignored reopen link. */
+  collapseWhenIgnored?: boolean;
 }) {
   const hasResult = Boolean(item.resumeBullet || item.talkingPoint);
+  const approved =
+    item.talkingPoint?.status === "APPROVED" ||
+    item.resumeBullet?.status === "APPROVED";
+  const [expanded, setExpanded] = useState(
+    !(
+      (collapseWhenApproved && approved && !item.ignored) ||
+      (collapseWhenIgnored && item.ignored)
+    ),
+  );
   const unanswered = !hasResult && !item.ignored;
   const canAnswer =
     canEdit &&
@@ -363,6 +378,100 @@ function QuestionCard({
   const canSkip = canEdit && actionsEnabled && unanswered;
   const canIgnore = canEdit && actionsEnabled && unanswered;
   const replyKey = consultationReplyTargetKey(item.questionTurnId);
+  const oneLineLabel =
+    item.talkingPoint?.content?.trim() ||
+    item.resumeBullet?.content?.trim() ||
+    item.question.trim();
+  const oneLinePreview =
+    oneLineLabel.length > 120 ? `${oneLineLabel.slice(0, 117)}…` : oneLineLabel;
+
+  if (!expanded && collapseWhenIgnored && item.ignored) {
+    return (
+      <article
+        id={harperQuestionAnchorId(item.questionTurnId)}
+        className="min-w-0 overflow-hidden rounded-md border border-edge bg-canvas p-4"
+        data-testid="consultation-ignored-question"
+        data-harper-question={item.questionTurnId}
+        data-harper-collapsed="ignored"
+      >
+        <div className="flex flex-wrap items-center gap-2 text-sm text-ink">
+          <span className="min-w-0 flex-1 break-words">{oneLinePreview}</span>
+          <span className="rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink">
+            {consultationConversationCopy.questionIgnored}
+          </span>
+          <a
+            href={`#${harperQuestionAnchorId(item.questionTurnId)}`}
+            className={textLinkClass}
+            data-testid={`expand-ignored-${item.questionTurnId}`}
+            onClick={(event) => {
+              event.preventDefault();
+              setExpanded(true);
+            }}
+          >
+            {consultationConversationCopy.showApprovedAnswer}
+          </a>
+          {canEdit ? (
+            <ApplicationActionForm
+              action={reopenIgnoredConsultationTargetAction}
+              submitLabel={consultationConversationCopy.reopenIgnored}
+              pendingLabel={consultationConversationCopy.thinking}
+              testId={`reopen-ignored-question-${item.questionTurnId}`}
+              hideSubmit
+              compact
+              formClassName={actionFormClass}
+            >
+              <input type="hidden" name="campaignId" value={campaignId} />
+              <input type="hidden" name="targetKey" value={replyKey} />
+              <a
+                href="#harper-reopen-ignored"
+                className={textLinkClass}
+                data-testid={`reopen-ignored-question-${item.questionTurnId}-link`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.currentTarget.closest("form")?.requestSubmit();
+                }}
+              >
+                {consultationConversationCopy.reopenIgnored}
+              </a>
+            </ApplicationActionForm>
+          ) : null}
+        </div>
+      </article>
+    );
+  }
+
+  if (!expanded && collapseWhenApproved && approved && !item.ignored) {
+    return (
+      <article
+        id={harperQuestionAnchorId(item.questionTurnId)}
+        className="min-w-0 overflow-hidden rounded-md border border-edge bg-canvas p-4"
+        data-testid="consultation-answered"
+        data-harper-question={item.questionTurnId}
+        data-harper-collapsed="approved"
+      >
+        <div className="flex flex-wrap items-center gap-2 text-sm text-ink">
+          <span className="min-w-0 flex-1 break-words">{oneLinePreview}</span>
+          <span
+            className="rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink"
+            data-testid="consultation-approved-badge"
+          >
+            {consultationStatementLabels.APPROVED}
+          </span>
+          <a
+            href={`#${harperQuestionAnchorId(item.questionTurnId)}`}
+            className={textLinkClass}
+            data-testid={`expand-approved-${item.questionTurnId}`}
+            onClick={(event) => {
+              event.preventDefault();
+              setExpanded(true);
+            }}
+          >
+            {consultationConversationCopy.showApprovedAnswer}
+          </a>
+        </div>
+      </article>
+    );
+  }
 
   return (
     <article
@@ -377,6 +486,21 @@ function QuestionCard({
       }
       data-harper-question={item.questionTurnId}
     >
+      {(collapseWhenApproved && approved) || (collapseWhenIgnored && item.ignored) ? (
+        <div className="mb-2">
+          <a
+            href={`#${harperQuestionAnchorId(item.questionTurnId)}`}
+            className={textLinkClass}
+            data-testid={`collapse-approved-${item.questionTurnId}`}
+            onClick={(event) => {
+              event.preventDefault();
+              setExpanded(false);
+            }}
+          >
+            {consultationConversationCopy.hideApprovedAnswer}
+          </a>
+        </div>
+      ) : null}
       {showQuestionText ? (
         <p
           className="text-sm font-medium text-ink"
@@ -524,6 +648,8 @@ export function QuestionList({
   pendingTarget,
   jobsActive,
   suppressQuestionTextWhenMatchesLabel,
+  collapseWhenApproved = false,
+  collapseWhenIgnored = false,
   onSubmitStart,
 }: {
   campaignId: string;
@@ -534,6 +660,8 @@ export function QuestionList({
   jobsActive: boolean;
   /** When set, hide the question paragraph if it equals this label (topic heading already shows it). */
   suppressQuestionTextWhenMatchesLabel?: string | null;
+  collapseWhenApproved?: boolean;
+  collapseWhenIgnored?: boolean;
   onSubmitStart: (replyKey: string, answer: string) => void;
 }) {
   const actionsEnabled = showReply && !jobsActive;
@@ -556,6 +684,8 @@ export function QuestionList({
               pendingTarget === consultationReplyTargetKey(item.questionTurnId) &&
               jobsActive
             }
+            collapseWhenApproved={collapseWhenApproved}
+            collapseWhenIgnored={collapseWhenIgnored}
             onSubmitStart={(answer) => {
               onSubmitStart(consultationReplyTargetKey(item.questionTurnId), answer);
             }}

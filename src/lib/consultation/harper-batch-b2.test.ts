@@ -168,7 +168,8 @@ describe("Harper Batch B2 — Where you stand inline Q&A", () => {
       render.indexOf("HarperPersonInlineProfile"),
     );
     expect(section).toContain("HarperStandingView");
-    expect(section).toContain("consultationConversationCopy.whereYouStand");
+    expect(section).toContain("consultationConversationCopy.pageIntro");
+    expect(standing).toContain("consultationConversationCopy.whereYouStand");
     expect(standing).toContain("consultation-standing-counts");
     expect(standing).toContain("consultation-standing-list");
     expect(standing).toContain("evidenceStrengthLabels.STRONG");
