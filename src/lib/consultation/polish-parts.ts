@@ -290,3 +290,76 @@ export function normalizePolishAnswer(input: {
     answerPartsGrounding: answerPartsGroundingFromPolish(input.data),
   };
 }
+
+/**
+ * Best-available draft when D3 parts / lenient result validation fails after
+ * bounded regen (e.g. missing result). Uses only non-empty parts without
+ * inventing facts, framework names, or part labels.
+ */
+export function bestEffortNormalizedPolish(input: {
+  data: ConsultationPolishResult;
+  whyThisCompany: boolean;
+  confirmedGap: boolean;
+}): NormalizedPolishAnswer | null {
+  const exception = input.whyThisCompany || input.confirmedGap;
+  if (exception) {
+    const interviewAnswer = fieldText(input.data.interviewAnswer);
+    if (!interviewAnswer || containsFrameworkOrPartLabel(interviewAnswer)) {
+      return null;
+    }
+    const resumeBullet = fieldText(input.data.resumeBullet);
+    if (resumeBullet && containsFrameworkOrPartLabel(resumeBullet)) {
+      return null;
+    }
+    return {
+      interviewAnswer,
+      resumeBullet: input.confirmedGap || input.whyThisCompany ? null : input.data.resumeBullet,
+      strengtheningNote: input.data.strengtheningNote,
+      answerPartsGrounding: null,
+    };
+  }
+
+  if (isConsultationPolishPartsResult(input.data)) {
+    const parts = partsInFrameworkOrder(input.data).filter(
+      (part) => part.trim() && !containsFrameworkOrPartLabel(part),
+    );
+    if (parts.length === 0) return null;
+    const interviewAnswer = composeInterviewAnswerFromParts(parts);
+    if (!interviewAnswer.trim()) return null;
+    const resumeBullet = fieldText(input.data.resumeBullet);
+    if (resumeBullet && containsFrameworkOrPartLabel(resumeBullet)) {
+      return {
+        interviewAnswer,
+        resumeBullet: null,
+        strengtheningNote: input.data.strengtheningNote,
+        answerPartsGrounding: null,
+      };
+    }
+    return {
+      interviewAnswer,
+      resumeBullet: resumeBullet || null,
+      strengtheningNote: input.data.strengtheningNote,
+      answerPartsGrounding: null,
+    };
+  }
+
+  const interviewAnswer = fieldText(input.data.interviewAnswer);
+  if (!interviewAnswer || containsFrameworkOrPartLabel(interviewAnswer)) {
+    return null;
+  }
+  const resumeBullet = fieldText(input.data.resumeBullet);
+  if (resumeBullet && containsFrameworkOrPartLabel(resumeBullet)) {
+    return {
+      interviewAnswer,
+      resumeBullet: null,
+      strengtheningNote: input.data.strengtheningNote,
+      answerPartsGrounding: null,
+    };
+  }
+  return {
+    interviewAnswer,
+    resumeBullet: resumeBullet || null,
+    strengtheningNote: input.data.strengtheningNote,
+    answerPartsGrounding: null,
+  };
+}

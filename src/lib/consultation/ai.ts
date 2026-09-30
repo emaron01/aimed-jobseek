@@ -108,6 +108,7 @@ export async function planConsultationWithModel(input: {
 
 export async function extractWithModel(input: {
   answer: string;
+  seekerReplies?: string[];
   question: string;
   target: { key: string; kind: string; text: string } | null;
   targets: Array<{ key: string; kind: string; text: string }>;
@@ -159,6 +160,7 @@ export async function extractWithModel(input: {
 
 export async function polishAnswerWithModel(input: {
   answer: string;
+  seekerReplies?: string[];
   story: {
     situation: string | null;
     task: string | null;

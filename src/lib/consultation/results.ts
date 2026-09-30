@@ -110,6 +110,41 @@ export function isQuestionMetaCommentary(content: string): boolean {
   return !hasExperienceSignal;
 }
 
+/** True when a single seeker reply looks like a non-answer rather than experience. */
+function isSeekerNonAnswer(content: string): boolean {
+  const text = content.trim();
+  if (!text) return true;
+  if (isQuestionMetaCommentary(text)) return true;
+  const compact = normalized(text);
+  if (
+    /^(n\/?a|none|nope|idk|dunno|skip|pass|nothing|no idea|\?+|-+|\.+)$/i.test(
+      compact,
+    )
+  ) {
+    return true;
+  }
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length <= 2 && !/\b(i|my|we|our)\b/i.test(text)) return true;
+  return false;
+}
+
+/**
+ * True when the reply chain has real substantive content Harper can shape into
+ * a best-available draft. False for empty, meta commentary, or non-answers.
+ * Batch C non-answer checks (meta / fragments as results) still apply at polish.
+ */
+export function seekerRepliesHaveUsableContent(
+  replies: readonly string[],
+): boolean {
+  for (const reply of replies) {
+    const text = reply.trim();
+    if (!text) continue;
+    if (isSeekerNonAnswer(text)) continue;
+    return true;
+  }
+  return false;
+}
+
 export function resultIgnoresLatestAnswer(
   content: string,
   seekerAnswers: readonly string[],

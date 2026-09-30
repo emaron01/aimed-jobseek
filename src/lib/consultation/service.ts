@@ -79,8 +79,10 @@ import {
 } from "@/lib/consultation/qa-view";
 import {
   isRawSeekerResult,
+  seekerRepliesHaveUsableContent,
 } from "@/lib/consultation/results";
 import {
+  bestEffortNormalizedPolish,
   normalizePolishAnswer,
   validatePolishPartsQuality,
   type AnswerPartsGrounding,
@@ -533,6 +535,7 @@ function extractAnswerQualityIssues(input: {
 
 async function extractAnswerWithQuality(input: {
   answer: string;
+  seekerReplies?: string[];
   question: string;
   target: EvidenceTarget | null;
   targets: EvidenceTarget[];
@@ -594,6 +597,7 @@ function interviewAnswerGroundingJson(
 
 export async function polishAnswerWithQuality(input: {
   answer: string;
+  seekerReplies?: string[];
   story: {
     situation: string | null;
     task: string | null;
@@ -623,14 +627,25 @@ export async function polishAnswerWithQuality(input: {
         answerPartsGrounding: AnswerPartsGrounding | null;
       };
     }
-  | { ok: false; message: string }
+  | {
+      ok: false;
+      message: string;
+      bestEffort?: {
+        interviewAnswer: string;
+        resumeBullet: string | null;
+        strengtheningNote: string | null;
+        answerPartsGrounding: AnswerPartsGrounding | null;
+      };
+    }
 > {
   const seekerAnswers =
     input.seekerAnswers?.map((answer) => answer.trim()).filter(Boolean) ??
+    input.seekerReplies?.map((answer) => answer.trim()).filter(Boolean) ??
     input.answer
       .split("\n")
       .map((answer) => answer.trim())
       .filter(Boolean);
+  const seekerReplies = seekerAnswers;
   const confirmedGap = input.confirmedGap === true;
   const whyThisCompany = input.whyThisCompany === true;
   const careerStage =
@@ -648,6 +663,12 @@ export async function polishAnswerWithQuality(input: {
       answerPartsGrounding: AnswerPartsGrounding | null;
     };
   } | null = null;
+  let lastBestEffort: {
+    interviewAnswer: string;
+    resumeBullet: string | null;
+    strengtheningNote: string | null;
+    answerPartsGrounding: AnswerPartsGrounding | null;
+  } | null = null;
   for (
     let attempt = 0;
     attempt <= consultationConfig.qualityRegenerationAttempts;
@@ -655,6 +676,7 @@ export async function polishAnswerWithQuality(input: {
   ) {
     const polished = await polishAnswerWithModel({
       answer: input.answer,
+      seekerReplies,
       story: input.story,
       declinedFollowUp: input.declinedFollowUp,
       confirmedGap,
@@ -684,10 +706,34 @@ export async function polishAnswerWithQuality(input: {
     if (partIssues.length > 0) {
       lastFailure = consultationConversationCopy.generationFailed;
       qualityFeedback = partIssues;
+      const salvage = bestEffortNormalizedPolish({
+        data: polished.data,
+        whyThisCompany,
+        confirmedGap,
+      });
+      if (salvage?.interviewAnswer.trim()) {
+        const salvageInterview = salvage.interviewAnswer.trim();
+        const salvageBullet = salvage.resumeBullet?.trim() ?? "";
+        const salvageRaw = Boolean(
+          isRawSeekerResult(salvageInterview, seekerAnswers) ||
+            (!confirmedGap &&
+              !whyThisCompany &&
+              salvageBullet &&
+              isRawSeekerResult(salvageBullet, seekerAnswers)),
+        );
+        if (!salvageRaw) {
+          lastBestEffort = {
+            ...salvage,
+            resumeBullet:
+              confirmedGap || whyThisCompany ? null : salvage.resumeBullet,
+          };
+        }
+      }
       if (lastAttempt) {
         return {
           ok: false as const,
           message: lastFailure,
+          ...(lastBestEffort ? { bestEffort: lastBestEffort } : {}),
         };
       }
       continue;
@@ -723,6 +769,7 @@ export async function polishAnswerWithQuality(input: {
         return {
           ok: false as const,
           message: lastFailure,
+          ...(lastBestEffort ? { bestEffort: lastBestEffort } : {}),
         };
       }
       continue;
@@ -766,6 +813,7 @@ export async function polishAnswerWithQuality(input: {
       return {
         ok: false as const,
         message: lastFailure,
+        ...(lastBestEffort ? { bestEffort: lastBestEffort } : {}),
       };
     }
     return accepted;
@@ -774,6 +822,7 @@ export async function polishAnswerWithQuality(input: {
   return {
     ok: false as const,
     message: lastFailure,
+    ...(lastBestEffort ? { bestEffort: lastBestEffort } : {}),
   };
 }
 
@@ -1721,6 +1770,7 @@ async function processAnswerGeneration(input: {
   resultTurnId?: string;
   supersedeTurnIds?: string[];
   answerContext: string;
+  seekerReplies: string[];
   question: string;
   target: EvidenceTarget | null;
   targets: EvidenceTarget[];
@@ -1745,6 +1795,10 @@ async function processAnswerGeneration(input: {
     "CONSULTATION_REPLY",
   );
   const profileItems = profileEvidenceItems(input.profile);
+  const seekerReplies = input.seekerReplies
+    .map((reply) => reply.trim())
+    .filter(Boolean);
+  const repliesUsable = seekerRepliesHaveUsableContent(seekerReplies);
   const storedAssessment = input.target
     ? await prisma.consultationAssessment.findFirst({
         where: { sessionId: input.sessionId, targetKey: input.target.key },
@@ -1766,6 +1820,7 @@ async function processAnswerGeneration(input: {
   const followUpAlreadyUsed = !(input.allowFollowUp ?? true);
   const extracted = await extractAnswerWithQuality({
     answer: input.answerContext,
+    seekerReplies,
     question: input.question,
     target: input.target,
     targets: input.targets,
@@ -1871,6 +1926,7 @@ async function processAnswerGeneration(input: {
     status: "READY",
     ...(input.replyToTurnId ? { replyToTurnId: input.replyToTurnId } : {}),
     answerContext: input.answerContext,
+    seekerReplies,
     story: storyProposal?.story ?? verified.partialStory ?? extracted.data.story,
     dropped: verified.droppedDetails,
     missingStarElements: verified.missingStarElements,
@@ -1886,6 +1942,7 @@ async function processAnswerGeneration(input: {
     });
     const polished = await polishAnswerWithQuality({
       answer: companyMotivation,
+      seekerReplies: [companyMotivation],
       story: {
         situation: null,
         task: null,
@@ -2045,7 +2102,8 @@ async function processAnswerGeneration(input: {
       companyMotivation,
     };
   }
-  if (incomplete) {
+  // Incomplete + nothing usable → needs-more-detail only (no draft).
+  if (incomplete && !repliesUsable) {
     if (followUpAlreadyUsed) {
       if (!coaching?.trim()) {
         await failGeneration(
@@ -2054,38 +2112,17 @@ async function processAnswerGeneration(input: {
         );
         return { ok: false };
       }
-    } else if (!coaching || !followUpQuestion?.trim()) {
-      await failGeneration(
-        input.sessionId,
-        consultationConversationCopy.generationFailed,
-      );
-      return { ok: false };
     }
-    await prisma.$transaction([
-      prisma.consultationProposal.deleteMany({
-        where: { turnId: input.turnId, status: "PENDING" },
-      }),
-      prisma.consultationTurn.update({
-        where: { id: input.turnId },
-        data: {
-          analysisJson: {
-            ...analysisJson,
-            gapDecision: "incomplete",
-          },
-        },
-      }),
-      prisma.consultationStatement.deleteMany({
-        where: {
-          sessionId: input.sessionId,
-          turnId: { in: [input.turnId, input.resultTurnId ?? input.turnId] },
-          kind: { in: ["INTERVIEW_ANSWER", "RESUME_BULLET"] },
-        },
-      }),
-      prisma.consultationSession.update({
-        where: { id: input.sessionId },
-        data: { generationStatus: "READY", generationError: null },
-      }),
-    ]);
+    await finishItemNeedsMoreDetail({
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      resultTurnId: input.resultTurnId ?? input.turnId,
+      supersedeTurnIds: input.supersedeTurnIds ?? [],
+      analysisJson: {
+        ...analysisJson,
+        gapDecision: "incomplete",
+      },
+    });
     if (followUpAlreadyUsed && coaching?.trim()) {
       await addTurn({
         organizationId: input.organizationId,
@@ -2102,7 +2139,7 @@ async function processAnswerGeneration(input: {
     }
     return {
       ok: true,
-      followUpQuestion: followUpAlreadyUsed ? null : followUpQuestion,
+      followUpQuestion: null,
       coaching,
       missingStarElements: verified.missingStarElements,
       wroteResult: false,
@@ -2110,9 +2147,15 @@ async function processAnswerGeneration(input: {
       companyMotivation,
     };
   }
+  // Incomplete + usable content: still polish. Evidence / no_evidence: polish as before.
   const confirmedGap = gapDecision === "no_evidence";
+  const polishFollowUp =
+    incomplete && !followUpAlreadyUsed
+      ? followUpQuestion?.trim() || null
+      : null;
   const polished = await polishAnswerWithQuality({
     answer: input.answerContext,
+    seekerReplies,
     story: {
       situation: story?.situation ?? null,
       task: story?.task ?? null,
@@ -2123,13 +2166,10 @@ async function processAnswerGeneration(input: {
       answer: input.answerContext,
       turnId: input.turnId,
     }),
-    declinedFollowUp: false,
+    declinedFollowUp: incomplete,
     confirmedGap,
     strengtheningNeeds: verified.missingStarElements,
-    seekerAnswers: input.answerContext
-      .split("\n")
-      .map((answer) => answer.trim())
-      .filter(Boolean),
+    seekerAnswers: seekerReplies,
     firstName: profileFirstName(input.profile),
     careerStage: deriveCareerStage(input.profile),
     profileItems,
@@ -2139,6 +2179,191 @@ async function processAnswerGeneration(input: {
     usage: replyUsage,
   });
   if (!polished.ok) {
+    if (repliesUsable && polished.bestEffort?.interviewAnswer.trim()) {
+      const best = polished.bestEffort;
+      const interviewText = best.interviewAnswer.trim();
+      const bulletText = best.resumeBullet?.trim() ?? "";
+      const followUp =
+        polishFollowUp ||
+        followUpQuestion?.trim() ||
+        "What detail would make this answer stronger?";
+      const storedGapDecision = incomplete
+        ? "incomplete"
+        : confirmedGap
+          ? "no_evidence"
+          : "evidence";
+      const resultTurnId = input.resultTurnId ?? input.turnId;
+      const supersedeTurnIds = (input.supersedeTurnIds ?? []).filter(
+        (turnId) => turnId && turnId !== resultTurnId,
+      );
+      const operations: Prisma.PrismaPromise<unknown>[] = [
+        prisma.consultationProposal.deleteMany({
+          where: { turnId: input.turnId, status: "PENDING" },
+        }),
+        prisma.consultationTurn.update({
+          where: { id: input.turnId },
+          data: {
+            analysisJson: {
+              ...analysisJson,
+              gapDecision: storedGapDecision,
+              needsMoreDetail: false,
+            },
+          },
+        }),
+        prisma.consultationSession.update({
+          where: { id: input.sessionId },
+          data: { generationStatus: "READY", generationError: null },
+        }),
+        prisma.consultationStatement.upsert({
+          where: {
+            turnId_kind: { turnId: resultTurnId, kind: "INTERVIEW_ANSWER" },
+          },
+          create: {
+            organizationId: input.organizationId,
+            sessionId: input.sessionId,
+            turnId: resultTurnId,
+            kind: "INTERVIEW_ANSWER",
+            content: interviewText,
+            strengtheningNote: best.strengtheningNote?.trim() || null,
+            groundingJson: interviewAnswerGroundingJson(
+              best.answerPartsGrounding,
+            ),
+            promptVersion: CONSULTATION_PROMPT_VERSION,
+          },
+          update: {
+            status: "DRAFT",
+            content: interviewText,
+            strengtheningNote: best.strengtheningNote?.trim() || null,
+            groundingJson: interviewAnswerGroundingJson(
+              best.answerPartsGrounding,
+            ),
+            promptVersion: CONSULTATION_PROMPT_VERSION,
+            generation: { increment: 1 },
+            approvedAt: null,
+          },
+        }),
+      ];
+      if (bulletText && !confirmedGap) {
+        operations.push(
+          prisma.consultationStatement.upsert({
+            where: {
+              turnId_kind: { turnId: resultTurnId, kind: "RESUME_BULLET" },
+            },
+            create: {
+              organizationId: input.organizationId,
+              sessionId: input.sessionId,
+              turnId: resultTurnId,
+              kind: "RESUME_BULLET",
+              content: bulletText,
+              strengtheningNote: null,
+              groundingJson: [],
+              promptVersion: CONSULTATION_PROMPT_VERSION,
+            },
+            update: {
+              status: "DRAFT",
+              content: bulletText,
+              strengtheningNote: null,
+              groundingJson: [],
+              promptVersion: CONSULTATION_PROMPT_VERSION,
+              generation: { increment: 1 },
+              approvedAt: null,
+            },
+          }),
+        );
+      }
+      if (supersedeTurnIds.length > 0) {
+        operations.push(
+          prisma.consultationStatement.deleteMany({
+            where: {
+              sessionId: input.sessionId,
+              turnId: { in: supersedeTurnIds },
+              status: "DRAFT",
+              kind: { in: ["INTERVIEW_ANSWER", "RESUME_BULLET"] },
+            },
+          }),
+        );
+      }
+      await prisma.$transaction(operations);
+      if (incomplete && followUpAlreadyUsed && coaching?.trim()) {
+        await addTurn({
+          organizationId: input.organizationId,
+          sessionId: input.sessionId,
+          speaker: "CONSULTANT",
+          body: coaching.trim(),
+          targetKey: input.target?.key ?? null,
+          followUp: false,
+          intent: "COACHING",
+          analysisJson: input.replyToTurnId
+            ? { replyToTurnId: input.replyToTurnId }
+            : undefined,
+        });
+      }
+      return {
+        ok: true,
+        followUpQuestion: followUpAlreadyUsed ? null : followUp,
+        coaching: incomplete ? coaching : null,
+        missingStarElements: verified.missingStarElements,
+        wroteResult: true,
+        gapDecision: storedGapDecision,
+        companyMotivation,
+      };
+    }
+    if (repliesUsable) {
+      const followUp =
+        polishFollowUp ||
+        followUpQuestion?.trim() ||
+        "What detail would make this answer stronger?";
+      await prisma.$transaction([
+        prisma.consultationProposal.deleteMany({
+          where: { turnId: input.turnId, status: "PENDING" },
+        }),
+        prisma.consultationTurn.update({
+          where: { id: input.turnId },
+          data: {
+            analysisJson: {
+              ...analysisJson,
+              gapDecision: incomplete
+                ? "incomplete"
+                : confirmedGap
+                  ? "no_evidence"
+                  : "evidence",
+              needsMoreDetail: false,
+            },
+          },
+        }),
+        prisma.consultationSession.update({
+          where: { id: input.sessionId },
+          data: { generationStatus: "READY", generationError: null },
+        }),
+      ]);
+      if (incomplete && followUpAlreadyUsed && coaching?.trim()) {
+        await addTurn({
+          organizationId: input.organizationId,
+          sessionId: input.sessionId,
+          speaker: "CONSULTANT",
+          body: coaching.trim(),
+          targetKey: input.target?.key ?? null,
+          followUp: false,
+          intent: "COACHING",
+          analysisJson: input.replyToTurnId
+            ? { replyToTurnId: input.replyToTurnId }
+            : undefined,
+        });
+      }
+      return {
+        ok: true,
+        followUpQuestion: followUpAlreadyUsed ? null : followUp,
+        coaching,
+        missingStarElements: verified.missingStarElements,
+        wroteResult: false,
+        gapDecision: incomplete
+          ? "incomplete"
+          : confirmedGap
+            ? "no_evidence"
+            : "evidence",
+        companyMotivation,
+      };
+    }
     await finishItemNeedsMoreDetail({
       sessionId: input.sessionId,
       turnId: input.turnId,
@@ -2146,7 +2371,11 @@ async function processAnswerGeneration(input: {
       supersedeTurnIds: input.supersedeTurnIds ?? [],
       analysisJson: {
         ...analysisJson,
-        gapDecision: confirmedGap ? "no_evidence" : "evidence",
+        gapDecision: confirmedGap
+          ? "no_evidence"
+          : incomplete
+            ? "incomplete"
+            : "evidence",
       },
     });
     return {
@@ -2155,13 +2384,94 @@ async function processAnswerGeneration(input: {
       coaching: null,
       missingStarElements: verified.missingStarElements,
       wroteResult: false,
-      gapDecision: confirmedGap ? "no_evidence" : "evidence",
+      gapDecision: confirmedGap
+        ? "no_evidence"
+        : incomplete
+          ? "incomplete"
+          : "evidence",
       companyMotivation,
     };
   }
   const interviewText = polished.data.interviewAnswer.trim();
   const bulletText = polished.data.resumeBullet?.trim() ?? "";
-  if (!interviewText || (!confirmedGap && !bulletText)) {
+  const allowInterviewOnly = repliesUsable && incomplete;
+  if (!interviewText || (!confirmedGap && !bulletText && !allowInterviewOnly)) {
+    if (repliesUsable) {
+      const followUp =
+        polishFollowUp ||
+        followUpQuestion?.trim() ||
+        "What detail would make this answer stronger?";
+      // Prefer saving interview-only draft when we have text.
+      if (!interviewText) {
+        await prisma.$transaction([
+          prisma.consultationProposal.deleteMany({
+            where: { turnId: input.turnId, status: "PENDING" },
+          }),
+          prisma.consultationTurn.update({
+            where: { id: input.turnId },
+            data: {
+              analysisJson: {
+                ...analysisJson,
+                gapDecision: incomplete
+                  ? "incomplete"
+                  : confirmedGap
+                    ? "no_evidence"
+                    : "evidence",
+                needsMoreDetail: false,
+              },
+            },
+          }),
+          prisma.consultationSession.update({
+            where: { id: input.sessionId },
+            data: { generationStatus: "READY", generationError: null },
+          }),
+        ]);
+        return {
+          ok: true,
+          followUpQuestion: followUpAlreadyUsed ? null : followUp,
+          coaching,
+          missingStarElements: verified.missingStarElements,
+          wroteResult: false,
+          gapDecision: incomplete
+            ? "incomplete"
+            : confirmedGap
+              ? "no_evidence"
+              : "evidence",
+          companyMotivation,
+        };
+      }
+      // interviewText present but no bullet — fall through to save interview-only.
+    } else {
+      await finishItemNeedsMoreDetail({
+        sessionId: input.sessionId,
+        turnId: input.turnId,
+        resultTurnId: input.resultTurnId ?? input.turnId,
+        supersedeTurnIds: input.supersedeTurnIds ?? [],
+        analysisJson: {
+          ...analysisJson,
+          gapDecision: confirmedGap
+            ? "no_evidence"
+            : incomplete
+              ? "incomplete"
+              : "evidence",
+        },
+      });
+      return {
+        ok: true,
+        followUpQuestion: null,
+        coaching: null,
+        missingStarElements: verified.missingStarElements,
+        wroteResult: false,
+        gapDecision: confirmedGap
+          ? "no_evidence"
+          : incomplete
+            ? "incomplete"
+            : "evidence",
+        companyMotivation,
+      };
+    }
+  }
+  if (!interviewText) {
     await finishItemNeedsMoreDetail({
       sessionId: input.sessionId,
       turnId: input.turnId,
@@ -2169,7 +2479,11 @@ async function processAnswerGeneration(input: {
       supersedeTurnIds: input.supersedeTurnIds ?? [],
       analysisJson: {
         ...analysisJson,
-        gapDecision: confirmedGap ? "no_evidence" : "evidence",
+        gapDecision: confirmedGap
+          ? "no_evidence"
+          : incomplete
+            ? "incomplete"
+            : "evidence",
       },
     });
     return {
@@ -2178,10 +2492,19 @@ async function processAnswerGeneration(input: {
       coaching: null,
       missingStarElements: verified.missingStarElements,
       wroteResult: false,
-      gapDecision: confirmedGap ? "no_evidence" : "evidence",
+      gapDecision: confirmedGap
+        ? "no_evidence"
+        : incomplete
+          ? "incomplete"
+          : "evidence",
       companyMotivation,
     };
   }
+  const storedGapDecision = incomplete
+    ? "incomplete"
+    : confirmedGap
+      ? "no_evidence"
+      : "evidence";
   const operations: Prisma.PrismaPromise<unknown>[] = [
     prisma.consultationProposal.deleteMany({
       where: { turnId: input.turnId, status: "PENDING" },
@@ -2191,7 +2514,7 @@ async function processAnswerGeneration(input: {
       data: {
         analysisJson: {
           ...analysisJson,
-          gapDecision: confirmedGap ? "no_evidence" : "evidence",
+          gapDecision: storedGapDecision,
           needsMoreDetail: false,
         },
       },
@@ -2304,18 +2627,34 @@ async function processAnswerGeneration(input: {
           sessionId: input.sessionId,
           targetKey: input.target.key,
         },
-        data: { strength: confirmedGap ? "NONE" : "STRONG" },
+        data: {
+          strength: confirmedGap ? "NONE" : incomplete ? "PARTIAL" : "STRONG",
+        },
       }),
     );
   }
   await prisma.$transaction(operations);
+  if (incomplete && followUpAlreadyUsed && coaching?.trim()) {
+    await addTurn({
+      organizationId: input.organizationId,
+      sessionId: input.sessionId,
+      speaker: "CONSULTANT",
+      body: coaching.trim(),
+      targetKey: input.target?.key ?? null,
+      followUp: false,
+      intent: "COACHING",
+      analysisJson: input.replyToTurnId
+        ? { replyToTurnId: input.replyToTurnId }
+        : undefined,
+    });
+  }
   return {
     ok: true,
-    followUpQuestion: null,
-    coaching,
+    followUpQuestion: polishFollowUp,
+    coaching: incomplete ? coaching : null,
     missingStarElements: verified.missingStarElements,
     wroteResult: true,
-    gapDecision: confirmedGap ? "no_evidence" : "evidence",
+    gapDecision: storedGapDecision,
     companyMotivation,
   };
 }
@@ -2372,7 +2711,7 @@ export async function retryConsultationGeneration(input: {
     );
     const targets = targetsFromRequirement(requirement);
     const target = targets.find((item) => item.key === question.targetKey);
-    const answerContext = turns
+    const answerReplies = turns
       .filter(
         (turn) =>
           turn.speaker === "SEEKER" &&
@@ -2382,14 +2721,15 @@ export async function retryConsultationGeneration(input: {
             turn.targetKey === failedAnswer.targetKey),
       )
       .map((turn) => turn.body)
-      .filter(Boolean)
-      .join("\n");
+      .filter(Boolean);
+    const answerContext = answerReplies.join("\n");
     const processed = await processAnswerGeneration({
       organizationId: input.organizationId,
       campaignId: input.campaignId,
       sessionId: session.id,
       turnId: failedAnswer.id,
       answerContext,
+      seekerReplies: answerReplies,
       question: question.body,
       target: target ?? null,
       targets,
@@ -2710,17 +3050,43 @@ export async function recordConsultationReply(input: {
   if (!item || !question) replyCouldNotBeRecorded();
   const targetKey =
     question.targetKey ?? `question:${item.questionTurnId}`;
-  const existing = [...turns]
+  const matchingSeekerTurns = [...turns]
     .reverse()
-    .find(
+    .filter(
       (turn) =>
         turn.speaker === "SEEKER" &&
-        turn.body === answer &&
-        !analysisIsComplete(turn.analysisJson) &&
+        turn.body.trim() === answer &&
         (replyToTurnIdFromAnalysis(turn.analysisJson) === item.questionTurnId ||
           turn.targetKey === targetKey),
     );
+  const existing =
+    matchingSeekerTurns.find((turn) => !analysisIsComplete(turn.analysisJson)) ??
+    matchingSeekerTurns[0] ??
+    null;
   if (existing) {
+    const replyToTurnId =
+      replyToTurnIdFromAnalysis(existing.analysisJson) ??
+      item.followUp?.turnId ??
+      item.questionTurnId;
+    const prior =
+      existing.analysisJson &&
+      typeof existing.analysisJson === "object" &&
+      !Array.isArray(existing.analysisJson)
+        ? (existing.analysisJson as Record<string, unknown>)
+        : {};
+    if (analysisIsComplete(existing.analysisJson)) {
+      await prisma.consultationTurn.update({
+        where: { id: existing.id },
+        data: {
+          analysisJson: {
+            ...prior,
+            status: "PENDING",
+            needsMoreDetail: false,
+            ...(replyToTurnId ? { replyToTurnId } : {}),
+          },
+        },
+      });
+    }
     await prisma.consultationSession.update({
       where: { id: session.id },
       data: { generationStatus: "GENERATING", generationError: null },
@@ -2939,6 +3305,7 @@ export async function processConsultationReply(input: {
   const answerContext = [...priorOnCard, recordedAnswer]
     .filter(Boolean)
     .join("\n");
+  const seekerReplies = [...priorOnCard, recordedAnswer].filter(Boolean);
   const askedTurnId = replyToTurnIdFromAnalysis(seekerTurn.analysisJson);
   const askedTurn = askedTurnId
     ? turns.find(
@@ -2979,6 +3346,7 @@ export async function processConsultationReply(input: {
     resultTurnId,
     supersedeTurnIds,
     answerContext,
+    seekerReplies,
     question:
       askedTurn?.body ??
       resolvedItem?.followUp?.text ??
@@ -3001,10 +3369,8 @@ export async function processConsultationReply(input: {
       companyMotivation: processed.companyMotivation,
     });
   }
-  const askFollowUp =
-    !processed.wroteResult &&
-    Boolean(processed.followUpQuestion) &&
-    allowFollowUp;
+  // Follow-up may accompany a draft when usable content is missing a detail.
+  const askFollowUp = Boolean(processed.followUpQuestion) && allowFollowUp;
   const askedQuestions = askedQuestionsFromTurns(turns);
   let followUpAdded = false;
   if (
@@ -4125,12 +4491,14 @@ export async function reviseConsultationResult(input: {
     },
     orderBy: { sequence: "asc" },
   });
+  const priorBodies = prior.map((item) => item.body).filter(Boolean);
   await processAnswerGeneration({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
     sessionId: session.id,
     turnId: seekerTurn.id,
-    answerContext: prior.map((item) => item.body).filter(Boolean).join("\n"),
+    answerContext: priorBodies.join("\n"),
+    seekerReplies: priorBodies,
     question: question.body,
     target: targets.find((item) => item.key === turn.targetKey) ?? null,
     targets,

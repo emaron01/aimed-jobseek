@@ -1701,7 +1701,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("34");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("35");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("You coach; you do not interrogate");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("askedQuestions");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -2617,11 +2617,12 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     });
     expect(followUps[0]?.body).toContain("concrete result");
     expect(await prisma.consultationProposal.count({ where: { sessionId: session!.id } })).toBe(0);
+    // Best-answer rule: usable incomplete replies still produce Interview + Resume drafts.
     expect(
       await prisma.consultationStatement.count({
         where: { sessionId: session!.id },
       }),
-    ).toBe(0);
+    ).toBe(2);
     expect(
       (
         await prisma.consultationTurn.findMany({
@@ -2995,7 +2996,8 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
       expect(followUp.body.toLowerCase()).toMatch(
         /what did you|tell me what you did|personally/,
       );
-      expect(afterAnswer?.statements).toHaveLength(0);
+      // Best-answer rule: usable incomplete replies still produce drafts plus the follow-up.
+      expect(afterAnswer?.statements.length).toBeGreaterThan(0);
       await skipConsultationQuestion({
         organizationId,
         campaignId: campaign.id,
@@ -3810,11 +3812,12 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     expect(followUp?.body).toMatch(/concrete result or metric/i);
     expect(followUp?.body).toMatch(/\byou\b/i);
     expect(followUp?.body).not.toMatch(/\bdid I\b/);
+    // Best-answer rule: usable incomplete replies still produce Interview + Resume drafts.
     expect(
       await prisma.consultationStatement.count({
         where: { turnId: incomplete!.id },
       }),
-    ).toBe(0);
+    ).toBe(2);
     expect(
       CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS,
     ).toContain("personalProfileItems is the person's full Personal Profile");
@@ -3837,7 +3840,9 @@ describe.skipIf(!hasTestDatabase())("consultation session", () => {
     expect(secondIncomplete?.analysisJson).toMatchObject({
       gapDecision: "incomplete",
     });
-    expect(secondIncomplete?.statements).toEqual([]);
+    // Best-answer rule: second incomplete with usable content still yields a draft;
+    // followUpAlreadyUsed adds coaching instead of another follow-up.
+    expect(secondIncomplete?.statements.length).toBeGreaterThan(0);
     const coachingNote = await prisma.consultationTurn.findFirst({
       where: {
         sessionId: session.id,

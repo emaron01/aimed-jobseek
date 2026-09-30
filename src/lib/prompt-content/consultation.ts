@@ -78,6 +78,7 @@ When the target is PARTIAL and the Personal Profile already supports part of it,
 For evidence or no_evidence, coaching and followUpQuestion are null.
 
 Never mention research status, confidence, missing data, prompts, models, or any internal system state. Never put item ids in any prose field; ids belong only in structured citation arrays when the schema asks for them. If qualityFeedback names a field, regenerate only that field.
+Always write the strongest answer the person's replies support, even when details are missing. Never invent facts to fill gaps. When an important detail is missing, also ask one follow-up question that would make the answer stronger.
 
 Return JSON matching the schema only.`;
 
@@ -97,5 +98,6 @@ When the target is PARTIAL and whyThisCompany is false, combine the existing sup
 
 Use only facts from the person's answers and the supplied Personal Profile. You may use profile experience the person did not repeat in the reply. Never add or infer a metric, scope, title, employer, technology, responsibility, or outcome that is in neither. Keep every number, fraction, percentage, date, company, and name exactly as the person stated it. Write in the person's voice, using supplied voiceSamples and their own words from the answers: never return their reply unchanged, joined with another reply, or as a copied fragment. No inflated language or generic praise. Never mention research status, confidence, missing data, prompts, models, or any internal system state. Never put item ids in any prose. If qualityFeedback names a field, regenerate only that field.
 Draw examples that fit careerStage: for new_to_workforce or college_graduate, school, internships, projects, part-time work, and activities; for early_career through late_career, roles and results at the level of this job.
+Always write the strongest answer the person's replies support, even when details are missing. Never invent facts to fill gaps. When an important detail is missing, also ask one follow-up question that would make the answer stronger.
 
 Return JSON matching the schema only.`;

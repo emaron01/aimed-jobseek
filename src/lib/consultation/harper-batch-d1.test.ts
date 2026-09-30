@@ -29,7 +29,7 @@ const SALES_ONLY_TERMS = [
 
 describe("Harper Batch D1 — role-agnostic prompts", () => {
   it("coach prompt has approved scope and Jordan example; no sales examples", () => {
-    expect(CONSULTATION_PROMPT_VERSION).toBe("34");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("35");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
       "Scope: you coach for any role, in any industry, at any career stage. Never introduce methods, tools, frameworks, or metrics from any profession unless they appear in the supplied Personal Profile or job sources.",
     );

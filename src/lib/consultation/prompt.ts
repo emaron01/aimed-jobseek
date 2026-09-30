@@ -127,6 +127,7 @@ export function buildConsultationCoachMessages(input: {
 
 export function buildConsultationExtractMessages(input: {
   answer: string;
+  seekerReplies?: string[];
   question: string;
   target: { key: string; kind: string; text: string } | null;
   targets: Array<{ key: string; kind: string; text: string }>;
@@ -146,6 +147,12 @@ export function buildConsultationExtractMessages(input: {
   supportingEvidence?: string[];
   followUpAlreadyUsed?: boolean;
 }): AiMessage[] {
+  const seekerReplies =
+    input.seekerReplies?.map((reply) => reply.trim()).filter(Boolean) ??
+    input.answer
+      .split("\n")
+      .map((reply) => reply.trim())
+      .filter(Boolean);
   return [
     { role: "system", content: extractSystem() },
     {
@@ -164,6 +171,8 @@ export function buildConsultationExtractMessages(input: {
         targetStrength: input.targetStrength ?? null,
         supportingEvidence: input.supportingEvidence ?? [],
         answer: input.answer,
+        seekerReplies,
+        latestReplyTakesPrecedence: true,
         qualityFeedback: input.qualityFeedback ?? [],
         followUpAlreadyUsed: input.followUpAlreadyUsed === true,
       }),
@@ -173,6 +182,7 @@ export function buildConsultationExtractMessages(input: {
 
 export function buildConsultationPolishMessages(input: {
   answer: string;
+  seekerReplies?: string[];
   story: {
     situation: string | null;
     task: string | null;
@@ -201,6 +211,12 @@ export function buildConsultationPolishMessages(input: {
     roleId?: string | null;
   }>;
 }): AiMessage[] {
+  const seekerReplies =
+    input.seekerReplies?.map((reply) => reply.trim()).filter(Boolean) ??
+    input.answer
+      .split("\n")
+      .map((reply) => reply.trim())
+      .filter(Boolean);
   return [
     { role: "system", content: polishSystem() },
     {
@@ -219,6 +235,8 @@ export function buildConsultationPolishMessages(input: {
       role: "user",
       content: JSON.stringify({
         answer: input.answer,
+        seekerReplies,
+        latestReplyTakesPrecedence: true,
         story: input.story,
         declinedFollowUp: input.declinedFollowUp,
         confirmedGap: input.confirmedGap === true,
