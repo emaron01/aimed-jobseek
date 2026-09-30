@@ -14,6 +14,8 @@ export type AiCallUsageContext = {
   contactId?: string | null;
   category: UsageCategory;
   operation: UsageOperation;
+  /** Safe structured metadata (e.g. Harper step + attempt). Never secrets. */
+  metadata?: Record<string, unknown> | null;
 };
 
 export type AiMessage = {

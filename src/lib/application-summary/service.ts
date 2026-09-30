@@ -1209,6 +1209,7 @@ export async function answerCheatSheetCoachItem(input: {
       campaignId: input.campaignId,
       category: "CONSULTATION",
       operation: "CONSULTATION_REPLY",
+      metadata: { step: "cheat_sheet_sample_polish", attempt: 1 },
     },
   });
   if (!polished.ok) {

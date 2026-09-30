@@ -1,6 +1,7 @@
 /**
- * Harper role-expertise coaching fill (Batch D6).
- * Fills the General coaching set to 20–25 questions after the gap plan.
+ * Harper role-expertise coaching fill (Batch D6 / model-split).
+ * Step A chooses questions (consultation / terra); Step B writes suggested
+ * answers (consultation reply / luna).
  */
 
 import { z } from "zod";
@@ -13,7 +14,9 @@ import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import type { AiCallUsageContext } from "@/lib/ai/types";
 import {
   getConsultationAiProvider,
+  getConsultationReplyAiProvider,
   isConsultationAiConfigured,
+  isConsultationReplyAiConfigured,
 } from "@/lib/ai";
 import type { CareerStage } from "@/lib/consultation/career-stage";
 import {
@@ -39,18 +42,46 @@ import {
   resolveInterviewTypeTag,
 } from "@/lib/consultation/questions";
 import type { RecentRole } from "@/lib/consultation/recent-roles";
-import { ROLE_EXPERTISE_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content/role-expertise";
+import {
+  ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS,
+  ROLE_EXPERTISE_QUESTIONS_SYSTEM_INSTRUCTIONS,
+} from "@/lib/prompt-content/role-expertise";
 import { consultationConfig } from "@/lib/product-config/consultation";
 import { parseStringArray } from "@/lib/research";
 import { aiCallTracking } from "@/lib/usage/ai-call";
 import { prisma } from "@/lib/prisma-client";
 import type { Prisma } from "@prisma/client";
 
-export const ROLE_EXPERTISE_PROMPT_VERSION = "2";
+/** Bumped for questions/answers model-split (schema + prompt structure). */
+export const ROLE_EXPERTISE_PROMPT_VERSION = "3";
 
 export const COACHING_SET_MIN = 20;
 export const COACHING_SET_MAX = 25;
 
+export const roleExpertiseQuestionChoiceSchema = z.object({
+  text: z.string(),
+  interviewTypeTag: interviewTypeTagSchema,
+});
+
+export const roleExpertiseQuestionsResultSchema = z.object({
+  questions: z.array(roleExpertiseQuestionChoiceSchema),
+});
+
+export const roleExpertiseAnswerPartsSchema = z.object({
+  text: z.string(),
+  answerFramework: z.enum(["CAR", "STAR"]),
+  challenge: z.string().nullable(),
+  situation: z.string().nullable(),
+  task: z.string().nullable(),
+  action: z.string(),
+  result: z.string(),
+});
+
+export const roleExpertiseAnswersResultSchema = z.object({
+  answers: z.array(roleExpertiseAnswerPartsSchema),
+});
+
+/** Combined question+answer shape used after merge / by validators. */
 export const roleExpertiseQuestionSchema = z.object({
   text: z.string(),
   interviewTypeTag: interviewTypeTagSchema,
@@ -62,10 +93,23 @@ export const roleExpertiseQuestionSchema = z.object({
   result: z.string(),
 });
 
+/** @deprecated Prefer roleExpertiseQuestionsResultSchema; kept for receipt migration parse. */
 export const roleExpertiseResultSchema = z.object({
   questions: z.array(roleExpertiseQuestionSchema),
 });
 
+export type RoleExpertiseQuestionChoice = z.infer<
+  typeof roleExpertiseQuestionChoiceSchema
+>;
+export type RoleExpertiseQuestionsResult = z.infer<
+  typeof roleExpertiseQuestionsResultSchema
+>;
+export type RoleExpertiseAnswerParts = z.infer<
+  typeof roleExpertiseAnswerPartsSchema
+>;
+export type RoleExpertiseAnswersResult = z.infer<
+  typeof roleExpertiseAnswersResultSchema
+>;
 export type RoleExpertiseQuestion = z.infer<typeof roleExpertiseQuestionSchema>;
 export type RoleExpertiseResult = z.infer<typeof roleExpertiseResultSchema>;
 
@@ -171,6 +215,20 @@ export function roleExpertiseJobFingerprint(
   });
 }
 
+/** Chosen questions only — profile changes do not change this fingerprint. */
+export function roleExpertiseAnswersFingerprint(
+  questions: RoleExpertiseQuestionChoice[],
+): string {
+  return fingerprintPaidCallInputs({
+    promptVersion: ROLE_EXPERTISE_PROMPT_VERSION,
+    schemaName: "role_expertise_answers",
+    questions: questions.map((question) => ({
+      text: question.text.trim(),
+      interviewTypeTag: question.interviewTypeTag,
+    })),
+  });
+}
+
 export function stableRoleExpertiseSlug(text: string): string {
   const slug = text
     .toLowerCase()
@@ -233,15 +291,37 @@ export type ValidatedRoleExpertiseQuestion = {
   grounding: AnswerPartsGrounding;
 };
 
-export function validateRoleExpertiseQuestions(input: {
-  questions: RoleExpertiseQuestion[];
+export type ValidatedRoleExpertiseQuestionChoice = {
+  text: string;
+  targetKey: string;
+  interviewTypeTag: InterviewTypeTag;
+};
+
+function withUsageAttempt(
+  usage: AiCallUsageContext | undefined,
+  step: string,
+  attemptIndex: number,
+): AiCallUsageContext | undefined {
+  if (!usage) return undefined;
+  return {
+    ...usage,
+    metadata: {
+      ...(usage.metadata ?? {}),
+      step,
+      attempt: attemptIndex + 1,
+    },
+  };
+}
+
+export function validateRoleExpertiseQuestionChoices(input: {
+  questions: RoleExpertiseQuestionChoice[];
   minCount: number;
   maxCount: number;
   askedQuestions: AskedConsultationQuestion[];
   chronologyAlreadyAsked: boolean;
-}): { valid: ValidatedRoleExpertiseQuestion[]; issues: string[] } {
+}): { valid: ValidatedRoleExpertiseQuestionChoice[]; issues: string[] } {
   const issues: string[] = [];
-  const valid: ValidatedRoleExpertiseQuestion[] = [];
+  const valid: ValidatedRoleExpertiseQuestionChoice[] = [];
   const usedSlugs = new Set<string>();
   let walkThroughKept = false;
 
@@ -297,25 +377,7 @@ export function validateRoleExpertiseQuestions(input: {
       modelTag: raw.interviewTypeTag,
     });
 
-    const composed = composedAnswerFromRoleExpertiseQuestion({
-      ...raw,
-      text,
-      interviewTypeTag,
-    });
-    if (!composed) {
-      issues.push(
-        "Every question needs a suggested answer with all CAR or STAR parts, a result that states an outcome, and no framework or part labels.",
-      );
-      continue;
-    }
-
-    valid.push({
-      text,
-      targetKey,
-      interviewTypeTag,
-      content: composed.content,
-      grounding: composed.grounding,
-    });
+    valid.push({ text, targetKey, interviewTypeTag });
     if (isWalkThrough) walkThroughKept = true;
   }
 
@@ -343,7 +405,112 @@ export function validateRoleExpertiseQuestions(input: {
   return { valid, issues };
 }
 
-function buildRoleExpertiseMessages(input: {
+export function validateRoleExpertiseQuestions(input: {
+  questions: RoleExpertiseQuestion[];
+  minCount: number;
+  maxCount: number;
+  askedQuestions: AskedConsultationQuestion[];
+  chronologyAlreadyAsked: boolean;
+}): { valid: ValidatedRoleExpertiseQuestion[]; issues: string[] } {
+  const choiceChecked = validateRoleExpertiseQuestionChoices({
+    questions: input.questions.map((question) => ({
+      text: question.text,
+      interviewTypeTag: question.interviewTypeTag,
+    })),
+    minCount: input.minCount,
+    maxCount: input.maxCount,
+    askedQuestions: input.askedQuestions,
+    chronologyAlreadyAsked: input.chronologyAlreadyAsked,
+  });
+  const issues = [...choiceChecked.issues];
+  const valid: ValidatedRoleExpertiseQuestion[] = [];
+
+  for (const choice of choiceChecked.valid) {
+    const raw = input.questions.find(
+      (question) => question.text.trim() === choice.text,
+    );
+    if (!raw) {
+      issues.push("Every chosen question needs a matching suggested answer.");
+      continue;
+    }
+    const composed = composedAnswerFromRoleExpertiseQuestion({
+      ...raw,
+      text: choice.text,
+      interviewTypeTag: choice.interviewTypeTag,
+    });
+    if (!composed) {
+      issues.push(
+        "Every question needs a suggested answer with all CAR or STAR parts, a result that states an outcome, and no framework or part labels.",
+      );
+      continue;
+    }
+    valid.push({
+      text: choice.text,
+      targetKey: choice.targetKey,
+      interviewTypeTag: choice.interviewTypeTag,
+      content: composed.content,
+      grounding: composed.grounding,
+    });
+  }
+
+  if (input.maxCount === 0) {
+    return { valid: [], issues };
+  }
+  if (valid.length < input.minCount) {
+    issues.push(
+      `Return at least ${input.minCount} and at most ${input.maxCount} role-expertise questions with suggested answers.`,
+    );
+  }
+  if (valid.length > input.maxCount) {
+    return {
+      valid: valid.slice(0, input.maxCount),
+      issues,
+    };
+  }
+  return { valid, issues };
+}
+
+function mergeQuestionsWithAnswers(
+  choices: ValidatedRoleExpertiseQuestionChoice[],
+  answers: RoleExpertiseAnswerParts[],
+): RoleExpertiseQuestion[] {
+  const byText = new Map(
+    answers.map((answer) => [answer.text.trim().toLowerCase(), answer]),
+  );
+  return choices.map((choice) => {
+    const answer =
+      byText.get(choice.text.toLowerCase()) ??
+      answers.find(
+        (item) =>
+          questionNearDuplicate(item.text, choice.text) ||
+          item.text.trim() === choice.text,
+      );
+    if (!answer) {
+      return {
+        text: choice.text,
+        interviewTypeTag: choice.interviewTypeTag,
+        answerFramework: "CAR" as const,
+        challenge: null,
+        situation: null,
+        task: null,
+        action: "",
+        result: "",
+      };
+    }
+    return {
+      text: choice.text,
+      interviewTypeTag: choice.interviewTypeTag,
+      answerFramework: answer.answerFramework,
+      challenge: answer.challenge,
+      situation: answer.situation,
+      task: answer.task,
+      action: answer.action,
+      result: answer.result,
+    };
+  });
+}
+
+function buildRoleExpertiseQuestionsMessages(input: {
   minCount: number;
   maxCount: number;
   askedQuestions: AskedConsultationQuestion[];
@@ -351,7 +518,6 @@ function buildRoleExpertiseMessages(input: {
   recentRoles: RecentRole[];
   careerStage: CareerStage;
   jobSources: Record<string, unknown>;
-  profileItems: unknown[];
   qualityFeedback?: string[];
 }) {
   return [
@@ -359,7 +525,7 @@ function buildRoleExpertiseMessages(input: {
       role: "system" as const,
       content: `Prompt version: ${ROLE_EXPERTISE_PROMPT_VERSION}
 
-${ROLE_EXPERTISE_SYSTEM_INSTRUCTIONS}`,
+${ROLE_EXPERTISE_QUESTIONS_SYSTEM_INSTRUCTIONS}`,
     },
     {
       role: "user" as const,
@@ -371,6 +537,35 @@ ${ROLE_EXPERTISE_SYSTEM_INSTRUCTIONS}`,
         recentRoles: input.recentRoles,
         askedQuestions: input.askedQuestions,
         jobSources: input.jobSources,
+        qualityFeedback: input.qualityFeedback ?? [],
+      }),
+    },
+  ];
+}
+
+function buildRoleExpertiseAnswersMessages(input: {
+  questions: ValidatedRoleExpertiseQuestionChoice[];
+  careerStage: CareerStage;
+  jobSources: Record<string, unknown>;
+  profileItems: unknown[];
+  qualityFeedback?: string[];
+}) {
+  return [
+    {
+      role: "system" as const,
+      content: `Prompt version: ${ROLE_EXPERTISE_PROMPT_VERSION}
+
+${ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS}`,
+    },
+    {
+      role: "user" as const,
+      content: JSON.stringify({
+        careerStage: input.careerStage,
+        questions: input.questions.map((question) => ({
+          text: question.text,
+          interviewTypeTag: question.interviewTypeTag,
+        })),
+        jobSources: input.jobSources,
         personalProfileItems: input.profileItems,
         qualityFeedback: input.qualityFeedback ?? [],
       }),
@@ -378,6 +573,38 @@ ${ROLE_EXPERTISE_SYSTEM_INSTRUCTIONS}`,
   ];
 }
 
+export function isRoleExpertiseQuestionsResultUsable(
+  result: RoleExpertiseQuestionsResult,
+  bounds: { minCount: number; maxCount: number },
+): boolean {
+  if (bounds.maxCount === 0) return true;
+  const { valid } = validateRoleExpertiseQuestionChoices({
+    questions: result.questions,
+    minCount: bounds.minCount,
+    maxCount: bounds.maxCount,
+    askedQuestions: [],
+    chronologyAlreadyAsked: false,
+  });
+  return valid.length >= Math.min(bounds.minCount, bounds.maxCount);
+}
+
+export function isRoleExpertiseAnswersResultUsable(
+  result: RoleExpertiseAnswersResult,
+  choices: ValidatedRoleExpertiseQuestionChoice[],
+): boolean {
+  if (choices.length === 0) return true;
+  const merged = mergeQuestionsWithAnswers(choices, result.answers);
+  const { valid } = validateRoleExpertiseQuestions({
+    questions: merged,
+    minCount: choices.length,
+    maxCount: choices.length,
+    askedQuestions: [],
+    chronologyAlreadyAsked: false,
+  });
+  return valid.length >= Math.min(1, choices.length);
+}
+
+/** @deprecated Prefer isRoleExpertiseQuestionsResultUsable. */
 export function isRoleExpertiseResultUsable(
   result: RoleExpertiseResult,
   bounds: { minCount: number; maxCount: number },
@@ -391,6 +618,323 @@ export function isRoleExpertiseResultUsable(
     chronologyAlreadyAsked: false,
   });
   return valid.length >= Math.min(bounds.minCount, bounds.maxCount);
+}
+
+function parseStoredQuestions(json: unknown): RoleExpertiseQuestionsResult {
+  const asQuestions = roleExpertiseQuestionsResultSchema.safeParse(json);
+  if (asQuestions.success) return asQuestions.data;
+  // Legacy combined receipt: strip answer fields.
+  const legacy = roleExpertiseResultSchema.parse(json);
+  return {
+    questions: legacy.questions.map((question) => ({
+      text: question.text,
+      interviewTypeTag: question.interviewTypeTag,
+    })),
+  };
+}
+
+async function generateRoleExpertiseQuestionsStep(input: {
+  organizationId: string;
+  campaignId: string;
+  job: RoleExpertiseJobInputs;
+  minCount: number;
+  maxCount: number;
+  askedQuestions: AskedConsultationQuestion[];
+  chronologyAlreadyAsked: boolean;
+  recentRoles: RecentRole[];
+  careerStage: CareerStage;
+  jobSources: Record<string, unknown>;
+  usage?: AiCallUsageContext;
+}): Promise<
+  | {
+      ok: true;
+      choices: ValidatedRoleExpertiseQuestionChoice[];
+      skipped: boolean;
+      keptAfterPartial: number | null;
+    }
+  | { ok: false; message: string; skipped: boolean }
+> {
+  if (!isConsultationAiConfigured()) {
+    return {
+      ok: false,
+      skipped: false,
+      message: "Consultation AI is not configured for role-expertise questions.",
+    };
+  }
+
+  const fingerprint = roleExpertiseJobFingerprint(input.job);
+  let qualityFeedback: string[] = [];
+  let lastValid: ValidatedRoleExpertiseQuestionChoice[] = [];
+
+  try {
+    const gated = await runPaidStructuredCall<RoleExpertiseQuestionsResult>({
+      organizationId: input.organizationId,
+      operation: "ROLE_EXPERTISE_QUESTIONS",
+      subjectKey: input.campaignId,
+      inputFingerprint: fingerprint,
+      parseStored: parseStoredQuestions,
+      isResultUsable: (stored) =>
+        isRoleExpertiseQuestionsResultUsable(stored, {
+          minCount: input.minCount,
+          maxCount: input.maxCount,
+        }),
+      callProvider: async () => {
+        let data: RoleExpertiseQuestionsResult = { questions: [] };
+        for (
+          let attempt = 0;
+          attempt <= consultationConfig.qualityRegenerationAttempts;
+          attempt += 1
+        ) {
+          const attemptUsage = withUsageAttempt(
+            input.usage,
+            "role_expertise_questions",
+            attempt,
+          );
+          const response = await getConsultationAiProvider().generateStructured({
+            ...structuredOutputRequest("roleExpertiseQuestions"),
+            ...(attemptUsage ? aiCallTracking(attemptUsage) : {}),
+            messages: buildRoleExpertiseQuestionsMessages({
+              minCount: input.minCount,
+              maxCount: input.maxCount,
+              askedQuestions: input.askedQuestions,
+              chronologyAlreadyAsked: input.chronologyAlreadyAsked,
+              recentRoles: input.recentRoles,
+              careerStage: input.careerStage,
+              jobSources: input.jobSources,
+              qualityFeedback,
+            }),
+            parseOutput: (raw) => ({
+              data: roleExpertiseQuestionsResultSchema.parse(raw),
+              coercedFields: [],
+            }),
+          });
+          data = response.data;
+          const checked = validateRoleExpertiseQuestionChoices({
+            questions: data.questions,
+            minCount: input.minCount,
+            maxCount: input.maxCount,
+            askedQuestions: input.askedQuestions,
+            chronologyAlreadyAsked: input.chronologyAlreadyAsked,
+          });
+          lastValid = checked.valid;
+          const lastAttempt =
+            attempt === consultationConfig.qualityRegenerationAttempts;
+          if (checked.issues.length === 0) {
+            return {
+              questions: checked.valid.map((item) => ({
+                text: item.text,
+                interviewTypeTag: item.interviewTypeTag,
+              })),
+            };
+          }
+          if (lastAttempt) {
+            return {
+              questions: checked.valid.map((item) => ({
+                text: item.text,
+                interviewTypeTag: item.interviewTypeTag,
+              })),
+            };
+          }
+          qualityFeedback = checked.issues;
+        }
+        return data;
+      },
+    });
+
+    const checked = validateRoleExpertiseQuestionChoices({
+      questions: gated.data.questions,
+      minCount: input.minCount,
+      maxCount: input.maxCount,
+      askedQuestions: input.askedQuestions,
+      chronologyAlreadyAsked: input.chronologyAlreadyAsked,
+    });
+    const kept = checked.valid.length;
+    const partial =
+      checked.issues.length > 0 || kept < input.minCount ? kept : null;
+    return {
+      ok: true,
+      choices: checked.valid,
+      skipped: gated.skipped,
+      keptAfterPartial: partial,
+    };
+  } catch (error) {
+    if (lastValid.length > 0) {
+      return {
+        ok: true,
+        choices: lastValid,
+        skipped: false,
+        keptAfterPartial: lastValid.length,
+      };
+    }
+    return {
+      ok: false,
+      skipped: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Role-expertise questions could not be generated.",
+    };
+  }
+}
+
+async function generateRoleExpertiseAnswersStep(input: {
+  organizationId: string;
+  campaignId: string;
+  choices: ValidatedRoleExpertiseQuestionChoice[];
+  careerStage: CareerStage;
+  jobSources: Record<string, unknown>;
+  profileItems: unknown[];
+  usage?: AiCallUsageContext;
+}): Promise<
+  | {
+      ok: true;
+      questions: ValidatedRoleExpertiseQuestion[];
+      skipped: boolean;
+      keptAfterPartial: number | null;
+    }
+  | { ok: false; message: string; skipped: boolean }
+> {
+  if (input.choices.length === 0) {
+    return {
+      ok: true,
+      questions: [],
+      skipped: true,
+      keptAfterPartial: null,
+    };
+  }
+  if (!isConsultationReplyAiConfigured()) {
+    return {
+      ok: false,
+      skipped: false,
+      message:
+        "Consultation reply AI is not configured for role-expertise answers.",
+    };
+  }
+
+  const choicePayload = input.choices.map((choice) => ({
+    text: choice.text,
+    interviewTypeTag: choice.interviewTypeTag,
+  }));
+  const fingerprint = roleExpertiseAnswersFingerprint(choicePayload);
+  let qualityFeedback: string[] = [];
+  let lastValid: ValidatedRoleExpertiseQuestion[] = [];
+
+  try {
+    const gated = await runPaidStructuredCall<RoleExpertiseAnswersResult>({
+      organizationId: input.organizationId,
+      operation: "ROLE_EXPERTISE_ANSWERS",
+      subjectKey: input.campaignId,
+      inputFingerprint: fingerprint,
+      parseStored: (json) => roleExpertiseAnswersResultSchema.parse(json),
+      isResultUsable: (stored) =>
+        isRoleExpertiseAnswersResultUsable(stored, input.choices),
+      callProvider: async () => {
+        let data: RoleExpertiseAnswersResult = { answers: [] };
+        for (
+          let attempt = 0;
+          attempt <= consultationConfig.qualityRegenerationAttempts;
+          attempt += 1
+        ) {
+          const attemptUsage = withUsageAttempt(
+            input.usage,
+            "role_expertise_answers",
+            attempt,
+          );
+          const response =
+            await getConsultationReplyAiProvider().generateStructured({
+              ...structuredOutputRequest("roleExpertiseAnswers"),
+              ...(attemptUsage ? aiCallTracking(attemptUsage) : {}),
+              messages: buildRoleExpertiseAnswersMessages({
+                questions: input.choices,
+                careerStage: input.careerStage,
+                jobSources: input.jobSources,
+                profileItems: input.profileItems,
+                qualityFeedback,
+              }),
+              parseOutput: (raw) => ({
+                data: roleExpertiseAnswersResultSchema.parse(raw),
+                coercedFields: [],
+              }),
+            });
+          data = response.data;
+          const merged = mergeQuestionsWithAnswers(input.choices, data.answers);
+          const checked = validateRoleExpertiseQuestions({
+            questions: merged,
+            minCount: input.choices.length,
+            maxCount: input.choices.length,
+            askedQuestions: [],
+            chronologyAlreadyAsked: false,
+          });
+          lastValid = checked.valid;
+          const lastAttempt =
+            attempt === consultationConfig.qualityRegenerationAttempts;
+          if (checked.issues.length === 0) {
+            return {
+              answers: checked.valid.map((item) => ({
+                text: item.text,
+                answerFramework: item.grounding.answerFramework,
+                challenge: item.grounding.challenge ?? null,
+                situation: item.grounding.situation ?? null,
+                task: item.grounding.task ?? null,
+                action: item.grounding.action,
+                result: item.grounding.result,
+              })),
+            };
+          }
+          if (lastAttempt) {
+            return {
+              answers: checked.valid.map((item) => ({
+                text: item.text,
+                answerFramework: item.grounding.answerFramework,
+                challenge: item.grounding.challenge ?? null,
+                situation: item.grounding.situation ?? null,
+                task: item.grounding.task ?? null,
+                action: item.grounding.action,
+                result: item.grounding.result,
+              })),
+            };
+          }
+          qualityFeedback = checked.issues;
+        }
+        return data;
+      },
+    });
+
+    const merged = mergeQuestionsWithAnswers(input.choices, gated.data.answers);
+    const checked = validateRoleExpertiseQuestions({
+      questions: merged,
+      minCount: input.choices.length,
+      maxCount: input.choices.length,
+      askedQuestions: [],
+      chronologyAlreadyAsked: false,
+    });
+    const kept = checked.valid.length;
+    const partial =
+      checked.issues.length > 0 || kept < input.choices.length ? kept : null;
+    return {
+      ok: true,
+      questions: checked.valid,
+      skipped: gated.skipped,
+      keptAfterPartial: partial,
+    };
+  } catch (error) {
+    if (lastValid.length > 0) {
+      return {
+        ok: true,
+        questions: lastValid,
+        skipped: false,
+        keptAfterPartial: lastValid.length,
+      };
+    }
+    return {
+      ok: false,
+      skipped: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Role-expertise answers could not be generated.",
+    };
+  }
 }
 
 export async function generateRoleExpertiseWithModel(input: {
@@ -410,6 +954,8 @@ export async function generateRoleExpertiseWithModel(input: {
       ok: true;
       questions: ValidatedRoleExpertiseQuestion[];
       skipped: boolean;
+      questionsSkipped: boolean;
+      answersSkipped: boolean;
       keptAfterPartial: number | null;
     }
   | { ok: false; message: string; skipped: boolean }
@@ -419,18 +965,12 @@ export async function generateRoleExpertiseWithModel(input: {
       ok: true,
       questions: [],
       skipped: true,
+      questionsSkipped: true,
+      answersSkipped: true,
       keptAfterPartial: null,
     };
   }
-  if (!isConsultationAiConfigured()) {
-    return {
-      ok: false,
-      skipped: false,
-      message: "Consultation AI is not configured for role-expertise questions.",
-    };
-  }
 
-  const fingerprint = roleExpertiseJobFingerprint(input.job);
   const jobSources = {
     title: input.job.title,
     employer: input.job.companyName,
@@ -443,129 +983,90 @@ export async function generateRoleExpertiseWithModel(input: {
     scorecard: scorecardFingerprintSlice(input.job.scorecardJson),
   };
 
-  let qualityFeedback: string[] = [];
-  let lastValid: ValidatedRoleExpertiseQuestion[] = [];
-  let skipped = false;
-
-  try {
-    const gated = await runPaidStructuredCall<RoleExpertiseResult>({
-      organizationId: input.organizationId,
-      operation: "ROLE_EXPERTISE_QUESTIONS",
-      subjectKey: input.campaignId,
-      inputFingerprint: fingerprint,
-      parseStored: (json) => roleExpertiseResultSchema.parse(json),
-      isResultUsable: (stored) =>
-        isRoleExpertiseResultUsable(stored, {
-          minCount: input.minCount,
-          maxCount: input.maxCount,
-        }),
-      callProvider: async () => {
-        let data: RoleExpertiseResult = { questions: [] };
-        for (
-          let attempt = 0;
-          attempt <= consultationConfig.qualityRegenerationAttempts;
-          attempt += 1
-        ) {
-          const response = await getConsultationAiProvider().generateStructured({
-            ...structuredOutputRequest("roleExpertiseQuestions"),
-            ...(input.usage ? aiCallTracking(input.usage) : {}),
-            messages: buildRoleExpertiseMessages({
-              minCount: input.minCount,
-              maxCount: input.maxCount,
-              askedQuestions: input.askedQuestions,
-              chronologyAlreadyAsked: input.chronologyAlreadyAsked,
-              recentRoles: input.recentRoles,
-              careerStage: input.careerStage,
-              jobSources,
-              profileItems: input.profileItems,
-              qualityFeedback,
-            }),
-            parseOutput: (raw) => ({
-              data: roleExpertiseResultSchema.parse(raw),
-              coercedFields: [],
-            }),
-          });
-          data = response.data;
-          const checked = validateRoleExpertiseQuestions({
-            questions: data.questions,
-            minCount: input.minCount,
-            maxCount: input.maxCount,
-            askedQuestions: input.askedQuestions,
-            chronologyAlreadyAsked: input.chronologyAlreadyAsked,
-          });
-          lastValid = checked.valid;
-          const lastAttempt =
-            attempt === consultationConfig.qualityRegenerationAttempts;
-          if (checked.issues.length === 0) {
-            return {
-              questions: checked.valid.map((item) => ({
-                text: item.text,
-                interviewTypeTag: item.interviewTypeTag,
-                answerFramework: item.grounding.answerFramework,
-                challenge: item.grounding.challenge ?? null,
-                situation: item.grounding.situation ?? null,
-                task: item.grounding.task ?? null,
-                action: item.grounding.action,
-                result: item.grounding.result,
-              })),
-            };
-          }
-          if (lastAttempt) {
-            // Keep every question that passed; never block Harper.
-            return {
-              questions: checked.valid.map((item) => ({
-                text: item.text,
-                interviewTypeTag: item.interviewTypeTag,
-                answerFramework: item.grounding.answerFramework,
-                challenge: item.grounding.challenge ?? null,
-                situation: item.grounding.situation ?? null,
-                task: item.grounding.task ?? null,
-                action: item.grounding.action,
-                result: item.grounding.result,
-              })),
-            };
-          }
-          qualityFeedback = checked.issues;
+  const questionsStep = await generateRoleExpertiseQuestionsStep({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    job: input.job,
+    minCount: input.minCount,
+    maxCount: input.maxCount,
+    askedQuestions: input.askedQuestions,
+    chronologyAlreadyAsked: input.chronologyAlreadyAsked,
+    recentRoles: input.recentRoles,
+    careerStage: input.careerStage,
+    jobSources,
+    usage: input.usage
+      ? {
+          ...input.usage,
+          operation: "CONSULTATION",
+          metadata: {
+            ...(input.usage.metadata ?? {}),
+            step: "role_expertise_questions",
+          },
         }
-        return data;
-      },
-    });
-
-    skipped = gated.skipped;
-    const checked = validateRoleExpertiseQuestions({
-      questions: gated.data.questions,
-      minCount: input.minCount,
-      maxCount: input.maxCount,
-      askedQuestions: input.askedQuestions,
-      chronologyAlreadyAsked: input.chronologyAlreadyAsked,
-    });
-    const kept = checked.valid.length;
-    const partial =
-      checked.issues.length > 0 || kept < input.minCount ? kept : null;
-    return {
-      ok: true,
-      questions: checked.valid,
-      skipped,
-      keptAfterPartial: partial,
-    };
-  } catch (error) {
-    if (lastValid.length > 0) {
-      return {
-        ok: true,
-        questions: lastValid,
-        skipped: false,
-        keptAfterPartial: lastValid.length,
-      };
-    }
+      : {
+          organizationId: input.organizationId,
+          campaignId: input.campaignId,
+          category: "CONSULTATION",
+          operation: "CONSULTATION",
+          metadata: { step: "role_expertise_questions", attempt: 1 },
+        },
+  });
+  if (!questionsStep.ok) {
     return {
       ok: false,
       skipped: false,
-      message:
-        error instanceof Error
-          ? error.message
-          : "Role-expertise questions could not be generated.",
+      message: questionsStep.message,
     };
   }
+
+  const answersUsageBase: AiCallUsageContext = input.usage
+    ? {
+        ...input.usage,
+        operation: "CONSULTATION_REPLY",
+        metadata: {
+          ...(input.usage.metadata ?? {}),
+          step: "role_expertise_answers",
+        },
+      }
+    : {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        category: "CONSULTATION",
+        operation: "CONSULTATION_REPLY",
+        metadata: { step: "role_expertise_answers", attempt: 1 },
+      };
+
+  const answersStep = await generateRoleExpertiseAnswersStep({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    choices: questionsStep.choices,
+    careerStage: input.careerStage,
+    jobSources,
+    profileItems: input.profileItems,
+    usage: answersUsageBase,
+  });
+  if (!answersStep.ok) {
+    return {
+      ok: false,
+      skipped: false,
+      message: answersStep.message,
+    };
+  }
+
+  const keptAfterPartial =
+    questionsStep.keptAfterPartial != null ||
+    answersStep.keptAfterPartial != null
+      ? answersStep.questions.length
+      : null;
+
+  return {
+    ok: true,
+    questions: answersStep.questions,
+    skipped: questionsStep.skipped && answersStep.skipped,
+    questionsSkipped: questionsStep.skipped,
+    answersSkipped: answersStep.skipped,
+    keptAfterPartial,
+  };
 }
 
 export async function storeRoleExpertiseQuestions(input: {
@@ -638,8 +1139,8 @@ export async function hasUsableRoleExpertiseReceipt(input: {
   });
   if (!receipt || receipt.inputHash !== fingerprint) return false;
   try {
-    const stored = roleExpertiseResultSchema.parse(receipt.resultJson);
-    return isRoleExpertiseResultUsable(stored, {
+    const stored = parseStoredQuestions(receipt.resultJson);
+    return isRoleExpertiseQuestionsResultUsable(stored, {
       minCount: input.minCount,
       maxCount: input.maxCount,
     });

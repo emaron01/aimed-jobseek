@@ -100,6 +100,7 @@ export async function writePresentationPlan(input: {
       campaignId: input.campaignId,
       category: "CONSULTATION",
       operation: "CONSULTATION",
+      metadata: { step: "presentation_plan", attempt: 1 },
     },
   });
   if (!written.ok) return written;

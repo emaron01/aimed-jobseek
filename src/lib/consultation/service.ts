@@ -197,12 +197,36 @@ function consultationUsage(
   organizationId: string,
   campaignId: string,
   operation: "CONSULTATION" | "CONSULTATION_REPLY",
+  step:
+    | "plan"
+    | "reassess"
+    | "role_expertise_questions"
+    | "role_expertise_answers"
+    | "extract"
+    | "polish"
+    | "statement_regeneration",
+  attempt = 1,
 ): AiCallUsageContext {
   return {
     organizationId,
     campaignId,
     category: "CONSULTATION",
     operation,
+    metadata: { step, attempt },
+  };
+}
+
+function withHarperUsageAttempt(
+  usage: AiCallUsageContext | undefined,
+  attemptIndex: number,
+): AiCallUsageContext | undefined {
+  if (!usage) return undefined;
+  return {
+    ...usage,
+    metadata: {
+      ...(usage.metadata ?? {}),
+      attempt: attemptIndex + 1,
+    },
   };
 }
 
@@ -560,7 +584,7 @@ async function extractAnswerWithQuality(input: {
     const extracted = await extractWithModel({
       ...input,
       qualityFeedback,
-      usage: input.usage,
+      usage: withHarperUsageAttempt(input.usage, attempt),
     });
     if (!extracted.ok) {
       lastFailure = extracted.message;
@@ -690,7 +714,7 @@ export async function polishAnswerWithQuality(input: {
       voiceSamples,
       careerStage,
       profileItems: input.profileItems,
-      usage: input.usage,
+      usage: withHarperUsageAttempt(input.usage, attempt),
     });
     if (!polished.ok) {
       lastFailure = polished.message;
@@ -1244,10 +1268,14 @@ async function planAndStoreRound(input: {
       applicationLearningsPendingHiringManager:
         input.applicationLearningsPendingHiringManager ?? null,
       companyResearch,
-      usage: consultationUsage(
-        input.organizationId,
-        input.campaignId,
-        "CONSULTATION",
+      usage: withHarperUsageAttempt(
+        consultationUsage(
+          input.organizationId,
+          input.campaignId,
+          "CONSULTATION",
+          input.additiveReassess ? "reassess" : "plan",
+        ),
+        attempt,
       ),
       chronologyRequested,
       coveredTargetKeys: [
@@ -1515,6 +1543,7 @@ async function maybeFillRoleExpertiseAfterGapPlan(input: {
       input.organizationId,
       input.campaignId,
       "CONSULTATION",
+      "role_expertise_questions",
     ),
   });
   if (!generated.ok) {
@@ -1790,10 +1819,17 @@ async function processAnswerGeneration(input: {
     }
   | { ok: false }
 > {
-  const replyUsage = consultationUsage(
+  const extractUsage = consultationUsage(
     input.organizationId,
     input.campaignId,
     "CONSULTATION_REPLY",
+    "extract",
+  );
+  const polishUsage = consultationUsage(
+    input.organizationId,
+    input.campaignId,
+    "CONSULTATION_REPLY",
+    "polish",
   );
   const profileItems = profileEvidenceItems(input.profile);
   const seekerReplies = input.seekerReplies
@@ -1829,7 +1865,7 @@ async function processAnswerGeneration(input: {
     targetStrength,
     supportingEvidence,
     followUpAlreadyUsed,
-    usage: replyUsage,
+    usage: extractUsage,
   });
   if (!extracted.ok) {
     await failGeneration(input.sessionId, extracted.message);
@@ -1965,7 +2001,7 @@ async function processAnswerGeneration(input: {
       target: input.target,
       targetStrength,
       supportingEvidence,
-      usage: replyUsage,
+      usage: polishUsage,
     });
     if (!polished.ok) {
       await finishItemNeedsMoreDetail({
@@ -2177,7 +2213,7 @@ async function processAnswerGeneration(input: {
     target: input.target,
     targetStrength,
     supportingEvidence,
-    usage: replyUsage,
+    usage: polishUsage,
   });
   if (!polished.ok) {
     if (repliesUsable && polished.bestEffort?.interviewAnswer.trim()) {
@@ -3533,6 +3569,7 @@ async function declineConsultationFollowUp(input: {
       input.organizationId,
       input.campaignId,
       "CONSULTATION_REPLY",
+      "polish",
     ),
   });
   if (!polished.ok) throw new TenantError(polished.message);
@@ -3912,6 +3949,7 @@ export async function regenerateConsultationStatement(input: {
       input.organizationId,
       statement.session.campaignId,
       "CONSULTATION_REPLY",
+      "statement_regeneration",
     ),
   });
   if (!polished.ok) throw new TenantError(polished.message);

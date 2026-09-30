@@ -49,5 +49,6 @@ export async function recordAiStructuredUsage(input: {
     webSearchCalls: input.usage?.webSearchCalls ?? null,
     status: input.status,
     durationMs: input.durationMs,
+    metadata: input.context.metadata ?? null,
   });
 }

@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const generateStructured = vi.hoisted(() => vi.fn());
+const generateReplyStructured = vi.hoisted(() => vi.fn());
 const isConsultationAiConfigured = vi.hoisted(() => vi.fn(() => true));
+const isConsultationReplyAiConfigured = vi.hoisted(() => vi.fn(() => true));
 const runPaidStructuredCall = vi.hoisted(() => vi.fn());
 const findPaidCallReceipt = vi.hoisted(() => vi.fn());
 
@@ -11,7 +13,11 @@ vi.mock("@/lib/ai", async (importOriginal) => {
   return {
     ...actual,
     isConsultationAiConfigured,
+    isConsultationReplyAiConfigured,
     getConsultationAiProvider: () => ({ generateStructured }),
+    getConsultationReplyAiProvider: () => ({
+      generateStructured: generateReplyStructured,
+    }),
   };
 });
 
@@ -42,6 +48,8 @@ import {
 import { fixtureSalesLeadershipProfile } from "@/lib/consultation/fixtures/sales-leadership-profile";
 import {
   CONSULTATION_COACH_SYSTEM_INSTRUCTIONS,
+  ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS,
+  ROLE_EXPERTISE_QUESTIONS_SYSTEM_INSTRUCTIONS,
   ROLE_EXPERTISE_SYSTEM_INSTRUCTIONS,
 } from "@/lib/prompt-content";
 import type { CandidateProfile } from "@/lib/product-research/candidate-profile";
@@ -254,9 +262,11 @@ const fixtures = {
 describe("Harper Batch D6 — role-expertise + recentRoles", () => {
   beforeEach(() => {
     generateStructured.mockReset();
+    generateReplyStructured.mockReset();
     runPaidStructuredCall.mockReset();
     findPaidCallReceipt.mockReset();
     isConsultationAiConfigured.mockReturnValue(true);
+    isConsultationReplyAiConfigured.mockReturnValue(true);
     runPaidStructuredCall.mockImplementation(async (input: {
       callProvider: () => Promise<unknown>;
     }) => ({ data: await input.callProvider(), skipped: false }));
@@ -265,9 +275,15 @@ describe("Harper Batch D6 — role-expertise + recentRoles", () => {
   it("bumps consultation prompt version and adds the recentRoles coach line", () => {
     expect(CONSULTATION_PROMPT_VERSION).toBe("35");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(COACH_RECENT_ROLES_LINE);
-    expect(ROLE_EXPERTISE_PROMPT_VERSION).toBe("2");
+    expect(ROLE_EXPERTISE_PROMPT_VERSION).toBe("3");
     expect(ROLE_EXPERTISE_SYSTEM_INSTRUCTIONS).toContain(
       "You are Harper, an expert interview coach. For one job application, you write the questions a hiring manager for this specific role and industry asks, and a suggested answer for each.",
+    );
+    expect(ROLE_EXPERTISE_QUESTIONS_SYSTEM_INSTRUCTIONS).toContain(
+      "you write the questions a hiring manager for this specific role and industry asks.",
+    );
+    expect(ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS).toContain(
+      "you write a suggested answer for each supplied interview question.",
     );
   });
 
@@ -360,12 +376,6 @@ describe("Harper Batch D6 — role-expertise + recentRoles", () => {
             {
               text: "Tell me about a time.",
               interviewTypeTag: "focused_competency",
-              answerFramework: "CAR",
-              challenge: null,
-              situation: null,
-              task: null,
-              action: "I acted.",
-              result: "Ok.",
             },
           ],
         },
@@ -373,15 +383,41 @@ describe("Harper Batch D6 — role-expertise + recentRoles", () => {
       .mockResolvedValueOnce({
         data: {
           questions: [
-            carQuestion(
-              "Walk me through how you handled a hard shift on the unit.",
-            ),
-            carQuestion(
-              "Tell me how you escalate a deteriorating patient.",
-            ),
+            {
+              text: "Walk me through how you handled a hard shift on the unit.",
+              interviewTypeTag: "focused_competency",
+            },
+            {
+              text: "Tell me how you escalate a deteriorating patient.",
+              interviewTypeTag: "focused_competency",
+            },
           ],
         },
       });
+    generateReplyStructured.mockResolvedValue({
+      data: {
+        answers: [
+          {
+            text: "Walk me through how you handled a hard shift on the unit.",
+            answerFramework: "CAR",
+            challenge: "I faced a staffing gap on the unit.",
+            situation: null,
+            task: null,
+            action: "I rebalanced assignments across the shift.",
+            result: "Coverage held and patients stayed safe through the night.",
+          },
+          {
+            text: "Tell me how you escalate a deteriorating patient.",
+            answerFramework: "CAR",
+            challenge: "A patient was declining on my watch.",
+            situation: null,
+            task: null,
+            action: "I escalated to the charge nurse and rapid response.",
+            result: "The team stabilized the patient within minutes.",
+          },
+        ],
+      },
+    });
 
     const result = await generateRoleExpertiseWithModel({
       organizationId: "org",
@@ -530,11 +566,36 @@ describe("Harper Batch D6 — role-expertise + recentRoles", () => {
     const fpProfileIrrelevant = roleExpertiseJobFingerprint(fixtures.nurse.job);
     expect(fpProfileIrrelevant).toBe(fpA);
 
-    runPaidStructuredCall.mockResolvedValueOnce({
-      data: { questions: [carQuestion("How do you prioritize patients?")] },
-      skipped: true,
-    });
+    runPaidStructuredCall
+      .mockResolvedValueOnce({
+        data: {
+          questions: [
+            {
+              text: "How do you prioritize patients?",
+              interviewTypeTag: "focused_competency",
+            },
+          ],
+        },
+        skipped: true,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          answers: [
+            {
+              text: "How do you prioritize patients?",
+              answerFramework: "CAR",
+              challenge: "I faced a staffing gap on the unit.",
+              situation: null,
+              task: null,
+              action: "I rebalanced assignments across the shift.",
+              result: "Coverage held and patients stayed safe through the night.",
+            },
+          ],
+        },
+        skipped: true,
+      });
     generateStructured.mockClear();
+    generateReplyStructured.mockClear();
     const skipped = await generateRoleExpertiseWithModel({
       organizationId: "org",
       campaignId: "camp",
@@ -548,7 +609,13 @@ describe("Harper Batch D6 — role-expertise + recentRoles", () => {
       profileItems: [{ id: "changed", text: "new profile fact" }],
     });
     expect(skipped.ok).toBe(true);
-    if (skipped.ok) expect(skipped.skipped).toBe(true);
+    if (skipped.ok) {
+      expect(skipped.skipped).toBe(true);
+      expect(skipped.questionsSkipped).toBe(true);
+      expect(skipped.answersSkipped).toBe(true);
+    }
+    expect(generateStructured).not.toHaveBeenCalled();
+    expect(generateReplyStructured).not.toHaveBeenCalled();
   });
 
   it("nothing runs on a page view or render path", () => {

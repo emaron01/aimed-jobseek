@@ -68,13 +68,13 @@ describe("Harper reply outcome, fact preservation, and approved-plus-draft", () 
     expect(processFn).toContain("wroteResult: processed.wroteResult");
   });
 
-  it("ITEM 2: fact sentence is exact in extract, polish, role-expertise, and application-summary; versions 34/2/15", () => {
+  it("ITEM 2: fact sentence is exact in extract, polish, role-expertise, and application-summary; versions 34/3/15", () => {
     expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(FACT_SENTENCE);
     expect(CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS).toContain(FACT_SENTENCE);
     expect(ROLE_EXPERTISE_SYSTEM_INSTRUCTIONS).toContain(FACT_SENTENCE);
     expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain(FACT_SENTENCE);
     expect(CONSULTATION_PROMPT_VERSION).toBe("35");
-    expect(ROLE_EXPERTISE_PROMPT_VERSION).toBe("2");
+    expect(ROLE_EXPERTISE_PROMPT_VERSION).toBe("3");
     expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("15");
   });
 
