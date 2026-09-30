@@ -117,12 +117,12 @@ export function ApplicationTrackerList({
             data-testid={`tracker-step-${step.key}`}
             aria-current={step.isCurrent ? "page" : undefined}
             className={cn(
-              "flex items-start gap-2 rounded-md bg-surface px-2 py-1.5 text-sm text-ink transition-colors duration-200 motion-reduce:transition-none",
+              "flex items-start gap-2 rounded-md px-2 py-1.5 text-sm transition-colors duration-200 motion-reduce:transition-none",
               step.isCurrent
-                ? "bg-surface text-ink"
+                ? "border-l-2 border-l-primary bg-primary/10 text-primary"
                 : ink
-                  ? "hover:bg-surface"
-                  : "hover:bg-canvas",
+                  ? "bg-surface text-ink hover:bg-surface"
+                  : "bg-surface text-ink hover:bg-canvas",
             )}
           >
             <ApplicationStepMarker
