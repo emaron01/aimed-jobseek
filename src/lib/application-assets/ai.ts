@@ -1,10 +1,9 @@
 import {
-  getAssetAiProvider,
   getAssetValidationAiProvider,
-  getEmailAiProvider,
+  getConsultationReplyAiProvider,
   getEmailFactsAiProvider,
   isAssetAiConfigured,
-  isEmailAiConfigured,
+  isConsultationReplyAiConfigured,
   isEmailFactsAiConfigured,
 } from "@/lib/ai";
 import { AiValidationError } from "@/lib/ai/errors";
@@ -56,8 +55,8 @@ type Result<T> =
 
 const UNCONFIGURED =
   "Application asset AI is not configured. Configure it, then retry.";
-const EMAIL_UNCONFIGURED =
-  "Email generation AI is not configured. Configure EMAIL_AI_*, then retry.";
+const WRITING_UNCONFIGURED =
+  "Writing AI is not configured. Configure CONSULTATION_REPLY_AI_*, then retry.";
 const EMAIL_FACTS_UNCONFIGURED =
   "Email company-fact selection AI is not configured. Configure EMAIL_FACTS_AI_*, then retry.";
 
@@ -100,10 +99,12 @@ export async function generateResumeWithModel(input: {
   regenerationInstruction: string | null;
   qualityFeedback: string[];
 }): Promise<Result<ResumeAssetContent>> {
-  if (!isAssetAiConfigured()) return { ok: false, message: UNCONFIGURED };
+  if (!isConsultationReplyAiConfigured()) {
+    return { ok: false, message: WRITING_UNCONFIGURED };
+  }
   const resumeInput = input;
   const callProvider = async () => {
-    const response = await getAssetAiProvider().generateStructured({
+    const response = await getConsultationReplyAiProvider().generateStructured({
       ...structuredOutputRequest("resumeAsset"),
       ...aiCallTracking(
         assetUsage(input.context, "APPLICATION_ASSET_GENERATION"),
@@ -135,10 +136,12 @@ export async function generateCoverLetterWithModel(input: {
   regenerationInstruction: string | null;
   qualityFeedback: string[];
 }): Promise<Result<CoverLetterAssetContent>> {
-  if (!isAssetAiConfigured()) return { ok: false, message: UNCONFIGURED };
+  if (!isConsultationReplyAiConfigured()) {
+    return { ok: false, message: WRITING_UNCONFIGURED };
+  }
   const coverInput = input;
   const callProvider = async () => {
-    const response = await getAssetAiProvider().generateStructured({
+    const response = await getConsultationReplyAiProvider().generateStructured({
       ...structuredOutputRequest("coverLetterAsset"),
       ...aiCallTracking(
         assetUsage(input.context, "APPLICATION_ASSET_GENERATION"),
@@ -228,8 +231,8 @@ export async function generateOutreachWithModel(
     interviewStageId?: string | null;
   },
 ): Promise<Result<ApplicationAssetContent>> {
-  if (!isEmailAiConfigured()) {
-    return { ok: false, message: EMAIL_UNCONFIGURED };
+  if (!isConsultationReplyAiConfigured()) {
+    return { ok: false, message: WRITING_UNCONFIGURED };
   }
   const selected = await selectOutreachFacts(input);
   if (!selected.ok) return selected;
@@ -249,7 +252,7 @@ export async function generateOutreachWithModel(
     );
   const callProvider = async (): Promise<ApplicationAssetContent> => {
     if (input.type === "EMAIL") {
-      const response = await getEmailAiProvider().generateStructured({
+      const response = await getConsultationReplyAiProvider().generateStructured({
         ...structuredOutputRequest("outreachEmailAsset"),
         ...tracking,
         messages,
@@ -261,7 +264,7 @@ export async function generateOutreachWithModel(
       return response.data;
     }
     if (input.type === "LINKEDIN_CONNECTION_NOTE") {
-      const response = await getEmailAiProvider().generateStructured({
+      const response = await getConsultationReplyAiProvider().generateStructured({
         ...structuredOutputRequest("outreachLinkedinNoteAsset"),
         ...tracking,
         messages,
@@ -272,7 +275,7 @@ export async function generateOutreachWithModel(
       });
       return response.data;
     }
-    const response = await getEmailAiProvider().generateStructured({
+    const response = await getConsultationReplyAiProvider().generateStructured({
       ...structuredOutputRequest("outreachLinkedinInmailAsset"),
       ...tracking,
       messages,

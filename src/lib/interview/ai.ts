@@ -1,4 +1,7 @@
-import { getAssetAiProvider, isAssetAiConfigured } from "@/lib/ai";
+import {
+  getConsultationReplyAiProvider,
+  isConsultationReplyAiConfigured,
+} from "@/lib/ai";
 import { AiValidationError } from "@/lib/ai/errors";
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import type { AiCallUsageContext } from "@/lib/ai/types";
@@ -13,7 +16,7 @@ import { buildInterviewThankYouClarifyingMessages } from "./prompt";
 type Result<T> = { ok: true; data: T } | { ok: false; message: string };
 
 const UNCONFIGURED =
-  "Application asset AI is not configured. Configure it, then retry.";
+  "Writing AI is not configured. Configure CONSULTATION_REPLY_AI_*, then retry.";
 
 function failure(operation: string, error: unknown, message: string): Result<never> {
   const issues = error instanceof AiValidationError ? error.issues : undefined;
@@ -39,11 +42,11 @@ export function generateInterviewThankYouClarifyingQuestions(input: {
   stageId: string;
   usage?: AiCallUsageContext;
 }): Promise<Result<InterviewThankYouClarifyingQuestions>> {
-  if (!isAssetAiConfigured()) {
+  if (!isConsultationReplyAiConfigured()) {
     return Promise.resolve({ ok: false, message: UNCONFIGURED });
   }
   const callProvider = async () => {
-    const response = await getAssetAiProvider().generateStructured({
+    const response = await getConsultationReplyAiProvider().generateStructured({
       ...structuredOutputRequest("interviewThankYouClarifyingQuestions"),
       ...(input.usage ? aiCallTracking(input.usage) : {}),
       messages: buildInterviewThankYouClarifyingMessages(input),

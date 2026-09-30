@@ -1,6 +1,8 @@
 import {
   getConsultationAiProvider,
+  getConsultationReplyAiProvider,
   isConsultationAiConfigured,
+  isConsultationReplyAiConfigured,
 } from "@/lib/ai";
 import type { AiCallUsageContext } from "@/lib/ai/types";
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
@@ -94,9 +96,9 @@ export async function generateCheatSheetPersonSectionGuidance(input: {
   | { ok: true; data: ReturnType<typeof cheatSheetPersonSectionGenerateSchema.parse> }
   | { ok: false; message: string }
 > {
-  if (!isConsultationAiConfigured()) return unavailable();
+  if (!isConsultationReplyAiConfigured()) return unavailable();
   try {
-    const response = await getConsultationAiProvider().generateStructured({
+    const response = await getConsultationReplyAiProvider().generateStructured({
       ...structuredOutputRequest("cheatSheetPersonSection"),
       ...(input.usage ? aiCallTracking(input.usage) : {}),
       messages: buildApplicationSummaryGuidanceMessages({

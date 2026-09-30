@@ -210,20 +210,34 @@ describe("AI cost reduction", () => {
     expect(nextStep).not.toContain("getConsultationAiProvider");
   });
 
-  it("uses EMAIL_AI and EMAIL_FACTS_AI for outreach and ASSET_AI for resume/cover", () => {
+  it("uses EMAIL_FACTS_AI for outreach fact selection, CONSULTATION_REPLY for writing, ASSET validation for claims", () => {
     const assets = readFileSync(
       resolve("src/lib/application-assets/ai.ts"),
       "utf8",
     );
-    expect(assets).toContain("getEmailAiProvider");
     expect(assets).toContain("getEmailFactsAiProvider");
-    expect(assets).toMatch(/generateResumeWithModel[\s\S]*getAssetAiProvider/);
+    expect(assets).toContain("getConsultationReplyAiProvider");
+    expect(assets).toContain("getAssetValidationAiProvider");
     expect(assets).toMatch(
+      /generateResumeWithModel[\s\S]*getConsultationReplyAiProvider/,
+    );
+    expect(assets).toMatch(
+      /generateCoverLetterWithModel[\s\S]*getConsultationReplyAiProvider/,
+    );
+    expect(assets).toMatch(
+      /generateOutreachWithModel[\s\S]*getConsultationReplyAiProvider/,
+    );
+    expect(assets).not.toMatch(
+      /generateResumeWithModel[\s\S]*getAssetAiProvider/,
+    );
+    expect(assets).not.toMatch(
       /generateCoverLetterWithModel[\s\S]*getAssetAiProvider/,
     );
-    expect(assets).toMatch(/generateOutreachWithModel[\s\S]*getEmailAiProvider/);
     expect(assets).not.toMatch(
-      /generateOutreachWithModel[\s\S]*getAssetAiProvider/,
+      /generateOutreachWithModel[\s\S]*getEmailAiProvider/,
+    );
+    expect(assets).toMatch(
+      /validateAssetClaimsWithModel[\s\S]*getAssetValidationAiProvider/,
     );
   });
 

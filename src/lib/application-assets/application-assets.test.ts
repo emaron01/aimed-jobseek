@@ -3,16 +3,19 @@ import JSZip from "jszip";
 
 const generateStructured = vi.hoisted(() => vi.fn());
 const isAssetAiConfigured = vi.hoisted(() => vi.fn(() => true));
+const isConsultationReplyAiConfigured = vi.hoisted(() => vi.fn(() => true));
 
 vi.mock("@/lib/ai", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/ai")>();
   return {
     ...actual,
     isAssetAiConfigured,
+    isConsultationReplyAiConfigured,
     isEmailAiConfigured: isAssetAiConfigured,
     isEmailFactsAiConfigured: isAssetAiConfigured,
     getAssetAiProvider: () => ({ generateStructured }),
     getAssetValidationAiProvider: () => ({ generateStructured }),
+    getConsultationReplyAiProvider: () => ({ generateStructured }),
     getEmailAiProvider: () => ({ generateStructured }),
     getEmailFactsAiProvider: () => ({ generateStructured }),
   };
@@ -351,6 +354,7 @@ describe.skipIf(!hasTestDatabase())("application assets", () => {
   beforeEach(async () => {
     generateStructured.mockReset();
     isAssetAiConfigured.mockReturnValue(true);
+    isConsultationReplyAiConfigured.mockReturnValue(true);
     await prisma.applicationAsset.deleteMany({ where: { campaignId } });
     // Phase 2 batch 2: gate receipts must not leak across tests with identical inputs.
     await prisma.paidCallReceipt.deleteMany({
