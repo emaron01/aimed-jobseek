@@ -202,6 +202,26 @@ export function needsMoreDetailFromAnalysis(value: unknown): boolean {
   return (value as { needsMoreDetail?: unknown }).needsMoreDetail === true;
 }
 
+/**
+ * Visible Harper outcome under a question: a draft (or approved) interview
+ * answer / resume bullet, an open follow-up, or the needs-more-detail message.
+ */
+export function consultationQuestionHasVisibleOutcome(
+  item: ConsultationQaItem,
+): boolean {
+  if (item.needsMoreDetail === true) return true;
+  if (item.followUp != null) return true;
+  if (item.talkingPoint || item.resumeBullet) return true;
+  if (item.pendingDraftTalkingPoint || item.pendingDraftResumeBullet) {
+    return true;
+  }
+  return item.statements.some(
+    (statement) =>
+      statement.kind === "INTERVIEW_ANSWER" ||
+      statement.kind === "RESUME_BULLET",
+  );
+}
+
 /** Seeker dismissed a Harper question or gap (Ignore). */
 export function isIgnoredSeekerTurn(
   turn: Pick<QaTurn, "speaker" | "analysisJson">,

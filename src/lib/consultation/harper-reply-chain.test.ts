@@ -27,6 +27,7 @@ import {
 } from "@/lib/consultation/results";
 import {
   buildConsultationQaView,
+  consultationQuestionHasVisibleOutcome,
   needsMoreDetailFromAnalysis,
 } from "@/lib/consultation/qa-view";
 import {
@@ -418,25 +419,80 @@ describe("Harper reply chain fix", () => {
     );
   });
 
-  it("ITEM 2: repeated same-body submit reuses one turn; at most one needs-more-detail per question", () => {
+  it("ITEM 2: same-body incomplete reuses one turn; complete with outcome is no-op; complete without outcome reprocesses; edit always processes", () => {
     const service = src("src/lib/consultation/service.ts");
+    const actions = src("src/app/actions/consultation.ts");
+    const qaView = src("src/lib/consultation/qa-view.ts");
+    const config = src("src/lib/product-config/consultation.ts");
+
+    expect(config).toContain('answerUnchanged: "No Changes To Your Answer"');
+    expect(consultationConversationCopy.answerUnchanged).toBe(
+      "No Changes To Your Answer",
+    );
+
+    expect(qaView).toContain("consultationQuestionHasVisibleOutcome");
+    expect(qaView).toContain("item.needsMoreDetail === true");
+    expect(qaView).toContain("item.followUp != null");
+
     const recordStart = service.indexOf(
       "export async function recordConsultationReply",
     );
-    const recordFn = service.slice(recordStart, recordStart + 4500);
+    const recordFn = service.slice(recordStart, recordStart + 6500);
     expect(recordFn).toContain("matchingSeekerTurns");
     expect(recordFn).toContain("turn.body.trim() === answer");
+    expect(recordFn).toContain("consultationQuestionHasVisibleOutcome(item)");
+    expect(recordFn).toContain("unchanged: true");
+    // Incomplete path: reuse without resetting a complete turn.
+    expect(recordFn).toContain("!analysisIsComplete(existing.analysisJson)");
+    // Legacy complete-without-outcome still resets to PENDING once.
     expect(recordFn).toContain('status: "PENDING"');
-    expect(recordFn).toContain("analysisIsComplete(existing.analysisJson)");
-    // Prefer latest match via reverse() filter then incomplete-first, else latest.
-    expect(recordFn).toContain("[...turns]");
-    expect(recordFn).toContain(".reverse()");
+    expect(recordFn).toContain("unchanged: false");
 
-    // QA view reads needsMoreDetail from latest seeker analysis only (once per question).
-    const qaView = src("src/lib/consultation/qa-view.ts");
-    expect(qaView).toContain("needsMoreDetailFromAnalysis(");
+    // Actions: unchanged → message, no enqueue; otherwise enqueue.
+    for (const name of [
+      "export async function answerConsultationAction",
+      "export async function replyConsultationAction",
+    ]) {
+      const start = actions.indexOf(name);
+      const fn = actions.slice(start, start + 1800);
+      expect(fn).toContain("recorded.unchanged");
+      expect(fn).toContain("consultationConversationCopy.answerUnchanged");
+      expect(fn).toContain("enqueueApplicationJob");
+      const unchangedIdx = fn.indexOf("recorded.unchanged");
+      const enqueueIdx = fn.indexOf("enqueueApplicationJob");
+      expect(unchangedIdx).toBeGreaterThan(-1);
+      expect(enqueueIdx).toBeGreaterThan(unchangedIdx);
+    }
+
+    // Sync path also skips process when unchanged.
+    const answerQ = service.slice(
+      service.indexOf("export async function answerConsultationQuestion"),
+      service.indexOf("export async function answerConsultationQuestion") + 900,
+    );
+    expect(answerQ).toContain("if (recorded.unchanged) return");
+    expect(answerQ).toContain("processConsultationReply");
+
+    // Edit path always records PENDING and enqueues (changed body processes).
+    const editRecord = service.slice(
+      service.indexOf("export async function recordConsultationAnswerEdit"),
+      service.indexOf("export async function recordConsultationAnswerEdit") + 2000,
+    );
+    expect(editRecord).toContain('status: "PENDING"');
+    const editAction = actions.slice(
+      actions.indexOf("export async function editConsultationAnswerAction"),
+      actions.indexOf("export async function editConsultationAnswerAction") + 1600,
+    );
+    expect(editAction).toContain("recordConsultationAnswerEdit");
+    expect(editAction).toContain("enqueueApplicationJob");
+    expect(editAction).not.toContain("answerUnchanged");
+
+    // Message renders via ApplicationActionForm status from action result.
+    const form = src("src/components/ApplicationActionForm.tsx");
+    expect(form).toContain("state.message");
+    expect(form).toContain('role="status"');
+
+    // At most one needs-more-detail per question (latest seeker analysis).
     expect(qaView).toContain("item.seekerAnswers.at(-1)?.analysisJson");
-
     const view = buildConsultationQaView({
       turns: [
         {
@@ -465,6 +521,56 @@ describe("Harper reply chain fix", () => {
     });
     expect(view.questions[0]?.seekerAnswers).toHaveLength(1);
     expect(view.questions[0]?.needsMoreDetail).toBe(true);
+    expect(
+      consultationQuestionHasVisibleOutcome(view.questions[0]!),
+    ).toBe(true);
+  });
+
+  it("ITEM 2 helper: visible outcome detection for draft, follow-up, needs-more-detail", () => {
+    const base = {
+      questionTurnId: "q1",
+      targetKey: "required:gtm",
+      question: "How did you divide ownership?",
+      followUp: null as { turnId: string; text: string } | null,
+      seekerAnswers: [{ id: "s1", body: REPLY_2 }],
+      statements: [] as Array<{
+        id: string;
+        turnId: string;
+        kind: "INTERVIEW_ANSWER" | "RESUME_BULLET";
+        status: string;
+        content: string;
+        strengtheningNote: string | null;
+      }>,
+      resumeBullet: null as null,
+      talkingPoint: null as null,
+      needsMoreDetail: false,
+    };
+    expect(consultationQuestionHasVisibleOutcome(base)).toBe(false);
+    expect(
+      consultationQuestionHasVisibleOutcome({
+        ...base,
+        needsMoreDetail: true,
+      }),
+    ).toBe(true);
+    expect(
+      consultationQuestionHasVisibleOutcome({
+        ...base,
+        followUp: { turnId: "f1", text: "What was the result?" },
+      }),
+    ).toBe(true);
+    expect(
+      consultationQuestionHasVisibleOutcome({
+        ...base,
+        talkingPoint: {
+          id: "st1",
+          turnId: "s1",
+          kind: "INTERVIEW_ANSWER",
+          status: "DRAFT",
+          content: "I split GTM 70/30 and generated $6.8MM.",
+          strengtheningNote: null,
+        },
+      }),
+    ).toBe(true);
   });
 
   it("ITEM 3: editing a saved reply records PENDING then enqueues processing to a visible outcome", () => {

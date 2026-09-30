@@ -73,6 +73,7 @@ import {
   resolveReplyableQaItem,
   primaryQuestionTurnIdForSeekerReply,
   primaryFor,
+  consultationQuestionHasVisibleOutcome,
   type ConsultationQaItem,
   type QaStatement,
   type QaTurn,
@@ -3018,6 +3019,8 @@ export async function recordConsultationReply(input: {
   targetKey: string;
   turnId: string;
   questionTurnId: string;
+  /** Same body already complete with a visible outcome — no process/enqueue. */
+  unchanged?: boolean;
 }> {
   const answer = input.answer.trim();
   if (!answer) throw new TenantError("Write an answer, or skip the question.");
@@ -3064,6 +3067,31 @@ export async function recordConsultationReply(input: {
     matchingSeekerTurns[0] ??
     null;
   if (existing) {
+    // Incomplete (PENDING/FAILED): reuse one turn; caller enqueues one process run.
+    if (!analysisIsComplete(existing.analysisJson)) {
+      await prisma.consultationSession.update({
+        where: { id: session.id },
+        data: { generationStatus: "GENERATING", generationError: null },
+      });
+      return {
+        sessionId: session.id,
+        targetKey,
+        turnId: existing.id,
+        questionTurnId: item.questionTurnId,
+        unchanged: false,
+      };
+    }
+    // Complete + already has a visible outcome: no paid call, no enqueue.
+    if (consultationQuestionHasVisibleOutcome(item)) {
+      return {
+        sessionId: session.id,
+        targetKey,
+        turnId: existing.id,
+        questionTurnId: item.questionTurnId,
+        unchanged: true,
+      };
+    }
+    // Complete but no visible outcome (legacy): process once so an outcome appears.
     const replyToTurnId =
       replyToTurnIdFromAnalysis(existing.analysisJson) ??
       item.followUp?.turnId ??
@@ -3074,19 +3102,17 @@ export async function recordConsultationReply(input: {
       !Array.isArray(existing.analysisJson)
         ? (existing.analysisJson as Record<string, unknown>)
         : {};
-    if (analysisIsComplete(existing.analysisJson)) {
-      await prisma.consultationTurn.update({
-        where: { id: existing.id },
-        data: {
-          analysisJson: {
-            ...prior,
-            status: "PENDING",
-            needsMoreDetail: false,
-            ...(replyToTurnId ? { replyToTurnId } : {}),
-          },
+    await prisma.consultationTurn.update({
+      where: { id: existing.id },
+      data: {
+        analysisJson: {
+          ...prior,
+          status: "PENDING",
+          needsMoreDetail: false,
+          ...(replyToTurnId ? { replyToTurnId } : {}),
         },
-      });
-    }
+      },
+    });
     await prisma.consultationSession.update({
       where: { id: session.id },
       data: { generationStatus: "GENERATING", generationError: null },
@@ -3096,6 +3122,7 @@ export async function recordConsultationReply(input: {
       targetKey,
       turnId: existing.id,
       questionTurnId: item.questionTurnId,
+      unchanged: false,
     };
   }
   const seekerTurn = await addTurn({
@@ -3120,6 +3147,7 @@ export async function recordConsultationReply(input: {
     targetKey,
     turnId: seekerTurn.id,
     questionTurnId: item.questionTurnId,
+    unchanged: false,
   };
 }
 
@@ -3131,6 +3159,7 @@ export async function answerConsultationQuestion(input: {
   intent?: string | null;
 }): Promise<void> {
   const recorded = await recordConsultationReply(input);
+  if (recorded.unchanged) return;
   await processConsultationReply({
     organizationId: input.organizationId,
     campaignId: input.campaignId,

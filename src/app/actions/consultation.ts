@@ -214,12 +214,19 @@ export async function answerConsultationAction(
     if (!campaignId || !targetKey) {
       return { ok: false, message: consultationConversationCopy.replyFailed };
     }
-    await recordConsultationReply({
+    const recorded = await recordConsultationReply({
       organizationId,
       campaignId,
       targetKey,
       answer,
     });
+    if (recorded.unchanged) {
+      revalidatePath(`/campaigns/${campaignId}`);
+      return {
+        ok: true,
+        message: consultationConversationCopy.answerUnchanged,
+      };
+    }
     await enqueueApplicationJob({
       organizationId,
       campaignId,
@@ -459,13 +466,20 @@ export async function replyConsultationAction(
       return { ok: false, message: consultationConversationCopy.threadReply };
     }
     const targetKey = String(formData.get("targetKey") ?? "").trim();
-    await recordConsultationReply({
+    const recorded = await recordConsultationReply({
       organizationId,
       campaignId,
       targetKey: targetKey || null,
       answer,
       intent: "REPLY",
     });
+    if (recorded.unchanged) {
+      revalidatePath(`/campaigns/${campaignId}`);
+      return {
+        ok: true,
+        message: consultationConversationCopy.answerUnchanged,
+      };
+    }
     await enqueueApplicationJob({
       organizationId,
       campaignId,

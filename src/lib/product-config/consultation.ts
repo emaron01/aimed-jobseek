@@ -114,6 +114,8 @@ export const consultationConversationCopy = Object.freeze({
   generationFailed: `${consultationConfig.displayName} could not finish this coaching. Retry.`,
   needsMoreDetailToShape:
     "Add a bit more detail so Harper can shape this answer.",
+  /** Same-body resubmit when the question already has a visible Harper outcome. */
+  answerUnchanged: "No Changes To Your Answer",
   replyFailed: "The reply could not be sent.",
   notAcceptingReplies: `${consultationConfig.displayName} is not taking replies right now.`,
   generationQualityFailed: `${consultationConfig.displayName} could not keep one part of this coaching after checks. The rest is below. Retry the missing part.`,
