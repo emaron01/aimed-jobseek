@@ -232,7 +232,7 @@ describe("workflow audit fixes", () => {
   });
 });
 
-describe.skipIf(!hasTestDatabase())("workflow audit database behavior", () => {
+describe.skipIf(!hasTestDatabase())("workflow audit database behavior", { timeout: 60_000 }, () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";

@@ -197,7 +197,7 @@ describe("Interview cheat sheet coach", () => {
   });
 });
 
-describe.skipIf(!hasTestDatabase())("cheat sheet Harper reply persistence", () => {
+describe.skipIf(!hasTestDatabase())("cheat sheet Harper reply persistence", { timeout: 60_000 }, () => {
   const suffix = Date.now().toString(36);
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";

@@ -231,7 +231,7 @@ describe("persona edit protection and add person", () => {
   });
 });
 
-describe.skipIf(!hasTestDatabase())("application job failure marking", () => {
+describe.skipIf(!hasTestDatabase())("application job failure marking", { timeout: 60_000 }, () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";

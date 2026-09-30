@@ -796,7 +796,7 @@ describe("title matching", () => {
 
 const describeDb = hasTestDatabase() ? describe : describe.skip;
 
-describeDb("application contacts and reminders", () => {
+describeDb("application contacts and reminders", { timeout: 60_000 }, () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";

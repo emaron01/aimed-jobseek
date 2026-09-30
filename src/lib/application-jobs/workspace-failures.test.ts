@@ -49,7 +49,7 @@ describe("obsolete workspace failures", () => {
   });
 });
 
-describe.skipIf(!hasTestDatabase())("stale fail-closed records", () => {
+describe.skipIf(!hasTestDatabase())("stale fail-closed records", { timeout: 60_000 }, () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";

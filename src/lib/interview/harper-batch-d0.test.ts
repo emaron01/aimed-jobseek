@@ -57,7 +57,7 @@ describe("Harper Batch D0 — remove unused notes-after gap check", () => {
 
 const describeDb = hasTestDatabase() ? describe : describe.skip;
 
-describeDb("Harper Batch D0 — notes save without consultationOfferJson", () => {
+describeDb("Harper Batch D0 — notes save without consultationOfferJson", { timeout: 60_000 }, () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";

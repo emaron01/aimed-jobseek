@@ -3,7 +3,7 @@ import { seedContactOnList } from "@/test/contact-seed";
 
 const hasDatabase = Boolean(process.env.DATABASE_URL?.trim());
 
-describe.skipIf(!hasDatabase)("tenant isolation", () => {
+describe.skipIf(!hasDatabase)("tenant isolation", { timeout: 60_000 }, () => {
   let prisma: import("@prisma/client").PrismaClient;
   let ready = false;
 

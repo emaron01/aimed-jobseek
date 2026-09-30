@@ -70,7 +70,7 @@ describe("scoring engine tenant isolation (Phase 3C)", () => {
 
 const hasDatabase = Boolean(process.env.DATABASE_URL?.trim());
 
-describe.skipIf(!hasDatabase)("scoring engine persistence (Phase 3C)", () => {
+describe.skipIf(!hasDatabase)("scoring engine persistence (Phase 3C)", { timeout: 60_000 }, () => {
   let prisma: import("@prisma/client").PrismaClient;
   let ready = false;
   let orgAId = "";

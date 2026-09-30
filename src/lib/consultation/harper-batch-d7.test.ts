@@ -440,7 +440,7 @@ describe("Harper Batch D7 — learnings fingerprint + HM routing", () => {
   });
 });
 
-describe.skipIf(!hasTestDatabase())("Harper Batch D7 — learnings gate (db)", () => {
+describe.skipIf(!hasTestDatabase())("Harper Batch D7 — learnings gate (db)", { timeout: 60_000 }, () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";

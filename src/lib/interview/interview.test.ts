@@ -121,7 +121,7 @@ describe("interview thank-you and stages (guide removed)", () => {
   });
 });
 
-describe.skipIf(!hasTestDatabase())("interview stages without guide", () => {
+describe.skipIf(!hasTestDatabase())("interview stages without guide", { timeout: 60_000 }, () => {
   const suffix = Date.now().toString(36);
   let organizationId = "";
   let userId = "";

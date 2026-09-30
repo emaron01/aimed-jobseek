@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 const hasDatabase = Boolean(process.env.DATABASE_URL?.trim());
 
-describe.skipIf(!hasDatabase)("product hierarchy and campaign validation", () => {
+describe.skipIf(!hasDatabase)("product hierarchy and campaign validation", { timeout: 60_000 }, () => {
   let prisma: import("@prisma/client").PrismaClient;
   let ready = false;
   let orgAId = "";

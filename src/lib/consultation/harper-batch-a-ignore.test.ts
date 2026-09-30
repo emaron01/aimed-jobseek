@@ -288,7 +288,7 @@ describe("Harper Batch A standing Answer / Ignore / reopen", () => {
 
 const describeDb = hasTestDatabase() ? describe : describe.skip;
 
-describeDb("Harper Batch A ignore/reopen (Postgres)", () => {
+describeDb("Harper Batch A ignore/reopen (Postgres)", { timeout: 60_000 }, () => {
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   let organizationId = "";
   let userId = "";

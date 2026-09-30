@@ -62,7 +62,7 @@ describe("What You Should Know About Me", () => {
   });
 });
 
-describe.skipIf(!hasTestDatabase())("seeker-stated background persistence", () => {
+describe.skipIf(!hasTestDatabase())("seeker-stated background persistence", { timeout: 60_000 }, () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";

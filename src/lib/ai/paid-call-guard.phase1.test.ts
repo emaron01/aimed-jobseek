@@ -140,7 +140,7 @@ describe("paid-call gate Phase 1 fingerprints and wiring", () => {
   });
 });
 
-describe.skipIf(!hasTestDatabase())("paid-call gate Phase 1 with database", () => {
+describe.skipIf(!hasTestDatabase())("paid-call gate Phase 1 with database", { timeout: 60_000 }, () => {
   const suffix = `pcg-${Date.now()}`;
   let organizationId = "";
   let productId = "";

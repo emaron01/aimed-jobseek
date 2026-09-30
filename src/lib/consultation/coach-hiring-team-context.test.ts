@@ -267,7 +267,7 @@ describe("Coach Hiring Team context", () => {
   });
 });
 
-describe.skipIf(!hasTestDatabase())("Coach Hiring Team context from the database", () => {
+describe.skipIf(!hasTestDatabase())("Coach Hiring Team context from the database", { timeout: 60_000 }, () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";

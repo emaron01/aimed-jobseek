@@ -151,7 +151,7 @@ describe("application job serialize policy (source)", () => {
   });
 });
 
-describe.skipIf(!hasTestDatabase())("application job serialize same-key (database)", () => {
+describe.skipIf(!hasTestDatabase())("application job serialize same-key (database)", { timeout: 60_000 }, () => {
   const suffix = `ser-${Date.now()}`;
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";

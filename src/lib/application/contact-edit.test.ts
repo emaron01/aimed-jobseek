@@ -38,7 +38,7 @@ vi.mock("@/lib/contact-profile/ai", () => ({
   })),
 }));
 
-describe.skipIf(!hasTestDatabase())("edit an existing application contact", () => {
+describe.skipIf(!hasTestDatabase())("edit an existing application contact", { timeout: 60_000 }, () => {
   const suffix = Date.now().toString(36);
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";

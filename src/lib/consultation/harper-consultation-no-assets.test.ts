@@ -114,6 +114,7 @@ describe("Harper consultation no asset side effects (static)", () => {
 
 describe.skipIf(!hasTestDatabase())(
   "Harper consultation no asset side effects (database)",
+  { timeout: 60_000 },
   () => {
     const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

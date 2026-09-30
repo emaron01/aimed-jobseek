@@ -2473,7 +2473,7 @@ describe("consultation evidence and questions", () => {
   });
 });
 
-describe.skipIf(!hasTestDatabase())("consultation session", () => {
+describe.skipIf(!hasTestDatabase())("consultation session", { timeout: 60_000 }, () => {
   const suffix = Date.now().toString(36);
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";

@@ -805,7 +805,7 @@ describe("hiring team evidence and selectors", () => {
   });
 });
 
-describe.skipIf(!hasTestDatabase())("hiring team per application", () => {
+describe.skipIf(!hasTestDatabase())("hiring team per application", { timeout: 60_000 }, () => {
   const suffix = Date.now().toString(36);
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";

@@ -221,7 +221,7 @@ describe("application asset DOCX", () => {
   });
 });
 
-describe.skipIf(!hasTestDatabase())("application assets", () => {
+describe.skipIf(!hasTestDatabase())("application assets", { timeout: 60_000 }, () => {
   const suffix = Date.now().toString(36);
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";

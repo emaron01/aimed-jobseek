@@ -3,7 +3,7 @@ import { seedContactOnList } from "@/test/contact-seed";
 
 const hasDatabase = Boolean(process.env.DATABASE_URL?.trim());
 
-describe.skipIf(!hasDatabase)("tenant-scoped list import", () => {
+describe.skipIf(!hasDatabase)("tenant-scoped list import", { timeout: 60_000 }, () => {
   it("creates a list only for the active organization and blocks cross-tenant access", async () => {
     const { PrismaClient } = await import("@prisma/client");
     const prisma = new PrismaClient();

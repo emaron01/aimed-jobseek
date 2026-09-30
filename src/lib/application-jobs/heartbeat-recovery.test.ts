@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { hasTestDatabase } from "@/test/database";
 
-describe.skipIf(!hasTestDatabase())("application job heartbeat recovery", () => {
+describe.skipIf(!hasTestDatabase())("application job heartbeat recovery", { timeout: 60_000 }, () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";
