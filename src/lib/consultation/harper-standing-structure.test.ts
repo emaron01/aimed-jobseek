@@ -14,7 +14,7 @@ import {
   buildStandingListEntries,
   strongerStandingStrength,
 } from "@/lib/consultation/standing-entries";
-import { consultationConversationCopy } from "@/lib/product-config/consultation";
+import { consultationConversationCopy, consultationStatementLabels } from "@/lib/product-config/consultation";
 import { sameRequirementMeaning } from "@/lib/consultation/assess";
 
 function src(rel: string): string {
@@ -344,6 +344,121 @@ describe("ITEM 4: no consultation asset side effects; DONE stays an open hub", (
     // Next-step still keys off consultationStatus; DONE falls through past in_progress.
     expect(nextStep).toContain('consultationStatus === "IN_PROGRESS"');
     expect(nextStep).toContain('key: "assets_available"');
+  });
+});
+
+describe("after merge with main: role-expertise drafts + reply attachment", () => {
+  it("shows a consultant-turn suggested answer once inside the single Where you stand entry", () => {
+    const view = buildConsultationQaView({
+      turns: [
+        turn({
+          id: "q-role",
+          speaker: "CONSULTANT",
+          body: "What would your first 90 days at CSC look like?",
+          targetKey: "role-expertise:first-90",
+          sequence: 1,
+        }),
+      ],
+      statements: [
+        {
+          id: "st-suggest",
+          turnId: "q-role",
+          kind: "INTERVIEW_ANSWER",
+          status: "DRAFT",
+          content:
+            "In the first 90 days I would map the pipeline, meet the team, and ship one forecast win.",
+          strengtheningNote: null,
+        },
+      ],
+    });
+    expect(view.questions).toHaveLength(1);
+    const qa = view.questions[0]!;
+    expect(qa.talkingPoint?.content).toContain("first 90 days");
+    expect(qa.talkingPoint?.status).toBe("DRAFT");
+    expect(qa.talkingPoint?.kind).toBe("INTERVIEW_ANSWER");
+
+    const entries = buildStandingListEntries({
+      requirements: [],
+      dedicatedTopics: [
+        {
+          kind: "role-expertise",
+          targetKey: "role-expertise:first-90",
+          label: "Role expertise",
+          questions: view.questions,
+        },
+      ],
+      questionsByTargetKey: new Map([["role-expertise:first-90", view.questions]]),
+    });
+    const roleEntries = entries.filter(
+      (entry) => entry.targetKey === "role-expertise:first-90",
+    );
+    expect(roleEntries).toHaveLength(1);
+    expect(roleEntries[0]?.questions).toHaveLength(1);
+    expect(roleEntries[0]?.questions[0]?.talkingPoint?.content).toContain(
+      "first 90 days",
+    );
+    expect(roleEntries[0]?.questions[0]?.talkingPoint?.status).toBe("DRAFT");
+
+    expect(consultationConversationCopy.approve).toBe("Approve");
+    expect(consultationConversationCopy.editAnswer).toBe("Edit");
+    expect(consultationStatementLabels.INTERVIEW_ANSWER).toBe("Interview answer");
+    expect(consultationStatementLabels.DRAFT).toBe("Draft");
+
+    const standing = src("src/components/ConsultationStanding.tsx");
+    expect(standing).toContain("entry.questions");
+    expect(standing).toContain("QuestionList");
+    const thread = src("src/components/ConsultationThread.tsx");
+    expect(thread).toContain("item.talkingPoint ? <ResultBody");
+    expect(thread).toContain("consultationConversationCopy.approve");
+    expect(thread).toContain("consultationConversationCopy.editAnswer");
+  });
+
+  it("still attaches a reply to the answered primary when a follow-up is open", () => {
+    const primary = turn({
+      id: "q-frontline",
+      speaker: "CONSULTANT",
+      body: "Ability to build strong front-line management layers and develop elite sales talent.",
+      targetKey: "required:frontline",
+      sequence: 1,
+    });
+    const other = turn({
+      id: "q-leaders",
+      speaker: "CONSULTANT",
+      body: "If we spoke with your recent leaders and peers, what would they say?",
+      targetKey: "required:frontline",
+      sequence: 2,
+    });
+    const followUp = turn({
+      id: "fu-frontline",
+      speaker: "CONSULTANT",
+      body: "Which specific team did you develop?",
+      targetKey: "required:frontline",
+      followUp: true,
+      sequence: 3,
+      analysisJson: { replyToTurnId: "q-frontline" },
+    });
+    const seeker = turn({
+      id: "s1",
+      speaker: "SEEKER",
+      body: "At MDA I coached KPIs.",
+      targetKey: "required:frontline",
+      sequence: 4,
+      analysisJson: { status: "PENDING", replyToTurnId: "fu-frontline" },
+    });
+    expect(
+      primaryQuestionTurnIdForSeekerReply({
+        turns: [primary, other, followUp, seeker],
+        seeker,
+        hintQuestionTurnId: "fu-frontline",
+      }),
+    ).toBe("q-frontline");
+    const service = src("src/lib/consultation/service.ts");
+    expect(service).toContain("primaryQuestionTurnIdForSeekerReply");
+    expect(service).toContain("pinnedPrimaryId");
+    // Main's consultant-turn supersede for role-expertise drafts is present.
+    expect(service).toMatch(
+      /Role-expertise suggested answers live on the CONSULTANT question turn[\s\S]*supersedeTurnIds = \[[\s\S]*questionTurnId/,
+    );
   });
 });
 
