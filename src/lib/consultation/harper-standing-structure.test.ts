@@ -255,7 +255,7 @@ describe("ITEM 2–3: one Where you stand list", () => {
   });
 });
 
-describe("ITEM 4: Pause / Done / Skip the rest removed", () => {
+describe("ITEM 4: no consultation asset side effects; DONE stays an open hub", () => {
   it("does not render Pause, Done, or Skip the rest; does not start assets from the Harper page UI", () => {
     const section = src("src/components/ConsultationSection.tsx");
     expect(section).not.toContain("pauseConsultationAction");
@@ -268,17 +268,82 @@ describe("ITEM 4: Pause / Done / Skip the rest removed", () => {
     expect(section).not.toContain("skip-consultation-open");
     expect(section).not.toContain("enqueueAssetsAfterConsultation");
     expect(section).not.toContain("queueAssetsForCampaign");
+    // Pre-start Skip consultation control remains for product-owner decision.
+    expect(section).toContain('submitLabel="Skip consultation"');
+    expect(section).toContain("skipConsultationAction");
   });
 
-  it("PAUSED sessions reopen on reply without blocking drain", () => {
+  it("consultation service never enqueues resume/cover assets on completion paths", () => {
     const service = src("src/lib/consultation/service.ts");
-    expect(service).toContain('session.status === "DONE" || session.status === "PAUSED"');
+    expect(service).not.toContain("queueAssetsWhenConsultationEnds");
+    expect(service).not.toContain("queueAssetsForCampaign");
+    expect(service).not.toContain("enqueueAssetsAfterConsultation");
+    const finishFn = service.slice(
+      service.indexOf("async function finishIfPlanningIsComplete"),
+      service.indexOf("function askedAndSkipped"),
+    );
+    expect(finishFn).toContain('status: "DONE"');
+    expect(finishFn).not.toContain("enqueueApplicationJob");
+    const skipFn = service.slice(
+      service.indexOf("export async function skipConsultation"),
+      service.indexOf("export async function completeConsultation"),
+    );
+    expect(skipFn).not.toContain("enqueue");
+    const completeFn = service.slice(
+      service.indexOf("export async function completeConsultation"),
+      service.indexOf("async function loadSessionTurns"),
+    );
+    expect(completeFn).not.toContain("enqueue");
+    expect(completeFn).toContain('command: "done"');
+  });
+
+  it("DONE and PAUSED reopen on seeker input; SKIPPED stays refused until Resume", () => {
+    const service = src("src/lib/consultation/service.ts");
+    expect(service).toContain("ensureConsultationAcceptsSeekerInput");
+    const helper = service.slice(
+      service.indexOf("async function ensureConsultationAcceptsSeekerInput"),
+      service.indexOf("async function setStatus"),
+    );
+    expect(helper).toContain('status === "SKIPPED"');
+    expect(helper).toContain('status === "DONE" || session.status === "PAUSED"');
+    expect(helper).toContain('status: "IN_PROGRESS"');
+    for (const name of [
+      "recordConsultationReply",
+      "processConsultationReply",
+      "skipConsultationQuestion",
+      "ignoreConsultationQuestion",
+      "reopenIgnoredConsultationTarget",
+      "recordConsultationAnswerEdit",
+      "replyConsultation",
+    ]) {
+      const start = service.indexOf(`export async function ${name}`);
+      expect(start).toBeGreaterThan(0);
+      const nextExport = service.indexOf("\nexport async function ", start + 1);
+      const body = service.slice(start, nextExport > 0 ? nextExport : undefined);
+      expect(body).toContain("ensureConsultationAcceptsSeekerInput");
+      expect(body).not.toContain('status !== "IN_PROGRESS"');
+    }
     const listFn = service.slice(
       service.indexOf("export async function listIncompleteConsultationSeekerTurns"),
       service.indexOf("export async function confirmConsultationProposal"),
     );
     expect(listFn).toContain('status === "SKIPPED"');
     expect(listFn).not.toContain("PAUSED");
+    expect(listFn).not.toContain("DONE");
+  });
+
+  it("sidebar consultation color uses unanswered completeness, not session DONE", () => {
+    const tracker = src("src/lib/application/tracker.ts");
+    const progress = src("src/lib/application/step-progress.ts");
+    const nextStep = src("src/lib/application/next-step.ts");
+    expect(tracker).toContain("complete: !unanswered");
+    expect(progress).toContain("facts.consultationComplete");
+    expect(progress).toMatch(
+      /case "consultation":\s*return facts\.consultationComplete/,
+    );
+    // Next-step still keys off consultationStatus; DONE falls through past in_progress.
+    expect(nextStep).toContain('consultationStatus === "IN_PROGRESS"');
+    expect(nextStep).toContain('key: "assets_available"');
   });
 });
 

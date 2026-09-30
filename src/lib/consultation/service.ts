@@ -1490,49 +1490,8 @@ async function finishIfPlanningIsComplete(
       where: { id: sessionId },
       data: { status: "DONE" },
     });
-    await queueAssetsWhenConsultationEnds(sessionId);
+    // Assets are generated only from the Resume and cover letter page — never here.
   }
-}
-
-async function queueAssetsWhenConsultationEnds(
-  sessionId: string,
-): Promise<void> {
-  const session = await prisma.consultationSession.findUnique({
-    where: { id: sessionId },
-    select: {
-      organizationId: true,
-      campaignId: true,
-      campaign: { select: { ownerUserId: true } },
-    },
-  });
-  if (!session) return;
-  const { enqueueAssetsAfterConsultation } = await import(
-    "@/lib/application-assets/plan-service"
-  );
-  await enqueueAssetsAfterConsultation({
-    organizationId: session.organizationId,
-    campaignId: session.campaignId,
-    userId: session.campaign.ownerUserId,
-  });
-}
-
-async function queueAssetsForCampaign(input: {
-  organizationId: string;
-  campaignId: string;
-}): Promise<void> {
-  const campaign = await prisma.campaign.findFirst({
-    where: { id: input.campaignId, organizationId: input.organizationId },
-    select: { ownerUserId: true },
-  });
-  if (!campaign) return;
-  const { enqueueAssetsAfterConsultation } = await import(
-    "@/lib/application-assets/plan-service"
-  );
-  await enqueueAssetsAfterConsultation({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    userId: campaign.ownerUserId,
-  });
 }
 
 function askedAndSkipped(
@@ -2425,6 +2384,25 @@ export async function retryConsultationGeneration(input: {
   await startConsultation(input);
 }
 
+/**
+ * Harper is an ongoing prep hub. DONE and PAUSED reopen on seeker input;
+ * SKIPPED stays closed until the seeker chooses Resume.
+ */
+async function ensureConsultationAcceptsSeekerInput(session: {
+  id: string;
+  status: string;
+}): Promise<void> {
+  if (session.status === "SKIPPED") {
+    throw new TenantError(consultationConversationCopy.notAcceptingReplies);
+  }
+  if (session.status === "DONE" || session.status === "PAUSED") {
+    await prisma.consultationSession.update({
+      where: { id: session.id },
+      data: { status: "IN_PROGRESS" },
+    });
+  }
+}
+
 async function setStatus(input: {
   organizationId: string;
   campaignId: string;
@@ -2483,11 +2461,10 @@ export async function skipConsultation(input: {
         promptVersion: CONSULTATION_PROMPT_VERSION,
       },
     });
-    await queueAssetsForCampaign(input);
+    // Assets are generated only from the Resume and cover letter page — never here.
     return;
   }
   await setStatus({ ...input, command: "skip" });
-  await queueAssetsForCampaign(input);
 }
 
 export async function completeConsultation(input: {
@@ -2495,7 +2472,6 @@ export async function completeConsultation(input: {
   campaignId: string;
 }) {
   await setStatus({ ...input, command: "done" });
-  await queueAssetsForCampaign(input);
 }
 
 async function loadSessionTurns(sessionId: string) {
@@ -2670,15 +2646,10 @@ export async function recordConsultationReply(input: {
   const session = await prisma.consultationSession.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
-  if (!session || session.status === "SKIPPED") {
+  if (!session) {
     throw new TenantError(consultationConversationCopy.notAcceptingReplies);
   }
-  if (session.status === "DONE" || session.status === "PAUSED") {
-    await prisma.consultationSession.update({
-      where: { id: session.id },
-      data: { status: "IN_PROGRESS" },
-    });
-  }
+  await ensureConsultationAcceptsSeekerInput(session);
   const { turns, view } = await loadSessionQaView(session.id);
   const requested = input.targetKey?.trim() ?? "";
   const item = requested.startsWith("question:")
@@ -2788,14 +2759,11 @@ export async function processConsultationReply(input: {
         : { campaignId: input.campaignId }),
     },
   });
-  if (!session || session.status === "SKIPPED") {
+  if (!session) {
     throw new TenantError(consultationConversationCopy.notAcceptingReplies);
   }
+  await ensureConsultationAcceptsSeekerInput(session);
   if (session.status === "PAUSED" || session.status === "DONE") {
-    await prisma.consultationSession.update({
-      where: { id: session.id },
-      data: { status: "IN_PROGRESS" },
-    });
     session = { ...session, status: "IN_PROGRESS" };
   }
   let { turns, view } = await loadSessionQaView(session.id);
@@ -3216,9 +3184,10 @@ export async function skipConsultationQuestion(input: {
   const session = await prisma.consultationSession.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
-  if (!session || session.status !== "IN_PROGRESS") {
+  if (!session) {
     throw new TenantError(consultationConversationCopy.notAcceptingReplies);
   }
+  await ensureConsultationAcceptsSeekerInput(session);
   const { turns, view } = await loadSessionQaView(session.id);
   const item = resolveReplyableQaItem(view, input.targetKey);
   const question = item ? consultantForQaItem(turns, item) : null;
@@ -3267,7 +3236,7 @@ export async function skipConsultationQuestion(input: {
       where: { id: session.id },
       data: { status: "DONE" },
     });
-    await queueAssetsWhenConsultationEnds(session.id);
+    // Assets are generated only from the Resume and cover letter page — never here.
     return;
   }
   const { roles, applicationLearningsPendingHiringManager } =
@@ -3299,9 +3268,10 @@ export async function ignoreConsultationQuestion(input: {
   const session = await prisma.consultationSession.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
-  if (!session || session.status !== "IN_PROGRESS") {
+  if (!session) {
     throw new TenantError(consultationConversationCopy.notAcceptingReplies);
   }
+  await ensureConsultationAcceptsSeekerInput(session);
   const { turns, view } = await loadSessionQaView(session.id);
   const replyable = resolveReplyableQaItem(view, input.targetKey);
   if (replyable) {
@@ -3364,9 +3334,10 @@ export async function reopenIgnoredConsultationTarget(input: {
   const session = await prisma.consultationSession.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
-  if (!session || session.status !== "IN_PROGRESS") {
+  if (!session) {
     throw new TenantError(consultationConversationCopy.notAcceptingReplies);
   }
+  await ensureConsultationAcceptsSeekerInput(session);
   const turns = await loadSessionTurns(session.id);
   const { questionTurnId, raw } = parseConsultationReplyTarget(input.targetKey);
   const gapKey = questionTurnId
@@ -3714,15 +3685,7 @@ export async function recordConsultationAnswerEdit(input: {
   if (!turn || turn.session.campaignId !== input.campaignId) {
     throw new TenantError(consultationConversationCopy.replyFailed);
   }
-  if (turn.session.status === "SKIPPED") {
-    throw new TenantError(consultationConversationCopy.notAcceptingReplies);
-  }
-  if (turn.session.status === "PAUSED" || turn.session.status === "DONE") {
-    await prisma.consultationSession.update({
-      where: { id: turn.sessionId },
-      data: { status: "IN_PROGRESS" },
-    });
-  }
+  await ensureConsultationAcceptsSeekerInput(turn.session);
   const replyToTurnId = replyToTurnIdFromAnalysis(turn.analysisJson);
   const prior =
     turn.analysisJson && typeof turn.analysisJson === "object"
@@ -3913,7 +3876,7 @@ export async function confirmConsultationProposal(input: {
       where: { id: proposal.sessionId },
       data: { status: "DONE" },
     });
-    await queueAssetsWhenConsultationEnds(proposal.sessionId);
+    // Assets are generated only from the Resume and cover letter page — never here.
   }
 }
 
@@ -3975,7 +3938,8 @@ export async function continueConsultationPlanning(input: {
   if (!session) throw new TenantError("The consultation has not started.");
   if (session.status === "SKIPPED" || session.status === "PAUSED") return;
   if (session.status === "DONE") {
-    await queueAssetsWhenConsultationEnds(session.id);
+    // Planning already finished; seeker replies reopen via the reply path.
+    // Assets are generated only from the Resume and cover letter page — never here.
     return;
   }
   const { turns, view } = await loadSessionQaView(session.id);
@@ -3999,7 +3963,7 @@ export async function continueConsultationPlanning(input: {
       where: { id: session.id },
       data: { status: "DONE" },
     });
-    await queueAssetsWhenConsultationEnds(session.id);
+    // Assets are generated only from the Resume and cover letter page — never here.
     return;
   }
   const { roles, applicationLearningsPendingHiringManager } =
@@ -4164,9 +4128,10 @@ export async function replyConsultation(input: {
   const session = await prisma.consultationSession.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
-  if (!session || session.status !== "IN_PROGRESS") {
+  if (!session) {
     throw new TenantError(consultationConversationCopy.notAcceptingReplies);
   }
+  await ensureConsultationAcceptsSeekerInput(session);
   const { view } = await loadSessionQaView(session.id);
   const open = view.questions.find(consultationQuestionAcceptsReply);
   if (open) {

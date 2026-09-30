@@ -111,7 +111,7 @@ describe("workflow audit fixes", () => {
     expect(interview).toContain("enqueueLearningsReassessIfChanged");
   });
 
-  it("creates resume and cover letter plans when Harper ends", () => {
+  it("does not enqueue resume or cover letter from consultation; assets stay on their page", () => {
     const service = readFileSync("src/lib/consultation/service.ts", "utf8");
     const plans = readFileSync("src/lib/application-assets/plan-service.ts", "utf8");
     const process = readFileSync("src/lib/application-jobs/process.ts", "utf8");
@@ -119,12 +119,19 @@ describe("workflow audit fixes", () => {
       "src/components/ApplicationAssetsSection.tsx",
       "utf8",
     );
-    expect(service).toContain("queueAssetsWhenConsultationEnds");
-    expect(service).toContain("queueAssetsForCampaign");
+    const assetActions = readFileSync(
+      "src/app/actions/application-assets.ts",
+      "utf8",
+    );
+    expect(service).not.toContain("queueAssetsWhenConsultationEnds");
+    expect(service).not.toContain("queueAssetsForCampaign");
+    expect(service).not.toContain("enqueueAssetsAfterConsultation");
     expect(plans).toContain("plan_accept_generate");
     expect(process).toContain("plan_accept_generate");
     expect(process).toContain("acceptPresentationPlan");
     expect(plans).toContain("ensureAcceptedPresentationPlan");
+    expect(assetActions).toContain("generateApplicationAssetAction");
+    expect(assetActions).toContain("enqueueApplicationJob");
     expect(assets).not.toContain("applicationAssetConfig.labels.adjustPlan");
     expect(assets).toContain("applicationAssetConfig.labels.regenerate");
     expect(assets).toContain("applicationAssetConfig.labels.changeInstruction");
@@ -351,7 +358,7 @@ describe.skipIf(!hasTestDatabase())("workflow audit database behavior", () => {
     expect(leftoverRuns).toBeGreaterThan(0);
   });
 
-  it("queues resume and cover letter generation when Harper is skipped", async () => {
+  it("does not queue resume or cover letter generation when Harper is skipped or completed", async () => {
     const campaign = await prisma.campaign.create({
       data: {
         organizationId,
@@ -374,24 +381,57 @@ describe.skipIf(!hasTestDatabase())("workflow audit database behavior", () => {
         scorecardJson: parsed.scorecard,
       },
     });
-    const { skipConsultation } = await import("@/lib/consultation/service");
+    const { skipConsultation, completeConsultation } = await import(
+      "@/lib/consultation/service"
+    );
     await skipConsultation({ organizationId, campaignId: campaign.id });
-    const jobs = await prisma.applicationJob.findMany({
+    const afterSkip = await prisma.applicationJob.findMany({
       where: {
         organizationId,
         campaignId: campaign.id,
         type: { in: ["RESUME", "COVER_LETTER"] },
       },
     });
-    expect(jobs.map((job) => job.type).sort()).toEqual([
-      "COVER_LETTER",
-      "RESUME",
-    ]);
-    expect(
-      jobs.every((job) => {
-        const payload = job.payload as { operation?: string };
-        return payload.operation === "plan_accept_generate";
-      }),
-    ).toBe(true);
+    expect(afterSkip).toEqual([]);
+
+    const doneCampaign = await prisma.campaign.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        name: `Harper done ${suffix}`,
+        productId,
+      },
+    });
+    await prisma.jobRequirement.create({
+      data: {
+        organizationId,
+        campaignId: doneCampaign.id,
+        rawText: NORMAL_JOB_POSTING,
+        title: parsed.title,
+        companyName: parsed.companyName,
+        scorecardJson: parsed.scorecard,
+      },
+    });
+    await prisma.consultationSession.create({
+      data: {
+        organizationId,
+        campaignId: doneCampaign.id,
+        productId,
+        status: "IN_PROGRESS",
+        promptVersion: "test",
+      },
+    });
+    await completeConsultation({
+      organizationId,
+      campaignId: doneCampaign.id,
+    });
+    const afterDone = await prisma.applicationJob.findMany({
+      where: {
+        organizationId,
+        campaignId: doneCampaign.id,
+        type: { in: ["RESUME", "COVER_LETTER"] },
+      },
+    });
+    expect(afterDone).toEqual([]);
   });
 });
