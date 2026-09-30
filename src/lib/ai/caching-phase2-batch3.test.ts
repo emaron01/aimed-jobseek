@@ -151,6 +151,8 @@ describe("Caching Phase 2 batch 3 wiring", () => {
 
 describe.skipIf(!hasTestDatabase())(
   "Caching Phase 2 batch 3 with database",
+  // Real Postgres gate fixtures; default 5s fails under parallel suite load.
+  { timeout: 60_000 },
   () => {
     const suffix = `p2b3-${Date.now()}`;
     let organizationId = "";

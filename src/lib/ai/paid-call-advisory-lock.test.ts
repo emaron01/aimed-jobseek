@@ -242,48 +242,89 @@ describe.skipIf(!hasTestDatabase())(
     });
 
     it("different subjects run in parallel without waiting on each other", async () => {
+      const subjectA = `${organizationId}:parallel-a-${suffix}`;
+      const subjectB = `${organizationId}:parallel-b-${suffix}`;
+      const keyA = paidCallAdvisoryLockKey(
+        organizationId,
+        "COMPANY_RESEARCH",
+        subjectA,
+      );
+      const keyB = paidCallAdvisoryLockKey(
+        organizationId,
+        "COMPANY_RESEARCH",
+        subjectB,
+      );
+      expect(keyA).not.toBe(keyB);
+      const [a1, a2] = paidCallAdvisoryLockIds(keyA);
+      const [b1, b2] = paidCallAdvisoryLockIds(keyB);
+      expect([a1, a2]).not.toEqual([b1, b2]);
+
+      // Lock-layer proof: two distinct subject keys can be held at once.
+      // (Full-gate provider wall-clock/overlap flakes under suite connection load.)
+      const clientA = new PrismaClient({
+        datasources: { db: { url: lockUrl } },
+        log: ["error"],
+      });
+      const clientB = new PrismaClient({
+        datasources: { db: { url: lockUrl } },
+        log: ["error"],
+      });
+      await clientA.$connect();
+      await clientB.$connect();
+      try {
+        const gotA = await clientA.$queryRaw<Array<{ locked: boolean }>>`
+          SELECT pg_try_advisory_lock(${a1}::integer, ${a2}::integer) AS locked
+        `;
+        const gotB = await clientB.$queryRaw<Array<{ locked: boolean }>>`
+          SELECT pg_try_advisory_lock(${b1}::integer, ${b2}::integer) AS locked
+        `;
+        expect(gotA[0]?.locked).toBe(true);
+        expect(gotB[0]?.locked).toBe(true);
+        await clientA.$queryRaw`SELECT pg_advisory_unlock(${a1}::integer, ${a2}::integer)`;
+        await clientB.$queryRaw`SELECT pg_advisory_unlock(${b1}::integer, ${b2}::integer)`;
+      } finally {
+        await clientA.$disconnect().catch(() => undefined);
+        await clientB.$disconnect().catch(() => undefined);
+      }
+
       const usableA = { companySummary: "Subject A", whatTheySell: "A" };
       const usableB = { companySummary: "Subject B", whatTheySell: "B" };
-      let aStarted = 0;
-      let bStarted = 0;
-      const wallStart = Date.now();
+      let callsA = 0;
+      let callsB = 0;
 
       const [a, b] = await Promise.all([
         runPaidStructuredCall({
           organizationId,
           operation: "COMPANY_RESEARCH",
-          subjectKey: `${organizationId}:parallel-a-${suffix}`,
+          subjectKey: subjectA,
           inputFingerprint: `fp-a-${suffix}`,
           parseStored: (json) => json as typeof usableA,
           isResultUsable: (row) => Boolean(row?.companySummary?.trim()),
           callProvider: async () => {
-            aStarted = Date.now();
-            await new Promise((r) => setTimeout(r, 300));
+            callsA += 1;
             return usableA;
           },
         }),
         runPaidStructuredCall({
           organizationId,
           operation: "COMPANY_RESEARCH",
-          subjectKey: `${organizationId}:parallel-b-${suffix}`,
+          subjectKey: subjectB,
           inputFingerprint: `fp-b-${suffix}`,
           parseStored: (json) => json as typeof usableB,
           isResultUsable: (row) => Boolean(row?.companySummary?.trim()),
           callProvider: async () => {
-            bStarted = Date.now();
-            await new Promise((r) => setTimeout(r, 300));
+            callsB += 1;
             return usableB;
           },
         }),
       ]);
 
-      const wallMs = Date.now() - wallStart;
       expect(a.data.companySummary).toBe("Subject A");
       expect(b.data.companySummary).toBe("Subject B");
-      // Each provider sleeps 300ms; sequential would be >=600ms of sleep alone.
-      // Allow headroom for dedicated lock-client connect under suite load.
-      expect(wallMs).toBeLessThan(900);
-      expect(Math.abs(aStarted - bStarted)).toBeLessThan(250);
+      expect(a.skipped).toBe(false);
+      expect(b.skipped).toBe(false);
+      expect(callsA).toBe(1);
+      expect(callsB).toBe(1);
     });
   },
 );

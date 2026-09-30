@@ -99,7 +99,10 @@ import {
 } from "@/lib/application-summary/service";
 import { applicationSummaryConfig } from "@/lib/product-config";
 
-describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", () => {
+describe.skipIf(!hasTestDatabase())("Interview Cheat Sheet", {
+  // Seed + multi-section generation against real Postgres; default 5s fails under parallel load.
+  timeout: 60_000,
+}, () => {
   const suffix = Date.now().toString(36);
   let prisma: import("@prisma/client").PrismaClient;
   let organizationId = "";

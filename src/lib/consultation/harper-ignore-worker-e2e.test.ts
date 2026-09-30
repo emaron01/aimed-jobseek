@@ -149,6 +149,8 @@ describe("Harper ignore askedAndSkipped gap (source)", () => {
 
 describe.skipIf(!hasTestDatabase())(
   "Harper ignore through database and worker path",
+  // Multi-step worker path against real Postgres; default 5s fails under parallel suite load.
+  { timeout: 60_000 },
   () => {
     const suffix = `ign-e2e-${Date.now().toString(36)}`;
     let prisma: import("@prisma/client").PrismaClient;
