@@ -9,6 +9,7 @@ import {
 import { AppActionLink } from "@/components/AppButton";
 import { CheatSheetSection } from "@/components/CheatSheetCollapsible";
 import { CheatSheetPersonBody } from "@/components/CheatSheetPersonBody";
+import { CheatSheetQuestionCards } from "@/components/CheatSheetQuestionCards";
 import { HarperDraftProvider } from "@/components/HarperDraftStore";
 import {
   CheatSheetFilterProvider,
@@ -23,13 +24,8 @@ import { loadCheatSheetCoachQaByContact } from "@/lib/application-summary/coach-
 import { statedListItems } from "@/lib/application-summary/display";
 import { compileNotesFromInterviewsWithPerson } from "@/lib/application-summary/interview-notes";
 import { getApplicationSummaryView } from "@/lib/application-summary/service";
-import {
-  additionalInterviewPrepQuestionsForProfile,
-} from "@/lib/consultation/additional-prep-qa";
-import {
-  loadOrderedAnsweredHarperQuestions,
-  primaryTurnIdsForContact,
-} from "@/lib/consultation/harper-display-qa";
+import { loadOrderedAnsweredHarperQuestions } from "@/lib/consultation/harper-display-qa";
+import { personViewListQuestions } from "@/lib/consultation/harper-layout";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
 import { canOpenCampaignDetail } from "@/lib/campaign/visibility";
@@ -120,7 +116,7 @@ export default async function ApplicationSummaryPage({
     organizationId: organization.id,
     campaignId: id,
   });
-  const { answeredInHarperOrder, interviewerQuestionsByContactId } =
+  const { interviewerQuestionsByContactId, generalQuestions } =
     await loadOrderedAnsweredHarperQuestions({
       organizationId: organization.id,
       campaignId: id,
@@ -237,6 +233,19 @@ export default async function ApplicationSummaryPage({
       </CheatSheetSharedSection>
 
       <HarperDraftProvider>
+      <CheatSheetSection id="general-questions" title="General Questions">
+        <CheatSheetQuestionCards
+          campaignId={id}
+          canEdit={canGenerate}
+          questions={generalQuestions}
+          jobsActive={live.jobs.some(
+            (job) =>
+              job.type === "CONSULTATION" &&
+              (job.status === "PENDING" || job.status === "IN_PROGRESS"),
+          )}
+          testId="cheat-sheet-general-questions"
+        />
+      </CheatSheetSection>
       {view.people.map((person) => {
         const section =
           guidance?.people.find((item) => item.sectionKey === person.sectionKey) ?? null;
@@ -253,17 +262,15 @@ export default async function ApplicationSummaryPage({
         const coachQaItems = person.contactId
           ? coachQaByContact.get(person.contactId) ?? []
           : [];
-        const additionalPrepQuestions =
-          person.contactId && person.involvement === "DIRECT"
-            ? additionalInterviewPrepQuestionsForProfile({
-                involvement: person.involvement,
-                profilePrimaryQuestionTurnIds: primaryTurnIdsForContact(
-                  interviewerQuestionsByContactId,
-                  person.contactId,
-                ),
-                answeredInHarperOrder,
-              })
-            : [];
+        const interviewerQuestions = person.contactId
+          ? interviewerQuestionsByContactId.get(person.contactId) ?? []
+          : [];
+        const personQuestions = personViewListQuestions({
+          questions: interviewerQuestions,
+          profileCoachItemIds: (section?.likelyQuestions ?? [])
+            .map((item) => item.id?.trim() ?? "")
+            .filter(Boolean),
+        });
         const consultationBusy = live.jobs.some(
           (job) =>
             job.type === "CONSULTATION" &&
@@ -284,7 +291,8 @@ export default async function ApplicationSummaryPage({
               jobsActive={consultationBusy}
               interviewNotes={person.contactId ? interviewNotes : null}
               interviewNotesPersonName={person.contactId ? person.heading : null}
-              additionalPrepQuestions={additionalPrepQuestions}
+              generalQuestions={generalQuestions}
+              personQuestions={personQuestions}
             />
           </CheatSheetSection>
           </CheatSheetPersonSection>

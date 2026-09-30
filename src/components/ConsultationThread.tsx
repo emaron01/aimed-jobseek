@@ -107,7 +107,17 @@ export function ResultActions({
   );
 }
 
-function ResultBody({ statement }: { statement: QaStatement }) {
+function seekerReplyIsPending(item: ConsultationQaItem): boolean {
+  const analysis = item.seekerAnswers.at(-1)?.analysisJson;
+  if (!analysis || typeof analysis !== "object" || Array.isArray(analysis)) return false;
+  return (analysis as { status?: unknown }).status === "PENDING";
+}
+
+function questionHasVisibleOutcome(item: ConsultationQaItem): boolean {
+  return Boolean(item.resumeBullet || item.talkingPoint || item.followUp || item.needsMoreDetail);
+}
+
+export function ResultBody({ statement }: { statement: QaStatement }) {
   const draft = statement.status === "DRAFT";
   return (
     <div
@@ -401,6 +411,9 @@ function QuestionCard({
     }
     setLocalExpanded(next);
   }
+  const hasOutcome = questionHasVisibleOutcome(item);
+  const showWorking =
+    !item.ignored && !hasOutcome && (pending || seekerReplyIsPending(item));
   const unanswered = !hasResult && !item.ignored;
   const canAnswer =
     canEdit &&
@@ -541,11 +554,7 @@ function QuestionCard({
         >
           {stripInternalIdsFromDisplayText(item.question)}
         </p>
-      ) : (
-        <span className="sr-only" data-testid="consultation-question">
-          {stripInternalIdsFromDisplayText(item.question)}
-        </span>
-      )}
+      ) : null}
       <div className="mt-3 space-y-3">
         {item.followUp && !item.ignored ? (
           <div className="space-y-2" data-testid="consultation-follow-up-block">
@@ -560,7 +569,7 @@ function QuestionCard({
             </p>
           </div>
         ) : null}
-        {!item.ignored ? (
+        {!item.ignored && !showWorking ? (
           <SeekerRepliesSection
             campaignId={campaignId}
             canEdit={canEdit && actionsEnabled}
@@ -618,7 +627,7 @@ function QuestionCard({
             {consultationConversationCopy.needsMoreDetailToShape}
           </p>
         ) : null}
-        {canAnswer ? (
+        {showWorking ? null : canAnswer ? (
           <QuestionReplyForm
             campaignId={campaignId}
             item={item}
@@ -687,7 +696,7 @@ function QuestionCard({
             </a>
           </ApplicationActionForm>
         ) : null}
-        {pending ? (
+        {showWorking ? (
           <div
             className="space-y-1 text-sm text-muted"
             data-testid="harper-thinking"
@@ -756,8 +765,8 @@ export function QuestionList({
             showQuestionText={showQuestionText}
             actionsEnabled={actionsEnabled}
             pending={
-              pendingTarget === consultationReplyTargetKey(item.questionTurnId) &&
-              jobsActive
+              pendingTarget === consultationReplyTargetKey(item.questionTurnId) ||
+              (jobsActive && seekerReplyIsPending(item))
             }
             collapseWhenApproved={collapseWhenApproved}
             collapseWhenIgnored={collapseWhenIgnored}

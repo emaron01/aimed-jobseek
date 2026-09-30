@@ -404,4 +404,87 @@ describe.skipIf(!hasTestDatabase())("cheat sheet Harper reply persistence", { ti
     expect(fn).not.toContain("enqueueApplicationJob");
     expect(fn).toContain("revalidateHarperAndCheatSheet");
   });
+
+  it("approves a sample answer exactly as written through Harper's approve path", async () => {
+    const item = collectCoachItems(coachGuidance()).find(
+      (row) => row.sampleAnswer && !row.harperQuestion,
+    );
+    expect(item?.id).toBeTruthy();
+    const { approveCheatSheetSampleAnswer } = await import(
+      "@/lib/application-summary/service"
+    );
+    await approveCheatSheetSampleAnswer({
+      organizationId,
+      campaignId,
+      userId,
+      itemId: item!.id!,
+    });
+    expect(polishAnswerWithQuality).not.toHaveBeenCalled();
+    const session = await prisma.consultationSession.findFirst({ where: { campaignId } });
+    const turn = await prisma.consultationTurn.findFirst({
+      where: { sessionId: session!.id, targetKey: `cheatSheet:${item!.id}` },
+    });
+    expect(turn?.speaker).toBe("CONSULTANT");
+    expect(turn?.body).toBe(item!.prompt);
+    const statement = await prisma.consultationStatement.findFirst({
+      where: { turnId: turn!.id, kind: "INTERVIEW_ANSWER" },
+    });
+    expect(statement?.status).toBe("APPROVED");
+    expect(statement?.content).toBe(item!.sampleAnswer);
+    const story = await prisma.profileStory.findFirst({
+      where: { organizationId, consultationTurnId: turn!.id },
+    });
+    expect(story?.interviewAnswer).toBe(item!.sampleAnswer);
+    expect(story?.interviewAnswerApprovedAt).toBeTruthy();
+    const jobs = await prisma.applicationJob.findMany({ where: { campaignId } });
+    expect(jobs).toEqual([]);
+    const action = readFileSync("src/app/actions/application-summary.ts", "utf8");
+    const fn = action.slice(
+      action.indexOf("export async function approveCheatSheetSampleAction"),
+      action.indexOf("export async function saveCheatSheetSampleDraftAction"),
+    );
+    expect(fn).not.toContain("enqueueApplicationJob");
+    expect(fn).not.toContain("polishAnswerWithQuality");
+  });
+
+  it("saves an edited sample as a draft with no provider call and no job", async () => {
+    const item = collectCoachItems(coachGuidance()).filter(
+      (row) => row.sampleAnswer && !row.harperQuestion,
+    )[1];
+    expect(item?.id).toBeTruthy();
+    const edited = "I moved the Monday commit to Tuesday after the buyer slipped.";
+    const { saveCheatSheetSampleDraft } = await import(
+      "@/lib/application-summary/service"
+    );
+    await saveCheatSheetSampleDraft({
+      organizationId,
+      campaignId,
+      userId,
+      itemId: item!.id!,
+      content: edited,
+    });
+    expect(polishAnswerWithQuality).not.toHaveBeenCalled();
+    const session = await prisma.consultationSession.findFirst({ where: { campaignId } });
+    const turn = await prisma.consultationTurn.findFirst({
+      where: { sessionId: session!.id, targetKey: `cheatSheet:${item!.id}` },
+    });
+    const statement = await prisma.consultationStatement.findFirst({
+      where: { turnId: turn!.id, kind: "INTERVIEW_ANSWER" },
+    });
+    expect(statement?.status).toBe("DRAFT");
+    expect(statement?.content).toBe(edited);
+    const story = await prisma.profileStory.findFirst({
+      where: { organizationId, consultationTurnId: turn!.id },
+    });
+    expect(story).toBeNull();
+    const jobs = await prisma.applicationJob.findMany({ where: { campaignId } });
+    expect(jobs).toEqual([]);
+    const action = readFileSync("src/app/actions/application-summary.ts", "utf8");
+    const fn = action.slice(
+      action.indexOf("export async function saveCheatSheetSampleDraftAction"),
+      action.indexOf("export async function resolveApplicationSummaryFlagAction"),
+    );
+    expect(fn).not.toContain("enqueueApplicationJob");
+    expect(fn).not.toContain("polishAnswerWithQuality");
+  });
 });

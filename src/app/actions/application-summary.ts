@@ -6,7 +6,9 @@ import { requireCurrentUser } from "@/lib/auth/session";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import {
   answerCheatSheetCoachItem,
+  approveCheatSheetSampleAnswer,
   resolveApplicationSummaryFlag,
+  saveCheatSheetSampleDraft,
 } from "@/lib/application-summary/service";
 import { queueHiringTeamBuild } from "@/lib/hiring-team/build";
 import {
@@ -158,6 +160,82 @@ export async function answerCheatSheetCoachAction(
     console.error(
       JSON.stringify({
         event: "cheat_sheet_coach_reply_failed",
+        message: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+    return { ok: false, message: consultationConversationCopy.replyFailed };
+  }
+}
+
+export async function approveCheatSheetSampleAction(
+  _previous: ApplicationSummaryActionResult | null,
+  formData: FormData,
+): Promise<ApplicationSummaryActionResult> {
+  const campaignId = String(formData.get("campaignId") ?? "").trim();
+  const itemId = String(formData.get("itemId") ?? "").trim();
+  if (!campaignId) return { ok: false, message: "Application was not found." };
+  if (!itemId) return { ok: false, message: "That question was not found." };
+  try {
+    const [organizationId, user] = await Promise.all([
+      requireOrganizationId(),
+      requireCurrentUser(),
+    ]);
+    await approveCheatSheetSampleAnswer({
+      organizationId,
+      campaignId,
+      userId: user.id,
+      itemId,
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/campaigns/${campaignId}/summary`);
+    revalidatePath(`/campaigns/${campaignId}/consultation`);
+    return { ok: true, message: consultationConversationCopy.confirmed };
+  } catch (error) {
+    if (error instanceof TenantError) {
+      return { ok: false, message: error.message };
+    }
+    console.error(
+      JSON.stringify({
+        event: "cheat_sheet_sample_approve_failed",
+        message: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+    return { ok: false, message: consultationConversationCopy.replyFailed };
+  }
+}
+
+export async function saveCheatSheetSampleDraftAction(
+  _previous: ApplicationSummaryActionResult | null,
+  formData: FormData,
+): Promise<ApplicationSummaryActionResult> {
+  const campaignId = String(formData.get("campaignId") ?? "").trim();
+  const itemId = String(formData.get("itemId") ?? "").trim();
+  const content = String(formData.get("content") ?? "");
+  if (!campaignId) return { ok: false, message: "Application was not found." };
+  if (!itemId) return { ok: false, message: "That question was not found." };
+  try {
+    const [organizationId, user] = await Promise.all([
+      requireOrganizationId(),
+      requireCurrentUser(),
+    ]);
+    await saveCheatSheetSampleDraft({
+      organizationId,
+      campaignId,
+      userId: user.id,
+      itemId,
+      content,
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/campaigns/${campaignId}/summary`);
+    revalidatePath(`/campaigns/${campaignId}/consultation`);
+    return { ok: true, message: consultationConversationCopy.answerUnchanged };
+  } catch (error) {
+    if (error instanceof TenantError) {
+      return { ok: false, message: error.message };
+    }
+    console.error(
+      JSON.stringify({
+        event: "cheat_sheet_sample_draft_failed",
         message: error instanceof Error ? error.message : "unknown",
       }),
     );

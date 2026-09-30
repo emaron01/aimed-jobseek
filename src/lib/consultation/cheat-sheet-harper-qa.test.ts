@@ -11,7 +11,6 @@ import { QuestionList } from "@/components/ConsultationThread";
 import { HarperDraftProvider } from "@/components/HarperDraftStore";
 import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
 import {
-  applicationSummaryConfig,
   consultationConversationCopy,
   consultationStatementLabels,
 } from "@/lib/product-config";
@@ -121,7 +120,10 @@ describe("Cheat Sheet uses Harper question workflow", () => {
         ],
       }),
     );
-    expect(html).toContain(applicationSummaryConfig.sections.sampleAnswer);
+    expect(html).toContain(consultationStatementLabels.INTERVIEW_ANSWER);
+    expect(html).toContain(consultationStatementLabels.DRAFT);
+    expect(html).toContain(consultationConversationCopy.approve);
+    expect(html).toContain(consultationConversationCopy.editAnswer);
     expect(html).toContain("I moved the commit to Monday.");
     expect(html).toContain("What changed after that Monday commit?");
     expect(html).toContain(consultationConversationCopy.threadReply);

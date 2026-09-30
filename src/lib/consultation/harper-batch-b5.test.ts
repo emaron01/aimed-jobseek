@@ -175,8 +175,8 @@ describe("Harper Batch B5 Additional Interview Prep Q&A", () => {
     expect(personView).toContain("AdditionalInterviewPrepQa");
     expect(personView).toContain("additionalPrepQuestions");
     expect(body).toContain("AdditionalInterviewPrepQa");
-    expect(page).toContain("additionalPrepQuestions");
-    expect(page).toContain('person.involvement === "DIRECT"');
+    expect(page).not.toContain("additionalPrepQuestions");
+    expect(page).toContain('title="General Questions"');
     expect(section).toContain("additionalInterviewPrepQuestionsForProfile");
     expect(section).toContain("involvement: person.involvement");
   });
@@ -277,7 +277,8 @@ describe("Harper Batch B5 Additional Interview Prep Q&A", () => {
     const body = src("src/components/CheatSheetPersonBody.tsx");
     const filter = src("src/components/CheatSheetPeopleFilter.tsx");
     expect(page).toContain("loadOrderedAnsweredHarperQuestions");
-    expect(page).toContain("additionalInterviewPrepQuestionsForProfile");
+    expect(page).not.toContain("additionalInterviewPrepQuestionsForProfile");
+    expect(page).toContain('id="general-questions"');
     expect(body).toContain("additionalPrepQuestions");
     // Print uses the same person body inside summary sections.
     expect(filter).toContain("CheatSheetPrintButton");

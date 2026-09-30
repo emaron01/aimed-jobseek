@@ -5,6 +5,7 @@ import {
 } from "@/lib/consultation/additional-prep-qa";
 import {
   buildHarperQaLayout,
+  generalQuestionsForCheatSheet,
   partitionGeneralQuestionsForStanding,
   type HarperInterviewerOrderItem,
 } from "@/lib/consultation/harper-layout";
@@ -26,6 +27,8 @@ export async function loadOrderedAnsweredHarperQuestions(input: {
   answeredInHarperOrder: ConsultationQaItem[];
   /** Primary interviewer-section questions by contact (for exclude-on-profile). */
   interviewerQuestionsByContactId: Map<string, ConsultationQaItem[]>;
+  /** Every general Harper item, once, for the Cheat Sheet General Questions section. */
+  generalQuestions: ConsultationQaItem[];
 }> {
   const [session, stages] = await Promise.all([
     prisma.consultationSession.findFirst({
@@ -97,6 +100,7 @@ export async function loadOrderedAnsweredHarperQuestions(input: {
   const empty = {
     answeredInHarperOrder: [] as ConsultationQaItem[],
     interviewerQuestionsByContactId: new Map<string, ConsultationQaItem[]>(),
+    generalQuestions: [] as ConsultationQaItem[],
   };
   if (!session) return empty;
 
@@ -193,7 +197,11 @@ export async function loadOrderedAnsweredHarperQuestions(input: {
     interviewerQuestionsByContactId.set(section.contactId, section.questions);
   }
 
-  return { answeredInHarperOrder, interviewerQuestionsByContactId };
+  return {
+    answeredInHarperOrder,
+    interviewerQuestionsByContactId,
+    generalQuestions: generalQuestionsForCheatSheet(standingInline),
+  };
 }
 
 export function primaryTurnIdsForContact(

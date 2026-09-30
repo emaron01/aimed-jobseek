@@ -389,6 +389,26 @@ export function partitionGeneralQuestionsForStanding(input: {
   };
 }
 
+/** Every general item once, in partition order, for the Cheat Sheet section. */
+export function generalQuestionsForCheatSheet(
+  partition: StandingInlinePartition,
+): ConsultationQaItem[] {
+  const ordered = [
+    ...partition.dedicatedTopics.flatMap((topic) => topic.questions),
+    ...[...partition.byRequirementKey.values()].flat(),
+    ...partition.orphanedRequirementTopics.flatMap((topic) => topic.questions),
+    ...partition.unmapped,
+  ];
+  const seen = new Set<string>();
+  const questions: ConsultationQaItem[] = [];
+  for (const item of ordered) {
+    if (seen.has(item.questionTurnId)) continue;
+    seen.add(item.questionTurnId);
+    questions.push(item);
+  }
+  return questions;
+}
+
 /** Question turn ids that the Harper page will render from layout + standing partition. */
 export function collectRenderedHarperQuestionTurnIds(input: {
   interviewers: HarperInterviewerSection[];

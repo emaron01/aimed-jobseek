@@ -295,7 +295,9 @@ describe("Harper question-limit coach", () => {
     expect(polishCopy.regenerate).toBe("Regenerate");
     const card = thread.slice(thread.indexOf("function QuestionCard"));
     const resultIndex = card.indexOf("{hasResult && !item.ignored ? (");
-    const repliesMatch = card.match(/\{!item\.ignored \? \(\r?\n\s*<SeekerRepliesSection/);
+    const repliesMatch = card.match(
+      /\{!item\.ignored && !showWorking \? \(\r?\n\s*<SeekerRepliesSection/,
+    );
     const repliesIndex = repliesMatch?.index ?? -1;
     const followUpIndex = card.indexOf("consultation-follow-up");
     expect(resultIndex).toBeGreaterThan(-1);

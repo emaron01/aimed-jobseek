@@ -26,7 +26,10 @@ import {
   validatePersonSectionLikelyQuestions,
 } from "@/lib/application-summary/likely-questions";
 import { isApplicationLearningsSourceId } from "@/lib/consultation/learnings";
-import { recordConsultationReply } from "@/lib/consultation/service";
+import {
+  approveConsultationStatement,
+  recordConsultationReply,
+} from "@/lib/consultation/service";
 import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
 import {
   individualProfileRecordSchema,
@@ -1105,17 +1108,17 @@ function blankGuidancePath(value: unknown, path: string): unknown {
   return clone;
 }
 
-export async function answerCheatSheetCoachItem(input: {
+async function ensureCheatSheetConsultantTurn(input: {
   organizationId: string;
   campaignId: string;
   userId: string;
   itemId: string;
-  answer: string;
-}): Promise<{ unchanged: boolean }> {
-  const answer = input.answer.trim();
-  if (!answer) {
-    throw new TenantError("Write an answer, or skip the question.");
-  }
+}): Promise<{
+  sessionId: string;
+  questionTurnId: string;
+  targetKey: string;
+  sampleAnswer: string;
+}> {
   const data = await loadSummaryData(input.organizationId, input.campaignId);
   if (data.campaign.ownerUserId !== input.userId) {
     throw new TenantError(`Only the owner can update this ${vocab.campaign.singular}.`);
@@ -1148,7 +1151,7 @@ export async function answerCheatSheetCoachItem(input: {
       },
     }));
   const targetKey = `cheatSheet:${input.itemId}`;
-  const existingQuestion = await prisma.consultationTurn.findFirst({
+  let questionTurn = await prisma.consultationTurn.findFirst({
     where: {
       sessionId: session.id,
       speaker: "CONSULTANT",
@@ -1156,13 +1159,13 @@ export async function answerCheatSheetCoachItem(input: {
     },
     select: { id: true },
   });
-  if (!existingQuestion) {
+  if (!questionTurn) {
     const lastTurn = await prisma.consultationTurn.findFirst({
       where: { sessionId: session.id },
       orderBy: { sequence: "desc" },
       select: { sequence: true },
     });
-    await prisma.consultationTurn.create({
+    questionTurn = await prisma.consultationTurn.create({
       data: {
         organizationId: input.organizationId,
         sessionId: session.id,
@@ -1172,16 +1175,110 @@ export async function answerCheatSheetCoachItem(input: {
         targetKey,
         followUp: false,
       },
+      select: { id: true },
     });
   }
+  return {
+    sessionId: session.id,
+    questionTurnId: questionTurn.id,
+    targetKey,
+    sampleAnswer: item.sampleAnswer?.trim() ?? "",
+  };
+}
+
+async function storeCheatSheetSampleStatement(input: {
+  organizationId: string;
+  sessionId: string;
+  questionTurnId: string;
+  content: string;
+}): Promise<string> {
+  const statement = await prisma.consultationStatement.upsert({
+    where: {
+      turnId_kind: { turnId: input.questionTurnId, kind: "INTERVIEW_ANSWER" },
+    },
+    create: {
+      organizationId: input.organizationId,
+      sessionId: input.sessionId,
+      turnId: input.questionTurnId,
+      kind: "INTERVIEW_ANSWER",
+      status: "DRAFT",
+      content: input.content,
+      groundingJson: [],
+      promptVersion: CONSULTATION_PROMPT_VERSION,
+    },
+    update: {
+      content: input.content,
+      status: "DRAFT",
+      approvedAt: null,
+    },
+    select: { id: true },
+  });
+  return statement.id;
+}
+
+export async function answerCheatSheetCoachItem(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  itemId: string;
+  answer: string;
+}): Promise<{ unchanged: boolean }> {
+  const answer = input.answer.trim();
+  if (!answer) {
+    throw new TenantError("Write an answer, or skip the question.");
+  }
+  const prepared = await ensureCheatSheetConsultantTurn(input);
   const recorded = await recordConsultationReply({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
-    targetKey,
+    targetKey: prepared.targetKey,
     answer,
     intent: "REPLY",
   });
   return { unchanged: recorded.unchanged === true };
+}
+
+/** Stores the generated sample exactly, then Harper's existing approve path. No model call. */
+export async function approveCheatSheetSampleAnswer(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  itemId: string;
+}): Promise<void> {
+  const prepared = await ensureCheatSheetConsultantTurn(input);
+  if (!prepared.sampleAnswer) {
+    throw new TenantError("That sample answer was not found.");
+  }
+  const statementId = await storeCheatSheetSampleStatement({
+    organizationId: input.organizationId,
+    sessionId: prepared.sessionId,
+    questionTurnId: prepared.questionTurnId,
+    content: prepared.sampleAnswer,
+  });
+  await approveConsultationStatement({
+    organizationId: input.organizationId,
+    statementId,
+    content: prepared.sampleAnswer,
+  });
+}
+
+/** Saves edited sample text as a draft statement. No model call and no job. */
+export async function saveCheatSheetSampleDraft(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  itemId: string;
+  content: string;
+}): Promise<void> {
+  const content = input.content.trim();
+  if (!content) throw new TenantError("Write an answer, or skip the question.");
+  const prepared = await ensureCheatSheetConsultantTurn(input);
+  await storeCheatSheetSampleStatement({
+    organizationId: input.organizationId,
+    sessionId: prepared.sessionId,
+    questionTurnId: prepared.questionTurnId,
+    content,
+  });
 }
 
 export async function resolveApplicationSummaryFlag(input: {
