@@ -150,13 +150,18 @@ describe("Harper reply outcome, fact preservation, and approved-plus-draft", () 
     expect(approveFn).toContain("turnId: { in: cardTurnIds }");
   });
 
-  it("ITEM 3: Thread shows newDraft / pendingDraft and Approve targets pending drafts", () => {
+  it("ITEM 3: Thread shows newDraft above approved, with Approve targeting pending drafts", () => {
     const thread = src("src/components/ConsultationThread.tsx");
     expect(thread).toContain("consultationConversationCopy.newDraft");
     expect(thread).toContain("pendingDraftTalkingPoint");
     expect(thread).toContain("pendingDraftResumeBullet");
     expect(thread).toContain("consultation-pending-draft");
     expect(consultationConversationCopy.newDraft).toBe("New draft");
+    const resultStart = thread.indexOf("{hasResult && !item.ignored ? (");
+    const resultBlock = thread.slice(resultStart, resultStart + 1800);
+    expect(resultBlock.indexOf("consultation-pending-draft")).toBeLessThan(
+      resultBlock.indexOf("item.talkingPoint ? <ResultBody"),
+    );
   });
 
   it("rendering paths make no paid call and enqueue no job", () => {

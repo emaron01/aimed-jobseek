@@ -536,8 +536,6 @@ function QuestionCard({
         ) : null}
         {hasResult && !item.ignored ? (
           <>
-            {item.talkingPoint ? <ResultBody statement={item.talkingPoint} /> : null}
-            {item.resumeBullet ? <ResultBody statement={item.resumeBullet} /> : null}
             {item.pendingDraftTalkingPoint || item.pendingDraftResumeBullet ? (
               <div
                 className="mt-3 space-y-1"
@@ -552,19 +550,28 @@ function QuestionCard({
                 {item.pendingDraftResumeBullet ? (
                   <ResultBody statement={item.pendingDraftResumeBullet} />
                 ) : null}
-              </div>
-            ) : null}
-            {canEdit ? (
-              <ResultActions
-                campaignId={campaignId}
-                statements={
-                  item.pendingDraftTalkingPoint || item.pendingDraftResumeBullet
-                    ? ([
+                {canEdit ? (
+                  <ResultActions
+                    campaignId={campaignId}
+                    statements={
+                      [
                         item.pendingDraftTalkingPoint,
                         item.pendingDraftResumeBullet,
-                      ].filter(Boolean) as QaStatement[])
-                    : item.statements
-                }
+                      ].filter(Boolean) as QaStatement[]
+                    }
+                    testId={`consultation-result-${item.questionTurnId}`}
+                  />
+                ) : null}
+              </div>
+            ) : null}
+            {item.talkingPoint ? <ResultBody statement={item.talkingPoint} /> : null}
+            {item.resumeBullet ? <ResultBody statement={item.resumeBullet} /> : null}
+            {canEdit &&
+            !item.pendingDraftTalkingPoint &&
+            !item.pendingDraftResumeBullet ? (
+              <ResultActions
+                campaignId={campaignId}
+                statements={item.statements}
                 testId={`consultation-result-${item.questionTurnId}`}
               />
             ) : null}

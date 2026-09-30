@@ -9,6 +9,7 @@ import { ApplicationResearchStatus } from "@/components/ApplicationResearchStatu
 import { ApplicationFitOverride } from "@/components/ApplicationFitOverride";
 import {
   ApplicationWorkspaceLive,
+  WorkspaceJobRefresh,
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
 import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-status";
@@ -749,6 +750,10 @@ export async function ApplicationWorkspace({
     ) : null}
     {showFocus(focus, ["assets"]) ? (
     <div id="assets">
+    <WorkspaceJobRefresh
+      campaignId={campaignId}
+      initialSignature={live.signature}
+    />
     <WorkspaceProgress
       jobs={live.jobs}
       type="RESUME"

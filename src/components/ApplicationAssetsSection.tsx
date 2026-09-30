@@ -454,6 +454,10 @@ function LatestAssetEditor({
   );
 }
 
+function sortAssetsNewestFirst(rows: AssetRow[]): AssetRow[] {
+  return [...rows].sort((a, b) => b.version - a.version);
+}
+
 function AssetHistory({
   campaignId,
   rows,
@@ -471,9 +475,10 @@ function AssetHistory({
     approveApplicationAssetAction,
     initial,
   );
+  const ordered = sortAssetsNewestFirst(rows);
   return (
-    <div className="space-y-3">
-      {rows.map((asset, index) => (
+    <div className="space-y-3" data-testid="asset-version-history">
+      {ordered.map((asset, index) => (
         <details
           key={asset.id}
           open={index === 0}
@@ -535,7 +540,8 @@ function AssetTypePanel({
   profileEditHref: string | null;
 }) {
   const [result, action] = useActionState(generateApplicationAssetAction, initial);
-  const latest = rows[0] ?? null;
+  const orderedRows = sortAssetsNewestFirst(rows);
+  const latest = orderedRows[0] ?? null;
   const latestResume =
     type === "RESUME" && latest?.content.type === "RESUME"
       ? latest.content
@@ -636,7 +642,7 @@ function AssetTypePanel({
               </fieldset>
             </details>
           ) : null}
-          {rows.length ? (
+          {orderedRows.length ? (
             <label className="block text-sm">
               <span className="font-medium text-ink">
                 {applicationAssetConfig.labels.changeInstruction}
@@ -650,7 +656,7 @@ function AssetTypePanel({
             </label>
           ) : null}
           <SubmitButton>
-            {rows.length
+            {orderedRows.length
               ? applicationAssetConfig.labels.regenerate
               : applicationAssetConfig.labels.generate}
           </SubmitButton>
@@ -669,10 +675,10 @@ function AssetTypePanel({
           />
         </form>
       ) : null}
-      {rows.length ? (
+      {orderedRows.length ? (
         <AssetHistory
           campaignId={campaignId}
-          rows={rows}
+          rows={orderedRows}
           canEdit={canEdit}
           earlierExperienceHeading={earlierExperienceHeading}
           profileHref={profileHref}
