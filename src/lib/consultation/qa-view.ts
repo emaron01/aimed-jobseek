@@ -37,6 +37,12 @@ export type ConsultationQaItem = {
   resumeBullet: QaStatement | null;
   talkingPoint: QaStatement | null;
   /**
+   * When an APPROVED answer exists and a newer DRAFT of the same kind exists,
+   * expose that DRAFT for Approve/Edit without hiding the approved answer.
+   */
+  pendingDraftTalkingPoint?: QaStatement | null;
+  pendingDraftResumeBullet?: QaStatement | null;
+  /**
    * WHO interview type from questionContextJson. Null for older turns.
    * Never shown to the seeker.
    */
@@ -143,6 +149,28 @@ function latestOfKind(
   return [...pool].sort((left, right) => statementTime(left) - statementTime(right)).at(-1) ?? null;
 }
 
+/** Newer DRAFT of the same kind when the current answer is APPROVED. */
+function pendingDraftOfKind(
+  statements: QaStatement[],
+  kind: QaStatement["kind"],
+  current: QaStatement | null,
+): QaStatement | null {
+  if (!current || current.status !== "APPROVED") return null;
+  const approvedAt = statementTime(current);
+  const newerDrafts = statements.filter(
+    (statement) =>
+      statement.kind === kind &&
+      statement.status === "DRAFT" &&
+      statementTime(statement) > approvedAt,
+  );
+  if (newerDrafts.length === 0) return null;
+  return (
+    [...newerDrafts]
+      .sort((left, right) => statementTime(left) - statementTime(right))
+      .at(-1) ?? null
+  );
+}
+
 function emptyItem(turn: QaTurn): ConsultationQaItem {
   return {
     questionTurnId: turn.id,
@@ -153,6 +181,8 @@ function emptyItem(turn: QaTurn): ConsultationQaItem {
     statements: [],
     resumeBullet: null,
     talkingPoint: null,
+    pendingDraftTalkingPoint: null,
+    pendingDraftResumeBullet: null,
     interviewTypeTag: interviewTypeTagFromQuestionContext(
       turn.questionContextJson,
     ),
@@ -504,18 +534,31 @@ export function buildConsultationQaView(input: {
       if (!item) {
         throw new Error("Harper question grouping lost a drafted question.");
       }
+      const preferredTurnId = item.seekerAnswers.at(-1)?.id;
+      const resumeBullet = latestOfKind(
+        item.statements,
+        "RESUME_BULLET",
+        preferredTurnId,
+      );
+      const talkingPoint = latestOfKind(
+        item.statements,
+        "INTERVIEW_ANSWER",
+        preferredTurnId,
+      );
       return {
         ...item,
         ignored: ignoredPrimaryIds.has(item.questionTurnId),
-        resumeBullet: latestOfKind(
+        resumeBullet,
+        talkingPoint,
+        pendingDraftResumeBullet: pendingDraftOfKind(
           item.statements,
           "RESUME_BULLET",
-          item.seekerAnswers.at(-1)?.id,
+          resumeBullet,
         ),
-        talkingPoint: latestOfKind(
+        pendingDraftTalkingPoint: pendingDraftOfKind(
           item.statements,
           "INTERVIEW_ANSWER",
-          item.seekerAnswers.at(-1)?.id,
+          talkingPoint,
         ),
         needsMoreDetail: needsMoreDetailFromAnalysis(
           item.seekerAnswers.at(-1)?.analysisJson,

@@ -25,6 +25,8 @@ function question(
     statements: [],
     resumeBullet: null,
     talkingPoint: null,
+    pendingDraftTalkingPoint: null,
+    pendingDraftResumeBullet: null,
     ignored: false,
     ...partial,
   };

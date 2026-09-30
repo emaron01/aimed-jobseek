@@ -4,7 +4,7 @@ import {
   interviewTypeTagSchema,
 } from "@/lib/consultation/contract";
 
-export const APPLICATION_SUMMARY_PROMPT_VERSION = "14";
+export const APPLICATION_SUMMARY_PROMPT_VERSION = "15";
 
 export const CHEAT_SHEET_SECTION_KINDS = [
   "RECRUITER",

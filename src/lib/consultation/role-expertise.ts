@@ -46,7 +46,7 @@ import { aiCallTracking } from "@/lib/usage/ai-call";
 import { prisma } from "@/lib/prisma-client";
 import type { Prisma } from "@prisma/client";
 
-export const ROLE_EXPERTISE_PROMPT_VERSION = "1";
+export const ROLE_EXPERTISE_PROMPT_VERSION = "2";
 
 export const COACHING_SET_MIN = 20;
 export const COACHING_SET_MAX = 25;

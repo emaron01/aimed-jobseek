@@ -50,6 +50,8 @@ function qaItem(
     statements: [],
     resumeBullet: null,
     talkingPoint: null,
+    pendingDraftTalkingPoint: null,
+    pendingDraftResumeBullet: null,
     ignored: false,
     needsMoreDetail: false,
     ...overrides,

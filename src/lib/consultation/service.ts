@@ -67,6 +67,7 @@ import {
   findConsultationQaItem,
   isIgnoredSeekerTurn,
   isTargetCurrentlyIgnored,
+  needsMoreDetailFromAnalysis,
   parseConsultationReplyTarget,
   replyToTurnIdFromAnalysis,
   resolveReplyableQaItem,
@@ -896,6 +897,39 @@ async function finishItemNeedsMoreDetail(input: {
       data: { generationStatus: "READY", generationError: null },
     }),
   ]);
+}
+
+/**
+ * Every processed reply must leave a visible outcome under the question:
+ * a draft (wroteResult), a follow-up CONSULTANT turn, or needs-more-detail.
+ */
+async function ensureConsultationReplyVisibleOutcome(input: {
+  sessionId: string;
+  turnId: string;
+  resultTurnId: string;
+  supersedeTurnIds: string[];
+  wroteResult: boolean;
+  followUpAdded: boolean;
+}): Promise<void> {
+  if (input.wroteResult || input.followUpAdded) return;
+  const turn = await prisma.consultationTurn.findUnique({
+    where: { id: input.turnId },
+    select: { analysisJson: true },
+  });
+  if (needsMoreDetailFromAnalysis(turn?.analysisJson)) return;
+  const analysisJson =
+    turn?.analysisJson &&
+    typeof turn.analysisJson === "object" &&
+    !Array.isArray(turn.analysisJson)
+      ? (turn.analysisJson as Record<string, unknown>)
+      : {};
+  await finishItemNeedsMoreDetail({
+    sessionId: input.sessionId,
+    turnId: input.turnId,
+    resultTurnId: input.resultTurnId,
+    supersedeTurnIds: input.supersedeTurnIds,
+    analysisJson,
+  });
 }
 
 function learnedNotesEvidence(
@@ -1771,6 +1805,7 @@ async function processAnswerGeneration(input: {
           analysisJson: {
             status: "READY",
             replyType: "feedback",
+            needsMoreDetail: true,
             ...(questionTurnId ? { replyToTurnId: questionTurnId } : {}),
           },
         },
@@ -2971,6 +3006,7 @@ export async function processConsultationReply(input: {
     Boolean(processed.followUpQuestion) &&
     allowFollowUp;
   const askedQuestions = askedQuestionsFromTurns(turns);
+  let followUpAdded = false;
   if (
     askFollowUp &&
     processed.followUpQuestion &&
@@ -2988,7 +3024,16 @@ export async function processConsultationReply(input: {
         replyToTurnId: questionTurnId,
       },
     });
+    followUpAdded = true;
   }
+  await ensureConsultationReplyVisibleOutcome({
+    sessionId: session.id,
+    turnId: seekerTurnId,
+    resultTurnId,
+    supersedeTurnIds,
+    wroteResult: processed.wroteResult,
+    followUpAdded,
+  });
 }
 
 function declinedPolishInput(value: unknown): {
@@ -3600,6 +3645,21 @@ export async function approveConsultationStatement(input: {
           resumeBullet: content,
           resumeBulletApprovedAt: now,
         };
+  // Same question card: statements on the primary question turn and its seeker answers.
+  const { view } = await loadSessionQaView(statement.sessionId);
+  const card =
+    view.questions.find((item) =>
+      item.statements.some((row) => row.id === statement.id),
+    ) ?? null;
+  const cardTurnIds = card
+    ? [
+        ...new Set([
+          card.questionTurnId,
+          ...card.seekerAnswers.map((answer) => answer.id),
+          ...card.statements.map((row) => row.turnId),
+        ]),
+      ]
+    : [statement.turnId];
   await prisma.$transaction([
     prisma.consultationStatement.update({
       where: { id: statement.id },
@@ -3607,6 +3667,16 @@ export async function approveConsultationStatement(input: {
         status: "APPROVED",
         content,
         approvedAt: now,
+      },
+    }),
+    // Retire prior APPROVED of the same kind on this card so only one remains.
+    prisma.consultationStatement.deleteMany({
+      where: {
+        sessionId: statement.sessionId,
+        kind: statement.kind,
+        status: "APPROVED",
+        id: { not: statement.id },
+        turnId: { in: cardTurnIds },
       },
     }),
     existingStory

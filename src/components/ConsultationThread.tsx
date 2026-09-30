@@ -538,10 +538,33 @@ function QuestionCard({
           <>
             {item.talkingPoint ? <ResultBody statement={item.talkingPoint} /> : null}
             {item.resumeBullet ? <ResultBody statement={item.resumeBullet} /> : null}
+            {item.pendingDraftTalkingPoint || item.pendingDraftResumeBullet ? (
+              <div
+                className="mt-3 space-y-1"
+                data-testid="consultation-pending-draft"
+              >
+                <p className="text-xs font-medium uppercase tracking-wide text-subtle">
+                  {consultationConversationCopy.newDraft}
+                </p>
+                {item.pendingDraftTalkingPoint ? (
+                  <ResultBody statement={item.pendingDraftTalkingPoint} />
+                ) : null}
+                {item.pendingDraftResumeBullet ? (
+                  <ResultBody statement={item.pendingDraftResumeBullet} />
+                ) : null}
+              </div>
+            ) : null}
             {canEdit ? (
               <ResultActions
                 campaignId={campaignId}
-                statements={item.statements}
+                statements={
+                  item.pendingDraftTalkingPoint || item.pendingDraftResumeBullet
+                    ? ([
+                        item.pendingDraftTalkingPoint,
+                        item.pendingDraftResumeBullet,
+                      ].filter(Boolean) as QaStatement[])
+                    : item.statements
+                }
                 testId={`consultation-result-${item.questionTurnId}`}
               />
             ) : null}

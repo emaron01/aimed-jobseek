@@ -93,6 +93,7 @@ export const consultationConversationCopy = Object.freeze({
   yourReply: "Your reply",
   followUpReplyHint:
     "To answer Harper's follow-up, open Your reply, add the details she's asking for, and save.",
+  newDraft: "New draft",
   editAnswer: "Edit",
   saveAnswer: "Save",
   showYourReplies: "Show your replies",

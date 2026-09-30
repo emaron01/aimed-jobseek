@@ -98,6 +98,8 @@ function qaItem(
     statements: overrides.statements ?? [],
     resumeBullet: overrides.resumeBullet ?? null,
     talkingPoint: overrides.talkingPoint ?? null,
+    pendingDraftTalkingPoint: overrides.pendingDraftTalkingPoint ?? null,
+    pendingDraftResumeBullet: overrides.pendingDraftResumeBullet ?? null,
   };
 }
 

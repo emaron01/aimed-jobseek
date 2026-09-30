@@ -235,6 +235,8 @@ describe("Harper Batch A standing Answer / Ignore / reopen", () => {
           statements: [],
           resumeBullet: null,
           talkingPoint: null,
+          pendingDraftTalkingPoint: null,
+          pendingDraftResumeBullet: null,
           ignored: false,
         },
       ],
