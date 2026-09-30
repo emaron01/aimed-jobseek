@@ -24,10 +24,15 @@ const person = {
 
 describe("Interview cheat sheet live update and headings", () => {
   it("refreshes the cheat sheet page when generation completes or fails", () => {
+    const layout = readFileSync("src/app/(app)/campaigns/[id]/layout.tsx", "utf8");
+    const chrome = readFileSync("src/components/ApplicationWorkspaceChrome.tsx", "utf8");
     const page = readFileSync("src/app/(app)/campaigns/[id]/summary/page.tsx", "utf8");
     const live = readFileSync("src/components/ApplicationWorkspaceLive.tsx", "utf8");
-    expect(page).toContain("WorkspaceJobRefresh");
-    expect(page).toContain("initialSignature={live.signature}");
+    expect(layout).toContain("ApplicationWorkspaceChrome");
+    expect(layout).toContain("initialSignature={live.signature}");
+    expect(layout).toContain("initialJobs={live.jobs}");
+    expect(chrome).toContain("WorkspaceJobRefresh");
+    expect(page).not.toContain("WorkspaceJobRefresh");
     expect(page).toContain("WorkspaceProgress");
     expect(page).toContain("APPLICATION_SUMMARY");
     expect(page).toContain("stayAndWatch");

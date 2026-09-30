@@ -83,29 +83,54 @@ const minimalResumeContext = {
 } as never;
 
 describe("Resume page live update, draft order, and cover letter writing", () => {
-  it("ITEM 1: assets focus mounts WorkspaceJobRefresh so completed RESUME/COVER_LETTER jobs clear generating without a manual refresh", () => {
+  it("ITEM 1: one WorkspaceJobRefresh at application chrome covers every page; no page mounts a second", () => {
+    const layout = src("src/app/(app)/campaigns/[id]/layout.tsx");
+    const chrome = src("src/components/ApplicationWorkspaceChrome.tsx");
+    const live = src("src/components/ApplicationWorkspaceLive.tsx");
     const workspace = src("src/components/ApplicationWorkspace.tsx");
     const assetsFocus = workspace.slice(
       workspace.indexOf('showFocus(focus, ["assets"])'),
-      workspace.indexOf('showFocus(focus, ["outreach"])') >= 0
-        ? workspace.indexOf('showFocus(focus, ["outreach"])')
-        : workspace.length,
+      workspace.indexOf('showFocus(focus, ["outreach"])'),
     );
-    expect(assetsFocus).toContain("WorkspaceJobRefresh");
-    expect(assetsFocus).toContain("initialSignature={live.signature}");
+    const outreachFocus = workspace.slice(
+      workspace.indexOf('showFocus(focus, ["outreach"])'),
+      workspace.indexOf('showFocus(focus, ["interviews"])'),
+    );
+    const hiringFocus = workspace.slice(
+      workspace.indexOf('showFocus(focus, ["hiring-team"])'),
+      workspace.indexOf('showFocus(focus, ["assets"])'),
+    );
+    const consultation = src("src/components/ConsultationSection.tsx");
+    const summary = src("src/app/(app)/campaigns/[id]/summary/page.tsx");
+
+    expect(layout).toContain("getApplicationWorkspaceLive");
+    expect(layout).toContain("ApplicationWorkspaceChrome");
+    expect(layout).toContain("initialSignature={live.signature}");
+    expect(layout).toContain("initialJobs={live.jobs}");
+    expect(chrome).toContain("<WorkspaceJobRefresh");
+    expect(chrome).toContain("initialSignature={initialSignature}");
+    expect((chrome.match(/WorkspaceJobRefresh/g) ?? []).length).toBe(2); // import + mount
+
+    expect(assetsFocus).not.toContain("WorkspaceJobRefresh");
     expect(assetsFocus).toContain('type="RESUME"');
     expect(assetsFocus).toContain('type="COVER_LETTER"');
-    expect(assetsFocus).toContain("WorkspaceProgress");
+    expect(outreachFocus).not.toContain("WorkspaceJobRefresh");
+    expect(hiringFocus).not.toContain("WorkspaceJobRefresh");
+    expect(consultation).not.toContain("WorkspaceJobRefresh");
+    expect(summary).not.toContain("WorkspaceJobRefresh");
+    expect(workspace).not.toContain("WorkspaceJobRefresh");
 
-    const live = src("src/components/ApplicationWorkspaceLive.tsx");
+    // Overview still shows failure UI but does not poll (no second refresher).
+    const liveFn = live.slice(live.indexOf("export function ApplicationWorkspaceLive"));
+    expect(liveFn).not.toContain("setInterval");
+    expect(liveFn).not.toContain("getApplicationWorkspaceLiveAction");
+
     expect(live).toContain("export function WorkspaceJobRefresh");
     expect(live).toContain("router.refresh()");
     expect(live).toContain("latest.signature !== signature.current");
+    expect(live).toContain("stopPolling");
+    expect(live).toContain('job.status === "PENDING" || job.status === "IN_PROGRESS"');
     expect(live).toContain('job.status === "FAILED"');
-    expect(live).toContain("workspace-failed-");
-    expect(live).toContain(
-      'latest.status === "PENDING" || latest.status === "IN_PROGRESS"',
-    );
   });
 
   it("ITEM 1: gated skip returns No Changes To Resume/Cover Letter without enqueueing a job", () => {
@@ -175,16 +200,53 @@ describe("Resume page live update, draft order, and cover letter writing", () =>
     expect(withInstruction).toMatch(/^[a-f0-9]{64}$/);
   });
 
-  it("ITEM 2: earlierExperienceHeading comes from the presentation plan, not resume content", () => {
+  it("ITEM 2: earlierExperienceHeading is editable inline, saves via unpaid plan update, and is not in the resume fingerprint", () => {
     const section = src("src/components/ApplicationAssetsSection.tsx");
     expect(section).toContain("earlierExperienceHeading");
     expect(section).toContain(
       'plan?.plan.type === "RESUME" ? plan.plan.earlierExperienceHeading',
     );
+    expect(section).toContain('data-testid="earlier-experience-heading-input"');
+    expect(section).toContain("onHeadingChange");
+    expect(section).toContain('name="earlierExperienceHeading"');
     const contract = src("src/lib/application-assets/contract.ts");
     expect(contract).not.toContain("earlierExperienceHeading");
     const planContract = src("src/lib/application-assets/plan-contract.ts");
     expect(planContract).toContain("earlierExperienceHeading");
+    const planService = src("src/lib/application-assets/plan-service.ts");
+    const headingFnStart = planService.indexOf(
+      "export async function updateEarlierExperienceHeading",
+    );
+    expect(headingFnStart).toBeGreaterThan(-1);
+    const headingFn = planService.slice(
+      headingFnStart,
+      planService.indexOf("export async function enqueueAssetsAfterConsultation"),
+    );
+    expect(headingFn).toContain("earlierExperienceHeading: trimmed");
+    expect(headingFn).toContain("prisma.applicationPresentationPlan.update");
+    expect(headingFn).not.toContain("writePresentationPlan");
+    expect(headingFn).not.toContain("runGatedPresentationPlan");
+    expect(headingFn).not.toContain("enqueueApplicationJob");
+    const actions = src("src/app/actions/application-assets.ts");
+    expect(actions).toContain("updateEarlierExperienceHeading");
+    const saveEditedAction = actions.slice(
+      actions.indexOf("export async function saveEditedApplicationAssetAction"),
+      actions.indexOf("export async function updateEarlierExperienceHeadingAction"),
+    );
+    expect(saveEditedAction).toContain("updateEarlierExperienceHeading");
+    expect(saveEditedAction).not.toContain("enqueueApplicationJob");
+    const paid = src("src/lib/application-assets/paid-inputs.ts");
+    const resumeFp = paid.slice(
+      paid.indexOf("export function resumeAssetFingerprint"),
+      paid.indexOf("export function coverLetterAssetFingerprint"),
+    );
+    expect(resumeFp).not.toContain("earlierExperienceHeading");
+    const prompt = src("src/lib/application-assets/prompt.ts");
+    const resumeMessages = prompt.slice(
+      prompt.indexOf("export function buildResumeAssetMessages"),
+      prompt.indexOf("export function buildCoverLetterAssetMessages"),
+    );
+    expect(resumeMessages).not.toContain("earlierExperienceHeading");
   });
 
   it("ITEM 3: AssetHistory and AssetTypePanel list versions newest first", () => {
@@ -192,9 +254,37 @@ describe("Resume page live update, draft order, and cover letter writing", () =>
     expect(section).toContain("sortAssetsNewestFirst");
     expect(section).toContain("b.version - a.version");
     expect(section).toContain("const orderedRows = sortAssetsNewestFirst(rows)");
-    expect(section).toContain("data-testid=\"asset-version-history\"");
+    expect(section).toContain('data-testid="asset-version-history"');
     const workspace = src("src/components/ApplicationWorkspace.tsx");
     expect(workspace).toContain('orderBy: [{ type: "asc" }, { version: "desc" }]');
+  });
+
+  it("ITEM 3: every viewed version (newest first) has Adjust manually; save creates a new version with no paid call", () => {
+    const section = src("src/components/ApplicationAssetsSection.tsx");
+    expect(section).toContain("function AssetVersionEditor");
+    expect(section).toContain("data-asset-version={asset.version}");
+    expect(section).toContain("AssetVersionEditor");
+    expect(section).not.toContain("LatestAssetEditor");
+    expect(section).toContain("applicationAssetConfig.labels.adjustManually");
+    expect(section).toContain("applicationAssetConfig.labels.saveNewVersion");
+    const history = section.slice(section.indexOf("function AssetHistory"));
+    expect(history).toContain("<AssetVersionEditor");
+    const editor = section.slice(
+      section.indexOf("function AssetVersionEditor"),
+      section.indexOf("function sortAssetsNewestFirst"),
+    );
+    expect(editor).toContain("applicationAssetConfig.labels.adjustManually");
+    expect(editor).toContain("applicationAssetConfig.labels.saveNewVersion");
+    expect(editor).toContain("saveEditedApplicationAssetAction");
+    const service = src("src/lib/application-assets/service.ts");
+    const saveEdited = service.slice(
+      service.indexOf("export async function saveEditedApplicationAsset"),
+      service.indexOf("export async function listApplicationAssets"),
+    );
+    expect(saveEdited).toContain("saveVersion");
+    expect(saveEdited).not.toContain("enqueueApplicationJob");
+    expect(saveEdited).not.toContain("runGatedResumeAsset");
+    expect(saveEdited).not.toContain("generateStructured");
   });
 
   it("ITEM 4: Harper shows New draft above the approved answer with Approve and Edit", () => {
@@ -224,7 +314,8 @@ describe("Resume page live update, draft order, and cover letter writing", () =>
     const section = src("src/components/ApplicationAssetsSection.tsx");
     const thread = src("src/components/ConsultationThread.tsx");
     const live = src("src/components/ApplicationWorkspaceLive.tsx");
-    for (const file of [workspace, section, thread, live]) {
+    const chrome = src("src/components/ApplicationWorkspaceChrome.tsx");
+    for (const file of [workspace, section, thread, live, chrome]) {
       expect(file).not.toMatch(
         /enqueueApplicationJob|generateStructured|runPaidStructuredCall/,
       );

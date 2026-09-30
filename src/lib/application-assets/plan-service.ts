@@ -285,6 +285,39 @@ export function earlierExperienceHeadingFromPlan(
   return plan?.type === "RESUME" ? plan.earlierExperienceHeading : null;
 }
 
+/** Seeker inline edit of the condensed-roles heading. No paid call. */
+export async function updateEarlierExperienceHeading(input: {
+  organizationId: string;
+  campaignId: string;
+  heading: string;
+}): Promise<{ ok: true; heading: string } | { ok: false; message: string }> {
+  const trimmed = input.heading.trim();
+  if (!trimmed) {
+    return { ok: false, message: "The earlier-experience heading is required." };
+  }
+  const plan = await loadPresentationPlan({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    type: "RESUME",
+  });
+  if (!plan) {
+    return { ok: false, message: "There is no resume plan to update." };
+  }
+  const parsed = parsePlan(plan.planJson);
+  if (parsed.type !== "RESUME") {
+    return { ok: false, message: "There is no resume plan to update." };
+  }
+  const next: PresentationPlan = {
+    ...parsed,
+    earlierExperienceHeading: trimmed,
+  };
+  await prisma.applicationPresentationPlan.update({
+    where: { id: plan.id },
+    data: { planJson: next as unknown as Prisma.InputJsonValue },
+  });
+  return { ok: true, heading: trimmed };
+}
+
 export async function enqueueAssetsAfterConsultation(input: {
   organizationId: string;
   campaignId: string;

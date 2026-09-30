@@ -204,11 +204,13 @@ function AssetPreview({
   earlierExperienceHeading,
   editable = false,
   onChange,
+  onHeadingChange,
 }: {
   content: ApplicationAssetContent;
   earlierExperienceHeading: string | null;
   editable?: boolean;
   onChange?: (claimId: string, text: string) => void;
+  onHeadingChange?: (heading: string) => void;
 }) {
   if (content.type === "COVER_LETTER") {
     const paragraphs = visibleItems(content.paragraphs, (claim) => claim.text);
@@ -309,8 +311,26 @@ function AssetPreview({
         ))}
         {condensed.length > 0 ? (
           <div className="space-y-1" data-testid="condensed-roles">
-            {earlierExperienceHeading ? (
-              <p className="font-medium">{earlierExperienceHeading}</p>
+            {earlierExperienceHeading || editable ? (
+              editable && onHeadingChange ? (
+                <label className="block">
+                  <span className="sr-only">Earlier experience heading</span>
+                  <input
+                    type="text"
+                    value={earlierExperienceHeading ?? ""}
+                    onChange={(event) => onHeadingChange(event.target.value)}
+                    className="w-full rounded-md border border-edge-strong px-2 py-1 font-medium text-ink"
+                    data-testid="earlier-experience-heading-input"
+                  />
+                </label>
+              ) : earlierExperienceHeading ? (
+                <p
+                  className="font-medium"
+                  data-testid="earlier-experience-heading"
+                >
+                  {earlierExperienceHeading}
+                </p>
+              ) : null
             ) : null}
             {condensed.map((role) => (
               <p key={role.roleId} className="font-medium">
@@ -390,7 +410,7 @@ function mapClaimText(
   };
 }
 
-function LatestAssetEditor({
+function AssetVersionEditor({
   campaignId,
   asset,
   earlierExperienceHeading,
@@ -401,11 +421,16 @@ function LatestAssetEditor({
 }) {
   const [editing, setEditing] = useState(false);
   const [content, setContent] = useState(asset.content);
+  const [heading, setHeading] = useState(earlierExperienceHeading ?? "");
   const [result, action] = useActionState(saveEditedApplicationAssetAction, initial);
 
   if (!editing) {
     return (
-      <div className="space-y-4" data-testid="asset-in-place-editor">
+      <div
+        className="space-y-4"
+        data-testid="asset-in-place-editor"
+        data-asset-version={asset.version}
+      >
         <AssetPreview
           content={asset.content}
           earlierExperienceHeading={earlierExperienceHeading}
@@ -414,6 +439,7 @@ function LatestAssetEditor({
           type="button"
           onClick={() => {
             setContent(asset.content);
+            setHeading(earlierExperienceHeading ?? "");
             setEditing(true);
           }}
         >
@@ -425,16 +451,33 @@ function LatestAssetEditor({
   }
 
   return (
-    <form action={action} className="space-y-4" data-testid="asset-in-place-editor">
+    <form
+      action={action}
+      className="space-y-4"
+      data-testid="asset-in-place-editor"
+      data-asset-version={asset.version}
+    >
       <input type="hidden" name="campaignId" value={campaignId} />
       <input type="hidden" name="assetId" value={asset.id} />
       <input type="hidden" name="contentJson" value={JSON.stringify(content)} />
+      {asset.content.type === "RESUME" ? (
+        <input
+          type="hidden"
+          name="earlierExperienceHeading"
+          value={heading}
+        />
+      ) : null}
       <AssetPreview
         content={content}
-        earlierExperienceHeading={earlierExperienceHeading}
+        earlierExperienceHeading={
+          asset.content.type === "RESUME" ? heading : earlierExperienceHeading
+        }
         editable
         onChange={(claimId, text) =>
           setContent((current) => mapClaimText(current, claimId, text))
+        }
+        onHeadingChange={
+          asset.content.type === "RESUME" ? setHeading : undefined
         }
       />
       <div className="flex flex-wrap gap-2">
@@ -443,6 +486,7 @@ function LatestAssetEditor({
           type="button"
           onClick={() => {
             setContent(asset.content);
+            setHeading(earlierExperienceHeading ?? "");
             setEditing(false);
           }}
         >
@@ -488,10 +532,19 @@ function AssetHistory({
             Version {asset.version} · {formatAssetStatusLabel(asset.status)}
           </summary>
           <div className="mt-4 space-y-4">
-            <AssetPreview
-              content={asset.content}
-              earlierExperienceHeading={earlierExperienceHeading}
-            />
+            {canEdit ? (
+              <AssetVersionEditor
+                key={`${asset.id}-${asset.version}`}
+                campaignId={campaignId}
+                asset={asset}
+                earlierExperienceHeading={earlierExperienceHeading}
+              />
+            ) : (
+              <AssetPreview
+                content={asset.content}
+                earlierExperienceHeading={earlierExperienceHeading}
+              />
+            )}
             <div className="flex flex-wrap gap-2">
               <AppActionLink href={workspaceAssetDocxHref(asset.id)}>
                 {applicationAssetConfig.labels.downloadDocx}
@@ -593,21 +646,19 @@ function AssetTypePanel({
           {planError}
         </p>
       ) : null}
-      {latest ? (
-        canEdit ? (
-          <LatestAssetEditor
-            key={`${latest.id}-${latest.version}`}
-            campaignId={campaignId}
-            asset={latest}
-            earlierExperienceHeading={earlierExperienceHeading}
-          />
-        ) : (
-          <AssetPreview
-            content={latest.content}
-            earlierExperienceHeading={earlierExperienceHeading}
-          />
-        )
-      ) : null}
+      {orderedRows.length ? (
+        <AssetHistory
+          campaignId={campaignId}
+          rows={orderedRows}
+          canEdit={canEdit}
+          earlierExperienceHeading={earlierExperienceHeading}
+          profileHref={profileHref}
+        />
+      ) : (
+        <p className="text-sm text-muted">
+          {applicationAssetConfig.labels.emptyHistory}
+        </p>
+      )}
       {canEdit ? (
         <form action={action} className="space-y-3">
           <input type="hidden" name="campaignId" value={campaignId} />
@@ -675,19 +726,6 @@ function AssetTypePanel({
           />
         </form>
       ) : null}
-      {orderedRows.length ? (
-        <AssetHistory
-          campaignId={campaignId}
-          rows={orderedRows}
-          canEdit={canEdit}
-          earlierExperienceHeading={earlierExperienceHeading}
-          profileHref={profileHref}
-        />
-      ) : (
-        <p className="text-sm text-muted">
-          {applicationAssetConfig.labels.emptyHistory}
-        </p>
-      )}
     </section>
   );
 }

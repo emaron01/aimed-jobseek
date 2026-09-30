@@ -7,7 +7,6 @@ import {
 import { AppPendingIndicator } from "@/components/AppButton";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import {
-  WorkspaceJobRefresh,
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
 import {
@@ -581,7 +580,6 @@ export async function ConsultationSection({
             initialText={parsed.ok ? seekerBackgroundText(parsed.profile) : ""}
           />
         ) : null}
-        <WorkspaceJobRefresh campaignId={campaignId} />
         <WorkspaceProgress jobs={jobs} type="CONSULTATION" stayAndWatch />
         {consultationBusy ? (
           <div className="space-y-1 text-sm text-muted" data-testid="harper-typing">

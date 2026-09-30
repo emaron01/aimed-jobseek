@@ -620,7 +620,9 @@ describe("Harper question-limit coach", () => {
     expect(consultationConversationCopy.confirmed).toBe("Approved.");
     const live = readFileSync("src/components/ApplicationWorkspaceLive.tsx", "utf8");
     expect(live).toContain("export function WorkspaceJobRefresh");
-    expect(section).toContain("WorkspaceJobRefresh");
+    const chrome = readFileSync("src/components/ApplicationWorkspaceChrome.tsx", "utf8");
+    expect(chrome).toContain("WorkspaceJobRefresh");
+    expect(section).not.toContain("WorkspaceJobRefresh");
     expect(section).toContain("consultationHasUnansweredQuestions");
     expect(section).toContain("{consultationBusy ? (");
     expect(section).not.toContain(

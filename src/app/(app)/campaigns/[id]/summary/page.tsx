@@ -4,7 +4,6 @@ import { generateApplicationPageMetadata } from "@/lib/application/page-metadata
 import { generateApplicationSummaryAction } from "@/app/actions/application-summary";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import {
-  WorkspaceJobRefresh,
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
 import { AppActionLink } from "@/components/AppButton";
@@ -201,7 +200,6 @@ export default async function ApplicationSummaryPage({
       />
 
       <div className="print:hidden">
-        <WorkspaceJobRefresh campaignId={id} initialSignature={live.signature} />
         <WorkspaceProgress jobs={live.jobs} type="APPLICATION_SUMMARY" stayAndWatch />
         {filterOptions.length > 0 ? (
           <div className="mb-4">

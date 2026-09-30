@@ -78,9 +78,11 @@ function JobErrorDetail({
 export function WorkspaceJobRefresh({
   campaignId,
   initialSignature,
+  initialJobs,
 }: {
   campaignId: string;
   initialSignature?: string;
+  initialJobs?: WorkspaceJobStatusView[];
 }) {
   const router = useRouter();
   const signature = useRef<string | null>(initialSignature ?? null);
@@ -92,17 +94,43 @@ export function WorkspaceJobRefresh({
   }, [initialSignature]);
 
   useEffect(() => {
+    let interval: number | null = null;
+    let cancelled = false;
+
+    function hasActive(jobs: WorkspaceJobStatusView[]): boolean {
+      return jobs.some(
+        (job) => job.status === "PENDING" || job.status === "IN_PROGRESS",
+      );
+    }
+
+    function stopPolling() {
+      if (interval != null) {
+        window.clearInterval(interval);
+        interval = null;
+      }
+    }
+
+    function startPolling() {
+      if (interval != null || cancelled) return;
+      interval = window.setInterval(() => {
+        void poll();
+      }, POLL_MS);
+    }
+
     async function poll() {
       try {
         const latest = await getApplicationWorkspaceLiveAction(campaignId);
-        if (!latest) return;
+        if (!latest || cancelled) return;
         if (signature.current == null) {
           signature.current = latest.signature;
-          return;
-        }
-        if (latest.signature !== signature.current) {
+        } else if (latest.signature !== signature.current) {
           signature.current = latest.signature;
           router.refresh();
+        }
+        if (hasActive(latest.jobs)) {
+          startPolling();
+        } else {
+          stopPolling();
         }
       } catch (error) {
         console.error(
@@ -113,12 +141,17 @@ export function WorkspaceJobRefresh({
         );
       }
     }
+
+    if (initialJobs && hasActive(initialJobs)) {
+      startPolling();
+    }
     void poll();
-    const interval = window.setInterval(() => {
-      void poll();
-    }, POLL_MS);
-    return () => window.clearInterval(interval);
-  }, [campaignId, router]);
+
+    return () => {
+      cancelled = true;
+      stopPolling();
+    };
+  }, [campaignId, router, initialSignature, initialJobs]);
 
   return null;
 }
@@ -202,9 +235,7 @@ export function ApplicationWorkspaceLive({
   initialJobs: WorkspaceJobStatusView[];
   profileHref?: string | null;
 }) {
-  const router = useRouter();
   const [jobs, setJobs] = useState(initialJobs);
-  const seen = useRef(new Set(initialJobs.map((job) => `${job.id}:${job.status}`)));
   const signature = useRef(
     initialJobs.map((job) => `${job.id}:${job.status}:${job.error ?? ""}`).join("|"),
   );
@@ -217,22 +248,6 @@ export function ApplicationWorkspaceLive({
     signature.current = nextSignature;
     setJobs(initialJobs);
   }, [initialJobs]);
-
-  useEffect(() => {
-    const interval = window.setInterval(async () => {
-      const latest = await getApplicationWorkspaceLiveAction(campaignId);
-      if (!latest) return;
-      for (const job of latest.jobs) {
-        seen.current.add(`${job.id}:${job.status}`);
-      }
-      if (latest.signature !== signature.current) {
-        signature.current = latest.signature;
-        setJobs(latest.jobs);
-        router.refresh();
-      }
-    }, POLL_MS);
-    return () => window.clearInterval(interval);
-  }, [campaignId, router]);
 
   const latestByKey = new Map<string, WorkspaceJobStatusView>();
   for (const job of jobs) {

@@ -5,6 +5,7 @@ import { requireCurrentUser } from "@/lib/auth/authz";
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import {
   acceptPresentationPlan,
+  updateEarlierExperienceHeading,
 } from "@/lib/application-assets/plan-service";
 import {
   approveApplicationAsset,
@@ -208,11 +209,23 @@ export async function saveEditedApplicationAssetAction(
     const id = campaignId(formData);
     const assetId = String(formData.get("assetId") ?? "").trim();
     if (!assetId) throw new TenantError("Application asset is required.");
+    const earlierExperienceHeading =
+      String(formData.get("earlierExperienceHeading") ?? "").trim() || null;
     let content: unknown;
     try {
       content = JSON.parse(String(formData.get("contentJson") ?? ""));
     } catch {
       return { ok: false, message: "The edited asset content is invalid." };
+    }
+    if (earlierExperienceHeading != null) {
+      const headingResult = await updateEarlierExperienceHeading({
+        organizationId,
+        campaignId: id,
+        heading: earlierExperienceHeading,
+      });
+      if (!headingResult.ok) {
+        return { ok: false, message: headingResult.message };
+      }
     }
     const result = await saveEditedApplicationAsset({
       organizationId,
@@ -235,6 +248,28 @@ export async function saveEditedApplicationAssetAction(
       assetId: result.assetId,
       version: result.version,
     };
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
+export async function updateEarlierExperienceHeadingAction(
+  _previous: ApplicationAssetActionResult | null,
+  formData: FormData,
+): Promise<ApplicationAssetActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const id = campaignId(formData);
+    const heading = String(formData.get("earlierExperienceHeading") ?? "").trim();
+    const result = await updateEarlierExperienceHeading({
+      organizationId,
+      campaignId: id,
+      heading,
+    });
+    if (!result.ok) return { ok: false, message: result.message };
+    revalidate(id);
+    return { ok: true, message: "Heading saved." };
   } catch (error) {
     return errorResult(error);
   }
