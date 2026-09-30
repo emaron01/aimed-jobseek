@@ -1009,4 +1009,77 @@ describeDb("application contacts and reminders", { timeout: 60_000 }, () => {
     });
     expect(after?.nextDueAt).toBeNull();
   });
+
+  it("records sentAt on the message and lists it under the person", async () => {
+    const { markOutreachSent } = await import("@/lib/application-assets/outreach");
+    const { sentMessagesForContact } = await import(
+      "@/components/ApplicationOutreachSections"
+    );
+    const contact = await prisma.contact.create({
+      data: {
+        organizationId,
+        ownerUserId: userId,
+        firstName: "Priya",
+        lastName: "Shah",
+      },
+    });
+    const asset = await prisma.applicationAsset.create({
+      data: {
+        organizationId,
+        campaignId,
+        contactId: contact.id,
+        type: "EMAIL",
+        groupKey: `EMAIL:${recruiterRoleId}:${contact.id}:PROACTIVE`,
+        version: 1,
+        contentJson: {
+          type: "EMAIL",
+          subject: "Hello",
+          greeting: "Hello,",
+          paragraphs: [
+            {
+              id: "p1",
+              text: "I applied.",
+              supports: [{ sourceId: "profile:id_name", quote: "Alex" }],
+            },
+          ],
+          signoff: "Thanks",
+          signerName: "Alex Chen",
+        },
+        claimTraceJson: [],
+        promptVersion: "1",
+      },
+    });
+    const sentAt = new Date("2026-09-02T12:00:00.000Z");
+    await markOutreachSent({
+      organizationId,
+      campaignId,
+      userId,
+      assetId: asset.id,
+      sentAt,
+    });
+    const stored = await prisma.applicationAsset.findUnique({
+      where: { id: asset.id },
+    });
+    expect(stored?.sentAt?.toISOString()).toBe(sentAt.toISOString());
+    expect(stored?.status).toBe("APPROVED");
+    const listed = sentMessagesForContact(
+      [
+        {
+          id: asset.id,
+          type: "EMAIL",
+          version: 1,
+          status: "APPROVED",
+          personaId: recruiterRoleId,
+          contactId: contact.id,
+          purpose: "PROACTIVE",
+          sentAt: stored?.sentAt?.toISOString() ?? null,
+          createdAt: asset.createdAt.toISOString(),
+          emailLength: null,
+          content: null,
+        },
+      ],
+      contact.id,
+    );
+    expect(listed.map((row) => row.id)).toEqual([asset.id]);
+  });
 });

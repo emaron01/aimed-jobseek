@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useRef, useState, type RefObject } from "react";
 import {
   addApplicationContactAction,
   buildOutreachPersonaThenGenerateAction,
@@ -1148,7 +1148,54 @@ function parsedContent(value: unknown): ApplicationAssetContent | null {
   return parsed.success ? parsed.data : null;
 }
 
-function OutreachMessageCard({
+function OutreachSentControl({
+  campaignId,
+  asset,
+  sentAction,
+  formRef,
+  dateRef,
+}: {
+  campaignId: string;
+  asset: OutreachRow;
+  sentAction: (formData: FormData) => void;
+  formRef: RefObject<HTMLFormElement | null>;
+  dateRef: RefObject<HTMLInputElement | null>;
+}) {
+  if (asset.sentAt) {
+    return (
+      <p
+        className="self-center text-sm text-ink"
+        data-testid={`outreach-sent-date-${asset.id}`}
+      >
+        {outreachConfig.labels.sentStatus} {todayInputValue(asset.sentAt)}
+      </p>
+    );
+  }
+  return (
+    <form
+      ref={formRef}
+      action={sentAction}
+      className="flex flex-wrap items-end gap-2"
+      data-testid={`outreach-mark-sent-${asset.id}`}
+    >
+      <input type="hidden" name="campaignId" value={campaignId} />
+      <input type="hidden" name="assetId" value={asset.id} />
+      <label className="text-sm">
+        <span className="font-medium text-ink">Sent date</span>
+        <input
+          ref={dateRef}
+          type="date"
+          name="sentAt"
+          defaultValue={todayInputValue()}
+          className="mt-1 block rounded-md border border-edge-strong px-3 py-2 text-sm"
+        />
+      </label>
+      <SubmitButton>{outreachConfig.labels.markSent}</SubmitButton>
+    </form>
+  );
+}
+
+export function OutreachMessageCard({
   campaignId,
   canEdit,
   asset,
@@ -1245,7 +1292,7 @@ function OutreachMessageCard({
         </p>
       )}
       {canEdit && composed && asset.type === "EMAIL" && handoff ? (
-        <div className="flex flex-wrap gap-2" data-testid="email-handoff">
+        <div className="flex flex-wrap items-end gap-2" data-testid="email-handoff">
           <AppButton
             type="button"
             variant="secondary"
@@ -1272,13 +1319,20 @@ function OutreachMessageCard({
               {outreachConfig.labels.downloadResume}
             </AppActionLink>
           ) : null}
+          <OutreachSentControl
+            campaignId={campaignId}
+            asset={asset}
+            sentAction={sentAction}
+            formRef={sentFormRef}
+            dateRef={sentDateRef}
+          />
           <p className="w-full text-xs text-muted">
             {outreachConfig.labels.attachResumeReminder}
           </p>
         </div>
       ) : null}
       {canEdit && composed && asset.type !== "EMAIL" ? (
-        <div className="flex flex-wrap gap-2" data-testid="linkedin-handoff">
+        <div className="flex flex-wrap items-end gap-2" data-testid="linkedin-handoff">
           {composed.subject ? (
             <AppButton
               type="button"
@@ -1304,6 +1358,13 @@ function OutreachMessageCard({
               {outreachConfig.labels.openLinkedIn}
             </AppActionLink>
           ) : null}
+          <OutreachSentControl
+            campaignId={campaignId}
+            asset={asset}
+            sentAction={sentAction}
+            formRef={sentFormRef}
+            dateRef={sentDateRef}
+          />
           {copied ? (
             <span className="text-xs text-success">Copied {copied}.</span>
           ) : null}
@@ -1343,28 +1404,6 @@ function OutreachMessageCard({
             />
           </label>
           <SubmitButton>{outreachConfig.labels.regenerate}</SubmitButton>
-        </form>
-      ) : null}
-      {canEdit && !asset.sentAt ? (
-        <form
-          ref={sentFormRef}
-          action={sentAction}
-          className="flex flex-wrap items-end gap-2"
-          data-testid={`outreach-mark-sent-${asset.id}`}
-        >
-          <input type="hidden" name="campaignId" value={campaignId} />
-          <input type="hidden" name="assetId" value={asset.id} />
-          <label className="text-sm">
-            <span className="font-medium text-ink">Sent date</span>
-            <input
-              ref={sentDateRef}
-              type="date"
-              name="sentAt"
-              defaultValue={todayInputValue()}
-              className="mt-1 block rounded-md border border-edge-strong px-3 py-2 text-sm"
-            />
-          </label>
-          <SubmitButton>{outreachConfig.labels.markSent}</SubmitButton>
         </form>
       ) : null}
       {canEdit && askSent && !asset.sentAt ? (
