@@ -371,6 +371,31 @@ export function dueReminderLine(count: number): string {
   return outreachConfig.labels.remindersDueLine.replace("{count}", String(count));
 }
 
+function escapeDigestHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+/** Home-page grouping for the digest: one line per application, duplicates counted once. */
+export function applicationReminderDigest(input: {
+  reminders: ApplicationReminderRow[];
+  now: Date;
+  timezone: string;
+}): { count: number; lines: string[]; html: string } {
+  const groups = groupDueApplicationReminders(input);
+  const lines = groups.map(
+    (group) => `${group.campaignName}: ${dueReminderLine(group.count)}`,
+  );
+  return {
+    count: groups.reduce((sum, group) => sum + group.count, 0),
+    lines,
+    html: lines.map((line) => `<p>${escapeDigestHtml(line)}</p>`).join(""),
+  };
+}
+
 export function applicationReminderLabel(row: ApplicationReminderRow): string {
   if (row.kind === "INTERVIEW_THANK_YOU") {
     return `${interviewConfig.reminders.thankYouKind} for ${vocab.campaign.singular} "${row.campaignName}"`;
