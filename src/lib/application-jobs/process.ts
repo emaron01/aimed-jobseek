@@ -94,15 +94,6 @@ export async function processApplicationJob(
                 personaId: job.targetId,
               });
               if (!rebuildResult.synthesizeSkipped) {
-                const { enqueueCheatSheetSectionsForPersona } = await import(
-                  "@/lib/application-summary/enqueue"
-                );
-                await enqueueCheatSheetSectionsForPersona({
-                  organizationId: job.organizationId,
-                  campaignId: job.campaignId,
-                  personaId: job.targetId,
-                  userId: job.initiatedByUserId ?? payload.userId ?? null,
-                });
                 const deferred = payload.deferredOutreach;
                 if (deferred?.assetType && deferred.personaId) {
                   const deferredPurpose =
@@ -156,26 +147,6 @@ export async function processApplicationJob(
               campaignId: job.campaignId,
               contactId: job.targetId,
             });
-            {
-              const { enqueueInterviewerCheatSheetSection } = await import(
-                "@/lib/application-summary/enqueue"
-              );
-              const owner = await prisma.campaign.findFirst({
-                where: {
-                  id: job.campaignId,
-                  organizationId: job.organizationId,
-                },
-                select: { ownerUserId: true },
-              });
-              if (owner) {
-                await enqueueInterviewerCheatSheetSection({
-                  organizationId: job.organizationId,
-                  campaignId: job.campaignId,
-                  userId: job.initiatedByUserId ?? payload.userId ?? owner.ownerUserId,
-                  contactId: job.targetId,
-                });
-              }
-            }
             break;
           case "CONSULTATION":
             await processConsultationJob({

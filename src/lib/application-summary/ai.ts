@@ -17,6 +17,7 @@ import type {
   CheatSheetInterviewerContext,
 } from "@/lib/application-summary/people";
 import { buildApplicationSummaryGuidanceMessages } from "@/lib/application-summary/prompt";
+import { fingerprintPaidCallInputs, runPaidStructuredCall } from "@/lib/ai/paid-call-gate";
 import { runGatedApplicationSummaryShell } from "@/lib/application-summary/shell-gate";
 import type { CareerStage } from "@/lib/consultation/career-stage";
 import { applicationSummaryConfig } from "@/lib/product-config";
@@ -100,23 +101,27 @@ export async function generateCheatSheetPersonSectionGuidance(input: {
   generalQuestions?: CheatSheetGeneralQuestionInput[];
   interviewer?: CheatSheetInterviewerContext | null;
 }): Promise<
-  | { ok: true; data: ReturnType<typeof cheatSheetPersonSectionGenerateSchema.parse> }
+  | {
+      ok: true;
+      data: ReturnType<typeof cheatSheetPersonSectionGenerateRecoverSchema.parse>;
+    }
   | { ok: false; message: string }
 > {
   if (!isConsultationReplyAiConfigured()) return unavailable();
-  try {
+  const messages = buildApplicationSummaryGuidanceMessages({
+    sources: input.sources,
+    people: [input.person],
+    mode: "person",
+    careerStage: input.careerStage,
+    qualityFeedback: input.qualityFeedback,
+    generalQuestions: input.generalQuestions,
+    interviewer: input.interviewer,
+  });
+  const callProvider = async () => {
     const response = await getConsultationReplyAiProvider().generateStructured({
       ...structuredOutputRequest("cheatSheetPersonSection"),
       ...(input.usage ? aiCallTracking(input.usage) : {}),
-      messages: buildApplicationSummaryGuidanceMessages({
-        sources: input.sources,
-        people: [input.person],
-        mode: "person",
-        careerStage: input.careerStage,
-        qualityFeedback: input.qualityFeedback,
-        generalQuestions: input.generalQuestions,
-        interviewer: input.interviewer,
-      }),
+      messages,
       parseOutput: (raw) => {
         const strict = cheatSheetPersonSectionGenerateSchema.safeParse(raw);
         if (strict.success) {
@@ -132,7 +137,25 @@ export async function generateCheatSheetPersonSectionGuidance(input: {
         );
       },
     });
-    return { ok: true, data: response.data };
+    return response.data;
+  };
+  try {
+    const organizationId = input.usage?.organizationId;
+    const campaignId = input.usage?.campaignId?.trim();
+    const sectionKey = input.person.sectionKey.trim();
+    if (organizationId && campaignId && sectionKey) {
+      const gated = await runPaidStructuredCall({
+        organizationId,
+        operation: "APPLICATION_SUMMARY_PERSON",
+        subjectKey: `${campaignId}:${sectionKey}`,
+        inputFingerprint: fingerprintPaidCallInputs(messages),
+        isResultUsable: (stored) => stored.likelyQuestions.length > 0,
+        parseStored: (json) => cheatSheetPersonSectionGenerateRecoverSchema.parse(json),
+        callProvider,
+      });
+      return { ok: true, data: gated.data };
+    }
+    return { ok: true, data: await callProvider() };
   } catch (error) {
     console.error(
       JSON.stringify({

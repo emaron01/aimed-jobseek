@@ -186,7 +186,8 @@ export const cheatSheetPersonSectionSchema = z.preprocess(
   cheatSheetPersonSectionGenerateSchema
     .omit({ likelyQuestions: true })
     .extend({
-      likelyQuestions: z.array(cheatSheetCoachItemSchema).min(1).max(12),
+      // The writer is capped at 12 per call. Additive refresh appends, so the stored list can grow past 12.
+      likelyQuestions: z.array(cheatSheetCoachItemSchema).min(1),
       bestMaterial: z.array(guidanceItemSchema).optional().default([]),
       storyIds: z.array(z.string()).optional().default([]),
       recruiter: z.unknown().nullable().optional(),

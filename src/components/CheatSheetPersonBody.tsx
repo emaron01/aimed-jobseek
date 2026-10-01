@@ -75,6 +75,28 @@ function NotesFromInterviewsSection({
   );
 }
 
+export function RefreshLikelyQuestionsButton({
+  campaignId,
+  sectionKey,
+}: {
+  campaignId: string;
+  sectionKey: string;
+}) {
+  return (
+    <ApplicationActionForm
+      action={generateApplicationSummaryAction}
+      submitLabel={applicationSummaryConfig.actions.refreshLikelyQuestions}
+      pendingLabel="Refreshing likely questions…"
+      variant="primary"
+      testId={`refresh-likely-questions-${sectionKey}`}
+      formClassName="print:hidden"
+    >
+      <input type="hidden" name="campaignId" value={campaignId} />
+      <input type="hidden" name="sectionKey" value={sectionKey} />
+    </ApplicationActionForm>
+  );
+}
+
 export function CheatSheetPersonBody({
   campaignId,
   canEdit,

@@ -80,16 +80,14 @@ describe("no AI on page view / skip unchanged / research cost", () => {
 
     expect(contactProfile).toContain("queued: false");
     expect(contactProfile).toContain(
-      "Cheat sheet section is queued once after CONTACT_PROFILE finishes.",
+      "A person's cheat sheet section is not queued from profile completion.",
     );
     expect(contactProfile).not.toMatch(
       /saveLinkedInPaste[\s\S]*enqueueInterviewerCheatSheetSection/,
     );
 
-    expect(hiringTeam).toMatch(
-      /if \(pastedText\)[\s\S]*saveLinkedInPaste[\s\S]*\} else \{[\s\S]*enqueueInterviewerCheatSheetSection/,
-    );
-    expect(process).toMatch(
+    expect(hiringTeam).not.toContain("enqueueInterviewerCheatSheetSection");
+    expect(process).not.toMatch(
       /case "CONTACT_PROFILE":[\s\S]*enqueueInterviewerCheatSheetSection/,
     );
   });

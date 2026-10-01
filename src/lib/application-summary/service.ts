@@ -4,7 +4,6 @@ import {
   generateApplicationSummaryShell,
   generateCheatSheetPersonSectionGuidance,
 } from "@/lib/application-summary/ai";
-import { enqueueMissingInterviewerCheatSheetSections } from "@/lib/application-summary/enqueue";
 import { linkedInProfileHasSubstance } from "@/lib/application-summary/linkedin";
 import {
   appendCheatSheetNote,
@@ -23,6 +22,7 @@ import {
 } from "@/lib/application-summary/coach";
 import {
   harperAlreadyAskedCareerWalkThrough,
+  mergePersonLikelyQuestions,
   personLikelyQuestionCountDecision,
   resolvePersonLikelyQuestions,
   validatePersonSectionLikelyQuestions,
@@ -55,7 +55,6 @@ import {
   type CheatSheetGeneralQuestionInput,
   type CheatSheetInterviewerContext,
 } from "@/lib/application-summary/people";
-import { enqueueCheatSheetPersonSection } from "@/lib/application-summary/enqueue";
 import { listPersonPreps } from "@/lib/interview/person-prep";
 import {
   applicationSummaryConfig,
@@ -882,6 +881,10 @@ export async function generateApplicationSummary(input: {
       generatedData: GeneratedSection,
       likelyQuestions: CheatSheetCoachItem[],
     ) => {
+      const mergedLikelyQuestions = mergePersonLikelyQuestions({
+        existing: existingPerson?.likelyQuestions ?? [],
+        incoming: likelyQuestions,
+      });
       const section = {
         ...assignCoachItemIds({
           overview: existing?.overview,
@@ -889,7 +892,7 @@ export async function generateApplicationSummary(input: {
           people: [
             {
               ...generatedData,
-              likelyQuestions,
+              likelyQuestions: mergedLikelyQuestions,
               bestMaterial: [],
               storyIds: [],
             },
@@ -1011,13 +1014,6 @@ export async function generateApplicationSummary(input: {
           promptVersion: APPLICATION_SUMMARY_PROMPT_VERSION,
         },
       });
-      await enqueueMissingInterviewerCheatSheetSections({
-        organizationId: input.organizationId,
-        campaignId: input.campaignId,
-        userId: actorId,
-        people: data.people,
-        existingPeople: existing.people,
-      });
       return;
     }
   }
@@ -1068,13 +1064,6 @@ export async function generateApplicationSummary(input: {
         generatedAt: new Date(),
         promptVersion: APPLICATION_SUMMARY_PROMPT_VERSION,
       },
-    });
-    await enqueueMissingInterviewerCheatSheetSections({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      userId: actorId,
-      people: data.people,
-      existingPeople: guidance.people,
     });
     return;
   }
@@ -1163,12 +1152,6 @@ export async function addCheatSheetInterviewNote(input: {
   await prisma.campaignContact.update({
     where: { id: membership.id },
     data: { cheatSheetNotesJson: notes },
-  });
-  await enqueueCheatSheetPersonSection({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    contactId: input.contactId,
-    userId: input.userId,
   });
   const { enqueueLearningsReassessIfChanged } = await import(
     "@/lib/consultation/learnings"

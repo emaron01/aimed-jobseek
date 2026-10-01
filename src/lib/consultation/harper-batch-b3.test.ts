@@ -156,7 +156,7 @@ describe("Harper Batch B3 person view, search, Add Interview Contact, assign-onl
     );
     expect(addFn).toContain("addApplicationContact");
     expect(addFn).toContain("offerPersonPrep");
-    expect(addFn).toContain("enqueueInterviewerCheatSheetSection");
+    expect(addFn).not.toContain("enqueueInterviewerCheatSheetSection");
     expect(addFn).toContain("saveLinkedInPaste");
     expect(addFn).not.toContain("replaceStageInterviewer");
 

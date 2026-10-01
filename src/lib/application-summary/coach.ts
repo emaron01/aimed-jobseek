@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type {
   ApplicationSummaryGuidance,
   CheatSheetCoachItem,
@@ -85,6 +86,36 @@ export function collectCoachItems(
   ];
 }
 
+/**
+ * Identity for a new likely question. Existing stored ids are kept as-is.
+ * The hash is the General question id when this row references one, otherwise
+ * the question text, so the id does not move when the list is reordered.
+ * The id still starts with `contact:{contactId}:likely:` when the section does.
+ */
+export function stableLikelyQuestionId(
+  sectionKey: string,
+  item: Pick<CheatSheetCoachItem, "prompt" | "generalQuestionId">,
+  taken: ReadonlySet<string>,
+): string {
+  const generalId = item.generalQuestionId?.trim();
+  const basis = generalId
+    ? `general:${generalId}`
+    : `question:${item.prompt.trim().toLowerCase().replace(/\s+/g, " ")}`;
+  const digest = createHash("sha256")
+    .update(`${sectionKey}\n${basis}`)
+    .digest("hex")
+    .slice(0, 16);
+  const base = `${sectionKey}:likely:${digest}`;
+  if (!taken.has(base)) return base;
+  let suffix = 2;
+  let candidate = `${base}-${suffix}`;
+  while (taken.has(candidate)) {
+    suffix += 1;
+    candidate = `${base}-${suffix}`;
+  }
+  return candidate;
+}
+
 export function assignCoachItemIds(
   guidance: ApplicationSummaryGuidance,
 ): ApplicationSummaryGuidance {
@@ -110,12 +141,17 @@ export function assignCoachItemIds(
           })),
         }
       : undefined,
-    people: guidance.people.map((person) => ({
+    people: guidance.people.map((person) => {
+      const takenLikelyIds = new Set<string>();
+      return {
       ...person,
-      likelyQuestions: person.likelyQuestions.map((item, index) => ({
-        ...item,
-        id: nextId(`${person.sectionKey}:likely`, index, item.id),
-      })),
+      likelyQuestions: person.likelyQuestions.map((item) => {
+        const current = item.id?.trim() ?? "";
+        const id =
+          current || stableLikelyQuestionId(person.sectionKey, item, takenLikelyIds);
+        takenLikelyIds.add(id);
+        return { ...item, id };
+      }),
       recruiter: mapKind(person.recruiter, person.sectionKey, "flagAnswers"),
       hiringManager: (() => {
         const row = asRecord(person.hiringManager);
@@ -132,7 +168,8 @@ export function assignCoachItemIds(
           })),
         };
       })(),
-    })),
+    };
+    }),
   };
 }
 

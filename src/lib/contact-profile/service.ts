@@ -89,7 +89,7 @@ export async function saveLinkedInPaste(input: {
     type: "CONTACT_PROFILE",
     targetId: membership.contactId,
   });
-  // Cheat sheet section is queued once after CONTACT_PROFILE finishes.
+  // A person's cheat sheet section is not queued from profile completion.
   return { suggestedPersonaId: nextPersonaId, queued: true, displayName };
 }
 

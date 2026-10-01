@@ -147,7 +147,7 @@ describeDb("Harper Batch D0 — notes save without consultationOfferJson", { tim
     await prisma.$disconnect();
   });
 
-  it("saves notes before/after, enqueues cheat sheet + consultation, writes no offer", async () => {
+  it("saves notes before/after without a person-section job, and enqueues consultation reassess", async () => {
     await prisma.applicationJob.deleteMany({
       where: {
         campaignId,
@@ -204,7 +204,7 @@ describeDb("Harper Batch D0 — notes save without consultationOfferJson", { tim
         targetId: `contact:${contactId}`,
       },
     });
-    expect(cheatSheetJobs.length).toBeGreaterThan(0);
+    expect(cheatSheetJobs).toHaveLength(0);
 
     const consultationJobs = await prisma.applicationJob.findMany({
       where: { campaignId, type: "CONSULTATION" },

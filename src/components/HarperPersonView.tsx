@@ -6,7 +6,11 @@ import {
 } from "@/app/actions/interview";
 import { AdditionalInterviewPrepQa } from "@/components/AdditionalInterviewPrepQa";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
-import { CheatSheetPersonBody } from "@/components/CheatSheetPersonBody";
+import {
+  CheatSheetPersonBody,
+  RefreshLikelyQuestionsButton,
+} from "@/components/CheatSheetPersonBody";
+import { PrintApplicationSummaryButton } from "@/components/PrintApplicationSummaryButton";
 import { QuestionList } from "@/components/ConsultationThread";
 import type { CheatSheetNote } from "@/lib/application-summary/notes";
 import type { CheatSheetPersonSection } from "@/lib/application-summary/contract";
@@ -166,7 +170,22 @@ export function HarperPersonInlineProfile({
       data-testid="harper-person-view"
       data-harper-contact={contactId}
     >
-      <h3 className="text-sm font-semibold text-ink">{heading}</h3>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h3 className="text-sm font-semibold text-ink">{heading}</h3>
+        {section ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <PrintApplicationSummaryButton
+              sectionId={harperContactAnchorId(contactId)}
+            />
+            {canEdit ? (
+              <RefreshLikelyQuestionsButton
+                campaignId={campaignId}
+                sectionKey={sectionKey}
+              />
+            ) : null}
+          </div>
+        ) : null}
+      </div>
       {canEdit && !prepStarted ? (
         <ApplicationActionForm
           action={startPersonPrepAction}

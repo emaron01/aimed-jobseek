@@ -8,7 +8,10 @@ import {
 } from "@/components/ApplicationWorkspaceLive";
 import { AppActionLink } from "@/components/AppButton";
 import { CheatSheetPrintBanner, CheatSheetSection } from "@/components/CheatSheetCollapsible";
-import { CheatSheetPersonBody } from "@/components/CheatSheetPersonBody";
+import {
+  CheatSheetPersonBody,
+  RefreshLikelyQuestionsButton,
+} from "@/components/CheatSheetPersonBody";
 import { CheatSheetQuestionCards } from "@/components/CheatSheetQuestionCards";
 import { HarperDraftProvider } from "@/components/HarperDraftStore";
 import {
@@ -279,7 +282,16 @@ export default async function ApplicationSummaryPage({
         );
         return (
           <CheatSheetPersonSection key={person.sectionKey} sectionKey={person.sectionKey}>
-          <CheatSheetSection id={person.sectionKey} title={person.heading}>
+          <CheatSheetSection id={person.sectionKey} title={person.heading}
+            headerAside={
+              canGenerate && section ? (
+                <RefreshLikelyQuestionsButton
+                  campaignId={id}
+                  sectionKey={person.sectionKey}
+                />
+              ) : null
+            }
+          >
             <CheatSheetPersonBody
               campaignId={id}
               canEdit={canGenerate}

@@ -17,6 +17,7 @@ import {
   looksLikeCareerWalkThrough,
   resolveInterviewTypeTag,
 } from "@/lib/consultation/questions";
+import { questionTextNearDuplicate } from "@/lib/consultation/general-question-match";
 import { careerWalkThroughAlreadyAsked } from "@/lib/consultation/question-detection";
 
 const WHO_TAG_ORDER: InterviewTypeTag[] = [
@@ -364,4 +365,42 @@ export function normalizePersonSectionLikelyQuestions(input: {
   generalQuestions?: readonly SuppliedGeneralQuestion[];
 }): CheatSheetCoachItem[] {
   return resolvePersonLikelyQuestions(input).items;
+}
+
+function referencedGeneralId(item: CheatSheetCoachItem): string | null {
+  const id = item.generalQuestionId?.trim();
+  return id ? id : null;
+}
+
+/**
+ * Append only questions the stored list does not already have.
+ * The writer's 4–12 range applies to `incoming` before this merge.
+ * The stored list keeps every existing question, in its existing order,
+ * and can grow past 12 with no fixed ceiling.
+ */
+export function mergePersonLikelyQuestions(input: {
+  existing: CheatSheetCoachItem[];
+  incoming: CheatSheetCoachItem[];
+}): CheatSheetCoachItem[] {
+  const kept = [...input.existing];
+  const generalIds = new Set(
+    kept
+      .map((item) => referencedGeneralId(item))
+      .filter((id): id is string => Boolean(id)),
+  );
+  for (const item of input.incoming) {
+    const generalId = referencedGeneralId(item);
+    if (generalId && generalIds.has(generalId)) continue;
+    const prompt = item.prompt.trim();
+    if (
+      kept.some((existing) =>
+        questionTextNearDuplicate(existing.prompt, prompt),
+      )
+    ) {
+      continue;
+    }
+    kept.push(item);
+    if (generalId) generalIds.add(generalId);
+  }
+  return kept;
 }

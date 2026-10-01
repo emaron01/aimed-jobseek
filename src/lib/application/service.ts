@@ -978,13 +978,9 @@ export async function saveApplicationJobLearnedNotes(input: {
     data: { seekerLearnedNotes: notes.length > 0 ? notes : null },
   });
   const { enqueueApplicationJob } = await import("@/lib/application-jobs/service");
-  const { enqueueCheatSheetPersonSection } = await import(
-    "@/lib/application-summary/enqueue"
+  const { enqueueLearningsReassessIfChanged } = await import(
+    "@/lib/consultation/learnings"
   );
-  const {
-    enqueueLearningsReassessIfChanged,
-    hiringManagerContactIds,
-  } = await import("@/lib/consultation/learnings");
   await enqueueApplicationJob({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
@@ -992,19 +988,6 @@ export async function saveApplicationJobLearnedNotes(input: {
     initiatedByUserId: input.userId,
     payload: { userId: input.userId },
   });
-  // Cost guard (D7): rebuild only Hiring Manager person sections for application learnings.
-  const hmContactIds = await hiringManagerContactIds({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-  });
-  for (const contactId of hmContactIds) {
-    await enqueueCheatSheetPersonSection({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      contactId,
-      userId: input.userId,
-    });
-  }
   await enqueueLearningsReassessIfChanged({
     organizationId: input.organizationId,
     campaignId: input.campaignId,

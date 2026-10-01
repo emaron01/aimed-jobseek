@@ -221,19 +221,6 @@ export async function updateInterviewStage(input: {
     },
     include: { interviewers: { select: { contactId: true } } },
   });
-  if (notesTextChanged) {
-    const { enqueueInterviewerCheatSheetSection } = await import(
-      "@/lib/application-summary/enqueue"
-    );
-    for (const interviewer of updated.interviewers) {
-      await enqueueInterviewerCheatSheetSection({
-        organizationId: input.organizationId,
-        campaignId: input.campaignId,
-        userId: input.userId,
-        contactId: interviewer.contactId,
-      });
-    }
-  }
   return { stage: updated, notesTextChanged };
 }
 
@@ -466,14 +453,6 @@ export async function addInterviewStageInterviewer(input: {
     contactId: added.contactId,
     personaId: input.personaId,
   });
-  if (!pasted) {
-    await enqueueInterviewerCheatSheetSection({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      userId: input.userId,
-      contactId: added.contactId,
-    });
-  }
   return added;
 }
 
@@ -523,14 +502,6 @@ export async function addInterviewContact(input: {
     contactId: added.contactId,
     personaId: input.personaId,
   });
-  if (!pasted) {
-    await enqueueInterviewerCheatSheetSection({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      userId: input.userId,
-      contactId: added.contactId,
-    });
-  }
   return added;
 }
 
@@ -560,7 +531,11 @@ export async function startPersonPrepForContact(input: {
     );
   }
   if (membership.personPrepOfferedAt) {
-    return { contactId: input.contactId, alreadyStarted: true as const };
+    return {
+      contactId: input.contactId,
+      alreadyStarted: true as const,
+      sectionUnchanged: false,
+    };
   }
   const personaId = input.personaId?.trim() || membership.chosenPersonaId;
   const { offerPersonPrep } = await import("@/lib/interview/person-prep");
@@ -570,13 +545,27 @@ export async function startPersonPrepForContact(input: {
     contactId: input.contactId,
     personaId,
   });
-  await enqueueInterviewerCheatSheetSection({
+  const { personSectionInputsUnchanged } = await import(
+    "@/lib/application-summary/service"
+  );
+  const sectionUnchanged = await personSectionInputsUnchanged({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
-    userId: input.userId,
-    contactId: input.contactId,
+    sectionKey: `contact:${input.contactId}`,
   });
-  return { contactId: input.contactId, alreadyStarted: false as const };
+  if (!sectionUnchanged) {
+    await enqueueInterviewerCheatSheetSection({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      userId: input.userId,
+      contactId: input.contactId,
+    });
+  }
+  return {
+    contactId: input.contactId,
+    alreadyStarted: false as const,
+    sectionUnchanged,
+  };
 }
 
 export function stageTypeLabel(type: string): string {

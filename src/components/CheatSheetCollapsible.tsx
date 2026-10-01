@@ -145,11 +145,13 @@ export function CheatSheetPrintBanner() {
 export function CheatSheetSection({
   id,
   title,
+  headerAside = null,
   children,
 }: {
   id: string;
   title: string;
-  children: ReactNode;
+  headerAside?: ReactNode;
+  children?: ReactNode;
 }) {
   const collapse = useCheatSheetCollapse();
   const open = collapse ? collapse.isOpen(id) : false;
@@ -171,7 +173,10 @@ export function CheatSheetSection({
             onToggle={() => collapse?.toggle(id)}
           />
         </div>
-        <PrintApplicationSummaryButton sectionId={id} />
+        <div className="flex flex-wrap items-center gap-2">
+          <PrintApplicationSummaryButton sectionId={id} />
+          {headerAside}
+        </div>
       </div>
       <div
         className={

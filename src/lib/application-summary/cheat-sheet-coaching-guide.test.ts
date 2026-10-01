@@ -102,22 +102,36 @@ describe("Interview cheat sheet coaching guide", () => {
     ]);
   });
 
-  it("enqueues a person section when an interviewer is added or their information is saved", () => {
+  it("enqueues a person section only when the seeker starts prep for that person", () => {
     const stages = readFileSync("src/lib/interview/stages.ts", "utf8");
     const hiringTeam = readFileSync("src/app/actions/hiring-team.ts", "utf8");
     const notes = readFileSync("src/lib/application-summary/service.ts", "utf8");
     const contactProfile = readFileSync("src/lib/contact-profile/service.ts", "utf8");
     const process = readFileSync("src/lib/application-jobs/process.ts", "utf8");
-    expect(stages).toContain("enqueueInterviewerCheatSheetSection");
+    const startPrep = stages.slice(
+      stages.indexOf("export async function startPersonPrepForContact"),
+      stages.indexOf("export function stageTypeLabel"),
+    );
+    const updateStage = stages.slice(
+      stages.indexOf("export async function updateInterviewStage"),
+      stages.indexOf("export async function setApplicationProgress"),
+    );
+    const addContact = stages.slice(
+      stages.indexOf("export async function addInterviewContact"),
+      stages.indexOf("export async function startPersonPrepForContact"),
+    );
+    expect(startPrep).toContain("enqueueInterviewerCheatSheetSection");
+    expect(startPrep).toContain("personSectionInputsUnchanged");
+    expect(updateStage).not.toContain("enqueueInterviewerCheatSheetSection");
+    expect(addContact).not.toContain("enqueueInterviewerCheatSheetSection");
     expect(stages).not.toContain("if (people.some((person) => person.sectionKey === sectionKey))");
-    expect(hiringTeam).toContain("enqueueInterviewerCheatSheetSection");
-    expect(notes).toContain("enqueueCheatSheetPersonSection");
-    // Paste queues CONTACT_PROFILE only; cheat sheet runs once after profile finishes.
+    expect(hiringTeam).not.toContain("enqueueInterviewerCheatSheetSection");
+    expect(notes).not.toContain("enqueueCheatSheetPersonSection");
     expect(contactProfile).not.toContain("enqueueInterviewerCheatSheetSection");
-    expect(process).toMatch(
+    expect(process).not.toMatch(
       /case "CONTACT_PROFILE":[\s\S]*enqueueInterviewerCheatSheetSection/,
     );
-    expect(process).toContain("enqueueCheatSheetSectionsForPersona");
+    expect(process).not.toContain("enqueueCheatSheetSectionsForPersona");
     expect(notes).not.toContain("validateGroundedStatement");
     expect(notes).not.toContain("qualityFeedback = errors");
   });

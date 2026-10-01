@@ -385,15 +385,6 @@ export async function assignExistingHiringTeamPersonAction(
       contactId: assigned.contactId,
       personaId: assigned.personaId,
     });
-    const { enqueueInterviewerCheatSheetSection } = await import(
-      "@/lib/application-summary/enqueue"
-    );
-    await enqueueInterviewerCheatSheetSection({
-      organizationId,
-      campaignId,
-      userId: user.id,
-      contactId: assigned.contactId,
-    });
     revalidatePath(`/campaigns/${campaignId}`);
     return { ok: true, message: `${vocab.contact.Singular} assigned.` };
   } catch (error) {
@@ -433,16 +424,6 @@ export async function addHiringTeamPersonAction(
         contactId: added.contactId,
         pastedText,
         personaId,
-      });
-    } else {
-      const { enqueueInterviewerCheatSheetSection } = await import(
-        "@/lib/application-summary/enqueue"
-      );
-      await enqueueInterviewerCheatSheetSection({
-        organizationId,
-        campaignId,
-        userId: user.id,
-        contactId: added.contactId,
       });
     }
     const { offerPersonPrep } = await import("@/lib/interview/person-prep");

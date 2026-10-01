@@ -13,6 +13,7 @@ import {
   updateInterviewStage,
   type StageSetupNewInterviewer,
 } from "@/lib/interview/stages";
+import { applicationSummaryConfig } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 
@@ -277,7 +278,7 @@ export async function startPersonPrepAction(
     const id = campaignId(formData);
     const contactId = String(formData.get("contactId") ?? "").trim();
     if (!contactId) throw new TenantError("Choose a person first.");
-    await startPersonPrepForContact({
+    const started = await startPersonPrepForContact({
       organizationId,
       campaignId: id,
       userId: user.id,
@@ -285,6 +286,12 @@ export async function startPersonPrepAction(
       personaId: String(formData.get("personaId") ?? "").trim() || null,
     });
     revalidate(id);
+    if (!started.alreadyStarted && started.sectionUnchanged) {
+      return {
+        ok: true,
+        message: applicationSummaryConfig.actions.unchangedLikelyQuestions,
+      };
+    }
     return { ok: true, message: "Interviewer prep started." };
   } catch (error) {
     return errorResult(error);

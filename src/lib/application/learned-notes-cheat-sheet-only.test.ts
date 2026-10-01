@@ -63,7 +63,7 @@ describe("learned notes and stage notes are cheat-sheet only", () => {
     expect(learnedBlock).not.toContain("interpretJobPosting");
     expect(learnedBlock).not.toContain("withJobRequirementProcessing");
     expect(learnedBlock).toContain('type: "APPLICATION_SUMMARY"');
-    expect(learnedBlock).toContain("enqueueCheatSheetPersonSection");
+    expect(learnedBlock).not.toContain("enqueueCheatSheetPersonSection");
 
     const savePosting = service.slice(
       service.indexOf("export async function saveApplicationJobPosting"),
@@ -227,7 +227,7 @@ describe.skipIf(!hasTestDatabase())("learned notes cheat-sheet-only (db)", { tim
     await prisma.$disconnect();
   });
 
-  it("saving learned notes does not parse and enqueues cheat sheet jobs", async () => {
+  it("saving learned notes does not parse and enqueues only the shell cheat sheet job", async () => {
     interpretJobPosting.mockClear();
     const { saveApplicationJobLearnedNotes } = await import(
       "@/lib/application/service"
@@ -254,12 +254,13 @@ describe.skipIf(!hasTestDatabase())("learned notes cheat-sheet-only (db)", { tim
       where: { campaignId, type: "APPLICATION_SUMMARY" },
     });
     expect(summaryJobs.length).toBeGreaterThan(0);
+    expect(summaryJobs.some((job) => job.targetId == null)).toBe(true);
     expect(
       summaryJobs.some((job) => job.targetId === `contact:${contactId}`),
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it("updating stage notes does not parse and enqueues cheat sheet", async () => {
+  it("updating stage notes does not parse and does not enqueue a person section", async () => {
     interpretJobPosting.mockClear();
     await prisma.applicationJob.deleteMany({
       where: { campaignId, type: "APPLICATION_SUMMARY" },
@@ -294,7 +295,7 @@ describe.skipIf(!hasTestDatabase())("learned notes cheat-sheet-only (db)", { tim
         targetId: `contact:${contactId}`,
       },
     });
-    expect(personJobs.length).toBeGreaterThan(0);
+    expect(personJobs).toHaveLength(0);
   });
 
   it("passes learned and stage notes into cheat-sheet generation sources", async () => {

@@ -83,7 +83,12 @@ export async function generateApplicationSummaryAction(
         sectionKey,
       })
     ) {
-      return { ok: true, message: applicationSummaryConfig.actions.unchanged };
+      return {
+        ok: true,
+        message: sectionKey
+          ? applicationSummaryConfig.actions.unchangedLikelyQuestions
+          : applicationSummaryConfig.actions.unchanged,
+      };
     }
     await enqueueApplicationJob({
       organizationId,

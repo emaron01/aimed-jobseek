@@ -97,7 +97,8 @@ describe("Harper Batch D7 — learnings fingerprint + HM routing", () => {
     expect(learnedBlock).not.toMatch(
       /type:\s*"CONSULTATION"[\s\S]*operation:\s*"reassess"/,
     );
-    expect(learnedBlock).toContain("hiringManagerContactIds");
+    expect(learnedBlock).not.toContain("hiringManagerContactIds");
+    expect(learnedBlock).not.toContain("enqueueCheatSheetPersonSection");
 
     const interview = src("src/app/actions/interview.ts");
     const updateFn = interview.slice(
@@ -771,7 +772,7 @@ describe.skipIf(!hasTestDatabase())("Harper Batch D7 — learnings gate (db)", {
     });
     expect(
       summaryJobs.some((job) => job.targetId === `contact:${hmContactId}`),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       summaryJobs.some((job) => job.targetId === `contact:${recruiterContactId}`),
     ).toBe(false);
