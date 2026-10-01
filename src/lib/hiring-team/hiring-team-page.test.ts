@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   applicationStepByKey,
   applicationWorkspaceCopy,
-  consultationConfig,
   hiringTeamConfig,
   hiringTeamDetailsTitle,
 } from "@/lib/product-config";
@@ -35,17 +34,14 @@ describe("hiring team page copy and layout", () => {
     expect(tracker).toContain("{step.number}. {step.title}");
   });
 
-  it("states that personas are assumptions needing the seeker's input", () => {
-    expect(hiringTeamConfig.assumptionIntro).toContain(
-      consultationConfig.displayName,
-    );
-    expect(hiringTeamConfig.assumptionIntro).toMatch(/assumptions/i);
-    expect(hiringTeamConfig.assumptionIntro).toMatch(/confirm or correct/i);
-    expect(hiringTeamConfig.assumptionIntro).toMatch(
-      /job posting and company research/i,
+  it("shows the Hiring Team roles notice in the warning box", () => {
+    expect(hiringTeamConfig.assumptionIntro).toBe(
+      "Harper identified these Hiring Team roles from the job posting and company research. Select the roles that align to the title or responsibilities of the person who you are interviewing with. NOTE: You can select personas as they are identified.",
     );
     const { workspace } = sourceFiles();
-    expect(workspace).toContain("hiringTeamConfig.assumptionIntro");
+    expect(workspace).toContain("HiringTeamAssumptionNotice");
+    expect(workspace).not.toContain("guessed these");
+    expect(workspace).not.toContain("They are assumptions");
   });
 
   it("lets the seeker move a persona between Direct and Indirect", () => {

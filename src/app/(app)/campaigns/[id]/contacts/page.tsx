@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AppActionLink } from "@/components/AppButton";
-import { EmptyState, PageHeader, TenantMissing } from "@/components/ui";
+import { ApplicationContactsPageHeader } from "@/components/ApplicationOutreachSections";
+import { EmptyState, TenantMissing } from "@/components/ui";
 import { listApplicationContacts } from "@/lib/application/contacts";
 import { requireApplicationWorkspace } from "@/lib/application/workspace-access";
 import {
@@ -8,6 +9,7 @@ import {
   workspaceContactEditHref,
 } from "@/lib/application/workspace-links";
 import { applicationPageTitle, brand, outreachConfig, vocab } from "@/lib/product-config";
+import { prisma } from "@/lib/prisma";
 import { contactDisplayName } from "@/lib/utils";
 
 type PageProps = { params: Promise<{ id: string }> };
@@ -33,22 +35,30 @@ export default async function ApplicationContactsPage({ params }: PageProps) {
     organizationId: access.organizationId,
     campaignId: access.campaignId,
   });
+  const roles = await prisma.persona.findMany({
+    where: {
+      organizationId: access.organizationId,
+      campaignId: access.campaignId,
+      archivedAt: null,
+    },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
 
   return (
     <main className="mx-auto max-w-5xl space-y-6" data-testid="application-contacts-page">
-      <PageHeader
+      <ApplicationContactsPageHeader
+        campaignId={access.campaignId}
+        roles={roles}
+        canEdit={access.canEdit}
         title={vocab.contact.Plural}
         description={`${access.campaignName} · ${vocab.contact.Plural} on this ${vocab.campaign.singular}.`}
-        actions={
-          <AppActionLink href={workspaceCampaignHref(access.campaignId)}>
-            Back to application
-          </AppActionLink>
-        }
+        backHref={workspaceCampaignHref(access.campaignId)}
       />
       {contacts.length === 0 ? (
         <EmptyState
           title={`No ${vocab.contact.plural} yet`}
-          description={`Add ${vocab.contact.aSingular} from Outreach or a Hiring Team role.`}
+          description={outreachConfig.labels.contactsHelp}
         />
       ) : (
         <div className="overflow-x-auto rounded-lg border border-edge bg-surface">

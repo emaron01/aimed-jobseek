@@ -30,7 +30,7 @@ import {
   outreachConfig,
   vocab,
 } from "@/lib/product-config";
-import { SubmitButton, AppButton, AppActionLink } from "@/components/ui";
+import { SubmitButton, AppButton, AppActionLink, PageHeader } from "@/components/ui";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import {
   WORKSPACE_CARD_WRAP_CLASS,
@@ -223,15 +223,16 @@ export function contactOutreachStatus(
   return outreachConfig.labels.contactStatusNone;
 }
 
+const outreachFieldClass =
+  "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
+
 function AddContactForm({
   campaignId,
   roles,
-  fieldClass,
   action,
 }: {
   campaignId: string;
-  roles: RoleOption[];
-  fieldClass: string;
+  roles: Array<{ id: string; name: string }>;
   action: (formData: FormData) => void;
 }) {
   return (
@@ -245,37 +246,37 @@ function AddContactForm({
         <span className="font-medium text-ink">
           {outreachConfig.labels.fieldFirstName}
         </span>
-        <input name="firstName" required className={fieldClass} />
+        <input name="firstName" required className={outreachFieldClass} />
       </label>
       <label className="text-sm">
         <span className="font-medium text-ink">
           {outreachConfig.labels.fieldLastName}
         </span>
-        <input name="lastName" required className={fieldClass} />
+        <input name="lastName" required className={outreachFieldClass} />
       </label>
       <label className="text-sm">
         <span className="font-medium text-ink">
           {outreachConfig.labels.fieldTitle}
         </span>
-        <input name="title" required className={fieldClass} />
+        <input name="title" required className={outreachFieldClass} />
       </label>
       <label className="text-sm">
         <span className="font-medium text-ink">
           {outreachConfig.labels.fieldEmail}
         </span>
-        <input name="email" type="email" className={fieldClass} />
+        <input name="email" type="email" className={outreachFieldClass} />
       </label>
       <label className="text-sm md:col-span-2">
         <span className="font-medium text-ink">
           {outreachConfig.labels.fieldLinkedIn}
         </span>
-        <input name="linkedinUrl" className={fieldClass} />
+        <input name="linkedinUrl" className={outreachFieldClass} />
       </label>
       <label className="text-sm md:col-span-2">
         <span className="font-medium text-ink">
           {outreachConfig.labels.pasteInterviewerProfile}
         </span>
-        <textarea name="linkedInProfileText" rows={5} className={fieldClass} />
+        <textarea name="linkedInProfileText" rows={5} className={outreachFieldClass} />
         <span className="mt-1 block text-xs text-muted">
           {outreachConfig.labels.pasteInterviewerProfileHelp}
         </span>
@@ -284,7 +285,7 @@ function AddContactForm({
         <span className="font-medium text-ink">
           {outreachConfig.labels.assignRole}
         </span>
-        <select name="personaId" required defaultValue="" className={fieldClass}>
+        <select name="personaId" required defaultValue="" className={outreachFieldClass}>
           <option value="" disabled>
             {roles.length === 0
               ? `No ${vocab.persona.plural} yet`
@@ -299,6 +300,52 @@ function AddContactForm({
       </label>
       <SubmitButton>Add {vocab.contact.singular}</SubmitButton>
     </form>
+  );
+}
+
+export function ApplicationContactsPageHeader({
+  campaignId,
+  roles,
+  canEdit,
+  title,
+  description,
+  backHref,
+}: {
+  campaignId: string;
+  roles: Array<{ id: string; name: string }>;
+  canEdit: boolean;
+  title: string;
+  description: string;
+  backHref: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [state, action] = useActionState(addApplicationContactAction, initial);
+  return (
+    <>
+      <PageHeader
+        title={title}
+        description={description}
+        actions={
+          <>
+            {canEdit ? (
+              <AppButton
+                type="button"
+                variant="secondary"
+                onClick={() => setOpen(true)}
+                data-testid="contacts-page-add-contact"
+              >
+                {outreachConfig.labels.addContact}
+              </AppButton>
+            ) : null}
+            <AppActionLink href={backHref}>Back to application</AppActionLink>
+          </>
+        }
+      />
+      {canEdit && open ? (
+        <AddContactForm campaignId={campaignId} roles={roles} action={action} />
+      ) : null}
+      <Status result={state} />
+    </>
   );
 }
 
@@ -664,7 +711,6 @@ export function ApplicationOutreachSection({
         <AddContactForm
           campaignId={campaignId}
           roles={roles}
-          fieldClass={fieldClass}
           action={addAction}
         />
       ) : null}

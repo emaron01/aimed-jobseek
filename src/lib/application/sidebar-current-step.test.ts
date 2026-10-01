@@ -98,4 +98,29 @@ describe("application sidebar current step", () => {
     expect(html).not.toContain("enqueueApplicationJob");
     expect(html).not.toContain("runPaidStructuredCall");
   });
+
+  it("highlights only Contacts on the Contacts page", () => {
+    const html = trackerHtml("/campaigns/camp_1/contacts");
+    const contacts = rowTag(html, "tracker-application-contacts");
+    expect(contacts).toContain('aria-current="page"');
+    expect(contacts).toContain(CURRENT_ROW);
+    const steps = html.match(/data-testid="tracker-step-/g) ?? [];
+    expect(steps.length).toBeGreaterThan(0);
+    for (const tag of html.match(/<a\b[^>]*>/g) ?? []) {
+      if (tag.includes("tracker-application-contacts")) continue;
+      expect(tag).not.toContain('aria-current="page"');
+      expect(tag).not.toContain("bg-primary/10");
+      expect(tag).not.toContain("border-l-primary");
+    }
+  });
+
+  it("does not highlight Contacts on a numbered step page", () => {
+    const html = trackerHtml("/campaigns/camp_1/job");
+    const contacts = rowTag(html, "tracker-application-contacts");
+    expect(contacts).not.toContain('aria-current="page"');
+    expect(contacts).not.toContain("bg-primary/10");
+    expect(contacts).not.toContain("border-l-primary");
+    expect(contacts).not.toContain("text-primary");
+    expectCurrent(html, "job");
+  });
 });

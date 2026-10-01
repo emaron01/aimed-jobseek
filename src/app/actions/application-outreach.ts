@@ -62,7 +62,13 @@ function parseDate(value: string, fallback: Date): Date {
 
 function revalidate(campaign: string) {
   revalidatePath(`/campaigns/${campaign}`);
+  revalidatePath(`/campaigns/${campaign}`, "layout");
   revalidatePath(`/campaigns/${campaign}/summary`);
+  revalidatePath(`/campaigns/${campaign}/contacts`);
+  revalidatePath(`/campaigns/${campaign}/outreach`);
+  revalidatePath(`/campaigns/${campaign}/hiring-team`);
+  revalidatePath(`/campaigns/${campaign}/consultation`);
+  revalidatePath(`/campaigns/${campaign}/interviews`);
   revalidatePath("/contacts");
   revalidatePath("/");
 }

@@ -68,6 +68,7 @@ import {
 } from "@/components/ApplicationOutreachSections";
 import { isOutreachAssetType } from "@/lib/product-config";
 import { HiringTeamDisclosureGroup } from "@/components/HiringTeamDisclosureGroup";
+import { HiringTeamAssumptionNotice } from "@/components/HiringTeamAssumptionNotice";
 import { HiringTeamReviewGroup } from "@/components/HiringTeamReviewGroup";
 import { HiringTeamPersonPicker } from "@/components/HiringTeamPersonPicker";
 import { HiringTeamRoleActions } from "@/components/HiringTeamRoleActions";
@@ -1397,9 +1398,7 @@ async function HiringTeamSection({
         {hiringTeamConfig.workspaceTitle}
       </summary>
       <div className="mt-4 space-y-4">
-      <p className="rounded-md border border-edge bg-canvas px-3 py-2 text-sm text-ink">
-        {hiringTeamConfig.assumptionIntro}
-      </p>
+      <HiringTeamAssumptionNotice />
       <WorkspaceProgress jobs={jobs} type="HIRING_TEAM_IDENTIFY" />
       <WorkspaceProgress jobs={jobs} type="HIRING_TEAM_BUILD" />
       <WorkspaceProgress jobs={jobs} type="CONTACT_PROFILE" />

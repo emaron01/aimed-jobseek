@@ -152,8 +152,12 @@ export function ApplicationTrackerList({
           data-testid="tracker-application-contacts"
           aria-current={contactsCurrent ? "page" : undefined}
           className={cn(
-            "flex items-start gap-2 rounded-md bg-surface px-2 py-1.5 text-sm text-ink transition-colors duration-200 motion-reduce:transition-none",
-            ink ? "hover:bg-surface" : "hover:bg-canvas",
+            "flex items-start gap-2 rounded-md px-2 py-1.5 text-sm transition-colors duration-200 motion-reduce:transition-none",
+            contactsCurrent
+              ? "border-l-2 border-l-primary bg-primary/10 text-primary"
+              : ink
+                ? "bg-surface text-ink hover:bg-surface"
+                : "bg-surface text-ink hover:bg-canvas",
           )}
         >
           <span className="min-w-0 flex-1">
