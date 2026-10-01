@@ -8,7 +8,9 @@ import { logoutAction } from "@/app/actions/account";
 import { updateUserDigestPreferencesAction } from "@/app/actions/cadence";
 import { ActionFeedbackForm } from "@/components/ActionFeedbackForm";
 import { ChangePasswordForm } from "@/components/ChangePasswordForm";
+import { DeleteMyAccountPanel } from "@/components/DeleteMyAccountPanel";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
+import { getMembershipForCurrentUser } from "@/lib/org/authz";
 
 export const metadata = { title: polishCopy.accountTitle };
 
@@ -20,6 +22,10 @@ export default async function AccountSettingsPage() {
     [user.firstName, user.lastName].filter(Boolean).join(" ") ||
     user.name ||
     null;
+  const isOwner = organization
+    ? (await getMembershipForCurrentUser(organization.id)).membership.role ===
+      "OWNER"
+    : false;
 
   return (
     <div className="mx-auto max-w-xl space-y-8">
@@ -133,6 +139,8 @@ export default async function AccountSettingsPage() {
           Log Out
         </AppButton>
       </form>
+
+      {isOwner ? <DeleteMyAccountPanel /> : null}
     </div>
   );
 }
