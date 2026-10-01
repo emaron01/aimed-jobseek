@@ -841,14 +841,7 @@ export function ApplicationOutreachSection({
                           {ready}
                         </p>
                       ) : null}
-                      {sent.length === 0 ? (
-                        <p
-                          className="px-3 pb-2 text-xs text-subtle"
-                          data-testid={`outreach-contact-status-${contact.contactId}`}
-                        >
-                          {status}
-                        </p>
-                      ) : (
+                      {sent.length > 0 ? (
                         <ul
                           className="space-y-0.5 px-2 pb-2"
                           data-testid={`outreach-contact-history-${contact.contactId}`}
@@ -878,7 +871,14 @@ export function ApplicationOutreachSection({
                             </li>
                           ))}
                         </ul>
-                      )}
+                      ) : status !== ready ? (
+                        <p
+                          className="px-3 pb-2 text-xs text-subtle"
+                          data-testid={`outreach-contact-status-${contact.contactId}`}
+                        >
+                          {status}
+                        </p>
+                      ) : null}
                     </div>
                   </li>
                 );
@@ -914,8 +914,10 @@ export function ApplicationOutreachSection({
             </div>
             {canEdit ? (
               <form
+                key={`role-${selected.contactId}`}
                 action={roleAction}
                 className="flex flex-wrap items-end gap-2"
+                data-testid="outreach-save-role"
               >
                 <input type="hidden" name="campaignId" value={campaignId} />
                 <input
@@ -932,6 +934,7 @@ export function ApplicationOutreachSection({
                     defaultValue={selected.personaId ?? ""}
                     required
                     className="mt-1 block rounded-md border border-edge-strong px-3 py-2 text-sm"
+                    data-testid="outreach-role-select"
                   >
                     <option value="" disabled>
                       Choose {vocab.persona.aSingular}
@@ -950,6 +953,7 @@ export function ApplicationOutreachSection({
 
             {openedMessage ? (
               <OutreachMessageCard
+                key={openedMessage.id}
                 campaignId={campaignId}
                 canEdit={canEdit}
                 asset={openedMessage}
@@ -1063,6 +1067,7 @@ export function ApplicationOutreachSection({
                 </div>
               ) : (
                 <form
+                  key={`generate-${selected.contactId}`}
                   action={generateAction}
                   onSubmit={(event) => {
                     setExplicitAssetId(null);

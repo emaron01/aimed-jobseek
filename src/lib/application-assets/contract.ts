@@ -148,7 +148,7 @@ export function composeOutreachText(content: ApplicationAssetContent): {
       body: [
         content.greeting,
         "",
-        ...content.paragraphs.map((claim) => claim.text),
+        content.paragraphs.map((claim) => claim.text).join("\n\n"),
         "",
         content.signoff,
         content.signerName,
