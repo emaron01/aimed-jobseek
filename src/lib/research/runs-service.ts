@@ -21,6 +21,7 @@ import { getResearchWorkerConcurrency } from "@/lib/research/config";
 import { isProviderLevelFailure } from "@/lib/research/failure-classification";
 import {
   isResearchRunQueuedUnstarted,
+  RESEARCH_RUN_QUEUED_STALE_MS_DEFAULT,
   type ResearchRunView,
 } from "@/lib/research/run-types";
 import { vocab } from "@/lib/product-config";
@@ -90,12 +91,6 @@ function lastActivityAt(run: Pick<
   "workerHeartbeatAt" | "startedAt" | "createdAt"
 >): Date {
   return run.workerHeartbeatAt ?? run.startedAt ?? run.createdAt;
-}
-
-function isAbandoned(run: ResearchRun, now = new Date()): boolean {
-  if (run.status !== "IN_PROGRESS") return false;
-  const last = lastActivityAt(run);
-  return now.getTime() - last.getTime() > RUN_ABANDON_MS;
 }
 
 function finalizeStatus(input: {
@@ -303,13 +298,38 @@ function isHeartbeatStale(
   return now.getTime() - last.getTime() > HEARTBEAT_STALE_MS;
 }
 
+function researchRunHeartbeatStaleOr(
+  cutoff: Date,
+): Prisma.ResearchRunWhereInput[] {
+  return [
+    { workerHeartbeatAt: { lt: cutoff } },
+    { workerHeartbeatAt: null, startedAt: { lt: cutoff } },
+    { workerHeartbeatAt: null, startedAt: null, createdAt: { lt: cutoff } },
+  ];
+}
+
 async function failStaleResearchRun(
   runId: string,
   now = new Date(),
   reason = "Research stopped — no worker progress.",
-): Promise<void> {
-  await prisma.researchRun.update({
-    where: { id: runId },
+): Promise<number> {
+  const heartbeatCutoff = new Date(now.getTime() - HEARTBEAT_STALE_MS);
+  const queuedCutoff = new Date(now.getTime() - RESEARCH_RUN_QUEUED_STALE_MS_DEFAULT);
+  const staleActivity = researchRunHeartbeatStaleOr(heartbeatCutoff);
+  const updated = await prisma.researchRun.updateMany({
+    where: {
+      id: runId,
+      OR: [
+        { status: "IN_PROGRESS", OR: staleActivity },
+        {
+          status: "PENDING",
+          OR: [
+            ...staleActivity,
+            { workerHeartbeatAt: null, createdAt: { lt: queuedCutoff } },
+          ],
+        },
+      ],
+    },
     data: {
       status: "FAILED",
       lastError: reason,
@@ -320,6 +340,7 @@ async function failStaleResearchRun(
       pausedAt: null,
     },
   });
+  return updated.count;
 }
 
 export async function createResearchRun(
@@ -474,22 +495,25 @@ export async function createResearchRun(
   }
 }
 
+function abandonedResearchRunWhere(now: Date): Prisma.ResearchRunWhereInput {
+  const cutoff = new Date(now.getTime() - RUN_ABANDON_MS);
+  return {
+    status: "IN_PROGRESS",
+    OR: researchRunHeartbeatStaleOr(cutoff),
+  };
+}
+
 export async function abandonStaleResearchRuns(now = new Date()): Promise<number> {
+  const abandonedWhere = abandonedResearchRunWhere(now);
   const inProgress = await prisma.researchRun.findMany({
-    where: { status: "IN_PROGRESS" },
-    select: {
-      id: true,
-      workerHeartbeatAt: true,
-      startedAt: true,
-      createdAt: true,
-    },
+    where: abandonedWhere,
+    select: { id: true },
   });
 
   let abandoned = 0;
   for (const run of inProgress) {
-    if (!isAbandoned(run as ResearchRun, now)) continue;
-    await prisma.researchRun.update({
-      where: { id: run.id },
+    const updated = await prisma.researchRun.updateMany({
+      where: { id: run.id, ...abandonedWhere },
       data: {
         status: "FAILED",
         lastError: "Run abandoned after 30 minutes without progress.",
@@ -498,7 +522,7 @@ export async function abandonStaleResearchRuns(now = new Date()): Promise<number
         currentCompanyName: null,
       },
     });
-    abandoned += 1;
+    abandoned += updated.count;
   }
   return abandoned;
 }

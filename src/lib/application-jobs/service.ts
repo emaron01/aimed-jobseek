@@ -11,7 +11,23 @@ import {
   type ApplicationJobView,
 } from "@/lib/application-jobs/types";
 
-const HEARTBEAT_STALE_MS = 15 * 60 * 1000;
+/** Heartbeat older than this is stale. A missing heartbeat uses startedAt (claim time) as the same grace. */
+export const HEARTBEAT_STALE_MS = 15 * 60 * 1000;
+
+function applicationJobStaleWhere(
+  staleBefore: Date,
+): PrismaNamespace.ApplicationJobWhereInput {
+  return {
+    status: "IN_PROGRESS",
+    OR: [
+      { workerHeartbeatAt: { lt: staleBefore } },
+      {
+        workerHeartbeatAt: null,
+        OR: [{ startedAt: null }, { startedAt: { lt: staleBefore } }],
+      },
+    ],
+  };
+}
 
 /** Types that allow one PENDING successor while a same-key job is IN_PROGRESS. */
 const SERIALIZED_APPLICATION_JOB_TYPES = new Set<ApplicationJobType>([
@@ -368,8 +384,17 @@ export async function claimNextApplicationJob(): Promise<string | null> {
               OR (
                 j.status = 'IN_PROGRESS'::"ApplicationJobStatus"
                 AND (
-                  j."workerHeartbeatAt" IS NULL
-                  OR j."workerHeartbeatAt" < ${staleBefore}
+                  (
+                    j."workerHeartbeatAt" IS NOT NULL
+                    AND j."workerHeartbeatAt" < ${staleBefore}
+                  )
+                  OR (
+                    j."workerHeartbeatAt" IS NULL
+                    AND (
+                      j."startedAt" IS NULL
+                      OR j."startedAt" < ${staleBefore}
+                    )
+                  )
                 )
                 AND NOT EXISTS (
                   SELECT 1 FROM "ApplicationJob" p
@@ -404,8 +429,17 @@ export async function claimNextApplicationJob(): Promise<string | null> {
           OR (
             j.status = 'IN_PROGRESS'::"ApplicationJobStatus"
             AND (
-              j."workerHeartbeatAt" IS NULL
-              OR j."workerHeartbeatAt" < ${staleBefore}
+              (
+                j."workerHeartbeatAt" IS NOT NULL
+                AND j."workerHeartbeatAt" < ${staleBefore}
+              )
+              OR (
+                j."workerHeartbeatAt" IS NULL
+                AND (
+                  j."startedAt" IS NULL
+                  OR j."startedAt" < ${staleBefore}
+                )
+              )
             )
             AND NOT EXISTS (
               SELECT 1 FROM "ApplicationJob" p
@@ -437,17 +471,13 @@ export async function claimNextApplicationJob(): Promise<string | null> {
   });
 }
 
-export async function abandonStaleApplicationJobs(): Promise<void> {
+export async function abandonStaleApplicationJobs(): Promise<number> {
   const staleBefore = new Date(Date.now() - HEARTBEAT_STALE_MS);
+  const staleWhere = applicationJobStaleWhere(staleBefore);
   const stale = await prisma.applicationJob.findMany({
-    where: {
-      status: "IN_PROGRESS",
-      OR: [
-        { workerHeartbeatAt: null },
-        { workerHeartbeatAt: { lt: staleBefore } },
-      ],
-    },
+    where: staleWhere,
   });
+  let reset = 0;
   for (const job of stale) {
     const pending = await findJobByStatus({
       organizationId: job.organizationId,
@@ -456,26 +486,24 @@ export async function abandonStaleApplicationJobs(): Promise<void> {
       targetId: job.targetId,
       status: "PENDING",
     });
-    if (pending) {
-      await prisma.applicationJob.update({
-        where: { id: job.id },
-        data: {
-          status: "FAILED",
-          error: "Worker heartbeat went stale. A queued job will continue the work.",
-          completedAt: new Date(),
-          workerHeartbeatAt: new Date(),
-        },
-      });
-      continue;
-    }
-    await prisma.applicationJob.update({
-      where: { id: job.id },
-      data: {
-        status: "PENDING",
-        error: "Worker heartbeat went stale. The job was requeued.",
-      },
+    const updated = await prisma.applicationJob.updateMany({
+      where: { id: job.id, ...staleWhere },
+      data: pending
+        ? {
+            status: "FAILED",
+            error:
+              "Worker heartbeat went stale. A queued job will continue the work.",
+            completedAt: new Date(),
+            workerHeartbeatAt: new Date(),
+          }
+        : {
+            status: "PENDING",
+            error: "Worker heartbeat went stale. The job was requeued.",
+          },
     });
+    reset += updated.count;
   }
+  return reset;
 }
 
 export async function completeApplicationJob(jobId: string): Promise<void> {

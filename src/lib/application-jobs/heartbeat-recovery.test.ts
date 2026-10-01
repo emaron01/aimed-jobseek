@@ -57,20 +57,21 @@ describe.skipIf(!hasTestDatabase())("application job heartbeat recovery", { time
   });
 
   it("re-queues IN_PROGRESS jobs whose workerHeartbeatAt is null", async () => {
+    const { abandonStaleApplicationJobs, HEARTBEAT_STALE_MS } = await import(
+      "@/lib/application-jobs/service"
+    );
     const nullHeartbeat = await prisma.applicationJob.create({
       data: {
         organizationId,
         campaignId,
         type: "RESUME",
         status: "IN_PROGRESS",
-        startedAt: new Date(),
+        // Claim time is past the grace, so a missing heartbeat is still stale.
+        startedAt: new Date(Date.now() - HEARTBEAT_STALE_MS - 1_000),
         workerHeartbeatAt: null,
       },
     });
     nullHeartbeatJobId = nullHeartbeat.id;
-    const { abandonStaleApplicationJobs } = await import(
-      "@/lib/application-jobs/service"
-    );
     await abandonStaleApplicationJobs();
     const recovered = await prisma.applicationJob.findUniqueOrThrow({
       where: { id: nullHeartbeatJobId },
