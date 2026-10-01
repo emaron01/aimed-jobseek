@@ -197,6 +197,11 @@ export function buildConsultationPolishMessages(input: {
   target?: { key: string; kind: string; text: string } | null;
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
   supportingEvidence?: string[];
+  priorApprovedAnswer?: {
+    statementId: string;
+    question: string;
+    content: string;
+  } | null;
   voiceSamples?: Array<{ label: string; sampleText: string }>;
   careerStage: CareerStage;
   profileItems: Array<{
@@ -244,6 +249,10 @@ export function buildConsultationPolishMessages(input: {
         target: input.target ?? null,
         targetStrength: input.targetStrength ?? null,
         supportingEvidence: input.supportingEvidence ?? [],
+        priorApprovedAnswer: input.priorApprovedAnswer ?? null,
+        seekerRepliesTakePrecedenceOverPriorApprovedAnswer: Boolean(
+          input.priorApprovedAnswer,
+        ),
         strengtheningNeeds: input.strengtheningNeeds,
         qualityFeedback: input.qualityFeedback ?? [],
       }),

@@ -15,6 +15,7 @@ import {
   type EvidenceTarget,
 } from "@/lib/consultation/assess";
 import { deriveCareerStage, type CareerStage } from "@/lib/consultation/career-stage";
+import { findHarperLibraryMatch } from "@/lib/consultation/harper-library";
 import { careerWalkThroughAlreadyAsked } from "@/lib/consultation/question-detection";
 import { deriveRecentRoles } from "@/lib/consultation/recent-roles";
 import {
@@ -34,6 +35,7 @@ import {
   type ApplicationLearningsForCoach,
   type CoachHiringTeamRole,
   type ConsultationExtractResult,
+  type InterviewTypeTag,
   type InterviewerPrepPayload,
   type SeekerStatedFactPayload,
 } from "@/lib/consultation/contract";
@@ -67,6 +69,7 @@ import {
   findConsultationQaItem,
   isIgnoredSeekerTurn,
   isTargetCurrentlyIgnored,
+  interviewTypeTagFromQuestionContext,
   needsMoreDetailFromAnalysis,
   parseConsultationReplyTarget,
   replyToTurnIdFromAnalysis,
@@ -620,6 +623,43 @@ function interviewAnswerGroundingJson(
   return grounding as Prisma.InputJsonValue;
 }
 
+async function libraryQuestionForPolish(input: {
+  organizationId: string;
+  campaignId: string;
+  sessionId: string;
+  question: string;
+  targetKey?: string | null;
+}): Promise<{
+  organizationId: string;
+  campaignId: string;
+  question: string;
+  interviewTypeTag: InterviewTypeTag | null;
+} | null> {
+  let question = input.question.trim();
+  let interviewTypeTag: InterviewTypeTag | null = null;
+  if (input.targetKey) {
+    const turn = await prisma.consultationTurn.findFirst({
+      where: {
+        sessionId: input.sessionId,
+        speaker: "CONSULTANT",
+        followUp: false,
+        targetKey: input.targetKey,
+      },
+      orderBy: { sequence: "asc" },
+      select: { body: true, questionContextJson: true },
+    });
+    interviewTypeTag = interviewTypeTagFromQuestionContext(turn?.questionContextJson);
+    if (!question && turn?.body.trim()) question = turn.body.trim();
+  }
+  if (!question) return null;
+  return {
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    question,
+    interviewTypeTag,
+  };
+}
+
 export async function polishAnswerWithQuality(input: {
   answer: string;
   seekerReplies?: string[];
@@ -638,6 +678,12 @@ export async function polishAnswerWithQuality(input: {
   firstName?: string | null;
   careerStage?: CareerStage;
   profileItems: ReturnType<typeof profileEvidenceItems>;
+  libraryQuestion?: {
+    organizationId: string;
+    campaignId: string;
+    question: string;
+    interviewTypeTag?: InterviewTypeTag | null;
+  } | null;
   target?: EvidenceTarget | null;
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
   supportingEvidence?: string[];
@@ -677,6 +723,15 @@ export async function polishAnswerWithQuality(input: {
     input.careerStage ??
     deriveCareerStage({ experience: [], education: [] });
   const voiceSamples = await voiceSamplesForUsage(input.usage);
+  const priorApprovedAnswer =
+    seekerReplies.length > 0 && input.libraryQuestion?.question.trim()
+      ? await findHarperLibraryMatch({
+          organizationId: input.libraryQuestion.organizationId,
+          campaignId: input.libraryQuestion.campaignId,
+          question: input.libraryQuestion.question,
+          interviewTypeTag: input.libraryQuestion.interviewTypeTag,
+        })
+      : null;
   let lastFailure: string = consultationConversationCopy.generationFailed;
   let qualityFeedback: string[] = [];
   let lastAcceptable: {
@@ -711,6 +766,13 @@ export async function polishAnswerWithQuality(input: {
       target: input.target ?? null,
       targetStrength: input.targetStrength ?? null,
       supportingEvidence: input.supportingEvidence ?? [],
+      priorApprovedAnswer: priorApprovedAnswer
+        ? {
+            statementId: priorApprovedAnswer.statementId,
+            question: priorApprovedAnswer.question,
+            content: priorApprovedAnswer.content,
+          }
+        : null,
       voiceSamples,
       careerStage,
       profileItems: input.profileItems,
@@ -1971,6 +2033,13 @@ async function processAnswerGeneration(input: {
     gapDecision: forcedWhyIncomplete ? "incomplete" : gapDecision,
     companyMotivation,
   };
+  const libraryQuestion = await libraryQuestionForPolish({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    sessionId: input.sessionId,
+    question: input.question,
+    targetKey: input.target?.key ?? null,
+  });
   if (isWhyThisCompany && companyMotivation) {
     await persistWhyThisCompany({
       organizationId: input.organizationId,
@@ -1998,6 +2067,7 @@ async function processAnswerGeneration(input: {
       firstName: profileFirstName(input.profile),
       careerStage: deriveCareerStage(input.profile),
       profileItems,
+      libraryQuestion,
       target: input.target,
       targetStrength,
       supportingEvidence,
@@ -2210,6 +2280,7 @@ async function processAnswerGeneration(input: {
     firstName: profileFirstName(input.profile),
     careerStage: deriveCareerStage(input.profile),
     profileItems,
+    libraryQuestion,
     target: input.target,
     targetStrength,
     supportingEvidence,
@@ -3548,6 +3619,23 @@ async function declineConsultationFollowUp(input: {
   const confirmedGap =
     analyzed.gapDecision === "no_evidence" ||
     (!analyzed.story.result && analyzed.gapDecision !== "evidence");
+  const questionTurn = input.turns.find(
+    (turn) =>
+      turn.speaker === "CONSULTANT" &&
+      !turn.followUp &&
+      turn.targetKey === input.question.targetKey &&
+      turn.body.trim().length > 0,
+  );
+  const libraryQuestion = questionTurn
+    ? {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        question: questionTurn.body,
+        interviewTypeTag: interviewTypeTagFromQuestionContext(
+          questionTurn.questionContextJson,
+        ),
+      }
+    : null;
   const polished = await polishAnswerWithQuality({
     answer: analyzed.answerContext,
     story: analyzed.story,
@@ -3565,6 +3653,7 @@ async function declineConsultationFollowUp(input: {
     careerStage: deriveCareerStage(profile),
     strengtheningNeeds: analyzed.missingStarElements,
     profileItems: profileEvidenceItems(profile),
+    libraryQuestion,
     usage: consultationUsage(
       input.organizationId,
       input.campaignId,
@@ -3923,6 +4012,16 @@ export async function regenerateConsultationStatement(input: {
     statement.session.campaignId,
   );
   const confirmedGap = analyzed?.gapDecision === "no_evidence";
+  const libraryQuestion = await libraryQuestionForPolish({
+    organizationId: input.organizationId,
+    campaignId: statement.session.campaignId,
+    sessionId: statement.sessionId,
+    question:
+      statement.turn.speaker === "CONSULTANT" && !statement.turn.followUp
+        ? statement.turn.body
+        : "",
+    targetKey: statement.turn.targetKey,
+  });
   const polished = await polishAnswerWithQuality({
     answer,
     story: analyzed?.story ?? {
@@ -3945,6 +4044,7 @@ export async function regenerateConsultationStatement(input: {
     careerStage: deriveCareerStage(profile),
     strengtheningNeeds: analyzed?.missingStarElements ?? [],
     profileItems: profileEvidenceItems(profile),
+    libraryQuestion,
     usage: consultationUsage(
       input.organizationId,
       statement.session.campaignId,

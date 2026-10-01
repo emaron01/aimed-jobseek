@@ -81,7 +81,7 @@ describe("Harper reply chain fix", () => {
   it("ITEM 4: extract and polish instructions contain the exact best-answer sentence; version is 35", () => {
     expect(CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS).toContain(BEST_ANSWER_SENTENCE);
     expect(CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS).toContain(BEST_ANSWER_SENTENCE);
-    expect(CONSULTATION_PROMPT_VERSION).toBe("35");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("36");
   });
 
   it("seekerRepliesHaveUsableContent: empty / meta / non-answer false; real content true", () => {

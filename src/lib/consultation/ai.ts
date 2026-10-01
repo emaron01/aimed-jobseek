@@ -175,6 +175,11 @@ export async function polishAnswerWithModel(input: {
   target?: { key: string; kind: string; text: string } | null;
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
   supportingEvidence?: string[];
+  priorApprovedAnswer?: {
+    statementId: string;
+    question: string;
+    content: string;
+  } | null;
   voiceSamples?: Array<{ label: string; sampleText: string }>;
   careerStage: CareerStage;
   profileItems: Array<{

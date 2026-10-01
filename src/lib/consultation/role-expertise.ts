@@ -20,6 +20,11 @@ import {
 } from "@/lib/ai";
 import type { CareerStage } from "@/lib/consultation/career-stage";
 import {
+  findHarperLibraryMatch,
+  harperLibraryFingerprintMatch,
+  type HarperLibraryMatch,
+} from "@/lib/consultation/harper-library";
+import {
   PERSON_PREP_TARGET_PREFIX,
   ROLE_EXPERTISE_TARGET_PREFIX,
   interviewTypeTagSchema,
@@ -54,6 +59,8 @@ import type { Prisma } from "@prisma/client";
 
 /** Bumped for questions/answers model-split (schema + prompt structure). */
 export const ROLE_EXPERTISE_PROMPT_VERSION = "3";
+/** Answers step only. Questions stay on ROLE_EXPERTISE_PROMPT_VERSION. */
+export const ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION = "4";
 
 export const COACHING_SET_MIN = 20;
 export const COACHING_SET_MAX = 25;
@@ -215,16 +222,24 @@ export function roleExpertiseJobFingerprint(
   });
 }
 
-/** Chosen questions only — profile changes do not change this fingerprint. */
+/** Chosen questions plus each library match, or an explicit empty match. */
 export function roleExpertiseAnswersFingerprint(
   questions: RoleExpertiseQuestionChoice[],
+  libraryMatches?: ReadonlyArray<{
+    statementId: string | null;
+    contentHash: string | null;
+  } | null>,
 ): string {
   return fingerprintPaidCallInputs({
-    promptVersion: ROLE_EXPERTISE_PROMPT_VERSION,
+    promptVersion: ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION,
     schemaName: "role_expertise_answers",
-    questions: questions.map((question) => ({
+    questions: questions.map((question, index) => ({
       text: question.text.trim(),
       interviewTypeTag: question.interviewTypeTag,
+      libraryMatch: libraryMatches?.[index] ?? {
+        statementId: null,
+        contentHash: null,
+      },
     })),
   });
 }
@@ -548,12 +563,13 @@ function buildRoleExpertiseAnswersMessages(input: {
   careerStage: CareerStage;
   jobSources: Record<string, unknown>;
   profileItems: unknown[];
+  libraryMatches: Array<HarperLibraryMatch | null>;
   qualityFeedback?: string[];
 }) {
   return [
     {
       role: "system" as const,
-      content: `Prompt version: ${ROLE_EXPERTISE_PROMPT_VERSION}
+      content: `Prompt version: ${ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION}
 
 ${ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS}`,
     },
@@ -561,10 +577,20 @@ ${ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS}`,
       role: "user" as const,
       content: JSON.stringify({
         careerStage: input.careerStage,
-        questions: input.questions.map((question) => ({
-          text: question.text,
-          interviewTypeTag: question.interviewTypeTag,
-        })),
+        questions: input.questions.map((question, index) => {
+          const match = input.libraryMatches[index] ?? null;
+          return {
+            text: question.text,
+            interviewTypeTag: question.interviewTypeTag,
+            priorApprovedAnswer: match
+              ? {
+                  statementId: match.statementId,
+                  question: match.question,
+                  content: match.content,
+                }
+              : null,
+          };
+        }),
         jobSources: input.jobSources,
         personalProfileItems: input.profileItems,
         qualityFeedback: input.qualityFeedback ?? [],
@@ -815,7 +841,20 @@ async function generateRoleExpertiseAnswersStep(input: {
     text: choice.text,
     interviewTypeTag: choice.interviewTypeTag,
   }));
-  const fingerprint = roleExpertiseAnswersFingerprint(choicePayload);
+  const libraryMatches = await Promise.all(
+    input.choices.map((choice) =>
+      findHarperLibraryMatch({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        question: choice.text,
+        interviewTypeTag: choice.interviewTypeTag,
+      }),
+    ),
+  );
+  const fingerprint = roleExpertiseAnswersFingerprint(
+    choicePayload,
+    libraryMatches.map((match) => harperLibraryFingerprintMatch(match)),
+  );
   let qualityFeedback: string[] = [];
   let lastValid: ValidatedRoleExpertiseQuestion[] = [];
 
@@ -849,6 +888,7 @@ async function generateRoleExpertiseAnswersStep(input: {
                 careerStage: input.careerStage,
                 jobSources: input.jobSources,
                 profileItems: input.profileItems,
+                libraryMatches,
                 qualityFeedback,
               }),
               parseOutput: (raw) => ({
