@@ -6,15 +6,21 @@ import { act, createElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DELETE_MY_ACCOUNT_FAILURE_MESSAGE } from "@/lib/account/delete-my-account";
+import {
+  deleteMyAccountAction as deleteMyAccountActionExport,
+  type AccountActionResult,
+} from "@/app/actions/account";
 
-const deleteMyAccountAction = vi.fn(async () => ({
-  ok: false as const,
-  message: DELETE_MY_ACCOUNT_FAILURE_MESSAGE,
-}));
+const deleteMyAccountAction = vi.fn<typeof deleteMyAccountActionExport>(
+  async () => ({
+    ok: false,
+    message: DELETE_MY_ACCOUNT_FAILURE_MESSAGE,
+  }),
+);
 
 vi.mock("@/app/actions/account", () => ({
   deleteMyAccountAction: (
-    prev: unknown,
+    prev: AccountActionResult | null,
     formData: FormData,
   ) => deleteMyAccountAction(prev, formData),
 }));
