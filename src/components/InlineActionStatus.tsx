@@ -1,8 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { AppPendingIndicator } from "@/components/AppButton";
-import { useWorkspaceJobs } from "@/components/workspace-jobs-context";
+import { useWorkspaceJobResolution } from "@/components/workspace-jobs-context";
 import { workspaceJobFailureMessage } from "@/lib/product-config";
 
 export type InlineActionResult = {
@@ -32,9 +32,15 @@ export function InlineActionStatus({
   testId?: string;
   children?: ReactNode;
 }) {
-  const jobs = useWorkspaceJobs();
+  const { jobs, missingJobIds, watchJobIds } = useWorkspaceJobResolution();
+  const ids = result ? trackedActionJobIds(result) : [];
+  const watchedKey = ids.join("\0");
+  useEffect(() => {
+    const current = watchedKey ? watchedKey.split("\0") : [];
+    if (current.length === 0) return;
+    watchJobIds(current);
+  }, [watchedKey, watchJobIds]);
   if (!result) return null;
-  const ids = trackedActionJobIds(result);
   if (ids.length === 0) {
     return (
       <div
@@ -48,9 +54,16 @@ export function InlineActionStatus({
     );
   }
 
-  const tracked = ids.map((id) => jobs.find((job) => job.id === id));
+  const missing = new Set(missingJobIds);
+  const tracked = ids.map((id) => ({
+    id,
+    job: jobs.find((job) => job.id === id),
+    absent: missing.has(id),
+  }));
   const stillRunning = tracked.some(
-    (job) => !job || job.status === "PENDING" || job.status === "IN_PROGRESS",
+    (item) =>
+      !item.absent &&
+      (!item.job || item.job.status === "PENDING" || item.job.status === "IN_PROGRESS"),
   );
   if (stillRunning) {
     return (
@@ -64,15 +77,15 @@ export function InlineActionStatus({
     );
   }
 
-  const failed = tracked.find((job) => job?.status === "FAILED");
-  if (failed?.status === "FAILED") {
+  const failed = tracked.find((item) => item.absent || item.job?.status === "FAILED");
+  if (failed) {
     return (
       <p
         role="status"
         data-testid={testId}
         className={`text-sm text-danger ${className}`.trim()}
       >
-        {workspaceJobFailureMessage(failed.error)}
+        {workspaceJobFailureMessage(failed.job?.error ?? null)}
       </p>
     );
   }

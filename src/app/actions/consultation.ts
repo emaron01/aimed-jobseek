@@ -31,8 +31,8 @@ import {
   vocab,
 } from "@/lib/product-config";
 import {
+  activeApplicationJob,
   enqueueApplicationJob,
-  latestApplicationJob,
 } from "@/lib/application-jobs/service";
 import { prisma } from "@/lib/prisma";
 import { saveSeekerStatedBackground } from "@/lib/product-research/seeker-background";
@@ -732,7 +732,7 @@ export async function saveWhatYouShouldKnowAboutMeAction(
       text: backgroundText,
     });
     const job = enqueued
-      ? await latestApplicationJob({
+      ? await activeApplicationJob({
           organizationId,
           campaignId,
           type: "CONSULTATION",

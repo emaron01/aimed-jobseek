@@ -3,6 +3,8 @@
 import { requireCurrentUser } from "@/lib/auth/session";
 import {
   getApplicationWorkspaceLive,
+  getWorkspaceJobsByIds,
+  type WorkspaceJobStatusView,
   type WorkspaceLiveView,
 } from "@/lib/application-jobs/workspace-status";
 import { retryApplicationJob } from "@/lib/application-jobs/service";
@@ -32,6 +34,33 @@ export async function getApplicationWorkspaceLiveAction(
     console.error(
       JSON.stringify({
         event: "workspace_live_status_failed",
+        message: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+    return null;
+  }
+}
+
+/** Status read for jobs an inline action is watching. Does not enqueue or call a model. */
+export async function readApplicationJobStatusesAction(
+  campaignId: string,
+  jobIds: string[],
+): Promise<WorkspaceJobStatusView[] | null> {
+  const id = campaignId.trim();
+  if (!id || jobIds.length === 0) return [];
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    return getWorkspaceJobsByIds({
+      organizationId,
+      campaignId: id,
+      jobIds,
+    });
+  } catch (error) {
+    if (error instanceof TenantError) return null;
+    console.error(
+      JSON.stringify({
+        event: "workspace_job_status_read_failed",
         message: error instanceof Error ? error.message : "unknown",
       }),
     );

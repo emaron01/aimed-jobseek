@@ -39,7 +39,7 @@ export function ApplicationWorkspaceChrome({
   }, [campaignId, pathname]);
 
   return (
-    <WorkspaceJobsProvider initialJobs={initialJobs}>
+    <WorkspaceJobsProvider campaignId={campaignId} initialJobs={initialJobs}>
       <div className="flex min-h-[calc(100vh-8rem)] flex-col md:flex-row md:items-stretch">
         <WorkspaceJobRefresh
           campaignId={campaignId}

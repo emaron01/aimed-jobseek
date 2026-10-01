@@ -342,6 +342,17 @@ export async function retryApplicationJob(input: {
   return toApplicationJobView(updated);
 }
 
+/** The pending or running job for this key: the row same-key enqueue returns. */
+export async function activeApplicationJob(input: {
+  organizationId: string;
+  campaignId: string;
+  type: ApplicationJobType;
+  targetId?: string | null;
+}): Promise<ApplicationJobView | null> {
+  const job = await findActiveJob(input);
+  return job ? toApplicationJobView(job) : null;
+}
+
 export async function latestApplicationJob(input: {
   organizationId: string;
   campaignId: string;

@@ -8,7 +8,10 @@ import { retryApplicationJobAction } from "@/app/actions/application-jobs";
 import { workspaceJobCopy } from "@/lib/product-config";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
 import { AppPendingIndicator } from "@/components/AppButton";
-import { useReplaceWorkspaceJobs } from "@/components/workspace-jobs-context";
+import {
+  useReplaceWorkspaceJobs,
+  useWorkspaceJobs,
+} from "@/components/workspace-jobs-context";
 import { workspaceJobFailureMessage } from "@/lib/product-config";
 import { AppActionLink } from "@/components/ui";
 import { hasVisibleText } from "@/lib/grounding/fact-tokens";
@@ -87,8 +90,12 @@ export function WorkspaceJobRefresh({
   initialJobs?: WorkspaceJobStatusView[];
 }) {
   const router = useRouter();
+  const jobs = useWorkspaceJobs();
   const replaceJobs = useReplaceWorkspaceJobs();
   const signature = useRef<string | null>(initialSignature ?? null);
+  const pollRef = useRef<(() => void) | null>(null);
+  const ensurePollingRef = useRef<(() => void) | null>(null);
+  const pollingRef = useRef(false);
 
   useEffect(() => {
     if (initialSignature != null) {
@@ -111,14 +118,21 @@ export function WorkspaceJobRefresh({
         window.clearInterval(interval);
         interval = null;
       }
+      pollingRef.current = false;
     }
 
     function startPolling() {
       if (interval != null || cancelled) return;
+      pollingRef.current = true;
       interval = window.setInterval(() => {
         void poll();
       }, POLL_MS);
     }
+
+    pollRef.current = () => {
+      void poll();
+    };
+    ensurePollingRef.current = startPolling;
 
     async function poll() {
       try {
@@ -153,9 +167,22 @@ export function WorkspaceJobRefresh({
 
     return () => {
       cancelled = true;
+      pollRef.current = null;
+      ensurePollingRef.current = null;
       stopPolling();
     };
   }, [campaignId, replaceJobs, router, initialSignature, initialJobs]);
+
+  const activeKey = jobs
+    .filter((job) => job.status === "PENDING" || job.status === "IN_PROGRESS")
+    .map((job) => job.id)
+    .sort()
+    .join("|");
+  useEffect(() => {
+    if (!activeKey || pollingRef.current) return;
+    ensurePollingRef.current?.();
+    pollRef.current?.();
+  }, [activeKey]);
 
   return null;
 }
