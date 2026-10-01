@@ -33,6 +33,7 @@ import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 
 export type ApplicationOutreachActionResult = {
+  jobId?: string;
   ok: boolean;
   message: string;
   assetId?: string;
@@ -283,7 +284,7 @@ export async function generateOutreachAssetAction(
     ) {
       return { ok: true, message: outreachUnchangedSkipMessage(purpose) };
     }
-    await enqueueApplicationJob({
+    const job = await enqueueApplicationJob({
       organizationId,
       campaignId: id,
       type: "OUTREACH",
@@ -310,7 +311,7 @@ export async function generateOutreachAssetAction(
       },
     });
     revalidate(id);
-    return { ok: true, message: workspaceProgressText("OUTREACH") };
+    return { ok: true, message: workspaceProgressText("OUTREACH"), jobId: job.id };
   } catch (error) {
     return errorResult(error);
   }
@@ -358,7 +359,7 @@ export async function buildOutreachPersonaThenGenerateAction(
     if (!persona) {
       throw new TenantError(`${vocab.persona.Singular} was not found.`);
     }
-    await queueHiringTeamBuild({
+    const job = await queueHiringTeamBuild({
       organizationId,
       campaignId: id,
       personaId,
@@ -389,7 +390,11 @@ export async function buildOutreachPersonaThenGenerateAction(
       },
     });
     revalidate(id);
-    return { ok: true, message: workspaceProgressText("HIRING_TEAM_BUILD") };
+    return {
+      ok: true,
+      message: workspaceProgressText("HIRING_TEAM_BUILD"),
+      jobId: job.id,
+    };
   } catch (error) {
     return errorResult(error);
   }

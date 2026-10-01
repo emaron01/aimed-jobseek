@@ -32,6 +32,7 @@ import {
 } from "@/lib/product-config";
 import { SubmitButton, AppButton, AppActionLink, PageHeader } from "@/components/ui";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
+import { InlineActionStatus } from "@/components/InlineActionStatus";
 import {
   WORKSPACE_CARD_WRAP_CLASS,
   WORKSPACE_MESSAGE_WRAP_CLASS,
@@ -106,11 +107,7 @@ function Status({ result }: { result: ApplicationOutreachActionResult | null }) 
   if (!result) return null;
   if (result.needsPersonaBuild) return null;
   return (
-    <div
-      role="status"
-      className={result.ok ? "text-sm text-success" : "text-sm text-danger"}
-    >
-      <p>{result.message}</p>
+    <InlineActionStatus result={result}>
       {result.violations?.length ? (
         <ul className="mt-1 list-disc pl-5">
           {result.violations.map((violation) => (
@@ -118,7 +115,7 @@ function Status({ result }: { result: ApplicationOutreachActionResult | null }) 
           ))}
         </ul>
       ) : null}
-    </div>
+    </InlineActionStatus>
   );
 }
 

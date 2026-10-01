@@ -563,7 +563,7 @@ export async function queueHiringTeamBuild(input: {
   personaId: string;
   initiatedByUserId?: string | null;
   deferredOutreach?: ApplicationJobPayload["deferredOutreach"];
-}): Promise<void> {
+}) {
   const { isPersonaAiConfigured } = await import("@/lib/ai");
   if (!isPersonaAiConfigured()) {
     throw new TenantError(
@@ -575,7 +575,7 @@ export async function queueHiringTeamBuild(input: {
     where: { id: persona.id },
     data: { setupStatus: "SYNTHESIZING", staleAt: null, staleReason: null },
   });
-  await enqueueApplicationJob({
+  return enqueueApplicationJob({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
     type: "HIRING_TEAM_BUILD",
@@ -596,7 +596,7 @@ export async function queueHiringTeamBuildDirect(input: {
   organizationId: string;
   campaignId: string;
   initiatedByUserId?: string | null;
-}): Promise<number> {
+}): Promise<{ queued: number; jobIds: string[] }> {
   const roles = await prisma.persona.findMany({
     where: {
       organizationId: input.organizationId,
@@ -605,18 +605,20 @@ export async function queueHiringTeamBuildDirect(input: {
     },
   });
   let queued = 0;
+  const jobIds: string[] = [];
   for (const role of roles) {
     if (hiringTeamInvolvement(role.profileJson) !== "DIRECT") continue;
     if (isHiringTeamPersonaBuilt(role) && !role.staleAt) continue;
-    await queueHiringTeamBuild({
+    const job = await queueHiringTeamBuild({
       organizationId: input.organizationId,
       campaignId: input.campaignId,
       personaId: role.id,
       initiatedByUserId: input.initiatedByUserId,
     });
+    jobIds.push(job.id);
     queued += 1;
   }
-  return queued;
+  return { queued, jobIds };
 }
 
 export async function addApplicationHiringTeamRole(input: {

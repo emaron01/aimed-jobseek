@@ -19,6 +19,7 @@ import { TenantError } from "@/lib/tenant/errors";
 export type ApplicationAssetActionResult = {
   ok: boolean;
   message: string;
+  jobId?: string;
   assetId?: string;
   version?: number;
   violations?: string[];
@@ -77,7 +78,7 @@ export async function writePresentationPlanAction(
     ) {
       return { ok: true, message: applicationAssetConfig.labels.readyPlan };
     }
-    await enqueueApplicationJob({
+    const job = await enqueueApplicationJob({
       organizationId,
       campaignId: id,
       type,
@@ -87,7 +88,11 @@ export async function writePresentationPlanAction(
       },
     });
     revalidate(id);
-    return { ok: true, message: workspaceProgressText(type, null, "plan") };
+    return {
+      ok: true,
+      message: workspaceProgressText(type, null, "plan"),
+      jobId: job.id,
+    };
   } catch (error) {
     return errorResult(error);
   }
@@ -151,7 +156,7 @@ export async function generateApplicationAssetAction(
             : applicationAssetConfig.labels.unchangedCoverLetter,
       };
     }
-    await enqueueApplicationJob({
+    const job = await enqueueApplicationJob({
       organizationId,
       campaignId: id,
       type,
@@ -166,6 +171,7 @@ export async function generateApplicationAssetAction(
     return {
       ok: true,
       message: workspaceProgressText(type),
+      jobId: job.id,
     };
   } catch (error) {
     return errorResult(error);

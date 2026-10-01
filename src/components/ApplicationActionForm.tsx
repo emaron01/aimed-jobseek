@@ -3,8 +3,12 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AppButton, type AppButtonVariant } from "@/components/AppButton";
+import {
+  InlineActionStatus,
+  type InlineActionResult,
+} from "@/components/InlineActionStatus";
 
-type ActionResult = { ok: boolean; message: string };
+type ActionResult = InlineActionResult;
 
 const FALLBACK_ERROR = "The action could not be completed.";
 
@@ -108,11 +112,7 @@ export function ApplicationActionForm({
   const fields = (
     <>
       {children}
-      {state ? (
-        <p className={state.ok ? "text-sm text-success" : "text-sm text-danger"} role="status">
-          {state.message}
-        </p>
-      ) : null}
+      <InlineActionStatus result={state} testId={`${testId}-status`} />
       <AppButton
         type="submit"
         variant={variant}

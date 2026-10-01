@@ -156,3 +156,12 @@ export const workspaceJobCopy = Object.freeze({
   failed: "This did not finish. Retry.",
   retry: "Retry",
 });
+
+/** First line of a job error, or the shared retry message when none is stored. */
+export function workspaceJobFailureMessage(error: string | null): string {
+  const line = (error ?? "")
+    .split("\n")
+    .map((item) => item.trim())
+    .find((item) => item.length > 0);
+  return line || workspaceJobCopy.failed;
+}

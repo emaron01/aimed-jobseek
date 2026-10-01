@@ -53,6 +53,7 @@ export { hiringTeamConfig, hiringTeamDetailsTitle } from "./hiring-team";
 export {
   WORKSPACE_JOB_TYPES,
   workspaceJobCopy,
+  workspaceJobFailureMessage,
   workspaceProgressText,
   workspaceReadyText,
   workspaceSectionId,

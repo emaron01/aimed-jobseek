@@ -18,6 +18,7 @@ import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 
 export type InterviewActionResult = {
+  jobId?: string;
   ok: boolean;
   message: string;
   questions?: Array<{ id: string; text: string }>;
@@ -292,7 +293,11 @@ export async function startPersonPrepAction(
         message: applicationSummaryConfig.actions.unchangedLikelyQuestions,
       };
     }
-    return { ok: true, message: "Interviewer prep started." };
+    return {
+      ok: true,
+      message: "Interviewer prep started.",
+      ...(started.jobId ? { jobId: started.jobId } : {}),
+    };
   } catch (error) {
     return errorResult(error);
   }

@@ -112,23 +112,38 @@ export async function createInterviewStage(input: {
     throw new TenantError("Expected decision date is invalid.");
   }
   const campaign = await requireOwnedCampaign(input);
-  const latest = await prisma.interviewStage.aggregate({
-    where: { campaignId: input.campaignId },
-    _max: { sortOrder: true },
+  const { stage, created } = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`interview-stage:${input.campaignId}`})::bigint)`;
+    const existing = await tx.interviewStage.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        type: input.type as InterviewStageType,
+        scheduledAt: input.scheduledAt,
+        outcome: null,
+      },
+    });
+    if (existing) return { stage: existing, created: false };
+    const latest = await tx.interviewStage.aggregate({
+      where: { campaignId: input.campaignId },
+      _max: { sortOrder: true },
+    });
+    const sortOrder = (latest._max.sortOrder ?? 0) + 1;
+    const createdStage = await tx.interviewStage.create({
+      data: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        sortOrder,
+        type: input.type as InterviewStageType,
+        scheduledAt: input.scheduledAt,
+        format: input.format as InterviewFormat,
+        notesBefore: input.notesBefore?.trim() || null,
+        expectedDecisionAt: input.expectedDecisionAt ?? null,
+      },
+    });
+    return { stage: createdStage, created: true };
   });
-  const sortOrder = (latest._max.sortOrder ?? 0) + 1;
-  const stage = await prisma.interviewStage.create({
-    data: {
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      sortOrder,
-      type: input.type as InterviewStageType,
-      scheduledAt: input.scheduledAt,
-      format: input.format as InterviewFormat,
-      notesBefore: input.notesBefore?.trim() || null,
-      expectedDecisionAt: input.expectedDecisionAt ?? null,
-    },
-  });
+  if (!created) return stage;
   if (!campaign.applicationProgress || !TERMINAL_PROGRESS.has(campaign.applicationProgress)) {
     await prisma.campaign.update({
       where: { id: campaign.id },
@@ -535,6 +550,7 @@ export async function startPersonPrepForContact(input: {
       contactId: input.contactId,
       alreadyStarted: true as const,
       sectionUnchanged: false,
+      jobId: null,
     };
   }
   const personaId = input.personaId?.trim() || membership.chosenPersonaId;
@@ -553,18 +569,19 @@ export async function startPersonPrepForContact(input: {
     campaignId: input.campaignId,
     sectionKey: `contact:${input.contactId}`,
   });
-  if (!sectionUnchanged) {
-    await enqueueInterviewerCheatSheetSection({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      userId: input.userId,
-      contactId: input.contactId,
-    });
-  }
+  const jobId = sectionUnchanged
+    ? null
+    : await enqueueInterviewerCheatSheetSection({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        userId: input.userId,
+        contactId: input.contactId,
+      });
   return {
     contactId: input.contactId,
     alreadyStarted: false as const,
     sectionUnchanged,
+    jobId,
   };
 }
 

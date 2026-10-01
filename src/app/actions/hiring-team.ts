@@ -30,7 +30,12 @@ import { vocab } from "@/lib/product-config";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
 
-export type HiringTeamActionResult = { ok: boolean; message: string };
+export type HiringTeamActionResult = {
+  ok: boolean;
+  message: string;
+  jobId?: string;
+  jobIds?: string[];
+};
 
 function fail(error: unknown, fallback: string): HiringTeamActionResult {
   if (error instanceof TenantError) return { ok: false, message: error.message };
@@ -233,9 +238,9 @@ export async function rebuildApplicationRoleAction(
       }
       return { ok: true, message: `No Changes To ${skip.roleName} Persona` };
     }
-    await queueHiringTeamBuild({ organizationId, campaignId, personaId });
+    const job = await queueHiringTeamBuild({ organizationId, campaignId, personaId });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: hiringTeamConfig.queuedBuild };
+    return { ok: true, message: hiringTeamConfig.queuedBuild, jobId: job.id };
   } catch (error) {
     return fail(error, `The ${vocab.persona.singular} could not be rebuilt.`);
   }
@@ -308,9 +313,9 @@ export async function buildApplicationRoleAction(
       }
       return { ok: true, message: `No Changes To ${skip.roleName} Persona` };
     }
-    await queueHiringTeamBuild({ organizationId, campaignId, personaId });
+    const job = await queueHiringTeamBuild({ organizationId, campaignId, personaId });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: hiringTeamConfig.queuedBuild };
+    return { ok: true, message: hiringTeamConfig.queuedBuild, jobId: job.id };
   } catch (error) {
     return fail(error, `The ${vocab.persona.singular} could not be started.`);
   }
@@ -327,9 +332,13 @@ export async function buildAllDirectRolesAction(
     if (!campaignId) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }
-    await queueHiringTeamBuildDirect({ organizationId, campaignId });
+    const queued = await queueHiringTeamBuildDirect({ organizationId, campaignId });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: hiringTeamConfig.queuedBuildAllDirect };
+    return {
+      ok: true,
+      message: hiringTeamConfig.queuedBuildAllDirect,
+      ...(queued.jobIds.length > 0 ? { jobIds: queued.jobIds } : {}),
+    };
   } catch (error) {
     return fail(error, "Direct role builds could not be started.");
   }
@@ -347,9 +356,9 @@ export async function retryApplicationJobAction(
     if (!campaignId || !jobId) {
       return { ok: false, message: "That job was not found." };
     }
-    await retryApplicationJob({ organizationId, campaignId, jobId });
+    const job = await retryApplicationJob({ organizationId, campaignId, jobId });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: hiringTeamConfig.actions.retry };
+    return { ok: true, message: hiringTeamConfig.actions.retry, jobId: job.id };
   } catch (error) {
     return fail(error, "The job could not be retried.");
   }

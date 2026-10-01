@@ -11,7 +11,7 @@ const enqueue = vi.hoisted(() =>
     targetId?: string | null;
   }) => {
     void input.campaignId;
-    return undefined;
+    return { id: "summary-job" };
   }),
 );
 const rebuild = vi.hoisted(() => vi.fn(async () => false));
@@ -456,7 +456,8 @@ describe("person sections run only when the seeker chooses that person", () => {
     formData.set("sectionKey", "contact:c-1");
     const result = await generateApplicationSummaryAction(null, formData);
     expect(result.ok).toBe(true);
-    expect(result.message).not.toBe("No Changes To Likely Questions");
+    expect(result.message).toBe("Refreshing likely questions…");
+    expect(result.jobId).toBe("summary-job");
     expect(enqueue).toHaveBeenCalledTimes(1);
     expect(enqueue.mock.calls[0]?.[0]).toMatchObject({
       campaignId: "camp",

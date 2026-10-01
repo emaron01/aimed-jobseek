@@ -8,6 +8,8 @@ import { retryApplicationJobAction } from "@/app/actions/application-jobs";
 import { workspaceJobCopy } from "@/lib/product-config";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
 import { AppPendingIndicator } from "@/components/AppButton";
+import { useReplaceWorkspaceJobs } from "@/components/workspace-jobs-context";
+import { workspaceJobFailureMessage } from "@/lib/product-config";
 import { AppActionLink } from "@/components/ui";
 import { hasVisibleText } from "@/lib/grounding/fact-tokens";
 import {
@@ -30,7 +32,7 @@ function JobErrorDetail({
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => hasVisibleText(line));
-  const message = lines[0] || workspaceJobCopy.failed;
+  const message = workspaceJobFailureMessage(error);
   const violations = lines.slice(1);
   const showFix =
     /claim|source|verif/i.test(error ?? "") || violations.length > 0;
@@ -85,6 +87,7 @@ export function WorkspaceJobRefresh({
   initialJobs?: WorkspaceJobStatusView[];
 }) {
   const router = useRouter();
+  const replaceJobs = useReplaceWorkspaceJobs();
   const signature = useRef<string | null>(initialSignature ?? null);
 
   useEffect(() => {
@@ -121,6 +124,7 @@ export function WorkspaceJobRefresh({
       try {
         const latest = await getApplicationWorkspaceLiveAction(campaignId);
         if (!latest || cancelled) return;
+        replaceJobs(latest.jobs);
         if (signature.current == null) {
           signature.current = latest.signature;
         } else if (latest.signature !== signature.current) {
@@ -151,7 +155,7 @@ export function WorkspaceJobRefresh({
       cancelled = true;
       stopPolling();
     };
-  }, [campaignId, router, initialSignature, initialJobs]);
+  }, [campaignId, replaceJobs, router, initialSignature, initialJobs]);
 
   return null;
 }

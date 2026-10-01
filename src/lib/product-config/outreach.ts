@@ -81,6 +81,8 @@ export const outreachConfig = Object.freeze({
     remindersTitle: "Follow-up reminders",
     remindersHelp:
       "Alerts only. Nothing is sent or blocked. Blank means no reminder for that slot.",
+    remindersDueLine:
+      "You may have {count} outbound due. Review Interview stages and Send Outreach to take action.",
   },
   greetings: {
     withNamePrefix: "Hi ",

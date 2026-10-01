@@ -124,7 +124,7 @@ export async function markApplicationStepViewedAction(
 export async function retryApplicationJobAction(
   _prev: { ok: boolean; message: string } | null,
   formData: FormData,
-): Promise<{ ok: boolean; message: string }> {
+): Promise<{ ok: boolean; message: string; jobId?: string }> {
   try {
     const organizationId = await requireOrganizationId();
     await requireCurrentUser();
@@ -133,9 +133,9 @@ export async function retryApplicationJobAction(
     if (!campaignId || !jobId) {
       return { ok: false, message: workspaceJobCopy.failed };
     }
-    await retryApplicationJob({ organizationId, campaignId, jobId });
+    const job = await retryApplicationJob({ organizationId, campaignId, jobId });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: workspaceJobCopy.retry };
+    return { ok: true, message: workspaceJobCopy.retry, jobId: job.id };
   } catch (error) {
     if (error instanceof TenantError) return { ok: false, message: error.message };
     console.error(

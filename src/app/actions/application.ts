@@ -33,7 +33,11 @@ import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
 import { assertGatedAction } from "@/lib/product-config/feature-access";
 
-export type ApplicationActionResult = { ok: boolean; message: string };
+export type ApplicationActionResult = {
+  ok: boolean;
+  message: string;
+  jobId?: string;
+};
 
 function fail(error: unknown, fallback: string): ApplicationActionResult {
   if (error instanceof TenantError) return { ok: false, message: error.message };
@@ -245,9 +249,13 @@ export async function retryApplicationNextStepAction(
     if (!campaignId) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }
-    await retryApplicationNextStep({ organizationId, campaignId });
+    const job = await retryApplicationNextStep({ organizationId, campaignId });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: consultationConversationCopy.nextStepRetry };
+    return {
+      ok: true,
+      message: consultationConversationCopy.nextStepRetry,
+      jobId: job.id,
+    };
   } catch (error) {
     return fail(error, consultationConversationCopy.nextStepFailed);
   }

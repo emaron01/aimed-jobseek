@@ -27,6 +27,7 @@ import {
   vocab,
 } from "@/lib/product-config";
 import { usePathname } from "next/navigation";
+import { InlineActionStatus, trackedActionJobIds } from "@/components/InlineActionStatus";
 import {
   AppActionLink,
   AppButton,
@@ -79,6 +80,11 @@ function Status({
 }) {
   const pathname = usePathname() || "";
   if (!result) return null;
+  if (trackedActionJobIds(result).length > 0) {
+    return (
+      <InlineActionStatus result={result} testId="asset-verification-status" />
+    );
+  }
   if (errorsOnly && result.ok) return null;
   const violations = visibleItems(result.violations ?? [], (item) => item);
   const messageLines = result.message

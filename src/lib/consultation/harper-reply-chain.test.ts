@@ -486,10 +486,12 @@ describe("Harper reply chain fix", () => {
     expect(editAction).toContain("enqueueApplicationJob");
     expect(editAction).not.toContain("answerUnchanged");
 
-    // Message renders via ApplicationActionForm status from action result.
+    // Message renders via the shared inline status from the action result.
     const form = src("src/components/ApplicationActionForm.tsx");
-    expect(form).toContain("state.message");
-    expect(form).toContain('role="status"');
+    expect(form).toContain("<InlineActionStatus result={state}");
+    const status = src("src/components/InlineActionStatus.tsx");
+    expect(status).toContain("result.message");
+    expect(status).toContain('role="status"');
 
     // At most one needs-more-detail per question (latest seeker analysis).
     expect(qaView).toContain("item.seekerAnswers.at(-1)?.analysisJson");

@@ -303,7 +303,7 @@ export async function queueApplicationNextStepIfNeeded(input: {
 export async function retryApplicationNextStep(input: {
   organizationId: string;
   campaignId: string;
-}): Promise<void> {
+}) {
   await prisma.campaign.update({
     where: { id: input.campaignId },
     data: {
@@ -311,7 +311,7 @@ export async function retryApplicationNextStep(input: {
       nextStepStateKey: null,
     },
   });
-  await enqueueApplicationJob({
+  return enqueueApplicationJob({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
     type: "NEXT_STEP",

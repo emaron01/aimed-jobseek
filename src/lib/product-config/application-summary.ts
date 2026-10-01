@@ -11,6 +11,7 @@ export const applicationSummaryConfig = Object.freeze({
     unchanged: "No Changes To Cheat Sheet",
     unchangedLikelyQuestions: "No Changes To Likely Questions",
     refreshLikelyQuestions: "Refresh likely questions",
+    refreshingLikelyQuestions: "Refreshing likely questions…",
     print: "Print or save as PDF",
     printSection: "Print this section",
     filterPeople: `Find a person or ${vocab.persona.singular}`,

@@ -22,6 +22,7 @@ import { TenantError } from "@/lib/tenant/errors";
 export type ApplicationSummaryActionResult = {
   ok: boolean;
   message: string;
+  jobId?: string;
 };
 
 export async function buildCheatSheetPersonaAction(
@@ -36,7 +37,7 @@ export async function buildCheatSheetPersonaAction(
   try {
     const organizationId = await requireOrganizationId();
     const user = await requireCurrentUser();
-    await queueHiringTeamBuild({
+    const job = await queueHiringTeamBuild({
       organizationId,
       campaignId,
       personaId,
@@ -45,7 +46,11 @@ export async function buildCheatSheetPersonaAction(
     revalidatePath(`/campaigns/${campaignId}/summary`);
     revalidatePath(`/campaigns/${campaignId}`);
     revalidatePath(`/campaigns/${campaignId}/interviews`);
-    return { ok: true, message: workspaceProgressText("HIRING_TEAM_BUILD") };
+    return {
+      ok: true,
+      message: workspaceProgressText("HIRING_TEAM_BUILD"),
+      jobId: job.id,
+    };
   } catch (error) {
     if (error instanceof TenantError) {
       return { ok: false, message: error.message };
@@ -90,7 +95,7 @@ export async function generateApplicationSummaryAction(
           : applicationSummaryConfig.actions.unchanged,
       };
     }
-    await enqueueApplicationJob({
+    const job = await enqueueApplicationJob({
       organizationId,
       campaignId,
       type: "APPLICATION_SUMMARY",
@@ -100,7 +105,13 @@ export async function generateApplicationSummaryAction(
     });
     revalidatePath(`/campaigns/${campaignId}/summary`);
     revalidatePath(`/campaigns/${campaignId}/interviews`);
-    return { ok: true, message: workspaceProgressText("APPLICATION_SUMMARY") };
+    return {
+      ok: true,
+      message: sectionKey
+        ? applicationSummaryConfig.actions.refreshingLikelyQuestions
+        : workspaceProgressText("APPLICATION_SUMMARY"),
+      jobId: job.id,
+    };
   } catch (error) {
     if (error instanceof TenantError) {
       return { ok: false, message: error.message };
@@ -141,13 +152,15 @@ export async function answerCheatSheetCoachAction(
       itemId,
       answer,
     });
+    let jobId: string | undefined;
     if (!recorded.unchanged) {
-      await enqueueApplicationJob({
+      const job = await enqueueApplicationJob({
         organizationId,
         campaignId,
         type: "CONSULTATION",
         payload: { operation: "process_reply" },
       });
+      jobId = job.id;
     }
     revalidatePath(`/campaigns/${campaignId}`);
     revalidatePath(`/campaigns/${campaignId}/summary`);
@@ -157,6 +170,7 @@ export async function answerCheatSheetCoachAction(
       message: recorded.unchanged
         ? consultationConversationCopy.answerUnchanged
         : consultationConversationCopy.thinking,
+      ...(jobId ? { jobId } : {}),
     };
   } catch (error) {
     if (error instanceof TenantError) {

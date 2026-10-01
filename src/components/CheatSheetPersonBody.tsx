@@ -86,7 +86,7 @@ export function RefreshLikelyQuestionsButton({
     <ApplicationActionForm
       action={generateApplicationSummaryAction}
       submitLabel={applicationSummaryConfig.actions.refreshLikelyQuestions}
-      pendingLabel="Refreshing likely questions…"
+      pendingLabel={applicationSummaryConfig.actions.refreshingLikelyQuestions}
       variant="primary"
       testId={`refresh-likely-questions-${sectionKey}`}
       formClassName="print:hidden"

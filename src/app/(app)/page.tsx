@@ -11,6 +11,7 @@ import { DueContactsPanel } from "@/components/DueContactsPanel";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
 import { canViewAllRepWork } from "@/lib/work/ownership";
 import { anyListFeatureEnabled, polishCopy, vocab } from "@/lib/product-config";
+import { resolveUserTimezone } from "@/lib/cadence/digest";
 
 function HomeNavLink({ href, label }: { href: string; label: string }) {
   return (
@@ -90,7 +91,13 @@ export default async function DashboardPage({
         />
       </div>
 
-      <ApplicationRemindersPanel reminders={workflow.applicationReminders} />
+      <ApplicationRemindersPanel
+        reminders={workflow.applicationReminders}
+        timezone={resolveUserTimezone({
+          userTimezone: user?.timezone ?? null,
+          organizationTimezone: organization.timezone,
+        })}
+      />
       {anyListFeatureEnabled() && workflow.dueByCampaign.length > 0 ? (
         <DueContactsPanel dueByCampaign={workflow.dueByCampaign} />
       ) : null}

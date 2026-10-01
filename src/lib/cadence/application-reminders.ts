@@ -1,6 +1,7 @@
 import { cadenceUrgency, type CadenceUrgency } from "@/lib/cadence/engine";
 import { prisma } from "@/lib/prisma";
 import { interviewConfig, outreachConfig, vocab } from "@/lib/product-config";
+import { getOrganizationDayKey } from "@/lib/usage/timezone";
 
 export type ApplicationReminderKind =
   | "OUTREACH"
@@ -292,6 +293,82 @@ export async function countDueApplicationReminders(input: {
 }): Promise<number> {
   const rows = await getDueApplicationReminders(input);
   return rows.length;
+}
+
+/** Same stored interview or outreach slot. Stage id is omitted so existing duplicates count once. */
+export function applicationReminderIdentity(row: ApplicationReminderRow): string {
+  return [
+    row.kind,
+    row.campaignId,
+    row.stageLabel ?? "",
+    row.day,
+    row.dueAt.toISOString(),
+    row.recordNotesFirst ? "1" : "0",
+  ].join("|");
+}
+
+export function dedupeApplicationReminders(
+  rows: ApplicationReminderRow[],
+): ApplicationReminderRow[] {
+  const seen = new Set<string>();
+  const unique: ApplicationReminderRow[] = [];
+  for (const row of rows) {
+    const key = applicationReminderIdentity(row);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(row);
+  }
+  return unique;
+}
+
+export function isReminderDueTodayOrPast(input: {
+  dueAt: Date;
+  now: Date;
+  timezone: string;
+}): boolean {
+  const dueDay = getOrganizationDayKey(input.timezone, input.dueAt);
+  const today = getOrganizationDayKey(input.timezone, input.now);
+  return dueDay <= today;
+}
+
+export type DueApplicationReminderGroup = {
+  campaignId: string;
+  campaignName: string;
+  count: number;
+};
+
+export function groupDueApplicationReminders(input: {
+  reminders: ApplicationReminderRow[];
+  now: Date;
+  timezone: string;
+}): DueApplicationReminderGroup[] {
+  const due = dedupeApplicationReminders(
+    input.reminders.filter((row) =>
+      isReminderDueTodayOrPast({
+        dueAt: row.dueAt,
+        now: input.now,
+        timezone: input.timezone,
+      }),
+    ),
+  );
+  const groups = new Map<string, DueApplicationReminderGroup>();
+  for (const row of due) {
+    const existing = groups.get(row.campaignId);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      groups.set(row.campaignId, {
+        campaignId: row.campaignId,
+        campaignName: row.campaignName,
+        count: 1,
+      });
+    }
+  }
+  return [...groups.values()];
+}
+
+export function dueReminderLine(count: number): string {
+  return outreachConfig.labels.remindersDueLine.replace("{count}", String(count));
 }
 
 export function applicationReminderLabel(row: ApplicationReminderRow): string {

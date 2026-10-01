@@ -7,7 +7,7 @@ export async function enqueueCheatSheetPersonSection(input: {
   campaignId: string;
   contactId: string;
   userId?: string | null;
-}): Promise<void> {
+}): Promise<string | null> {
   const sectionKey = `contact:${input.contactId}`;
   try {
     const { personSectionInputsUnchanged } = await import(
@@ -20,7 +20,7 @@ export async function enqueueCheatSheetPersonSection(input: {
         sectionKey,
       })
     ) {
-      return;
+      return null;
     }
   } catch (error) {
     console.error(
@@ -32,7 +32,7 @@ export async function enqueueCheatSheetPersonSection(input: {
       }),
     );
   }
-  await enqueueApplicationJob({
+  const job = await enqueueApplicationJob({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
     type: "APPLICATION_SUMMARY",
@@ -43,6 +43,7 @@ export async function enqueueCheatSheetPersonSection(input: {
       sectionKey,
     },
   });
+  return job.id;
 }
 
 export async function enqueueInterviewerCheatSheetSection(input: {
@@ -50,7 +51,7 @@ export async function enqueueInterviewerCheatSheetSection(input: {
   campaignId: string;
   userId: string;
   contactId: string;
-}): Promise<void> {
+}): Promise<string | null> {
   const membership = await prisma.campaignContact.findFirst({
     where: {
       organizationId: input.organizationId,
@@ -59,8 +60,8 @@ export async function enqueueInterviewerCheatSheetSection(input: {
     },
     select: { chosenPersonaId: true },
   });
-  if (!membership?.chosenPersonaId) return;
-  await enqueueCheatSheetPersonSection(input);
+  if (!membership?.chosenPersonaId) return null;
+  return enqueueCheatSheetPersonSection(input);
 }
 
 export async function enqueueCheatSheetSectionsForPersona(input: {

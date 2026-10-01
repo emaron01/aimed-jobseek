@@ -30,13 +30,20 @@ import {
   isObsoleteWorkspaceFailure,
   vocab,
 } from "@/lib/product-config";
-import { enqueueApplicationJob } from "@/lib/application-jobs/service";
+import {
+  enqueueApplicationJob,
+  latestApplicationJob,
+} from "@/lib/application-jobs/service";
 import { prisma } from "@/lib/prisma";
 import { saveSeekerStatedBackground } from "@/lib/product-research/seeker-background";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 import { TenantError } from "@/lib/tenant/errors";
 
-export type ConsultationActionResult = { ok: boolean; message: string };
+export type ConsultationActionResult = {
+  ok: boolean;
+  message: string;
+  jobId?: string;
+};
 
 /** Harper and the Cheat Sheet read the same statements, so both routes refresh. */
 function revalidateHarperAndCheatSheet(campaignId: string) {
@@ -92,14 +99,14 @@ export async function startConsultationAction(
     if (!campaignId) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }
-    await enqueueApplicationJob({
+    const job = await enqueueApplicationJob({
       organizationId,
       campaignId,
       type: "CONSULTATION",
       payload: { operation: "start" },
     });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: consultationConversationCopy.starting };
+    return { ok: true, message: consultationConversationCopy.starting, jobId: job.id };
   } catch (error) {
     return fail(error, "The consultation could not be started.");
   }
@@ -116,14 +123,14 @@ export async function retryConsultationAction(
     if (!campaignId) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }
-    await enqueueApplicationJob({
+    const job = await enqueueApplicationJob({
       organizationId,
       campaignId,
       type: "CONSULTATION",
       payload: { operation: "retry" },
     });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: consultationConversationCopy.starting };
+    return { ok: true, message: consultationConversationCopy.starting, jobId: job.id };
   } catch (error) {
     return fail(error, "The consultation could not be retried.");
   }
@@ -234,14 +241,14 @@ export async function answerConsultationAction(
         message: consultationConversationCopy.answerUnchanged,
       };
     }
-    await enqueueApplicationJob({
+    const job = await enqueueApplicationJob({
       organizationId,
       campaignId,
       type: "CONSULTATION",
       payload: { operation: "process_reply" },
     });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: consultationConversationCopy.typing };
+    return { ok: true, message: consultationConversationCopy.typing, jobId: job.id };
   } catch (error) {
     return fail(error, "The answer could not be saved.");
   }
@@ -487,14 +494,14 @@ export async function replyConsultationAction(
         message: consultationConversationCopy.answerUnchanged,
       };
     }
-    await enqueueApplicationJob({
+    const job = await enqueueApplicationJob({
       organizationId,
       campaignId,
       type: "CONSULTATION",
       payload: { operation: "process_reply" },
     });
     revalidateHarperAndCheatSheet(campaignId);
-    return { ok: true, message: consultationConversationCopy.thinking };
+    return { ok: true, message: consultationConversationCopy.thinking, jobId: job.id };
   } catch (error) {
     return fail(error, consultationConversationCopy.replyFailed);
   }
@@ -522,14 +529,14 @@ export async function editConsultationAnswerAction(
       turnId,
       answer,
     });
-    await enqueueApplicationJob({
+    const job = await enqueueApplicationJob({
       organizationId,
       campaignId,
       type: "CONSULTATION",
       payload: { operation: "process_reply" },
     });
     revalidateHarperAndCheatSheet(campaignId);
-    return { ok: true, message: consultationConversationCopy.thinking };
+    return { ok: true, message: consultationConversationCopy.thinking, jobId: job.id };
   } catch (error) {
     return fail(error, consultationConversationCopy.replyFailed);
   }
@@ -555,14 +562,16 @@ export async function approveConsultationQaResultAction(
       return { ok: false, message: "That polished statement was not found." };
     }
     await approveConsultationQaResult({ organizationId, statementIds });
+    let jobId: string | undefined;
     if (campaignId) {
       try {
-        await enqueueApplicationJob({
+        const job = await enqueueApplicationJob({
           organizationId,
           campaignId,
           type: "CONSULTATION",
           payload: { operation: "continue" },
         });
+        jobId = job.id;
       } catch (error) {
         console.error(
           JSON.stringify({
@@ -574,7 +583,11 @@ export async function approveConsultationQaResultAction(
       }
       revalidateHarperAndCheatSheet(campaignId);
     }
-    return { ok: true, message: consultationConversationCopy.confirmed };
+    return {
+      ok: true,
+      message: consultationConversationCopy.confirmed,
+      ...(jobId ? { jobId } : {}),
+    };
   } catch (error) {
     return fail(error, "The result could not be approved.");
   }
@@ -612,13 +625,15 @@ export async function useConsultationResultAction(
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }
     await confirmConsultationResult({ organizationId, campaignId });
+    let jobId: string | undefined;
     try {
-      await enqueueApplicationJob({
+      const job = await enqueueApplicationJob({
         organizationId,
         campaignId,
         type: "CONSULTATION",
         payload: { operation: "continue" },
       });
+      jobId = job.id;
     } catch (error) {
       console.error(
         JSON.stringify({
@@ -629,7 +644,11 @@ export async function useConsultationResultAction(
       );
     }
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: consultationConversationCopy.confirmed };
+    return {
+      ok: true,
+      message: consultationConversationCopy.confirmed,
+      ...(jobId ? { jobId } : {}),
+    };
   } catch (error) {
     return fail(error, "The result could not be used.");
   }
@@ -712,6 +731,14 @@ export async function saveWhatYouShouldKnowAboutMeAction(
       userId: user.id,
       text: backgroundText,
     });
+    const job = enqueued
+      ? await latestApplicationJob({
+          organizationId,
+          campaignId,
+          type: "CONSULTATION",
+          targetId: "reassess",
+        })
+      : null;
     revalidatePath(`/campaigns/${campaignId}`);
     revalidatePath(`/campaigns/${campaignId}/consultation`);
     revalidatePath(`/campaigns/${campaignId}/assets`);
@@ -720,6 +747,9 @@ export async function saveWhatYouShouldKnowAboutMeAction(
       message: enqueued
         ? consultationConversationCopy.knowAboutMeSaved
         : consultationConversationCopy.knowAboutMeUnchanged,
+      ...(job && (job.status === "PENDING" || job.status === "IN_PROGRESS")
+        ? { jobId: job.id }
+        : {}),
     };
   } catch (error) {
     return fail(error, consultationConversationCopy.knowAboutMeFailed);
