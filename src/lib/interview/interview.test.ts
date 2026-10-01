@@ -407,7 +407,11 @@ describe.skipIf(!hasTestDatabase())("interview stages without guide", { timeout:
     });
     await prisma.applicationJob.update({
       where: { id: job.id },
-      data: { status: "IN_PROGRESS", startedAt: new Date() },
+      data: {
+        status: "IN_PROGRESS",
+        startedAt: new Date(),
+        workerHeartbeatAt: new Date(),
+      },
     });
     const { processApplicationJob } = await import(
       "@/lib/application-jobs/process"

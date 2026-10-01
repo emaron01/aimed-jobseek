@@ -155,7 +155,9 @@ describe("research worker CLI Node boundary", () => {
     expect(credits).not.toMatch(/["']@\/lib\/prisma["']/);
   });
 
-  it("plain tsx can load the Node-safe worker service without server-only errors", () => {
+  it(
+    "plain tsx can load the Node-safe worker service without server-only errors",
+    () => {
     const probe = `
 import { HEARTBEAT_STALE_MS, researchWorkerShutdown } from "./src/lib/research/runs-service.ts";
 console.log("WORKER_SERVICE_OK", HEARTBEAT_STALE_MS, researchWorkerShutdown.requested);
@@ -164,9 +166,15 @@ console.log("WORKER_SERVICE_OK", HEARTBEAT_STALE_MS, researchWorkerShutdown.requ
     expect(result.stderr).not.toMatch(/server-only/i);
     expect(result.stdout).toContain("WORKER_SERVICE_OK");
     expect(result.status).toBe(0);
-  });
+    },
+    // Spawns tsx outside Vitest. The child is allowed 45s; the 5s default
+    // expires while that compile is still running under a parallel suite.
+    60_000,
+  );
 
-  it("application job process graph loads under react-server without createContext crash", () => {
+  it(
+    "application job process graph loads under react-server without createContext crash",
+    () => {
     const probe = `
 import { processApplicationJob } from "./src/lib/application-jobs/process.ts";
 console.log("PROCESS_OK", typeof processApplicationJob);
@@ -176,14 +184,19 @@ console.log("PROCESS_OK", typeof processApplicationJob);
     expect(result.stderr).not.toMatch(/server-only/i);
     expect(result.stdout).toContain("PROCESS_OK function");
     expect(result.status).toBe(0);
-  });
+    },
+    // Spawns tsx outside Vitest. The child is allowed 45s; the 5s default
+    // expires while that compile is still running under a parallel suite.
+    60_000,
+  );
 
   it(
     "execution path (allowance + researchCompany) does not load server-only prisma",
     async () => {
       // Must spawn a real Node/tsx process and evaluate the worker graph —
       // Vitest's server-only stub would hide the failure. Prisma is pointed at
-      // a refused port so queries fail fast; 15s covers compile + three calls.
+      // a refused port so queries fail fast. The child is allowed 45s; 60s
+      // covers that compile under a parallel suite.
       const probe = `
 function withTimeout(promise, ms) {
   return new Promise((resolve, reject) => {
@@ -269,7 +282,7 @@ main().catch((error) => {
       expect(result.stdout).toContain("WORKER_EXEC_PATH_OK");
       expect(result.status).toBe(0);
     },
-    15_000,
+    60_000,
   );
 
   it("worker script source imports the service, not the server-only wrapper", () => {

@@ -34,17 +34,6 @@ describe.skipIf(!hasTestDatabase())("application job heartbeat recovery", { time
       },
     });
     campaignId = campaign.id;
-    const nullHeartbeat = await prisma.applicationJob.create({
-      data: {
-        organizationId,
-        campaignId,
-        type: "RESUME",
-        status: "IN_PROGRESS",
-        startedAt: new Date(),
-        workerHeartbeatAt: null,
-      },
-    });
-    nullHeartbeatJobId = nullHeartbeat.id;
     const fresh = await prisma.applicationJob.create({
       data: {
         organizationId,
@@ -68,6 +57,17 @@ describe.skipIf(!hasTestDatabase())("application job heartbeat recovery", { time
   });
 
   it("re-queues IN_PROGRESS jobs whose workerHeartbeatAt is null", async () => {
+    const nullHeartbeat = await prisma.applicationJob.create({
+      data: {
+        organizationId,
+        campaignId,
+        type: "RESUME",
+        status: "IN_PROGRESS",
+        startedAt: new Date(),
+        workerHeartbeatAt: null,
+      },
+    });
+    nullHeartbeatJobId = nullHeartbeat.id;
     const { abandonStaleApplicationJobs } = await import(
       "@/lib/application-jobs/service"
     );

@@ -270,11 +270,19 @@ describe.skipIf(!hasDatabase)(
       const { assertRateLimit, RateLimitError } = await import(
         "@/lib/auth/rate-limit"
       );
-      const key = `test-rl-${suffix}`;
-      await assertRateLimit({ key, limit: 2, windowMs: 60_000 });
-      await assertRateLimit({ key, limit: 2, windowMs: 60_000 });
+      const windowMs = 60_000;
+      const key = `test-rl-${crypto.randomUUID()}`;
+      // Buckets are fixed wall-clock windows. A call that crosses the
+      // boundary starts a new count, so the third call would not reject.
+      // Wait out a short remainder so these three calls share one window.
+      const remainingMs = windowMs - (Date.now() % windowMs);
+      if (remainingMs < 5_000) {
+        await new Promise((resolve) => setTimeout(resolve, remainingMs + 25));
+      }
+      await assertRateLimit({ key, limit: 2, windowMs });
+      await assertRateLimit({ key, limit: 2, windowMs });
       await expect(
-        assertRateLimit({ key, limit: 2, windowMs: 60_000 }),
+        assertRateLimit({ key, limit: 2, windowMs }),
       ).rejects.toBeInstanceOf(RateLimitError);
     });
 

@@ -420,7 +420,11 @@ describe.skipIf(!hasTestDatabase())(
       });
       await prisma.applicationJob.update({
         where: { id: job.id },
-        data: { status: "IN_PROGRESS", startedAt: new Date() },
+        data: {
+          status: "IN_PROGRESS",
+          startedAt: new Date(),
+          workerHeartbeatAt: new Date(),
+        },
       });
       const result = await processApplicationJob(job.id);
       expect(result.ok).toBe(true);

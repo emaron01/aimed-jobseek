@@ -271,6 +271,8 @@ describe.skipIf(!hasTestDatabase())("application job failure marking", { timeout
         campaignId: campaign.id,
         type: "CONTACT_PROFILE",
         status: "IN_PROGRESS",
+        startedAt: new Date(),
+        workerHeartbeatAt: new Date(),
         payload: {},
       },
     });

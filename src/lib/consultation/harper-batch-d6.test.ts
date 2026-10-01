@@ -7,6 +7,7 @@ const isConsultationAiConfigured = vi.hoisted(() => vi.fn(() => true));
 const isConsultationReplyAiConfigured = vi.hoisted(() => vi.fn(() => true));
 const runPaidStructuredCall = vi.hoisted(() => vi.fn());
 const findPaidCallReceipt = vi.hoisted(() => vi.fn());
+const findHarperLibraryMatch = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ai", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/ai")>();
@@ -30,6 +31,12 @@ vi.mock("@/lib/ai/paid-call-gate", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/consultation/harper-library", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/consultation/harper-library")>();
+  return { ...actual, findHarperLibraryMatch };
+});
+
 import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
 import { deriveCareerStage } from "@/lib/consultation/career-stage";
 import { careerWalkThroughAlreadyAsked } from "@/lib/consultation/question-detection";
@@ -40,6 +47,7 @@ import {
   ROLE_EXPERTISE_PROMPT_VERSION,
   countNonRoleExpertiseQuestions,
   generateRoleExpertiseWithModel,
+  roleExpertiseAnswersFingerprint,
   roleExpertiseFillRange,
   roleExpertiseJobFingerprint,
   validateRoleExpertiseQuestions,
@@ -265,6 +273,8 @@ describe("Harper Batch D6 — role-expertise + recentRoles", () => {
     generateReplyStructured.mockReset();
     runPaidStructuredCall.mockReset();
     findPaidCallReceipt.mockReset();
+    findHarperLibraryMatch.mockReset();
+    findHarperLibraryMatch.mockResolvedValue(null);
     isConsultationAiConfigured.mockReturnValue(true);
     isConsultationReplyAiConfigured.mockReturnValue(true);
     runPaidStructuredCall.mockImplementation(async (input: {
@@ -420,8 +430,8 @@ describe("Harper Batch D6 — role-expertise + recentRoles", () => {
     });
 
     const result = await generateRoleExpertiseWithModel({
-      organizationId: "org",
-      campaignId: "camp",
+      organizationId: `org-${crypto.randomUUID()}`,
+      campaignId: `camp-${crypto.randomUUID()}`,
       job: fixtures.nurse.job,
       minCount: 2,
       maxCount: 3,
@@ -566,39 +576,48 @@ describe("Harper Batch D6 — role-expertise + recentRoles", () => {
     const fpProfileIrrelevant = roleExpertiseJobFingerprint(fixtures.nurse.job);
     expect(fpProfileIrrelevant).toBe(fpA);
 
-    runPaidStructuredCall
-      .mockResolvedValueOnce({
-        data: {
-          questions: [
-            {
-              text: "How do you prioritize patients?",
-              interviewTypeTag: "focused_competency",
-            },
-          ],
-        },
-        skipped: true,
-      })
-      .mockResolvedValueOnce({
-        data: {
-          answers: [
-            {
-              text: "How do you prioritize patients?",
-              answerFramework: "CAR",
-              challenge: "I faced a staffing gap on the unit.",
-              situation: null,
-              task: null,
-              action: "I rebalanced assignments across the shift.",
-              result: "Coverage held and patients stayed safe through the night.",
-            },
-          ],
-        },
-        skipped: true,
-      });
+    const questionChoice = {
+      text: "How do you prioritize patients?",
+      interviewTypeTag: "focused_competency" as const,
+    };
+    const questionsFingerprint = roleExpertiseJobFingerprint(fixtures.nurse.job);
+    const answersFingerprint = roleExpertiseAnswersFingerprint(
+      [questionChoice],
+      [{ statementId: null, contentHash: null }],
+    );
+    expect(questionsFingerprint).not.toBe(answersFingerprint);
+    runPaidStructuredCall.mockImplementation(
+      async (input: { operation: string; inputFingerprint: string }) => {
+        if (input.operation === "ROLE_EXPERTISE_QUESTIONS") {
+          expect(input.inputFingerprint).toBe(questionsFingerprint);
+          return { data: { questions: [questionChoice] }, skipped: true };
+        }
+        expect(input.operation).toBe("ROLE_EXPERTISE_ANSWERS");
+        expect(input.inputFingerprint).toBe(answersFingerprint);
+        return {
+          data: {
+            answers: [
+              {
+                text: "How do you prioritize patients?",
+                answerFramework: "CAR",
+                challenge: "I faced a staffing gap on the unit.",
+                situation: null,
+                task: null,
+                action: "I rebalanced assignments across the shift.",
+                result:
+                  "Coverage held and patients stayed safe through the night.",
+              },
+            ],
+          },
+          skipped: true,
+        };
+      },
+    );
     generateStructured.mockClear();
     generateReplyStructured.mockClear();
     const skipped = await generateRoleExpertiseWithModel({
-      organizationId: "org",
-      campaignId: "camp",
+      organizationId: `org-${crypto.randomUUID()}`,
+      campaignId: `camp-${crypto.randomUUID()}`,
       job: fixtures.nurse.job,
       minCount: 1,
       maxCount: 2,

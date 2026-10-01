@@ -346,6 +346,7 @@ describe.skipIf(!hasDatabase)(
           type: "CONSULTATION",
           status: "IN_PROGRESS",
           startedAt: new Date(),
+          workerHeartbeatAt: new Date(),
         },
       });
       const contactList = await prisma.contactList.create({
@@ -734,6 +735,8 @@ describe.skipIf(!hasDatabase)(
           campaignId: campaign.id,
           type: "CONSULTATION",
           status: "IN_PROGRESS",
+          startedAt: new Date(),
+          workerHeartbeatAt: new Date(),
         },
       });
       const contactList = await prisma.contactList.create({

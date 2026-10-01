@@ -94,7 +94,9 @@ describe("platform provision CLI Node boundary", () => {
     }
   });
 
-  it("plain tsx can load the Node-safe service without server-only errors", () => {
+  it(
+    "plain tsx can load the Node-safe service without server-only errors",
+    () => {
     const probe = `
 import { PLATFORM_BOOTSTRAP_CONFIRM_VALUE, assertPlatformProvisionConfirmation, PlatformProvisionError } from "./src/lib/auth/platform-provision-service.ts";
 assertPlatformProvisionConfirmation(PLATFORM_BOOTSTRAP_CONFIRM_VALUE);
@@ -152,7 +154,12 @@ console.log("CLI_SERVICE_OK", PLATFORM_BOOTSTRAP_CONFIRM_VALUE);
     expect(result.stdout || "").toContain("CLI_SERVICE_OK");
     expect(result.stdout || "").toContain("PROVISION_INITIAL_SUPER_ADMIN");
     expect(result.status).toBe(0);
-  });
+    },
+    // Spawns a tsx process to compile and load the service outside Vitest.
+    // The child is already allowed 60s; the 5s Vitest default expires while
+    // that compile is still running under a parallel suite.
+    60_000,
+  );
 
   it("CLI script source imports the service, not the server-only wrapper", () => {
     const script = readFileSync(join(ROOT, CLI_ENTRY), "utf8");
