@@ -18,6 +18,7 @@ import {
   buildHarperQaLayout,
   collectRenderedHarperQuestionTurnIds,
   harperContentRenderCoverage,
+  generalQuestionsForCheatSheet,
   partitionGeneralQuestionsForStanding,
   type HarperInterviewerOrderItem,
 } from "@/lib/consultation/harper-layout";
@@ -538,6 +539,7 @@ export async function ConsultationSection({
     briefing?.success ||
     standingRequirementsForUi.length > 0 ||
     standingInline.dedicatedTopics.length > 0;
+  const harperGeneralQuestions = generalQuestionsForCheatSheet(standingInline);
   const standingComplete = standingWorkIsComplete({
     gaps: standingGaps,
     unansweredQuestions: unanswered,
@@ -775,6 +777,7 @@ export async function ConsultationSection({
                   sessionStatus={threadStatus}
                   jobsActive={consultationBusy}
                   additionalPrepQuestions={additionalPrepQuestions}
+                  generalQuestions={harperGeneralQuestions}
                 />
               </div>
             </HarperPersonViewShell>

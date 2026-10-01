@@ -1,5 +1,9 @@
 import type { AiMessage } from "@/lib/ai/types";
 import { APPLICATION_SUMMARY_PROMPT_VERSION } from "@/lib/application-summary/contract";
+import type {
+  CheatSheetGeneralQuestionInput,
+  CheatSheetInterviewerContext,
+} from "@/lib/application-summary/people";
 import type { CareerStage } from "@/lib/consultation/career-stage";
 import { APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content";
 import { consultationConfig } from "@/lib/product-config";
@@ -18,6 +22,8 @@ export function buildApplicationSummaryGuidanceMessages(input: {
   mode: "shell" | "person";
   careerStage?: CareerStage;
   qualityFeedback?: string[];
+  generalQuestions?: CheatSheetGeneralQuestionInput[];
+  interviewer?: CheatSheetInterviewerContext | null;
 }): AiMessage[] {
   return [
     {
@@ -41,6 +47,12 @@ ${APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS}`,
       role: "user",
       content: JSON.stringify({
         people: input.people,
+        ...(input.mode === "person"
+          ? {
+              generalQuestions: input.generalQuestions ?? [],
+              interviewer: input.interviewer ?? null,
+            }
+          : {}),
         qualityFeedback: input.qualityFeedback ?? [],
       }),
     },

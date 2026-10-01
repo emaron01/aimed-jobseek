@@ -58,12 +58,22 @@ export function sharedGeneralTurnIdsForLikelyQuestions(
     id?: string | null;
     prompt: string;
     interviewTypeTag?: InterviewTypeTag | null;
+    generalQuestionId?: string | null;
   }>,
   qaItems: readonly ConsultationQaItem[],
   generalQuestions: readonly ConsultationQaItem[],
 ): Set<string> {
   const ids = new Set<string>();
   for (const item of items) {
+    const referenceId = item.generalQuestionId?.trim() ?? "";
+    if (referenceId) {
+      const referenced = generalQuestions.find(
+        (question) =>
+          question.questionTurnId === referenceId || question.targetKey === referenceId,
+      );
+      if (referenced) ids.add(referenced.questionTurnId);
+      continue;
+    }
     const coachId = item.id?.trim() ?? "";
     const own = qaItems.find(
       (qa) => coachItemIdFromCheatSheetTarget(qa.targetKey) === coachId,

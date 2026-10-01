@@ -4,7 +4,7 @@ import {
   interviewTypeTagSchema,
 } from "@/lib/consultation/contract";
 
-export const APPLICATION_SUMMARY_PROMPT_VERSION = "15";
+export const APPLICATION_SUMMARY_PROMPT_VERSION = "16";
 
 export const CHEAT_SHEET_SECTION_KINDS = [
   "RECRUITER",
@@ -37,6 +37,8 @@ export const cheatSheetCoachItemGenerateSchema = z.object({
   task: z.string().nullable(),
   action: z.string().nullable(),
   result: z.string().nullable(),
+  /** Turn id or targetKey of a supplied General question. Null when this is a new question. */
+  generalQuestionId: z.string().nullable().optional(),
   supports: z.array(supportSchema).optional().default([]),
 });
 
@@ -56,6 +58,8 @@ export const cheatSheetCoachItemSchema = z.object({
   task: z.string().nullable().optional(),
   action: z.string().nullable().optional(),
   result: z.string().nullable().optional(),
+  /** Set when this row is one of Harper's General questions. Absent on older sections. */
+  generalQuestionId: z.string().nullable().optional(),
   supports: z.array(supportSchema).optional().default([]),
 });
 
@@ -167,16 +171,22 @@ export const cheatSheetPersonSectionGenerateSchema = z.object({
   caresAbout: z.array(caresAboutItemSchema).min(1).max(6),
   positioningStatements: z.array(guidanceItemSchema).min(1).max(6),
   keyStatements: z.array(guidanceItemSchema).min(1).max(6),
-  likelyQuestions: z.array(cheatSheetCoachItemGenerateSchema).min(1).max(6),
+  likelyQuestions: z.array(cheatSheetCoachItemGenerateSchema).min(4).max(12),
   questionsToAsk: z.array(questionToAskSchema).min(1).max(6),
 });
+
+/** Same section shape when the model returns fewer than 4 questions, so the one retry can keep them. */
+export const cheatSheetPersonSectionGenerateRecoverSchema =
+  cheatSheetPersonSectionGenerateSchema.extend({
+    likelyQuestions: z.array(cheatSheetCoachItemGenerateSchema).min(0).max(12),
+  });
 
 export const cheatSheetPersonSectionSchema = z.preprocess(
   coercePersonSection,
   cheatSheetPersonSectionGenerateSchema
     .omit({ likelyQuestions: true })
     .extend({
-      likelyQuestions: z.array(cheatSheetCoachItemSchema).min(1).max(6),
+      likelyQuestions: z.array(cheatSheetCoachItemSchema).min(1).max(12),
       bestMaterial: z.array(guidanceItemSchema).optional().default([]),
       storyIds: z.array(z.string()).optional().default([]),
       recruiter: z.unknown().nullable().optional(),

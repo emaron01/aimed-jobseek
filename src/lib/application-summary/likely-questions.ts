@@ -107,11 +107,47 @@ function scanLabels(...fields: Array<string | null | undefined>): string | null 
   return null;
 }
 
+export const LIKELY_QUESTION_MIN = 4;
+export const LIKELY_QUESTION_MAX = 12;
+
+/** A General question the person-section writer may reference by id or targetKey. */
+export type SuppliedGeneralQuestion = {
+  id: string;
+  text: string;
+  interviewTypeTag?: InterviewTypeTag | null;
+  targetKey?: string | null;
+};
+
+/**
+ * 4–12 is a save. Fewer than 4 retries once, then the shorter list is kept.
+ * More than 12 is never accepted.
+ */
+export function personLikelyQuestionCountDecision(
+  count: number,
+  attemptIndex: number,
+): "save" | "retry" | "accept-short" {
+  if (count > LIKELY_QUESTION_MAX) return "retry";
+  if (count >= LIKELY_QUESTION_MIN) return "save";
+  return attemptIndex < 1 ? "retry" : "accept-short";
+}
+
 /**
  * Quality issues for one likely-questions item (reuses D2 tag overrides + D3 checks).
+ * A reference to a General question does not need its own sample answer.
  */
 export function validateLikelyQuestionItem(item: CheatSheetCoachItem): string[] {
   const issues: string[] = [];
+  if (fieldText(item.generalQuestionId)) {
+    if (!item.interviewTypeTag) {
+      issues.push(
+        "Every likelyQuestions item requires interviewTypeTag (screening, chronological_walk_through, focused_competency, or reference_check_prep).",
+      );
+    }
+    if (!fieldText(item.prompt)) {
+      issues.push("A referenced General question is missing its text.");
+    }
+    return issues;
+  }
   if (!item.interviewTypeTag) {
     issues.push(
       "Every likelyQuestions item requires interviewTypeTag (screening, chronological_walk_through, focused_competency, or reference_check_prep).",
@@ -236,21 +272,96 @@ function normalizeOneLikelyQuestion(item: CheatSheetCoachItem): CheatSheetCoachI
   };
 }
 
+function suppliedGeneralQuestions(
+  questions: readonly SuppliedGeneralQuestion[],
+): Map<string, SuppliedGeneralQuestion> {
+  const byId = new Map<string, SuppliedGeneralQuestion>();
+  for (const question of questions) {
+    const id = question.id.trim();
+    if (id) byId.set(id, question);
+    const targetKey = question.targetKey?.trim() ?? "";
+    if (targetKey) byId.set(targetKey, question);
+  }
+  return byId;
+}
+
+function hasOwnQuestionContent(item: CheatSheetCoachItem): boolean {
+  if (!fieldText(item.prompt)) return false;
+  if (fieldText(item.harperQuestion)) return true;
+  if (item.answerFramework === "CAR" || item.answerFramework === "STAR") return true;
+  return fieldText(item.sampleAnswer).length > 0;
+}
+
+function isCareerWalkThroughItem(item: CheatSheetCoachItem): boolean {
+  return (
+    item.interviewTypeTag === "chronological_walk_through" ||
+    looksLikeCareerWalkThrough(item.prompt)
+  );
+}
+
 /**
- * Compose sample answers, apply D2 tag overrides, drop duplicate career
- * walk-through when Harper already asked chronology, and WHO-sort.
+ * Resolve General-question references, compose new questions, and drop a
+ * chronological walk-through (new or referenced) when Harper already asked it.
+ * Writer order is kept. The walk-through filter can leave fewer than 4 items;
+ * the caller then retries once and saves the shorter list.
+ */
+export function resolvePersonLikelyQuestions(input: {
+  likelyQuestions: CheatSheetCoachItem[];
+  harperAskedCareerWalkThrough: boolean;
+  generalQuestions?: readonly SuppliedGeneralQuestion[];
+}): { items: CheatSheetCoachItem[]; unusedReferenceIds: string[] } {
+  const supplied = suppliedGeneralQuestions(input.generalQuestions ?? []);
+  const unusedReferenceIds: string[] = [];
+  const items: CheatSheetCoachItem[] = [];
+  for (const raw of input.likelyQuestions) {
+    const referenceId = fieldText(raw.generalQuestionId);
+    if (referenceId) {
+      const match = supplied.get(referenceId);
+      if (!match || !fieldText(match.text)) {
+        unusedReferenceIds.push(referenceId);
+        if (hasOwnQuestionContent(raw)) {
+          items.push(
+            normalizeOneLikelyQuestion({ ...raw, generalQuestionId: null }),
+          );
+        }
+        continue;
+      }
+      items.push(
+        normalizeOneLikelyQuestion({
+          ...raw,
+          generalQuestionId: match.id,
+          prompt: match.text,
+          interviewTypeTag: (match.interviewTypeTag ??
+            raw.interviewTypeTag ??
+            "focused_competency") as InterviewTypeTag,
+          sampleAnswer: null,
+          harperQuestion: null,
+          answerFramework: null,
+          challenge: null,
+          situation: null,
+          task: null,
+          action: null,
+          result: null,
+        }),
+      );
+      continue;
+    }
+    items.push(normalizeOneLikelyQuestion({ ...raw, generalQuestionId: null }));
+  }
+  const filtered = input.harperAskedCareerWalkThrough
+    ? items.filter((item) => !isCareerWalkThroughItem(item))
+    : items;
+  return { items: filtered, unusedReferenceIds };
+}
+
+/**
+ * Compose sample answers, apply D2 tag overrides, and drop a duplicate career
+ * walk-through when Harper already asked chronology. Keeps writer order.
  */
 export function normalizePersonSectionLikelyQuestions(input: {
   likelyQuestions: CheatSheetCoachItem[];
   harperAskedCareerWalkThrough: boolean;
+  generalQuestions?: readonly SuppliedGeneralQuestion[];
 }): CheatSheetCoachItem[] {
-  let items = input.likelyQuestions.map(normalizeOneLikelyQuestion);
-  if (input.harperAskedCareerWalkThrough) {
-    items = items.filter(
-      (item) =>
-        item.interviewTypeTag !== "chronological_walk_through" &&
-        !looksLikeCareerWalkThrough(item.prompt),
-    );
-  }
-  return sortLikelyQuestionsByWhoTag(items);
+  return resolvePersonLikelyQuestions(input).items;
 }

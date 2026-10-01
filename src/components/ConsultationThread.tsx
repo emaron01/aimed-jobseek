@@ -380,7 +380,11 @@ function QuestionPrintView({ item }: { item: ConsultationQaItem }) {
       ? stripInternalIdsFromDisplayText(item.talkingPoint.content).trim()
       : "";
   return (
-    <div className="consultation-question-print" data-testid="consultation-print-question">
+    <div
+      className="consultation-question-print"
+      data-testid="consultation-print-question"
+      hidden
+    >
       <p className="text-sm text-ink">{stripInternalIdsFromDisplayText(item.question)}</p>
       {approvedAnswer ? <p className="mt-1 text-sm text-ink">{approvedAnswer}</p> : null}
     </div>

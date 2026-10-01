@@ -4,6 +4,22 @@ import {
   type CheatSheetSectionKind,
 } from "@/lib/application-summary/contract";
 import type { CareerStage } from "@/lib/consultation/career-stage";
+import type { InterviewTypeTag } from "@/lib/consultation/contract";
+
+export type CheatSheetGeneralQuestionInput = {
+  id: string;
+  text: string;
+  interviewTypeTag: InterviewTypeTag | null;
+  targetKey: string | null;
+};
+
+export type CheatSheetInterviewerContext = {
+  hiringTeamRole: string;
+  title: string;
+  persona: string;
+  responsibilities: string;
+  caresAbout: string[];
+};
 
 export type CheatSheetPersonInput = {
   sectionKey: string;
@@ -28,6 +44,8 @@ export function cheatSheetPersonSectionInputHash(input: {
   };
   sources: Array<{ id: string; text: string }>;
   careerStage: CareerStage;
+  generalQuestions?: CheatSheetGeneralQuestionInput[];
+  interviewer?: CheatSheetInterviewerContext | null;
 }): string {
   return createHash("sha256")
     .update(
@@ -39,6 +57,8 @@ export function cheatSheetPersonSectionInputHash(input: {
           id: source.id,
           text: source.text,
         })),
+        generalQuestions: input.generalQuestions ?? [],
+        interviewer: input.interviewer ?? null,
       }),
     )
     .digest("hex");

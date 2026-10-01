@@ -73,7 +73,7 @@ describe("Harper Batch D1 — role-agnostic prompts", () => {
       "10. Hiring and growth signals go in hiringSignals. Leave buyingSignals as an empty array (kept only for compatibility).",
     );
 
-    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("15");
+    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("16");
     expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain(
       "Role scope: write for this job's actual role and industry. Never introduce methods, tools, frameworks, or metrics that are not in the supplied sources.",
     );

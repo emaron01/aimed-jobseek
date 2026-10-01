@@ -264,6 +264,15 @@ export function CheatSheetPersonBody({
           jobsActive={jobsActive}
           showReply={showReply}
         />
+        <p className="likely-questions-note mt-4 text-sm text-ink" data-testid="likely-questions-note">
+          {"These are Harper's top picks. They represent the types of questions this interviewer may ask. Make sure you study "}
+          <a
+            href={`/campaigns/${campaignId}/summary#general-questions`}
+            className="font-medium text-ink underline"
+          >
+            General Questions
+          </a>{"."}
+        </p>
       </CheatSheetSubsection>
       {personQuestionCards}
       <CheatSheetSubsection

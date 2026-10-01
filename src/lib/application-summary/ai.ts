@@ -9,8 +9,13 @@ import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import { aiCallTracking } from "@/lib/usage/ai-call";
 import {
   applicationSummaryShellSchema,
+  cheatSheetPersonSectionGenerateRecoverSchema,
   cheatSheetPersonSectionGenerateSchema,
 } from "@/lib/application-summary/contract";
+import type {
+  CheatSheetGeneralQuestionInput,
+  CheatSheetInterviewerContext,
+} from "@/lib/application-summary/people";
 import { buildApplicationSummaryGuidanceMessages } from "@/lib/application-summary/prompt";
 import { runGatedApplicationSummaryShell } from "@/lib/application-summary/shell-gate";
 import type { CareerStage } from "@/lib/consultation/career-stage";
@@ -92,6 +97,8 @@ export async function generateCheatSheetPersonSectionGuidance(input: {
   careerStage: CareerStage;
   qualityFeedback?: string[];
   usage?: AiCallUsageContext;
+  generalQuestions?: CheatSheetGeneralQuestionInput[];
+  interviewer?: CheatSheetInterviewerContext | null;
 }): Promise<
   | { ok: true; data: ReturnType<typeof cheatSheetPersonSectionGenerateSchema.parse> }
   | { ok: false; message: string }
@@ -107,11 +114,23 @@ export async function generateCheatSheetPersonSectionGuidance(input: {
         mode: "person",
         careerStage: input.careerStage,
         qualityFeedback: input.qualityFeedback,
+        generalQuestions: input.generalQuestions,
+        interviewer: input.interviewer,
       }),
-      parseOutput: (raw) => ({
-        data: cheatSheetPersonSectionGenerateSchema.parse(raw),
-        coercedFields: [],
-      }),
+      parseOutput: (raw) => {
+        const strict = cheatSheetPersonSectionGenerateSchema.safeParse(raw);
+        if (strict.success) {
+          return { data: strict.data, coercedFields: [] };
+        }
+        const recovered = cheatSheetPersonSectionGenerateRecoverSchema.safeParse(raw);
+        if (recovered.success && recovered.data.likelyQuestions.length < 4) {
+          return { data: recovered.data, coercedFields: [] };
+        }
+        throw new Error(
+          strict.error.issues.map((issue) => issue.message).join("; ") ||
+            "Cheat sheet person section did not match the schema.",
+        );
+      },
     });
     return { ok: true, data: response.data };
   } catch (error) {

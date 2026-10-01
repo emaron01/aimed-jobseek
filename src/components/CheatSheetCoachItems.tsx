@@ -58,7 +58,19 @@ export function CheatSheetCoachItems({
         const coachId = item.id?.trim() ?? "";
         const qaItem = coachId ? qaByCoachId.get(coachId) : undefined;
         const anchorId = coachId ? harperCoachItemAnchorId(coachId) : undefined;
-        const shared = sharedGeneralForCoachItem(item, qaItem, generalQuestions);
+        const referenceId = item.generalQuestionId?.trim() ?? "";
+        const referenced = referenceId
+          ? generalQuestions.find(
+              (question) =>
+                question.questionTurnId === referenceId ||
+                question.targetKey === referenceId,
+            )
+          : undefined;
+        const shared = referenced
+          ? referenced
+          : referenceId
+            ? null
+            : sharedGeneralForCoachItem(item, qaItem, generalQuestions);
         const sampleStatement: QaStatement | null = answer
           ? {
               id: `sample:${coachId || item.prompt}`,
@@ -78,7 +90,14 @@ export function CheatSheetCoachItems({
             data-testid={`cheat-sheet-coach-${item.id ?? "item"}`}
           >
             {shared ? (
-              <div className="mt-3" data-testid="cheat-sheet-shared-general-question">
+              <div
+                className="mt-3"
+                data-testid={
+                  referenced
+                    ? "cheat-sheet-referenced-general-question"
+                    : "cheat-sheet-shared-general-question"
+                }
+              >
                 <QuestionList
                   campaignId={campaignId}
                   canEdit={canEdit}
@@ -94,7 +113,9 @@ export function CheatSheetCoachItems({
               </div>
             ) : qaItem ? (
               <div data-testid="cheat-sheet-coach-harper-qa">
-                <p className="text-sm font-medium text-ink">{item.prompt}</p>
+                <p className="consultation-question-screen text-sm font-medium text-ink">
+                  {item.prompt}
+                </p>
                 <div className="mt-3">
                   <QuestionList
                     campaignId={campaignId}

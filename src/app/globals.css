@@ -149,7 +149,15 @@ body {
 
 .cheat-sheet-print-banner,
 .consultation-question-print {
-  display: none;
+  display: none !important;
+}
+
+@media print {
+  .application-summary .likely-questions-note a {
+    color: inherit !important;
+    text-decoration: none !important;
+    font-weight: inherit !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
