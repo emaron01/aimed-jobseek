@@ -1,5 +1,10 @@
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
-import type { AiCallUsageContext } from "@/lib/ai/types";
+import type { AiCallUsageContext, AiMessage } from "@/lib/ai/types";
+import {
+  fingerprintPaidCallInputs,
+  runPaidStructuredCall,
+  type PaidCallOperation,
+} from "@/lib/ai/paid-call-gate";
 import {
   getConsultationAiProvider,
   getConsultationReplyAiProvider,
@@ -8,6 +13,7 @@ import {
 } from "@/lib/ai";
 import type { CareerStage } from "@/lib/consultation/career-stage";
 import {
+  CONSULTATION_PROMPT_VERSION,
   consultationPlanSchema,
   consultationExtractSchema,
   consultationPolishSchema,
@@ -40,6 +46,82 @@ const REPLY_UNCONFIGURED =
 
 function tracking(usage?: AiCallUsageContext) {
   return usage ? aiCallTracking(usage) : {};
+}
+
+export const CONSULTATION_EXTRACT_OPERATION =
+  "CONSULTATION_EXTRACT" satisfies PaidCallOperation;
+export const CONSULTATION_POLISH_OPERATION =
+  "CONSULTATION_POLISH" satisfies PaidCallOperation;
+export const CONSULTATION_STATEMENT_REGENERATE_OPERATION =
+  "CONSULTATION_STATEMENT_REGENERATE" satisfies PaidCallOperation;
+
+function replyModelIdentity(): { provider: string; model: string } {
+  return {
+    provider:
+      process.env.CONSULTATION_REPLY_AI_PROVIDER?.trim() || "consultation_reply",
+    model: process.env.CONSULTATION_REPLY_AI_MODEL?.trim() || "consultation_reply",
+  };
+}
+
+/** Model, prompt version, and the full message payload, including quality feedback. */
+export function consultationAnswerCallFingerprint(messages: AiMessage[]): string {
+  return fingerprintPaidCallInputs({
+    ...replyModelIdentity(),
+    promptVersion: CONSULTATION_PROMPT_VERSION,
+    messages,
+  });
+}
+
+/**
+ * Receipts are one row per operation and subject. The fingerprint is part of
+ * the key so a later quality attempt cannot replace an earlier attempt's result.
+ */
+export function consultationAnswerSubjectKey(input: {
+  campaignId: string;
+  questionKey: string;
+  inputFingerprint: string;
+}): string {
+  return `${input.campaignId}:${input.questionKey}:${input.inputFingerprint}`;
+}
+
+function polishPaidOperation(usage?: AiCallUsageContext): PaidCallOperation {
+  return usage?.metadata?.step === "statement_regeneration"
+    ? CONSULTATION_STATEMENT_REGENERATE_OPERATION
+    : CONSULTATION_POLISH_OPERATION;
+}
+
+async function runReplyPaidCall<T>(input: {
+  operation: PaidCallOperation;
+  usage?: AiCallUsageContext;
+  questionKey?: string | null;
+  targetKey?: string | null;
+  messages: AiMessage[];
+  parseStored: (json: unknown) => T;
+  isResultUsable: (stored: T) => boolean;
+  callProvider: () => Promise<T>;
+}): Promise<T> {
+  const organizationId = input.usage?.organizationId?.trim();
+  const campaignId = input.usage?.campaignId?.trim() ?? "";
+  const questionKey =
+    input.questionKey?.trim() || input.targetKey?.trim() || "";
+  if (!organizationId || !campaignId || !questionKey) {
+    return input.callProvider();
+  }
+  const inputFingerprint = consultationAnswerCallFingerprint(input.messages);
+  const gated = await runPaidStructuredCall({
+    organizationId,
+    operation: input.operation,
+    subjectKey: consultationAnswerSubjectKey({
+      campaignId,
+      questionKey,
+      inputFingerprint,
+    }),
+    inputFingerprint,
+    parseStored: input.parseStored,
+    isResultUsable: input.isResultUsable,
+    callProvider: input.callProvider,
+  });
+  return gated.data;
 }
 
 export async function planConsultationWithModel(input: {
@@ -127,6 +209,8 @@ export async function extractWithModel(input: {
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
   supportingEvidence?: string[];
   followUpAlreadyUsed?: boolean;
+  /** Question turn id, or the target key when the turn is not known. */
+  questionKey?: string | null;
   usage?: AiCallUsageContext;
 }): Promise<
   | { ok: true; data: ConsultationExtractResult }
@@ -135,17 +219,32 @@ export async function extractWithModel(input: {
   if (!isConsultationReplyAiConfigured()) {
     return { ok: false, message: REPLY_UNCONFIGURED };
   }
-  try {
+  const messages = buildConsultationExtractMessages(input);
+  const callProvider = async () => {
     const response = await getConsultationReplyAiProvider().generateStructured({
       ...structuredOutputRequest("consultationExtract"),
       ...tracking(input.usage),
-      messages: buildConsultationExtractMessages(input),
+      messages,
       parseOutput: (raw) => ({
         data: consultationExtractSchema.parse(raw),
         coercedFields: [],
       }),
     });
-    return { ok: true, data: response.data };
+    return response.data;
+  };
+  try {
+    const data = await runReplyPaidCall({
+      operation: CONSULTATION_EXTRACT_OPERATION,
+      usage: input.usage,
+      questionKey: input.questionKey,
+      targetKey: input.target?.key,
+      messages,
+      parseStored: (json) => consultationExtractSchema.parse(json),
+      isResultUsable: (stored) =>
+        stored.replyType === "answer" || stored.replyType === "feedback",
+      callProvider,
+    });
+    return { ok: true, data };
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
     console.error(
@@ -193,6 +292,8 @@ export async function polishAnswerWithModel(input: {
     endDate?: string | null;
     roleId?: string | null;
   }>;
+  /** Question turn id, or the target key when the turn is not known. */
+  questionKey?: string | null;
   usage?: AiCallUsageContext;
 }): Promise<
   | { ok: true; data: ConsultationPolishResult }
@@ -201,17 +302,31 @@ export async function polishAnswerWithModel(input: {
   if (!isConsultationReplyAiConfigured()) {
     return { ok: false, message: REPLY_UNCONFIGURED };
   }
-  try {
+  const messages = buildConsultationPolishMessages(input);
+  const callProvider = async () => {
     const response = await getConsultationReplyAiProvider().generateStructured({
       ...structuredOutputRequest("consultationPolish"),
       ...tracking(input.usage),
-      messages: buildConsultationPolishMessages(input),
+      messages,
       parseOutput: (raw) => ({
         data: consultationPolishSchema.parse(raw),
         coercedFields: [],
       }),
     });
-    return { ok: true, data: response.data };
+    return response.data;
+  };
+  try {
+    const data = await runReplyPaidCall({
+      operation: polishPaidOperation(input.usage),
+      usage: input.usage,
+      questionKey: input.questionKey,
+      targetKey: input.target?.key,
+      messages,
+      parseStored: (json) => consultationPolishSchema.parse(json),
+      isResultUsable: () => true,
+      callProvider,
+    });
+    return { ok: true, data };
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
     console.error(

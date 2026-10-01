@@ -571,6 +571,7 @@ async function extractAnswerWithQuality(input: {
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
   supportingEvidence?: string[];
   followUpAlreadyUsed?: boolean;
+  questionKey?: string | null;
   usage?: AiCallUsageContext;
 }) {
   let lastFailure: string = consultationConversationCopy.generationFailed;
@@ -687,6 +688,7 @@ export async function polishAnswerWithQuality(input: {
   target?: EvidenceTarget | null;
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
   supportingEvidence?: string[];
+  questionKey?: string | null;
   usage?: AiCallUsageContext;
 }): Promise<
   | {
@@ -776,6 +778,7 @@ export async function polishAnswerWithQuality(input: {
       voiceSamples,
       careerStage,
       profileItems: input.profileItems,
+      questionKey: input.questionKey,
       usage: withHarperUsageAttempt(input.usage, attempt),
     });
     if (!polished.ok) {
@@ -1881,6 +1884,10 @@ async function processAnswerGeneration(input: {
     }
   | { ok: false }
 > {
+  const questionKey =
+    input.replyToTurnId?.trim() ||
+    input.target?.key?.trim() ||
+    input.turnId;
   const extractUsage = consultationUsage(
     input.organizationId,
     input.campaignId,
@@ -1927,6 +1934,7 @@ async function processAnswerGeneration(input: {
     targetStrength,
     supportingEvidence,
     followUpAlreadyUsed,
+    questionKey,
     usage: extractUsage,
   });
   if (!extracted.ok) {
@@ -2071,6 +2079,7 @@ async function processAnswerGeneration(input: {
       target: input.target,
       targetStrength,
       supportingEvidence,
+      questionKey,
       usage: polishUsage,
     });
     if (!polished.ok) {
@@ -2284,6 +2293,7 @@ async function processAnswerGeneration(input: {
     target: input.target,
     targetStrength,
     supportingEvidence,
+    questionKey,
     usage: polishUsage,
   });
   if (!polished.ok) {
@@ -3654,6 +3664,8 @@ async function declineConsultationFollowUp(input: {
     strengtheningNeeds: analyzed.missingStarElements,
     profileItems: profileEvidenceItems(profile),
     libraryQuestion,
+    questionKey:
+      questionTurn?.id ?? input.question.targetKey ?? priorAnswer.id,
     usage: consultationUsage(
       input.organizationId,
       input.campaignId,
@@ -4045,6 +4057,7 @@ export async function regenerateConsultationStatement(input: {
     strengtheningNeeds: analyzed?.missingStarElements ?? [],
     profileItems: profileEvidenceItems(profile),
     libraryQuestion,
+    questionKey: statement.turn.targetKey ?? statement.turnId,
     usage: consultationUsage(
       input.organizationId,
       statement.session.campaignId,

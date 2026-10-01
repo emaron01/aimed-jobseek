@@ -121,8 +121,14 @@ describe("paid-call gate Phase 1 fingerprints and wiring", () => {
     expect(
       readFileSync("src/lib/application-assets/paid-inputs.ts", "utf8"),
     ).toContain("runPaidStructuredCall");
+    const consultationAi = readFileSync("src/lib/consultation/ai.ts", "utf8");
+    expect(consultationAi).toContain("runPaidStructuredCall");
+    const planFn = consultationAi.slice(
+      consultationAi.indexOf("export async function planConsultationWithModel"),
+      consultationAi.indexOf("export async function extractWithModel"),
+    );
+    expect(planFn).not.toContain("runPaidStructuredCall");
     for (const path of [
-      "src/lib/consultation/ai.ts",
       "src/lib/email-generation/service.ts",
       "src/lib/research/provider.ts",
     ]) {
