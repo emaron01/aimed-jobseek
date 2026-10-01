@@ -2,11 +2,13 @@
 
 import { AppButton } from "@/components/AppButton";
 import { useActionState, useId, useState } from "react";
+import Link from "next/link";
 import { deleteMyAccountAction } from "@/app/actions/account";
 import {
   DELETE_MY_ACCOUNT_BUTTON_LABEL,
   DELETE_MY_ACCOUNT_CONFIRM_BODY,
   DELETE_MY_ACCOUNT_CONFIRM_PHRASE,
+  DELETE_MY_ACCOUNT_FAILURE_MESSAGE,
   DELETE_MY_ACCOUNT_MENU_LABEL,
 } from "@/lib/account/delete-my-account";
 
@@ -14,6 +16,15 @@ import {
  * Self-serve account wipe (lifecycle B4). OWNER-only UI; server action re-checks.
  * Same confirmation copy/DELETE gate as originally shipped in the account menu.
  */
+export function AccountSettingsDeleteSection({
+  isOwner,
+}: {
+  isOwner: boolean;
+}) {
+  if (!isOwner) return null;
+  return <DeleteMyAccountPanel />;
+}
+
 export function DeleteMyAccountPanel() {
   const [open, setOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
@@ -111,7 +122,18 @@ export function DeleteMyAccountPanel() {
               role="alert"
               data-testid="delete-my-account-error"
             >
-              {state.message}
+              {state.message === DELETE_MY_ACCOUNT_FAILURE_MESSAGE ? (
+                <>
+                  We couldn&apos;t delete your account. Nothing was deleted.
+                  Please{" "}
+                  <Link href="/support" className="underline">
+                    contact support
+                  </Link>
+                  .
+                </>
+              ) : (
+                state.message
+              )}
             </p>
           ) : null}
         </div>

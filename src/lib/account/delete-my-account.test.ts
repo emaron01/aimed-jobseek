@@ -44,10 +44,9 @@ describe("account lifecycle B4 — account settings delete placement", () => {
       resolve("src/app/(app)/settings/account/page.tsx"),
       "utf8",
     );
-    expect(page).toContain("DeleteMyAccountPanel");
+    expect(page).toContain("AccountSettingsDeleteSection");
     expect(page).toContain('"OWNER"');
-    expect(page).toContain("isOwner");
-    expect(page).toContain("<DeleteMyAccountPanel />");
+    expect(page).toContain("isOwner={isOwner}");
 
     const panel = readFileSync(
       resolve("src/components/DeleteMyAccountPanel.tsx"),
@@ -67,6 +66,7 @@ describe("account lifecycle B4 — account settings delete placement", () => {
     const menu = readFileSync(resolve("src/components/UserMenu.tsx"), "utf8");
     expect(menu).not.toContain("deleteMyAccountAction");
     expect(menu).not.toContain("DeleteMyAccount");
+    expect(menu).toContain('action="/api/account/logout"');
 
     const copy = readFileSync(
       resolve("src/lib/account/delete-my-account.ts"),
@@ -113,17 +113,30 @@ describe("account lifecycle B4 — account settings delete placement", () => {
     expect(action).not.toMatch(/\brequireOrganization\s*\(/);
     expect(action).toContain("DELETE_MY_ACCOUNT_FAILURE_MESSAGE");
     expect(DELETE_MY_ACCOUNT_FAILURE_MESSAGE).toBe(
-      "We couldn't delete your account. Nothing was deleted. Contact support at /support if you need help.",
+      "We couldn't delete your account. Nothing was deleted. Please contact support.",
     );
   });
 
-  it("read-only layout gate does not blanket-block account-menu actions", () => {
+  it("restores the read-only layout block and exempts account settings and Log Out", () => {
     const gate = readFileSync(
       resolve("src/lib/billing/payment-lock-gate.ts"),
       "utf8",
     );
-    expect(gate).toContain("self-serve delete");
-    expect(gate).not.toContain("throw new OrganizationReadOnlyError");
+    expect(gate).toContain("throw new OrganizationReadOnlyError");
+    expect(gate).toContain("/api/account/logout");
+    expect(gate).toContain("/settings/account");
+    const route = readFileSync(
+      resolve("src/app/api/account/logout/route.ts"),
+      "utf8",
+    );
+    expect(route).toContain("logoutAction");
+    expect(route).not.toMatch(/\brequireOrganization\s*\(/);
+    expect(route).not.toContain("enforcePaymentLockGate");
+    const accountPage = readFileSync(
+      resolve("src/app/(app)/settings/account/page.tsx"),
+      "utf8",
+    );
+    expect(accountPage).toContain("logoutAction");
     const org = readFileSync(
       resolve("src/lib/tenant/getCurrentOrganization.ts"),
       "utf8",

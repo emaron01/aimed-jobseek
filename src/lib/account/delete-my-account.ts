@@ -22,10 +22,10 @@ export const ACCOUNT_DELETED_LOGIN_QUERY = "accountDeleted";
 
 /**
  * Shown when wipe refuses or fails. Nothing is deleted; seeker stays signed in.
- * Includes the existing Support path.
+ * The panel links the words "contact support" to /support.
  */
 export const DELETE_MY_ACCOUNT_FAILURE_MESSAGE =
-  "We couldn't delete your account. Nothing was deleted. Contact support at /support if you need help.";
+  "We couldn't delete your account. Nothing was deleted. Please contact support.";
 
 export const DELETE_MY_ACCOUNT_OWNER_ONLY_MESSAGE =
   "Only the workspace owner can delete this account.";

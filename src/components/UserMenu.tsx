@@ -4,7 +4,6 @@ import { AppButton } from "@/components/AppButton";
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { logoutAction } from "@/app/actions/account";
 import { switchActiveOrganizationAction } from "@/app/actions/workspace";
 import type { UserMenuModel } from "@/lib/auth/user-menu";
 
@@ -160,7 +159,7 @@ export function UserMenu({ model }: { model: UserMenuModel }) {
           </div>
 
           <div className="border-t border-edge p-1">
-            <form action={logoutAction}>
+            <form action="/api/account/logout" method="post">
               <AppButton
                 type="submit"
                 variant="secondary"

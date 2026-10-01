@@ -8,7 +8,7 @@ import { logoutAction } from "@/app/actions/account";
 import { updateUserDigestPreferencesAction } from "@/app/actions/cadence";
 import { ActionFeedbackForm } from "@/components/ActionFeedbackForm";
 import { ChangePasswordForm } from "@/components/ChangePasswordForm";
-import { DeleteMyAccountPanel } from "@/components/DeleteMyAccountPanel";
+import { AccountSettingsDeleteSection } from "@/components/DeleteMyAccountPanel";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
 import { getMembershipForCurrentUser } from "@/lib/org/authz";
 
@@ -140,7 +140,7 @@ export default async function AccountSettingsPage() {
         </AppButton>
       </form>
 
-      {isOwner ? <DeleteMyAccountPanel /> : null}
+      <AccountSettingsDeleteSection isOwner={isOwner} />
     </div>
   );
 }

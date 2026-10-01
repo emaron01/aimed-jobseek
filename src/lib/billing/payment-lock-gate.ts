@@ -1,14 +1,20 @@
 /**
  * Layout gate (account lifecycle B3 / B4):
  * - No billing-only route redirect — every page stays viewable.
- * - Product Server Action writes refused via requireOrganization →
- *   assertWritableOnServerAction (OrganizationReadOnlyError).
- * - Account-menu logout and self-serve delete must work from any page while
- *   read-only, so this gate does not blanket-refuse all Server Actions.
+ * - Server Actions on non-exempt pages throw OrganizationReadOnlyError while
+ *   read-only. requireOrganization → assertOrganizationWritable stays as the
+ *   second layer.
+ * - Exempt paths: billing, payment, credits, support, Account settings
+ *   (password change and Delete my account), and the terms page.
+ * - Log Out from the account menu posts to /api/account/logout. That route is
+ *   outside this layout, so this gate never runs for it. Log Out on Account
+ *   settings is logoutAction on /settings/account, which is path-exempt.
+ *   logoutAction does not call requireOrganization.
  */
 import "server-only";
 
 import { headers } from "next/headers";
+import { OrganizationReadOnlyError } from "@/lib/billing/account-read-only";
 import {
   NEXT_ACTION_HEADER,
   getOrganizationPaymentLockState,
@@ -24,14 +30,8 @@ function isPaymentLockRouteExempt(pathname: string): boolean {
 }
 
 /**
- * Read-only orgs: allow all GETs.
- *
- * Server Action write refusal lives in requireOrganization →
- * assertWritableOnServerAction (throws OrganizationReadOnlyError). The layout
- * does not blanket-refuse every Server Action: account-menu logout and
- * self-serve delete (B4) must work from any page while read-only, and billing
- * portal actions from banners must too. Exempt path prefixes still short-circuit
- * for billing / support / account pages.
+ * Read-only orgs: allow all GETs. Refuse Server Actions outside the exempt
+ * paths. Account-menu Log Out is /api/account/logout and never reaches here.
  */
 export async function enforcePaymentLockGate(): Promise<void> {
   const organization = await getCurrentOrganization();
@@ -48,5 +48,5 @@ export async function enforcePaymentLockGate(): Promise<void> {
   if (!h.get(NEXT_ACTION_HEADER)) return;
   if (pathname && isPaymentLockPathExempt(pathname)) return;
 
-  // Intentionally no throw: product writes are gated in requireOrganization.
+  throw new OrganizationReadOnlyError();
 }

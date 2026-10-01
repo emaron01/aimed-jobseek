@@ -218,11 +218,13 @@ describe("payment lock route gate", () => {
       "src/lib/billing/organization-spend.ts",
       "utf8",
     );
-    // B4: layout gate no longer blanket-throws so logout/delete work from any
-    // page while read-only. Write refusal remains on requireOrganization.
+    // B4 finish restores the layout throw. Account settings stays path-exempt.
+    // Account-menu Log Out posts to /api/account/logout, outside this layout.
+    // requireOrganization → assertOrganizationWritable remains the second layer.
     expect(gate).toContain("NEXT_ACTION_HEADER");
     expect(gate).toContain("requireOrganization");
-    expect(gate).not.toContain("throw new OrganizationReadOnlyError");
+    expect(gate).toContain("throw new OrganizationReadOnlyError");
+    expect(gate).toContain("/api/account/logout");
     expect(org).toContain("NEXT_ACTION_HEADER");
     expect(org).toContain("assertOrganizationWritable");
     expect(org).toContain("outside a request scope");
