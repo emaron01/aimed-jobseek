@@ -3,6 +3,7 @@
  * Deletes one organization and all personal leftovers; Stripe Customer stays.
  * Node-safe (no server-only) for workers and Server Actions.
  */
+import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma-client";
 import { purgeOrphanedTenantUsersAfterOrgDelete } from "@/lib/auth/purge-identity";
@@ -53,7 +54,9 @@ function isWipeLogValue(value: unknown): value is WipeLogValue {
 
 /**
  * Append an anonymous wipe record (date + reason only). No org/user/Stripe ids.
- * Writes PlatformSetting directly so no identifying AdminAuditEvent is created.
+ * One INSERT … ON CONFLICT appends to the stored JSON array so concurrent
+ * wipes cannot drop an entry. Writes PlatformSetting directly so no
+ * identifying AdminAuditEvent is created.
  */
 export async function recordAnonymousAccountWipe(input: {
   reason: AccountWipeReason;
@@ -65,24 +68,38 @@ export async function recordAnonymousAccountWipe(input: {
     at: (input.at ?? new Date()).toISOString(),
     reason: input.reason,
   };
-  const existing = await db.platformSetting.findUnique({
-    where: { key: ACCOUNT_WIPE_LOG_SETTING_KEY },
-    select: { value: true },
-  });
-  const prior = isWipeLogValue(existing?.value) ? existing.value.entries : [];
-  const next: WipeLogValue = { entries: [...prior, entry] };
-  await db.platformSetting.upsert({
-    where: { key: ACCOUNT_WIPE_LOG_SETTING_KEY },
-    create: {
-      key: ACCOUNT_WIPE_LOG_SETTING_KEY,
-      value: next as Prisma.InputJsonValue,
-      updatedByUserId: null,
-    },
-    update: {
-      value: next as Prisma.InputJsonValue,
-      updatedByUserId: null,
-    },
-  });
+  const entryJson = JSON.stringify(entry);
+  await db.$executeRaw`
+    INSERT INTO "PlatformSetting" ("id", "key", "value", "createdAt", "updatedAt", "updatedByUserId")
+    VALUES (
+      ${randomUUID()},
+      ${ACCOUNT_WIPE_LOG_SETTING_KEY},
+      jsonb_build_object('entries', jsonb_build_array(${entryJson}::jsonb)),
+      CURRENT_TIMESTAMP,
+      CURRENT_TIMESTAMP,
+      NULL
+    )
+    ON CONFLICT ("key") DO UPDATE
+    SET
+      "value" = jsonb_set(
+        CASE
+          WHEN jsonb_typeof("PlatformSetting"."value"->'entries') = 'array'
+            THEN "PlatformSetting"."value"
+          ELSE jsonb_build_object('entries', '[]'::jsonb)
+        END,
+        '{entries}',
+        (
+          CASE
+            WHEN jsonb_typeof("PlatformSetting"."value"->'entries') = 'array'
+              THEN "PlatformSetting"."value"->'entries'
+            ELSE '[]'::jsonb
+          END
+        ) || jsonb_build_array(${entryJson}::jsonb),
+        true
+      ),
+      "updatedAt" = CURRENT_TIMESTAMP,
+      "updatedByUserId" = NULL
+  `;
   return entry;
 }
 
@@ -200,6 +217,8 @@ async function deletePersonalLeftoversForWipe(
 export async function wipeOrganizationAccount(input: {
   organizationId: string;
   reason: AccountWipeReason;
+  /** Optional timestamp for the anonymous log entry. Defaults to now. */
+  at?: Date;
 }): Promise<WipeOrganizationAccountResult> {
   const organizationId = input.organizationId.trim();
   if (!organizationId) {
@@ -267,6 +286,7 @@ export async function wipeOrganizationAccount(input: {
       );
       await recordAnonymousAccountWipe({
         reason: input.reason,
+        at: input.at,
         client: tx,
       });
       return orphanPurge;

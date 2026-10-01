@@ -502,11 +502,16 @@ describe.skipIf(!hasDatabase)(
       } = await import("@/lib/account/wipe-organization");
 
       const seeded = await seedFullyUsedAccount(`${suffix}_full`);
-      const logBefore = await readAnonymousAccountWipeLog();
+      let stamp = 0;
+      for (let index = 0; index < seeded.orgId.length; index += 1) {
+        stamp = (stamp * 131 + seeded.orgId.charCodeAt(index)) % 1_000_000_000;
+      }
+      const wipedAt = new Date(Date.UTC(2099, 0, 1) + stamp);
 
       const result = await wipeOrganizationAccount({
         organizationId: seeded.orgId,
         reason: "admin",
+        at: wipedAt,
       });
       expect(result.alreadyWiped).toBe(false);
       expect(result.purgedUserIds).toContain(seeded.userId);
@@ -577,10 +582,13 @@ describe.skipIf(!hasDatabase)(
       ).toBe(0);
 
       const logAfter = await readAnonymousAccountWipeLog();
-      expect(logAfter.length).toBe(logBefore.length + 1);
-      const entry = logAfter[logAfter.length - 1]!;
+      const matches = logAfter.filter(
+        (entry) => entry.at === wipedAt.toISOString() && entry.reason === "admin",
+      );
+      expect(matches).toHaveLength(1);
+      const entry = matches[0]!;
       expect(entry.reason).toBe("admin");
-      expect(typeof entry.at).toBe("string");
+      expect(entry.at).toBe(wipedAt.toISOString());
       expect(Number.isNaN(Date.parse(entry.at))).toBe(false);
       expect(Object.keys(entry).sort()).toEqual(["at", "reason"]);
       expect(JSON.stringify(entry)).not.toContain(seeded.orgId);

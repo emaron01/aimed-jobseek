@@ -400,6 +400,26 @@ async function nextSequence(sessionId: string): Promise<number> {
   return (latest?.sequence ?? 0) + 1;
 }
 
+/** Exact consultant turn already committed for this plan text. A crash retry must not insert it again. */
+async function consultantTurnStored(input: {
+  sessionId: string;
+  body: string;
+  targetKey: string | null;
+  intent: string | null;
+}): Promise<boolean> {
+  const existing = await prisma.consultationTurn.findFirst({
+    where: {
+      sessionId: input.sessionId,
+      speaker: "CONSULTANT",
+      body: input.body,
+      targetKey: input.targetKey,
+      intent: input.intent,
+    },
+    select: { id: true },
+  });
+  return existing != null;
+}
+
 async function addTurn(input: {
   organizationId: string;
   sessionId: string;
@@ -1343,6 +1363,7 @@ async function planAndStoreRound(input: {
         attempt,
       ),
       chronologyRequested,
+      sessionId: input.sessionId,
       coveredTargetKeys: [
         ...new Set(
           [...input.askedKeys, ...input.skippedKeys].filter(
@@ -1452,6 +1473,16 @@ async function planAndStoreRound(input: {
   };
   await saveAssessments(input.organizationId, input.sessionId, voicedAssessments);
   for (const question of voicedQuestions) {
+    if (
+      await consultantTurnStored({
+        sessionId: input.sessionId,
+        body: question.text,
+        targetKey: question.targetKey,
+        intent: null,
+      })
+    ) {
+      continue;
+    }
     await addTurn({
       organizationId: input.organizationId,
       sessionId: input.sessionId,
@@ -1507,17 +1538,24 @@ async function planAndStoreRound(input: {
     where: { sessionId: input.sessionId, intent: "CLOSING" },
     select: { id: true },
   });
+  const closingBody = plan.data.closingNote?.trim() ?? "";
   if (
     voicedQuestions.length === 0 &&
     remainingGaps.length === 0 &&
     !alreadyClosed &&
-    plan.data.closingNote?.trim()
+    closingBody &&
+    !(await consultantTurnStored({
+      sessionId: input.sessionId,
+      body: closingBody,
+      targetKey: null,
+      intent: "CLOSING",
+    }))
   ) {
     await addTurn({
       organizationId: input.organizationId,
       sessionId: input.sessionId,
       speaker: "CONSULTANT",
-      body: plan.data.closingNote.trim(),
+      body: closingBody,
       targetKey: null,
       intent: "CLOSING",
     });

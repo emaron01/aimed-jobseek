@@ -127,7 +127,8 @@ describe("paid-call gate Phase 1 fingerprints and wiring", () => {
       consultationAi.indexOf("export async function planConsultationWithModel"),
       consultationAi.indexOf("export async function extractWithModel"),
     );
-    expect(planFn).not.toContain("runPaidStructuredCall");
+    expect(planFn).toContain("runPaidStructuredCall");
+    expect(planFn).toContain("CONSULTATION_PLAN");
     for (const path of [
       "src/lib/email-generation/service.ts",
       "src/lib/research/provider.ts",

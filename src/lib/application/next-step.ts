@@ -1,5 +1,10 @@
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
-import type { AiCallUsageContext } from "@/lib/ai/types";
+import type { AiCallUsageContext, AiMessage } from "@/lib/ai/types";
+import {
+  fingerprintPaidCallInputs,
+  runPaidStructuredCall,
+  type PaidCallOperation,
+} from "@/lib/ai/paid-call-gate";
 import {
   getConsultationReplyAiProvider,
   isConsultationReplyAiConfigured,
@@ -64,6 +69,55 @@ export function applicationNextStepState(input: {
   return { key: "assets_available", facts: { consultation: input.consultationStatus } };
 }
 
+export const APPLICATION_NEXT_STEP_OPERATION =
+  "APPLICATION_NEXT_STEP" satisfies PaidCallOperation;
+
+function nextStepModelIdentity(): { provider: string; model: string } {
+  return {
+    provider:
+      process.env.CONSULTATION_REPLY_AI_PROVIDER?.trim() || "consultation_reply",
+    model: process.env.CONSULTATION_REPLY_AI_MODEL?.trim() || "consultation_reply",
+  };
+}
+
+function nextStepMessages(state: NextStepState): AiMessage[] {
+  return [
+    {
+      role: "system",
+      content: `Prompt version: ${NEXT_STEP_PROMPT_VERSION}\n\n${APPLICATION_NEXT_STEP_INSTRUCTIONS}`,
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        consultantName: consultationConfig.displayName,
+      }),
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        state,
+        rejectedPrevious: null,
+      }),
+    },
+  ];
+}
+
+/** Model, prompt version, and the full next-step input. */
+export function applicationNextStepCallFingerprint(messages: AiMessage[]): string {
+  return fingerprintPaidCallInputs({
+    ...nextStepModelIdentity(),
+    promptVersion: NEXT_STEP_PROMPT_VERSION,
+    messages,
+  });
+}
+
+export function applicationNextStepSubjectKey(input: {
+  campaignId: string;
+  inputFingerprint: string;
+}): string {
+  return `${input.campaignId}:${input.inputFingerprint}`;
+}
+
 export async function writeApplicationNextStep(input: {
   state: NextStepState;
   usage?: AiCallUsageContext;
@@ -85,34 +139,41 @@ export async function writeApplicationNextStep(input: {
       attempt += 1
     ) {
       try {
-        const response = await getConsultationReplyAiProvider().generateStructured({
-          ...structuredOutputRequest("applicationNextStep"),
-          ...(input.usage ? aiCallTracking(input.usage) : {}),
-          messages: [
-            {
-              role: "system",
-              content: `Prompt version: ${NEXT_STEP_PROMPT_VERSION}\n\n${APPLICATION_NEXT_STEP_INSTRUCTIONS}`,
-            },
-            {
-              role: "user",
-              content: JSON.stringify({
-                consultantName: consultationConfig.displayName,
-              }),
-            },
-            {
-              role: "user",
-              content: JSON.stringify({
-                state: input.state,
-                rejectedPrevious: null,
-              }),
-            },
-          ],
-          parseOutput: (raw) => ({
-            data: applicationNextStepSchema.parse(raw),
-            coercedFields: [],
-          }),
-        });
-        return { ok: true, text: response.data.text };
+        const messages = nextStepMessages(input.state);
+        const callProvider = async () => {
+          const response = await getConsultationReplyAiProvider().generateStructured({
+            ...structuredOutputRequest("applicationNextStep"),
+            ...(input.usage ? aiCallTracking(input.usage) : {}),
+            messages,
+            parseOutput: (raw) => ({
+              data: applicationNextStepSchema.parse(raw),
+              coercedFields: [],
+            }),
+          });
+          return response.data;
+        };
+        const organizationId = input.usage?.organizationId?.trim();
+        const campaignId = input.usage?.campaignId?.trim();
+        const inputFingerprint = applicationNextStepCallFingerprint(messages);
+        const data =
+          organizationId && campaignId
+            ? (
+                await runPaidStructuredCall({
+                  organizationId,
+                  operation: APPLICATION_NEXT_STEP_OPERATION,
+                  subjectKey: applicationNextStepSubjectKey({
+                    campaignId,
+                    inputFingerprint,
+                  }),
+                  inputFingerprint,
+                  parseStored: (json) => applicationNextStepSchema.parse(json),
+                  isResultUsable: (stored) =>
+                    typeof stored.text === "string" && stored.text.trim().length > 0,
+                  callProvider,
+                })
+              ).data
+            : await callProvider();
+        return { ok: true, text: data.text };
       } catch (error) {
         lastFailure =
           error instanceof Error

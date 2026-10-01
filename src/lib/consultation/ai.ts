@@ -54,6 +54,45 @@ export const CONSULTATION_POLISH_OPERATION =
   "CONSULTATION_POLISH" satisfies PaidCallOperation;
 export const CONSULTATION_STATEMENT_REGENERATE_OPERATION =
   "CONSULTATION_STATEMENT_REGENERATE" satisfies PaidCallOperation;
+export const CONSULTATION_PLAN_OPERATION =
+  "CONSULTATION_PLAN" satisfies PaidCallOperation;
+
+function planModelIdentity(): { provider: string; model: string } {
+  return {
+    provider: process.env.CONSULTATION_AI_PROVIDER?.trim() || "consultation",
+    model: process.env.CONSULTATION_AI_MODEL?.trim() || "consultation",
+  };
+}
+
+/** Model, prompt version, and the full coach message payload, including quality feedback. */
+export function consultationPlanCallFingerprint(messages: AiMessage[]): string {
+  return fingerprintPaidCallInputs({
+    ...planModelIdentity(),
+    promptVersion: CONSULTATION_PROMPT_VERSION,
+    messages,
+  });
+}
+
+/**
+ * Receipts are one row per operation and subject. The fingerprint is part of
+ * the key so a later quality attempt cannot replace an earlier attempt's plan.
+ */
+export function consultationPlanSubjectKey(input: {
+  campaignId: string;
+  sessionId: string;
+  inputFingerprint: string;
+}): string {
+  return `${input.campaignId}:${input.sessionId}:${input.inputFingerprint}`;
+}
+
+function usableConsultationPlan(stored: ConsultationPlanResult): boolean {
+  return (
+    typeof stored.commentary === "string" &&
+    stored.briefing != null &&
+    typeof stored.briefing.overall === "string" &&
+    Array.isArray(stored.questions)
+  );
+}
 
 function replyModelIdentity(): { provider: string; model: string } {
   return {
@@ -149,6 +188,8 @@ export async function planConsultationWithModel(input: {
   focusTargetKey?: string | null;
   interviewerPrep?: InterviewerPrepPayload | null;
   qualityFeedback?: string[];
+  /** Session the plan belongs to. Required for the paid-call receipt. */
+  sessionId?: string | null;
   usage?: AiCallUsageContext;
 }): Promise<ConsultationPlanAiResult> {
   if (!isConsultationAiConfigured()) {
@@ -161,17 +202,41 @@ export async function planConsultationWithModel(input: {
     );
     return { ok: false, message: UNCONFIGURED };
   }
-  try {
+  const messages = buildConsultationCoachMessages(input);
+  const callProvider = async () => {
     const response = await getConsultationAiProvider().generateStructured({
       ...structuredOutputRequest("consultationPlan"),
       ...tracking(input.usage),
-      messages: buildConsultationCoachMessages(input),
+      messages,
       parseOutput: (raw) => ({
         data: consultationPlanSchema.parse(raw),
         coercedFields: [],
       }),
     });
-    return { ok: true, data: response.data };
+    return response.data;
+  };
+  try {
+    const organizationId = input.usage?.organizationId?.trim();
+    const campaignId = input.usage?.campaignId?.trim();
+    const sessionId = input.sessionId?.trim();
+    if (!organizationId || !campaignId || !sessionId) {
+      return { ok: true, data: await callProvider() };
+    }
+    const inputFingerprint = consultationPlanCallFingerprint(messages);
+    const gated = await runPaidStructuredCall({
+      organizationId,
+      operation: CONSULTATION_PLAN_OPERATION,
+      subjectKey: consultationPlanSubjectKey({
+        campaignId,
+        sessionId,
+        inputFingerprint,
+      }),
+      inputFingerprint,
+      parseStored: (json) => consultationPlanSchema.parse(json),
+      isResultUsable: usableConsultationPlan,
+      callProvider,
+    });
+    return { ok: true, data: gated.data };
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
     const cause =
