@@ -234,17 +234,17 @@ describe("ITEM 2–3: one Where you stand list", () => {
     );
   });
 
-  it("orders a–f: replies before results; Your reply collapsed; Interview answer / Resume bullet labeled", () => {
+  it("orders replies beneath the answer; Your reply collapsed; Interview answer / Resume bullet labeled", () => {
     const thread = src("src/components/ConsultationThread.tsx");
     const repliesIdx = thread.indexOf("consultation-seeker-answers");
     const interviewIdx = thread.indexOf('consultation-statement-${statement.kind}');
-    // Seeker replies section appears before statement render in QuestionCard source order.
+    // Show your replies sits with Edit, beneath the interview answer and resume bullet.
     const seekerBlock = thread.indexOf("<SeekerRepliesSection");
     const talkingBlock = thread.indexOf("item.talkingPoint ? <ResultBody");
     const resumeBlock = thread.indexOf("item.resumeBullet ? <ResultBody");
     expect(seekerBlock).toBeGreaterThan(0);
-    expect(talkingBlock).toBeGreaterThan(seekerBlock);
-    expect(resumeBlock).toBeGreaterThan(seekerBlock);
+    expect(seekerBlock).toBeGreaterThan(talkingBlock);
+    expect(seekerBlock).toBeGreaterThan(resumeBlock);
     expect(thread).toContain("showYourReplies");
     expect(thread).toContain("yourReply");
     expect(thread).toContain("consultationStatementLabels[statement.kind]");

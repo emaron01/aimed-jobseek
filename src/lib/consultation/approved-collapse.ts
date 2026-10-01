@@ -2,9 +2,9 @@ import { questionHasApprovedResult } from "@/lib/consultation/harper-three-secti
 import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
 import { consultationConversationCopy } from "@/lib/product-config/consultation";
 
-/** Larger than the previous text-xs ink chip, using the existing success tokens. */
+/** Body-size (text-sm) bold success pill. Compact padding, existing success tokens. */
 export const APPROVED_STATUS_BADGE_CLASS =
-  "inline-flex items-center rounded-md border border-success bg-success-tint px-2 py-1 text-base font-semibold normal-case tracking-normal text-success";
+  "inline-flex items-center rounded-md border border-success bg-success-tint px-1.5 py-0.5 text-sm font-bold normal-case tracking-normal text-success";
 
 export function approvedAnswersAreAllExpanded(
   approvedIds: readonly string[],

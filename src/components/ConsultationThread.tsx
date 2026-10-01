@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   APPROVED_STATUS_BADGE_CLASS,
   collapsedApprovedQuestionLabel,
@@ -124,7 +124,7 @@ export function ResultBody({ statement }: { statement: QaStatement }) {
       className="mt-3 min-w-0 space-y-1 overflow-hidden border-t border-edge pt-3"
       data-testid={`consultation-statement-${statement.kind}`}
     >
-      <p className="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-subtle">
+      <p className="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-ink">
         <span>{consultationStatementLabels[statement.kind]}</span>
         {statement.status === "APPROVED" ? (
           <span
@@ -202,39 +202,49 @@ function SeekerRepliesSection({
   campaignId,
   canEdit,
   answers,
+  open,
 }: {
   campaignId: string;
   canEdit: boolean;
   answers: Array<{ id: string; body: string }>;
+  open: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  if (answers.length === 0) return null;
+  if (!open || answers.length === 0) return null;
   return (
     <div className="space-y-2" data-testid="consultation-seeker-answers">
-      <a
-        href="#harper-toggle-replies"
-        className={textLinkClass}
-        data-testid="consultation-toggle-replies"
-        onClick={(event) => {
-          event.preventDefault();
-          setOpen((value) => !value);
-        }}
-      >
-        {open
-          ? consultationConversationCopy.hideYourReplies
-          : consultationConversationCopy.showYourReplies}
-      </a>
-      {open
-        ? answers.map((answer) => (
-            <SeekerAnswerEntry
-              key={answer.id}
-              campaignId={campaignId}
-              canEdit={canEdit}
-              answer={answer}
-            />
-          ))
-        : null}
+      {answers.map((answer) => (
+        <SeekerAnswerEntry
+          key={answer.id}
+          campaignId={campaignId}
+          canEdit={canEdit}
+          answer={answer}
+        />
+      ))}
     </div>
+  );
+}
+
+function RepliesToggle({
+  open,
+  onToggle,
+}: {
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <a
+      href="#harper-toggle-replies"
+      className={textLinkClass}
+      data-testid="consultation-toggle-replies"
+      onClick={(event) => {
+        event.preventDefault();
+        onToggle();
+      }}
+    >
+      {open
+        ? consultationConversationCopy.hideYourReplies
+        : consultationConversationCopy.showYourReplies}
+    </a>
   );
 }
 
@@ -245,6 +255,7 @@ function QuestionReplyForm({
   showSkip,
   showIgnore,
   onSubmitStart,
+  repliesToggle,
 }: {
   campaignId: string;
   item: ConsultationQaItem;
@@ -252,6 +263,7 @@ function QuestionReplyForm({
   showSkip: boolean;
   showIgnore: boolean;
   onSubmitStart: (answer: string) => void;
+  repliesToggle?: ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
   const hasPriorReply = item.seekerAnswers.length > 0;
@@ -275,6 +287,7 @@ function QuestionReplyForm({
         >
           {consultationConversationCopy.editAnswer}
         </a>
+        {repliesToggle}
       </div>
     );
   }
@@ -355,7 +368,21 @@ function QuestionReplyForm({
             <input type="hidden" name="targetKey" value={replyKey} />
           </ApplicationActionForm>
         ) : null}
+        {repliesToggle}
       </div>
+    </div>
+  );
+}
+
+function QuestionPrintView({ item }: { item: ConsultationQaItem }) {
+  const approvedAnswer =
+    item.talkingPoint?.status === "APPROVED"
+      ? stripInternalIdsFromDisplayText(item.talkingPoint.content).trim()
+      : "";
+  return (
+    <div className="consultation-question-print" data-testid="consultation-print-question">
+      <p className="text-sm text-ink">{stripInternalIdsFromDisplayText(item.question)}</p>
+      {approvedAnswer ? <p className="mt-1 text-sm text-ink">{approvedAnswer}</p> : null}
     </div>
   );
 }
@@ -428,6 +455,18 @@ function QuestionCard({
     item.question.trim();
   const oneLinePreview =
     oneLineLabel.length > 120 ? `${oneLineLabel.slice(0, 117)}…` : oneLineLabel;
+  const [repliesOpen, setRepliesOpen] = useState(false);
+  const hasApprovedInterview = item.talkingPoint?.status === "APPROVED";
+  const hasNewerDraft = Boolean(
+    item.pendingDraftTalkingPoint || item.pendingDraftResumeBullet,
+  );
+  const repliesToggle =
+    item.seekerAnswers.length > 0 ? (
+      <RepliesToggle
+        open={repliesOpen}
+        onToggle={() => setRepliesOpen((value) => !value)}
+      />
+    ) : null;
 
   if (!expanded && collapseWhenIgnored && item.ignored) {
     return (
@@ -438,6 +477,8 @@ function QuestionCard({
         data-harper-question={item.questionTurnId}
         data-harper-collapsed="ignored"
       >
+        <QuestionPrintView item={item} />
+        <div className="consultation-question-screen">
         <div className="flex flex-wrap items-center gap-2 text-sm text-ink">
           <span className="min-w-0 flex-1 break-words">{oneLinePreview}</span>
           <span className="rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink">
@@ -480,6 +521,7 @@ function QuestionCard({
             </ApplicationActionForm>
           ) : null}
         </div>
+        </div>
       </article>
     );
   }
@@ -493,6 +535,8 @@ function QuestionCard({
         data-harper-question={item.questionTurnId}
         data-harper-collapsed="approved"
       >
+        <QuestionPrintView item={item} />
+        <div className="consultation-question-screen">
         <div className="flex flex-wrap items-center gap-2 text-sm text-ink">
           <span className="min-w-0 flex-1 break-words">
             {collapsedApprovedQuestionLabel(stripInternalIdsFromDisplayText(item.question))}
@@ -515,6 +559,7 @@ function QuestionCard({
             {consultationConversationCopy.showApprovedAnswer}
           </a>
         </div>
+        </div>
       </article>
     );
   }
@@ -532,6 +577,8 @@ function QuestionCard({
       }
       data-harper-question={item.questionTurnId}
     >
+      <QuestionPrintView item={item} />
+      <div className="consultation-question-screen">
       {(collapseWhenApproved && approved) || (collapseWhenIgnored && item.ignored) ? (
         <div className="mb-2">
           <a
@@ -557,6 +604,7 @@ function QuestionCard({
       ) : null}
       <div className="mt-3 space-y-3">
         {item.followUp && !item.ignored ? (
+          hasApprovedInterview && !hasNewerDraft ? null : (
           <div className="space-y-2" data-testid="consultation-follow-up-block">
             <p className={`text-sm text-ink ${wrapClass}`} data-testid="consultation-follow-up">
               {stripInternalIdsFromDisplayText(item.followUp.text)}
@@ -568,13 +616,7 @@ function QuestionCard({
               {consultationConversationCopy.followUpReplyHint}
             </p>
           </div>
-        ) : null}
-        {!item.ignored && !showWorking ? (
-          <SeekerRepliesSection
-            campaignId={campaignId}
-            canEdit={canEdit && actionsEnabled}
-            answers={item.seekerAnswers}
-          />
+          )
         ) : null}
         {hasResult && !item.ignored ? (
           <>
@@ -635,8 +677,9 @@ function QuestionCard({
             showSkip={canSkip}
             showIgnore={canIgnore}
             onSubmitStart={onSubmitStart}
+            repliesToggle={repliesToggle}
           />
-        ) : canSkip || canIgnore ? (
+        ) : canSkip || canIgnore || repliesToggle ? (
           <div
             className={actionRowClass}
             data-testid="consultation-question-actions"
@@ -669,7 +712,16 @@ function QuestionCard({
                 <input type="hidden" name="targetKey" value={replyKey} />
               </ApplicationActionForm>
             ) : null}
+            {repliesToggle}
           </div>
+        ) : null}
+        {!item.ignored && !showWorking ? (
+          <SeekerRepliesSection
+            campaignId={campaignId}
+            canEdit={canEdit && actionsEnabled}
+            answers={item.seekerAnswers}
+            open={repliesOpen}
+          />
         ) : null}
         {item.ignored && canEdit ? (
           <ApplicationActionForm
@@ -714,6 +766,7 @@ function QuestionCard({
             </p>
           </div>
         ) : null}
+      </div>
       </div>
     </article>
   );

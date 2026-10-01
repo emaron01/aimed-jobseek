@@ -136,6 +136,20 @@ body {
   .application-summary details > * {
     display: block !important;
   }
+
+  .application-summary .cheat-sheet-print-banner,
+  .application-summary .consultation-question-print {
+    display: block !important;
+  }
+
+  .application-summary .consultation-question-screen {
+    display: none !important;
+  }
+}
+
+.cheat-sheet-print-banner,
+.consultation-question-print {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

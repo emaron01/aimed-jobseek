@@ -295,17 +295,13 @@ describe("Harper question-limit coach", () => {
     expect(polishCopy.regenerate).toBe("Regenerate");
     const card = thread.slice(thread.indexOf("function QuestionCard"));
     const resultIndex = card.indexOf("{hasResult && !item.ignored ? (");
-    const repliesMatch = card.match(
-      /\{!item\.ignored && !showWorking \? \(\r?\n\s*<SeekerRepliesSection/,
-    );
-    const repliesIndex = repliesMatch?.index ?? -1;
+    const repliesIndex = card.indexOf("repliesToggle={repliesToggle}");
     const followUpIndex = card.indexOf("consultation-follow-up");
     expect(resultIndex).toBeGreaterThan(-1);
-    // Standing structure (Item 2): Your reply before Interview answer / Resume bullet.
-    expect(repliesIndex).toBeGreaterThan(-1);
-    expect(resultIndex).toBeGreaterThan(repliesIndex);
+    // Show your replies is passed into the Edit row, beneath the answer.
+    expect(repliesIndex).toBeGreaterThan(resultIndex);
     expect(followUpIndex).toBeGreaterThan(-1);
-    expect(followUpIndex).toBeLessThan(repliesIndex);
+    expect(followUpIndex).toBeLessThan(resultIndex);
     expect(card).not.toMatch(
       /SeekerRepliesSection[\s\S]*consultation-follow-up/,
     );

@@ -131,6 +131,17 @@ function HeadingButton({
   );
 }
 
+export function CheatSheetPrintBanner() {
+  return (
+    <p
+      className="cheat-sheet-print-banner text-sm font-medium text-ink"
+      data-testid="cheat-sheet-print-banner"
+    >
+      Approved answers only.
+    </p>
+  );
+}
+
 export function CheatSheetSection({
   id,
   title,

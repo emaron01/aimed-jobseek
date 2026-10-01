@@ -7,7 +7,7 @@ import {
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
 import { AppActionLink } from "@/components/AppButton";
-import { CheatSheetSection } from "@/components/CheatSheetCollapsible";
+import { CheatSheetPrintBanner, CheatSheetSection } from "@/components/CheatSheetCollapsible";
 import { CheatSheetPersonBody } from "@/components/CheatSheetPersonBody";
 import { CheatSheetQuestionCards } from "@/components/CheatSheetQuestionCards";
 import { HarperDraftProvider } from "@/components/HarperDraftStore";
@@ -153,6 +153,7 @@ export default async function ApplicationSummaryPage({
       initialPersonKey={query.person ?? null}
     >
     <main className="application-summary mx-auto max-w-5xl space-y-6">
+      <CheatSheetPrintBanner />
       <style>{`
         @media print {
           body[data-print-section] .application-summary-section { display: none !important; }

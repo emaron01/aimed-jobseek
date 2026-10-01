@@ -70,6 +70,14 @@ function markup(node: ReactNode): string {
   return renderToStaticMarkup(createElement(HarperDraftProvider, null, node));
 }
 
+/** Screen copy only. Print-only question text is a second DOM copy hidden on screen. */
+function screenMarkup(html: string): string {
+  return html.replace(
+    /<div class="consultation-question-print"[\s\S]*?<\/div>/g,
+    "",
+  );
+}
+
 const sharedText = "Tell me how you run a weekly forecast inspection.";
 const generalShared = openQuestion("q-general", "required:forecast", sharedText, {
   interviewTypeTag: "focused_competency",
@@ -270,8 +278,9 @@ describe("Cheat Sheet batch 2b", () => {
         ),
       ),
     );
+    const screen = screenMarkup(html);
     for (const item of general) {
-      expect(html.match(new RegExp(item.question.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))?.length).toBe(1);
+      expect(screen.match(new RegExp(item.question.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))?.length).toBe(1);
     }
     expect(html).toContain('id="general-questions"');
     expect(html).toContain("General Questions");
@@ -377,7 +386,7 @@ describe("Cheat Sheet batch 2b", () => {
     );
     expect(html).toContain('data-testid="cheat-sheet-shared-general-question"');
     expect(html).toContain(`name="targetKey" value="${consultationReplyTargetKey(generalShared.questionTurnId)}"`);
-    expect(html.match(new RegExp(sharedText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))?.length).toBe(2);
+    expect(screenMarkup(html).match(new RegExp(sharedText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))?.length).toBe(2);
     expect(html).toContain(intentOnlyPerson);
     expect(html).not.toContain(intentOnlyGeneral.question);
     expect(html).toContain('data-testid="cheat-sheet-coach-harper-qa"');

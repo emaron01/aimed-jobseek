@@ -69,12 +69,16 @@ describe("UI batch 1 Harper approved status and collapse", () => {
   const thread = src("src/components/ConsultationThread.tsx");
   const standing = src("src/components/ConsultationStanding.tsx");
 
-  it("renders Approved as a larger success-green badge when collapsed and expanded", () => {
+  it("renders Approved as a compact success-green badge at body text size when collapsed and expanded", () => {
     expect(consultationStatementLabels.APPROVED).toBe("Approved");
-    expect(APPROVED_STATUS_BADGE_CLASS).toContain("text-base");
+    expect(APPROVED_STATUS_BADGE_CLASS).toContain("text-sm");
+    expect(APPROVED_STATUS_BADGE_CLASS).toContain("font-bold");
+    expect(APPROVED_STATUS_BADGE_CLASS).toContain("px-1.5");
+    expect(APPROVED_STATUS_BADGE_CLASS).toContain("py-0.5");
     expect(APPROVED_STATUS_BADGE_CLASS).toContain("text-success");
     expect(APPROVED_STATUS_BADGE_CLASS).toContain("bg-success-tint");
     expect(APPROVED_STATUS_BADGE_CLASS).toContain("border-success");
+    expect(APPROVED_STATUS_BADGE_CLASS).not.toContain("text-base");
     expect(APPROVED_STATUS_BADGE_CLASS).not.toContain("text-ink");
     expect(APPROVED_STATUS_BADGE_CLASS).not.toContain("text-xs");
     expect(thread).toContain("APPROVED_STATUS_BADGE_CLASS");
