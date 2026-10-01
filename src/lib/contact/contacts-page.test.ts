@@ -4,15 +4,16 @@ import { describe, expect, it } from "vitest";
 describe("contacts page filters", () => {
   it("filters by application and has no list filters", () => {
     const page = readFileSync("src/app/(app)/contacts/page.tsx", "utf8");
-    expect(page).toContain('name="campaignId"');
-    expect(page).toContain("All {vocab.campaign.plural}");
+    const directory = readFileSync("src/components/ContactsDirectory.tsx", "utf8");
+    expect(directory).toContain('name="campaignId"');
+    expect(directory).toContain("All {vocab.campaign.plural}");
     expect(page).toContain("listContacts({");
     expect(page).toContain("campaignId");
-    expect(page).toContain("workspaceContactEditHref");
-    expect(page).toContain("edit-contact-");
+    expect(directory).toContain("workspaceContactEditHref");
+    expect(directory).toContain("edit-contact-");
     expect(page).not.toContain("listContactLists");
     expect(page).not.toMatch(/\blistId\b/);
-    expect(page).not.toContain("Show unlisted");
-    expect(page).not.toContain("All {vocab.list.plural}");
+    expect(directory).not.toContain("Show unlisted");
+    expect(directory).not.toContain("All {vocab.list.plural}");
   });
 });

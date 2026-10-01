@@ -15,6 +15,7 @@ export type ContactCampaignSummaryLine = {
   campaignName: string;
   line: string;
   sentCount: number;
+  roleName: string | null;
 };
 
 export async function loadContactCampaignSummaries(
@@ -34,6 +35,7 @@ export async function loadContactCampaignSummaries(
     },
     select: {
       contactId: true,
+      chosenPersona: { select: { name: true } },
       campaign: {
         select: {
           id: true,
@@ -63,6 +65,7 @@ export async function loadContactCampaignSummaries(
       rows: Array<{
         contactId: string;
         sentCount: number;
+        roleName: string | null;
       }>;
     }
   >();
@@ -75,6 +78,7 @@ export async function loadContactCampaignSummaries(
     entry.rows.push({
       contactId: row.contactId,
       sentCount: row.emailDrafts.length,
+      roleName: row.chosenPersona?.name ?? null,
     });
     contactsByCampaign.set(row.campaign.id, entry);
   }
@@ -117,6 +121,7 @@ export async function loadContactCampaignSummaries(
         campaignName: campaign.name,
         line,
         sentCount: row.sentCount,
+        roleName: row.roleName,
       });
       summaries.set(row.contactId, existing);
     }

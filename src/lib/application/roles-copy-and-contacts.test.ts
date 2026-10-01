@@ -246,13 +246,16 @@ describe("Contacts page Add Contact", () => {
     expect(action).toContain("`/campaigns/${campaign}/outreach`");
     expect(action).toContain("`/campaigns/${campaign}/hiring-team`");
     expect(action).toContain("`/campaigns/${campaign}/interviews`");
-    const page = readFileSync(
+    const page = readFileSync("src/app/(app)/contacts/page.tsx", "utf8");
+    const directory = readFileSync("src/components/ContactsDirectory.tsx", "utf8");
+    const retired = readFileSync(
       "src/app/(app)/campaigns/[id]/contacts/page.tsx",
       "utf8",
     );
-    expect(page).toContain("ApplicationContactsPageHeader");
-    expect(page).toContain("listApplicationContacts");
-    expect(page).toContain("application-contact-");
+    expect(page).toContain("ContactsDirectory");
+    expect(directory).toContain("ApplicationContactsPageHeader");
+    expect(retired).toContain("redirect(workspaceApplicationContactsHref");
+    expect(retired).not.toContain("listApplicationContacts");
     const section = readFileSync(
       "src/components/ApplicationOutreachSections.tsx",
       "utf8",

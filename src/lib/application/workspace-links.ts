@@ -123,7 +123,11 @@ export function workspaceInterviewLikelyQuestionsHref(
 }
 
 export function workspaceApplicationContactsHref(campaignId: string): string {
-  return `${workspaceCampaignHref(campaignId)}/contacts`;
+  const id = campaignId.trim();
+  if (!id) {
+    throw new Error("Application contacts link is missing an application.");
+  }
+  return `/contacts?campaignId=${encodeURIComponent(id)}`;
 }
 
 export function workspaceContactEditHref(

@@ -3,10 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { updateApplicationContact } from "@/lib/application/contacts";
-import {
-  workspaceApplicationContactsHref,
-  workspaceContactEditHref,
-} from "@/lib/application/workspace-links";
+import { workspaceContactEditHref } from "@/lib/application/workspace-links";
 import { vocab, workspaceProgressText, unchangedContactProfileMessage } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
@@ -25,7 +22,7 @@ function revalidateContact(contactId: string, campaignId: string | null) {
     revalidatePath(`/campaigns/${campaignId}/hiring-team`);
     revalidatePath(`/campaigns/${campaignId}/interviews`);
     revalidatePath(`/campaigns/${campaignId}/summary`);
-    revalidatePath(workspaceApplicationContactsHref(campaignId));
+    revalidatePath(`/campaigns/${campaignId}/contacts`);
   }
 }
 

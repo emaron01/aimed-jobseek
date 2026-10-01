@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState, type RefObject } from "react";
+import { useActionState, useRef, useState, type ReactNode, type RefObject } from "react";
 import {
   addApplicationContactAction,
   buildOutreachPersonaThenGenerateAction,
@@ -230,18 +230,46 @@ function AddContactForm({
   campaignId,
   roles,
   action,
+  applications,
 }: {
   campaignId: string;
-  roles: Array<{ id: string; name: string }>;
+  roles: Array<{ id: string; name: string; campaignId?: string | null }>;
+  applications?: Array<{ id: string; name: string }>;
   action: (formData: FormData) => void;
 }) {
+  const applicationLocked = campaignId.trim().length > 0;
+  const [chosenCampaignId, setChosenCampaignId] = useState(campaignId);
+  const visibleRoles = roles.filter(
+    (role) => !role.campaignId || role.campaignId === chosenCampaignId,
+  );
   return (
     <form
       action={action}
       className="grid gap-3 md:grid-cols-2"
       data-testid="add-application-contact"
     >
-      <input type="hidden" name="campaignId" value={campaignId} />
+      {applicationLocked ? (
+        <input type="hidden" name="campaignId" value={campaignId} />
+      ) : (
+        <label className="text-sm md:col-span-2">
+          <span className="font-medium text-ink">{vocab.campaign.Singular}</span>
+          <select
+            name="campaignId"
+            required
+            value={chosenCampaignId}
+            data-testid="add-contact-application"
+            className={outreachFieldClass}
+            onChange={(event) => setChosenCampaignId(event.target.value)}
+          >
+            <option value="">{`Choose ${vocab.campaign.aSingular}`}</option>
+            {(applications ?? []).map((application) => (
+              <option key={application.id} value={application.id}>
+                {application.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="text-sm">
         <span className="font-medium text-ink">
           {outreachConfig.labels.fieldFirstName}
@@ -285,13 +313,19 @@ function AddContactForm({
         <span className="font-medium text-ink">
           {outreachConfig.labels.assignRole}
         </span>
-        <select name="personaId" required defaultValue="" className={outreachFieldClass}>
+        <select
+          key={chosenCampaignId || "none"}
+          name="personaId" required
+          defaultValue=""
+          disabled={!chosenCampaignId}
+          className={outreachFieldClass}
+        >
           <option value="" disabled>
-            {roles.length === 0
+            {visibleRoles.length === 0
               ? `No ${vocab.persona.plural} yet`
               : `Choose ${vocab.persona.aSingular}`}
           </option>
-          {roles.map((role) => (
+          {visibleRoles.map((role) => (
             <option key={role.id} value={role.id}>
               {role.name}
             </option>
@@ -310,13 +344,17 @@ export function ApplicationContactsPageHeader({
   title,
   description,
   backHref,
+  applications,
+  trailingActions,
 }: {
   campaignId: string;
-  roles: Array<{ id: string; name: string }>;
+  roles: Array<{ id: string; name: string; campaignId?: string | null }>;
   canEdit: boolean;
   title: string;
   description: string;
-  backHref: string;
+  backHref?: string | null;
+  applications?: Array<{ id: string; name: string }>;
+  trailingActions?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [state, action] = useActionState(addApplicationContactAction, initial);
@@ -337,12 +375,25 @@ export function ApplicationContactsPageHeader({
                 {outreachConfig.labels.addContact}
               </AppButton>
             ) : null}
-            <AppActionLink href={backHref}>Back to application</AppActionLink>
+            {backHref ? (
+              <AppActionLink
+                href={backHref}
+                data-testid="contacts-page-back-to-application"
+              >
+                Back to application
+              </AppActionLink>
+            ) : null}
+            {trailingActions}
           </>
         }
       />
       {canEdit && open ? (
-        <AddContactForm campaignId={campaignId} roles={roles} action={action} />
+        <AddContactForm
+          campaignId={campaignId}
+          roles={roles}
+          applications={applications}
+          action={action}
+        />
       ) : null}
       <Status result={state} />
     </>

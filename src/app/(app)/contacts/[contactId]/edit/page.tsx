@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AppActionLink } from "@/components/AppButton";
 import { ContactEditForm } from "@/components/ContactEditForm";
 import { PageHeader, TenantMissing } from "@/components/ui";
+import { workspaceApplicationContactsHref } from "@/lib/application/workspace-links";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { applicationPageTitle, outreachConfig } from "@/lib/product-config";
@@ -98,7 +99,7 @@ export default async function ContactEditPage({ params, searchParams }: PageProp
     : [];
 
   const returnTo = selected
-    ? `/campaigns/${selected.campaignId}/contacts`
+    ? workspaceApplicationContactsHref(selected.campaignId)
     : "/contacts";
   const name = contactDisplayName(contact.firstName, contact.lastName);
 

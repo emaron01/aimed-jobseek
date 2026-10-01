@@ -29,8 +29,11 @@ describe("contact edit entry points", () => {
     expect(form).toContain('name="personaId"');
     expect(editPage).toContain("selected.chosenPersonaId");
     expect(editPage).toContain("archivedAt: null");
-    expect(global).toContain("workspaceContactEditHref");
-    expect(application).toContain("workspaceContactEditHref");
+    expect(global).toContain("ContactsDirectory");
+    const directory = readFileSync("src/components/ContactsDirectory.tsx", "utf8");
+    expect(directory).toContain("workspaceContactEditHref");
+    expect(application).toContain("redirect(workspaceApplicationContactsHref");
+    expect(application).not.toContain("workspaceContactEditHref");
     expect(outreach).toContain("workspaceContactEditHref");
     expect(hiringTeam).toContain("workspaceContactEditHref");
     // Batch B1: Stage Edit removed; interviewer name links to Harper instead.
@@ -51,10 +54,10 @@ describe("contact edit entry points", () => {
       "src/components/ApplicationSidebarTracker.tsx",
       "utf8",
     );
-    expect(application).toContain("listApplicationContacts");
-    expect(application).toContain("data-testid=\"application-contacts-page\"");
+    expect(application).toContain("redirect(workspaceApplicationContactsHref");
+    expect(application).not.toContain("listApplicationContacts");
     expect(workspaceApplicationContactsHref("camp_1")).toBe(
-      "/campaigns/camp_1/contacts",
+      "/contacts?campaignId=camp_1",
     );
     expect(tracker).toContain("workspaceApplicationContactsHref");
     expect(tracker).toContain("tracker-application-contacts");

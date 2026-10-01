@@ -61,7 +61,10 @@ function matchPath(
 
 function workspaceHrefResolves(href: string): boolean {
   const hashIndex = href.indexOf("#");
-  const pathname = (hashIndex === -1 ? href : href.slice(0, hashIndex)) || "";
+  const withoutHash = hashIndex === -1 ? href : href.slice(0, hashIndex);
+  const queryIndex = withoutHash.indexOf("?");
+  const pathname =
+    (queryIndex === -1 ? withoutHash : withoutHash.slice(0, queryIndex)) || "";
   const hash = hashIndex === -1 ? "" : href.slice(hashIndex + 1);
   if (!pathname) {
     const known = new Set([

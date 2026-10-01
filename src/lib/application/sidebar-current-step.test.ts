@@ -4,9 +4,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 const pathnameRef = vi.hoisted(() => ({ value: "/campaigns/camp_1/consultation" }));
+const searchRef = vi.hoisted(() => ({ value: "" }));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => pathnameRef.value,
+  useSearchParams: () => new URLSearchParams(searchRef.value),
 }));
 
 import { ApplicationTrackerList } from "@/components/ApplicationSidebarTracker";
@@ -19,8 +21,9 @@ import { applicationStepFromPathname } from "@/lib/product-config/application-st
 const CURRENT_ROW =
   "border-l-2 border-l-primary bg-primary/10 text-primary";
 
-function trackerHtml(pathname: string): string {
+function trackerHtml(pathname: string, search = ""): string {
   pathnameRef.value = pathname;
+  searchRef.value = search;
   const currentStep = applicationStepFromPathname(pathname);
   const tracker = {
     campaignId: "camp_1",
@@ -99,11 +102,17 @@ describe("application sidebar current step", () => {
     expect(html).not.toContain("runPaidStructuredCall");
   });
 
-  it("highlights only Contacts on the Contacts page", () => {
-    const html = trackerHtml("/campaigns/camp_1/contacts");
+  it("highlights only Contacts when the Contacts page is filtered to this application", () => {
+    const html = trackerHtml("/contacts", "campaignId=camp_1");
     const contacts = rowTag(html, "tracker-application-contacts");
+    expect(contacts).toContain('href="/contacts?campaignId=camp_1"');
     expect(contacts).toContain('aria-current="page"');
     expect(contacts).toContain(CURRENT_ROW);
+    const surface =
+      html.match(
+        /<li\b[^>]*data-testid="tracker-application-contacts-surface"[^>]*>/,
+      )?.[0] ?? "";
+    expect(surface).toContain("bg-surface");
     const steps = html.match(/data-testid="tracker-step-/g) ?? [];
     expect(steps.length).toBeGreaterThan(0);
     for (const tag of html.match(/<a\b[^>]*>/g) ?? []) {

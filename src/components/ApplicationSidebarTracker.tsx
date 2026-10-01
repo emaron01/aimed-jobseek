@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   getApplicationTrackerAction,
 } from "@/app/actions/application-jobs";
@@ -104,7 +104,13 @@ export function ApplicationTrackerList({
 }) {
   const ink = variant === "sidebar";
   const pathname = usePathname() || "";
-  const contactsCurrent = pathname.includes("/contacts");
+  const searchParams = useSearchParams();
+  const filteredCampaignId =
+    searchParams.get("campaignId")?.trim() ||
+    searchParams.get("application")?.trim() ||
+    "";
+  const contactsCurrent =
+    pathname === "/contacts" && filteredCampaignId === tracker.campaignId;
   return (
     <ol
       className="space-y-1"
@@ -146,7 +152,10 @@ export function ApplicationTrackerList({
           </Link>
         </li>
       ))}
-      <li>
+      <li
+        className="rounded-md bg-surface"
+        data-testid="tracker-application-contacts-surface"
+      >
         <Link
           href={workspaceApplicationContactsHref(tracker.campaignId)}
           data-testid="tracker-application-contacts"
@@ -156,8 +165,8 @@ export function ApplicationTrackerList({
             contactsCurrent
               ? "border-l-2 border-l-primary bg-primary/10 text-primary"
               : ink
-                ? "bg-surface text-ink hover:bg-surface"
-                : "bg-surface text-ink hover:bg-canvas",
+                ? "text-ink hover:bg-canvas"
+                : "text-ink hover:bg-canvas",
           )}
         >
           <span className="min-w-0 flex-1">
@@ -354,7 +363,9 @@ export function ApplicationCompactTracker({
       ) : null}
       {open && tracker ? (
         <div className="mt-2">
-          <ApplicationTrackerList tracker={tracker} variant="overlay" />
+          <Suspense fallback={null}>
+            <ApplicationTrackerList tracker={tracker} variant="overlay" />
+          </Suspense>
         </div>
       ) : null}
     </div>
