@@ -20,47 +20,53 @@ import { BILLING_PLAN_STANDARD } from "@/lib/billing/plans";
 
 const hasDatabase = Boolean(process.env.DATABASE_URL?.trim());
 
-describe("account lifecycle B4 — menu and confirmation copy", () => {
-  it("menu shows Delete my account for OWNER in Support/Log Out section only", () => {
+describe("account lifecycle B4 — account settings delete placement", () => {
+  it("menu does not include Delete my account", () => {
     const owner = buildUserMenuModel({
       email: "owner@example.test",
       platformRole: "NONE",
       organizationName: "Mine",
       membershipRole: "OWNER",
     });
-    const ids = owner.links.map((l) => l.id);
-    expect(ids).toEqual([
+    expect(owner.links.map((l) => l.id)).toEqual([
       "account_settings",
       "organization_settings",
       "support",
-      "delete_my_account",
       "log_out",
     ]);
-    expect(
-      owner.links.find((l) => l.id === "delete_my_account")?.label,
-    ).toBe(DELETE_MY_ACCOUNT_MENU_LABEL);
-
-    const member = buildUserMenuModel({
-      email: "member@example.test",
-      platformRole: "NONE",
-      organizationName: "Mine",
-      membershipRole: "MEMBER",
-    });
-    expect(member.links.some((l) => l.id === "delete_my_account")).toBe(false);
+    expect(owner.links.some((l) => l.label === DELETE_MY_ACCOUNT_MENU_LABEL)).toBe(
+      false,
+    );
   });
 
-  it("UserMenu confirmation uses exact body, DELETE gate, and cancel", () => {
+  it("Account settings hosts OWNER-only delete panel with exact confirmation", () => {
+    const page = readFileSync(
+      resolve("src/app/(app)/settings/account/page.tsx"),
+      "utf8",
+    );
+    expect(page).toContain("DeleteMyAccountPanel");
+    expect(page).toContain('"OWNER"');
+    expect(page).toContain("isOwner");
+    expect(page).toContain("<DeleteMyAccountPanel />");
+
+    const panel = readFileSync(
+      resolve("src/components/DeleteMyAccountPanel.tsx"),
+      "utf8",
+    );
+    expect(panel).toContain("DELETE_MY_ACCOUNT_CONFIRM_BODY");
+    expect(panel).toContain("DELETE_MY_ACCOUNT_CONFIRM_PHRASE");
+    expect(panel).toContain("DELETE_MY_ACCOUNT_BUTTON_LABEL");
+    expect(panel).toContain("deleteMyAccountAction");
+    expect(panel).toContain('data-testid="delete-my-account-confirm"');
+    expect(panel).toContain('data-testid="delete-my-account-confirm-input"');
+    expect(panel).toContain('data-testid="delete-my-account-submit"');
+    expect(panel).toContain('data-testid="delete-my-account-cancel"');
+    expect(panel).toContain("disabled={!matches || pending}");
+    expect(panel).toContain('setOpen(false)');
+
     const menu = readFileSync(resolve("src/components/UserMenu.tsx"), "utf8");
-    expect(menu).toContain("DELETE_MY_ACCOUNT_CONFIRM_BODY");
-    expect(menu).toContain("DELETE_MY_ACCOUNT_CONFIRM_PHRASE");
-    expect(menu).toContain("DELETE_MY_ACCOUNT_BUTTON_LABEL");
-    expect(menu).toContain("deleteMyAccountAction");
-    expect(menu).toContain('data-testid="delete-my-account-confirm"');
-    expect(menu).toContain('data-testid="delete-my-account-confirm-input"');
-    expect(menu).toContain('data-testid="delete-my-account-submit"');
-    expect(menu).toContain('data-testid="delete-my-account-cancel"');
-    expect(menu).toContain("disabled={!matches || pending}");
-    expect(menu).toContain('setOpen(false)');
+    expect(menu).not.toContain("deleteMyAccountAction");
+    expect(menu).not.toContain("DeleteMyAccount");
 
     const copy = readFileSync(
       resolve("src/lib/account/delete-my-account.ts"),

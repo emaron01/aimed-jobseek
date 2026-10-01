@@ -58,7 +58,6 @@ describe("buildUserMenuModel", () => {
     expect(model.links.some((l) => l.id === "organization_settings")).toBe(
       false,
     );
-    expect(model.links.some((l) => l.id === "delete_my_account")).toBe(false);
   });
 
   it("SUPPORT sees Platform Support link to /platform", () => {
@@ -98,28 +97,25 @@ describe("buildUserMenuModel", () => {
     expect(model.links.some((l) => l.id === "platform_admin")).toBe(false);
     expect(model.links.some((l) => l.id === "log_out")).toBe(true);
     expect(model.links.some((l) => l.id === "support")).toBe(true);
-    expect(model.links.some((l) => l.id === "delete_my_account")).toBe(true);
     expect(model.workspaces).toEqual([]);
   });
 
-  it("OWNER sees Delete my account between Support and Log Out; MEMBER does not", () => {
+  it("does not put Delete my account in the account menu", () => {
     const owner = buildUserMenuModel({
       email: "owner@acme.test",
       platformRole: "NONE",
       organizationName: "Acme",
       membershipRole: "OWNER",
     });
-    const ownerIds = owner.links.map((l) => l.id);
-    expect(ownerIds).toContain("delete_my_account");
-    expect(ownerIds.indexOf("support")).toBeLessThan(
-      ownerIds.indexOf("delete_my_account"),
+    expect(owner.links.map((l) => l.id)).toEqual([
+      "account_settings",
+      "organization_settings",
+      "support",
+      "log_out",
+    ]);
+    expect(owner.links.some((l) => l.label === "Delete my account")).toBe(
+      false,
     );
-    expect(ownerIds.indexOf("delete_my_account")).toBeLessThan(
-      ownerIds.indexOf("log_out"),
-    );
-    expect(
-      owner.links.find((l) => l.id === "delete_my_account")?.label,
-    ).toBe("Delete my account");
 
     for (const role of ["MEMBER", "ADMIN", "VIEWER"] as const) {
       const other = buildUserMenuModel({
@@ -128,33 +124,18 @@ describe("buildUserMenuModel", () => {
         organizationName: "Acme",
         membershipRole: role,
       });
-      expect(other.links.some((l) => l.id === "delete_my_account")).toBe(
+      expect(other.links.some((l) => l.label === "Delete my account")).toBe(
         false,
       );
     }
   });
 
-  it("keeps Delete my account for OWNER when payment locked (read-only)", () => {
+  it("keeps Support available when payment locked", () => {
     const model = buildUserMenuModel({
       email: "locked@acme.test",
       platformRole: "NONE",
       organizationName: "Acme",
       membershipRole: "OWNER",
-      paymentLocked: true,
-    });
-    expect(model.links.map((link) => link.id)).toEqual([
-      "support",
-      "delete_my_account",
-      "log_out",
-    ]);
-  });
-
-  it("keeps Support available when payment locked", () => {
-    const model = buildUserMenuModel({
-      email: "locked-member@acme.test",
-      platformRole: "NONE",
-      organizationName: "Acme",
-      membershipRole: "MEMBER",
       paymentLocked: true,
     });
     expect(model.links.map((link) => link.id)).toEqual(["support", "log_out"]);
