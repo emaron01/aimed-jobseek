@@ -25,26 +25,28 @@ export function AskHarperBox({
 
   return (
     <div className="space-y-3" data-testid="ask-harper">
-      <p className="text-sm text-ink" data-testid="ask-harper-line">
-        {consultationConversationCopy.askHarperLine}
-      </p>
-      {canEdit ? (
-        <AppButton
-          type="button"
-          variant="warning"
-          data-testid="ask-harper-open"
-          onClick={() => setOpen(true)}
-        >
-          {consultationConversationCopy.askHarperAction}
-        </AppButton>
-      ) : null}
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-xl font-bold text-ink" data-testid="ask-harper-line">
+          {consultationConversationCopy.askHarperLine}
+        </p>
+        {canEdit ? (
+          <AppButton
+            type="button"
+            variant="orange"
+            data-testid="ask-harper-open"
+            onClick={() => setOpen(true)}
+          >
+            {consultationConversationCopy.askHarperAction}
+          </AppButton>
+        ) : null}
+      </div>
       {open && canEdit ? (
         <ApplicationActionForm
           action={askHarperAction}
           submitLabel={consultationConversationCopy.askHarperAction}
           pendingLabel={consultationConversationCopy.thinking}
           testId="ask-harper-form"
-          variant="warning"
+          variant="orange"
         >
           <input type="hidden" name="campaignId" value={campaignId} />
           <label className="block text-sm">

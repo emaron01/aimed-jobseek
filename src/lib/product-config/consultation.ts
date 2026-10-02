@@ -107,7 +107,7 @@ export const consultationConversationCopy = Object.freeze({
   reopenIgnored: "Ignored",
   coachingDisclaimer:
     "Harper's coaching and suggestions to help you prepare and strengthen your interview skills.",
-  askHarperLine: "Have an interview question you're stumped on? Ask Harper!",
+  askHarperLine: "Have an interview question you're stumped on?",
   askHarperAction: "Ask Harper",
   askHarperNeedsQuestion: "Enter the question you want Harper to answer.",
   askHarperDrafted: "Harper drafted an answer.",

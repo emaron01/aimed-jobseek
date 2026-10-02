@@ -141,9 +141,15 @@ async function paint(root: Root, node: ReactNode) {
 function bannerAbove(host: HTMLElement, header: Element | null) {
   const line = host.querySelector("[data-testid=ask-harper-line]");
   const button = host.querySelector("[data-testid=ask-harper-open]");
-  expect(line?.textContent).toBe(consultationConversationCopy.askHarperLine);
+  expect(line?.textContent).toBe("Have an interview question you're stumped on?");
+  expect(line?.className).toContain("font-bold");
+  expect(line?.className).toContain("text-xl");
   expect(button?.textContent).toBe(consultationConversationCopy.askHarperAction);
-  expect(button?.className).toContain("bg-warning");
+  expect(button?.className).toContain("bg-bright-orange");
+  expect(button?.className).toContain("text-black");
+  expect(
+    line!.compareDocumentPosition(button!) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
   expect(header).toBeTruthy();
   expect(
     line!.compareDocumentPosition(header!) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -322,6 +328,10 @@ describe("Ask Harper, sidebar order, and learned notes", () => {
     expect(field).toBeTruthy();
     const form = host.querySelector<HTMLFormElement>("[data-testid=ask-harper-form]");
     expect(form).toBeTruthy();
+    const submit = form!.querySelector("button[type=submit]");
+    expect(submit?.textContent).toBe(consultationConversationCopy.askHarperAction);
+    expect(submit?.className).toContain("bg-bright-orange");
+    expect(submit?.className).toContain("text-black");
     field!.value = QUESTION;
     const pending = act(async () => {
       form!.requestSubmit();

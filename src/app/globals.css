@@ -16,6 +16,7 @@
   --color-danger-tint: #fee2e2;
   --color-warning: #92400e;
   --color-warning-tint: #fef3c7;
+  --color-bright-orange: #ff6a00;
   --color-active: #0f766e;
   --color-active-tint: #ccfbf1;
   --color-canvas: #f8fafc;
@@ -49,6 +50,7 @@
   --color-danger-tint: var(--color-danger-tint);
   --color-warning: var(--color-warning);
   --color-warning-tint: var(--color-warning-tint);
+  --color-bright-orange: var(--color-bright-orange);
   --color-active: var(--color-active);
   --color-active-tint: var(--color-active-tint);
   --color-canvas: var(--color-canvas);
