@@ -24,7 +24,9 @@ import {
   CheatSheetPrintButton,
   CheatSheetSharedSection,
 } from "@/components/CheatSheetPeopleFilter";
+import { AskHarperBox } from "@/components/AskHarperBox";
 import { PageHeader, TenantMissing } from "@/components/ui";
+import { loadAskHarperDrafts } from "@/lib/consultation/ask-harper";
 import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-status";
 import { loadCheatSheetCoachQaByContact } from "@/lib/application-summary/coach-qa";
 import { statedListItems } from "@/lib/application-summary/display";
@@ -161,6 +163,10 @@ export default async function ApplicationSummaryPage({
         personNameByContactId.get(row.contactId) ?? interviewConfig.labels.interviewer,
     ),
   }));
+  const askHarperDrafts = await loadAskHarperDrafts({
+    organizationId: organization.id,
+    campaignId: id,
+  });
   const applicationInterviewNotes = compileApplicationInterviewNotes({
     people: [...view.notesByContactId.entries()].map(([contactId, notes]) => ({
       contactId,
@@ -183,6 +189,11 @@ export default async function ApplicationSummaryPage({
           body[data-print-section] .application-summary-section[data-print-active="true"] { display: block !important; }
         }
       `}</style>
+      <AskHarperBox
+        campaignId={id}
+        canEdit={canGenerate}
+        drafts={askHarperDrafts}
+      />
       <PageHeader
         title={applicationSummaryConfig.title}
         description={`${view.campaign.name} · ${applicationSummaryConfig.description}`}

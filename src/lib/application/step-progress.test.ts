@@ -61,8 +61,8 @@ describe("application step routes", () => {
     );
     expect(applicationStepList.map((step) => step.key)).toEqual([
       "applied",
-      "company",
       "job",
+      "company",
       "consultation",
       "assets",
       "hiring-team",

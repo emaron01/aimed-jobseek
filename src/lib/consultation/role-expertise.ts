@@ -25,6 +25,7 @@ import {
   type HarperLibraryMatch,
 } from "@/lib/consultation/harper-library";
 import {
+  ASK_HARPER_TARGET_PREFIX,
   PERSON_PREP_TARGET_PREFIX,
   ROLE_EXPERTISE_TARGET_PREFIX,
   interviewTypeTagSchema,
@@ -133,6 +134,7 @@ export function isCountedCoachingQuestion(
   if (question.followUp) return false;
   const key = question.targetKey ?? "";
   if (key.startsWith(PERSON_PREP_TARGET_PREFIX)) return false;
+  if (key.startsWith(ASK_HARPER_TARGET_PREFIX)) return false;
   return true;
 }
 
@@ -242,6 +244,23 @@ export function roleExpertiseAnswersFingerprint(
       },
     })),
   });
+}
+
+/** Ask Harper stores one General question. The tag is required by the answers schema and is not shown. */
+export const ASK_HARPER_INTERVIEW_TYPE_TAG = "focused_competency" as const;
+
+export function askHarperTargetKey(questionText: string): string {
+  const text = questionText.trim();
+  const slug = stableRoleExpertiseSlug(text);
+  const hash = fingerprintPaidCallInputs({ text }).slice(0, 12);
+  return `${ASK_HARPER_TARGET_PREFIX}${slug}-${hash}`;
+}
+
+/** One receipt per question text on this application, separate from the batch answers receipt. */
+export function askHarperSubjectKey(campaignId: string, questionText: string): string {
+  return `ask-harper:${campaignId}:${fingerprintPaidCallInputs({
+    text: questionText.trim(),
+  })}`;
 }
 
 export function stableRoleExpertiseSlug(text: string): string {
@@ -811,6 +830,8 @@ async function generateRoleExpertiseAnswersStep(input: {
   jobSources: Record<string, unknown>;
   profileItems: unknown[];
   usage?: AiCallUsageContext;
+  /** Defaults to the campaign so the batch fill keeps one receipt. Ask Harper passes a per-question key. */
+  subjectKey?: string;
 }): Promise<
   | {
       ok: true;
@@ -862,7 +883,7 @@ async function generateRoleExpertiseAnswersStep(input: {
     const gated = await runPaidStructuredCall<RoleExpertiseAnswersResult>({
       organizationId: input.organizationId,
       operation: "ROLE_EXPERTISE_ANSWERS",
-      subjectKey: input.campaignId,
+      subjectKey: input.subjectKey ?? input.campaignId,
       inputFingerprint: fingerprint,
       parseStored: (json) => roleExpertiseAnswersResultSchema.parse(json),
       isResultUsable: (stored) =>
@@ -975,6 +996,81 @@ async function generateRoleExpertiseAnswersStep(input: {
           : "Role-expertise answers could not be generated.",
     };
   }
+}
+
+/**
+ * One seeker-written question through the existing role-expertise answers step
+ * (writing model, Harper library, fact-preservation checks, paid-call gate).
+ * Does not run the questions step and does not change that prompt.
+ */
+export async function generateAskHarperSuggestedAnswer(input: {
+  organizationId: string;
+  campaignId: string;
+  questionText: string;
+  careerStage: CareerStage;
+  job: RoleExpertiseJobInputs;
+  profileItems: unknown[];
+}): Promise<
+  | { ok: true; question: ValidatedRoleExpertiseQuestion; skipped: boolean }
+  | { ok: false; message: string }
+> {
+  const text = input.questionText.trim();
+  if (!text) {
+    return { ok: false, message: "A role-expertise question was empty." };
+  }
+  const jobSources = {
+    title: input.job.title,
+    employer: input.job.companyName,
+    seniority: input.job.seniority,
+    location: input.job.location,
+    workArrangement: input.job.workArrangement,
+    requiredItems: parseStringArray(input.job.requiredItems),
+    preferredItems: parseStringArray(input.job.preferredItems),
+    responsibilities: parseStringArray(input.job.responsibilities),
+    scorecard: scorecardFingerprintSlice(input.job.scorecardJson),
+  };
+  const answersStep = await generateRoleExpertiseAnswersStep({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    choices: [
+      {
+        text,
+        targetKey: askHarperTargetKey(text),
+        interviewTypeTag: ASK_HARPER_INTERVIEW_TYPE_TAG,
+      },
+    ],
+    careerStage: input.careerStage,
+    jobSources,
+    profileItems: input.profileItems,
+    subjectKey: askHarperSubjectKey(input.campaignId, text),
+    usage: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      category: "CONSULTATION",
+      operation: "CONSULTATION_REPLY",
+      metadata: { step: "role_expertise_answers", attempt: 1 },
+    },
+  });
+  if (!answersStep.ok) {
+    return { ok: false, message: answersStep.message };
+  }
+  const question = answersStep.questions[0];
+  if (!question) {
+    return {
+      ok: false,
+      message: "Role-expertise answers could not be generated.",
+    };
+  }
+  return {
+    ok: true,
+    skipped: answersStep.skipped,
+    question: {
+      ...question,
+      text,
+      targetKey: askHarperTargetKey(text),
+      interviewTypeTag: ASK_HARPER_INTERVIEW_TYPE_TAG,
+    },
+  };
 }
 
 export async function generateRoleExpertiseWithModel(input: {

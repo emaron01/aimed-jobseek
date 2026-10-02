@@ -5,6 +5,7 @@
  * Section 3 — Best-practice interview questions (role-expertise, always)
  */
 import {
+  ASK_HARPER_TARGET_PREFIX,
   CHRONOLOGY_TARGET_KEY,
   ROLE_EXPERTISE_TARGET_PREFIX,
   WHY_THIS_COMPANY_TARGET_KEY,
@@ -34,6 +35,15 @@ export function isRoleExpertiseQuestion(item: ConsultationQaItem): boolean {
   return Boolean(item.targetKey?.startsWith(ROLE_EXPERTISE_TARGET_PREFIX));
 }
 
+export function isApprovedAskHarperQuestion(item: ConsultationQaItem): boolean {
+  return Boolean(
+    item.targetKey?.startsWith(ASK_HARPER_TARGET_PREFIX) &&
+      !item.ignored &&
+      (item.talkingPoint?.status === "APPROVED" ||
+        item.resumeBullet?.status === "APPROVED"),
+  );
+}
+
 export function isWhyThisCompanyQuestion(item: ConsultationQaItem): boolean {
   return item.targetKey === WHY_THIS_COMPANY_TARGET_KEY;
 }
@@ -54,7 +64,9 @@ export function isDedicatedPrepQuestion(item: ConsultationQaItem): boolean {
 export function harperSectionForQuestion(
   item: ConsultationQaItem,
 ): HarperPageSectionId {
-  if (isRoleExpertiseQuestion(item)) return HARPER_SECTION_IDS.bestPractice;
+  if (isRoleExpertiseQuestion(item) || isApprovedAskHarperQuestion(item)) {
+    return HARPER_SECTION_IDS.bestPractice;
+  }
   if (questionHasApprovedResult(item) && !item.ignored) {
     return HARPER_SECTION_IDS.standing;
   }
@@ -114,7 +126,8 @@ export function partitionHarperThreeSections(
     // those questions live in Section 3 only.
     const isRoleTopic =
       entry.kind === "TOPIC" &&
-      entry.targetKey.startsWith(ROLE_EXPERTISE_TARGET_PREFIX);
+      (entry.targetKey.startsWith(ROLE_EXPERTISE_TARGET_PREFIX) ||
+        entry.targetKey.startsWith(ASK_HARPER_TARGET_PREFIX));
     if (isRoleTopic) {
       continue;
     }

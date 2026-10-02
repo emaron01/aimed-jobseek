@@ -3,6 +3,7 @@ import {
   type ConsultationQaItem,
 } from "@/lib/consultation/qa-view";
 import {
+  ASK_HARPER_TARGET_PREFIX,
   CHEAT_SHEET_TARGET_PREFIX,
   CHRONOLOGY_TARGET_KEY,
   ROLE_EXPERTISE_TARGET_PREFIX,
@@ -98,6 +99,14 @@ export function isRequirementLikeTargetKey(targetKey: string): boolean {
 
 /** True when the item must appear somewhere on Harper (answers, statements, or open Q). */
 export function harperItemNeedsRender(item: ConsultationQaItem): boolean {
+  // Ask Harper drafts render only in the Ask Harper box, not the three sections.
+  if (
+    item.targetKey?.startsWith(ASK_HARPER_TARGET_PREFIX) &&
+    item.talkingPoint?.status !== "APPROVED" &&
+    item.resumeBullet?.status !== "APPROVED"
+  ) {
+    return false;
+  }
   if (item.ignored) return true;
   if (consultationQuestionAcceptsReply(item)) return true;
   if (item.seekerAnswers.length > 0) return true;
@@ -311,6 +320,17 @@ export function partitionGeneralQuestionsForStanding(input: {
       const list = roleByKey.get(key) ?? [];
       list.push(item);
       roleByKey.set(key, list);
+      continue;
+    }
+    if (key.startsWith(ASK_HARPER_TARGET_PREFIX)) {
+      const approved =
+        item.talkingPoint?.status === "APPROVED" ||
+        item.resumeBullet?.status === "APPROVED";
+      if (approved && !item.ignored) {
+        const list = roleByKey.get(key) ?? [];
+        list.push(item);
+        roleByKey.set(key, list);
+      }
       continue;
     }
     if (key && requirementKeys.has(key)) {

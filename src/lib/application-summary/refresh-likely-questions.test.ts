@@ -414,7 +414,8 @@ describe("person sections run only when the seeker chooses that person", () => {
     expect(summary).not.toContain("enqueueCheatSheetPersonSection");
     expect(summary).not.toContain("enqueueMissingInterviewerCheatSheetSections");
     expect(learnedNotes).not.toContain("enqueueCheatSheetPersonSection");
-    expect(learnedNotes).toContain('type: "APPLICATION_SUMMARY"');
+    expect(learnedNotes).not.toContain('type: "APPLICATION_SUMMARY"');
+    expect(learnedNotes).not.toContain("enqueueApplicationJob");
     expect(process).not.toContain("enqueueInterviewerCheatSheetSection");
     expect(process).not.toContain("enqueueCheatSheetSectionsForPersona");
     const startPrep = stages.slice(

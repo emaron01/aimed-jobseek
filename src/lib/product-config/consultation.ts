@@ -107,6 +107,11 @@ export const consultationConversationCopy = Object.freeze({
   reopenIgnored: "Ignored",
   coachingDisclaimer:
     "Harper's coaching and suggestions to help you prepare and strengthen your interview skills.",
+  askHarperLine: "Have an interview question you're stumped on? Ask Harper!",
+  askHarperAction: "Ask Harper",
+  askHarperNeedsQuestion: "Enter the question you want Harper to answer.",
+  askHarperDrafted: "Harper drafted an answer.",
+  askHarperFailed: "Harper could not draft an answer for that question. Try again.",
   approve: "Approve",
   useThis: "Use this",
   confirmed: "Approved.",

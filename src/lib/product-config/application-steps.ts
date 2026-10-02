@@ -13,8 +13,8 @@ import { applicationWorkspaceCopy, vocab } from "./vocabulary";
 
 export const APPLICATION_STEP_KEYS = [
   "applied",
-  "company",
   "job",
+  "company",
   "consultation",
   "assets",
   "hiring-team",
@@ -43,18 +43,18 @@ export const applicationStepList: readonly ApplicationStepDefinition[] =
       emptyGuidance: outreachConfig.labels.appliedHelp,
     },
     {
-      key: "company",
-      number: 2,
-      hrefSegment: "company",
-      title: applicationWorkspaceCopy.companyTitle,
-      emptyGuidance: "Research this employer so the rest of the application has a company to work from.",
-    },
-    {
       key: "job",
-      number: 3,
+      number: 2,
       hrefSegment: "job",
       title: applicationWorkspaceCopy.jobRequirementTitle,
       emptyGuidance: "Review the posting, location, compensation, and employer fit before you write materials.",
+    },
+    {
+      key: "company",
+      number: 3,
+      hrefSegment: "company",
+      title: applicationWorkspaceCopy.companyTitle,
+      emptyGuidance: "Research this employer so the rest of the application has a company to work from.",
     },
     {
       key: "consultation",

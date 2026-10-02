@@ -273,10 +273,7 @@ describe("notes never reassess Harper, and the cheat sheet lists them once", () 
       notes: "The role wants security sales.",
     });
     expect(paidCall).not.toHaveBeenCalled();
-    expect(enqueue.mock.calls.some((call) => call[0]?.type === "CONSULTATION")).toBe(false);
-    expect(enqueue).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "APPLICATION_SUMMARY", campaignId }),
-    );
+    expect(enqueue).not.toHaveBeenCalled();
 
     enqueue.mockClear();
     paidCall.mockClear();

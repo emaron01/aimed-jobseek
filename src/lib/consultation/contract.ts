@@ -6,6 +6,11 @@ export const WHY_THIS_COMPANY_TARGET_KEY = "why-this-company";
 export const PERSON_PREP_TARGET_PREFIX = "person-prep:";
 /** Batch D role-expertise questions under Where you stand (targetKey prefix). */
 export const ROLE_EXPERTISE_TARGET_PREFIX = "role-expertise:";
+/**
+ * Seeker-written General question from Ask Harper.
+ * Drafts stay in the Ask Harper box. Approved ones join General questions.
+ */
+export const ASK_HARPER_TARGET_PREFIX = "ask-harper:";
 export const CHRONOLOGY_TARGET_KEY = "chronology";
 /** Answers given on the Cheat Sheet (and former Stage coach items). */
 export const CHEAT_SHEET_TARGET_PREFIX = "cheatSheet:";

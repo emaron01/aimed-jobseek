@@ -1,4 +1,5 @@
 import {
+  ASK_HARPER_TARGET_PREFIX,
   INTERVIEW_TYPE_TAGS,
   ROLE_EXPERTISE_TARGET_PREFIX,
   type InterviewTypeTag,
@@ -284,7 +285,10 @@ export function consultationQuestionAcceptsReply(
     item.seekerAnswers.length === 0 &&
     !item.resumeBullet &&
     item.talkingPoint?.status === "DRAFT" &&
-    Boolean(item.targetKey?.startsWith(ROLE_EXPERTISE_TARGET_PREFIX))
+    Boolean(
+      item.targetKey?.startsWith(ROLE_EXPERTISE_TARGET_PREFIX) ||
+        item.targetKey?.startsWith(ASK_HARPER_TARGET_PREFIX),
+    )
   ) {
     return true;
   }

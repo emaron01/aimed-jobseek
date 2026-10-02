@@ -62,7 +62,8 @@ describe("learned notes and stage notes are cheat-sheet only", () => {
     expect(learnedBlock).toContain("seekerLearnedNotes");
     expect(learnedBlock).not.toContain("interpretJobPosting");
     expect(learnedBlock).not.toContain("withJobRequirementProcessing");
-    expect(learnedBlock).toContain('type: "APPLICATION_SUMMARY"');
+    expect(learnedBlock).not.toContain('type: "APPLICATION_SUMMARY"');
+    expect(learnedBlock).not.toContain("enqueueApplicationJob");
     expect(learnedBlock).not.toContain("enqueueCheatSheetPersonSection");
 
     const savePosting = service.slice(
@@ -227,7 +228,7 @@ describe.skipIf(!hasTestDatabase())("learned notes cheat-sheet-only (db)", { tim
     await prisma.$disconnect();
   });
 
-  it("saving learned notes does not parse and enqueues only the shell cheat sheet job", async () => {
+  it("saving learned notes does not parse and does not enqueue a cheat sheet job", async () => {
     interpretJobPosting.mockClear();
     const { saveApplicationJobLearnedNotes } = await import(
       "@/lib/application/service"
@@ -253,11 +254,7 @@ describe.skipIf(!hasTestDatabase())("learned notes cheat-sheet-only (db)", { tim
     const summaryJobs = await prisma.applicationJob.findMany({
       where: { campaignId, type: "APPLICATION_SUMMARY" },
     });
-    expect(summaryJobs.length).toBeGreaterThan(0);
-    expect(summaryJobs.some((job) => job.targetId == null)).toBe(true);
-    expect(
-      summaryJobs.some((job) => job.targetId === `contact:${contactId}`),
-    ).toBe(false);
+    expect(summaryJobs).toHaveLength(0);
   });
 
   it("updating stage notes does not parse and does not enqueue a person section", async () => {

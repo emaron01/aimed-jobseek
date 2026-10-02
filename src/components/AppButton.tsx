@@ -9,7 +9,7 @@ import {
   type Ref,
 } from "react";
 
-export type AppButtonVariant = "primary" | "secondary" | "danger" | "chip";
+export type AppButtonVariant = "primary" | "secondary" | "danger" | "warning" | "chip";
 
 const VARIANT_CLASS: Record<AppButtonVariant, string> = {
   primary:
@@ -18,6 +18,8 @@ const VARIANT_CLASS: Record<AppButtonVariant, string> = {
     "border border-edge-strong bg-surface text-ink shadow-sm hover:border-edge-strong hover:bg-canvas active:bg-canvas focus-visible:outline-focus disabled:border-edge disabled:bg-canvas disabled:text-subtle disabled:shadow-none",
   danger:
     "bg-danger text-on-ink hover:bg-danger active:bg-danger focus-visible:outline-focus disabled:bg-edge-strong disabled:text-on-ink",
+  warning:
+    "border border-warning bg-warning text-on-ink hover:bg-warning active:bg-warning focus-visible:outline-focus disabled:bg-edge-strong disabled:text-on-ink",
   chip:
     "border border-edge-strong bg-surface px-2 py-0.5 text-[11px] text-ink underline decoration-edge-strong underline-offset-2 shadow-sm hover:bg-canvas active:bg-canvas focus-visible:outline-focus disabled:border-edge disabled:text-subtle disabled:no-underline",
 };

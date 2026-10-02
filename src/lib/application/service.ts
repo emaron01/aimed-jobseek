@@ -977,14 +977,6 @@ export async function saveApplicationJobLearnedNotes(input: {
     where: { id: requirement.id },
     data: { seekerLearnedNotes: notes.length > 0 ? notes : null },
   });
-  const { enqueueApplicationJob } = await import("@/lib/application-jobs/service");
-  await enqueueApplicationJob({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    type: "APPLICATION_SUMMARY",
-    initiatedByUserId: input.userId,
-    payload: { userId: input.userId },
-  });
 }
 
 export { displayedFitBucket };

@@ -28,6 +28,8 @@ import {
   standingWorkIsComplete,
 } from "@/lib/consultation/standing";
 import { buildStandingListEntries } from "@/lib/consultation/standing-entries";
+import { AskHarperBox } from "@/components/AskHarperBox";
+import { askHarperDraftQuestions } from "@/lib/consultation/ask-harper";
 import { ConsultationKnowAboutMe } from "@/components/ConsultationKnowAboutMe";
 import { ConsultationStanding } from "@/components/ConsultationStanding";
 import { HarperDraftProvider } from "@/components/HarperDraftStore";
@@ -430,6 +432,11 @@ export async function ConsultationSection({
         className={`space-y-4 rounded-lg border border-edge bg-surface p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
         data-testid="consultation"
       >
+        <AskHarperBox
+          campaignId={campaignId}
+          canEdit={canEdit}
+          drafts={askHarperDraftQuestions(qaView.questions)}
+        />
         <h2 className="text-base font-semibold text-ink">
           {consultationConfig.displayName}
         </h2>
