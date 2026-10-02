@@ -42,8 +42,42 @@ export function isHiringManagerRole(role: {
   return /\bhiring manager\b/i.test(role.name ?? "");
 }
 
-/** Canonical learnings fingerprint — profile changes do not affect this. */
+/**
+ * Canonical learnings fingerprint — profile changes do not affect this.
+ * Harper learns the note text, not which row stored it. Stage ids, dates, and
+ * outcomes are omitted. An interview with no notes before or after is omitted,
+ * so adding or removing that interview does not change the hash.
+ */
 export function learningsFingerprint(input: {
+  seekerLearnedNotes: string | null | undefined;
+  stages: LearningsStageNotes[];
+  newlyGained: LearningsGainedNote[];
+  promptVersion?: string;
+}): string {
+  const stages = input.stages
+    .map((stage) => ({
+      notesBefore: stage.notesBefore?.trim() || null,
+      notesAfter: stage.notesAfter?.trim() || null,
+    }))
+    .filter((stage) => stage.notesBefore || stage.notesAfter)
+    .sort(
+      (a, b) =>
+        (a.notesBefore ?? "").localeCompare(b.notesBefore ?? "") ||
+        (a.notesAfter ?? "").localeCompare(b.notesAfter ?? ""),
+    );
+  return fingerprintPaidCallInputs({
+    promptVersion: input.promptVersion ?? CONSULTATION_PROMPT_VERSION,
+    seekerLearnedNotes: input.seekerLearnedNotes?.trim() || null,
+    stages,
+    newlyGained: canonicalNewlyGained(input.newlyGained),
+  });
+}
+
+/**
+ * Previous fingerprint, kept so a receipt written when every stage id was
+ * hashed still counts as unchanged when the learned text is the same.
+ */
+export function learningsFingerprintWithStageIds(input: {
   seekerLearnedNotes: string | null | undefined;
   stages: LearningsStageNotes[];
   newlyGained: LearningsGainedNote[];
@@ -56,7 +90,16 @@ export function learningsFingerprint(input: {
       notesAfter: stage.notesAfter?.trim() || null,
     }))
     .sort((a, b) => a.id.localeCompare(b.id));
-  const newlyGained = [...input.newlyGained]
+  return fingerprintPaidCallInputs({
+    promptVersion: input.promptVersion ?? CONSULTATION_PROMPT_VERSION,
+    seekerLearnedNotes: input.seekerLearnedNotes?.trim() || null,
+    stages,
+    newlyGained: canonicalNewlyGained(input.newlyGained),
+  });
+}
+
+function canonicalNewlyGained(notes: LearningsGainedNote[]) {
+  return [...notes]
     .map((note) => ({
       contactId: note.contactId,
       id: note.id,
@@ -65,12 +108,6 @@ export function learningsFingerprint(input: {
       createdAt: note.createdAt,
     }))
     .sort((a, b) => a.id.localeCompare(b.id) || a.contactId.localeCompare(b.contactId));
-  return fingerprintPaidCallInputs({
-    promptVersion: input.promptVersion ?? CONSULTATION_PROMPT_VERSION,
-    seekerLearnedNotes: input.seekerLearnedNotes?.trim() || null,
-    stages,
-    newlyGained,
-  });
 }
 
 export async function loadApplicationLearnings(
@@ -125,10 +162,31 @@ export async function learningsFingerprintChanged(input: {
     operation: LEARNINGS_REASSESS_OPERATION,
     subjectKey: input.campaignId,
   });
-  if (!receipt || receipt.inputHash !== fingerprint) {
-    return { changed: true, fingerprint };
-  }
-  return { changed: false, fingerprint };
+  if (!receipt) return { changed: true, fingerprint };
+  const unchanged =
+    receipt.inputHash === fingerprint ||
+    receipt.inputHash === learningsFingerprintWithStageIds(learnings);
+  return { changed: !unchanged, fingerprint };
+}
+
+/**
+ * After a removal that did not change learned text, point an existing receipt
+ * at the current fingerprint. No receipt is created, and no job is enqueued.
+ */
+export async function retargetLearningsReceiptIfPresent(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<void> {
+  const receipt = await findPaidCallReceipt({
+    organizationId: input.organizationId,
+    operation: LEARNINGS_REASSESS_OPERATION,
+    subjectKey: input.campaignId,
+  });
+  if (!receipt) return;
+  await recordLearningsReassessFingerprint({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+  });
 }
 
 export async function recordLearningsReassessFingerprint(input: {

@@ -594,7 +594,7 @@ export async function removeInterviewForPerson(input: {
   userId: string;
   stageId: string;
   contactId?: string | null;
-}): Promise<{ removed: "stage" | "link" }> {
+}): Promise<{ removed: "stage" | "link"; learnedNotesRemoved: boolean }> {
   await requireOwnedCampaign(input);
   const stageId = input.stageId.trim();
   if (!stageId) throw new TenantError("Interview stage is required.");
@@ -606,26 +606,29 @@ export async function removeInterviewForPerson(input: {
     },
     select: {
       id: true,
+      notesBefore: true,
+      notesAfter: true,
       interviewers: { select: { id: true, contactId: true } },
     },
   });
   if (!stage) throw new TenantError("Interview stage was not found.");
+  const learnedNotesRemoved = Boolean(stage.notesBefore?.trim() || stage.notesAfter?.trim());
   const contactId = input.contactId?.trim() || null;
   if (!contactId) {
     if (stage.interviewers.length > 0) {
       throw new TenantError("Choose the person to remove from this interview.");
     }
     await prisma.interviewStage.delete({ where: { id: stage.id } });
-    return { removed: "stage" };
+    return { removed: "stage", learnedNotesRemoved };
   }
   const link = stage.interviewers.find((row) => row.contactId === contactId);
   if (!link) throw new TenantError("That person is not on this interview.");
   if (stage.interviewers.length === 1) {
     await prisma.interviewStage.delete({ where: { id: stage.id } });
-    return { removed: "stage" };
+    return { removed: "stage", learnedNotesRemoved };
   }
   await prisma.interviewStageInterviewer.delete({ where: { id: link.id } });
-  return { removed: "link" };
+  return { removed: "link", learnedNotesRemoved: false };
 }
 
 export function stageTypeLabel(type: string): string {

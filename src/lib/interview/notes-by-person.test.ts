@@ -795,9 +795,7 @@ describe.skipIf(!hasTestDatabase())("remove interview against postgres", { timeo
       stageId: unlinkedEmptyId,
     }));
     expect(removedEmpty.ok).toBe(true);
-    expect(enqueue).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "CONSULTATION", targetId: "reassess", campaignId }),
-    );
+    expect(enqueue).not.toHaveBeenCalled();
     expect(await prisma.interviewStage.findUnique({ where: { id: unlinkedEmptyId } })).toBeNull();
 
     enqueue.mockClear();

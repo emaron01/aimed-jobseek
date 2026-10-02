@@ -105,21 +105,31 @@ export async function removeInterviewAction(
     const stageId = String(formData.get("stageId") ?? "").trim();
     if (!stageId) throw new TenantError("Interview stage is required.");
     const contactId = String(formData.get("contactId") ?? "").trim();
-    await removeInterviewForPerson({
+    const removed = await removeInterviewForPerson({
       organizationId,
       campaignId: id,
       userId: user.id,
       stageId,
       contactId: contactId || null,
     });
-    const { enqueueLearningsReassessIfChanged } = await import(
-      "@/lib/consultation/learnings"
-    );
-    await enqueueLearningsReassessIfChanged({
-      organizationId,
-      campaignId: id,
-      userId: user.id,
-    });
+    if (removed.learnedNotesRemoved) {
+      const { enqueueLearningsReassessIfChanged } = await import(
+        "@/lib/consultation/learnings"
+      );
+      await enqueueLearningsReassessIfChanged({
+        organizationId,
+        campaignId: id,
+        userId: user.id,
+      });
+    } else if (removed.removed === "stage") {
+      const { retargetLearningsReceiptIfPresent } = await import(
+        "@/lib/consultation/learnings"
+      );
+      await retargetLearningsReceiptIfPresent({
+        organizationId,
+        campaignId: id,
+      });
+    }
     revalidate(id, stageId);
     return { ok: true, message: "Interview removed." };
   } catch (error) {
