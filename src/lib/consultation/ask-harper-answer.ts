@@ -139,15 +139,30 @@ function sourceBlob(sourceTexts: readonly string[]): string {
   return sourceTexts.join("\n").toLowerCase();
 }
 
-function sentenceIsInvented(sentence: string, sources: string): boolean {
+const FIRST_PERSON = /\b(?:i|me|my|we|our)\b|\bmy\s+team\b/i;
+const NAME_STOP_WORDS = new Set(["i", "me", "my", "we", "our", "the", "a", "an", "at"]);
+
+function isFirstPersonClaim(sentence: string): boolean {
+  return FIRST_PERSON.test(sentence);
+}
+
+/**
+ * Unsupported personal claim: a first-person sentence that contains a number
+ * or a name/employer that is not already in the seeker's sources. General
+ * expertise, including numbers and names, is kept.
+ */
+function sentenceIsUnsupportedPersonalClaim(sentence: string, sources: string): boolean {
   const value = sentence.trim();
   if (!value) return true;
   if (value.replace(/[.!?]+$/g, "").trim() === ASK_HARPER_PLACEHOLDER_ANSWER) return true;
+  if (!isFirstPersonClaim(value)) return false;
   const numbers = value.match(/\$?\d[\d,]*(?:\.\d+)?%?/g) ?? [];
   if (numbers.some((number) => !sources.includes(number.toLowerCase()))) return true;
-  const afterFirstWord = value.replace(/^\W*\w+/, "");
-  const names = afterFirstWord.match(/\b[A-Z][A-Za-z0-9]+\b/g) ?? [];
-  return names.some((name) => !sources.includes(name.toLowerCase()));
+  const names = value.match(/\b[A-Z][A-Za-z0-9]+\b/g) ?? [];
+  return names.some(
+    (name) =>
+      !NAME_STOP_WORDS.has(name.toLowerCase()) && !sources.includes(name.toLowerCase()),
+  );
 }
 
 function isRawProfileFact(text: string, sourceTexts: readonly string[]): boolean {
@@ -159,9 +174,10 @@ function isRawProfileFact(text: string, sourceTexts: readonly string[]): boolean
 }
 
 /**
- * Model prose for a failed attempt, with invented employers, numbers, results,
- * and the placeholder sentence removed. A point-of-view draft omits the result
- * part. A story draft omits a result that is not already in the seeker's sources.
+ * Model prose for a failed attempt. Removes the placeholder sentence and
+ * first-person claims that contain a number, employer, or name not in the
+ * seeker's sources. General expertise is kept. A point-of-view draft omits the
+ * result part. A story draft omits a result that is not already in the sources.
  * Returns "" when nothing usable remains, including when the remainder is only
  * one raw profile fact.
  */
@@ -180,7 +196,7 @@ export function askHarperUnpassedDraft(input: {
     .join(" ")
     .split(/(?<=[.!?])\s+/)
     .map((sentence) => sentence.trim())
-    .filter((sentence) => sentence && !sentenceIsInvented(sentence, sources));
+    .filter((sentence) => sentence && !sentenceIsUnsupportedPersonalClaim(sentence, sources));
   const content = composeInterviewAnswerFromParts(sentences);
   if (!content.trim() || content.trim() === ASK_HARPER_PLACEHOLDER_ANSWER) return "";
   if (isRawProfileFact(content, input.sourceTexts)) return "";

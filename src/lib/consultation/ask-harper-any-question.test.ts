@@ -25,6 +25,7 @@ import {
   ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION,
   ROLE_EXPERTISE_PROMPT_VERSION,
   roleExpertiseJobFingerprint,
+  storeRoleExpertiseQuestions,
   validateRoleExpertiseQuestions,
 } from "@/lib/consultation/role-expertise";
 import { ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content/role-expertise";
@@ -323,6 +324,30 @@ describe("Ask Harper question shape", () => {
         sourceTexts: [FACT],
       }),
     ).toBe("");
+  });
+
+  it("keeps general expertise and grounded first-person claims, and drops unsupported personal claims", () => {
+    const draft = askHarperUnpassedDraft({
+      answer: {
+        answerFramework: "CAR",
+        challenge: null,
+        situation: null,
+        task: null,
+        action:
+          "I grew revenue 40% at Acme. Top reps keep 3x pipeline coverage. MEDDPICC helps qualify deals. I closed 14 deals at Northwind.",
+        result: ASK_HARPER_PLACEHOLDER_ANSWER,
+      },
+      kind: "point-of-view",
+      sourceTexts: [FACT],
+    });
+    expect(draft).not.toContain("I grew revenue 40% at Acme.");
+    expect(draft).not.toContain("40%");
+    expect(draft).not.toContain("Acme");
+    expect(draft).toContain("Top reps keep 3x pipeline coverage.");
+    expect(draft).toContain("MEDDPICC helps qualify deals.");
+    expect(draft).toContain("I closed 14 deals at Northwind.");
+    expect(draft).not.toContain(ASK_HARPER_PLACEHOLDER_ANSWER);
+    expect(draft).not.toBe(`${FACT}.`);
   });
 });
 
@@ -686,5 +711,66 @@ describe("Ask Harper answers every real question", () => {
       }),
     );
     expect(replyGenerate).toHaveBeenCalledTimes(callsBeforeRepeat);
+  }, 60_000);
+
+  it("stores and shows no follow-up on a best-practice suggested answer", async () => {
+    if (!hasTestDatabase()) return;
+    enqueue.mockClear();
+    const callsBefore = replyGenerate.mock.calls.length;
+    await ConsultationPage({ params: Promise.resolve({ id: campaignId }) });
+    expect(replyGenerate).toHaveBeenCalledTimes(callsBefore);
+    expect(enqueue).not.toHaveBeenCalled();
+
+    const session = await prisma.consultationSession.findFirstOrThrow({
+      where: { organizationId, campaignId },
+      select: { id: true },
+    });
+    const followUpText = "Which forecast review would you use as your example?";
+    await storeRoleExpertiseQuestions({
+      organizationId,
+      sessionId: session.id,
+      questions: [
+        {
+          text: "How do you run a weekly sales forecast review?",
+          targetKey: "role-expertise:weekly-forecast-review",
+          interviewTypeTag: "focused_competency",
+          content: "I rebuild the review around the commits we already had.",
+          grounding: {
+            answerFramework: "CAR",
+            challenge: "The Monday forecast review kept slipping.",
+            action: "I rebuild the review around the commits we already had.",
+            result: "The team caught the slip before the quarter closed.",
+          },
+          followUpQuestion: followUpText,
+        },
+      ],
+    });
+    const followUps = await prisma.consultationTurn.count({
+      where: {
+        organizationId,
+        targetKey: "role-expertise:weekly-forecast-review",
+        followUp: true,
+      },
+    });
+    expect(followUps).toBe(0);
+
+    const callsBeforeRender = replyGenerate.mock.calls.length;
+    const harper = await ConsultationSection({
+      campaignId,
+      organizationId,
+      canEdit: true,
+      jobs: [],
+    });
+    await act(async () => {
+      root.render(harper);
+    });
+    expect(replyGenerate).toHaveBeenCalledTimes(callsBeforeRender);
+    expect(enqueue).not.toHaveBeenCalled();
+    const card = [...host.querySelectorAll("article")].find((item) =>
+      item.textContent?.includes("How do you run a weekly sales forecast review?"),
+    );
+    expect(card?.textContent).toContain("rebuild the review around the commits");
+    expect(card?.textContent).not.toContain(followUpText);
+    expect(card?.querySelector("[data-testid=consultation-follow-up]")).toBeNull();
   }, 60_000);
 });

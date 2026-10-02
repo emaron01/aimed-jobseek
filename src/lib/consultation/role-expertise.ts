@@ -1422,7 +1422,9 @@ export async function storeRoleExpertiseQuestions(input: {
         promptVersion: ROLE_EXPERTISE_PROMPT_VERSION,
       },
     });
-    const followUp = question.followUpQuestion?.trim() ?? "";
+    const followUp = question.targetKey.startsWith(ASK_HARPER_TARGET_PREFIX)
+      ? (question.followUpQuestion?.trim() ?? "")
+      : "";
     if (!followUp) continue;
     await prisma.consultationTurn.create({
       data: {
