@@ -1196,7 +1196,8 @@ describe.skipIf(!hasTestDatabase())("hiring team per application", { timeout: 60
       where: { campaignId: campaign.id, archivedAt: null },
     });
     expect(remaining.filter((row) => /customer success/i.test(row.name))).toHaveLength(1);
-    expect(remaining.filter((row) => /executive/i.test(row.name))).toHaveLength(1);
+    expect(remaining.filter((row) => row.name === "Executive Sponsor")).toHaveLength(1);
+    expect(remaining.filter((row) => row.name === "Executive Sales Sponsor")).toHaveLength(1);
     const survivor = remaining.find((row) => /customer success/i.test(row.name));
     expect(survivor?.id).toBe(built.id);
     expect(survivor?.setupStatus).toBe("APPROVED");

@@ -1,8 +1,5 @@
 import type { Persona, Prisma } from "@prisma/client";
-import {
-  rolesDescribeSamePerson,
-  titlesCoherentToRole,
-} from "@/lib/hiring-team/identify";
+import { titlesCoherentToRole } from "@/lib/hiring-team/identify";
 import { prisma } from "@/lib/prisma-client";
 import { parseStringArray } from "@/lib/research";
 
@@ -16,13 +13,8 @@ function personaBuilt(persona: Persona): boolean {
   return Boolean(narrative && typeof narrative === "object");
 }
 
-function asRole(row: Persona) {
-  return {
-    roleKey: row.suggestionKey?.trim() || row.id,
-    name: row.name,
-    likelyTitles: parseStringArray(row.targetTitles),
-    whyInvolved: row.whyThisPersonaMatters ?? "",
-  };
+function sameStoredRoleName(left: string, right: string): boolean {
+  return left.trim().toLowerCase() === right.trim().toLowerCase();
 }
 
 function attachmentScore(input: {
@@ -191,7 +183,7 @@ export async function mergeExistingHiringTeamRoles(input: {
     const cluster = [row];
     for (const other of rows) {
       if (other.id === row.id || used.has(other.id)) continue;
-      if (rolesDescribeSamePerson(asRole(row), asRole(other))) {
+      if (sameStoredRoleName(row.name, other.name)) {
         cluster.push(other);
       }
     }

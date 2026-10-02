@@ -290,14 +290,15 @@ function mergePair(
   };
 }
 
-function sameStableIdentity(
-  left: Pick<IdentifiedHiringRole, "name" | "likelyTitles" | "whyInvolved" | "roleKey">,
-  right: Pick<IdentifiedHiringRole, "name" | "likelyTitles" | "whyInvolved" | "roleKey">,
-): boolean {
-  if (rolesDescribeSamePerson(left, right)) return true;
-  const leftTokens = tokenSet([left.name, ...left.likelyTitles]);
-  const rightTokens = tokenSet([right.name, ...right.likelyTitles]);
-  return leftTokens.size > 0 && [...leftTokens].filter((token) => rightTokens.has(token)).length >= 2;
+/** Same stored persona when the names match, or the names themselves share two content words. Titles do not count. */
+export function sameStoredPersonaName(left: string, right: string): boolean {
+  const a = left.trim().toLowerCase();
+  const b = right.trim().toLowerCase();
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const leftTokens = contentTokens(a);
+  const rightTokens = new Set(contentTokens(b));
+  return leftTokens.filter((token) => rightTokens.has(token)).length >= 2;
 }
 
 export function stabilizeRoleKeys(
@@ -313,12 +314,7 @@ export function stabilizeRoleKeys(
     const match = existing.find((row) => {
       const key = row.suggestionKey?.trim() ?? "";
       if (!key || key === HIRING_MANAGER_KEY || used.has(key)) return false;
-      return sameStableIdentity(role, {
-        roleKey: key,
-        name: row.name,
-        likelyTitles: row.titles,
-        whyInvolved: "",
-      });
+      return sameStoredPersonaName(row.name, role.name);
     });
     const roleKey = match?.suggestionKey?.trim() || role.roleKey;
     used.add(roleKey);

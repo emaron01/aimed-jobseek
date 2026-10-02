@@ -10,6 +10,7 @@ import {
 import {
   applyHiringTeamIdentificationGuardrails,
   evidenceTextFor,
+  sameStoredPersonaName,
   type IdentifiedHiringRole,
 } from "@/lib/hiring-team/identify";
 import type { PersonaDifferentiationInput } from "@/lib/persona/persona-differentiation";
@@ -445,10 +446,12 @@ export async function syncApplicationHiringTeam(input: {
     includeResearch: loaded.includeResearch,
   });
   const seenKeys = new Set<string>();
+  const sameRoleName = (left: string, right: string) =>
+    left.trim().toLowerCase() === right.trim().toLowerCase();
   for (const role of roles) {
-    const existing =
-      existingRows.find((row) => row.suggestionKey === role.roleKey) ??
-      existingRows.find((row) => row.name === role.name);
+    const existing = existingRows.find(
+      (row) => !seenKeys.has(row.id) && sameRoleName(row.name, role.name),
+    );
     const built = existing ? isHiringTeamPersonaBuilt(existing) : false;
     const existingNarrative =
       existing?.profileJson &&
@@ -467,18 +470,13 @@ export async function syncApplicationHiringTeam(input: {
     });
     if (existing) {
       seenKeys.add(existing.id);
-      const edited = seekerEdited(existing.manuallyEditedFields);
       const peerIdentities = existingRows
         .filter((row) => row.id !== existing.id)
         .map(peerIdentityFromPersona);
-      const nextName = edited ? existing.name : role.name;
-      const nextTitles = edited
-        ? parseStringArray(existing.targetTitles)
-        : role.likelyTitles;
-      const nextDepartment = edited ? existing.department : role.department;
-      const nextWhy = edited
-        ? existing.whyThisPersonaMatters
-        : role.whyInvolved;
+      const nextName = existing.name;
+      const nextTitles = parseStringArray(existing.targetTitles);
+      const nextDepartment = existing.department;
+      const nextWhy = existing.whyThisPersonaMatters;
       const nextInvolvement = hiringTeamInvolvement(existing.profileJson);
       const stalePatch = built
         ? await staleAtPatchForBuiltRole({
@@ -497,31 +495,22 @@ export async function syncApplicationHiringTeam(input: {
       await prisma.persona.update({
         where: { id: existing.id },
         data: {
-          ...(edited
-            ? {}
-            : {
-                name: role.name,
-                targetTitles: role.likelyTitles,
-                department: role.department,
-                whyThisPersonaMatters: role.whyInvolved,
-                suggestionKey: role.roleKey,
-              }),
+          name: existing.name,
+          targetTitles: existing.targetTitles as Prisma.InputJsonValue,
+          department: existing.department,
+          whyThisPersonaMatters: existing.whyThisPersonaMatters,
+          suggestionKey: existing.suggestionKey ?? role.roleKey,
           profileJson,
-          ...(built
-            ? stalePatch!
-            : {
-                setupStatus: "NOT_STARTED",
-                approvalStatus: "NOT_STARTED",
-                definition: null,
-                responsibilities: null,
-                painPoints: null,
-                desiredOutcomes: null,
-                messagingNotes: null,
-              }),
+          ...(built ? stalePatch! : {}),
         },
       });
       continue;
     }
+    const nameTaken = existingRows.some((row) => sameStoredPersonaName(row.name, role.name));
+    const keyTaken = existingRows.some(
+      (row) => Boolean(row.suggestionKey) && row.suggestionKey === role.roleKey,
+    );
+    if (nameTaken || keyTaken) continue;
     const fields = personaFields(role, null);
     await prisma.persona.create({
       data: {
@@ -531,15 +520,6 @@ export async function syncApplicationHiringTeam(input: {
         ...fields,
         profileJson,
       },
-    });
-  }
-  for (const existing of existingRows) {
-    if (seenKeys.has(existing.id)) continue;
-    if (seekerEdited(existing.manuallyEditedFields)) continue;
-    if (existing.personaTemplateId) continue;
-    await prisma.persona.update({
-      where: { id: existing.id },
-      data: { archivedAt: new Date() },
     });
   }
 }
@@ -779,35 +759,22 @@ export async function rebuildApplicationHiringTeamRole(input: {
       archivedAt: null,
     },
   });
-  const { roles, corrections, dropped, identifySkipped } = await identifiedRoles({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    job: loaded.job,
-    research: loaded.research,
-    includeResearch: loaded.includeResearch,
-    existing: existingRows.map((row) => ({
-      suggestionKey: row.suggestionKey,
-      name: row.name,
-      titles: parseStringArray(row.targetTitles),
-    })),
-  });
-  const role =
-    roles.find((item) => item.roleKey === persona.suggestionKey) ??
-    roles.find((item) => item.name === persona.name) ?? {
-      roleKey: persona.suggestionKey ?? `custom_${persona.id}`,
-      name: persona.name,
-      likelyTitles: parseStringArray(persona.targetTitles),
-      department: persona.department,
-      involvement: "DIRECT" as const,
-      whyInvolved: persona.whyThisPersonaMatters ?? persona.name,
-      evidence: [
-        {
-          claim: persona.whyThisPersonaMatters ?? persona.name,
-          kind: "INFERENCE" as const,
-          sourceId: "job-requirement",
-        },
-      ],
-    };
+  const why = persona.whyThisPersonaMatters?.trim() || persona.name;
+  const role: IdentifiedHiringRole = {
+    roleKey: persona.suggestionKey?.trim() || `custom_${persona.id}`,
+    name: persona.name,
+    likelyTitles: parseStringArray(persona.targetTitles),
+    department: persona.department,
+    involvement: hiringTeamInvolvement(persona.profileJson),
+    whyInvolved: why,
+    evidence: [
+      {
+        claim: why,
+        kind: "INFERENCE",
+        sourceId: "job-requirement",
+      },
+    ],
+  };
   const excerpts = hiringTeamEvidenceExcerpts({
     job: loaded.job,
     research: loaded.research,
@@ -849,16 +816,12 @@ export async function rebuildApplicationHiringTeamRole(input: {
     where: { id: persona.id },
     data: {
       ...fields,
-      ...(edited
-        ? {
-            name: persona.name,
-            targetTitles: persona.targetTitles as Prisma.InputJsonValue,
-            department: persona.department,
-            whyThisPersonaMatters: persona.whyThisPersonaMatters,
-            additionalContext: persona.additionalContext,
-          }
-        : {}),
-      suggestionKey: persona.suggestionKey ?? role.roleKey,
+      name: persona.name,
+      targetTitles: persona.targetTitles as Prisma.InputJsonValue,
+      department: persona.department,
+      whyThisPersonaMatters: persona.whyThisPersonaMatters,
+      suggestionKey: persona.suggestionKey,
+      ...(edited ? { additionalContext: persona.additionalContext } : {}),
       manuallyEditedFields: edited
         ? (persona.manuallyEditedFields as Prisma.InputJsonValue)
         : [],
@@ -871,12 +834,12 @@ export async function rebuildApplicationHiringTeamRole(input: {
         narrative: draft.narrative,
         modelNote: draft.message,
         awaitingSeekerInput: Boolean(draft.awaitingSeekerInput),
-        corrections,
-        dropped,
+        corrections: [],
+        dropped: [],
       }),
     },
   });
-  return { identifySkipped, synthesizeSkipped: synthesizeSkipped || !draft.narrative };
+  return { identifySkipped: true, synthesizeSkipped: synthesizeSkipped || !draft.narrative };
 }
 
 /** CHANGE 2: DB-only check before queuing Generate/Regenerate. */
