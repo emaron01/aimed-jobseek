@@ -18,6 +18,11 @@ import {
   isConsultationAiConfigured,
   isConsultationReplyAiConfigured,
 } from "@/lib/ai";
+import {
+  askHarperAnswerKind,
+  askHarperBestAvailableDraft,
+  composedPointOfViewAnswer,
+} from "@/lib/consultation/ask-harper-answer";
 import type { CareerStage } from "@/lib/consultation/career-stage";
 import {
   findHarperLibraryMatch,
@@ -822,6 +827,67 @@ async function generateRoleExpertiseQuestionsStep(input: {
   }
 }
 
+function validateAnswersForMode(
+  questions: RoleExpertiseQuestion[],
+  mode: "story" | "point-of-view" | undefined,
+): { valid: ValidatedRoleExpertiseQuestion[]; issues: string[] } {
+  if (mode !== "point-of-view") {
+    return validateRoleExpertiseQuestions({
+      questions,
+      minCount: questions.length,
+      maxCount: questions.length,
+      askedQuestions: [],
+      chronologyAlreadyAsked: false,
+    });
+  }
+  const choiceChecked = validateRoleExpertiseQuestionChoices({
+    questions: questions.map((question) => ({
+      text: question.text,
+      interviewTypeTag: question.interviewTypeTag,
+    })),
+    minCount: questions.length,
+    maxCount: questions.length,
+    askedQuestions: [],
+    chronologyAlreadyAsked: false,
+  });
+  const issues = [...choiceChecked.issues];
+  const valid: ValidatedRoleExpertiseQuestion[] = [];
+  for (const choice of choiceChecked.valid) {
+    const raw = questions.find((question) => question.text.trim() === choice.text);
+    if (!raw) {
+      issues.push("Every chosen question needs a matching suggested answer.");
+      continue;
+    }
+    const composed = composedPointOfViewAnswer(raw);
+    if (!composed) {
+      issues.push(
+        "A point-of-view answer needs the seeker's view in the answer, without a required outcome.",
+      );
+      continue;
+    }
+    valid.push({
+      text: choice.text,
+      targetKey: choice.targetKey,
+      interviewTypeTag: choice.interviewTypeTag,
+      content: composed.content,
+      grounding: composed.grounding,
+    });
+  }
+  return { valid, issues };
+}
+
+function mappedAnswers(questions: ValidatedRoleExpertiseQuestion[]) {
+  return questions.map((item) => ({
+    text: item.text,
+    answerFramework: item.grounding.answerFramework,
+    challenge: item.grounding.challenge ?? null,
+    situation: item.grounding.situation ?? null,
+    task: item.grounding.task ?? null,
+    action: item.grounding.action,
+    result: item.grounding.result,
+  }));
+}
+
 async function generateRoleExpertiseAnswersStep(input: {
   organizationId: string;
   campaignId: string;
@@ -832,6 +898,12 @@ async function generateRoleExpertiseAnswersStep(input: {
   usage?: AiCallUsageContext;
   /** Defaults to the campaign so the batch fill keeps one receipt. Ask Harper passes a per-question key. */
   subjectKey?: string;
+  /**
+   * Ask Harper only. Point-of-view answers do not need a story outcome.
+   * Either mode still stores a parsed answer so an identical question does not pay again,
+   * and the caller can show a best-available draft when the checks do not pass.
+   */
+  answerMode?: "story" | "point-of-view";
 }): Promise<
   | {
       ok: true;
@@ -887,7 +959,9 @@ async function generateRoleExpertiseAnswersStep(input: {
       inputFingerprint: fingerprint,
       parseStored: (json) => roleExpertiseAnswersResultSchema.parse(json),
       isResultUsable: (stored) =>
-        isRoleExpertiseAnswersResultUsable(stored, input.choices),
+        input.answerMode
+          ? stored.answers.length > 0
+          : isRoleExpertiseAnswersResultUsable(stored, input.choices),
       callProvider: async () => {
         let data: RoleExpertiseAnswersResult = { answers: [] };
         for (
@@ -919,40 +993,16 @@ async function generateRoleExpertiseAnswersStep(input: {
             });
           data = response.data;
           const merged = mergeQuestionsWithAnswers(input.choices, data.answers);
-          const checked = validateRoleExpertiseQuestions({
-            questions: merged,
-            minCount: input.choices.length,
-            maxCount: input.choices.length,
-            askedQuestions: [],
-            chronologyAlreadyAsked: false,
-          });
+          const checked = validateAnswersForMode(merged, input.answerMode);
           lastValid = checked.valid;
           const lastAttempt =
             attempt === consultationConfig.qualityRegenerationAttempts;
           if (checked.issues.length === 0) {
-            return {
-              answers: checked.valid.map((item) => ({
-                text: item.text,
-                answerFramework: item.grounding.answerFramework,
-                challenge: item.grounding.challenge ?? null,
-                situation: item.grounding.situation ?? null,
-                task: item.grounding.task ?? null,
-                action: item.grounding.action,
-                result: item.grounding.result,
-              })),
-            };
+            return { answers: mappedAnswers(checked.valid) };
           }
           if (lastAttempt) {
             return {
-              answers: checked.valid.map((item) => ({
-                text: item.text,
-                answerFramework: item.grounding.answerFramework,
-                challenge: item.grounding.challenge ?? null,
-                situation: item.grounding.situation ?? null,
-                task: item.grounding.task ?? null,
-                action: item.grounding.action,
-                result: item.grounding.result,
-              })),
+              answers: input.answerMode ? data.answers : mappedAnswers(checked.valid),
             };
           }
           qualityFeedback = checked.issues;
@@ -962,13 +1012,7 @@ async function generateRoleExpertiseAnswersStep(input: {
     });
 
     const merged = mergeQuestionsWithAnswers(input.choices, gated.data.answers);
-    const checked = validateRoleExpertiseQuestions({
-      questions: merged,
-      minCount: input.choices.length,
-      maxCount: input.choices.length,
-      askedQuestions: [],
-      chronologyAlreadyAsked: false,
-    });
+    const checked = validateAnswersForMode(merged, input.answerMode);
     const kept = checked.valid.length;
     const partial =
       checked.issues.length > 0 || kept < input.choices.length ? kept : null;
@@ -985,6 +1029,14 @@ async function generateRoleExpertiseAnswersStep(input: {
         questions: lastValid,
         skipped: false,
         keptAfterPartial: lastValid.length,
+      };
+    }
+    if (input.answerMode) {
+      return {
+        ok: true,
+        questions: [],
+        skipped: false,
+        keptAfterPartial: 0,
       };
     }
     return {
@@ -1018,6 +1070,22 @@ export async function generateAskHarperSuggestedAnswer(input: {
   if (!text) {
     return { ok: false, message: "A role-expertise question was empty." };
   }
+  const kind = askHarperAnswerKind(text);
+  const fallbackQuestion = (): ValidatedRoleExpertiseQuestion => {
+    const content = askHarperBestAvailableDraft(input.profileItems);
+    return {
+      text,
+      targetKey: askHarperTargetKey(text),
+      interviewTypeTag: ASK_HARPER_INTERVIEW_TYPE_TAG,
+      content,
+      grounding: {
+        answerFramework: "CAR",
+        challenge: "",
+        action: content,
+        result: "",
+      },
+    };
+  };
   const jobSources = {
     title: input.job.title,
     employer: input.job.companyName,
@@ -1043,6 +1111,7 @@ export async function generateAskHarperSuggestedAnswer(input: {
     jobSources,
     profileItems: input.profileItems,
     subjectKey: askHarperSubjectKey(input.campaignId, text),
+    answerMode: kind,
     usage: {
       organizationId: input.organizationId,
       campaignId: input.campaignId,
@@ -1051,16 +1120,14 @@ export async function generateAskHarperSuggestedAnswer(input: {
       metadata: { step: "role_expertise_answers", attempt: 1 },
     },
   });
-  if (!answersStep.ok) {
-    return { ok: false, message: answersStep.message };
-  }
-  const question = answersStep.questions[0];
-  if (!question) {
+  if (!answersStep.ok || !answersStep.questions[0]) {
     return {
-      ok: false,
-      message: "Role-expertise answers could not be generated.",
+      ok: true,
+      skipped: answersStep.ok ? answersStep.skipped : false,
+      question: fallbackQuestion(),
     };
   }
+  const question = answersStep.questions[0];
   return {
     ok: true,
     skipped: answersStep.skipped,

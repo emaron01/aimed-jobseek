@@ -110,6 +110,7 @@ export const consultationConversationCopy = Object.freeze({
   askHarperLine: "Have an interview question you're stumped on?",
   askHarperAction: "Ask Harper",
   askHarperNeedsQuestion: "Enter the question you want Harper to answer.",
+  askHarperNotAQuestion: "That isn't an interview question. Ask a real one.",
   askHarperDrafted: "Harper drafted an answer.",
   askHarperFailed: "Harper could not draft an answer for that question. Try again.",
   approve: "Approve",

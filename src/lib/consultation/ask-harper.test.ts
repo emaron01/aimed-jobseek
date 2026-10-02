@@ -146,7 +146,7 @@ function bannerAbove(host: HTMLElement, header: Element | null) {
   expect(line?.className).toContain("text-xl");
   expect(button?.textContent).toBe(consultationConversationCopy.askHarperAction);
   expect(button?.className).toContain("bg-bright-orange");
-  expect(button?.className).toContain("text-black");
+  expect(button?.className).toContain("text-on-bright-orange");
   expect(
     line!.compareDocumentPosition(button!) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
@@ -331,7 +331,7 @@ describe("Ask Harper, sidebar order, and learned notes", () => {
     const submit = form!.querySelector("button[type=submit]");
     expect(submit?.textContent).toBe(consultationConversationCopy.askHarperAction);
     expect(submit?.className).toContain("bg-bright-orange");
-    expect(submit?.className).toContain("text-black");
+    expect(submit?.className).toContain("text-on-bright-orange");
     field!.value = QUESTION;
     const pending = act(async () => {
       form!.requestSubmit();

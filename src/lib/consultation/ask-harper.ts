@@ -3,6 +3,7 @@
  * role-expertise answers step. Drafts stay out of the Harper sections and the
  * Cheat Sheet until the seeker approves the suggested answer.
  */
+import { isRealAskHarperQuestion } from "@/lib/consultation/ask-harper-answer";
 import { ASK_HARPER_TARGET_PREFIX, CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
 import { deriveCareerStage } from "@/lib/consultation/career-stage";
 import { profileEvidenceItems } from "@/lib/consultation/assess";
@@ -89,8 +90,8 @@ export async function askHarper(input: {
   question: string;
 }): Promise<{ ok: true; targetKey: string; skipped: boolean } | { ok: false; message: string }> {
   const question = input.question.trim();
-  if (!question) {
-    return { ok: false, message: consultationConversationCopy.askHarperNeedsQuestion };
+  if (!isRealAskHarperQuestion(question)) {
+    return { ok: false, message: consultationConversationCopy.askHarperNotAQuestion };
   }
 
   const campaign = await prisma.campaign.findFirst({
