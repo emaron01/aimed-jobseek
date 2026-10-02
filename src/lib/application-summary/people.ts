@@ -118,6 +118,10 @@ export function personSectionNeedsGeneration(section: {
   );
 }
 
+export function personaCheatSheetSectionKey(personaId: string): string {
+  return `persona:${personaId}`;
+}
+
 export function buildCheatSheetPeople(input: {
   roles: Array<{
     id: string;
@@ -134,6 +138,14 @@ export function buildCheatSheetPeople(input: {
     title: string | null;
   }>;
   interviewerContactIds: string[];
+  /** Roles the seeker added to the Cheat Sheet. Omitted roles stay off the sheet. */
+  activatedRoles?: Array<{
+    id: string;
+    name: string;
+    titles: string[];
+    involvement: "DIRECT" | "INDIRECT";
+    suggestionKey: string | null;
+  }>;
 }): CheatSheetPersonInput[] {
   const interviewerIds = new Set(input.interviewerContactIds);
   const people: CheatSheetPersonInput[] = [];
@@ -149,6 +161,18 @@ export function buildCheatSheetPeople(input: {
       heading: heading || role.name,
       roleName: role.name,
       titles: contact.title ? [contact.title, ...role.titles] : role.titles,
+      involvement: role.involvement,
+      suggestionKey: role.suggestionKey,
+    });
+  }
+  for (const role of input.activatedRoles ?? []) {
+    people.push({
+      sectionKey: personaCheatSheetSectionKey(role.id),
+      roleId: role.id,
+      contactId: null,
+      heading: role.name,
+      roleName: role.name,
+      titles: role.titles,
       involvement: role.involvement,
       suggestionKey: role.suggestionKey,
     });

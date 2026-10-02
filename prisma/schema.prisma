@@ -1500,6 +1500,8 @@ model Persona {
   /// Set when identification or research changed after this role was built.
   staleAt                     DateTime?
   staleReason                 String?
+  /// Set when the seeker adds this role to the Interview Cheat Sheet. Null means it is not shown there.
+  cheatSheetActivatedAt       DateTime?
   approvedPersonaSetupRunId   String?
   /// Soft-archive: hidden from setup UI; preserves ScoringRun FK history.
   archivedAt                  DateTime?

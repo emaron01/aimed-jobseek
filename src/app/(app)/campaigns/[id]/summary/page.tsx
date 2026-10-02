@@ -8,6 +8,7 @@ import {
 } from "@/components/ApplicationWorkspaceLive";
 import { AppActionLink } from "@/components/AppButton";
 import { CheatSheetPrintBanner, CheatSheetSection } from "@/components/CheatSheetCollapsible";
+import { CheatSheetEmptyState } from "@/components/CheatSheetEmptyState";
 import {
   CheatSheetPersonBody,
   RefreshLikelyQuestionsButton,
@@ -237,6 +238,7 @@ export default async function ApplicationSummaryPage({
       </CheatSheetSharedSection>
 
       <HarperDraftProvider>
+      {view.people.length === 0 ? <CheatSheetEmptyState campaignId={id} /> : null}
       <CheatSheetSection id="general-questions" title="General Questions">
         <CheatSheetQuestionCards
           campaignId={id}

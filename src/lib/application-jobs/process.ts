@@ -13,6 +13,7 @@ import {
   writePresentationPlan,
 } from "@/lib/application-assets/plan-service";
 import { generateOutreachAsset } from "@/lib/application-assets/outreach";
+import { enqueuePersonaCheatSheetSection } from "@/lib/application-summary/enqueue";
 import { generateApplicationSummary } from "@/lib/application-summary/service";
 import { checkOrganizationMaySpend } from "@/lib/billing/organization-spend";
 import { buildContactIndividualProfile } from "@/lib/contact-profile/service";
@@ -93,6 +94,14 @@ export async function processApplicationJob(
                 campaignId: job.campaignId,
                 personaId: job.targetId,
               });
+              if (payload.deferCheatSheetSection && job.targetId) {
+                await enqueuePersonaCheatSheetSection({
+                  organizationId: job.organizationId,
+                  campaignId: job.campaignId,
+                  personaId: job.targetId,
+                  userId: job.initiatedByUserId ?? payload.userId ?? null,
+                });
+              }
               if (!rebuildResult.synthesizeSkipped) {
                 const deferred = payload.deferredOutreach;
                 if (deferred?.assetType && deferred.personaId) {

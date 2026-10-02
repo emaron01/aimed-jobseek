@@ -287,13 +287,16 @@ export function CheatSheetPersonBody({
           showReply={showReply}
         />
         <p className="likely-questions-note mt-4 text-sm text-ink" data-testid="likely-questions-note">
-          {"These are Harper's top picks. They represent the types of questions this interviewer may ask. Make sure you study "}
+          {section.contactId
+            ? "These are Harper's top picks. They represent the types of questions this interviewer may ask. Make sure you study "
+            : applicationSummaryConfig.roleLikelyQuestionsLead}
           <a
             href={`/campaigns/${campaignId}/summary#general-questions`}
             className="font-medium text-ink underline"
           >
-            General Questions
-          </a>{"."}
+            {section.contactId ? "General Questions" : applicationSummaryConfig.generalQuestionsLink}
+          </a>
+          {"."}
         </p>
       </CheatSheetSubsection>
       {personQuestionCards}

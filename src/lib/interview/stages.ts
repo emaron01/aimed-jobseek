@@ -461,19 +461,12 @@ export async function addInterviewStageInterviewer(input: {
     stageId: stage.id,
     contactId: added.contactId,
   });
-  const { offerPersonPrep } = await import("@/lib/interview/person-prep");
-  await offerPersonPrep({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    contactId: added.contactId,
-    personaId: input.personaId,
-  });
   return added;
 }
 
 /**
- * Harper "Add Interview Contact": create the campaign contact and start prep
- * through the same seeker paths as Stage add-interviewer, without assigning a stage.
+ * Harper "Add Interview Contact": create the campaign contact without starting
+ * interviewer prep. Prep starts only from Start interviewer prep.
  */
 export async function addInterviewContact(input: {
   organizationId: string;
@@ -510,13 +503,6 @@ export async function addInterviewContact(input: {
       personaId: added.personaId,
     });
   }
-  const { offerPersonPrep } = await import("@/lib/interview/person-prep");
-  await offerPersonPrep({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    contactId: added.contactId,
-    personaId: input.personaId,
-  });
   return added;
 }
 

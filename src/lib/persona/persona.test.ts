@@ -75,6 +75,7 @@ function asPersona(partial: typeof SALES_LEADER_FIXTURE): Persona {
     setupStatus: "NOT_STARTED",
     staleAt: null,
     staleReason: null,
+    cheatSheetActivatedAt: null,
     approvedPersonaSetupRunId: null,
     archivedAt: null,
     createdAt: new Date(),

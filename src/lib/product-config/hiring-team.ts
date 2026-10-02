@@ -29,12 +29,17 @@ export const hiringTeamConfig = {
     edit: "Edit",
     addPerson: "Add person",
     knowWhoInterviewing: "I know who is interviewing me in this group",
+    addToCheatSheet: "Add to Cheat Sheet",
+    removeFromCheatSheet: "Remove from Cheat Sheet",
     moveToDirect: "Move to Direct",
     moveToIndirect: "Move to Indirect",
   },
   addPersonTitle: "Add a Person",
   detailsLabel: "Details",
   needsReviewGroup: "Needs review",
+  recommendedMark: "Recommended",
+  recommendedLine:
+    "Harper recommends studying these roles. They're the ones most likely to interview you for this job.",
   assumptionIntro:
     "Harper identified these Hiring Team roles from the job posting and company research. Select the roles that align to the title or responsibilities of the person who you are interviewing with. NOTE: You can select personas as they are identified.",
   addPersonNote:

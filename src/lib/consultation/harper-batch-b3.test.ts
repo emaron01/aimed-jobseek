@@ -138,7 +138,7 @@ describe("Harper Batch B3 person view, search, Add Interview Contact, assign-onl
     expect(filter).toContain("selectOption");
   });
 
-  it("Add Interview Contact creates contact and starts prep through existing paths", () => {
+  it("Add Interview Contact creates the contact and does not start prep", () => {
     const stages = src("src/lib/interview/stages.ts");
     const actions = src("src/app/actions/interview.ts");
     const personView = src("src/components/HarperPersonView.tsx");
@@ -155,7 +155,7 @@ describe("Harper Batch B3 person view, search, Add Interview Contact, assign-onl
       stages.indexOf("export async function startPersonPrepForContact"),
     );
     expect(addFn).toContain("addApplicationContact");
-    expect(addFn).toContain("offerPersonPrep");
+    expect(addFn).not.toContain("await offerPersonPrep");
     expect(addFn).not.toContain("enqueueInterviewerCheatSheetSection");
     expect(addFn).toContain("saveLinkedInPaste");
     expect(addFn).not.toContain("replaceStageInterviewer");

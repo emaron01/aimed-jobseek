@@ -563,6 +563,7 @@ export async function queueHiringTeamBuild(input: {
   personaId: string;
   initiatedByUserId?: string | null;
   deferredOutreach?: ApplicationJobPayload["deferredOutreach"];
+  deferCheatSheetSection?: boolean;
 }) {
   const { isPersonaAiConfigured } = await import("@/lib/ai");
   if (!isPersonaAiConfigured()) {
@@ -575,20 +576,17 @@ export async function queueHiringTeamBuild(input: {
     where: { id: persona.id },
     data: { setupStatus: "SYNTHESIZING", staleAt: null, staleReason: null },
   });
+  const payload: ApplicationJobPayload = {};
+  if (input.initiatedByUserId) payload.userId = input.initiatedByUserId;
+  if (input.deferredOutreach) payload.deferredOutreach = input.deferredOutreach;
+  if (input.deferCheatSheetSection) payload.deferCheatSheetSection = true;
   return enqueueApplicationJob({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
     type: "HIRING_TEAM_BUILD",
     targetId: persona.id,
     initiatedByUserId: input.initiatedByUserId,
-    payload: input.deferredOutreach
-      ? {
-          userId: input.initiatedByUserId ?? undefined,
-          deferredOutreach: input.deferredOutreach,
-        }
-      : input.initiatedByUserId
-        ? { userId: input.initiatedByUserId }
-        : undefined,
+    payload: Object.keys(payload).length > 0 ? payload : undefined,
   });
 }
 

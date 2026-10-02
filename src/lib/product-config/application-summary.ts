@@ -69,6 +69,12 @@ export const applicationSummaryConfig = Object.freeze({
     unbuiltPersona:
       "You have not fully built this persona. Do you want to build it now?",
   },
+  emptyPeopleLead: "When you know who you will interview with, ",
+  emptyPeopleLink: "add them here",
+  emptyPeopleTail: " for Interview Prep.",
+  roleLikelyQuestionsLead:
+    "These are Harper's top picks for this role. They represent the types of questions someone in this role may ask. Make sure you study ",
+  generalQuestionsLink: "General Questions",
   cultureEvidenceLabel: "Based on limited public evidence",
   missingWhyThisCompany:
     "State why you want this company in the Personal Profile. This is not answered by a work story.",

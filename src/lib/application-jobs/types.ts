@@ -44,6 +44,8 @@ export type ApplicationJobPayload = {
   adjustmentNote?: string | null;
   planType?: "RESUME" | "COVER_LETTER";
   sectionKey?: string;
+  /** Add to Cheat Sheet: write the role section after this build finishes. */
+  deferCheatSheetSection?: boolean;
   deferredOutreach?: {
     userId?: string;
     assetType: string;

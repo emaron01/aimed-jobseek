@@ -1,6 +1,9 @@
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { prisma } from "@/lib/prisma-client";
-import { personSectionNeedsGeneration } from "@/lib/application-summary/people";
+import {
+  personaCheatSheetSectionKey,
+  personSectionNeedsGeneration,
+} from "@/lib/application-summary/people";
 
 export async function enqueueCheatSheetPersonSection(input: {
   organizationId: string;
@@ -28,6 +31,61 @@ export async function enqueueCheatSheetPersonSection(input: {
         event: "cheat_sheet_input_hash_check_failed",
         campaignId: input.campaignId,
         contactId: input.contactId,
+        message: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+  }
+  const job = await enqueueApplicationJob({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    type: "APPLICATION_SUMMARY",
+    targetId: sectionKey,
+    initiatedByUserId: input.userId ?? null,
+    payload: {
+      userId: input.userId ?? undefined,
+      sectionKey,
+    },
+  });
+  return job.id;
+}
+
+/** One role section. Skips when the role is not on the Cheat Sheet or inputs are unchanged. */
+export async function enqueuePersonaCheatSheetSection(input: {
+  organizationId: string;
+  campaignId: string;
+  personaId: string;
+  userId?: string | null;
+}): Promise<string | null> {
+  const persona = await prisma.persona.findFirst({
+    where: {
+      id: input.personaId,
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      archivedAt: null,
+    },
+    select: { cheatSheetActivatedAt: true },
+  });
+  if (!persona?.cheatSheetActivatedAt) return null;
+  const sectionKey = personaCheatSheetSectionKey(input.personaId);
+  try {
+    const { personSectionInputsUnchanged } = await import(
+      "@/lib/application-summary/service"
+    );
+    if (
+      await personSectionInputsUnchanged({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        sectionKey,
+      })
+    ) {
+      return null;
+    }
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "cheat_sheet_input_hash_check_failed",
+        campaignId: input.campaignId,
+        personaId: input.personaId,
         message: error instanceof Error ? error.message : "unknown",
       }),
     );

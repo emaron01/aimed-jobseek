@@ -223,8 +223,8 @@ describe.skipIf(!hasTestDatabase())("interview stages without guide", { timeout:
       where: { campaignId, contactId: added.contactId },
     });
     expect(membership?.roleConfirmed).toBe(true);
-    expect(membership?.personPrepOfferedAt).not.toBeNull();
-    expect(membership?.personPrepStatus).toBe("OFFERED");
+    expect(membership?.personPrepOfferedAt).toBeNull();
+    expect(membership?.personPrepStatus).toBeNull();
     await updateInterviewStage({
       organizationId,
       campaignId,

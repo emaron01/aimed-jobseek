@@ -400,6 +400,7 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
     suggestionKey: role.suggestionKey,
     reason: role.whyThisPersonaMatters,
     updatedAt: role.updatedAt,
+    cheatSheetActivatedAt: role.cheatSheetActivatedAt,
     ...personaNarrative(role.profileJson),
   }));
   const interviewerContactIds = interviewerContactIdsFrom({
@@ -429,6 +430,15 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
         title: row.contact.title,
       })),
     interviewerContactIds,
+    activatedRoles: roles
+      .filter((role) => role.cheatSheetActivatedAt)
+      .map((role) => ({
+        id: role.id,
+        name: role.name,
+        titles: role.likelyTitles,
+        involvement: role.involvement,
+        suggestionKey: role.suggestionKey,
+      })),
   }).map((person) => {
     const role = campaign.hiringTeamRoles.find((item) => item.id === person.roleId);
     return {

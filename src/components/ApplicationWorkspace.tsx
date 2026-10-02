@@ -73,6 +73,11 @@ import { HiringTeamReviewGroup } from "@/components/HiringTeamReviewGroup";
 import { HiringTeamPersonPicker } from "@/components/HiringTeamPersonPicker";
 import { HiringTeamRoleActions } from "@/components/HiringTeamRoleActions";
 import {
+  HiringTeamCheatSheetToggle,
+  HiringTeamRecommendedLine,
+  HiringTeamRecommendedMark,
+} from "@/components/HiringTeamCheatSheetControls";
+import {
   displayedFitBucket,
   fitCriterionReason,
   fitSignalLabels,
@@ -1149,6 +1154,9 @@ async function HiringTeamSection({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h4 className="text-sm font-semibold text-ink">{role.name}</h4>
+            {narrative?.involvement !== "INDIRECT" ? (
+              <HiringTeamRecommendedMark personaId={role.id} />
+            ) : null}
             {chip.kind === "building" ? (
               <span data-testid={`hiring-team-status-${role.id}`}>
                 <AppPendingIndicator label={chip.text ?? hiringTeamConfig.status.building} />
@@ -1260,24 +1268,31 @@ async function HiringTeamSection({
           <p className="text-sm text-ink">{role.whyThisPersonaMatters}</p>
         ) : null}
         {canEdit ? (
-          <ApplicationActionForm
-            action={
-              role.setupStatus === "FAILED" || role.staleAt
-                ? rebuildApplicationRoleAction
-                : buildApplicationRoleAction
-            }
-            submitLabel={
-              role.setupStatus === "FAILED"
-                ? hiringTeamConfig.actions.retry
-                : role.staleAt
-                  ? hiringTeamConfig.actions.rebuild
-                  : hiringTeamConfig.actions.build
-            }
-            testId={`build-role-${role.id}`}
-          >
-            <input type="hidden" name="campaignId" value={campaignId} />
-            <input type="hidden" name="personaId" value={role.id} />
-          </ApplicationActionForm>
+          <>
+            <ApplicationActionForm
+              action={
+                role.setupStatus === "FAILED" || role.staleAt
+                  ? rebuildApplicationRoleAction
+                  : buildApplicationRoleAction
+              }
+              submitLabel={
+                role.setupStatus === "FAILED"
+                  ? hiringTeamConfig.actions.retry
+                  : role.staleAt
+                    ? hiringTeamConfig.actions.rebuild
+                    : hiringTeamConfig.actions.build
+              }
+              testId={`build-role-${role.id}`}
+            >
+              <input type="hidden" name="campaignId" value={campaignId} />
+              <input type="hidden" name="personaId" value={role.id} />
+            </ApplicationActionForm>
+            <HiringTeamCheatSheetToggle
+              campaignId={campaignId}
+              personaId={role.id}
+              added={role.cheatSheetActivatedAt != null}
+            />
+          </>
         ) : null}
         {canEdit ? (
           <ApplicationActionForm
@@ -1440,6 +1455,7 @@ async function HiringTeamSection({
         <p className="text-sm text-muted">No {vocab.persona.plural} yet.</p>
       ) : (
         <div className="space-y-5">
+          {directRoles.length > 0 ? <HiringTeamRecommendedLine /> : null}
           <HiringTeamReviewGroup
             title={hiringTeamConfig.status.approved}
             testId="hiring-team-group-approved"

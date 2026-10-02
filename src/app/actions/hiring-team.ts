@@ -19,6 +19,10 @@ import {
   assignApplicationContactToPersona,
 } from "@/lib/application/contacts";
 import { saveLinkedInPaste } from "@/lib/contact-profile/service";
+import {
+  addPersonaToCheatSheet,
+  removePersonaFromCheatSheet,
+} from "@/lib/application-summary/persona-cheat-sheet";
 import { hiringTeamConfig, workspaceProgressText } from "@/lib/product-config";
 import {
   createPersonaTemplate,
@@ -188,6 +192,69 @@ export async function moveApplicationRoleInvolvementAction(
     return { ok: true, message: `${vocab.persona.Singular} moved.` };
   } catch (error) {
     return fail(error, `The ${vocab.persona.singular} could not be moved.`);
+  }
+}
+
+export async function addPersonaToCheatSheetAction(
+  _prev: HiringTeamActionResult | null,
+  formData: FormData,
+): Promise<HiringTeamActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    const user = await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    const personaId = String(formData.get("personaId") ?? "").trim();
+    if (!campaignId || !personaId) {
+      return { ok: false, message: `${vocab.persona.Singular} was not found.` };
+    }
+    const added = await addPersonaToCheatSheet({
+      organizationId,
+      campaignId,
+      personaId,
+      userId: user.id,
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/campaigns/${campaignId}/hiring-team`);
+    revalidatePath(`/campaigns/${campaignId}/summary`);
+    if (added.kind === "build") {
+      return {
+        ok: true,
+        message: hiringTeamConfig.queuedBuild,
+        ...(added.jobId ? { jobId: added.jobId } : {}),
+      };
+    }
+    if (added.kind === "section") {
+      return {
+        ok: true,
+        message: workspaceProgressText("APPLICATION_SUMMARY"),
+        ...(added.jobId ? { jobId: added.jobId } : {}),
+      };
+    }
+    return { ok: true, message: hiringTeamConfig.actions.addToCheatSheet };
+  } catch (error) {
+    return fail(error, `The ${vocab.persona.singular} could not be added to the cheat sheet.`);
+  }
+}
+
+export async function removePersonaFromCheatSheetAction(
+  _prev: HiringTeamActionResult | null,
+  formData: FormData,
+): Promise<HiringTeamActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    const personaId = String(formData.get("personaId") ?? "").trim();
+    if (!campaignId || !personaId) {
+      return { ok: false, message: `${vocab.persona.Singular} was not found.` };
+    }
+    await removePersonaFromCheatSheet({ organizationId, campaignId, personaId });
+    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/campaigns/${campaignId}/hiring-team`);
+    revalidatePath(`/campaigns/${campaignId}/summary`);
+    return { ok: true, message: hiringTeamConfig.actions.removeFromCheatSheet };
+  } catch (error) {
+    return fail(error, `The ${vocab.persona.singular} could not be removed from the cheat sheet.`);
   }
 }
 
@@ -380,19 +447,12 @@ export async function assignExistingHiringTeamPersonAction(
     if (!contactId) {
       return { ok: false, message: `${vocab.contact.Singular} was not found.` };
     }
-    const assigned = await assignApplicationContactToPersona({
+    await assignApplicationContactToPersona({
       organizationId,
       campaignId,
       userId: user.id,
       contactId,
       personaId,
-    });
-    const { offerPersonPrep } = await import("@/lib/interview/person-prep");
-    await offerPersonPrep({
-      organizationId,
-      campaignId,
-      contactId: assigned.contactId,
-      personaId: assigned.personaId,
     });
     revalidatePath(`/campaigns/${campaignId}`);
     return { ok: true, message: `${vocab.contact.Singular} assigned.` };
@@ -435,13 +495,6 @@ export async function addHiringTeamPersonAction(
         personaId,
       });
     }
-    const { offerPersonPrep } = await import("@/lib/interview/person-prep");
-    await offerPersonPrep({
-      organizationId,
-      campaignId,
-      contactId: added.contactId,
-      personaId,
-    });
     revalidatePath(`/campaigns/${campaignId}`);
     return {
       ok: true,
