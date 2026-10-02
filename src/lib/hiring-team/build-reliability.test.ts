@@ -44,13 +44,18 @@ describe("hiring team build reliability", () => {
 
   it("shows the Add Interviewer Title / Persona form above Direct", () => {
     const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
-    const formAt = workspace.indexOf('submitLabel="Add Interviewer Title / Persona"');
+    const form = readFileSync("src/components/AddPersonaSection.tsx", "utf8");
+    const formAt = workspace.indexOf("<AddPersonaSection");
     const directAt = workspace.indexOf("hiringTeamConfig.sections.direct");
     expect(formAt).toBeGreaterThan(0);
     expect(directAt).toBeGreaterThan(formAt);
-    expect(workspace).toContain('testId="add-hiring-team-role"');
-    expect(workspace).toContain('name="likelyTitles"');
-    expect(workspace).toContain('name="whyThisRoleMatters"');
+    expect(form).toContain("hiringTeamConfig.addPersonaTitle");
+    expect(form).toContain("hiringTeamConfig.addPersonaSubmit");
+    expect(hiringTeamConfig.addPersonaTitle).toBe("Add a new persona");
+    expect(hiringTeamConfig.addPersonaSubmit).toBe("Add persona");
+    expect(form).toContain('testId="add-hiring-team-role"');
+    expect(form).toContain('name="likelyTitles"');
+    expect(form).toContain('name="whyThisRoleMatters"');
   });
 
   it("maps status chips to the seeker-facing strings only", () => {

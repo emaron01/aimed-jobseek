@@ -46,6 +46,7 @@ export function ApplicationActionForm({
   hideSubmit = false,
   disableFieldsWhilePending = false,
   preserveScroll = true,
+  onSuccess,
   compact = false,
   formClassName = "space-y-3",
   formId,
@@ -65,6 +66,8 @@ export function ApplicationActionForm({
   disableFieldsWhilePending?: boolean;
   /** Keep viewport position after a successful router.refresh (Harper Q&A). */
   preserveScroll?: boolean;
+  /** Runs after a successful action, before the page refresh. */
+  onSuccess?: () => void;
   /** Smaller seeker action buttons (Harper question row). */
   compact?: boolean;
   formClassName?: string;
@@ -86,6 +89,7 @@ export function ApplicationActionForm({
       const result = await runApplicationFormAction(action, state, formData);
       setState(result);
       if (result.ok) {
+        onSuccess?.();
         router.refresh();
         if (preserveScroll && typeof window !== "undefined") {
           const restore = () => window.scrollTo(scrollX, scrollY);

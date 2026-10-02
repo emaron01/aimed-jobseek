@@ -120,7 +120,7 @@ function HeadingButton({
       <Heading className="flex items-center gap-2 text-sm font-semibold text-primary">
         <span
           aria-hidden="true"
-          className="inline-block text-primary"
+          className="inline-block text-primary print:hidden"
           data-cheat-sheet-indicator={open ? "open" : "collapsed"}
         >
           {open ? "▼" : "▶"}

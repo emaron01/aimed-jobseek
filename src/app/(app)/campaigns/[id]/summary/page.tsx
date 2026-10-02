@@ -15,6 +15,7 @@ import {
 } from "@/components/CheatSheetPersonBody";
 import { CheatSheetQuestionCards } from "@/components/CheatSheetQuestionCards";
 import { HarperDraftProvider } from "@/components/HarperDraftStore";
+import { HiringTeamCheatSheetToggle } from "@/components/HiringTeamCheatSheetControls";
 import {
   CheatSheetFilterProvider,
   CheatSheetPeopleFilter,
@@ -286,12 +287,21 @@ export default async function ApplicationSummaryPage({
           <CheatSheetPersonSection key={person.sectionKey} sectionKey={person.sectionKey}>
           <CheatSheetSection id={person.sectionKey} title={person.heading}
             headerAside={
-              canGenerate && section ? (
-                <RefreshLikelyQuestionsButton
-                  campaignId={id}
-                  sectionKey={person.sectionKey}
-                />
-              ) : null
+              <>
+                {canGenerate && section ? (
+                  <RefreshLikelyQuestionsButton
+                    campaignId={id}
+                    sectionKey={person.sectionKey}
+                  />
+                ) : null}
+                {!person.contactId ? (
+                  <HiringTeamCheatSheetToggle
+                    campaignId={id}
+                    personaId={person.roleId}
+                    added
+                  />
+                ) : null}
+              </>
             }
           >
             <CheatSheetPersonBody

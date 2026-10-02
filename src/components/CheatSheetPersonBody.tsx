@@ -22,6 +22,7 @@ import {
 import {
   applicationSummaryConfig,
   consultationConversationCopy,
+  hiringTeamConfig,
 } from "@/lib/product-config";
 
 function CoachingDisclaimer() {
@@ -184,7 +185,8 @@ export function CheatSheetPersonBody({
         {canEdit ? (
           <ApplicationActionForm
             action={buildCheatSheetPersonaAction}
-            submitLabel={applicationSummaryConfig.actions.buildPersonaNow}
+            submitLabel={hiringTeamConfig.actions.build}
+            pendingLabel={hiringTeamConfig.queuedBuild}
             testId={`build-cheat-sheet-persona-${sectionKey}`}
           >
             <input type="hidden" name="campaignId" value={campaignId} />
@@ -304,12 +306,12 @@ export function CheatSheetPersonBody({
         id={`${sectionKey}-questions-to-ask`}
         title={applicationSummaryConfig.sections.questionsToAsk}
       >
-        <ul className="list-disc space-y-3 pl-5 text-sm text-ink">
+        <ul className="list-disc space-y-3 pl-5 text-sm text-ink" data-testid="questions-to-ask-print">
           {section.questionsToAsk.map((item, index) => (
             <li key={`${index}:${item.text}`}>
               <p>{item.text}</p>
               {item.followUps.length > 0 ? (
-                <div className="mt-1">
+                <div className="mt-1 print:hidden">
                   <p className="font-medium">
                     {applicationSummaryConfig.sections.followUps}
                   </p>

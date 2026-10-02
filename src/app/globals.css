@@ -115,8 +115,20 @@ body {
   }
 
   .application-summary .cheat-sheet-collapsible-body,
+  .application-summary .cheat-sheet-collapsible-body.hidden,
   .application-summary button.cheat-sheet-collapsible-heading {
     display: block !important;
+  }
+
+  .application-summary [data-cheat-sheet-indicator] {
+    display: none !important;
+  }
+
+  html,
+  body,
+  main {
+    overflow: visible !important;
+    height: auto !important;
   }
 
   .application-summary-section {
@@ -148,8 +160,32 @@ body {
 }
 
 .cheat-sheet-print-banner,
+.cheat-sheet-print-copy,
 .consultation-question-print {
   display: none !important;
+}
+
+@media print {
+  .cheat-sheet-print-copy,
+  .application-summary .consultation-question-print,
+  .application-summary .consultation-question-print[hidden] {
+    display: block !important;
+  }
+
+  .application-summary [data-testid="cheat-sheet-coach-items"] > li,
+  .application-summary [data-testid="cheat-sheet-coach-items"] article {
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+  }
+
+  .application-summary a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
 }
 
 @media print {

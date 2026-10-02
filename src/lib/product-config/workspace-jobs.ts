@@ -4,6 +4,7 @@
  */
 import type { ApplicationJobType } from "@prisma/client";
 import { consultationConfig } from "./consultation";
+import { hiringTeamConfig } from "./hiring-team";
 import { applicationResearchCopy, applicationWorkspaceCopy, vocab } from "./vocabulary";
 import { applicationAssetConfig } from "./application-assets";
 import { applicationSummaryConfig } from "./application-summary";
@@ -70,6 +71,7 @@ export function workspaceProgressText(
   roleName?: string | null,
   operation?: string | null,
 ): string {
+  void roleName;
   switch (type) {
     case "CONSULTATION":
       if (operation === "continue") {
@@ -86,9 +88,7 @@ export function workspaceProgressText(
     case "HIRING_TEAM_IDENTIFY":
       return `Identifying the ${vocab.persona.nav}…`;
     case "HIRING_TEAM_BUILD":
-      return roleName
-        ? `Generating the ${roleName} ${vocab.persona.singular}…`
-        : `Generating this ${vocab.persona.singular}…`;
+      return hiringTeamConfig.queuedBuild;
     case "CONTACT_PROFILE":
       return "Generating this person's individual profile…";
     case "RESUME":

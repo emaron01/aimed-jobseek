@@ -32,7 +32,6 @@ import { profileJsonAwaitingSeekerInput } from "@/lib/hiring-team/synthesize-out
 import { AppPendingIndicator } from "@/components/AppButton";
 import { getApplicationResearchStatus } from "@/lib/application/research-status";
 import {
-  addApplicationRoleAction,
   addTemplateRoleAction,
   approveApplicationRoleAction,
   buildAllDirectRolesAction,
@@ -68,6 +67,7 @@ import {
 } from "@/components/ApplicationOutreachSections";
 import { isOutreachAssetType } from "@/lib/product-config";
 import { HiringTeamDisclosureGroup } from "@/components/HiringTeamDisclosureGroup";
+import { AddPersonaSection } from "@/components/AddPersonaSection";
 import { HiringTeamAssumptionNotice } from "@/components/HiringTeamAssumptionNotice";
 import { HiringTeamReviewGroup } from "@/components/HiringTeamReviewGroup";
 import { HiringTeamPersonPicker } from "@/components/HiringTeamPersonPicker";
@@ -1275,13 +1275,8 @@ async function HiringTeamSection({
                   ? rebuildApplicationRoleAction
                   : buildApplicationRoleAction
               }
-              submitLabel={
-                role.setupStatus === "FAILED"
-                  ? hiringTeamConfig.actions.retry
-                  : role.staleAt
-                    ? hiringTeamConfig.actions.rebuild
-                    : hiringTeamConfig.actions.build
-              }
+              submitLabel={hiringTeamConfig.actions.build}
+              pendingLabel={hiringTeamConfig.queuedBuild}
               testId={`build-role-${role.id}`}
             >
               <input type="hidden" name="campaignId" value={campaignId} />
@@ -1407,50 +1402,19 @@ async function HiringTeamSection({
   );
   };
   return (
+    <>
+    {asPage ? <HiringTeamAssumptionNotice /> : null}
     <details id="hiring-team" className="space-y-4 rounded-lg border border-edge bg-surface p-5" data-testid="hiring-team">
       {asPage ? <OpenDetailsOnMount /> : null}
       <summary className="cursor-pointer text-base font-semibold text-ink">
         {hiringTeamConfig.workspaceTitle}
       </summary>
       <div className="mt-4 space-y-4">
-      <HiringTeamAssumptionNotice />
+      {asPage ? null : <HiringTeamAssumptionNotice />}
       <WorkspaceProgress jobs={jobs} type="HIRING_TEAM_IDENTIFY" />
       <WorkspaceProgress jobs={jobs} type="HIRING_TEAM_BUILD" />
       <WorkspaceProgress jobs={jobs} type="CONTACT_PROFILE" />
-      <div>
-        <p className="mt-1 text-sm text-muted">
-          Saved templates are added only when you choose one.
-        </p>
-      </div>
-      {canEdit ? (
-        <ApplicationActionForm
-          action={addApplicationRoleAction}
-          submitLabel="Add Interviewer Title / Persona"
-          testId="add-hiring-team-role"
-        >
-          <input type="hidden" name="campaignId" value={campaignId} />
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Name</span>
-            <input name="name" required className={fieldClass} />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Likely titles</span>
-            <textarea name="likelyTitles" rows={3} className={fieldClass} />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Department</span>
-            <input name="department" className={fieldClass} />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Why this role matters</span>
-            <textarea name="whyThisRoleMatters" rows={2} className={fieldClass} />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Notes</span>
-            <textarea name="notes" rows={2} className={fieldClass} />
-          </label>
-        </ApplicationActionForm>
-      ) : null}
+      {canEdit ? <AddPersonaSection campaignId={campaignId} /> : null}
       {roles.length === 0 ? (
         <p className="text-sm text-muted">No {vocab.persona.plural} yet.</p>
       ) : (
@@ -1533,6 +1497,7 @@ async function HiringTeamSection({
       ) : null}
       </div>
     </details>
+    </>
   );
 }
 

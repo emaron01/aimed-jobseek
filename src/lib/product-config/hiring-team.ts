@@ -22,7 +22,7 @@ export const hiringTeamConfig = {
     awaitingDetails: "Add more details to build this persona",
   },
   actions: {
-    build: `${polishCopy.generate} ${vocab.persona.singular}`,
+    build: "Generate persona research",
     buildAllDirect: "Generate all Direct roles",
     rebuild: polishCopy.regenerate,
     retry: "Retry",
@@ -45,7 +45,9 @@ export const hiringTeamConfig = {
   addPersonNote:
     "When you know who will be interviewing you for this role, add them to their Hiring Team role.",
   queuedIdentify: `Identifying the ${vocab.persona.nav}…`,
-  queuedBuild: `Generating this ${vocab.persona.singular}…`,
+  addPersonaTitle: "Add a new persona",
+  addPersonaSubmit: "Add persona",
+  queuedBuild: "Researching this persona…",
   queuedBuildAllDirect: "Generating all direct roles…",
   needsBuildFirst: `Generate this ${vocab.persona.singular} first. Starting now…`,
   controls: {

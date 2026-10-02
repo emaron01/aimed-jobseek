@@ -152,7 +152,7 @@ export async function AppShell({
         {personalBillingNoticeOrgs.length > 0 ? (
           <PersonalBillingNoticeBanner orgs={personalBillingNoticeOrgs} />
         ) : null}
-        <main className="flex-1 overflow-auto bg-canvas p-4 sm:p-6">
+        <main className="flex-1 overflow-auto bg-canvas p-4 print:overflow-visible print:h-auto sm:p-6">
           <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>
       </div>

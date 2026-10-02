@@ -173,12 +173,13 @@ describe("Harper Batch B4 Cheat Sheet read-only", () => {
     expect(page).not.toContain("stage.notesAfter ?");
   });
 
-  it("generation, regenerate, and build controls are unchanged", () => {
+  it("generation and missing-section controls stay, and persona build uses the shared research labels", () => {
     expect(page).toContain("generateApplicationSummaryAction");
     expect(page).toContain('testId="application-summary-generation"');
     expect(body).toContain("buildCheatSheetPersonaAction");
     expect(body).toContain("generateApplicationSummaryAction");
-    expect(body).toContain("applicationSummaryConfig.actions.buildPersonaNow");
+    expect(body).toContain("hiringTeamConfig.actions.build");
+    expect(body).toContain("hiringTeamConfig.queuedBuild");
     expect(body).toContain("applicationSummaryConfig.actions.generateSection");
   });
 
