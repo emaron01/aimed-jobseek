@@ -162,8 +162,10 @@ describe("Harper Batch B3 person view, search, Add Interview Contact, assign-onl
     expect(addFn).not.toContain("replaceStageInterviewer");
 
     // Create starts from an existing contact; the per-stage assign control is gone.
-    expect(stageList).toContain("people.map");
-    expect(stageList).toContain('name="contactId"');
+    const addSomeone = src("src/components/StageInterviewerSection.tsx");
+    expect(addSomeone).toContain("people.map");
+    expect(addSomeone).toContain('name="contactId"');
+    expect(stageList).toContain("AddSomeoneYoureMeeting");
     expect(panel).not.toContain("assignExistingInterviewerAction");
   });
 

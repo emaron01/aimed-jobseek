@@ -1,14 +1,13 @@
-import {
-  addCheatSheetInterviewNoteAction,
-  createInterviewStageAction,
-  updateInterviewStageAction,
-} from "@/app/actions/interview";
+import { updateInterviewStageAction } from "@/app/actions/interview";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { InterviewStageInterviewerLink } from "@/components/InterviewStagePanel";
 import {
+  AddFollowUpInterview,
+  AddSomeoneYoureMeeting,
+  CheatSheetNoteForm,
   InterviewerCollapsible,
   RemoveInterviewControl,
-  StageAddContactForm,
+  SavedInterviewNotes,
 } from "@/components/StageInterviewerSection";
 import { listApplicationContacts } from "@/lib/application/contacts";
 import { parseCheatSheetNotes } from "@/lib/application-summary/notes";
@@ -137,7 +136,7 @@ function StageStoredNotes({
   contactId: string | null;
   notesBefore: string | null;
   notesAfter: string | null;
-  cheatSheetNotes: Array<{ id: string; text: string }>;
+  cheatSheetNotes: Array<{ id: string; text: string; createdAt: string }>;
   expectedDecisionAt: Date | null;
   canEdit: boolean;
   campaignId: string;
@@ -145,6 +144,10 @@ function StageStoredNotes({
   const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
   const before = notesBefore?.trim() ?? "";
   const after = notesAfter?.trim() ?? "";
+  const savedNotes = [...cheatSheetNotes].sort(
+    (left, right) =>
+      left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id),
+  );
   return (
     <div
       className="space-y-3"
@@ -167,12 +170,6 @@ function StageStoredNotes({
           <span className="mt-1 block whitespace-pre-wrap">{after}</span>
         </p>
       ) : null}
-      {cheatSheetNotes.map((note) => (
-        <p key={note.id} className="text-sm text-ink" data-testid={`stored-gained-note-${note.id}`}>
-          <span className="font-medium">{interviewConfig.labels.gainedInformation}</span>
-          <span className="mt-1 block whitespace-pre-wrap">{note.text}</span>
-        </p>
-      ))}
       {expectedDecisionAt ? (
         <p className="text-sm text-ink" data-testid={`saved-expected-decision-${stageId}-${contactId ?? "stage"}`}>
           <span className="font-medium">{interviewConfig.labels.savedExpectedDecision}</span>
@@ -180,75 +177,16 @@ function StageStoredNotes({
         </p>
       ) : null}
       {canEdit && contactId ? (
-        <ApplicationActionForm
-          action={addCheatSheetInterviewNoteAction}
-          submitLabel={interviewConfig.labels.addGainedInformation}
-          testId={`add-cheat-sheet-note-${stageId}-${contactId}`}
-        >
-          <input type="hidden" name="campaignId" value={campaignId} />
-          <input type="hidden" name="stageId" value={stageId} />
-          <input type="hidden" name="contactId" value={contactId} />
-          <label className="text-sm">
-            {interviewConfig.labels.gainedInformation}
-            <textarea name="note" rows={4} required className={fieldClass} />
-          </label>
-        </ApplicationActionForm>
-      ) : null}
-    </div>
-  );
-}
-
-function InterviewScheduleFields({
-  fieldClass,
-  contactId,
-  people = [],
-}: {
-  fieldClass: string;
-  contactId?: string;
-  people?: PersonOption[];
-}) {
-  return (
-    <div className="grid gap-3 md:grid-cols-2">
-      {contactId ? (
-        <input type="hidden" name="contactId" value={contactId} />
+        <CheatSheetNoteForm
+          campaignId={campaignId}
+          stageId={stageId}
+          contactId={contactId}
+          fieldClass={fieldClass}
+          notes={savedNotes}
+        />
       ) : (
-        <label className="text-sm md:col-span-2">
-          {interviewConfig.labels.interviewer}
-          <select name="contactId" required className={fieldClass} defaultValue="">
-            <option value="">{interviewConfig.labels.noInterviewer}</option>
-            {people.map((person) => (
-              <option key={person.contactId} value={person.contactId}>
-                {person.name}
-                {person.title ? ` · ${person.title}` : ""}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SavedInterviewNotes stageId={stageId} contactId={contactId} notes={savedNotes} />
       )}
-      <label className="text-sm">
-        Type
-        <select name="type" required className={fieldClass} defaultValue="RECRUITER_SCREEN">
-          {Object.entries(interviewConfig.types).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="text-sm">
-        Format
-        <select name="format" required className={fieldClass} defaultValue="VIDEO">
-          {Object.entries(interviewConfig.formats).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="text-sm">
-        Date and time
-        <input name="scheduledAt" type="datetime-local" required className={fieldClass} />
-      </label>
     </div>
   );
 }
@@ -306,10 +244,11 @@ function PersonInterview({
             action={updateInterviewStageAction}
             submitLabel={interviewConfig.labels.saveStage}
             testId={`update-stage-${stage.id}-${contactId ?? "unlinked"}`}
+            formClassName="flex flex-col gap-3"
           >
             <input type="hidden" name="campaignId" value={campaignId} />
             <input type="hidden" name="stageId" value={stage.id} />
-            <label className="text-sm">
+            <label className="block text-sm">
               {interviewConfig.labels.outcome}
               <select name="outcome" className={fieldClass} defaultValue={stage.outcome ?? ""}>
                 <option value="">{interviewConfig.labels.noOutcome}</option>
@@ -375,20 +314,12 @@ export function InterviewStagesList({
       </div>
 
       {canEdit ? (
-        <div className="space-y-4">
-          <h3 className="text-sm font-medium text-ink" data-testid="stage-create-start">
-            {interviewConfig.labels.addSomeoneYoureMeeting}
-          </h3>
-          <StageAddContactForm campaignId={campaignId} roles={roles} />
-          <ApplicationActionForm
-            action={createInterviewStageAction}
-            submitLabel={interviewConfig.labels.addStage}
-            testId="add-interview-stage"
-          >
-            <input type="hidden" name="campaignId" value={campaignId} />
-            <InterviewScheduleFields fieldClass={fieldClass} people={people} />
-          </ApplicationActionForm>
-        </div>
+        <AddSomeoneYoureMeeting
+          campaignId={campaignId}
+          roles={roles}
+          people={people}
+          fieldClass={fieldClass}
+        />
       ) : null}
 
       {grouped.people.map((group) => {
@@ -415,17 +346,11 @@ export function InterviewStagesList({
               />
             ))}
             {canEdit ? (
-              <ApplicationActionForm
-                action={createInterviewStageAction}
-                submitLabel={interviewConfig.labels.addAnotherInterview}
-                testId={`add-another-interview-${group.person.contactId}`}
-              >
-                <input type="hidden" name="campaignId" value={campaignId} />
-                <InterviewScheduleFields
-                  fieldClass={fieldClass}
-                  contactId={group.person.contactId}
-                />
-              </ApplicationActionForm>
+              <AddFollowUpInterview
+                campaignId={campaignId}
+                contactId={group.person.contactId}
+                fieldClass={fieldClass}
+              />
             ) : null}
           </InterviewerCollapsible>
         );

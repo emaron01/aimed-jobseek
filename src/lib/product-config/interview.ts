@@ -5,11 +5,11 @@
 
 export const interviewConfig = Object.freeze({
   labels: {
-    sectionTitle: "Interview stages",
+    sectionTitle: "Interview Notes",
     sectionHelp:
       "Record each interview: who you're meeting, when, and how. After each one, add your Post Interview Notes.",
-    addStage: "Add stage",
-    saveStage: "Save stage",
+    addStage: "Add interview",
+    saveStage: "Save outcome",
     interviewer: "Interviewer",
     chooseInterviewer: "Choose interviewer",
     addNewInterviewer: "Add new interviewer",
@@ -20,7 +20,7 @@ export const interviewConfig = Object.freeze({
     gainedInformation: "Newly gained information",
     gainedInformationHelp:
       "Paste an invitation email, or write notes about what they care about. This is saved on this person's Interview cheat sheet section.",
-    addGainedInformation: "Add to cheat sheet",
+    addGainedInformation: "Save and Add Note to Cheat Sheet",
     addNewlyGainedInformation: "Add newly gained information here",
     postInterviewNotes: "Post Interview Notes",
     reviewOpenQuestions: "Review open questions for this interview",
@@ -46,7 +46,10 @@ export const interviewConfig = Object.freeze({
     openGuide: "Open stage",
     startByChoosing: "Start by choosing who you're meeting.",
     addSomeoneYoureMeeting: "Add someone you're meeting",
+    addNewContact: "Add a new contact",
     addAnotherInterview: "Add another interview",
+    addFollowUpInterview: "Add Follow-up Interview",
+    addFollowUpInterviewSubmit: "Add follow-up interview",
     notLinkedToAnyone: "Not linked to anyone",
     removeInterview: "Remove",
     removeInterviewCancel: "Cancel",

@@ -104,7 +104,9 @@ describe("interview stage open buttons", () => {
     expect(stages).not.toContain("reviewOpenQuestions");
     expect(stages).not.toContain("workspaceInterviewLikelyQuestionsHref");
     expect(stages).toContain("post-interview-notes-${stageId}");
-    expect(stages).toContain("addCheatSheetInterviewNoteAction");
+    expect(source("src/components/StageInterviewerSection.tsx")).toContain(
+      "addCheatSheetInterviewNoteAction",
+    );
     expect(panel).not.toContain("CheatSheetPersonBody");
     expect(notes).not.toContain("enqueueCheatSheetPersonSection");
     expect(notes).toContain("enqueueLearningsReassessIfChanged");

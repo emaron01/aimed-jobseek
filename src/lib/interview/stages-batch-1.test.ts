@@ -46,6 +46,14 @@ async function paint(root: Root, node: ReactNode) {
   });
 }
 
+async function click(host: HTMLElement, selector: string) {
+  const node = host.querySelector(selector);
+  if (!(node instanceof HTMLElement)) throw new Error(`Missing ${selector}`);
+  await act(async () => {
+    node.click();
+  });
+}
+
 const person = {
   contactId: "contact-1",
   name: "Priya Shah",
@@ -163,13 +171,16 @@ describe("interview stages batch 1", () => {
     expect(host.querySelector("[data-testid=stage-create-start]")?.textContent).toBe(
       "Add someone you're meeting",
     );
+    await click(host, "[data-testid=add-someone-youre-meeting-toggle]");
+    await click(host, "[data-testid=add-new-contact-toggle]");
     const contactForm = host.querySelector("[data-testid=add-application-contact]");
     expect(contactForm).not.toBeNull();
     for (const name of ["firstName", "lastName", "title", "email", "linkedinUrl", "linkedInProfileText", "personaId"]) {
       expect(contactForm?.querySelector(`[name=${name}]`)).not.toBeNull();
     }
     const stageForm = host.querySelector("[data-testid=add-interview-stage]");
-    expect(stageForm?.querySelector("select[name=contactId]")?.hasAttribute("required")).toBe(true);
+    const contactSelect = host.querySelector("[data-testid=add-someone-youre-meeting] select[name=contactId]");
+    expect(contactSelect?.hasAttribute("required")).toBe(true);
     expect((stageForm?.querySelector("select[name=type]") as HTMLSelectElement).value).toBe(
       "RECRUITER_SCREEN",
     );

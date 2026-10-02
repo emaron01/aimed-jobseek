@@ -397,12 +397,13 @@ describe("UI batch 1 stage interviewer setup", () => {
   const action = src("src/app/actions/interview.ts");
 
   it("adds interviewers on the create form and assigns them without starting prep", () => {
-    expect(section).toContain("StageAddContactForm");
+    expect(section).toContain("AddSomeoneYoureMeeting");
+    expect(createForm).toContain("StageAddContactForm");
     expect(createForm).toContain("AddContactForm");
     expect(createForm).toContain("addApplicationContactAction");
-    expect(section).toContain("interviewConfig.labels.addSomeoneYoureMeeting");
-    expect(section).toContain("createInterviewStageAction");
-    expect(section).toContain('name="contactId"');
+    expect(createForm).toContain("interviewConfig.labels.addSomeoneYoureMeeting");
+    expect(createForm).toContain("createInterviewStageAction");
+    expect(createForm).toContain('name="contactId"');
     expect(section).not.toContain("InterviewStageSetupInterviewers");
     expect(panel).not.toContain("stage-setup-interviewers");
     expect(panel).not.toContain("assignExistingInterviewerAction");

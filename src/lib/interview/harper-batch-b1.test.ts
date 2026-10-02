@@ -68,7 +68,9 @@ describe("Harper Batch B1 Stage timeline and Outreach thank-you", () => {
     expect(interviewConfig.labels.postInterviewNotes).toBe("Post Interview Notes");
     expect(stages).toContain("postInterviewNotes");
     expect(stages).toContain("post-interview-notes-${stageId}");
-    expect(stages).toContain("addCheatSheetInterviewNoteAction");
+    expect(src("src/components/StageInterviewerSection.tsx")).toContain(
+      "addCheatSheetInterviewNoteAction",
+    );
     expect(stages).toContain("updateInterviewStageAction");
     expect(stages).toContain("notesBefore");
     expect(stages).toContain("notesAfter");
@@ -77,8 +79,10 @@ describe("Harper Batch B1 Stage timeline and Outreach thank-you", () => {
     expect(stages).not.toContain('name="notesBefore"');
     expect(stages).not.toContain('name="notesAfter"');
     expect(stages).not.toContain('name="expectedDecisionAt"');
-    expect(stages).toContain("gainedInformation");
-    expect(stages).toContain("createInterviewStageAction");
+    expect(src("src/components/StageInterviewerSection.tsx")).toContain("gainedInformation");
+    expect(src("src/components/StageInterviewerSection.tsx")).toContain(
+      "createInterviewStageAction",
+    );
     expect(panel).not.toContain("addInterviewInterviewerAction");
   });
 

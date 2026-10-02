@@ -267,8 +267,10 @@ describe("interview page organized by person", () => {
     expect(host.querySelector("[data-testid=stage-create-start]")?.textContent).toBe(
       "Add someone you're meeting",
     );
+    await click(host, "[data-testid=add-someone-youre-meeting-toggle]");
     const createForm = host.querySelector("[data-testid=add-interview-stage]");
-    expect(createForm?.querySelector("select[name=contactId]")?.hasAttribute("required")).toBe(true);
+    const contactSelect = host.querySelector("[data-testid=add-someone-youre-meeting] select[name=contactId]");
+    expect(contactSelect?.hasAttribute("required")).toBe(true);
     expect(createForm?.textContent).toContain("Type");
     expect(createForm?.textContent).toContain("Date and time");
     const format = createForm?.querySelector("select[name=format]") as HTMLSelectElement;
@@ -321,7 +323,7 @@ describe("interview page organized by person", () => {
     expect(priyaLatestNode?.textContent).toContain("Outcome");
     expect(priyaLatestNode?.textContent).toContain("Advanced");
     expect(priyaLatestNode?.querySelector("[name=outcome]")).not.toBeNull();
-    expect(priyaLatestNode?.textContent).toContain("Save stage");
+    expect(priyaLatestNode?.textContent).toContain("Save outcome");
     expect(priyaLatestNode?.textContent).toContain("Post Interview Notes");
     expect(priyaLatestNode?.textContent).toContain("Notes before");
     expect(priyaLatestNode?.textContent).toContain("Priya prep.");
@@ -345,8 +347,9 @@ describe("interview page organized by person", () => {
       "Jordan gained this.",
     );
 
+    await click(host, "[data-testid=add-follow-up-sam-toggle]");
     const another = host.querySelector("[data-testid=add-another-interview-sam]") as HTMLFormElement;
-    expect(another?.textContent).toContain("Add another interview");
+    expect(another?.textContent).toContain("Add follow-up interview");
     expect((another.querySelector("[name=contactId]") as HTMLInputElement).value).toBe("sam");
     expect(another.querySelector("[name=contactId]")?.getAttribute("type")).toBe("hidden");
     expect((another.querySelector("select[name=format]") as HTMLSelectElement).required).toBe(true);
@@ -729,6 +732,7 @@ describe.skipIf(!hasTestDatabase())("remove interview against postgres", { timeo
       `person-section-${priyaId}`,
     ]);
 
+    await click(host, `[data-testid=add-follow-up-${samId}-toggle]`);
     const samForm = host.querySelector(
       `[data-testid=add-another-interview-${samId}]`,
     ) as HTMLFormElement;
