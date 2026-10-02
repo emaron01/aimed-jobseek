@@ -18,6 +18,7 @@ import {
   skipConsultationQuestion,
   ignoreConsultationQuestion,
   reopenIgnoredConsultationTarget,
+  approvalContinuesHarperPlanning,
   confirmConsultationResult,
   flagConsultationInaccuracy,
   recordConsultationAnswerEdit,
@@ -564,24 +565,30 @@ export async function approveConsultationQaResultAction(
     await approveConsultationQaResult({ organizationId, statementIds });
     let jobId: string | undefined;
     if (campaignId) {
-      try {
-        const job = await enqueueApplicationJob({
-          organizationId,
-          campaignId,
-          type: "CONSULTATION",
-          payload: { operation: "continue" },
-        });
-        jobId = job.id;
-      } catch (error) {
-        console.error(
-          JSON.stringify({
-            event: "consultation_continue_enqueue_failed",
-            campaignId,
-            message: error instanceof Error ? error.message : "unknown",
-          }),
-        );
-      }
       revalidateHarperAndCheatSheet(campaignId);
+      const continues = await approvalContinuesHarperPlanning({
+        organizationId,
+        statementIds,
+      });
+      if (continues) {
+        try {
+          const job = await enqueueApplicationJob({
+            organizationId,
+            campaignId,
+            type: "CONSULTATION",
+            payload: { operation: "continue" },
+          });
+          jobId = job.id;
+        } catch (error) {
+          console.error(
+            JSON.stringify({
+              event: "consultation_continue_enqueue_failed",
+              campaignId,
+              message: error instanceof Error ? error.message : "unknown",
+            }),
+          );
+        }
+      }
     }
     return {
       ok: true,
@@ -624,8 +631,24 @@ export async function useConsultationResultAction(
     if (!campaignId) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }
+    const pendingApproval = await prisma.consultationStatement.findMany({
+      where: {
+        organizationId,
+        status: "DRAFT",
+        session: { campaignId, organizationId },
+      },
+      select: { id: true },
+    });
     await confirmConsultationResult({ organizationId, campaignId });
     let jobId: string | undefined;
+    const continues = await approvalContinuesHarperPlanning({
+      organizationId,
+      statementIds: pendingApproval.map((statement) => statement.id),
+    });
+    if (!continues) {
+      revalidatePath(`/campaigns/${campaignId}`);
+      return { ok: true, message: consultationConversationCopy.confirmed };
+    }
     try {
       const job = await enqueueApplicationJob({
         organizationId,

@@ -28,6 +28,7 @@ import {
   type RoleExpertiseJobInputs,
 } from "@/lib/consultation/role-expertise";
 import {
+  ASK_HARPER_TARGET_PREFIX,
   CONSULTATION_PROMPT_VERSION,
   WHY_THIS_COMPANY_TARGET_KEY,
   isConsultationExtractAnswer,
@@ -4152,6 +4153,39 @@ export async function regenerateConsultationStatement(input: {
         ]
       : []),
   ]);
+}
+
+/**
+ * Harper planning continues after an approval unless every statement belongs
+ * to an Ask Harper question. Those questions are outside planning rounds.
+ */
+export async function approvalContinuesHarperPlanning(input: {
+  organizationId: string;
+  statementIds: string[];
+}): Promise<boolean> {
+  const uniqueIds = [
+    ...new Set(input.statementIds.map((id) => id.trim()).filter(Boolean)),
+  ];
+  if (uniqueIds.length === 0) return false;
+  const rows = await prisma.consultationStatement.findMany({
+    where: { id: { in: uniqueIds }, organizationId: input.organizationId },
+    select: { id: true, sessionId: true },
+  });
+  if (rows.length !== uniqueIds.length) return true;
+  const targetByStatement = new Map<string, string | null>();
+  for (const sessionId of new Set(rows.map((row) => row.sessionId))) {
+    const { view } = await loadSessionQaView(sessionId);
+    for (const item of view.questions) {
+      for (const statement of item.statements) {
+        targetByStatement.set(statement.id, item.targetKey);
+      }
+    }
+  }
+  for (const id of uniqueIds) {
+    const targetKey = targetByStatement.get(id);
+    if (!targetKey?.startsWith(ASK_HARPER_TARGET_PREFIX)) return true;
+  }
+  return false;
 }
 
 export async function approveConsultationQaResult(input: {

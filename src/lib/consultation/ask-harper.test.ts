@@ -6,6 +6,12 @@ import ConsultationPage from "@/app/(app)/campaigns/[id]/consultation/page";
 import InterviewsPage from "@/app/(app)/campaigns/[id]/interviews/page";
 import SummaryPage from "@/app/(app)/campaigns/[id]/summary/page";
 import { askHarperAction } from "@/app/actions/ask-harper";
+import {
+  approveConsultationQaResultAction,
+  approveConsultationStatementAction,
+  editConsultationAnswerAction,
+  useConsultationResultAction,
+} from "@/app/actions/consultation";
 import { ApplicationTrackerList } from "@/components/ApplicationSidebarTracker";
 import { ConsultationSection } from "@/components/ConsultationSection";
 import { InterviewStagesSection } from "@/components/InterviewStagesSection";
@@ -228,14 +234,25 @@ describe("Ask Harper, sidebar order, and learned notes", () => {
         identityConfirmation: "CONFIRMED",
       },
     });
-    replyGenerate.mockImplementation(async (request: { messages?: unknown }) => {
+    replyGenerate.mockImplementation(async (request: { messages?: Array<{ content?: string }> }) => {
       if (!releaseFirst) {
         await new Promise<void>((resolve) => {
           releaseFirst = resolve;
         });
       }
-      void request;
-      return { data: { answers: [ANSWER] } };
+      const user = [...(request.messages ?? [])].reverse().find((message) =>
+        message.content?.includes("\"questions\""),
+      )?.content;
+      let text = QUESTION;
+      if (user) {
+        try {
+          const parsed = JSON.parse(user) as { questions?: Array<{ text?: string }> };
+          if (parsed.questions?.[0]?.text) text = parsed.questions[0].text;
+        } catch {
+          text = QUESTION;
+        }
+      }
+      return { data: { answers: [{ ...ANSWER, text }] } };
     });
   }, 60_000);
 
@@ -464,11 +481,7 @@ describe("Ask Harper, sidebar order, and learned notes", () => {
     expect(matches[0]?.targetKey?.startsWith("ask-harper:")).toBe(true);
     expect(matches[0]?.interviewTypeTag).toBe("focused_competency");
     expect(replyGenerate).toHaveBeenCalledTimes(1);
-    expect(enqueue).toHaveBeenCalledTimes(1);
-    expect(enqueue.mock.calls[0]?.[0]).toMatchObject({
-      type: "CONSULTATION",
-      payload: { operation: "continue" },
-    });
+    expect(enqueue).not.toHaveBeenCalled();
   }, 60_000);
 
   it("orders Job requirements before Company and keeps step status by key", async () => {
@@ -570,4 +583,320 @@ describe("Ask Harper, sidebar order, and learned notes", () => {
     const requirement = await prisma.jobRequirement.findUniqueOrThrow({ where: { campaignId } });
     expect(requirement.seekerLearnedNotes).toBe("They care about renewal hygiene.");
   });
+
+  it("approves Ask Harper answers without a planning job and still continues other answers", async () => {
+    if (!hasTestDatabase()) return;
+    replyGenerate.mockClear();
+    paidSpy.mockClear();
+    enqueue.mockClear();
+
+    await ConsultationPage({ params: Promise.resolve({ id: campaignId }) });
+    await InterviewsPage({ params: Promise.resolve({ id: campaignId }) });
+    await SummaryPage({
+      params: Promise.resolve({ id: campaignId }),
+      searchParams: Promise.resolve({}),
+    });
+    expect(replyGenerate).not.toHaveBeenCalled();
+    expect(paidSpy).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
+
+    const first = "How did you keep the Northwind account when the champion changed?";
+    const drafted = await askHarperAction(null, formData({ campaignId, question: first }));
+    expect(drafted.ok).toBe(true);
+    enqueue.mockClear();
+    paidSpy.mockClear();
+    replyGenerate.mockClear();
+
+    const firstTurn = await prisma.consultationTurn.findFirstOrThrow({
+      where: { organizationId, body: first, speaker: "CONSULTANT" },
+      include: { statements: true },
+    });
+    const firstStatement = firstTurn.statements[0];
+    expect(firstStatement?.status).toBe("DRAFT");
+    const approvedFirst = await approveConsultationQaResultAction(
+      null,
+      formData({ campaignId, statementId: firstStatement!.id }),
+    );
+    expect(approvedFirst.ok).toBe(true);
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(paidSpy).not.toHaveBeenCalled();
+    expect(replyGenerate).not.toHaveBeenCalled();
+
+    const harper = await ConsultationSection({
+      campaignId,
+      organizationId,
+      canEdit: true,
+      jobs: [],
+    });
+    await paint(root, harper);
+    expect(
+      [...host.querySelectorAll("[data-testid=harper-best-practice-list] [data-harper-question]")]
+        .filter((node) => node.textContent?.includes(first)),
+    ).toHaveLength(1);
+    const summary = await SummaryPage({
+      params: Promise.resolve({ id: campaignId }),
+      searchParams: Promise.resolve({}),
+    });
+    await paint(root, summary);
+    expect(
+      [...host.querySelectorAll("#general-questions [data-harper-question]")]
+        .filter((node) => node.textContent?.includes(first)),
+    ).toHaveLength(1);
+
+    const editedQuestion = "How did you hold the Northwind renewal through the champion change?";
+    const editedDraft = await askHarperAction(
+      null,
+      formData({ campaignId, question: editedQuestion }),
+    );
+    expect(editedDraft.ok).toBe(true);
+    const editedTurn = await prisma.consultationTurn.findFirstOrThrow({
+      where: { organizationId, body: editedQuestion, speaker: "CONSULTANT" },
+      include: { statements: true, session: true },
+    });
+    const latest = await prisma.consultationTurn.findFirst({
+      where: { sessionId: editedTurn.sessionId },
+      orderBy: { sequence: "desc" },
+      select: { sequence: true },
+    });
+    const seeker = await prisma.consultationTurn.create({
+      data: {
+        organizationId,
+        sessionId: editedTurn.sessionId,
+        sequence: (latest?.sequence ?? 0) + 1,
+        speaker: "SEEKER",
+        body: "I stayed with the buyer until the renewal closed.",
+        targetKey: editedTurn.targetKey,
+        followUp: false,
+        analysisJson: { status: "COMPLETE", replyToTurnId: editedTurn.id },
+      },
+    });
+    enqueue.mockClear();
+    paidSpy.mockClear();
+    replyGenerate.mockClear();
+    const edited = await editConsultationAnswerAction(
+      null,
+      formData({
+        campaignId,
+        turnId: seeker.id,
+        answer: "I stayed with the buyer until the Northwind renewal closed.",
+      }),
+    );
+    expect(edited.ok).toBe(true);
+    expect(enqueue.mock.calls.some((call) => call[0]?.payload?.operation === "continue")).toBe(
+      false,
+    );
+    enqueue.mockClear();
+    paidSpy.mockClear();
+    replyGenerate.mockClear();
+    const approvedAfterEdit = await approveConsultationQaResultAction(
+      null,
+      formData({ campaignId, statementId: editedTurn.statements[0]!.id }),
+    );
+    expect(approvedAfterEdit.ok).toBe(true);
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(paidSpy).not.toHaveBeenCalled();
+    expect(replyGenerate).not.toHaveBeenCalled();
+
+    const pendingQuestion = "What kept the Northwind buyer from leaving in the last month?";
+    const pendingDraft = await askHarperAction(
+      null,
+      formData({ campaignId, question: pendingQuestion }),
+    );
+    expect(pendingDraft.ok).toBe(true);
+    const pendingTurn = await prisma.consultationTurn.findFirstOrThrow({
+      where: { organizationId, body: pendingQuestion, speaker: "CONSULTANT" },
+      include: { statements: true },
+    });
+    const pendingLatest = await prisma.consultationTurn.findFirst({
+      where: { sessionId: pendingTurn.sessionId },
+      orderBy: { sequence: "desc" },
+      select: { sequence: true },
+    });
+    const pendingSeeker = await prisma.consultationTurn.create({
+      data: {
+        organizationId,
+        sessionId: pendingTurn.sessionId,
+        sequence: (pendingLatest?.sequence ?? 0) + 1,
+        speaker: "SEEKER",
+        body: "I wrote the renewal plan down.",
+        targetKey: pendingTurn.targetKey,
+        followUp: false,
+        analysisJson: { status: "COMPLETE", replyToTurnId: pendingTurn.id },
+      },
+    });
+    const pendingStatement = await prisma.consultationStatement.create({
+      data: {
+        organizationId,
+        sessionId: pendingTurn.sessionId,
+        turnId: pendingSeeker.id,
+        kind: "INTERVIEW_ANSWER",
+        status: "DRAFT",
+        content: `The renewal plan kept ${FACT} in place.`,
+        groundingJson: [],
+        promptVersion: pendingTurn.statements[0]?.promptVersion ?? "36",
+      },
+    });
+    enqueue.mockClear();
+    paidSpy.mockClear();
+    replyGenerate.mockClear();
+    const approvedPending = await approveConsultationQaResultAction(
+      null,
+      formData({ campaignId, statementId: pendingStatement.id }),
+    );
+    expect(approvedPending.ok).toBe(true);
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(paidSpy).not.toHaveBeenCalled();
+    await prisma.consultationStatement.update({
+      where: { id: pendingTurn.statements[0]!.id },
+      data: { status: "APPROVED", approvedAt: new Date() },
+    });
+
+    const statementQuestion = "Who on the Northwind team signed the renewal?";
+    const statementDraft = await askHarperAction(
+      null,
+      formData({ campaignId, question: statementQuestion }),
+    );
+    expect(statementDraft.ok).toBe(true);
+    const statementTurn = await prisma.consultationTurn.findFirstOrThrow({
+      where: { organizationId, body: statementQuestion, speaker: "CONSULTANT" },
+      include: { statements: true },
+    });
+    enqueue.mockClear();
+    paidSpy.mockClear();
+    replyGenerate.mockClear();
+    const approvedStatement = await approveConsultationStatementAction(
+      null,
+      formData({
+        campaignId,
+        statementId: statementTurn.statements[0]!.id,
+        content: statementTurn.statements[0]!.content,
+      }),
+    );
+    expect(approvedStatement.ok).toBe(true);
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(paidSpy).not.toHaveBeenCalled();
+    expect(replyGenerate).not.toHaveBeenCalled();
+
+    const bulkQuestion = "Which Northwind objection did you answer last?";
+    const bulkDraft = await askHarperAction(
+      null,
+      formData({ campaignId, question: bulkQuestion }),
+    );
+    expect(bulkDraft.ok).toBe(true);
+    enqueue.mockClear();
+    paidSpy.mockClear();
+    replyGenerate.mockClear();
+    const bulkApproved = await useConsultationResultAction(
+      null,
+      formData({ campaignId }),
+    );
+    expect(bulkApproved.ok).toBe(true);
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(paidSpy).not.toHaveBeenCalled();
+    expect(replyGenerate).not.toHaveBeenCalled();
+    const harperBulk = await ConsultationSection({
+      campaignId,
+      organizationId,
+      canEdit: true,
+      jobs: [],
+    });
+    await paint(root, harperBulk);
+    expect(
+      [...host.querySelectorAll("[data-testid=harper-best-practice-list] [data-harper-question]")]
+        .filter((node) => node.textContent?.includes(bulkQuestion)),
+    ).toHaveLength(1);
+    const summaryBulk = await SummaryPage({
+      params: Promise.resolve({ id: campaignId }),
+      searchParams: Promise.resolve({}),
+    });
+    await paint(root, summaryBulk);
+    expect(
+      [...host.querySelectorAll("#general-questions [data-harper-question]")]
+        .filter((node) => node.textContent?.includes(bulkQuestion)),
+    ).toHaveLength(1);
+
+    const sessionRow = await prisma.consultationSession.findUniqueOrThrow({
+      where: { campaignId },
+    });
+    const otherLatest = await prisma.consultationTurn.findFirst({
+      where: { sessionId: sessionRow.id },
+      orderBy: { sequence: "desc" },
+      select: { sequence: true },
+    });
+    const otherTurn = await prisma.consultationTurn.create({
+      data: {
+        organizationId,
+        sessionId: sessionRow.id,
+        sequence: (otherLatest?.sequence ?? 0) + 1,
+        speaker: "CONSULTANT",
+        body: "Tell me about a time you shipped a service.",
+        targetKey: "required:python",
+        followUp: false,
+      },
+    });
+    const otherStatement = await prisma.consultationStatement.create({
+      data: {
+        organizationId,
+        sessionId: sessionRow.id,
+        turnId: otherTurn.id,
+        kind: "INTERVIEW_ANSWER",
+        status: "DRAFT",
+        content: "I shipped the motion-planning service.",
+        groundingJson: [],
+        promptVersion: "36",
+      },
+    });
+    enqueue.mockClear();
+    paidSpy.mockClear();
+    replyGenerate.mockClear();
+    const approvedOther = await approveConsultationQaResultAction(
+      null,
+      formData({ campaignId, statementId: otherStatement.id }),
+    );
+    expect(approvedOther.ok).toBe(true);
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(enqueue.mock.calls[0]?.[0]).toMatchObject({
+      type: "CONSULTATION",
+      payload: { operation: "continue" },
+    });
+    expect(paidSpy).not.toHaveBeenCalled();
+    expect(replyGenerate).not.toHaveBeenCalled();
+
+    const otherTurnTwo = await prisma.consultationTurn.create({
+      data: {
+        organizationId,
+        sessionId: sessionRow.id,
+        sequence: (otherLatest?.sequence ?? 0) + 2,
+        speaker: "CONSULTANT",
+        body: "Tell me about a time you led an incident.",
+        targetKey: "required:incident",
+        followUp: false,
+      },
+    });
+    await prisma.consultationStatement.create({
+      data: {
+        organizationId,
+        sessionId: sessionRow.id,
+        turnId: otherTurnTwo.id,
+        kind: "INTERVIEW_ANSWER",
+        status: "DRAFT",
+        content: "I led the incident response.",
+        groundingJson: [],
+        promptVersion: "36",
+      },
+    });
+    enqueue.mockClear();
+    paidSpy.mockClear();
+    const approvedBulkOther = await useConsultationResultAction(
+      null,
+      formData({ campaignId }),
+    );
+    expect(approvedBulkOther.ok).toBe(true);
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(enqueue.mock.calls[0]?.[0]).toMatchObject({
+      type: "CONSULTATION",
+      payload: { operation: "continue" },
+    });
+    expect(paidSpy).not.toHaveBeenCalled();
+  }, 60_000);
 });
