@@ -79,7 +79,7 @@ describe("Harper library instructions and fingerprint", () => {
       "When a prior approved answer is supplied, tailor it to this company and role. Replace anything about the previous company with this company's information; never carry it over. Do not add employers, numbers, titles, or outcomes that are not in the supplied answer or the Personal Profile.",
     );
     expect(ROLE_EXPERTISE_PROMPT_VERSION).toBe("3");
-    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("4");
+    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("5");
   });
 
   it("puts an explicit empty library match in the answers fingerprint and changes it when the source content changes", () => {

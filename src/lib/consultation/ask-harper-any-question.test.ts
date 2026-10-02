@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { readFileSync } from "node:fs";
 import { act, createElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -6,17 +7,27 @@ import ConsultationPage from "@/app/(app)/campaigns/[id]/consultation/page";
 import InterviewsPage from "@/app/(app)/campaigns/[id]/interviews/page";
 import SummaryPage from "@/app/(app)/campaigns/[id]/summary/page";
 import { askHarperAction } from "@/app/actions/ask-harper";
+import { replyConsultationAction } from "@/app/actions/consultation";
 import { ConsultationSection } from "@/components/ConsultationSection";
 import { askHarper } from "@/lib/consultation/ask-harper";
 import {
+  ASK_HARPER_PLACEHOLDER_ANSWER,
+  askHarperAnswerCloseness,
   askHarperAnswerKind,
+  askHarperUnpassedDraft,
+  chooseAskHarperFallbackAnswer,
   composedPointOfViewAnswer,
   isRealAskHarperQuestion,
 } from "@/lib/consultation/ask-harper-answer";
+import { continueConsultationPlanning } from "@/lib/consultation/service";
 import {
   composedAnswerFromRoleExpertiseQuestion,
+  ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION,
+  ROLE_EXPERTISE_PROMPT_VERSION,
+  roleExpertiseJobFingerprint,
   validateRoleExpertiseQuestions,
 } from "@/lib/consultation/role-expertise";
+import { ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content/role-expertise";
 import { resultStatesOutcome } from "@/lib/consultation/polish-parts";
 import { NORMAL_JOB_MODEL, NORMAL_JOB_POSTING } from "@/lib/job-requirement/fixtures";
 import { normalizeParsedJobRequirement } from "@/lib/job-requirement/normalize";
@@ -40,6 +51,12 @@ const APPROACH = "How do you think about a late-stage negotiation?";
 const KNOWLEDGE = "What's your philosophy on discounting to win a deal?";
 const STORY = "How did you keep the Northwind renewal when the buyer wanted to leave?";
 const FAILED = "What should I say when the hiring manager asks about a gap?";
+const UNCOVERED = "How do you think about building a territory from zero?";
+const SAMPLE =
+  "I would learn the buyer's decision process before I talk about price.";
+const FOLLOW_UP = "Which account would you use as your own example?";
+const APPROVED_ANSWERS_PARAGRAPH =
+  "Suggested answers: for each question, write the answer this person could give, drawn from their Personal Profile and fitting careerStage (for new_to_workforce or college_graduate, school, internships, projects, part-time work, and activities; for early_career through late_career, roles and results at the level of this job). When the profile has little on a question, still write the strongest suggested answer you can, as a starting point the person will make their own. Keep every number, fraction, percentage, date, company, and name exactly as the person stated it. Never name the framework or label a part in any field. When the question asks for an opinion, an approach, a philosophy, or what the person looks for or knows, answer in the seeker's point of view and support it with an example from the Personal Profile or a prior approved answer when one exists. Do not invent a story result or outcome for that kind of question. For a story question, return answerFramework plus its parts, CAR (challenge, action, result) by default or STAR (situation, task, action, result) when setup matters, in natural first-person speech so the parts read as one answer when joined in order. The result states what changed because of the person's action; a number is welcome but never required. When the person's information doesn't cover the question, write a strong sample answer from your own expertise on the topic, framed as the person's point of view. Never invent personal experience, employers, numbers, or results. Then ask one follow-up question that would let the person add their own example.";
 
 for (const [key, value] of [
   ["CONSULTATION_REPLY_AI_PROVIDER", "openai-responses"],
@@ -222,6 +239,91 @@ describe("Ask Harper question shape", () => {
       "That isn't an interview question. Ask a real one.",
     );
   });
+
+  it("uses the approved answers paragraph and does not re-run stored suggested answers from that bump", () => {
+    expect(ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS).toContain(
+      APPROVED_ANSWERS_PARAGRAPH,
+    );
+    expect(ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS).toContain(
+      "When a prior approved answer is supplied, tailor it to this company and role.",
+    );
+    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("5");
+    expect(ROLE_EXPERTISE_PROMPT_VERSION).toBe("3");
+    const roleExpertise = readFileSync("src/lib/consultation/role-expertise.ts", "utf8");
+    const jobFn = roleExpertise.slice(
+      roleExpertise.indexOf("export function roleExpertiseJobFingerprint"),
+      roleExpertise.indexOf("export function roleExpertiseAnswersFingerprint"),
+    );
+    expect(jobFn).toContain("ROLE_EXPERTISE_PROMPT_VERSION");
+    expect(jobFn).not.toContain("ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION");
+    const service = readFileSync("src/lib/consultation/service.ts", "utf8");
+    const fill = service.slice(
+      service.indexOf("async function maybeFillRoleExpertiseAfterGapPlan"),
+      service.indexOf("async function finishIfPlanningIsComplete"),
+    );
+    const skip = fill.indexOf("if (usable && existingRoleExpertise >= minCount) return;");
+    const generate = fill.indexOf("generateRoleExpertiseWithModel");
+    expect(skip).toBeGreaterThan(-1);
+    expect(generate).toBeGreaterThan(skip);
+    const job = {
+      title: "Sales Director",
+      companyName: "Contoso",
+      seniority: null,
+      location: null,
+      workArrangement: null,
+      requiredItems: [],
+      preferredItems: [],
+      responsibilities: [],
+      scorecardJson: {},
+    };
+    expect(roleExpertiseJobFingerprint(job)).toBe(roleExpertiseJobFingerprint(job));
+  });
+
+  it("picks the closest failed attempt and drops invented claims and profile-fact placeholders", () => {
+    const invented = {
+      answerFramework: "CAR" as const,
+      challenge: null,
+      situation: null,
+      task: null,
+      action: "Result: At Globex I closed 40 deals and revenue rose 12%.",
+      result: "",
+    };
+    const closest = {
+      answerFramework: "CAR" as const,
+      challenge: null,
+      situation: null,
+      task: null,
+      action: "I value preparation.",
+      result: "",
+    };
+    const empty = {
+      answerFramework: "CAR" as const,
+      challenge: null,
+      situation: null,
+      task: null,
+      action: "",
+      result: ASK_HARPER_PLACEHOLDER_ANSWER,
+    };
+    expect(askHarperAnswerCloseness(closest, "point-of-view")).toBeGreaterThan(
+      askHarperAnswerCloseness(invented, "point-of-view"),
+    );
+    const chosen = chooseAskHarperFallbackAnswer({
+      attempts: [invented, closest, empty],
+      kind: "point-of-view",
+      sourceTexts: [FACT],
+    });
+    expect(chosen?.content).toBe("I value preparation.");
+    expect(chosen?.content).not.toContain("Globex");
+    expect(chosen?.content).not.toContain(FACT);
+    expect(chosen?.content).not.toBe(ASK_HARPER_PLACEHOLDER_ANSWER);
+    expect(
+      askHarperUnpassedDraft({
+        answer: { ...closest, action: FACT },
+        kind: "point-of-view",
+        sourceTexts: [FACT],
+      }),
+    ).toBe("");
+  });
 });
 
 describe("Ask Harper answers every real question", () => {
@@ -236,12 +338,65 @@ describe("Ask Harper answers every real question", () => {
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
+    const failedAttempt = { n: 0 };
     replyGenerate.mockImplementation(async (request: { messages?: Array<{ content?: string }> }) => {
       const user = [...(request.messages ?? [])]
         .reverse()
         .find((message) => message.content?.includes("\"questions\""))?.content;
       const parsed = JSON.parse(user ?? "{}") as { questions?: Array<{ text?: string }> };
       const text = parsed.questions?.[0]?.text ?? "";
+      if (text === UNCOVERED) {
+        return {
+          data: {
+            answers: [
+              {
+                text,
+                answerFramework: "CAR" as const,
+                challenge: null,
+                situation: null,
+                task: null,
+                action: SAMPLE,
+                result: "",
+                followUpQuestion: FOLLOW_UP,
+              },
+            ],
+          },
+        };
+      }
+      if (text === FAILED) {
+        failedAttempt.n += 1;
+        const turn = ((failedAttempt.n - 1) % 3) + 1;
+        const base = {
+          text,
+          answerFramework: "CAR" as const,
+          challenge: null,
+          situation: null,
+          task: null,
+          action: "",
+          result: "",
+          followUpQuestion: null as string | null,
+        };
+        if (turn === 1) {
+          return {
+            data: {
+              answers: [
+                {
+                  ...base,
+                  action: "Result: At Globex I closed 40 deals and revenue rose 12%.",
+                },
+              ],
+            },
+          };
+        }
+        if (turn === 2) {
+          return {
+            data: {
+              answers: [{ ...base, action: "I value preparation.", followUpQuestion: FOLLOW_UP }],
+            },
+          };
+        }
+        return { data: { answers: [base] } };
+      }
       return { data: { answers: [modelAnswer(text)] } };
     });
     if (!hasTestDatabase()) return;
@@ -400,8 +555,32 @@ describe("Ask Harper answers every real question", () => {
       where: { organizationId, body: FAILED },
       include: { statements: true },
     });
-    expect(failedTurn.statements[0]?.content).toBe(`${FACT}.`);
+    expect(failedTurn.statements[0]?.content).toBe("I value preparation.");
+    expect(failedTurn.statements[0]?.content).not.toBe(`${FACT}.`);
     expect(failedTurn.statements[0]?.content).not.toContain("Globex");
+    expect(failedTurn.statements[0]?.content).not.toContain(ASK_HARPER_PLACEHOLDER_ANSWER);
+    expect(failedTurn.statements[0]?.status).toBe("DRAFT");
+    const callsBeforeRender = replyGenerate.mock.calls.length;
+    const failedHarper = await ConsultationSection({
+      campaignId,
+      organizationId,
+      canEdit: true,
+      jobs: [],
+    });
+    await act(async () => {
+      root.render(failedHarper);
+    });
+    expect(replyGenerate).toHaveBeenCalledTimes(callsBeforeRender);
+    const failedCard = [...host.querySelectorAll("article")].find((card) =>
+      card.textContent?.includes(FAILED),
+    );
+    expect(failedCard?.textContent).toContain("I value preparation.");
+    expect(failedCard?.textContent).toContain(consultationStatementLabels.DRAFT);
+    expect(failedCard?.textContent).toContain(consultationConversationCopy.approve);
+    expect(failedCard?.textContent).toContain(consultationConversationCopy.threadReply);
+    expect(failedCard?.textContent).not.toContain("Globex");
+    expect(failedCard?.textContent).not.toContain(FACT);
+    expect(failedCard?.textContent).not.toContain(ASK_HARPER_PLACEHOLDER_ANSWER);
     const callsAfterFail = replyGenerate.mock.calls.length;
     const failedAgain = await askHarperAction(null, formData({ campaignId, question: FAILED }));
     expect(failedAgain.ok).toBe(true);
@@ -414,5 +593,98 @@ describe("Ask Harper answers every real question", () => {
     });
     expect(replyGenerate).toHaveBeenCalledTimes(callsAfterFail);
     expect(enqueue).not.toHaveBeenCalled();
+  }, 60_000);
+
+  it("shows one follow-up on an uncovered question and does not re-run stored answers", async () => {
+    if (!hasTestDatabase()) return;
+    const callsBeforePlanning = replyGenerate.mock.calls.length;
+    await continueConsultationPlanning({ organizationId, campaignId });
+    expect(replyGenerate).toHaveBeenCalledTimes(callsBeforePlanning);
+    expect(enqueue).not.toHaveBeenCalled();
+
+    const callsBeforePages = replyGenerate.mock.calls.length;
+    await ConsultationPage({ params: Promise.resolve({ id: campaignId }) });
+    await InterviewsPage({ params: Promise.resolve({ id: campaignId }) });
+    await SummaryPage({
+      params: Promise.resolve({ id: campaignId }),
+      searchParams: Promise.resolve({}),
+    });
+    expect(replyGenerate).toHaveBeenCalledTimes(callsBeforePages);
+    expect(enqueue).not.toHaveBeenCalled();
+
+    const asked = await askHarperAction(null, formData({ campaignId, question: UNCOVERED }));
+    expect(asked.ok).toBe(true);
+    expect(asked.message).not.toBe(consultationConversationCopy.askHarperFailed);
+    expect(replyGenerate.mock.calls.length - callsBeforePages).toBe(1);
+    const questionTurn = await prisma.consultationTurn.findFirstOrThrow({
+      where: { organizationId, body: UNCOVERED, followUp: false },
+      include: { statements: true },
+    });
+    expect(questionTurn.statements[0]?.content).toContain(SAMPLE);
+    expect(questionTurn.statements[0]?.content).not.toContain("Northwind");
+    expect(questionTurn.statements[0]?.content).not.toContain("14");
+    expect(questionTurn.statements[0]?.content).not.toContain("Globex");
+    expect(questionTurn.statements[0]?.status).toBe("DRAFT");
+    const followUp = await prisma.consultationTurn.findFirstOrThrow({
+      where: { organizationId, targetKey: questionTurn.targetKey, followUp: true },
+    });
+    expect(followUp.body).toBe(FOLLOW_UP);
+    const followUps = await prisma.consultationTurn.count({
+      where: { organizationId, targetKey: questionTurn.targetKey, followUp: true },
+    });
+    expect(followUps).toBe(1);
+
+    const harper = await ConsultationSection({
+      campaignId,
+      organizationId,
+      canEdit: true,
+      jobs: [],
+    });
+    await act(async () => {
+      root.render(harper);
+    });
+    expect(replyGenerate).toHaveBeenCalledTimes(callsBeforePages + 1);
+    const card = [...host.querySelectorAll("article")].find((item) =>
+      item.textContent?.includes(UNCOVERED),
+    );
+    expect(card?.textContent).toContain(SAMPLE);
+    expect(card?.querySelector("[data-testid=consultation-follow-up]")?.textContent).toBe(
+      FOLLOW_UP,
+    );
+    expect(card?.textContent).toContain(consultationConversationCopy.followUpReplyHint);
+    expect(card?.textContent).toContain(consultationConversationCopy.approve);
+    expect(card?.textContent).toContain(consultationConversationCopy.threadReply);
+
+    const callsBeforeRepeat = replyGenerate.mock.calls.length;
+    const repeat = await askHarperAction(null, formData({ campaignId, question: UNCOVERED }));
+    expect(repeat.ok).toBe(true);
+    expect(replyGenerate).toHaveBeenCalledTimes(callsBeforeRepeat);
+
+    const replied = await replyConsultationAction(
+      null,
+      formData({
+        campaignId,
+        answer: "I would use the first territory I opened.",
+        targetKey: `question:${questionTurn.id}`,
+      }),
+    );
+    expect(replied.ok).toBe(true);
+    const seeker = await prisma.consultationTurn.findFirstOrThrow({
+      where: {
+        organizationId,
+        speaker: "SEEKER",
+        body: "I would use the first territory I opened.",
+      },
+    });
+    const analysis = seeker.analysisJson as { replyToTurnId?: string };
+    expect(analysis.replyToTurnId).toBe(followUp.id);
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "CONSULTATION",
+        payload: { operation: "process_reply" },
+      }),
+    );
+    expect(replyGenerate).toHaveBeenCalledTimes(callsBeforeRepeat);
   }, 60_000);
 });

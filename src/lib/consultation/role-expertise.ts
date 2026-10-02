@@ -19,8 +19,10 @@ import {
   isConsultationReplyAiConfigured,
 } from "@/lib/ai";
 import {
+  askHarperAnswerCloseness,
   askHarperAnswerKind,
-  askHarperBestAvailableDraft,
+  askHarperUnpassedDraft,
+  chooseAskHarperFallbackAnswer,
   composedPointOfViewAnswer,
 } from "@/lib/consultation/ask-harper-answer";
 import type { CareerStage } from "@/lib/consultation/career-stage";
@@ -65,8 +67,12 @@ import type { Prisma } from "@prisma/client";
 
 /** Bumped for questions/answers model-split (schema + prompt structure). */
 export const ROLE_EXPERTISE_PROMPT_VERSION = "3";
-/** Answers step only. Questions stay on ROLE_EXPERTISE_PROMPT_VERSION. */
-export const ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION = "4";
+/**
+ * Answers step only. Bump when the answers instructions change.
+ * Questions stay on ROLE_EXPERTISE_PROMPT_VERSION, so a bump here does not
+ * invalidate a stored questions receipt or rewrite stored suggested answers.
+ */
+export const ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION = "5";
 
 export const COACHING_SET_MIN = 20;
 export const COACHING_SET_MAX = 25;
@@ -88,6 +94,7 @@ export const roleExpertiseAnswerPartsSchema = z.object({
   task: z.string().nullable(),
   action: z.string(),
   result: z.string(),
+  followUpQuestion: z.string().nullable(),
 });
 
 export const roleExpertiseAnswersResultSchema = z.object({
@@ -281,6 +288,12 @@ function fieldText(value: string | null | undefined): string {
   return value?.trim() ?? "";
 }
 
+function followUpText(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const text = (value as { followUpQuestion?: unknown }).followUpQuestion;
+  return typeof text === "string" && text.trim() ? text.trim() : null;
+}
+
 function answerPartsFromQuestion(
   question: RoleExpertiseQuestion,
 ): AnswerPartsGrounding | null {
@@ -328,6 +341,7 @@ export type ValidatedRoleExpertiseQuestion = {
   interviewTypeTag: InterviewTypeTag;
   content: string;
   grounding: AnswerPartsGrounding;
+  followUpQuestion: string | null;
 };
 
 export type ValidatedRoleExpertiseQuestionChoice = {
@@ -489,6 +503,7 @@ export function validateRoleExpertiseQuestions(input: {
       interviewTypeTag: choice.interviewTypeTag,
       content: composed.content,
       grounding: composed.grounding,
+      followUpQuestion: followUpText(raw),
     });
   }
 
@@ -512,7 +527,7 @@ export function validateRoleExpertiseQuestions(input: {
 function mergeQuestionsWithAnswers(
   choices: ValidatedRoleExpertiseQuestionChoice[],
   answers: RoleExpertiseAnswerParts[],
-): RoleExpertiseQuestion[] {
+): Array<RoleExpertiseQuestion & { followUpQuestion: string | null }> {
   const byText = new Map(
     answers.map((answer) => [answer.text.trim().toLowerCase(), answer]),
   );
@@ -534,6 +549,7 @@ function mergeQuestionsWithAnswers(
         task: null,
         action: "",
         result: "",
+        followUpQuestion: null,
       };
     }
     return {
@@ -545,6 +561,7 @@ function mergeQuestionsWithAnswers(
       task: answer.task,
       action: answer.action,
       result: answer.result,
+      followUpQuestion: followUpText(answer),
     };
   });
 }
@@ -871,6 +888,7 @@ function validateAnswersForMode(
       interviewTypeTag: choice.interviewTypeTag,
       content: composed.content,
       grounding: composed.grounding,
+      followUpQuestion: followUpText(raw),
     });
   }
   return { valid, issues };
@@ -885,7 +903,49 @@ function mappedAnswers(questions: ValidatedRoleExpertiseQuestion[]) {
     task: item.grounding.task ?? null,
     action: item.grounding.action,
     result: item.grounding.result,
+    followUpQuestion: item.followUpQuestion,
   }));
+}
+
+function normalizeAnswer(
+  answer: Omit<RoleExpertiseAnswerParts, "followUpQuestion"> & {
+    followUpQuestion?: string | null;
+  },
+): RoleExpertiseAnswerParts {
+  return {
+    text: answer.text,
+    answerFramework: answer.answerFramework,
+    challenge: answer.challenge ?? null,
+    situation: answer.situation ?? null,
+    task: answer.task ?? null,
+    action: answer.action ?? "",
+    result: answer.result ?? "",
+    followUpQuestion: followUpText(answer),
+  };
+}
+
+function askHarperSourceTexts(
+  profileItems: readonly unknown[],
+  libraryMatches: ReadonlyArray<{ content?: string | null } | null>,
+  jobSources: Record<string, unknown>,
+): string[] {
+  const texts: string[] = [];
+  for (const item of profileItems) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as { kind?: unknown; text?: unknown };
+    if (row.kind !== "FACT" || typeof row.text !== "string") continue;
+    const text = row.text.trim();
+    if (text) texts.push(text);
+  }
+  for (const match of libraryMatches) {
+    const content = match?.content?.trim() ?? "";
+    if (content) texts.push(content);
+  }
+  for (const key of ["title", "employer"] as const) {
+    const value = jobSources[key];
+    if (typeof value === "string" && value.trim()) texts.push(value.trim());
+  }
+  return texts;
 }
 
 async function generateRoleExpertiseAnswersStep(input: {
@@ -950,6 +1010,11 @@ async function generateRoleExpertiseAnswersStep(input: {
   );
   let qualityFeedback: string[] = [];
   let lastValid: ValidatedRoleExpertiseQuestion[] = [];
+  const sourceTexts = askHarperSourceTexts(
+    input.profileItems,
+    libraryMatches,
+    input.jobSources,
+  );
 
   try {
     const gated = await runPaidStructuredCall<RoleExpertiseAnswersResult>({
@@ -964,6 +1029,7 @@ async function generateRoleExpertiseAnswersStep(input: {
           : isRoleExpertiseAnswersResultUsable(stored, input.choices),
       callProvider: async () => {
         let data: RoleExpertiseAnswersResult = { answers: [] };
+        const failedAttempts: RoleExpertiseAnswerParts[] = [];
         for (
           let attempt = 0;
           attempt <= consultationConfig.qualityRegenerationAttempts;
@@ -991,7 +1057,10 @@ async function generateRoleExpertiseAnswersStep(input: {
                 coercedFields: [],
               }),
             });
-          data = response.data;
+          data = {
+            answers: response.data.answers.map((answer) => normalizeAnswer(answer)),
+          };
+          if (input.answerMode && data.answers[0]) failedAttempts.push(data.answers[0]);
           const merged = mergeQuestionsWithAnswers(input.choices, data.answers);
           const checked = validateAnswersForMode(merged, input.answerMode);
           lastValid = checked.valid;
@@ -1001,9 +1070,20 @@ async function generateRoleExpertiseAnswersStep(input: {
             return { answers: mappedAnswers(checked.valid) };
           }
           if (lastAttempt) {
-            return {
-              answers: input.answerMode ? data.answers : mappedAnswers(checked.valid),
-            };
+            if (!input.answerMode) return { answers: mappedAnswers(checked.valid) };
+            const chosen = chooseAskHarperFallbackAnswer({
+              attempts: failedAttempts,
+              kind: input.answerMode,
+              sourceTexts,
+            });
+            const stored =
+              chosen?.attempt ??
+              [...failedAttempts].sort(
+                (left, right) =>
+                  askHarperAnswerCloseness(right, input.answerMode!) -
+                  askHarperAnswerCloseness(left, input.answerMode!),
+              )[0];
+            return { answers: stored ? [normalizeAnswer(stored)] : [] };
           }
           qualityFeedback = checked.issues;
         }
@@ -1013,6 +1093,38 @@ async function generateRoleExpertiseAnswersStep(input: {
 
     const merged = mergeQuestionsWithAnswers(input.choices, gated.data.answers);
     const checked = validateAnswersForMode(merged, input.answerMode);
+    if (input.answerMode && checked.valid.length === 0) {
+      const choice = input.choices[0];
+      const answer = gated.data.answers[0];
+      const content = answer
+        ? askHarperUnpassedDraft({
+            answer,
+            kind: input.answerMode,
+            sourceTexts,
+          })
+        : "";
+      if (choice && content) {
+        return {
+          ok: true,
+          questions: [
+            {
+              text: choice.text,
+              targetKey: choice.targetKey,
+              interviewTypeTag: choice.interviewTypeTag,
+              content,
+              grounding: {
+                answerFramework: answer.answerFramework,
+                action: content,
+                result: "",
+              },
+              followUpQuestion: followUpText(answer),
+            },
+          ],
+          skipped: gated.skipped,
+          keptAfterPartial: 1,
+        };
+      }
+    }
     const kept = checked.valid.length;
     const partial =
       checked.issues.length > 0 || kept < input.choices.length ? kept : null;
@@ -1071,21 +1183,6 @@ export async function generateAskHarperSuggestedAnswer(input: {
     return { ok: false, message: "A role-expertise question was empty." };
   }
   const kind = askHarperAnswerKind(text);
-  const fallbackQuestion = (): ValidatedRoleExpertiseQuestion => {
-    const content = askHarperBestAvailableDraft(input.profileItems);
-    return {
-      text,
-      targetKey: askHarperTargetKey(text),
-      interviewTypeTag: ASK_HARPER_INTERVIEW_TYPE_TAG,
-      content,
-      grounding: {
-        answerFramework: "CAR",
-        challenge: "",
-        action: content,
-        result: "",
-      },
-    };
-  };
   const jobSources = {
     title: input.job.title,
     employer: input.job.companyName,
@@ -1122,9 +1219,10 @@ export async function generateAskHarperSuggestedAnswer(input: {
   });
   if (!answersStep.ok || !answersStep.questions[0]) {
     return {
-      ok: true,
-      skipped: answersStep.ok ? answersStep.skipped : false,
-      question: fallbackQuestion(),
+      ok: false,
+      message: answersStep.ok
+        ? "Role-expertise answers could not be generated."
+        : answersStep.message,
     };
   }
   const question = answersStep.questions[0];
@@ -1322,6 +1420,26 @@ export async function storeRoleExpertiseQuestions(input: {
         strengtheningNote: null,
         groundingJson: question.grounding as Prisma.InputJsonValue,
         promptVersion: ROLE_EXPERTISE_PROMPT_VERSION,
+      },
+    });
+    const followUp = question.followUpQuestion?.trim() ?? "";
+    if (!followUp) continue;
+    await prisma.consultationTurn.create({
+      data: {
+        organizationId: input.organizationId,
+        sessionId: input.sessionId,
+        sequence: sequence + 1,
+        speaker: "CONSULTANT",
+        body: followUp,
+        targetKey: question.targetKey,
+        followUp: true,
+        analysisJson: { replyToTurnId: turn.id } as Prisma.InputJsonValue,
+        questionContextJson: {
+          requirementInterpretation: null,
+          hiringTeamRoleId: "",
+          whoCaresNote: "",
+          interviewTypeTag: question.interviewTypeTag,
+        } as Prisma.InputJsonValue,
       },
     });
   }
