@@ -32,6 +32,8 @@ export const TEMPLATE_VARIABLE_ALLOWLIST: Record<
     "dueCount",
     "dueCountPlural",
     "weekdayLabel",
+    "reminderLines",
+    "reminderLinesHtml",
     "dashboardUrl",
   ],
   USAGE_LIMIT_WARNING: [
@@ -133,9 +135,9 @@ export const BASELINE_TEMPLATES: Record<
     displayName: "Cadence daily digest",
     subjectTemplate: "{{dueCount}} follow-up{{dueCountPlural}} due in {{workspaceName}}",
     htmlTemplate:
-      "<p>Hi {{firstName}},</p><p>On this {{weekdayLabel}} morning you have <strong>{{dueCount}}</strong> follow-up reminder{{dueCountPlural}} on Home in {{workspaceName}}.</p><p><a href=\"{{dashboardUrl}}\">Review on Home</a></p><p>— {{appName}}</p>",
+      "<p>Hi {{firstName}},</p><p>On this {{weekdayLabel}} morning you have <strong>{{dueCount}}</strong> follow-up reminder{{dueCountPlural}} on Home in {{workspaceName}}.</p>{{reminderLinesHtml}}<p><a href=\"{{dashboardUrl}}\">Review on Home</a></p><p>— {{appName}}</p>",
     textTemplate:
-      "Hi {{firstName}},\n\nOn this {{weekdayLabel}} morning you have {{dueCount}} follow-up reminder(s) on Home in {{workspaceName}}.\n\nReview: {{dashboardUrl}}\n\n— {{appName}}",
+      "Hi {{firstName}},\n\nOn this {{weekdayLabel}} morning you have {{dueCount}} follow-up reminder(s) on Home in {{workspaceName}}.\n\n{{reminderLines}}\nReview: {{dashboardUrl}}\n\n— {{appName}}",
   },
   USAGE_LIMIT_WARNING: {
     displayName: "Usage limit warning",

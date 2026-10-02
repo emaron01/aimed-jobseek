@@ -3,7 +3,10 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { sendTransactionalEmail } from "@/lib/transactional-email/send-service";
 import { ensureTransactionalTemplatesSeeded } from "@/lib/transactional-email/seed";
-import { countDueApplicationReminders } from "@/lib/cadence/application-reminders";
+import {
+  applicationReminderDigest,
+  getDueApplicationReminders,
+} from "@/lib/cadence/application-reminders";
 import { countDueContactsForUser } from "@/lib/cadence/dashboard";
 
 const WEEKDAY_NAMES = [
@@ -257,17 +260,24 @@ export async function runCadenceDigestJob(
       }
     }
 
-    const [contactDueCount, applicationDueCount] = await Promise.all([
+    const [contactDueCount, reminders] = await Promise.all([
       countDueContactsForUser({
         organizationId: organization.id,
         userId: user.id,
       }),
-      countDueApplicationReminders({
+      getDueApplicationReminders({
         organizationId: organization.id,
         userId: user.id,
+        includeUpcoming: true,
+        now,
       }),
     ]);
-    const dueCount = contactDueCount + applicationDueCount;
+    const applicationReminders = applicationReminderDigest({
+      reminders,
+      now,
+      timezone,
+    });
+    const dueCount = contactDueCount + applicationReminders.count;
     if (dueCount === 0) {
       bumpSkip(result, "no_due_contacts", {
         userId: user.id,
@@ -298,6 +308,8 @@ export async function runCadenceDigestJob(
           dueCount: String(dueCount),
           dueCountPlural: dueCount === 1 ? "" : "s",
           weekdayLabel,
+          reminderLines: applicationReminders.lines.join("\n"),
+          reminderLinesHtml: applicationReminders.html,
           dashboardUrl: `${process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/`,
         },
       });
