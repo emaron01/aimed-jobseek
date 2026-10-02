@@ -7,6 +7,7 @@ import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { InterviewStageInterviewerLink } from "@/components/InterviewStagePanel";
 import {
   InterviewerCollapsible,
+  RemoveInterviewControl,
   StageAddContactForm,
 } from "@/components/StageInterviewerSection";
 import { listApplicationContacts } from "@/lib/application/contacts";
@@ -50,6 +51,76 @@ type StageView = {
 
 function dateLabel(value: Date): string {
   return value.toISOString().slice(0, 10);
+}
+
+function compareNewest(
+  left: { id: string; scheduledAt: Date },
+  right: { id: string; scheduledAt: Date },
+): number {
+  const byDate = right.scheduledAt.getTime() - left.scheduledAt.getTime();
+  if (byDate !== 0) return byDate;
+  return right.id.localeCompare(left.id);
+}
+
+function personForInterviewer(
+  row: StageView["interviewers"][number],
+  people: PersonOption[],
+): PersonOption {
+  const person = people.find((item) => item.contactId === row.contactId);
+  if (person) return person;
+  const name =
+    [row.contact.firstName, row.contact.lastName].filter(Boolean).join(" ").trim() ||
+    row.contact.title ||
+    row.contactId;
+  return {
+    contactId: row.contactId,
+    name,
+    title: row.contact.title,
+    personaId: null,
+    personaName: null,
+  };
+}
+
+function stageHasSavedNotes(
+  stage: StageView,
+  notesByContactId: Map<string, Array<{ stageId: string | null; text: string }>>,
+): boolean {
+  if (stage.notesBefore?.trim() || stage.notesAfter?.trim()) return true;
+  for (const notes of notesByContactId.values()) {
+    if (notes.some((note) => note.stageId === stage.id && note.text.trim())) return true;
+  }
+  return false;
+}
+
+function interviewsByPerson(stages: StageView[], people: PersonOption[]) {
+  const groups = new Map<string, { person: PersonOption; interviews: StageView[] }>();
+  const unlinked: StageView[] = [];
+  for (const stage of stages) {
+    if (stage.interviewers.length === 0) {
+      unlinked.push(stage);
+      continue;
+    }
+    for (const row of stage.interviewers) {
+      const person = personForInterviewer(row, people);
+      const group = groups.get(person.contactId) ?? { person, interviews: [] };
+      group.interviews.push(stage);
+      groups.set(person.contactId, group);
+    }
+  }
+  const ordered = [...groups.values()].map((group) => ({
+    person: group.person,
+    interviews: [...group.interviews].sort(compareNewest),
+  }));
+  ordered.sort((left, right) => {
+    const byDate = compareNewest(left.interviews[0]!, right.interviews[0]!);
+    if (byDate !== 0) return byDate;
+    return (
+      left.person.name.localeCompare(right.person.name) ||
+      left.person.contactId.localeCompare(right.person.contactId)
+    );
+  });
+  unlinked.sort(compareNewest);
+  return { people: ordered, unlinked };
 }
 
 function StageStoredNotes({
@@ -103,7 +174,7 @@ function StageStoredNotes({
         </p>
       ))}
       {expectedDecisionAt ? (
-        <p className="text-sm text-ink" data-testid={`saved-expected-decision-${stageId}`}>
+        <p className="text-sm text-ink" data-testid={`saved-expected-decision-${stageId}-${contactId ?? "stage"}`}>
           <span className="font-medium">{interviewConfig.labels.savedExpectedDecision}</span>
           <span className="mt-1 block">{dateLabel(expectedDecisionAt)}</span>
         </p>
@@ -127,6 +198,153 @@ function StageStoredNotes({
   );
 }
 
+function InterviewScheduleFields({
+  fieldClass,
+  contactId,
+  people = [],
+}: {
+  fieldClass: string;
+  contactId?: string;
+  people?: PersonOption[];
+}) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {contactId ? (
+        <input type="hidden" name="contactId" value={contactId} />
+      ) : (
+        <label className="text-sm md:col-span-2">
+          {interviewConfig.labels.interviewer}
+          <select name="contactId" required className={fieldClass} defaultValue="">
+            <option value="">{interviewConfig.labels.noInterviewer}</option>
+            {people.map((person) => (
+              <option key={person.contactId} value={person.contactId}>
+                {person.name}
+                {person.title ? ` · ${person.title}` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <label className="text-sm">
+        Type
+        <select name="type" required className={fieldClass} defaultValue="RECRUITER_SCREEN">
+          {Object.entries(interviewConfig.types).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="text-sm">
+        Format
+        <select name="format" required className={fieldClass} defaultValue="VIDEO">
+          {Object.entries(interviewConfig.formats).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="text-sm">
+        Date and time
+        <input name="scheduledAt" type="datetime-local" required className={fieldClass} />
+      </label>
+    </div>
+  );
+}
+
+function PersonInterview({
+  campaignId,
+  stage,
+  contactId,
+  notesByContactId,
+  canEdit,
+  fieldClass,
+}: {
+  campaignId: string;
+  stage: StageView;
+  contactId: string | null;
+  notesByContactId: Map<string, ReturnType<typeof parseCheatSheetNotes>>;
+  canEdit: boolean;
+  fieldClass: string;
+}) {
+  const gained = contactId
+    ? (notesByContactId.get(contactId) ?? []).filter((note) => note.stageId === stage.id)
+    : [];
+  return (
+    <article
+      className="space-y-3 border-t border-edge pt-4"
+      data-testid={
+        contactId ? `person-interview-${contactId}-${stage.id}` : `unlinked-interview-${stage.id}`
+      }
+    >
+      <dl className="grid gap-2 text-sm text-ink sm:grid-cols-3">
+        <div>
+          <dt className="font-medium">Type</dt>
+          <dd>{stageTypeLabel(stage.type)}</dd>
+        </div>
+        <div>
+          <dt className="font-medium">Date and time</dt>
+          <dd>{stage.scheduledAt.toLocaleString()}</dd>
+        </div>
+        <div>
+          <dt className="font-medium">Format</dt>
+          <dd>{interviewConfig.formats[stage.format]}</dd>
+        </div>
+      </dl>
+      <div className="space-y-3">
+        <p className="text-sm text-ink">
+          <span className="font-medium">{interviewConfig.labels.outcome}</span>
+          <span className="mt-1 block">
+            {stage.outcome
+              ? interviewConfig.outcomes[stage.outcome]
+              : interviewConfig.labels.noOutcome}
+          </span>
+        </p>
+        {canEdit ? (
+          <ApplicationActionForm
+            action={updateInterviewStageAction}
+            submitLabel={interviewConfig.labels.saveStage}
+            testId={`update-stage-${stage.id}-${contactId ?? "unlinked"}`}
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+            <input type="hidden" name="stageId" value={stage.id} />
+            <label className="text-sm">
+              {interviewConfig.labels.outcome}
+              <select name="outcome" className={fieldClass} defaultValue={stage.outcome ?? ""}>
+                <option value="">{interviewConfig.labels.noOutcome}</option>
+                {Object.entries(interviewConfig.outcomes).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </ApplicationActionForm>
+        ) : null}
+      </div>
+      <StageStoredNotes
+        campaignId={campaignId}
+        stageId={stage.id}
+        contactId={contactId}
+        notesBefore={stage.notesBefore}
+        notesAfter={stage.notesAfter}
+        cheatSheetNotes={gained}
+        expectedDecisionAt={stage.expectedDecisionAt}
+        canEdit={canEdit && Boolean(contactId)}
+      />
+      {canEdit ? (
+        <RemoveInterviewControl
+          campaignId={campaignId}
+          stageId={stage.id}
+          contactId={contactId}
+          hasNotes={stageHasSavedNotes(stage, notesByContactId)}
+        />
+      ) : null}
+    </article>
+  );
+}
+
 export function InterviewStagesList({
   campaignId,
   canEdit,
@@ -143,6 +361,7 @@ export function InterviewStagesList({
   notesByContactId: Map<string, ReturnType<typeof parseCheatSheetNotes>>;
 }) {
   const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
+  const grouped = interviewsByPerson(stages, people);
   return (
     <section
       className="space-y-4 rounded-lg border border-edge bg-surface p-5"
@@ -157,9 +376,9 @@ export function InterviewStagesList({
 
       {canEdit ? (
         <div className="space-y-4">
-          <p className="text-sm font-medium text-ink" data-testid="stage-create-start">
-            {interviewConfig.labels.startByChoosing}
-          </p>
+          <h3 className="text-sm font-medium text-ink" data-testid="stage-create-start">
+            {interviewConfig.labels.addSomeoneYoureMeeting}
+          </h3>
           <StageAddContactForm campaignId={campaignId} roles={roles} />
           <ApplicationActionForm
             action={createInterviewStageAction}
@@ -167,148 +386,73 @@ export function InterviewStagesList({
             testId="add-interview-stage"
           >
             <input type="hidden" name="campaignId" value={campaignId} />
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="text-sm md:col-span-2">
-                {interviewConfig.labels.interviewer}
-                <select name="contactId" required className={fieldClass} defaultValue="">
-                  <option value="">{interviewConfig.labels.noInterviewer}</option>
-                  {people.map((person) => (
-                    <option key={person.contactId} value={person.contactId}>
-                      {person.name}
-                      {person.title ? ` · ${person.title}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm">
-                Type
-                <select name="type" required className={fieldClass} defaultValue="RECRUITER_SCREEN">
-                  {Object.entries(interviewConfig.types).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm">
-                Format
-                <select name="format" required className={fieldClass} defaultValue="VIDEO">
-                  {Object.entries(interviewConfig.formats).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm">
-                Date and time
-                <input name="scheduledAt" type="datetime-local" required className={fieldClass} />
-              </label>
-            </div>
+            <InterviewScheduleFields fieldClass={fieldClass} people={people} />
           </ApplicationActionForm>
         </div>
       ) : null}
 
+      {grouped.people.map((group) => {
+        const startOpen = group.interviews.length === 1 && group.interviews[0]?.outcome == null;
+        return (
+          <InterviewerCollapsible
+            key={group.person.contactId}
+            title={group.person.name}
+            startOpen={startOpen}
+            testId={`person-section-${group.person.contactId}`}
+            headingAside={
+              <InterviewStageInterviewerLink campaignId={campaignId} person={group.person} />
+            }
+          >
+            {group.interviews.map((stage) => (
+              <PersonInterview
+                key={stage.id}
+                campaignId={campaignId}
+                stage={stage}
+                contactId={group.person.contactId}
+                notesByContactId={notesByContactId}
+                canEdit={canEdit}
+                fieldClass={fieldClass}
+              />
+            ))}
+            {canEdit ? (
+              <ApplicationActionForm
+                action={createInterviewStageAction}
+                submitLabel={interviewConfig.labels.addAnotherInterview}
+                testId={`add-another-interview-${group.person.contactId}`}
+              >
+                <input type="hidden" name="campaignId" value={campaignId} />
+                <InterviewScheduleFields
+                  fieldClass={fieldClass}
+                  contactId={group.person.contactId}
+                />
+              </ApplicationActionForm>
+            ) : null}
+          </InterviewerCollapsible>
+        );
+      })}
+
+      {grouped.unlinked.length > 0 ? (
+        <section className="space-y-4" data-testid="interviews-not-linked">
+          <h3 className="text-sm font-medium text-ink">
+            {interviewConfig.labels.notLinkedToAnyone}
+          </h3>
+          {grouped.unlinked.map((stage) => (
+            <PersonInterview
+              key={stage.id}
+              campaignId={campaignId}
+              stage={stage}
+              contactId={null}
+              notesByContactId={notesByContactId}
+              canEdit={canEdit}
+              fieldClass={fieldClass}
+            />
+          ))}
+        </section>
+      ) : null}
+
       {stages.length === 0 ? (
         <p className="text-sm text-subtle">No stages yet.</p>
-      ) : (
-        <div className="space-y-6">
-          {stages.map((stage) => {
-            const startOpen = stage.outcome == null && stage.interviewers.length === 1;
-            return (
-              <article
-                key={stage.id}
-                className="space-y-3 border-t border-edge pt-4"
-                data-testid={`interview-stage-${stage.id}`}
-              >
-                <h3 className="font-medium text-ink">
-                  {stageTypeLabel(stage.type)} · {interviewConfig.formats[stage.format]}
-                </h3>
-                <p className="text-sm text-muted">
-                  {stage.scheduledAt.toLocaleString()}
-                  {stage.outcome ? ` · ${interviewConfig.outcomes[stage.outcome]}` : ""}
-                </p>
-                {stage.interviewers.length === 0 ? (
-                  <div data-testid={`stage-no-interviewer-${stage.id}`}>
-                    <p className="text-sm text-ink">{interviewConfig.labels.noInterviewerOnStage}</p>
-                    <StageStoredNotes
-                      campaignId={campaignId}
-                      stageId={stage.id}
-                      contactId={null}
-                      notesBefore={stage.notesBefore}
-                      notesAfter={stage.notesAfter}
-                      cheatSheetNotes={[]}
-                      expectedDecisionAt={stage.expectedDecisionAt}
-                      canEdit={false}
-                    />
-                  </div>
-                ) : (
-                  stage.interviewers.map((row) => {
-                    const person = people.find((item) => item.contactId === row.contactId);
-                    const display = person ?? {
-                      contactId: row.contactId,
-                      name: [row.contact.firstName, row.contact.lastName].filter(Boolean).join(" ").trim()
-                        || row.contact.title
-                        || row.contactId,
-                      title: row.contact.title,
-                      personaId: null,
-                      personaName: null,
-                    };
-                    const gained = (notesByContactId.get(row.contactId) ?? []).filter(
-                      (note) => note.stageId === stage.id,
-                    );
-                    return (
-                      <InterviewerCollapsible
-                        key={row.id}
-                        title={display.name}
-                        startOpen={startOpen}
-                        testId={`stage-interviewer-${stage.id}-${row.contactId}`}
-                      >
-                        <InterviewStageInterviewerLink campaignId={campaignId} person={display} />
-                        <StageStoredNotes
-                          campaignId={campaignId}
-                          stageId={stage.id}
-                          contactId={row.contactId}
-                          notesBefore={stage.notesBefore}
-                          notesAfter={stage.notesAfter}
-                          cheatSheetNotes={gained}
-                          expectedDecisionAt={stage.expectedDecisionAt}
-                          canEdit={canEdit}
-                        />
-                      </InterviewerCollapsible>
-                    );
-                  })
-                )}
-                {canEdit ? (
-                  <ApplicationActionForm
-                    action={updateInterviewStageAction}
-                    submitLabel={interviewConfig.labels.saveStage}
-                    testId={`update-stage-${stage.id}`}
-                  >
-                    <input type="hidden" name="campaignId" value={campaignId} />
-                    <input type="hidden" name="stageId" value={stage.id} />
-                    <label className="text-sm">
-                      {interviewConfig.labels.outcome}
-                      <select
-                        name="outcome"
-                        className={fieldClass}
-                        defaultValue={stage.outcome ?? ""}
-                      >
-                        <option value="">{interviewConfig.labels.noOutcome}</option>
-                        {Object.entries(interviewConfig.outcomes).map(([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </ApplicationActionForm>
-                ) : null}
-              </article>
-            );
-          })}
-        </div>
-      )}
+      ) : null}
     </section>
   );
 }

@@ -161,7 +161,7 @@ describe("interview stages batch 1", () => {
     expect(interviewConfig.labels.openGuide).toBe("Open stage");
     expect(host.textContent).not.toContain("Open stage");
     expect(host.querySelector("[data-testid=stage-create-start]")?.textContent).toBe(
-      "Start by choosing who you're meeting.",
+      "Add someone you're meeting",
     );
     const contactForm = host.querySelector("[data-testid=add-application-contact]");
     expect(contactForm).not.toBeNull();
@@ -183,11 +183,25 @@ describe("interview stages batch 1", () => {
     expect(host.textContent).not.toContain("Use this interviewer");
     expect(host.textContent).not.toContain("Add new interviewer");
 
-    const open = host.querySelector("[data-testid=stage-interviewer-stage-open-contact-1]");
-    expect(open?.getAttribute("data-open")).toBe("true");
-    expect(open?.textContent).toContain("Priya Shah");
-    expect(open?.querySelector("[data-cheat-sheet-indicator]")?.getAttribute("data-cheat-sheet-indicator")).toBe("open");
-    expect(open?.querySelector("[data-testid=harper-contact-link-contact-1]")?.getAttribute("href")).toContain(
+    const priya = host.querySelector("[data-testid=person-section-contact-1]");
+    expect(priya?.getAttribute("data-open")).toBe("false");
+    const jordan = host.querySelector("[data-testid=person-section-contact-2]");
+    expect(jordan?.getAttribute("data-open")).toBe("true");
+    expect(jordan?.textContent).toContain("Jordan Lee");
+    expect(jordan?.querySelector("[data-cheat-sheet-indicator]")?.getAttribute("data-cheat-sheet-indicator")).toBe(
+      "open",
+    );
+    expect(jordan?.querySelector("[data-testid=harper-contact-link-contact-2]")?.getAttribute("href")).toContain(
+      "harper-contact",
+    );
+
+    await act(async () => {
+      (host.querySelector("[data-testid=person-section-contact-1-toggle]") as HTMLButtonElement).click();
+    });
+    const opened = host.querySelector("[data-testid=person-section-contact-1]");
+    expect(opened?.getAttribute("data-open")).toBe("true");
+    const open = host.querySelector("[data-testid=person-interview-contact-1-stage-open]");
+    expect(opened?.querySelector("[data-testid=harper-contact-link-contact-1]")?.getAttribute("href")).toContain(
       "harper-contact",
     );
     expect(open?.textContent).toContain("Post Interview Notes");
@@ -201,17 +215,11 @@ describe("interview stages batch 1", () => {
     expect(open?.textContent).toContain("Expected decision date (saved earlier)");
     expect(open?.querySelector("[name=notesBefore]")).toBeNull();
     expect(open?.querySelector("[name=note]")).not.toBeNull();
+    expect(host.querySelectorAll("[data-testid=person-interview-contact-1-stage-two], [data-testid=person-interview-contact-2-stage-two]")).toHaveLength(2);
 
-    const two = host.querySelectorAll("[data-testid^=stage-interviewer-stage-two-][data-open]");
-    expect(two).toHaveLength(2);
-    expect(two[0]?.getAttribute("data-open")).toBe("false");
-    expect(two[1]?.getAttribute("data-open")).toBe("false");
-    expect(host.querySelector("[data-testid=stage-interviewer-stage-done-contact-1]")?.getAttribute("data-open")).toBe(
-      "false",
-    );
-
-    const empty = host.querySelector("[data-testid=stage-no-interviewer-stage-empty]");
-    expect(empty?.textContent).toContain("No interviewer was added to this stage.");
+    const empty = host.querySelector("[data-testid=unlinked-interview-stage-empty]");
+    expect(host.textContent).toContain("Not linked to anyone");
+    expect(host.textContent).not.toContain("No interviewer was added to this stage.");
     expect(empty?.querySelectorAll("[data-testid=stored-notes-before-stage-empty-stage]")).toHaveLength(1);
     expect(empty?.textContent).toContain("Prep the forecast.");
     expect(empty?.textContent).toContain("Expected decision date (saved earlier)");

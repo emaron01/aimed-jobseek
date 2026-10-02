@@ -400,7 +400,7 @@ describe("UI batch 1 stage interviewer setup", () => {
     expect(section).toContain("StageAddContactForm");
     expect(createForm).toContain("AddContactForm");
     expect(createForm).toContain("addApplicationContactAction");
-    expect(section).toContain("interviewConfig.labels.startByChoosing");
+    expect(section).toContain("interviewConfig.labels.addSomeoneYoureMeeting");
     expect(section).toContain("createInterviewStageAction");
     expect(section).toContain('name="contactId"');
     expect(section).not.toContain("InterviewStageSetupInterviewers");

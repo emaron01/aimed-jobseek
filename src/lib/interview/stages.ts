@@ -579,6 +579,55 @@ export async function startPersonPrepForContact(input: {
   };
 }
 
+/**
+ * Remove one person's interview.
+ * A stage with only this person, or with nobody, is deleted. The schema then
+ * cascades InterviewStageInterviewer and InterviewStageGuide, and sets
+ * ApplicationAsset.interviewStageId to null so messages stay. A stage that
+ * still has other people drops only this person's interviewer row.
+ * Contacts, cheat-sheet notes, Harper turns, prep, sortOrder, and application
+ * progress are not changed.
+ */
+export async function removeInterviewForPerson(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  stageId: string;
+  contactId?: string | null;
+}): Promise<{ removed: "stage" | "link" }> {
+  await requireOwnedCampaign(input);
+  const stageId = input.stageId.trim();
+  if (!stageId) throw new TenantError("Interview stage is required.");
+  const stage = await prisma.interviewStage.findFirst({
+    where: {
+      id: stageId,
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+    },
+    select: {
+      id: true,
+      interviewers: { select: { id: true, contactId: true } },
+    },
+  });
+  if (!stage) throw new TenantError("Interview stage was not found.");
+  const contactId = input.contactId?.trim() || null;
+  if (!contactId) {
+    if (stage.interviewers.length > 0) {
+      throw new TenantError("Choose the person to remove from this interview.");
+    }
+    await prisma.interviewStage.delete({ where: { id: stage.id } });
+    return { removed: "stage" };
+  }
+  const link = stage.interviewers.find((row) => row.contactId === contactId);
+  if (!link) throw new TenantError("That person is not on this interview.");
+  if (stage.interviewers.length === 1) {
+    await prisma.interviewStage.delete({ where: { id: stage.id } });
+    return { removed: "stage" };
+  }
+  await prisma.interviewStageInterviewer.delete({ where: { id: link.id } });
+  return { removed: "link" };
+}
+
 export function stageTypeLabel(type: string): string {
   return type in interviewConfig.types
     ? interviewConfig.types[type as keyof typeof interviewConfig.types]

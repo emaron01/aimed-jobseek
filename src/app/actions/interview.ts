@@ -9,6 +9,7 @@ import {
   addInterviewStageInterviewer,
   assignExistingInterviewStageInterviewer,
   createInterviewStage,
+  removeInterviewForPerson,
   startPersonPrepForContact,
   updateInterviewStage,
 } from "@/lib/interview/stages";
@@ -86,6 +87,41 @@ export async function createInterviewStageAction(
     });
     revalidate(id);
     return { ok: true, message: "Interview stage added." };
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
+export async function removeInterviewAction(
+  _previous: InterviewActionResult | null,
+  formData: FormData,
+): Promise<InterviewActionResult> {
+  try {
+    const [user, organizationId] = await Promise.all([
+      requireCurrentUser(),
+      requireOrganizationId(),
+    ]);
+    const id = campaignId(formData);
+    const stageId = String(formData.get("stageId") ?? "").trim();
+    if (!stageId) throw new TenantError("Interview stage is required.");
+    const contactId = String(formData.get("contactId") ?? "").trim();
+    await removeInterviewForPerson({
+      organizationId,
+      campaignId: id,
+      userId: user.id,
+      stageId,
+      contactId: contactId || null,
+    });
+    const { enqueueLearningsReassessIfChanged } = await import(
+      "@/lib/consultation/learnings"
+    );
+    await enqueueLearningsReassessIfChanged({
+      organizationId,
+      campaignId: id,
+      userId: user.id,
+    });
+    revalidate(id, stageId);
+    return { ok: true, message: "Interview removed." };
   } catch (error) {
     return errorResult(error);
   }
