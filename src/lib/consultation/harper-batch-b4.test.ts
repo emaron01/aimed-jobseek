@@ -47,9 +47,10 @@ describe("Harper Batch B4 Cheat Sheet read-only", () => {
     expect(consultationConversationCopy.editAnswer).toBe("Edit");
     expect(harperQuestionAnchorId("turn-42")).toBe("harper-q:turn-42");
     const href = workspaceHarperQuestionHref("camp_1", "ct_1", "turn-42");
-    expect(href).toContain("/campaigns/camp_1/consultation");
+    expect(href).toContain("/campaigns/camp_1/summary");
     expect(href).toContain("person=contact%3Act_1");
-    expect(href).toContain("harper-q%3Aturn-42");
+    expect(href).toContain(encodeURIComponent("contact:ct_1"));
+    expect(href).not.toContain("harper-q");
   });
 
   it("unanswered coach item keeps the Harper anchor and answers in place", () => {
@@ -66,10 +67,10 @@ describe("Harper Batch B4 Cheat Sheet read-only", () => {
       "ct_1",
       "contact:c1:likely:1",
     );
+    expect(href).toContain("/campaigns/camp_1/summary");
     expect(href).toContain("person=contact%3Act_1");
-    expect(href).toContain(
-      encodeURIComponent("harper-coach:contact:c1:likely:1"),
-    );
+    expect(href).toContain(encodeURIComponent("contact:ct_1"));
+    expect(href).not.toContain("harper-coach");
     // Harper person view still mounts coach items (anchors via shared component).
     expect(personView).toContain("CheatSheetPersonBody");
     expect(personView).toContain("showCoachAnswerForms");
@@ -184,8 +185,7 @@ describe("Harper Batch B4 Cheat Sheet read-only", () => {
   });
 
   it("Harper deep-link selects person via ?person= and scrolls to hash", () => {
-    expect(consultationPage).toContain("searchParams");
-    expect(consultationPage).toContain("initialPersonKey={query.person ?? null}");
+    expect(consultationPage).not.toContain("initialPersonKey");
     expect(filter).toContain("initialPersonKey");
     expect(filter).toContain("harper-q:");
     expect(filter).toContain("harper-coach:");

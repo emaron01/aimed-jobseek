@@ -40,10 +40,13 @@ describe("Harper Batch B1 Stage timeline and Outreach thank-you", () => {
     expect(panel).not.toContain("edit-contact-");
     expect(panel).not.toContain("editContact");
     expect(workspaceHarperContactHref("camp_1", "ct_1")).toContain(
-      "/campaigns/camp_1/consultation",
+      "/campaigns/camp_1/summary",
     );
     expect(workspaceHarperContactHref("camp_1", "ct_1")).toContain(
-      "harper-contact%3Act_1",
+      "contact%3Act_1",
+    );
+    expect(workspaceHarperContactHref("camp_1", "ct_1")).not.toContain(
+      "harper-contact",
     );
   });
 
@@ -66,7 +69,7 @@ describe("Harper Batch B1 Stage timeline and Outreach thank-you", () => {
 
   it("Post Interview Notes opens the notes form with the same fields", () => {
     expect(interviewConfig.labels.postInterviewNotes).toBe("Post Interview Notes");
-    expect(stages).toContain("postInterviewNotes");
+    expect(stages).toContain("interviewNotes");
     expect(stages).toContain("post-interview-notes-${stageId}");
     expect(src("src/components/StageInterviewerSection.tsx")).toContain(
       "addCheatSheetInterviewNoteAction",
@@ -79,7 +82,8 @@ describe("Harper Batch B1 Stage timeline and Outreach thank-you", () => {
     expect(stages).not.toContain('name="notesBefore"');
     expect(stages).not.toContain('name="notesAfter"');
     expect(stages).not.toContain('name="expectedDecisionAt"');
-    expect(src("src/components/StageInterviewerSection.tsx")).toContain("gainedInformation");
+    expect(src("src/components/StageInterviewerSection.tsx")).not.toContain("gainedInformation");
+    expect(src("src/components/StageInterviewerSection.tsx")).toContain("aria-labelledby");
     expect(src("src/components/StageInterviewerSection.tsx")).toContain(
       "createInterviewStageAction",
     );

@@ -72,11 +72,9 @@ describe("no AI on page view / skip unchanged / research cost", () => {
     const process = src("src/lib/application-jobs/process.ts");
 
     expect(stages).toContain("notesTextChanged");
-    expect(interviewAction).toContain("updated.notesTextChanged");
+    expect(interviewAction).not.toContain("updated.notesTextChanged");
     expect(interviewAction).not.toContain("regenerateApplicationJobRequirement");
-    expect(interviewAction).toMatch(
-      /if \(updated\.notesTextChanged\)[\s\S]*enqueueLearningsReassessIfChanged/,
-    );
+    expect(interviewAction).not.toContain("enqueueLearningsReassessIfChanged");
 
     expect(contactProfile).toContain("queued: false");
     expect(contactProfile).toContain(
@@ -183,7 +181,7 @@ describe("no AI on page view / skip unchanged / research cost", () => {
     expect(section).toContain("buildHarperQaLayout");
     expect(section).toContain("partitionGeneralQuestionsForStanding");
     expect(section).toContain("consultationBusy");
-    expect(section).toContain("getApplicationSummaryView");
+    expect(section).not.toContain("getApplicationSummaryView");
     expect(page).toContain("jobs={live.jobs}");
 
     expect(thread).not.toContain("enqueueApplicationJob");

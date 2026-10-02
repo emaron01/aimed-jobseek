@@ -157,7 +157,16 @@ function StageStoredNotes({
           : `post-interview-notes-${stageId}`
       }
     >
-      <h4 className="text-sm font-medium text-ink">{interviewConfig.labels.postInterviewNotes}</h4>
+      <h4
+        id={
+          contactId
+            ? `interview-notes-label-${stageId}-${contactId}`
+            : `interview-notes-label-${stageId}`
+        }
+        className="text-sm font-medium text-ink"
+      >
+        {interviewConfig.labels.interviewNotes}
+      </h4>
       {before ? (
         <p className="text-sm text-ink" data-testid={`stored-notes-before-${stageId}-${contactId ?? "stage"}`}>
           <span className="font-medium">{interviewConfig.labels.notesBefore}</span>
@@ -183,6 +192,11 @@ function StageStoredNotes({
           contactId={contactId}
           fieldClass={fieldClass}
           notes={savedNotes}
+          labelId={
+            contactId
+              ? `interview-notes-label-${stageId}-${contactId}`
+              : `interview-notes-label-${stageId}`
+          }
         />
       ) : (
         <SavedInterviewNotes stageId={stageId} contactId={contactId} notes={savedNotes} />
@@ -232,7 +246,7 @@ function PersonInterview({
       </dl>
       <div className="space-y-3">
         <p className="text-sm text-ink">
-          <span className="font-medium">{interviewConfig.labels.outcome}</span>
+          <span className="font-medium">{interviewConfig.labels.savedOutcome}</span>
           <span className="mt-1 block">
             {stage.outcome
               ? interviewConfig.outcomes[stage.outcome]

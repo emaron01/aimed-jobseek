@@ -93,7 +93,7 @@ describe("Harper Batch D7 — learnings fingerprint + HM routing", () => {
       learned.indexOf("export async function saveApplicationJobLearnedNotes"),
       learned.indexOf("export { displayedFitBucket }"),
     );
-    expect(learnedBlock).toContain("enqueueLearningsReassessIfChanged");
+    expect(learnedBlock).not.toContain("enqueueLearningsReassessIfChanged");
     expect(learnedBlock).not.toMatch(
       /type:\s*"CONSULTATION"[\s\S]*operation:\s*"reassess"/,
     );
@@ -105,14 +105,14 @@ describe("Harper Batch D7 — learnings fingerprint + HM routing", () => {
       interview.indexOf("export async function updateInterviewStageAction"),
       interview.indexOf("export async function addInterviewInterviewerAction"),
     );
-    expect(updateFn).toContain("enqueueLearningsReassessIfChanged");
+    expect(updateFn).not.toContain("enqueueLearningsReassessIfChanged");
 
     const summary = src("src/lib/application-summary/service.ts");
     const noteFn = summary.slice(
       summary.indexOf("export async function addCheatSheetInterviewNote"),
       summary.indexOf("function blankGuidancePath"),
     );
-    expect(noteFn).toContain("enqueueLearningsReassessIfChanged");
+    expect(noteFn).not.toContain("enqueueLearningsReassessIfChanged");
     expect(noteFn).not.toMatch(/type:\s*"CONSULTATION"/);
 
     expect(src("src/lib/ai/paid-call-gate.ts")).toContain(

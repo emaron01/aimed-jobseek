@@ -203,7 +203,7 @@ describe("interview stages batch 1", () => {
       "open",
     );
     expect(jordan?.querySelector("[data-testid=harper-contact-link-contact-2]")?.getAttribute("href")).toContain(
-      "harper-contact",
+      "/summary",
     );
 
     await act(async () => {
@@ -213,14 +213,14 @@ describe("interview stages batch 1", () => {
     expect(opened?.getAttribute("data-open")).toBe("true");
     const open = host.querySelector("[data-testid=person-interview-contact-1-stage-open]");
     expect(opened?.querySelector("[data-testid=harper-contact-link-contact-1]")?.getAttribute("href")).toContain(
-      "harper-contact",
+      "/summary",
     );
-    expect(open?.textContent).toContain("Post Interview Notes");
+    expect(open?.textContent).toContain("Interview Notes");
+    expect(open?.textContent).not.toContain("Newly gained information");
     expect(open?.textContent).toContain("Notes before");
     expect(open?.textContent).toContain("Prep the forecast.");
     expect(open?.textContent).toContain("Notes after");
     expect(open?.textContent).toContain("They pushed on margin.");
-    expect(open?.textContent).toContain("Newly gained information");
     expect(open?.textContent).toContain("Board asked about margin.");
     expect(open?.textContent).not.toContain("This note belongs to another stage.");
     expect(open?.textContent).toContain("Expected decision date (saved earlier)");
@@ -421,9 +421,7 @@ describe.skipIf(!hasTestDatabase())("interview stages batch 1 stored values", { 
       text: "Board asked about margin.",
     });
     expect(notes.map((note) => note.text)).toContain("Board asked about margin.");
-    expect(enqueue).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "CONSULTATION", targetId: "reassess" }),
-    );
+    expect(enqueue).not.toHaveBeenCalled();
     const stored = await prisma.campaignContact.findFirstOrThrow({
       where: { campaignId, contactId: interviewer.contactId },
     });

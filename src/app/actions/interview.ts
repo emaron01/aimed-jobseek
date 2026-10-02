@@ -13,7 +13,7 @@ import {
   startPersonPrepForContact,
   updateInterviewStage,
 } from "@/lib/interview/stages";
-import { applicationSummaryConfig } from "@/lib/product-config";
+import { applicationSummaryConfig, interviewConfig } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 
@@ -112,16 +112,7 @@ export async function removeInterviewAction(
       stageId,
       contactId: contactId || null,
     });
-    if (removed.learnedNotesRemoved) {
-      const { enqueueLearningsReassessIfChanged } = await import(
-        "@/lib/consultation/learnings"
-      );
-      await enqueueLearningsReassessIfChanged({
-        organizationId,
-        campaignId: id,
-        userId: user.id,
-      });
-    } else if (removed.removed === "stage") {
+    if (!removed.learnedNotesRemoved && removed.removed === "stage") {
       const { retargetLearningsReceiptIfPresent } = await import(
         "@/lib/consultation/learnings"
       );
@@ -149,7 +140,7 @@ export async function updateInterviewStageAction(
     const id = campaignId(formData);
     const stageId = String(formData.get("stageId") ?? "").trim();
     if (!stageId) throw new TenantError("Interview stage is required.");
-    const updated = await updateInterviewStage({
+    await updateInterviewStage({
       organizationId,
       campaignId: id,
       userId: user.id,
@@ -171,18 +162,8 @@ export async function updateInterviewStageAction(
         ? String(formData.get("outcome") ?? "").trim() || null
         : undefined,
     });
-    if (updated.notesTextChanged) {
-      const { enqueueLearningsReassessIfChanged } = await import(
-        "@/lib/consultation/learnings"
-      );
-      await enqueueLearningsReassessIfChanged({
-        organizationId,
-        campaignId: id,
-        userId: user.id,
-      });
-    }
     revalidate(id, stageId);
-    return { ok: true, message: "Interview stage updated." };
+    return { ok: true, message: interviewConfig.labels.outcomeSaved };
   } catch (error) {
     return errorResult(error);
   }

@@ -31,16 +31,25 @@ export function workspaceConsultationHref(campaignId?: string): string {
   );
 }
 
-/** Harper interviewer section on the consultation page. Fragment only — never show the id as text. */
-export function workspaceHarperContactHref(
+/** That person's Interview Cheat Sheet section. Fragment only — never show the id as text. */
+export function workspaceCheatSheetPersonHref(
   campaignId: string,
   contactId: string,
 ): string {
   const person = contactId.trim();
   if (!person) {
-    throw new Error("Harper contact link is missing an interviewer.");
+    throw new Error("Cheat sheet person link is missing a person.");
   }
-  return `${workspaceConsultationHref(campaignId)}?person=${encodeURIComponent(`contact:${person}`)}#${encodeURIComponent(`harper-contact:${person}`)}`;
+  const sectionKey = `contact:${person}`;
+  return `${workspaceCampaignSummaryHref(campaignId)}?person=${encodeURIComponent(sectionKey)}#${encodeURIComponent(sectionKey)}`;
+}
+
+/** Interviewer name on Interview Notes. Opens that person's Cheat Sheet section. */
+export function workspaceHarperContactHref(
+  campaignId: string,
+  contactId: string,
+): string {
+  return workspaceCheatSheetPersonHref(campaignId, contactId);
 }
 
 /** Harper question on Where you stand / general — no person selected. */
@@ -55,38 +64,30 @@ export function workspaceHarperStandingQuestionHref(
   return `${workspaceConsultationHref(campaignId)}#${encodeURIComponent(`harper-q:${turnId}`)}`;
 }
 
-/** Harper question card: select the person profile, then scroll to `#harper-q:{questionTurnId}`. */
+/** Former Harper person-question link. Opens that person's Cheat Sheet section. */
 export function workspaceHarperQuestionHref(
   campaignId: string,
   contactId: string,
   questionTurnId: string,
 ): string {
-  const person = contactId.trim();
   const turnId = questionTurnId.trim();
-  if (!person) {
-    throw new Error("Harper question link is missing an interviewer.");
-  }
   if (!turnId) {
     throw new Error("Harper question link is missing a question.");
   }
-  return `${workspaceConsultationHref(campaignId)}?person=${encodeURIComponent(`contact:${person}`)}#${encodeURIComponent(`harper-q:${turnId}`)}`;
+  return workspaceCheatSheetPersonHref(campaignId, contactId);
 }
 
-/** Harper coach item (no turn yet): select the person profile, then scroll to `#harper-coach:{itemId}`. */
+/** Former Harper coach-item link. Opens that person's Cheat Sheet section. */
 export function workspaceHarperCoachItemHref(
   campaignId: string,
   contactId: string,
   coachItemId: string,
 ): string {
-  const person = contactId.trim();
   const itemId = coachItemId.trim();
-  if (!person) {
-    throw new Error("Harper coach link is missing an interviewer.");
-  }
   if (!itemId) {
     throw new Error("Harper coach link is missing a coach item.");
   }
-  return `${workspaceConsultationHref(campaignId)}?person=${encodeURIComponent(`contact:${person}`)}#${encodeURIComponent(`harper-coach:${itemId}`)}`;
+  return workspaceCheatSheetPersonHref(campaignId, contactId);
 }
 
 export function workspaceConsultationHrefFromPathname(pathname: string): string {

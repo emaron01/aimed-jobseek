@@ -17,6 +17,7 @@ export const interviewConfig = Object.freeze({
     addInterviewer: "Add interviewer",
     /** Harper: add a person expected to interview before a stage is scheduled. */
     addInterviewContact: "Add Interview Contact",
+    interviewNotes: "Interview Notes",
     gainedInformation: "Newly gained information",
     gainedInformationHelp:
       "Paste an invitation email, or write notes about what they care about. This is saved on this person's Interview cheat sheet section.",
@@ -32,6 +33,8 @@ export const interviewConfig = Object.freeze({
     notesAfterHelp: "What was discussed and what you learned.",
     expectedDecision: "Expected decision date",
     outcome: "Outcome",
+    savedOutcome: "Saved outcome",
+    outcomeSaved: "Outcome saved.",
     noOutcome: "No outcome yet",
     generateGuide: "Generate guide",
     regenerateGuide: "Regenerate guide",

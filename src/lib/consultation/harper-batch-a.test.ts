@@ -119,17 +119,16 @@ describe("Harper Batch A layout", () => {
 
     const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
     const render = section.slice(section.indexOf("return ("));
-    expect(render.indexOf("consultation-standing-panel")).toBeLessThan(
-      render.indexOf("HarperPersonInlineProfile"),
-    );
+    expect(render).toContain("consultation-standing-panel");
+    expect(render).not.toContain("HarperPersonInlineProfile");
     // Batch B2: General questions partition into standing.
     // Batch B3: interviewer Q&A moves into Harper person view.
     expect(section).toContain("partitionGeneralQuestionsForStanding");
     // Unified standing list (standing-structure): entries built from dedicatedTopics + requirements.
     expect(section).toContain("buildStandingListEntries");
     expect(section).toContain("entries={standingEntries}");
-    expect(section).toContain("HarperPersonInlineProfile");
-    expect(section).toContain("interviewerSection=");
+    expect(section).not.toContain("HarperPersonInlineProfile");
+    expect(section).not.toContain("interviewerSection=");
     expect(section).not.toContain("generalQuestions={qaLayout.general}");
     expect(section).toContain("buildHarperQaLayout");
 

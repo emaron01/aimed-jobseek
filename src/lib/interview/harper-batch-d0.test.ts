@@ -24,9 +24,7 @@ describe("Harper Batch D0 — remove unused notes-after gap check", () => {
     expect(updateFn).not.toContain("detectInterviewNoteGap");
     expect(updateFn).not.toContain("consultationOfferJson");
     expect(action).not.toContain("refreshConsultationOffer");
-    expect(updateFn).toMatch(
-      /if \(updated\.notesTextChanged\)[\s\S]*enqueueLearningsReassessIfChanged/,
-    );
+    expect(updateFn).not.toContain("enqueueLearningsReassessIfChanged");
   });
 
   it("removes refreshConsultationOffer, detectInterviewNoteGap, and offer copy", () => {

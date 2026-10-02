@@ -100,7 +100,7 @@ describe("interview stage open buttons", () => {
     });
     expect(openInterviewStage([{ outcome: "COMPLETED" }])).toBeNull();
     expect(interviewConfig.labels.postInterviewNotes).toBe("Post Interview Notes");
-    expect(stages).toContain("postInterviewNotes");
+    expect(stages).toContain("interviewNotes");
     expect(stages).not.toContain("reviewOpenQuestions");
     expect(stages).not.toContain("workspaceInterviewLikelyQuestionsHref");
     expect(stages).toContain("post-interview-notes-${stageId}");
@@ -109,6 +109,6 @@ describe("interview stage open buttons", () => {
     );
     expect(panel).not.toContain("CheatSheetPersonBody");
     expect(notes).not.toContain("enqueueCheatSheetPersonSection");
-    expect(notes).toContain("enqueueLearningsReassessIfChanged");
+    expect(notes).not.toContain("enqueueLearningsReassessIfChanged");
   });
 });

@@ -166,9 +166,8 @@ describe("Harper Batch B2 — Where you stand inline Q&A", () => {
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
 
     const render = section.slice(section.indexOf("return ("));
-    expect(render.indexOf("consultation-standing-panel")).toBeLessThan(
-      render.indexOf("HarperPersonInlineProfile"),
-    );
+    expect(render).toContain("consultation-standing-panel");
+    expect(render).not.toContain("HarperPersonInlineProfile");
     expect(section).toContain("HarperStandingView");
     expect(section).toContain("consultationConversationCopy.pageIntro");
     expect(standing).toContain("consultationConversationCopy.whereYouStand");

@@ -397,7 +397,12 @@ describe.skipIf(!hasTestDatabase())("remove interview reassess against postgres"
       notesBefore: "Priya prep revised.",
     }));
     expect(notesChanged.ok).toBe(true);
-    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(notesChanged.message).toBe("Outcome saved.");
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(paidCall).not.toHaveBeenCalled();
+    expect(
+      await enqueueLearningsReassessIfChanged({ organizationId, campaignId, userId }),
+    ).toBe(true);
     await recordLearningsReassessFingerprint({ organizationId, campaignId });
     enqueue.mockClear();
     expect(
@@ -412,7 +417,11 @@ describe.skipIf(!hasTestDatabase())("remove interview reassess against postgres"
       stageId: notedId,
       text: "Priya gained this.",
     });
-    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(paidCall).not.toHaveBeenCalled();
+    expect(
+      await enqueueLearningsReassessIfChanged({ organizationId, campaignId, userId }),
+    ).toBe(true);
     await recordLearningsReassessFingerprint({ organizationId, campaignId });
     enqueue.mockClear();
     expect(
@@ -452,7 +461,7 @@ describe.skipIf(!hasTestDatabase())("remove interview reassess against postgres"
       contactId: contactA,
     }));
     expect(removedNoted.ok).toBe(true);
-    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(enqueue).not.toHaveBeenCalled();
     expect(paidCall).not.toHaveBeenCalled();
     expect(await prisma.interviewStage.findUnique({ where: { id: notedId } })).toBeNull();
   });

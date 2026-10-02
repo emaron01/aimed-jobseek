@@ -86,13 +86,11 @@ describe("Harper Batch B3 person view, search, Add Interview Contact, assign-onl
     expect(filter).toContain("applicationSummaryConfig.actions.filterPeople");
     expect(filter).toContain('data-testid="harper-people-filter"');
     expect(filter).toContain("HarperStandingView");
-    expect(section).toContain("HarperPeopleFilter");
+    expect(section).not.toContain("<HarperPeopleFilter");
     expect(section).toContain("HarperStandingView");
     expect(section).toContain("consultation-standing-panel");
     const render = section.slice(section.indexOf("return ("));
-    expect(render.indexOf("HarperStandingView")).toBeLessThan(
-      render.indexOf("HarperPersonInlineProfile"),
-    );
+    expect(render).not.toContain("HarperPersonInlineProfile");
   });
 
   it("selecting a person opens full inline profile matching Cheat Sheet order plus inline Q&A", () => {
@@ -123,16 +121,16 @@ describe("Harper Batch B3 person view, search, Add Interview Contact, assign-onl
     expect(key).toBeGreaterThan(positioning);
     expect(likely).toBeGreaterThan(key);
     expect(ask).toBeGreaterThan(likely);
-    expect(section).toContain("HarperPersonViewShell");
-    expect(section).toContain("interviewerSection=");
+    expect(section).not.toContain("HarperPersonViewShell");
+    expect(section).not.toContain("interviewerSection=");
   });
 
   it("interviewer cards and #harper-contact open the person inline profile", () => {
     const section = src("src/components/ConsultationSection.tsx");
     const filter = src("src/components/HarperPeopleFilter.tsx");
-    expect(section).toContain("HarperSelectPersonLink");
-    expect(section).toContain("harper-prep-card-");
-    expect(section).toContain("interviewConfig.labels.personPrepOffer");
+    expect(section).not.toContain("HarperSelectPersonLink");
+    expect(section).not.toContain("harper-prep-card-");
+    expect(section).not.toContain("interviewConfig.labels.personPrepOffer");
     expect(filter).toContain("harper-contact:");
     expect(filter).toContain("sectionKeyFromHarperHash");
     expect(filter).toContain("selectOption");
@@ -179,7 +177,7 @@ describe("Harper Batch B3 person view, search, Add Interview Contact, assign-onl
     expect(personView).toContain("interviewConfig.labels.personPrepStart");
     expect(personView).toContain("startPersonPrepAction");
     expect(personView).toContain("{canEdit && !prepStarted ? (");
-    expect(section).toContain("prepStarted={prepStartedByContact.has(person.contactId)}");
+    expect(section).not.toContain("prepStarted={prepStartedByContact.has(person.contactId)}");
     expect(actions).toContain("startPersonPrepAction");
     expect(actions).toContain("startPersonPrepForContact");
 
@@ -271,7 +269,7 @@ describe("Harper Batch B3 person view, search, Add Interview Contact, assign-onl
       expect(text).not.toContain("runPaidStructuredCall");
     }
     // Read-only summary load for person content — no generate on view
-    expect(section).toContain("getApplicationSummaryView");
+    expect(section).not.toContain("getApplicationSummaryView");
     expect(section).not.toContain("generateApplicationSummary(");
     expect(section).not.toContain("offerPersonPrep(");
   });

@@ -177,8 +177,8 @@ describe("Harper Batch B5 Additional Interview Prep Q&A", () => {
     expect(body).toContain("AdditionalInterviewPrepQa");
     expect(page).not.toContain("additionalPrepQuestions");
     expect(page).toContain('title="General Questions"');
-    expect(section).toContain("additionalInterviewPrepQuestionsForProfile");
-    expect(section).toContain("involvement: person.involvement");
+    expect(section).not.toContain("additionalInterviewPrepQuestionsForProfile");
+    expect(section).not.toContain("involvement: person.involvement");
   });
 
   it("questions already in the profile are not repeated; empty list renders no heading", () => {
@@ -215,10 +215,13 @@ describe("Harper Batch B5 Additional Interview Prep Q&A", () => {
       "person=",
     );
     expect(workspaceHarperQuestionHref("camp_1", "c-recruiter", "q-other")).toContain(
-      "person=contact%3Ac-recruiter",
+      "/campaigns/camp_1/summary",
     );
     expect(workspaceHarperQuestionHref("camp_1", "c-recruiter", "q-other")).toContain(
-      "harper-q%3Aq-other",
+      "person=contact%3Ac-recruiter",
+    );
+    expect(workspaceHarperQuestionHref("camp_1", "c-recruiter", "q-other")).not.toContain(
+      "harper-q",
     );
   });
 

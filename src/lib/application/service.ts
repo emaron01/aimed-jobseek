@@ -978,20 +978,12 @@ export async function saveApplicationJobLearnedNotes(input: {
     data: { seekerLearnedNotes: notes.length > 0 ? notes : null },
   });
   const { enqueueApplicationJob } = await import("@/lib/application-jobs/service");
-  const { enqueueLearningsReassessIfChanged } = await import(
-    "@/lib/consultation/learnings"
-  );
   await enqueueApplicationJob({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
     type: "APPLICATION_SUMMARY",
     initiatedByUserId: input.userId,
     payload: { userId: input.userId },
-  });
-  await enqueueLearningsReassessIfChanged({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    userId: input.userId,
   });
 }
 

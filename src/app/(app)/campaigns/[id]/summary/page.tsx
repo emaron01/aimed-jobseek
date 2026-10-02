@@ -8,6 +8,7 @@ import {
 } from "@/components/ApplicationWorkspaceLive";
 import { AppActionLink } from "@/components/AppButton";
 import { CheatSheetPrintBanner, CheatSheetSection } from "@/components/CheatSheetCollapsible";
+import { CheatSheetInterviewNotes } from "@/components/CheatSheetInterviewNotes";
 import { CheatSheetEmptyState } from "@/components/CheatSheetEmptyState";
 import {
   CheatSheetPersonBody,
@@ -27,7 +28,10 @@ import { PageHeader, TenantMissing } from "@/components/ui";
 import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-status";
 import { loadCheatSheetCoachQaByContact } from "@/lib/application-summary/coach-qa";
 import { statedListItems } from "@/lib/application-summary/display";
-import { compileNotesFromInterviewsWithPerson } from "@/lib/application-summary/interview-notes";
+import {
+  compileApplicationInterviewNotes,
+  compileNotesFromInterviewsWithPerson,
+} from "@/lib/application-summary/interview-notes";
 import { getApplicationSummaryView } from "@/lib/application-summary/service";
 import { loadOrderedAnsweredHarperQuestions } from "@/lib/consultation/harper-display-qa";
 import { personViewListQuestions } from "@/lib/consultation/harper-layout";
@@ -35,7 +39,7 @@ import { requireCurrentUser } from "@/lib/auth/session";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
 import { canOpenCampaignDetail } from "@/lib/campaign/visibility";
 import type { JobScorecard } from "@/lib/job-requirement/types";
-import { applicationSummaryConfig } from "@/lib/product-config";
+import { applicationSummaryConfig, interviewConfig } from "@/lib/product-config";
 import { stageTypeLabel } from "@/lib/interview/stages";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
@@ -140,6 +144,11 @@ export default async function ApplicationSummaryPage({
     personaName: person.roleName,
     titles: person.titles,
   }));
+  const personNameByContactId = new Map(
+    view.people.flatMap((person) =>
+      person.contactId ? [[person.contactId, person.heading] as const] : [],
+    ),
+  );
   const stagesForNotes = view.stages.map((stage) => ({
     id: stage.id,
     type: stage.type,
@@ -147,7 +156,19 @@ export default async function ApplicationSummaryPage({
     notesBefore: stage.notesBefore,
     notesAfter: stage.notesAfter,
     interviewerContactIds: stage.interviewers.map((row) => row.contactId),
+    interviewerNames: stage.interviewers.map(
+      (row) =>
+        personNameByContactId.get(row.contactId) ?? interviewConfig.labels.interviewer,
+    ),
   }));
+  const applicationInterviewNotes = compileApplicationInterviewNotes({
+    people: [...view.notesByContactId.entries()].map(([contactId, notes]) => ({
+      contactId,
+      name: personNameByContactId.get(contactId) ?? interviewConfig.labels.interviewer,
+      notes,
+    })),
+    stages: stagesForNotes,
+  });
 
   return (
     <CheatSheetFilterProvider
@@ -249,6 +270,12 @@ export default async function ApplicationSummaryPage({
           )}
           testId="cheat-sheet-general-questions"
         />
+      </CheatSheetSection>
+      <CheatSheetSection
+        id="interview-notes"
+        title={applicationSummaryConfig.sections.interviewNotes}
+      >
+        <CheatSheetInterviewNotes notes={applicationInterviewNotes} />
       </CheatSheetSection>
       {view.people.map((person) => {
         const section =

@@ -1,4 +1,5 @@
 import type { CheatSheetNote } from "@/lib/application-summary/notes";
+import { formatSavedInterviewNoteAt } from "@/lib/interview/saved-note-label";
 import { interviewConfig } from "@/lib/product-config/interview";
 
 export type InterviewNoteKind = "gained" | "before" | "after";
@@ -126,6 +127,114 @@ export function compileNotesFromInterviewsWithPerson(input: {
       return kindOrder[left.kind] - kindOrder[right.kind];
     }
     return left.id.localeCompare(right.id);
+  });
+}
+
+export type ApplicationInterviewNote = {
+  /** Stable unique key. Each stored note appears once. */
+  id: string;
+  /** ISO timestamp used for newest-first ordering. */
+  sortAt: string;
+  /** Date and time shown on the entry. */
+  atLabel: string;
+  personName: string;
+  /** Interview type and date when the note belongs to an interview. */
+  interviewLabel: string | null;
+  text: string;
+};
+
+/**
+ * Every interview note on the application, once: cheat-sheet notes from every
+ * person, plus each stage's notes before and notes after. Newest first.
+ * A shared interview's stage notes are one entry, not one per person.
+ */
+export function compileApplicationInterviewNotes(input: {
+  people: Array<{ contactId: string; name: string; notes: CheatSheetNote[] }>;
+  stages: Array<{
+    id: string;
+    type: string;
+    scheduledAt: Date | string | null;
+    notesBefore: string | null;
+    notesAfter: string | null;
+    interviewerNames: readonly string[];
+  }>;
+}): ApplicationInterviewNote[] {
+  const stagesById = new Map(input.stages.map((stage) => [stage.id, stage]));
+  const entries: ApplicationInterviewNote[] = [];
+  const seen = new Set<string>();
+
+  function push(entry: ApplicationInterviewNote) {
+    if (!entry.text.trim() || seen.has(entry.id)) return;
+    seen.add(entry.id);
+    entries.push(entry);
+  }
+
+  function personLine(names: readonly string[]): string {
+    const unique = [...new Set(names.map((name) => name.trim()).filter(Boolean))];
+    return unique.length > 0
+      ? unique.join(", ")
+      : interviewConfig.labels.notLinkedToAnyone;
+  }
+
+  function noteTime(value: Date | string | null | undefined): string {
+    if (!value) return "1970-01-01T00:00:00.000Z";
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return "1970-01-01T00:00:00.000Z";
+    return date.toISOString();
+  }
+
+  for (const person of input.people) {
+    const name = person.name.trim() || interviewConfig.labels.interviewer;
+    for (const note of person.notes) {
+      const stage = note.stageId ? stagesById.get(note.stageId) : undefined;
+      push({
+        id: `gained:${note.id}`,
+        sortAt: note.createdAt,
+        atLabel: formatSavedInterviewNoteAt(note.createdAt),
+        personName: name,
+        interviewLabel: stage
+          ? interviewLabelForStage({ type: stage.type, scheduledAt: stage.scheduledAt })
+          : null,
+        text: note.text.trim(),
+      });
+    }
+  }
+
+  for (const stage of input.stages) {
+    const sortAt = noteTime(stage.scheduledAt);
+    const atLabel = formatSavedInterviewNoteAt(sortAt);
+    const interviewLabel = interviewLabelForStage({
+      type: stage.type,
+      scheduledAt: stage.scheduledAt,
+    });
+    const personName = personLine(stage.interviewerNames);
+    const before = stage.notesBefore?.trim() ?? "";
+    if (before) {
+      push({
+        id: `interview:${stage.id}:notesBefore`,
+        sortAt,
+        atLabel,
+        personName,
+        interviewLabel,
+        text: before,
+      });
+    }
+    const after = stage.notesAfter?.trim() ?? "";
+    if (after) {
+      push({
+        id: `interview:${stage.id}:notesAfter`,
+        sortAt,
+        atLabel,
+        personName,
+        interviewLabel,
+        text: after,
+      });
+    }
+  }
+
+  return entries.sort((left, right) => {
+    if (left.sortAt !== right.sortAt) return right.sortAt.localeCompare(left.sortAt);
+    return right.id.localeCompare(left.id);
   });
 }
 

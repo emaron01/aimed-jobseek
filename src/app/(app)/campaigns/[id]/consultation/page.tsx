@@ -16,13 +16,10 @@ export async function generateMetadata({
 
 export default async function ApplicationConsultationPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ person?: string }>;
 }) {
   const { id } = await params;
-  const query = await searchParams;
   const access = await requireApplicationWorkspace(id);
   if (access.kind === "missing-tenant") return <TenantMissing />;
   const live = await getApplicationWorkspaceLive({
@@ -35,7 +32,6 @@ export default async function ApplicationConsultationPage({
       organizationId={access.organizationId}
       canEdit={access.canEdit}
       jobs={live.jobs}
-      initialPersonKey={query.person ?? null}
     />
   );
 }

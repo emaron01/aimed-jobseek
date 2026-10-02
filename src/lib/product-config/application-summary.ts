@@ -45,6 +45,8 @@ export const applicationSummaryConfig = Object.freeze({
     followUps: "Follow-up questions",
     thisStoryAnswers: "This story answers:",
     stories: "Stories",
+    interviewNotes: "Interview Notes",
+    interviewNotesEmpty: "No interview notes yet.",
     interviewStages: "Interview stages",
     nextStage: "Next stage",
     completedStages: "Completed stages",

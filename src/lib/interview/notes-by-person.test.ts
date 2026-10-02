@@ -292,10 +292,10 @@ describe("interview page organized by person", () => {
     expect(sections[0]?.textContent).toContain("Recruiter");
     expect(sections[1]?.textContent).toContain("Recruiter");
     expect(sections[0]?.querySelector("[data-testid=harper-contact-link-priya]")?.getAttribute("href")).toContain(
-      "harper-contact",
+      "/summary",
     );
     expect(sections[1]?.querySelector("[data-testid=harper-contact-link-jordan]")?.getAttribute("href")).toContain(
-      "harper-contact",
+      "/summary",
     );
 
     await click(host, "[data-testid=person-section-priya-toggle]");
@@ -324,10 +324,10 @@ describe("interview page organized by person", () => {
     expect(priyaLatestNode?.textContent).toContain("Advanced");
     expect(priyaLatestNode?.querySelector("[name=outcome]")).not.toBeNull();
     expect(priyaLatestNode?.textContent).toContain("Save outcome");
-    expect(priyaLatestNode?.textContent).toContain("Post Interview Notes");
+    expect(priyaLatestNode?.textContent).toContain("Interview Notes");
+    expect(priyaLatestNode?.textContent).not.toContain("Newly gained information");
     expect(priyaLatestNode?.textContent).toContain("Notes before");
     expect(priyaLatestNode?.textContent).toContain("Priya prep.");
-    expect(priyaLatestNode?.textContent).toContain("Newly gained information");
     expect(priyaLatestNode?.textContent).toContain("Priya gained this.");
     expect(priyaLatestNode?.textContent).not.toContain("Jordan gained this.");
     expect(priyaLatestNode?.textContent).toContain("Remove");
@@ -810,7 +810,7 @@ describe.skipIf(!hasTestDatabase())("remove interview against postgres", { timeo
       contactId: priyaId,
     }));
     expect(removedPriya.ok).toBe(true);
-    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(enqueue).not.toHaveBeenCalled();
     expect(await prisma.interviewStage.findUnique({ where: { id: priyaStageId } })).toBeNull();
     expect(await prisma.interviewStageGuide.findUnique({ where: { stageId: priyaStageId } })).toBeNull();
     expect(await prisma.interviewStageInterviewer.findMany({ where: { stageId: priyaStageId } })).toEqual([]);

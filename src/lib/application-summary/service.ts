@@ -1163,14 +1163,6 @@ export async function addCheatSheetInterviewNote(input: {
     where: { id: membership.id },
     data: { cheatSheetNotesJson: notes },
   });
-  const { enqueueLearningsReassessIfChanged } = await import(
-    "@/lib/consultation/learnings"
-  );
-  await enqueueLearningsReassessIfChanged({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    userId: input.userId,
-  });
   return notes;
 }
 

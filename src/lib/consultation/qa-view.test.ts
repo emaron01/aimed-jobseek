@@ -600,9 +600,8 @@ describe("Harper question-limit coach", () => {
     const render = section.slice(section.indexOf("return ("));
     expect(section).not.toContain("HarperSuggestionList");
     expect(section).toContain("consultation-standing-panel");
-    expect(render.indexOf("consultation-standing-panel")).toBeLessThan(
-      render.indexOf("HarperPersonInlineProfile"),
-    );
+    expect(render).toContain("consultation-standing-panel");
+    expect(render).not.toContain("HarperPersonInlineProfile");
     expect(section).toContain("consultationConversationCopy.pageIntro");
     const standing = readFileSync("src/components/ConsultationStanding.tsx", "utf8");
     expect(standing).toContain("consultationConversationCopy.whereYouStand");

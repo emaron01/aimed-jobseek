@@ -193,12 +193,14 @@ export function CheatSheetNoteForm({
   contactId,
   fieldClass,
   notes,
+  labelId,
 }: {
   campaignId: string;
   stageId: string;
   contactId: string;
   fieldClass: string;
   notes: Array<{ id: string; text: string; createdAt: string }>;
+  labelId: string;
 }) {
   const formRef = useRef<HTMLDivElement>(null);
   return (
@@ -213,9 +215,14 @@ export function CheatSheetNoteForm({
       <input type="hidden" name="stageId" value={stageId} />
       <input type="hidden" name="contactId" value={contactId} />
       <label className="block text-sm">
-        {interviewConfig.labels.gainedInformation}
         <SavedInterviewNotes stageId={stageId} contactId={contactId} notes={notes} />
-        <textarea name="note" rows={4} required className={fieldClass} />
+        <textarea
+          name="note"
+          rows={4}
+          required
+          aria-labelledby={labelId}
+          className={fieldClass}
+        />
       </label>
     </ApplicationActionForm>
     </div>

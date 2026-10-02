@@ -105,10 +105,10 @@ describe("workflow audit fixes", () => {
     const learnings = readFileSync("src/lib/consultation/learnings.ts", "utf8");
     expect(application).toContain("saveApplicationJobLearnedNotes");
     expect(application).toContain("interpretJobPosting");
-    expect(application).toContain("enqueueLearningsReassessIfChanged");
+    expect(application).not.toContain("enqueueLearningsReassessIfChanged");
     expect(learnings).toContain('operation: "reassess"');
     expect(interview).not.toContain("regenerateApplicationJobRequirement");
-    expect(interview).toContain("enqueueLearningsReassessIfChanged");
+    expect(interview).not.toContain("enqueueLearningsReassessIfChanged");
   });
 
   it("does not enqueue resume or cover letter from consultation; assets stay on their page", () => {
