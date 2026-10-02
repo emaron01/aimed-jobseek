@@ -155,7 +155,12 @@ describe("workspace links", () => {
     expect(live).toContain("workspaceConsultationHrefFromPathname");
     expect(assets).toContain("workspaceConsultationHrefFromPathname");
     expect(assets).toContain("workspaceAssetDocxHref");
-    expect(interview).toContain("workspaceInterviewStageHref");
+    const stagePage = readFileSync(
+      "src/app/(app)/campaigns/[id]/interviews/[stageId]/page.tsx",
+      "utf8",
+    );
+    expect(interview).not.toContain("workspaceInterviewStageHref");
+    expect(stagePage).toContain("redirect(`/campaigns/${id}/interviews`)");
     expect(outreach).toContain("workspaceAssetDocxHref");
     expect(joined).not.toMatch(/`\/products\/\$\{/);
     expect(joined).not.toMatch(/\/campaigns\/\$\{[^}]+\}#consultation/);

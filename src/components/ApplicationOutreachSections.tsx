@@ -223,7 +223,7 @@ export function contactOutreachStatus(
 const outreachFieldClass =
   "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
 
-function AddContactForm({
+export function AddContactForm({
   campaignId,
   roles,
   action,

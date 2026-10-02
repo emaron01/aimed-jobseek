@@ -10,7 +10,6 @@ function src(path: string): string {
 describe("Harper Batch B1 Stage timeline and Outreach thank-you", () => {
   const stages = src("src/components/InterviewStagesSection.tsx");
   const panel = src("src/components/InterviewStagePanel.tsx");
-  const openActions = src("src/components/InterviewStageOpenActions.tsx");
   const outreach = src("src/components/ApplicationOutreachSections.tsx");
   const workspace = src("src/components/ApplicationWorkspace.tsx");
   const assign = src("src/lib/interview/stages.ts");
@@ -19,8 +18,8 @@ describe("Harper Batch B1 Stage timeline and Outreach thank-you", () => {
   const cheatSheetAnswers = src("src/lib/application-summary/service.ts");
 
   it("Stage has no review-open-questions, cheat-sheet person body, gap CTA, or outreach", () => {
-    expect(openActions).not.toContain("reviewOpenQuestions");
-    expect(openActions).not.toContain("workspaceInterviewLikelyQuestionsHref");
+    expect(stages).not.toContain("reviewOpenQuestions");
+    expect(stages).not.toContain("workspaceInterviewLikelyQuestionsHref");
     expect(panel).not.toContain("CheatSheetPersonBody");
     expect(panel).not.toContain("noCheatSheetSection");
     expect(stages).not.toContain("CheatSheetPersonBody");
@@ -49,8 +48,8 @@ describe("Harper Batch B1 Stage timeline and Outreach thank-you", () => {
   });
 
   it("Use this interviewer assigns only — no prep, cheat sheet, persona, or contact profile", () => {
-    expect(panel).toContain("assignExistingInterviewerAction");
-    expect(panel).toContain("useInterviewer");
+    expect(panel).not.toContain("assignExistingInterviewerAction");
+    expect(stages).not.toContain("useInterviewer");
     const assignFn = assign.slice(
       assign.indexOf("export async function assignExistingInterviewStageInterviewer"),
       assign.indexOf("export async function addInterviewStageInterviewer"),
@@ -67,19 +66,20 @@ describe("Harper Batch B1 Stage timeline and Outreach thank-you", () => {
 
   it("Post Interview Notes opens the notes form with the same fields", () => {
     expect(interviewConfig.labels.postInterviewNotes).toBe("Post Interview Notes");
-    expect(openActions).toContain("postInterviewNotes");
-    expect(openActions).toContain("post-interview-notes-");
-    expect(openActions).toContain("post-interview-notes-${stageId}");
-    expect(stages).toContain("post-interview-notes-${stage.id}");
+    expect(stages).toContain("postInterviewNotes");
+    expect(stages).toContain("post-interview-notes-${stageId}");
     expect(stages).toContain("addCheatSheetInterviewNoteAction");
     expect(stages).toContain("updateInterviewStageAction");
     expect(stages).toContain("notesBefore");
     expect(stages).toContain("notesAfter");
     expect(stages).toContain("expectedDecisionAt");
     expect(stages).toContain('name="outcome"');
+    expect(stages).not.toContain('name="notesBefore"');
+    expect(stages).not.toContain('name="notesAfter"');
+    expect(stages).not.toContain('name="expectedDecisionAt"');
     expect(stages).toContain("gainedInformation");
     expect(stages).toContain("createInterviewStageAction");
-    expect(panel).toContain("addInterviewInterviewerAction");
+    expect(panel).not.toContain("addInterviewInterviewerAction");
   });
 
   it("moved thank-you clarify, thank-you generate, and check-in render on Outreach", () => {

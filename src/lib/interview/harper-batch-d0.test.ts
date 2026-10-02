@@ -6,6 +6,7 @@ import {
   createInterviewStage,
   updateInterviewStage,
 } from "@/lib/interview/stages";
+import { addApplicationContact } from "@/lib/application/contacts";
 import { hasTestDatabase } from "@/test/database";
 
 function src(path: string): string {
@@ -47,7 +48,7 @@ describe("Harper Batch D0 — remove unused notes-after gap check", () => {
       "src/lib/product-config/interview.ts",
       "src/components/InterviewStagesSection.tsx",
       "src/components/InterviewStagePanel.tsx",
-      "src/components/InterviewStageOpenActions.tsx",
+      "src/components/StageInterviewerSection.tsx",
     ];
     for (const path of paths) {
       expect(src(path)).not.toContain("consultationOfferJson");
@@ -96,7 +97,7 @@ describeDb("Harper Batch D0 — notes save without consultationOfferJson", { tim
       },
     });
     campaignId = campaign.id;
-    await prisma.persona.create({
+    const recruiter = await prisma.persona.create({
       data: {
         organizationId,
         productId: product.id,
@@ -105,6 +106,16 @@ describeDb("Harper Batch D0 — notes save without consultationOfferJson", { tim
         name: "Recruiter",
         targetTitles: ["Recruiter"],
       },
+    });
+    const interviewer = await addApplicationContact({
+      organizationId,
+      campaignId,
+      userId,
+      firstName: "Casey",
+      lastName: "Ng",
+      title: "Recruiter",
+      personaId: recruiter.id,
+      confirmRole: true,
     });
     await prisma.jobRequirement.create({
       data: {
@@ -123,6 +134,7 @@ describeDb("Harper Batch D0 — notes save without consultationOfferJson", { tim
       type: "RECRUITER_SCREEN",
       scheduledAt: new Date("2026-10-01T15:00:00.000Z"),
       format: "VIDEO",
+      interviewerContactIds: [interviewer.contactId],
     });
     stageId = stage.id;
     const added = await addInterviewStageInterviewer({

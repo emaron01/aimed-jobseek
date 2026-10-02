@@ -127,6 +127,7 @@ describe.skipIf(!hasTestDatabase())("interview stages without guide", { timeout:
   let userId = "";
   let campaignId = "";
   let recruiterRoleId = "";
+  let seedContactId = "";
 
   beforeAll(async () => {
     const org = await prisma.organization.create({
@@ -184,6 +185,17 @@ describe.skipIf(!hasTestDatabase())("interview stages without guide", { timeout:
         scorecardJson: { mission: null, outcomes: [], competencies: [] },
       },
     });
+    const seed = await addApplicationContact({
+      organizationId,
+      campaignId,
+      userId,
+      firstName: "Seed",
+      lastName: "Interviewer",
+      title: "Technical Recruiter",
+      personaId: recruiterRoleId,
+      confirmRole: true,
+    });
+    seedContactId = seed.contactId;
   });
 
   afterAll(async () => {
@@ -203,6 +215,7 @@ describe.skipIf(!hasTestDatabase())("interview stages without guide", { timeout:
       type: "RECRUITER_SCREEN",
       scheduledAt: new Date("2026-10-01T15:00:00.000Z"),
       format: "VIDEO",
+      interviewerContactIds: [seedContactId],
     });
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
@@ -256,6 +269,7 @@ describe.skipIf(!hasTestDatabase())("interview stages without guide", { timeout:
       type: "RECRUITER_SCREEN",
       scheduledAt: new Date("2026-10-02T15:00:00.000Z"),
       format: "PHONE",
+      interviewerContactIds: [existing.contactId],
     });
     await assignExistingInterviewStageInterviewer({
       organizationId,
@@ -277,6 +291,7 @@ describe.skipIf(!hasTestDatabase())("interview stages without guide", { timeout:
       type: "HIRING_MANAGER",
       scheduledAt: new Date("2026-10-03T15:00:00.000Z"),
       format: "VIDEO",
+      interviewerContactIds: [existing.contactId],
     });
     const linkedInText = Array.from({ length: 90 }, () => "experience").join(" ");
     const added = await addInterviewStageInterviewer({
@@ -330,35 +345,20 @@ describe.skipIf(!hasTestDatabase())("interview stages without guide", { timeout:
       scheduledAt: new Date("2026-10-05T15:00:00.000Z"),
       format: "VIDEO",
       interviewerContactIds: [existing.contactId],
-      newInterviewers: [
-        {
-          firstName: "Mina",
-          lastName: "Ortiz",
-          title: "Technical Recruiter",
-          email: `mina-setup-${suffix}@acme.example`,
-          personaId: recruiterRoleId,
-          linkedInProfileText: "Mina Ortiz, technical recruiter.",
-        },
-      ],
     });
     const rows = await prisma.interviewStageInterviewer.findMany({
       where: { stageId: stage.id },
       select: { contactId: true },
     });
-    expect(rows).toHaveLength(2);
-    expect(rows.map((row) => row.contactId)).toContain(existing.contactId);
+    expect(rows.map((row) => row.contactId)).toEqual([existing.contactId]);
     const memberships = await prisma.campaignContact.findMany({
-      where: { campaignId, contactId: { in: rows.map((row) => row.contactId) } },
+      where: { campaignId, contactId: existing.contactId },
     });
-    expect(memberships).toHaveLength(2);
+    expect(memberships).toHaveLength(1);
     for (const membership of memberships) {
       expect(membership.personPrepOfferedAt).toBeNull();
       expect(membership.personPrepStatus).toBeNull();
     }
-    const mina = memberships.find(
-      (membership) => membership.contactId !== existing.contactId,
-    );
-    expect(mina?.linkedInProfileText).toBe("Mina Ortiz, technical recruiter.");
     expect(
       await prisma.applicationJob.count({
         where: {
@@ -394,6 +394,7 @@ describe.skipIf(!hasTestDatabase())("interview stages without guide", { timeout:
       type: "RECRUITER_SCREEN",
       scheduledAt: new Date("2026-10-04T15:00:00.000Z"),
       format: "VIDEO",
+      interviewerContactIds: [seedContactId],
     });
     const job = await prisma.applicationJob.create({
       data: {

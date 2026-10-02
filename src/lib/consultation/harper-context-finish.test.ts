@@ -110,7 +110,7 @@ describe("Harper context finish", () => {
     expect(outreachConfig.labels.pasteInterviewerProfile).toBe(
       "Paste Interviewer Profile",
     );
-    const stage = readFileSync("src/components/InterviewStagePanel.tsx", "utf8");
+    const stage = readFileSync("src/components/InterviewStagesSection.tsx", "utf8");
     const addPerson = readFileSync(
       "src/components/HiringTeamPersonPicker.tsx",
       "utf8",
@@ -119,7 +119,7 @@ describe("Harper context finish", () => {
       "src/components/ApplicationOutreachSections.tsx",
       "utf8",
     );
-    expect(stage).toContain("pasteInterviewerProfile");
+    expect(stage).toContain("StageAddContactForm");
     expect(addPerson).toContain("pasteInterviewerProfile");
     expect(contacts).toContain("pasteInterviewerProfile");
     expect(stage).not.toContain("Paste LinkedIn profile");

@@ -35,10 +35,7 @@ import { requireCurrentUser } from "@/lib/auth/session";
 import { getMembershipForCurrentUser } from "@/lib/auth/authz";
 import { canOpenCampaignDetail } from "@/lib/campaign/visibility";
 import type { JobScorecard } from "@/lib/job-requirement/types";
-import {
-  applicationSummaryConfig,
-  interviewConfig,
-} from "@/lib/product-config";
+import { applicationSummaryConfig } from "@/lib/product-config";
 import { stageTypeLabel } from "@/lib/interview/stages";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
@@ -381,17 +378,6 @@ export default async function ApplicationSummaryPage({
                 </li>
               ))}
             </ul>
-            {(() => {
-              const next = view.stages.find((stage) => !stage.outcome);
-              return next ? (
-                <AppActionLink
-                  href={`/campaigns/${id}/interviews/${next.id}`}
-                  className="print:hidden"
-                >
-                  {interviewConfig.labels.openGuide}
-                </AppActionLink>
-              ) : null;
-            })()}
           </>
         )}
       </CheatSheetSection>

@@ -15,6 +15,7 @@ import {
   type ApplicationReminderRow,
 } from "@/lib/cadence/application-reminders";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
+import { addApplicationContact } from "@/lib/application/contacts";
 import { createInterviewStage } from "@/lib/interview/stages";
 import {
   applicationSummaryConfig,
@@ -579,6 +580,30 @@ describe.skipIf(!hasTestDatabase())("duplicate thank-you stage", () => {
   });
 
   it("stores one stage when the same interview is submitted twice", async () => {
+    const campaign = await prisma.campaign.findUniqueOrThrow({
+      where: { id: campaignId },
+      select: { productId: true },
+    });
+    const persona = await prisma.persona.create({
+      data: {
+        organizationId,
+        productId: campaign.productId,
+        campaignId,
+        name: "Hiring manager",
+        suggestionKey: "hiring_manager",
+        targetTitles: ["Hiring Manager"],
+      },
+    });
+    const interviewer = await addApplicationContact({
+      organizationId,
+      campaignId,
+      userId,
+      firstName: "Dana",
+      lastName: "Cho",
+      title: "Hiring Manager",
+      personaId: persona.id,
+      confirmRole: true,
+    });
     const scheduledAt = new Date("2026-10-01T15:00:00.000Z");
     const input = {
       organizationId,
@@ -587,6 +612,7 @@ describe.skipIf(!hasTestDatabase())("duplicate thank-you stage", () => {
       type: "HIRING_MANAGER",
       scheduledAt,
       format: "VIDEO",
+      interviewerContactIds: [interviewer.contactId],
     };
     const [first, second] = await Promise.all([
       createInterviewStage(input),

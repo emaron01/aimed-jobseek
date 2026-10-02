@@ -90,23 +90,20 @@ describe("persona picker", () => {
 describe("interview stage open buttons", () => {
   const stages = source("src/components/InterviewStagesSection.tsx");
   const panel = source("src/components/InterviewStagePanel.tsx");
-  const openActions = source("src/components/InterviewStageOpenActions.tsx");
   const notes = source("src/lib/application-summary/service.ts");
 
   it("places Post Interview Notes on the earliest stage without an outcome", () => {
-    expect(stages).toContain("openInterviewStage(stages)");
-    expect(stages).toContain("InterviewStageOpenActions");
+    expect(stages).not.toContain("InterviewStageOpenActions");
     expect(openInterviewStage([{ outcome: "ADVANCED" }, { outcome: null }])?.outcome).toBeNull();
     expect(openInterviewStage([{ outcome: null }, { outcome: null }])).toEqual({
       outcome: null,
     });
     expect(openInterviewStage([{ outcome: "COMPLETED" }])).toBeNull();
     expect(interviewConfig.labels.postInterviewNotes).toBe("Post Interview Notes");
-    expect(openActions).toContain("postInterviewNotes");
-    expect(openActions).not.toContain("reviewOpenQuestions");
-    expect(openActions).not.toContain("workspaceInterviewLikelyQuestionsHref");
-    expect(openActions).toContain("disabled={!interviewerContactId}");
-    expect(stages).toContain("post-interview-notes-${stage.id}");
+    expect(stages).toContain("postInterviewNotes");
+    expect(stages).not.toContain("reviewOpenQuestions");
+    expect(stages).not.toContain("workspaceInterviewLikelyQuestionsHref");
+    expect(stages).toContain("post-interview-notes-${stageId}");
     expect(stages).toContain("addCheatSheetInterviewNoteAction");
     expect(panel).not.toContain("CheatSheetPersonBody");
     expect(notes).not.toContain("enqueueCheatSheetPersonSection");

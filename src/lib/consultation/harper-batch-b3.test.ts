@@ -143,6 +143,7 @@ describe("Harper Batch B3 person view, search, Add Interview Contact, assign-onl
     const actions = src("src/app/actions/interview.ts");
     const personView = src("src/components/HarperPersonView.tsx");
     const panel = src("src/components/InterviewStagePanel.tsx");
+    const stageList = src("src/components/InterviewStagesSection.tsx");
 
     expect(interviewConfig.labels.addInterviewContact).toBe("Add Interview Contact");
     expect(personView).toContain("addInterviewContactAction");
@@ -160,9 +161,10 @@ describe("Harper Batch B3 person view, search, Add Interview Contact, assign-onl
     expect(addFn).toContain("saveLinkedInPaste");
     expect(addFn).not.toContain("replaceStageInterviewer");
 
-    // Contact remains available to Stage assign (assign lists campaign people)
-    expect(panel).toContain("assignExistingInterviewerAction");
-    expect(panel).toContain("people.map");
+    // Create starts from an existing contact; the per-stage assign control is gone.
+    expect(stageList).toContain("people.map");
+    expect(stageList).toContain('name="contactId"');
+    expect(panel).not.toContain("assignExistingInterviewerAction");
   });
 
   it("start-prep control appears only when prep has not started and uses existing paths", () => {

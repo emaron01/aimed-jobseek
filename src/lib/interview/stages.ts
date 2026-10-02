@@ -105,6 +105,14 @@ export async function createInterviewStage(input: {
   if (Number.isNaN(input.scheduledAt.getTime())) {
     throw new TenantError("Interview date is invalid.");
   }
+  const contactIds = [
+    ...new Set(
+      (input.interviewerContactIds ?? []).map((id) => id.trim()).filter(Boolean),
+    ),
+  ];
+  if (contactIds.length !== 1 || (input.newInterviewers?.length ?? 0) > 0) {
+    throw new TenantError("Choose who you are meeting.");
+  }
   if (
     input.expectedDecisionAt &&
     Number.isNaN(input.expectedDecisionAt.getTime())
@@ -137,8 +145,8 @@ export async function createInterviewStage(input: {
         type: input.type as InterviewStageType,
         scheduledAt: input.scheduledAt,
         format: input.format as InterviewFormat,
-        notesBefore: input.notesBefore?.trim() || null,
-        expectedDecisionAt: input.expectedDecisionAt ?? null,
+        notesBefore: null,
+        expectedDecisionAt: null,
       },
     });
     return { stage: createdStage, created: true };
@@ -156,8 +164,8 @@ export async function createInterviewStage(input: {
       campaignId: input.campaignId,
       userId: input.userId,
       stageId: stage.id,
-      interviewerContactIds: input.interviewerContactIds ?? [],
-      newInterviewers: input.newInterviewers ?? [],
+      interviewerContactIds: contactIds,
+      newInterviewers: [],
     });
   } catch (error) {
     await prisma.interviewStage.delete({ where: { id: stage.id } });

@@ -391,24 +391,24 @@ describe("UI batch 1 outreach did-you-send prompt", () => {
 
 describe("UI batch 1 stage interviewer setup", () => {
   const section = src("src/components/InterviewStagesSection.tsx");
+  const createForm = src("src/components/StageInterviewerSection.tsx");
   const panel = src("src/components/InterviewStagePanel.tsx");
   const stages = src("src/lib/interview/stages.ts");
   const action = src("src/app/actions/interview.ts");
 
   it("adds interviewers on the create form and assigns them without starting prep", () => {
-    expect(section).toContain("InterviewStageSetupInterviewers");
+    expect(section).toContain("StageAddContactForm");
+    expect(createForm).toContain("AddContactForm");
+    expect(createForm).toContain("addApplicationContactAction");
+    expect(section).toContain("interviewConfig.labels.startByChoosing");
     expect(section).toContain("createInterviewStageAction");
-    expect(panel).toContain("stage-setup-interviewers");
-    expect(panel).toContain("interviewConfig.labels.chooseInterviewer");
-    expect(panel).toContain("interviewConfig.labels.useInterviewer");
-    expect(panel).toContain("interviewConfig.labels.addNewInterviewer");
-    expect(panel).toContain("interviewConfig.labels.addInterviewer");
-    expect(panel).toContain('name="contactId"');
-    expect(panel).toContain('name="newInterviewerFirstName"');
-    expect(panel).toContain("assignExistingInterviewerAction");
-    expect(panel).toContain("addInterviewInterviewerAction");
-    expect(action).toContain("readStageSetupInterviewers");
-    expect(action).toContain("interviewerContactIds: setupInterviewers.interviewerContactIds");
+    expect(section).toContain('name="contactId"');
+    expect(section).not.toContain("InterviewStageSetupInterviewers");
+    expect(panel).not.toContain("stage-setup-interviewers");
+    expect(panel).not.toContain("assignExistingInterviewerAction");
+    expect(panel).not.toContain("addInterviewInterviewerAction");
+    expect(action).toContain("interviewerContactIds: [contactId]");
+    expect(action).not.toContain("readStageSetupInterviewers");
     const setup = stages.slice(
       stages.indexOf("export async function assignInterviewersDuringStageSetup"),
       stages.indexOf("export async function addInterviewStageInterviewer"),
