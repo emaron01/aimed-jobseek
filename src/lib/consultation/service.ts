@@ -9,6 +9,7 @@ import {
   extractWithModel,
   polishAnswerWithModel,
 } from "@/lib/consultation/ai";
+import { buildConsultationCoachMessages } from "@/lib/consultation/prompt";
 import {
   evidenceTargets,
   gapsAreCovered,
@@ -52,7 +53,7 @@ import {
   recordLearningsReassessFingerprint,
 } from "@/lib/consultation/learnings";
 import { recordSeekerBackgroundReassessFingerprint } from "@/lib/consultation/seeker-background-reassess";
-import type { AiCallUsageContext } from "@/lib/ai/types";
+import type { AiCallUsageContext, AiMessage } from "@/lib/ai/types";
 import {
   askedQuestionsFromTurns,
   matchConsultationFocus,
@@ -1801,6 +1802,89 @@ function resolveConsultationTargets(input: {
     focusTargetKey = "interview-note-focus";
   }
   return { targets, focusTargetKey };
+}
+
+/**
+ * Read-only coach messages for one application, using the same assembly as
+ * the first planning attempt (no focus, no quality feedback, no writes).
+ */
+export async function buildConsultationCoachMessagesForCampaign(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<AiMessage[]> {
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: {
+      id: true,
+      whyThisCompany: true,
+      product: { select: { profileJson: true } },
+      jobRequirement: true,
+      consultationSession: { select: { id: true } },
+    },
+  });
+  if (!campaign?.jobRequirement) {
+    throw new Error("Application or job requirement was not found.");
+  }
+  const parsed = campaign.product.profileJson
+    ? parseCandidateProfileSafe(campaign.product.profileJson)
+    : { ok: true as const, profile: emptyCandidateProfile() };
+  if (!parsed.ok) {
+    throw new Error("Personal profile could not be read.");
+  }
+  const profile = parsed.profile;
+  const requirement = campaign.jobRequirement;
+  const { targets } = resolveConsultationTargets({ requirement });
+  const turns = campaign.consultationSession
+    ? await loadSessionTurns(campaign.consultationSession.id)
+    : [];
+  const { askedKeys, skippedKeys } = askedAndSkipped(turns);
+  markWhyThisCompanyAsked(askedKeys, {
+    campaignId: campaign.id,
+    whyThisCompany: campaign.whyThisCompany,
+    profile,
+  });
+  const [{ roles, applicationLearningsPendingHiringManager }, companyResearch, interviewStages] =
+    await Promise.all([
+      loadCoachHiringTeamWithLearnings(input.organizationId, input.campaignId),
+      loadCoachCompanyResearch(input.organizationId, input.campaignId),
+      prisma.interviewStage.findMany({
+        where: {
+          organizationId: input.organizationId,
+          campaignId: input.campaignId,
+        },
+        select: { id: true, notesBefore: true, notesAfter: true },
+      }),
+    ]);
+  const careerStage = deriveCareerStage(profile);
+  const recentRoles = deriveRecentRoles(profile, new Date(), careerStage);
+  return buildConsultationCoachMessages({
+    targets,
+    profileItems: [
+      ...profileEvidenceItems(profile),
+      ...learnedNotesEvidence(input.campaignId, requirement.seekerLearnedNotes),
+      ...interviewNotesEvidence(interviewStages),
+    ],
+    careerStage,
+    recentRoles,
+    seekerStatedFacts: seekerStatedFactsForCoach({
+      profile,
+      campaignId: input.campaignId,
+      learnedNotes: requirement.seekerLearnedNotes,
+      stages: interviewStages,
+    }),
+    askedQuestions: askedQuestionsFromTurns(turns),
+    hiringTeam: roles,
+    applicationLearningsPendingHiringManager,
+    companyResearch,
+    chronologyRequested: seniorityWarrantsChronology({
+      seniority: requirement.seniority,
+      title: requirement.title,
+    }),
+    coveredTargetKeys: [...new Set([...askedKeys, ...skippedKeys])],
+    focusTargetKey: null,
+    interviewerPrep: null,
+    qualityFeedback: [],
+  });
 }
 
 export async function startConsultation(input: {

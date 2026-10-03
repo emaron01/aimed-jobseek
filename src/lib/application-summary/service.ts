@@ -4,6 +4,7 @@ import {
   generateApplicationSummaryShell,
   generateCheatSheetPersonSectionGuidance,
 } from "@/lib/application-summary/ai";
+import { buildApplicationSummaryGuidanceMessages } from "@/lib/application-summary/prompt";
 import { linkedInProfileHasSubstance } from "@/lib/application-summary/linkedin";
 import {
   appendCheatSheetNote,
@@ -244,6 +245,19 @@ export function sourcesForShell(sources: SummarySource[]): SummarySource[] {
   return sources.filter(
     (source) => !SHELL_EXCLUDED_SOURCE_CATEGORIES.has(source.category),
   );
+}
+
+/** Cheat Sheet overview messages. Reads stored sources; writes nothing. */
+export async function applicationSummaryShellModelMessages(input: {
+  organizationId: string;
+  campaignId: string;
+}) {
+  const data = await loadSummaryData(input.organizationId, input.campaignId);
+  return buildApplicationSummaryGuidanceMessages({
+    sources: sourcesForShell(data.sources),
+    people: [],
+    mode: "shell",
+  });
 }
 
 function record(value: unknown): Record<string, unknown> | null {

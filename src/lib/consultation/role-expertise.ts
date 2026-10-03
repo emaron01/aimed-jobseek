@@ -275,6 +275,59 @@ function employerResearchFromJobSources(
   return value as EmployerResearchModelInput;
 }
 
+async function roleExpertiseJobSources(
+  organizationId: string,
+  campaignId: string,
+  job: RoleExpertiseJobInputs,
+): Promise<Record<string, unknown>> {
+  const employerResearch = await employerResearchForCampaign(
+    organizationId,
+    campaignId,
+  );
+  return {
+    title: job.title,
+    employer: job.companyName,
+    seniority: job.seniority,
+    location: job.location,
+    workArrangement: job.workArrangement,
+    requiredItems: parseStringArray(job.requiredItems),
+    preferredItems: parseStringArray(job.preferredItems),
+    responsibilities: parseStringArray(job.responsibilities),
+    scorecard: scorecardFingerprintSlice(job.scorecardJson),
+    employerResearch,
+  };
+}
+
+/** Question-selection messages production sends on the first attempt. */
+export async function roleExpertiseQuestionMessages(input: {
+  organizationId: string;
+  campaignId: string;
+  job: RoleExpertiseJobInputs;
+  minCount: number;
+  maxCount: number;
+  askedQuestions: AskedConsultationQuestion[];
+  chronologyAlreadyAsked: boolean;
+  recentRoles: RecentRole[];
+  careerStage: CareerStage;
+  qualityFeedback?: string[];
+}) {
+  const jobSources = await roleExpertiseJobSources(
+    input.organizationId,
+    input.campaignId,
+    input.job,
+  );
+  return buildRoleExpertiseQuestionsMessages({
+    minCount: input.minCount,
+    maxCount: input.maxCount,
+    askedQuestions: input.askedQuestions,
+    chronologyAlreadyAsked: input.chronologyAlreadyAsked,
+    recentRoles: input.recentRoles,
+    careerStage: input.careerStage,
+    jobSources,
+    qualityFeedback: input.qualityFeedback,
+  });
+}
+
 async function employerResearchForCampaign(
   organizationId: string,
   campaignId: string,
@@ -1309,22 +1362,11 @@ export async function generateRoleExpertiseWithModel(input: {
     };
   }
 
-  const employerResearch = await employerResearchForCampaign(
+  const jobSources = await roleExpertiseJobSources(
     input.organizationId,
     input.campaignId,
+    input.job,
   );
-  const jobSources = {
-    title: input.job.title,
-    employer: input.job.companyName,
-    seniority: input.job.seniority,
-    location: input.job.location,
-    workArrangement: input.job.workArrangement,
-    requiredItems: parseStringArray(input.job.requiredItems),
-    preferredItems: parseStringArray(input.job.preferredItems),
-    responsibilities: parseStringArray(input.job.responsibilities),
-    scorecard: scorecardFingerprintSlice(input.job.scorecardJson),
-    employerResearch,
-  };
 
   const questionsStep = await generateRoleExpertiseQuestionsStep({
     organizationId: input.organizationId,

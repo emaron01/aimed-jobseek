@@ -3,6 +3,7 @@ import {
   getResearchAiProvider,
   isResearchAiConfigured,
 } from "@/lib/ai";
+import { createAiProvider } from "@/lib/ai/provider";
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import {
   AiConfigError,
@@ -62,8 +63,21 @@ import { DEFAULT_RESEARCH_POLICY_VALUES } from "@/lib/usage/defaults";
 export type ResearchUsageSnapshot = {
   inputTokens: number | null;
   outputTokens: number | null;
+  cachedInputTokens?: number | null;
+  cacheWriteTokens?: number | null;
   webSearchCallCount: number | null;
   researchDurationMs: number | null;
+};
+
+/**
+ * Optional per-run overrides. Omitted fields keep production behavior:
+ * RESEARCH_AI_MODEL and a UsageEvent row for each stage.
+ */
+export type CompanyResearchRunOptions = {
+  /** This run only. Does not change RESEARCH_AI_MODEL. */
+  model?: string;
+  /** When false, stage responses are not stored as UsageEvent rows. Default true. */
+  recordUsage?: boolean;
 };
 
 export type AutomatedCompanyResearchResult = CompanyResearchResult & {
@@ -131,14 +145,21 @@ function dedupeSources(sources: ResearchSource[]): ResearchSource[] {
  * and start with web_search immediately.
  */
 export class AiCompanyResearchProvider implements CompanyResearchProvider {
+  constructor(private readonly runOptions: CompanyResearchRunOptions = {}) {}
+
   async research(
     input: CompanyResearchInput,
   ): Promise<AutomatedCompanyResearchResult> {
     const started = Date.now();
     const config = getResearchAiConfig();
+    const explicitModel = this.runOptions.model?.trim() || "";
+    const model = explicitModel || config.model;
+    const recordUsage = this.runOptions.recordUsage !== false;
     let retries = 0;
     let totalInputTokens: number | null = null;
     let totalOutputTokens: number | null = null;
+    let totalCachedInputTokens: number | null = null;
+    let totalCacheWriteTokens: number | null = null;
     let totalWebSearchCalls = 0;
     let searchStagesUsed = 0;
     const stageTimings: ResearchStageTiming[] = [];
@@ -154,7 +175,9 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
     };
 
     try {
-      const ai = getResearchAiProvider();
+      const ai = explicitModel
+        ? createAiProvider({ ...config, model: explicitModel })
+        : getResearchAiProvider();
       const retriever = getCompanySourceRetriever();
       const websiteEvidence = await retriever.retrieve(input);
       const homepageHtml = websiteEvidence.homepageHtml ?? null;
@@ -230,14 +253,16 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
             ai.generateStructured({
               ...structuredOutputRequest("companyResearch"),
               webSearchEnabled: opts.webSearchEnabled,
-              ...aiCallTracking({
-                organizationId: input.organizationId,
-                userId: input.userId ?? null,
-                campaignId: input.campaignId ?? null,
-                companyId: input.companyId,
-                category: "RESEARCH",
-                operation: "RESEARCH_SYNTHESIS",
-              }),
+              ...(recordUsage
+                ? aiCallTracking({
+                    organizationId: input.organizationId,
+                    userId: input.userId ?? null,
+                    campaignId: input.campaignId ?? null,
+                    companyId: input.companyId,
+                    category: "RESEARCH",
+                    operation: "RESEARCH_SYNTHESIS",
+                  })
+                : {}),
               messages: buildCompanyResearchMessages({
                 company: input,
                 evidence,
@@ -266,6 +291,14 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
         if (response.usage?.outputTokens != null) {
           totalOutputTokens =
             (totalOutputTokens ?? 0) + response.usage.outputTokens;
+        }
+        if (response.usage?.cachedInputTokens != null) {
+          totalCachedInputTokens =
+            (totalCachedInputTokens ?? 0) + response.usage.cachedInputTokens;
+        }
+        if (response.usage?.cacheWriteTokens != null) {
+          totalCacheWriteTokens =
+            (totalCacheWriteTokens ?? 0) + response.usage.cacheWriteTokens;
         }
         if (opts.webSearchEnabled) {
           if (response.usage?.webSearchCalls != null) {
@@ -427,13 +460,15 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
           : {}),
         provenance: {
           aiProvider: config.provider,
-          aiModel: config.model,
+          aiModel: model,
           aiModelUrlIdentifier: config.modelUrlIdentifier,
           promptVersion: RESEARCH_PROMPT_VERSION,
         },
         usage: {
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,
+          cachedInputTokens: totalCachedInputTokens,
+          cacheWriteTokens: totalCacheWriteTokens,
           webSearchCallCount: webSearchAvailable ? totalWebSearchCalls : null,
           researchDurationMs: Date.now() - started,
         },
@@ -449,7 +484,7 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
         companyId: input.companyId,
         organizationId: input.organizationId,
         provider: config.provider,
-        model: config.model,
+        model,
         durationMs: Date.now() - started,
         webSearchCalls: result.usage?.webSearchCallCount ?? null,
         searchStagesUsed: result.searchStagesUsed ?? null,
@@ -471,7 +506,7 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
         companyId: input.companyId,
         organizationId: input.organizationId,
         provider: config.provider,
-        model: config.model,
+        model,
         durationMs: Date.now() - started,
         webSearchCalls: null,
         sourceCount: 0,
