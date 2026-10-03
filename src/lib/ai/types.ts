@@ -61,6 +61,12 @@ export type AiUsageMetadata = {
   cachedInputTokens?: number;
   cacheWriteTokens?: number;
   outputTokens?: number;
+  /**
+   * Subset of outputTokens when the provider returns
+   * output_tokens_details.reasoning_tokens. Not stored on UsageEvent.
+   * Billed inside output tokens, not as a second charge.
+   */
+  reasoningTokens?: number;
   webSearchCalls?: number;
 };
 

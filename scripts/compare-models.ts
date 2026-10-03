@@ -3,9 +3,10 @@
  * Read-only: no UsageEvent, receipt, job, or other database write.
  *
  * Render web service shell (env vars are already set; do not pass a dotenv file):
- *   tsx --conditions=react-server scripts/compare-models.ts --campaign <campaignId> [--steps planning,questions,cheatsheet,research] [--dry-run]
+ *   tsx --conditions=react-server scripts/compare-models.ts --campaign <campaignId> [--steps planning,questions,cheatsheet,research] [--dry-run] [--fresh] [--mode current|split]
  */
 import {
+  parseComparisonMode,
   parseComparisonSteps,
   RENDER_SHELL_COMMAND,
   runModelComparison,
@@ -32,6 +33,8 @@ async function main(): Promise<void> {
     campaignId,
     steps: parseComparisonSteps(flagValue("--steps")),
     dryRun: process.argv.includes("--dry-run"),
+    fresh: process.argv.includes("--fresh"),
+    mode: parseComparisonMode(flagValue("--mode")),
     writeReport: true,
   });
   process.stdout.write(report.markdown);

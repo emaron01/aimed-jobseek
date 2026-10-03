@@ -1807,10 +1807,13 @@ function resolveConsultationTargets(input: {
 /**
  * Read-only coach messages for one application, using the same assembly as
  * the first planning attempt (no focus, no quality feedback, no writes).
+ * `fresh` is for the comparison script: ignore stored turns and build that
+ * first round in memory. Profile, targets, research, and Hiring Team stay.
  */
 export async function buildConsultationCoachMessagesForCampaign(input: {
   organizationId: string;
   campaignId: string;
+  fresh?: boolean;
 }): Promise<AiMessage[]> {
   const campaign = await prisma.campaign.findFirst({
     where: { id: input.campaignId, organizationId: input.organizationId },
@@ -1834,9 +1837,10 @@ export async function buildConsultationCoachMessagesForCampaign(input: {
   const profile = parsed.profile;
   const requirement = campaign.jobRequirement;
   const { targets } = resolveConsultationTargets({ requirement });
-  const turns = campaign.consultationSession
-    ? await loadSessionTurns(campaign.consultationSession.id)
-    : [];
+  const turns =
+    input.fresh || !campaign.consultationSession
+      ? []
+      : await loadSessionTurns(campaign.consultationSession.id);
   const { askedKeys, skippedKeys } = askedAndSkipped(turns);
   markWhyThisCompanyAsked(askedKeys, {
     campaignId: campaign.id,

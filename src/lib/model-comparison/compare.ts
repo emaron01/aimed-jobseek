@@ -8,6 +8,7 @@ import { join } from "node:path";
 import type { AiConfig } from "@/lib/ai/config";
 import {
   getConsultationAiConfig,
+  getConsultationReplyAiConfig,
   getResearchAiConfig,
 } from "@/lib/ai/config";
 import { createAiProvider } from "@/lib/ai/provider";
@@ -22,6 +23,17 @@ import { applicationSummaryShellModelMessages } from "@/lib/application-summary/
 import { employerWebsiteAnchor } from "@/lib/application/company-website";
 import { consultationPlanSchema } from "@/lib/consultation/contract";
 import { buildConsultationCoachMessagesForCampaign } from "@/lib/consultation/service";
+import {
+  EXPERIMENTAL_PLANNING_DECISION_INSTRUCTIONS,
+  EXPERIMENTAL_PLANNING_WRITING_INSTRUCTIONS,
+  PLANNING_DECISION_SCHEMA_NAME,
+  PLANNING_WRITING_SCHEMA_NAME,
+  formatExperimentalSplit,
+  planningDecisionMessages,
+  planningDecisionSchema,
+  planningWritingMessages,
+  planningWritingSchema,
+} from "@/lib/model-comparison/plan-split-experiment";
 import { deriveCareerStage } from "@/lib/consultation/career-stage";
 import { careerWalkThroughAlreadyAsked } from "@/lib/consultation/question-detection";
 import { askedQuestionsFromTurns } from "@/lib/consultation/questions";
@@ -62,15 +74,46 @@ export type ComparisonStep = (typeof COMPARISON_STEPS)[number];
 
 /** Render web service shell. Env vars are already on the service. */
 export const RENDER_SHELL_COMMAND =
-  "tsx --conditions=react-server scripts/compare-models.ts --campaign <campaignId> [--steps planning,questions,cheatsheet,research] [--dry-run]";
+  "tsx --conditions=react-server scripts/compare-models.ts --campaign <campaignId> [--steps planning,questions,cheatsheet,research] [--dry-run] [--fresh] [--mode current|split]";
+
+export const COMPARISON_MODES = ["current", "split"] as const;
+export type ComparisonMode = (typeof COMPARISON_MODES)[number];
+
+/**
+ * OpenAI bills reasoning tokens as output tokens. Responses usage reports
+ * them inside output_tokens (output_tokens_details.reasoning_tokens is a
+ * subset). Cost below prices output tokens once and does not add reasoning
+ * tokens again.
+ */
+export const REASONING_TOKENS_BILLING_NOTE =
+  "Reasoning tokens are part of billed output tokens. OpenAI includes output_tokens_details.reasoning_tokens inside output_tokens and bills them as output tokens. This report prices output tokens once and does not add reasoning tokens again.";
 
 export type UsageTotals = {
   inputTokens: number;
   outputTokens: number;
   cachedInputTokens: number;
   cacheWriteTokens: number;
+  /** Null when the provider did not return a separate reasoning count. */
+  reasoningTokens: number | null;
   webSearchCalls: number;
   providerCalls: number;
+};
+
+export type VariantCall = {
+  label: string;
+  model: ComparisonModel;
+  usage: UsageTotals;
+  costUsd: number;
+  rated: boolean;
+};
+
+export type PlanningVariantResult = {
+  id: "terra-today" | "split" | "luna-today";
+  label: string;
+  output: string;
+  calls: VariantCall[];
+  costUsd: number;
+  inputPreview: string;
 };
 
 export type ModelStepResult = {
@@ -86,12 +129,17 @@ export type ModelStepResult = {
 export type StepComparison = {
   step: ComparisonStep;
   models: ModelStepResult[];
+  /** Set for planning when --mode split. Other steps stay terra versus luna. */
+  planningVariants?: PlanningVariantResult[];
 };
 
 export type ModelComparisonReport = {
   campaignId: string;
   campaignName: string;
   dryRun: boolean;
+  fresh: boolean;
+  mode: ComparisonMode;
+  wroteToDatabase: false;
   steps: StepComparison[];
   totals: Record<ComparisonModel, number>;
   markdown: string;
@@ -103,6 +151,7 @@ const EMPTY_USAGE: UsageTotals = {
   outputTokens: 0,
   cachedInputTokens: 0,
   cacheWriteTokens: 0,
+  reasoningTokens: null,
   webSearchCalls: 0,
   providerCalls: 0,
 };
@@ -113,6 +162,8 @@ function addUsage(usage: AiUsageMetadata | null | undefined): UsageTotals {
     outputTokens: usage?.outputTokens ?? 0,
     cachedInputTokens: usage?.cachedInputTokens ?? 0,
     cacheWriteTokens: usage?.cacheWriteTokens ?? 0,
+    reasoningTokens:
+      typeof usage?.reasoningTokens === "number" ? usage.reasoningTokens : null,
     webSearchCalls: usage?.webSearchCalls ?? 0,
     providerCalls: 1,
   };
@@ -209,15 +260,21 @@ async function loadCampaign(campaignId: string) {
   return campaign;
 }
 
-async function planningMessages(campaignId: string, organizationId: string) {
+async function planningMessages(
+  campaignId: string,
+  organizationId: string,
+  fresh: boolean,
+) {
   return buildConsultationCoachMessagesForCampaign({
     organizationId,
     campaignId,
+    fresh,
   });
 }
 
 async function questionMessages(
   campaign: Awaited<ReturnType<typeof loadCampaign>>,
+  fresh: boolean,
 ): Promise<{ messages: AiMessage[]; skippedReason: string | null }> {
   const requirement = campaign.jobRequirement;
   if (!requirement) {
@@ -229,12 +286,13 @@ async function questionMessages(
   if (!parsed.ok) {
     return { messages: [], skippedReason: "Personal profile could not be read." };
   }
-  const turns = campaign.consultationSession
-    ? await prisma.consultationTurn.findMany({
-        where: { sessionId: campaign.consultationSession.id },
-        orderBy: { sequence: "asc" },
-      })
-    : [];
+  const turns =
+    fresh || !campaign.consultationSession
+      ? []
+      : await prisma.consultationTurn.findMany({
+          where: { sessionId: campaign.consultationSession.id },
+          orderBy: { sequence: "asc" },
+        });
   const asked = askedQuestionsFromTurns(turns);
   const counted = countAllCountedCoachingQuestions(asked);
   const range = roleExpertiseFillRange(countNonRoleExpertiseQuestions(asked));
@@ -385,10 +443,15 @@ async function callStructured(input: {
   model: ComparisonModel;
   messages: AiMessage[];
   schemaKey: "consultationPlan" | "roleExpertiseQuestions" | "applicationSummaryShell";
+  schemaOverride?: {
+    schema: AiStructuredRequest<unknown>["schema"];
+    schemaName: string;
+  };
 }): Promise<{ data: unknown; usage: UsageTotals }> {
   const provider = createAiProvider({ ...input.config, model: input.model });
   const response = await provider.generateStructured({
     ...structuredOutputRequest(input.schemaKey),
+    ...(input.schemaOverride ?? {}),
     messages: input.messages,
   } as AiStructuredRequest<unknown>);
   return { data: response.data, usage: addUsage(response.usage) };
@@ -408,18 +471,179 @@ function searchCeiling(model: string, rates: AiModelRateRow[]): number {
   );
 }
 
+function pricedCall(input: {
+  label: string;
+  model: ComparisonModel;
+  usage: UsageTotals;
+  rates: AiModelRateRow[];
+}): VariantCall {
+  const priced = costFor(input.model, "openai-responses", input.usage, input.rates);
+  return {
+    label: input.label,
+    model: input.model,
+    usage: input.usage,
+    costUsd: priced.costUsd,
+    rated: priced.rated,
+  };
+}
+
+async function runPlanningSplit(input: {
+  campaign: Awaited<ReturnType<typeof loadCampaign>>;
+  rates: AiModelRateRow[];
+  dryRun: boolean;
+  fresh: boolean;
+}): Promise<PlanningVariantResult[]> {
+  const messages = await planningMessages(
+    input.campaign.id,
+    input.campaign.organizationId,
+    input.fresh,
+  );
+  if (input.dryRun) {
+    const decisionPreview = previewMessages(planningDecisionMessages(messages));
+    const writingPreview = previewMessages(
+      planningWritingMessages(messages, {
+        assessments: [],
+        questions: [],
+      }),
+    );
+    return [
+      {
+        id: "terra-today",
+        label: "Today's planning on gpt-5.6-terra",
+        output: "",
+        calls: [],
+        costUsd: 0,
+        inputPreview: previewMessages(messages),
+      },
+      {
+        id: "split",
+        label: "Split: terra decision, then luna writing",
+        output: "",
+        calls: [],
+        costUsd: 0,
+        inputPreview: `${decisionPreview}\n\n---\n\n${writingPreview}`,
+      },
+      {
+        id: "luna-today",
+        label: "Today's planning on gpt-5.6-luna",
+        output: "",
+        calls: [],
+        costUsd: 0,
+        inputPreview: previewMessages(messages),
+      },
+    ];
+  }
+
+  const terraToday = await callStructured({
+    config: getConsultationAiConfig(),
+    model: "gpt-5.6-terra",
+    messages,
+    schemaKey: "consultationPlan",
+  });
+  const decisionCalled = await callStructured({
+    config: getConsultationAiConfig(),
+    model: "gpt-5.6-terra",
+    messages: planningDecisionMessages(messages),
+    schemaKey: "consultationPlan",
+    schemaOverride: {
+      schema: planningDecisionSchema,
+      schemaName: PLANNING_DECISION_SCHEMA_NAME,
+    },
+  });
+  const decision = planningDecisionSchema.parse(decisionCalled.data);
+  let writing: ReturnType<typeof planningWritingSchema.parse> | null = null;
+  let writingError: string | null = null;
+  let writingUsage: UsageTotals | null = null;
+  try {
+    const writingCalled = await callStructured({
+      config: getConsultationReplyAiConfig(),
+      model: "gpt-5.6-luna",
+      messages: planningWritingMessages(messages, decision),
+      schemaKey: "consultationPlan",
+      schemaOverride: {
+        schema: planningWritingSchema,
+        schemaName: PLANNING_WRITING_SCHEMA_NAME,
+      },
+    });
+    writingUsage = writingCalled.usage;
+    writing = planningWritingSchema.parse(writingCalled.data);
+  } catch (error) {
+    writingError = error instanceof Error ? error.message : "Writing call failed.";
+  }
+  const lunaToday = await callStructured({
+    config: getConsultationAiConfig(),
+    model: "gpt-5.6-luna",
+    messages,
+    schemaKey: "consultationPlan",
+  });
+  const terraCall = pricedCall({
+    label: "Today's planning",
+    model: "gpt-5.6-terra",
+    usage: terraToday.usage,
+    rates: input.rates,
+  });
+  const decisionCall = pricedCall({
+    label: "Decision",
+    model: "gpt-5.6-terra",
+    usage: decisionCalled.usage,
+    rates: input.rates,
+  });
+  const writingCall = writingUsage
+    ? pricedCall({
+        label: "Writing",
+        model: "gpt-5.6-luna",
+        usage: writingUsage,
+        rates: input.rates,
+      })
+    : null;
+  const lunaCall = pricedCall({
+    label: "Today's planning",
+    model: "gpt-5.6-luna",
+    usage: lunaToday.usage,
+    rates: input.rates,
+  });
+  return [
+    {
+      id: "terra-today",
+      label: "Today's planning on gpt-5.6-terra",
+      output: formatPlan(terraToday.data),
+      calls: [terraCall],
+      costUsd: terraCall.costUsd,
+      inputPreview: "",
+    },
+    {
+      id: "split",
+      label: "Split: terra decision, then luna writing",
+      output: formatExperimentalSplit({ decision, writing, writingError }),
+      calls: writingCall ? [decisionCall, writingCall] : [decisionCall],
+      costUsd: decisionCall.costUsd + (writingCall?.costUsd ?? 0),
+      inputPreview: "",
+    },
+    {
+      id: "luna-today",
+      label: "Today's planning on gpt-5.6-luna",
+      output: formatPlan(lunaToday.data),
+      calls: [lunaCall],
+      costUsd: lunaCall.costUsd,
+      inputPreview: "",
+    },
+  ];
+}
+
 async function runOneModel(input: {
   step: ComparisonStep;
   model: ComparisonModel;
   campaign: Awaited<ReturnType<typeof loadCampaign>>;
   rates: AiModelRateRow[];
   dryRun: boolean;
+  fresh: boolean;
 }): Promise<ModelStepResult> {
   const providerName = "openai-responses";
   if (input.step === "planning") {
     const messages = await planningMessages(
       input.campaign.id,
       input.campaign.organizationId,
+      input.fresh,
     );
     if (input.dryRun) {
       return {
@@ -451,7 +675,7 @@ async function runOneModel(input: {
   }
 
   if (input.step === "questions") {
-    const built = await questionMessages(input.campaign);
+    const built = await questionMessages(input.campaign, input.fresh);
     if (built.skippedReason) {
       return {
         model: input.model,
@@ -576,6 +800,7 @@ async function runOneModel(input: {
     outputTokens: result.usage?.outputTokens ?? 0,
     cachedInputTokens: result.usage?.cachedInputTokens ?? 0,
     cacheWriteTokens: result.usage?.cacheWriteTokens ?? 0,
+    reasoningTokens: null,
     webSearchCalls: result.usage?.webSearchCallCount ?? 0,
     providerCalls: result.searchStagesUsed ?? 0,
   };
@@ -596,10 +821,34 @@ async function runOneModel(input: {
   };
 }
 
+function reasoningCell(value: number | null): string {
+  return value == null ? "not returned" : String(value);
+}
+
+function renderCallTable(calls: VariantCall[]): string[] {
+  const header = ["| |", ...calls.map((call) => ` ${call.label} (${call.model}) |`)].join("");
+  const rule = ["| --- |", ...calls.map(() => " --- |")].join("");
+  const row = (label: string, value: (call: VariantCall) => string) =>
+    [`| ${label} |`, ...calls.map((call) => ` ${value(call)} |`)].join("");
+  return [
+    header,
+    rule,
+    row("Input tokens", (call) => String(call.usage.inputTokens)),
+    row("Output tokens", (call) => String(call.usage.outputTokens)),
+    row("Reasoning tokens", (call) => reasoningCell(call.usage.reasoningTokens)),
+    row("Cached input tokens", (call) => String(call.usage.cachedInputTokens)),
+    row("Cache write tokens", (call) => String(call.usage.cacheWriteTokens)),
+    row("Provider calls", (call) => String(call.usage.providerCalls)),
+    row("Cost", (call) => money(call.costUsd)),
+  ];
+}
+
 function renderMarkdown(input: {
   campaignId: string;
   campaignName: string;
   dryRun: boolean;
+  fresh: boolean;
+  mode: ComparisonMode;
   steps: StepComparison[];
   totals: Record<ComparisonModel, number>;
   rates: AiModelRateRow[];
@@ -615,9 +864,34 @@ function renderMarkdown(input: {
     "",
     `Application: ${input.campaignName} (\`${input.campaignId}\`)`,
     `Models: ${COMPARISON_MODELS.join(", ")}`,
+    `Mode: ${input.mode}`,
+    `Fresh: ${input.fresh ? "yes — first Harper round, stored turns left in place" : "no"}`,
     `Dry run: ${input.dryRun ? "yes — no model was called" : "no"}`,
+    "wroteToDatabase: false",
+    "",
+    REASONING_TOKENS_BILLING_NOTE,
     "",
   ];
+  if (input.mode === "split") {
+    lines.push(
+      "## Experimental instructions (not in production)",
+      "",
+      "These instructions are used only by `--mode split` in this comparison script. They are not Harper's production coach. They need product-owner approval before any production use.",
+      "",
+      "### Decision (gpt-5.6-terra)",
+      "",
+      "```",
+      EXPERIMENTAL_PLANNING_DECISION_INSTRUCTIONS,
+      "```",
+      "",
+      "### Writing (gpt-5.6-luna)",
+      "",
+      "```",
+      EXPERIMENTAL_PLANNING_WRITING_INSTRUCTIONS,
+      "```",
+      "",
+    );
+  }
   if (input.dryRun) {
     lines.push(
       "Estimated token cost is $0.000000 because a dry run does not call a model.",
@@ -627,6 +901,26 @@ function renderMarkdown(input: {
   }
   for (const step of input.steps) {
     lines.push(`## ${step.step}`, "");
+    if (step.planningVariants) {
+      if (input.dryRun) {
+        for (const variant of step.planningVariants) {
+          lines.push(`### ${variant.label}`, "", "```", variant.inputPreview, "```", "");
+        }
+        lines.push("");
+        continue;
+      }
+      for (const variant of step.planningVariants) {
+        lines.push(`### ${variant.label}`, "", "```", variant.output, "```", "");
+        if (variant.calls.length > 0) {
+          lines.push(...renderCallTable(variant.calls), "");
+        }
+      }
+      const split = step.planningVariants.find((variant) => variant.id === "split");
+      if (split) {
+        lines.push(`Split total: ${money(split.costUsd)}`, "");
+      }
+      continue;
+    }
     const [left, right] = step.models;
     if (!left || !right) continue;
     if (left.skippedReason) {
@@ -660,6 +954,7 @@ function renderMarkdown(input: {
       "| --- | --- | --- |",
       `| Input tokens | ${left.usage.inputTokens} | ${right.usage.inputTokens} |`,
       `| Output tokens | ${left.usage.outputTokens} | ${right.usage.outputTokens} |`,
+      `| Reasoning tokens | ${reasoningCell(left.usage.reasoningTokens)} | ${reasoningCell(right.usage.reasoningTokens)} |`,
       `| Cached input tokens | ${left.usage.cachedInputTokens} | ${right.usage.cachedInputTokens} |`,
       `| Cache write tokens | ${left.usage.cacheWriteTokens} | ${right.usage.cacheWriteTokens} |`,
       `| Web searches | ${left.usage.webSearchCalls} | ${right.usage.webSearchCalls} |`,
@@ -677,6 +972,12 @@ function renderMarkdown(input: {
     "",
   );
   return lines.join("\n");
+}
+
+export function parseComparisonMode(raw: string | undefined): ComparisonMode {
+  if (!raw?.trim()) return "current";
+  if (raw === "current" || raw === "split") return raw;
+  throw new Error(`Unknown mode "${raw}". Use current or split.`);
 }
 
 export function parseComparisonSteps(raw: string | undefined): ComparisonStep[] {
@@ -697,19 +998,33 @@ export async function runModelComparison(input: {
   campaignId: string;
   steps?: readonly ComparisonStep[];
   dryRun?: boolean;
+  fresh?: boolean;
+  mode?: ComparisonMode;
   writeReport?: boolean;
   reportDirectory?: string;
 }): Promise<ModelComparisonReport> {
   const steps = input.steps?.length ? [...input.steps] : [...COMPARISON_STEPS];
   const dryRun = input.dryRun === true;
+  const fresh = input.fresh === true;
+  const mode: ComparisonMode = input.mode ?? "current";
   const campaign = await loadCampaign(input.campaignId);
   const rates = await loadRates();
   const comparisons: StepComparison[] = [];
   for (const step of steps) {
+    if (step === "planning" && mode === "split") {
+      const planningVariants = await runPlanningSplit({
+        campaign,
+        rates,
+        dryRun,
+        fresh,
+      });
+      comparisons.push({ step, models: [], planningVariants });
+      continue;
+    }
     const models: ModelStepResult[] = [];
     for (const model of COMPARISON_MODELS) {
       models.push(
-        await runOneModel({ step, model, campaign, rates, dryRun }),
+        await runOneModel({ step, model, campaign, rates, dryRun, fresh }),
       );
     }
     comparisons.push({ step, models });
@@ -719,6 +1034,14 @@ export async function runModelComparison(input: {
     "gpt-5.6-luna": 0,
   } satisfies Record<ComparisonModel, number>;
   for (const step of comparisons) {
+    if (step.planningVariants) {
+      for (const variant of step.planningVariants) {
+        for (const call of variant.calls) {
+          totals[call.model] += call.costUsd;
+        }
+      }
+      continue;
+    }
     for (const model of step.models) {
       totals[model.model] += model.costUsd;
     }
@@ -727,6 +1050,8 @@ export async function runModelComparison(input: {
     campaignId: campaign.id,
     campaignName: campaign.name,
     dryRun,
+    fresh,
+    mode,
     steps: comparisons,
     totals,
     rates,
@@ -743,6 +1068,9 @@ export async function runModelComparison(input: {
     campaignId: campaign.id,
     campaignName: campaign.name,
     dryRun,
+    fresh,
+    mode,
+    wroteToDatabase: false,
     steps: comparisons,
     totals,
     markdown,

@@ -478,6 +478,18 @@ export function parseResponsesUsage(
       : typeof details?.cache_creation_input_tokens === "number"
         ? details.cache_creation_input_tokens
         : undefined;
+  const outputDetails =
+    usageRaw?.output_tokens_details &&
+    typeof usageRaw.output_tokens_details === "object"
+      ? (usageRaw.output_tokens_details as Record<string, unknown>)
+      : usageRaw?.completion_tokens_details &&
+          typeof usageRaw.completion_tokens_details === "object"
+        ? (usageRaw.completion_tokens_details as Record<string, unknown>)
+        : undefined;
+  const reasoningTokens =
+    typeof outputDetails?.reasoning_tokens === "number"
+      ? outputDetails.reasoning_tokens
+      : undefined;
   return {
     inputTokens:
       typeof usageRaw?.input_tokens === "number"
@@ -493,6 +505,7 @@ export function parseResponsesUsage(
         : typeof usageRaw?.completion_tokens === "number"
           ? usageRaw.completion_tokens
           : undefined,
+    ...(typeof reasoningTokens === "number" ? { reasoningTokens } : {}),
   };
 }
 

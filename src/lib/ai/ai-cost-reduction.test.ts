@@ -43,6 +43,22 @@ function setConsultationRoles() {
 }
 
 describe("AI cost reduction", () => {
+  it("reports reasoning tokens separately when the provider returns them", () => {
+    expect(
+      parseResponsesUsage({
+        input_tokens: 8700,
+        output_tokens: 3700,
+        output_tokens_details: { reasoning_tokens: 2100 },
+      }),
+    ).toEqual({
+      inputTokens: 8700,
+      outputTokens: 3700,
+      cachedInputTokens: undefined,
+      cacheWriteTokens: undefined,
+      reasoningTokens: 2100,
+    });
+  });
+
   it("parses cached and cache-write tokens from Responses usage", () => {
     expect(
       parseResponsesUsage({

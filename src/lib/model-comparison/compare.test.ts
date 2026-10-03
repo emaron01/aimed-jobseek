@@ -9,6 +9,7 @@ const calls = vi.hoisted(() => [] as Array<{
   model: string;
   role: string;
   schemaName?: string;
+  schema?: unknown;
   usage?: unknown;
   webSearchEnabled?: boolean;
   messages: Array<{ role: string; content: string }>;
@@ -21,6 +22,7 @@ vi.mock("@/lib/ai/provider", async (importOriginal) => {
     createAiProvider: (config: { model: string; role: string }) => ({
     async generateStructured(request: {
       schemaName?: string;
+      schema?: unknown;
       usage?: unknown;
       webSearchEnabled?: boolean;
       messages: Array<{ role: string; content: string }>;
@@ -29,11 +31,70 @@ vi.mock("@/lib/ai/provider", async (importOriginal) => {
         model: config.model,
         role: config.role,
         schemaName: request.schemaName,
+        schema: request.schema,
         usage: request.usage,
         webSearchEnabled: request.webSearchEnabled,
         messages: request.messages,
       });
       const stamp = config.model;
+      if (request.schemaName === "consultation_plan_decision_experiment") {
+        return {
+          data: {
+            assessments: [
+              {
+                targetKey: "gap-1",
+                strength: "PARTIAL",
+                supportingFactIds: ["fact-1"],
+                relevantRoleIds: ["role-1"],
+                strategyMode: "PROVE_WITH_STORY",
+              },
+            ],
+            questions: [
+              {
+                targetKey: "gap-1",
+                text: "terra decision question",
+                hiringTeamRoleId: "role",
+                interviewTypeTag: "focused_competency",
+              },
+            ],
+          },
+          usage: tokenUsage(false, 128),
+          provider: "openai-responses",
+          model: stamp,
+          modelUrlIdentifier: "example",
+          rawText: "",
+        };
+      }
+      if (request.schemaName === "consultation_plan_writing_experiment") {
+        return {
+          data: {
+            overall: "You stand well for this job.",
+            strongestAngles: ["Angle one", "Angle two"],
+            importantGaps: ["A gap remains."],
+            commentary: "luna writing note",
+            closingNote: null,
+            assessments: [
+              {
+                targetKey: "gap-1",
+                explanation: "Partial evidence.",
+                strategy: "Prove it with the payroll story.",
+              },
+            ],
+            questions: [
+              {
+                targetKey: "gap-1",
+                whoCaresNote: "The hiring manager needs this.",
+                requirementInterpretation: null,
+              },
+            ],
+          },
+          usage: tokenUsage(false),
+          provider: "openai-responses",
+          model: stamp,
+          modelUrlIdentifier: "example",
+          rawText: "",
+        };
+      }
       if (request.schemaName === "consultation_plan") {
         return {
           data: {
@@ -166,13 +227,14 @@ vi.mock("@/lib/research/sources", async (importOriginal) => {
   };
 });
 
-function tokenUsage(webSearch: boolean) {
+function tokenUsage(webSearch: boolean, reasoningTokens?: number) {
   return {
     inputTokens: 1000,
     outputTokens: 200,
     cachedInputTokens: 10,
     cacheWriteTokens: 5,
     webSearchCalls: webSearch ? 3 : 0,
+    ...(reasoningTokens != null ? { reasoningTokens } : {}),
   };
 }
 
@@ -222,6 +284,7 @@ describe.skipIf(!hasTestDatabase())(
   () => {
     let campaignId = "";
     let organizationId = "";
+    let ownerUserId = "";
     let ready = false;
 
     beforeAll(async () => {
@@ -237,7 +300,7 @@ describe.skipIf(!hasTestDatabase())(
       }
       await probe.$disconnect();
 
-      for (const prefix of ["CONSULTATION_AI", "RESEARCH_AI"]) {
+      for (const prefix of ["CONSULTATION_AI", "CONSULTATION_REPLY_AI", "RESEARCH_AI"]) {
         process.env[`${prefix}_PROVIDER`] = "openai-responses";
         process.env[`${prefix}_MODEL`] = "gpt-5.6-terra";
         process.env[`${prefix}_MODEL_URL`] = "https://api.openai.com/v1/responses";
@@ -277,6 +340,7 @@ describe.skipIf(!hasTestDatabase())(
       });
       organizationId = provisioned.organization!.id;
       const userId = provisioned.user.id;
+      ownerUserId = userId;
       const { emptyCandidateProfile } = await import(
         "@/lib/product-research/candidate-profile"
       );
@@ -465,6 +529,430 @@ describe.skipIf(!hasTestDatabase())(
       expect(report.markdown).toContain("web-search ceiling");
       expect(report.totals["gpt-5.6-terra"]).toBe(0);
       expect(report.totals["gpt-5.6-luna"]).toBe(0);
+    });
+
+    it("planning without the new options stays terra versus luna", async () => {
+      if (!ready) return;
+      const { runModelComparison, snapshotOrganizationTables } = await import(
+        "@/lib/model-comparison/compare"
+      );
+      const { CONSULTATION_PROMPT_VERSION } = await import(
+        "@/lib/consultation/contract"
+      );
+      const beforeTables = await snapshotOrganizationTables(organizationId);
+      const beforeEnv = envSnapshot();
+      calls.length = 0;
+      const report = await runModelComparison({
+        campaignId,
+        steps: ["planning"],
+        writeReport: false,
+      });
+      expect(await snapshotOrganizationTables(organizationId)).toEqual(beforeTables);
+      expect(envSnapshot()).toBe(beforeEnv);
+      expect(CONSULTATION_PROMPT_VERSION).toBe("37");
+      expect(report.mode).toBe("current");
+      expect(report.fresh).toBe(false);
+      expect(report.wroteToDatabase).toBe(false);
+      const planningCalls = calls.filter(
+        (call) => call.schemaName === "consultation_plan",
+      );
+      expect(planningCalls.map((call) => call.model).sort()).toEqual([
+        "gpt-5.6-luna",
+        "gpt-5.6-terra",
+      ]);
+      expect(
+        calls.some((call) =>
+          String(call.schemaName).includes("experiment"),
+        ),
+      ).toBe(false);
+      expect(report.markdown).toContain("Reasoning tokens");
+      expect(report.markdown).toContain("not returned");
+      expect(report.markdown).toContain("wroteToDatabase: false");
+    });
+
+    it("fresh builds the first round and split compares three planning variants", async () => {
+      if (!ready) return;
+      const { prisma } = await import("@/lib/prisma-client");
+      const { emptyCandidateProfile } = await import(
+        "@/lib/product-research/candidate-profile"
+      );
+      const { candidateProfileSchema } = await import(
+        "@/lib/product-research/candidate-profile"
+      );
+      const profile = candidateProfileSchema.parse({
+        ...emptyCandidateProfile(),
+        skills: [
+          {
+            id: "skill_profile_marker",
+            kind: "FACT",
+            text: "PROFILE_MARKER hospital payroll lead",
+            provenance: [{ sourceId: "source_test" }],
+          },
+        ],
+        experience: [
+          {
+            id: "role_profile_marker",
+            kind: "FACT",
+            employer: "City Hospital",
+            title: "PROFILE_ROLE_MARKER Nurse Manager",
+            startDate: "2022-01",
+            endDate: null,
+            summary: null,
+            achievements: [],
+            provenance: [{ sourceId: "source_test" }],
+          },
+        ],
+      });
+      const suffix = `fresh_${Date.now().toString(36)}`;
+      const product = await prisma.product.create({
+        data: {
+          organizationId,
+          name: `Fresh profile ${suffix}`,
+          profileJson: profile,
+        },
+      });
+      const company = await prisma.company.create({
+        data: {
+          organizationId,
+          name: "Fresh Northwind",
+          normalizedName: `fresh northwind ${suffix}`,
+          website: `https://fresh-${suffix}.example`,
+          normalizedDomain: `fresh-${suffix}.example`,
+        },
+      });
+      const campaign = await prisma.campaign.create({
+        data: {
+          organizationId,
+          ownerUserId,
+          name: `Fresh application ${suffix}`,
+          productId: product.id,
+        },
+      });
+      await prisma.jobRequirement.create({
+        data: {
+          organizationId,
+          campaignId: campaign.id,
+          companyId: company.id,
+          title: "FRESH_JOB_MARKER Nurse Manager",
+          companyName: "Fresh Northwind",
+          rawText: "FRESH_JOB_MARKER Nurse Manager at Fresh Northwind.",
+          suppliedEmployerWebsite: `https://fresh-${suffix}.example`,
+          requiredItems: ["payroll operations"],
+          responsibilities: ["lead the team"],
+          preferredItems: [],
+          scorecardJson: {
+            mission: { text: "Run payroll" },
+            outcomes: [],
+            competencies: [],
+          },
+        },
+      });
+      await prisma.applicationEmployerResearch.create({
+        data: {
+          organizationId,
+          campaignId: campaign.id,
+          companyId: company.id,
+          status: "COMPLETED",
+          companySummary: "RESEARCH_MARKER Northwind runs hospital payroll",
+          anchorHost: `fresh-${suffix}.example`,
+          researchedAt: new Date(),
+        },
+      });
+      const session = await prisma.consultationSession.create({
+        data: {
+          organizationId,
+          campaignId: campaign.id,
+          productId: product.id,
+          promptVersion: "37",
+          status: "IN_PROGRESS",
+          generationStatus: "READY",
+        },
+      });
+      for (let index = 0; index < 20; index += 1) {
+        await prisma.consultationTurn.create({
+          data: {
+            organizationId,
+            sessionId: session.id,
+            sequence: index + 1,
+            speaker: "CONSULTANT",
+            body: `STORED_GAP_QUESTION_${index} about payroll`,
+            targetKey: `gap-${index}`,
+          },
+        });
+      }
+      await prisma.consultationTurn.create({
+        data: {
+          organizationId,
+          sessionId: session.id,
+          sequence: 21,
+          speaker: "SEEKER",
+          body: "STORED_SEEKER_ANSWER I led payroll.",
+          targetKey: "gap-0",
+          seekerAuthored: true,
+        },
+      });
+      await prisma.consultationTurn.create({
+        data: {
+          organizationId,
+          sessionId: session.id,
+          sequence: 22,
+          speaker: "CONSULTANT",
+          body: "STORED_BEST_PRACTICE how do you coach a team",
+          targetKey: "role-expertise:stored",
+        },
+      });
+
+      const libraryProduct = await prisma.product.create({
+        data: {
+          organizationId,
+          name: `Library profile ${suffix}`,
+          profileJson: emptyCandidateProfile(),
+        },
+      });
+      const libraryCampaign = await prisma.campaign.create({
+        data: {
+          organizationId,
+          ownerUserId,
+          name: `Library application ${suffix}`,
+          productId: libraryProduct.id,
+        },
+      });
+      const librarySession = await prisma.consultationSession.create({
+        data: {
+          organizationId,
+          campaignId: libraryCampaign.id,
+          productId: libraryProduct.id,
+          promptVersion: "37",
+        },
+      });
+      const libraryTurn = await prisma.consultationTurn.create({
+        data: {
+          organizationId,
+          sessionId: librarySession.id,
+          sequence: 1,
+          speaker: "CONSULTANT",
+          body: "How did you lead a payroll conversion for a hospital?",
+          targetKey: "role-expertise:library",
+          questionContextJson: { interviewTypeTag: "focused_competency" },
+        },
+      });
+      await prisma.consultationStatement.create({
+        data: {
+          organizationId,
+          sessionId: librarySession.id,
+          turnId: libraryTurn.id,
+          kind: "INTERVIEW_ANSWER",
+          status: "APPROVED",
+          content: "LIBRARY_MARKER I led the hospital payroll conversion.",
+          groundingJson: {},
+          promptVersion: "37",
+          approvedAt: new Date(),
+        },
+      });
+
+      const { runModelComparison, snapshotOrganizationTables } = await import(
+        "@/lib/model-comparison/compare"
+      );
+      const { CONSULTATION_PROMPT_VERSION } = await import(
+        "@/lib/consultation/contract"
+      );
+      const { findHarperLibraryMatch } = await import(
+        "@/lib/consultation/harper-library"
+      );
+      const { zodToOpenAiStrictJsonSchema } = await import(
+        "@/lib/ai/zod-json-schema"
+      );
+      const { estimateEventCostUsd } = await import("@/lib/platform/cost");
+      const { SEED_AI_MODEL_RATES } = await import("@/lib/platform/model-rates");
+
+      const library = await findHarperLibraryMatch({
+        organizationId,
+        campaignId: campaign.id,
+        question: "How did you lead a payroll conversion for a hospital?",
+        interviewTypeTag: "focused_competency",
+      });
+      expect(library?.content).toContain("LIBRARY_MARKER");
+
+      const beforeTables = await snapshotOrganizationTables(organizationId);
+      const beforeEnv = envSnapshot();
+      calls.length = 0;
+      const skipped = await runModelComparison({
+        campaignId: campaign.id,
+        steps: ["questions"],
+        writeReport: false,
+      });
+      expect(
+        calls.some((call) => call.schemaName === "role_expertise_questions"),
+      ).toBe(false);
+      expect(skipped.markdown).toContain(
+        "Production would not select more best-practice questions",
+      );
+
+      calls.length = 0;
+      const fresh = await runModelComparison({
+        campaignId: campaign.id,
+        steps: ["planning", "questions"],
+        fresh: true,
+        writeReport: false,
+      });
+      expect(await snapshotOrganizationTables(organizationId)).toEqual(beforeTables);
+      expect(envSnapshot()).toBe(beforeEnv);
+      expect(CONSULTATION_PROMPT_VERSION).toBe("37");
+      expect(fresh.fresh).toBe(true);
+      expect(fresh.wroteToDatabase).toBe(false);
+
+      const planning = calls.find((call) => call.schemaName === "consultation_plan");
+      const planningText = planning?.messages.map((message) => message.content).join("\n") ?? "";
+      expect(planningText).toContain("PROFILE_MARKER hospital payroll lead");
+      expect(planningText).toContain("PROFILE_ROLE_MARKER Nurse Manager");
+      expect(planningText).toContain("payroll operations");
+      expect(planningText).toContain("RESEARCH_MARKER Northwind runs hospital payroll");
+      expect(planningText).not.toContain("STORED_GAP_QUESTION_0");
+      expect(planningText).not.toContain("STORED_SEEKER_ANSWER");
+      expect(planningText).not.toContain("STORED_BEST_PRACTICE");
+      expect(planningText).not.toContain("LIBRARY_MARKER");
+      const round = planning?.messages.find(
+        (message) =>
+          message.content.startsWith("{") &&
+          message.content.includes("\"askedQuestions\""),
+      );
+      const roundJson = JSON.parse(round?.content ?? "{}") as {
+        askedQuestions?: unknown[];
+        coveredTargetKeys?: unknown[];
+      };
+      expect(roundJson.askedQuestions).toEqual([]);
+      expect(roundJson.coveredTargetKeys).toEqual([]);
+
+      const questions = calls.filter(
+        (call) => call.schemaName === "role_expertise_questions",
+      );
+      expect(questions.map((call) => call.model).sort()).toEqual([
+        "gpt-5.6-luna",
+        "gpt-5.6-terra",
+      ]);
+      const questionText = questions[0]?.messages.map((message) => message.content).join("\n") ?? "";
+      expect(questionText).toContain("FRESH_JOB_MARKER Nurse Manager");
+      expect(questionText).toContain("RESEARCH_MARKER Northwind runs hospital payroll");
+      expect(questionText).toContain("PROFILE_ROLE_MARKER Nurse Manager");
+      expect(questionText).not.toContain("STORED_GAP_QUESTION_0");
+      expect(questionText).not.toContain("STORED_BEST_PRACTICE");
+      expect(questionText).not.toContain("LIBRARY_MARKER");
+      const questionPayload = JSON.parse(questions[0]?.messages[1]?.content ?? "{}") as {
+        askedQuestions?: unknown[];
+      };
+      expect(questionPayload.askedQuestions).toEqual([]);
+
+      calls.length = 0;
+      const split = await runModelComparison({
+        campaignId: campaign.id,
+        steps: ["planning"],
+        fresh: true,
+        mode: "split",
+        writeReport: false,
+      });
+      expect(await snapshotOrganizationTables(organizationId)).toEqual(beforeTables);
+      expect(envSnapshot()).toBe(beforeEnv);
+      expect(CONSULTATION_PROMPT_VERSION).toBe("37");
+      expect(split.mode).toBe("split");
+      expect(split.wroteToDatabase).toBe(false);
+
+      const names = calls.map((call) => `${call.model}:${call.schemaName}`);
+      expect(names).toEqual([
+        "gpt-5.6-terra:consultation_plan",
+        "gpt-5.6-terra:consultation_plan_decision_experiment",
+        "gpt-5.6-luna:consultation_plan_writing_experiment",
+        "gpt-5.6-luna:consultation_plan",
+      ]);
+      const decision = calls[1];
+      const writing = calls[2];
+      expect(writing?.role).toBe("consultation_reply");
+      const decisionJson = zodToOpenAiStrictJsonSchema(
+        decision?.schema as Parameters<typeof zodToOpenAiStrictJsonSchema>[0],
+      );
+      const decisionProperties =
+        decisionJson.properties && typeof decisionJson.properties === "object"
+          ? (decisionJson.properties as Record<string, unknown>)
+          : {};
+      expect(Object.keys(decisionProperties)).toEqual([
+        "assessments",
+        "questions",
+      ]);
+      function itemPropertyNames(node: unknown): string[] {
+        if (!node || typeof node !== "object") return [];
+        const items = (node as { items?: { properties?: unknown } }).items;
+        const properties = items?.properties;
+        if (!properties || typeof properties !== "object") return [];
+        return Object.keys(properties as object);
+      }
+      expect(itemPropertyNames(decisionProperties.assessments).sort()).toEqual([
+        "relevantRoleIds",
+        "strategyMode",
+        "strength",
+        "supportingFactIds",
+        "targetKey",
+      ]);
+      expect(itemPropertyNames(decisionProperties.questions).sort()).toEqual([
+        "hiringTeamRoleId",
+        "interviewTypeTag",
+        "targetKey",
+        "text",
+      ]);
+      expect(
+        writing?.messages.some((message) =>
+          message.content.includes("terra decision question"),
+        ),
+      ).toBe(true);
+      expect(writing?.messages[0]?.content).toContain("EXPERIMENTAL. Not production.");
+      expect(split.markdown).toContain("terra decision question");
+      expect(split.markdown).toContain("luna writing note");
+      expect(split.markdown).toContain("gpt-5.6-terra plan");
+      expect(split.markdown).toContain("gpt-5.6-luna plan");
+      expect(split.markdown).toContain("Reasoning tokens");
+      expect(split.markdown).toContain("128");
+      expect(split.markdown).toContain("EXPERIMENTAL. Not production.");
+      expect(split.markdown).toContain("Split total:");
+      expect(split.markdown).toContain(
+        "Reasoning tokens are part of billed output tokens.",
+      );
+
+      const outputOnly = estimateEventCostUsd(
+        {
+          provider: "openai-responses",
+          model: "gpt-5.6-terra",
+          inputTokens: 1000,
+          cachedInputTokens: 10,
+          cacheWriteTokens: 5,
+          outputTokens: 200,
+          webSearchCalls: 0,
+          occurredAt: new Date(),
+        },
+        SEED_AI_MODEL_RATES,
+      );
+      const outputPlusReasoning = estimateEventCostUsd(
+        {
+          provider: "openai-responses",
+          model: "gpt-5.6-terra",
+          inputTokens: 1000,
+          cachedInputTokens: 10,
+          cacheWriteTokens: 5,
+          outputTokens: 328,
+          webSearchCalls: 0,
+          occurredAt: new Date(),
+        },
+        SEED_AI_MODEL_RATES,
+      );
+      expect(split.markdown).toContain(`$${outputOnly.toFixed(6)}`);
+      expect(split.markdown).not.toContain(`$${outputPlusReasoning.toFixed(6)}`);
+      const splitVariant = split.steps[0]?.planningVariants?.find(
+        (variant) => variant.id === "split",
+      );
+      expect(splitVariant?.calls.map((call) => call.model)).toEqual([
+        "gpt-5.6-terra",
+        "gpt-5.6-luna",
+      ]);
+      expect(splitVariant?.calls[0]?.usage.reasoningTokens).toBe(128);
+      expect(splitVariant?.calls[0]?.usage.outputTokens).toBe(200);
+      expect(splitVariant?.calls).toHaveLength(2);
     });
   },
 );
