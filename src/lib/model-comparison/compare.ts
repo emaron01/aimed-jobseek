@@ -24,15 +24,26 @@ import { employerWebsiteAnchor } from "@/lib/application/company-website";
 import { consultationPlanSchema } from "@/lib/consultation/contract";
 import { buildConsultationCoachMessagesForCampaign } from "@/lib/consultation/service";
 import {
+  EXPERIMENTAL_LEAN_DECISION_INSTRUCTIONS,
+  EXPERIMENTAL_LEAN_WRITING_INSTRUCTIONS,
   EXPERIMENTAL_PLANNING_DECISION_INSTRUCTIONS,
   EXPERIMENTAL_PLANNING_WRITING_INSTRUCTIONS,
+  LEAN_DECISION_SCHEMA_NAME,
+  LEAN_WRITING_SCHEMA_NAME,
   PLANNING_DECISION_SCHEMA_NAME,
   PLANNING_WRITING_SCHEMA_NAME,
+  combineLeanDecisionAndWriting,
   formatExperimentalSplit,
+  formatLeanSplit,
+  leanDecisionMessages,
+  leanDecisionSchema,
+  leanWritingMessages,
+  leanWritingSchema,
   planningDecisionMessages,
   planningDecisionSchema,
   planningWritingMessages,
   planningWritingSchema,
+  suppliedEvidenceIds,
 } from "@/lib/model-comparison/plan-split-experiment";
 import { deriveCareerStage } from "@/lib/consultation/career-stage";
 import { careerWalkThroughAlreadyAsked } from "@/lib/consultation/question-detection";
@@ -108,7 +119,7 @@ export type VariantCall = {
 };
 
 export type PlanningVariantResult = {
-  id: "terra-today" | "split" | "luna-today";
+  id: "terra-today" | "split" | "luna-today" | "lean-split";
   label: string;
   output: string;
   calls: VariantCall[];
@@ -531,6 +542,16 @@ async function runPlanningSplit(input: {
         costUsd: 0,
         inputPreview: previewMessages(messages),
       },
+      {
+        id: "lean-split",
+        label: "Lean split: terra questions and strengths, then luna",
+        output: "",
+        calls: [],
+        costUsd: 0,
+        inputPreview: `${previewMessages(leanDecisionMessages(messages))}\n\n---\n\n${previewMessages(
+          leanWritingMessages(messages, { assessments: [], questions: [] }),
+        )}`,
+      },
     ];
   }
 
@@ -602,6 +623,60 @@ async function runPlanningSplit(input: {
     usage: lunaToday.usage,
     rates: input.rates,
   });
+  const leanDecisionCalled = await callStructured({
+    config: getConsultationAiConfig(),
+    model: "gpt-5.6-terra",
+    messages: leanDecisionMessages(messages),
+    schemaKey: "consultationPlan",
+    schemaOverride: {
+      schema: leanDecisionSchema,
+      schemaName: LEAN_DECISION_SCHEMA_NAME,
+    },
+  });
+  const leanDecision = leanDecisionSchema.parse(leanDecisionCalled.data);
+  let leanWritingRaw: unknown = null;
+  let leanWritingError: string | null = null;
+  let leanWritingUsage: UsageTotals | null = null;
+  try {
+    const leanWritingCalled = await callStructured({
+      config: getConsultationReplyAiConfig(),
+      model: "gpt-5.6-luna",
+      messages: leanWritingMessages(messages, leanDecision),
+      schemaKey: "consultationPlan",
+      schemaOverride: {
+        schema: leanWritingSchema,
+        schemaName: LEAN_WRITING_SCHEMA_NAME,
+      },
+    });
+    leanWritingUsage = leanWritingCalled.usage;
+    leanWritingRaw = leanWritingCalled.data;
+  } catch (error) {
+    leanWritingError =
+      error instanceof Error ? error.message : "Lean writing call failed.";
+  }
+  const supplied = suppliedEvidenceIds(messages);
+  const leanCombined = leanWritingRaw
+    ? combineLeanDecisionAndWriting({
+        decision: leanDecision,
+        writingRaw: leanWritingRaw,
+        suppliedFactIds: supplied.factIds,
+        suppliedRoleIds: supplied.roleIds,
+      })
+    : { plan: null, notes: [] };
+  const leanDecisionCall = pricedCall({
+    label: "Lean decision",
+    model: "gpt-5.6-terra",
+    usage: leanDecisionCalled.usage,
+    rates: input.rates,
+  });
+  const leanWritingCall = leanWritingUsage
+    ? pricedCall({
+        label: "Lean writing",
+        model: "gpt-5.6-luna",
+        usage: leanWritingUsage,
+        rates: input.rates,
+      })
+    : null;
   return [
     {
       id: "terra-today",
@@ -625,6 +700,20 @@ async function runPlanningSplit(input: {
       output: formatPlan(lunaToday.data),
       calls: [lunaCall],
       costUsd: lunaCall.costUsd,
+      inputPreview: "",
+    },
+    {
+      id: "lean-split",
+      label: "Lean split: terra questions and strengths, then luna",
+      output: formatLeanSplit({
+        plan: leanCombined.plan,
+        notes: leanCombined.notes,
+        writingError: leanWritingError,
+      }),
+      calls: leanWritingCall
+        ? [leanDecisionCall, leanWritingCall]
+        : [leanDecisionCall],
+      costUsd: leanDecisionCall.costUsd + (leanWritingCall?.costUsd ?? 0),
       inputPreview: "",
     },
   ];
@@ -890,6 +979,18 @@ function renderMarkdown(input: {
       EXPERIMENTAL_PLANNING_WRITING_INSTRUCTIONS,
       "```",
       "",
+      "### Lean decision (gpt-5.6-terra)",
+      "",
+      "```",
+      EXPERIMENTAL_LEAN_DECISION_INSTRUCTIONS,
+      "```",
+      "",
+      "### Lean writing (gpt-5.6-luna)",
+      "",
+      "```",
+      EXPERIMENTAL_LEAN_WRITING_INSTRUCTIONS,
+      "```",
+      "",
     );
   }
   if (input.dryRun) {
@@ -915,10 +1016,21 @@ function renderMarkdown(input: {
           lines.push(...renderCallTable(variant.calls), "");
         }
       }
+      const terraToday = step.planningVariants.find(
+        (variant) => variant.id === "terra-today",
+      );
       const split = step.planningVariants.find((variant) => variant.id === "split");
-      if (split) {
-        lines.push(`Split total: ${money(split.costUsd)}`, "");
+      const lean = step.planningVariants.find((variant) => variant.id === "lean-split");
+      if (terraToday) {
+        lines.push(`Today's terra total: ${money(terraToday.costUsd)}`);
       }
+      if (split) {
+        lines.push(`Split total: ${money(split.costUsd)}`);
+      }
+      if (lean) {
+        lines.push(`Lean split total: ${money(lean.costUsd)}`);
+      }
+      if (terraToday || split || lean) lines.push("");
       continue;
     }
     const [left, right] = step.models;

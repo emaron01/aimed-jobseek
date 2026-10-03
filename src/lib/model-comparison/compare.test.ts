@@ -95,6 +95,77 @@ vi.mock("@/lib/ai/provider", async (importOriginal) => {
           rawText: "",
         };
       }
+      if (request.schemaName === "consultation_plan_lean_decision_experiment") {
+        return {
+          data: {
+            assessments: [
+              {
+                targetKey: "gap-1",
+                strength: "PARTIAL",
+                strategyMode: "PROVE_WITH_STORY",
+              },
+            ],
+            questions: [
+              {
+                targetKey: "gap-1",
+                text: "lean decision question",
+                hiringTeamRoleId: "role-ht",
+                interviewTypeTag: "focused_competency",
+              },
+            ],
+          },
+          usage: tokenUsage(false, 40),
+          provider: "openai-responses",
+          model: stamp,
+          modelUrlIdentifier: "example",
+          rawText: "",
+        };
+      }
+      if (request.schemaName === "consultation_plan_lean_writing_experiment") {
+        return {
+          data: {
+            overall: "You stand well for this job.",
+            strongestAngles: ["Angle one", "Angle two"],
+            importantGaps: ["A gap remains."],
+            commentary: "lean writing note",
+            closingNote: null,
+            assessments: [
+              {
+                targetKey: "gap-1",
+                strength: "NONE",
+                strategyMode: "ACKNOWLEDGE",
+                supportingFactIds: ["skill_profile_marker", "invented-fact"],
+                relevantRoleIds: ["role_profile_marker", "invented-role"],
+                explanation: "Partial evidence.",
+                strategy: "Prove it with the payroll story.",
+              },
+            ],
+            questions: [
+              {
+                targetKey: "gap-1",
+                text: "rewritten question",
+                hiringTeamRoleId: "other-role",
+                interviewTypeTag: "screening",
+                whoCaresNote: "The hiring manager needs this.",
+                requirementInterpretation: null,
+              },
+              {
+                targetKey: "not-in-decision",
+                text: "extra question",
+                hiringTeamRoleId: "other-role",
+                interviewTypeTag: "screening",
+                whoCaresNote: "Ignore me.",
+                requirementInterpretation: null,
+              },
+            ],
+          },
+          usage: tokenUsage(false),
+          provider: "openai-responses",
+          model: stamp,
+          modelUrlIdentifier: "example",
+          rawText: "",
+        };
+      }
       if (request.schemaName === "consultation_plan") {
         return {
           data: {
@@ -570,7 +641,7 @@ describe.skipIf(!hasTestDatabase())(
       expect(report.markdown).toContain("wroteToDatabase: false");
     });
 
-    it("fresh builds the first round and split compares three planning variants", async () => {
+    it("fresh builds the first round and split compares four planning variants", async () => {
       if (!ready) return;
       const { prisma } = await import("@/lib/prisma-client");
       const { emptyCandidateProfile } = await import(
@@ -862,6 +933,8 @@ describe.skipIf(!hasTestDatabase())(
         "gpt-5.6-terra:consultation_plan_decision_experiment",
         "gpt-5.6-luna:consultation_plan_writing_experiment",
         "gpt-5.6-luna:consultation_plan",
+        "gpt-5.6-terra:consultation_plan_lean_decision_experiment",
+        "gpt-5.6-luna:consultation_plan_lean_writing_experiment",
       ]);
       const decision = calls[1];
       const writing = calls[2];
@@ -953,6 +1026,166 @@ describe.skipIf(!hasTestDatabase())(
       expect(splitVariant?.calls[0]?.usage.reasoningTokens).toBe(128);
       expect(splitVariant?.calls[0]?.usage.outputTokens).toBe(200);
       expect(splitVariant?.calls).toHaveLength(2);
+
+      expect(split.steps[0]?.planningVariants?.map((variant) => variant.id)).toEqual([
+        "terra-today",
+        "split",
+        "luna-today",
+        "lean-split",
+      ]);
+      const leanDecisionCall = calls[4];
+      const leanWritingCall = calls[5];
+      expect(leanWritingCall?.role).toBe("consultation_reply");
+      expect(leanWritingCall?.model).toBe("gpt-5.6-luna");
+      expect(leanDecisionCall?.model).toBe("gpt-5.6-terra");
+      const leanDecisionJson = zodToOpenAiStrictJsonSchema(
+        leanDecisionCall?.schema as Parameters<typeof zodToOpenAiStrictJsonSchema>[0],
+      );
+      const leanDecisionProperties =
+        leanDecisionJson.properties && typeof leanDecisionJson.properties === "object"
+          ? (leanDecisionJson.properties as Record<string, unknown>)
+          : {};
+      expect(Object.keys(leanDecisionProperties)).toEqual([
+        "assessments",
+        "questions",
+      ]);
+      expect(itemPropertyNames(leanDecisionProperties.assessments).sort()).toEqual([
+        "strategyMode",
+        "strength",
+        "targetKey",
+      ]);
+      expect(itemPropertyNames(leanDecisionProperties.questions).sort()).toEqual([
+        "hiringTeamRoleId",
+        "interviewTypeTag",
+        "targetKey",
+        "text",
+      ]);
+      expect(
+        leanWritingCall?.messages.some((message) =>
+          message.content.includes("lean decision question"),
+        ),
+      ).toBe(true);
+      const lean = split.steps[0]?.planningVariants?.find(
+        (variant) => variant.id === "lean-split",
+      );
+      expect(lean?.label).toBe(
+        "Lean split: terra questions and strengths, then luna",
+      );
+      expect(lean?.calls.map((call) => call.label)).toEqual([
+        "Lean decision",
+        "Lean writing",
+      ]);
+      expect(lean?.costUsd).toBeCloseTo(
+        (lean?.calls[0]?.costUsd ?? 0) + (lean?.calls[1]?.costUsd ?? 0),
+      );
+      expect(lean?.output).toContain("1. lean decision question");
+      expect(lean?.output).toContain("gap-1: PARTIAL (PROVE_WITH_STORY)");
+      expect(lean?.output).toContain("Fact ids: skill_profile_marker");
+      expect(lean?.output).toContain("Role ids: role_profile_marker");
+      expect(lean?.output).not.toMatch(/Fact ids:.*invented-fact/);
+      expect(lean?.output).not.toMatch(/Role ids:.*invented-role/);
+      expect(lean?.output).toContain("lean writing note");
+      expect(lean?.output).toContain(
+        "Restored question gap-1 text from the decision (rejected rewritten question).",
+      );
+      expect(lean?.output).toContain(
+        "Restored question gap-1 hiringTeamRoleId from the decision (rejected other-role).",
+      );
+      expect(lean?.output).toContain(
+        "Restored question gap-1 interviewTypeTag from the decision (rejected screening).",
+      );
+      expect(lean?.output).toContain(
+        "Restored assessment gap-1 strength from the decision (rejected NONE).",
+      );
+      expect(lean?.output).toContain(
+        "Restored assessment gap-1 strategyMode from the decision (rejected ACKNOWLEDGE).",
+      );
+      expect(lean?.output).toContain(
+        "Dropped supportingFactIds for gap-1 not in the supplied ids: invented-fact.",
+      );
+      expect(lean?.output).toContain(
+        "Ignored question not-in-decision because it is not in the decision.",
+      );
+      expect(split.markdown).toContain("Today's terra total:");
+      expect(split.markdown).toContain(
+        `Lean split total: $${(lean?.costUsd ?? 0).toFixed(6)}`,
+      );
+      expect(split.markdown).toContain("EXPERIMENTAL. Not production.");
+      expect(split.markdown).toContain(
+        "You decide strengths and questions only.",
+      );
+      const { consultationPlanSchema } = await import(
+        "@/lib/consultation/contract"
+      );
+      const { combineLeanDecisionAndWriting, suppliedEvidenceIds } =
+        await import("@/lib/model-comparison/plan-split-experiment");
+      const suppliedIds = suppliedEvidenceIds(
+        (leanWritingCall?.messages ?? []).flatMap((message) =>
+          message.role === "system" ||
+          message.role === "user" ||
+          message.role === "assistant"
+            ? [{ role: message.role, content: message.content }]
+            : [],
+        ),
+      );
+      const combined = combineLeanDecisionAndWriting({
+        decision: {
+          assessments: [
+            {
+              targetKey: "gap-1",
+              strength: "PARTIAL",
+              strategyMode: "PROVE_WITH_STORY",
+            },
+          ],
+          questions: [
+            {
+              targetKey: "gap-1",
+              text: "lean decision question",
+              hiringTeamRoleId: "role-ht",
+              interviewTypeTag: "focused_competency",
+            },
+          ],
+        },
+        writingRaw: {
+          overall: "You stand well for this job.",
+          strongestAngles: ["Angle one", "Angle two"],
+          importantGaps: ["A gap remains."],
+          commentary: "lean writing note",
+          closingNote: null,
+          assessments: [
+            {
+              targetKey: "gap-1",
+              strength: "NONE",
+              strategyMode: "ACKNOWLEDGE",
+              supportingFactIds: ["skill_profile_marker", "invented-fact"],
+              relevantRoleIds: ["role_profile_marker", "invented-role"],
+              explanation: "Partial evidence.",
+              strategy: "Prove it with the payroll story.",
+            },
+          ],
+          questions: [
+            {
+              targetKey: "gap-1",
+              text: "rewritten question",
+              hiringTeamRoleId: "other-role",
+              interviewTypeTag: "screening",
+              whoCaresNote: "The hiring manager needs this.",
+              requirementInterpretation: null,
+            },
+          ],
+        },
+        suppliedFactIds: suppliedIds.factIds,
+        suppliedRoleIds: suppliedIds.roleIds,
+      });
+      expect(consultationPlanSchema.safeParse(combined.plan).success).toBe(true);
+      expect(combined.plan?.questions[0]?.text).toBe("lean decision question");
+      expect(combined.plan?.assessments[0]?.strength).toBe("PARTIAL");
+      expect(combined.plan?.assessments[0]?.strategyMode).toBe("PROVE_WITH_STORY");
+      expect(combined.plan?.questions[0]?.hiringTeamRoleId).toBe("role-ht");
+      expect(combined.plan?.questions[0]?.interviewTypeTag).toBe(
+        "focused_competency",
+      );
+      expect(combined.plan?.briefing.storyPlan).toEqual([]);
     });
   },
 );
