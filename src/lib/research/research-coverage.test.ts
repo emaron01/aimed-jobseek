@@ -19,6 +19,7 @@ import {
 } from "@/lib/research/sources";
 import type { CompanyResearchInput, ResearchSource } from "@/lib/research/types";
 import { employerRisksForJobSeeker, validateCompanyResearchResult } from "@/lib/research/validate";
+import { RESEARCH_PROMPT_VERSION } from "@/lib/research/config";
 import { hasTestDatabase } from "@/test/database";
 import { prisma } from "@/lib/prisma-client";
 import { withTestTenant } from "@/test/with-test-tenant";
@@ -584,7 +585,8 @@ describe.skipIf(!hasTestDatabase())(
       }
     });
 
-    it("makes no paid call when the stored fingerprint matches", async () => {
+    it("makes no paid call when the stored fingerprint matches version 7", async () => {
+      expect(RESEARCH_PROMPT_VERSION).toBe("7");
       const company = await prisma.company.findFirstOrThrow({
         where: { organizationId, normalizedDomain: `csc-${suffix}.example` },
       });

@@ -4,6 +4,7 @@ import {
   htmlToTextSnippet,
   parseStubCanonicalUrl,
   sameRegistrableDomain,
+  WEBSITE_EVIDENCE_PER_PAGE_CHAR_CAP,
   WEBSITE_EVIDENCE_TOTAL_CHAR_BUDGET,
 } from "@/lib/research/sources";
 
@@ -14,19 +15,19 @@ describe("website evidence budget", () => {
         slot: "homepage",
         url: "https://acme.example/",
         title: "Home",
-        text: "h".repeat(2000),
+        text: "h".repeat(10_000),
       },
       {
         slot: "products",
         url: "https://acme.example/products",
         title: "Products",
-        text: "p".repeat(1200),
+        text: "p".repeat(4_000),
       },
       {
         slot: "about",
         url: "https://acme.example/about",
         title: "About",
-        text: "a".repeat(1200),
+        text: "a".repeat(4_000),
       },
     ]);
 
@@ -36,7 +37,52 @@ describe("website evidence budget", () => {
     expect(excerpts[0]?.url).toContain("/products");
     expect(excerpts[1]?.url).toContain("/about");
     const homepage = excerpts.find((e) => e.url === "https://acme.example/");
-    expect(homepage?.text.length).toBe(1600);
+    expect(homepage?.text.length).toBe(8_000);
+  });
+
+  it("cuts one page at 4,000 characters and the combined excerpts at 16,000", () => {
+    expect(WEBSITE_EVIDENCE_PER_PAGE_CHAR_CAP).toBe(4_000);
+    expect(WEBSITE_EVIDENCE_TOTAL_CHAR_BUDGET).toBe(16_000);
+    expect(htmlToTextSnippet("y".repeat(9_000)).length).toBe(4_000);
+
+    const page = "z".repeat(4_000);
+    const excerpts = allocateExcerptBudget([
+      {
+        slot: "jobFocus",
+        url: "https://acme.example/brand",
+        title: "Brand",
+        text: page,
+      },
+      {
+        slot: "products",
+        url: "https://acme.example/products",
+        title: "Products",
+        text: page,
+      },
+      {
+        slot: "about",
+        url: "https://acme.example/about",
+        title: "About",
+        text: page,
+      },
+      {
+        slot: "company",
+        url: "https://acme.example/company",
+        title: "Company",
+        text: page,
+      },
+      {
+        slot: "homepage",
+        url: "https://acme.example/",
+        title: "Home",
+        text: page,
+      },
+    ]);
+    expect(excerpts.reduce((n, excerpt) => n + excerpt.text.length, 0)).toBe(16_000);
+    expect(excerpts.every((excerpt) => excerpt.text.length === 4_000)).toBe(true);
+    expect(excerpts.some((excerpt) => excerpt.url === "https://acme.example/")).toBe(
+      false,
+    );
   });
 
   it("caps per-page text via htmlToTextSnippet", () => {

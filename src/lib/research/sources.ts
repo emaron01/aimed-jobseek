@@ -35,11 +35,11 @@ export function hasFirstPartyWebsiteEvidence(
   return bundle.excerpts.some((excerpt) => excerpt.text.trim().length > 0);
 }
 
-/** Combined excerpt budget sent to stage-1 synthesis (unchanged from single-page era). */
-export const WEBSITE_EVIDENCE_TOTAL_CHAR_BUDGET = 4000;
+/** Combined excerpt budget sent to research synthesis. */
+export const WEBSITE_EVIDENCE_TOTAL_CHAR_BUDGET = 16_000;
 
 /** Per-page extraction cap before budget ranking. */
-export const WEBSITE_EVIDENCE_PER_PAGE_CHAR_CAP = 1200;
+export const WEBSITE_EVIDENCE_PER_PAGE_CHAR_CAP = 4_000;
 
 /** Homepage shorter than this triggers one-hop canonical-domain follow. */
 export const STUB_HOMEPAGE_MAX_CHARS = 200;
@@ -100,7 +100,10 @@ function extractTitle(html: string): string | null {
   return match[1].replace(/\s+/g, " ").trim().slice(0, 200) || null;
 }
 
-export function htmlToTextSnippet(html: string, maxLen = 4000): string {
+export function htmlToTextSnippet(
+  html: string,
+  maxLen = WEBSITE_EVIDENCE_PER_PAGE_CHAR_CAP,
+): string {
   const withoutScripts = html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
