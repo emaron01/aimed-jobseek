@@ -19,19 +19,22 @@ import {
 import { finalizeResearchSources } from "@/lib/research/finalize-sources";
 import {
   anchorHostEvidenceEnough,
+  coverageSearchFocus,
   employerSearchBudget,
+  jobFocusDetailCovered,
+  missingHighlightTopics,
   shouldRunAnotherEmployerSearch,
+  topicsAddressedBySearchFocus,
+  type CoverageEvidenceInput,
+  type HighlightCoverageTopic,
 } from "@/lib/research/source-policy";
 import { buildCompanyResearchMessages } from "@/lib/research/prompt";
 import { appendSeekerSuppliedResearchEvidence } from "@/lib/research/seeker-supplied-notes";
 import {
+  fetchJobFocusPageFromHomepage,
   getCompanySourceRetriever,
   hasFirstPartyWebsiteEvidence,
 } from "@/lib/research/sources";
-import {
-  buildTargetedSearchFocus,
-  evaluateEvidenceSufficiency,
-} from "@/lib/research/sufficiency";
 import {
   categorizeResearchError,
   logResearchTelemetry,
@@ -121,8 +124,8 @@ function dedupeSources(sources: ResearchSource[]): ResearchSource[] {
 
 /**
  * Progressive evidence acquisition:
- * Known data → website prefetch synthesis (when fetch succeeds) → always web_search
- * (bounded by Organization ResearchPolicy.maxSearchQueriesPerCompany).
+ * Known data → website prefetch, including a job-focus page linked from the
+ * homepage → web search until the brief is covered or the search cap is hit.
  *
  * When first-party fetch returns nothing (403, empty), skip prefetch synthesis
  * and start with web_search immediately.
@@ -154,6 +157,8 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
       const ai = getResearchAiProvider();
       const retriever = getCompanySourceRetriever();
       const websiteEvidence = await retriever.retrieve(input);
+      const homepageHtml = websiteEvidence.homepageHtml ?? null;
+      const homepageUrl = websiteEvidence.homepageUrl ?? null;
       const webSearchAvailable = config.provider === "openai-responses";
       const hasFirstPartyEvidence =
         hasFirstPartyWebsiteEvidence(websiteEvidence);
@@ -180,19 +185,38 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
           input.postingUrl?.trim() ||
           input.postingText?.trim(),
       );
+      const searchedTopics = new Set<HighlightCoverageTopic>();
+      const coverageInput = (
+        result: CompanyResearchResult | undefined,
+      ): CoverageEvidenceInput => ({
+        anchorHost: input.normalizedDomain,
+        sources: result?.sources ?? [],
+        excerpts: evidence.excerpts,
+        companySummary: result?.companySummary ?? null,
+        whatTheySell: result?.whatTheySell ?? null,
+        businessModel: result?.businessModel ?? null,
+        companySizeContext: result?.companySizeContext ?? null,
+        jobFocus: result?.jobFocus ?? null,
+        jobFocusDetail: result?.jobFocusDetail ?? null,
+        postingProvided,
+        postingText: input.postingText,
+        topicsRecordedNotFound: [...searchedTopics],
+      });
       const evidenceEnough = (result: CompanyResearchResult | undefined) =>
-        Boolean(
-          result &&
-            anchorHostEvidenceEnough({
-              anchorHost: input.normalizedDomain,
-              sources: result.sources,
-              companySummary: result.companySummary,
-              whatTheySell: result.whatTheySell,
-              jobFocus: result.jobFocus ?? null,
-              jobFocusDetail: result.jobFocusDetail ?? null,
-              postingProvided,
-            }),
-        );
+        Boolean(result && anchorHostEvidenceEnough(coverageInput(result)));
+      const recordSearchedTopics = (focus: string) => {
+        for (const topic of topicsAddressedBySearchFocus(focus)) {
+          searchedTopics.add(topic);
+        }
+      };
+      const nextSearchFocus = (result: CompanyResearchResult | undefined) => {
+        const snapshot = coverageInput(result);
+        return coverageSearchFocus({
+          missingTopics: missingHighlightTopics(snapshot),
+          jobFocus: result?.jobFocus ?? null,
+          needJobFocusPage: postingProvided && !jobFocusDetailCovered(snapshot),
+        });
+      };
 
       const runStage = async (opts: {
         stage: "initial" | "follow_up";
@@ -259,6 +283,7 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
         const validated = validateCompanyResearchResult(
           response.data,
           evidence,
+          { postingText: input.postingText },
         );
         assertResearchConfidenceAllowed(validated);
         const next: CompanyResearchResult = {
@@ -291,6 +316,7 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
           searchesRemaining: Math.max(0, maxQueries - totalWebSearchCalls),
           webSearchEnabled: true,
         });
+        recordSearchedTopics(initialFocus);
 
         while (
           shouldRunAnotherEmployerSearch({
@@ -299,27 +325,14 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
             enough: evidenceEnough(current),
           })
         ) {
-          const sufficiency = evaluateEvidenceSufficiency({
-            sources: current?.sources ?? [],
-            fields: current ?? {
-              companySummary: null,
-              whatTheySell: null,
-              customerTypes: [],
-              businessModel: null,
-              companySizeContext: null,
-            },
-            maxSourcesPerCompany: depth.maxSourcesPerCompany,
-          });
-          const focus = buildTargetedSearchFocus(
-            sufficiency.missingPrimary,
-            sufficiency.missingSecondary,
-          );
+          const focus = nextSearchFocus(current);
           current = await runStage({
             stage: "follow_up",
             searchFocus: focus,
             searchesRemaining: Math.max(0, maxQueries - totalWebSearchCalls),
             webSearchEnabled: true,
           });
+          recordSearchedTopics(focus);
         }
 
         stoppedReason = evidenceEnough(current) ? "sufficient" : "max_queries";
@@ -333,13 +346,38 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
         });
         stoppedReason = "no_web_search";
       } else if (skipWebsiteOnlySynthesis) {
-        await runWebSearchStages(WEBSITE_FETCH_UNAVAILABLE_FOCUS, "initial");
+        await runWebSearchStages(
+          `${WEBSITE_FETCH_UNAVAILABLE_FOCUS} ${nextSearchFocus(current)}`,
+          "initial",
+        );
       } else {
         current = await runStage({
           stage: "initial",
           searchesRemaining: maxQueries,
           webSearchEnabled: false,
         });
+        if (
+          current.jobFocus?.trim() &&
+          homepageHtml &&
+          homepageUrl &&
+          !jobFocusDetailCovered(coverageInput(current))
+        ) {
+          const extra = await fetchJobFocusPageFromHomepage({
+            html: homepageHtml,
+            pageUrl: homepageUrl,
+            anchorHost: input.normalizedDomain,
+            subject: current.jobFocus,
+            skipUrls: evidence.sources.map((source) => source.url),
+          });
+          if (extra && extra.excerpts.length > 0) {
+            evidence = mergeEvidenceBundles(evidence, extra);
+            current = await runStage({
+              stage: "initial",
+              searchesRemaining: maxQueries,
+              webSearchEnabled: false,
+            });
+          }
+        }
 
         const websiteGate = evaluateWebsiteFirstSufficiency({
           websiteExcerptText,
@@ -351,11 +389,7 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
         if (evidenceEnough(current)) {
           stoppedReason = "website_sufficient";
         } else {
-          const searchFocus = websiteGate.sufficient
-            ? "Company highlights and the part of the company this job serves."
-            : websiteGate.failReasons.join("; ") ||
-              "Company highlights and the part of the company this job serves.";
-          await runWebSearchStages(searchFocus, "follow_up");
+          await runWebSearchStages(nextSearchFocus(current), "follow_up");
         }
       }
 

@@ -16,6 +16,65 @@ function normalizeUrl(url: string): string {
   }
 }
 
+const POSTING_INCONSISTENCY =
+  /\b(inconsist\w*|discrepan\w*|contradict\w*|workforce figures|conflicting (figures|numbers|headcount|employee counts)|posting (lists|says|states|claims|shows))\b/i;
+
+const JOB_REQUIREMENT =
+  /\b((role|job|position) (requires|demands|needs)|must have|years of experience|qualifications?|job(?:'s|’s)? demands|role requirements)\b/i;
+
+/** Company events a job seeker should see. Posting noise is not in this list. */
+const REAL_EMPLOYER_RISK =
+  /\b(layoffs?|laid off|restructur\w*|bankrupt\w*|insolven\w*|lawsuits?|litigation|sued|regulatory|regulators?|investigation|turnover|resign\w*|stepped down|financial trouble|funding trouble|debt|shutdown|shut down)\b/i;
+
+function mostlyPostingText(risk: string, posting: string): boolean {
+  const riskNorm = risk.toLowerCase().replace(/\s+/g, " ").trim();
+  const postingNorm = posting.toLowerCase().replace(/\s+/g, " ").trim();
+  if (riskNorm.length >= 12 && postingNorm.includes(riskNorm)) return true;
+  const words = riskNorm.match(/[a-z0-9]{3,}/g) ?? [];
+  if (words.length < 4) return false;
+  const postingWords = new Set(postingNorm.match(/[a-z0-9]{3,}/g) ?? []);
+  const overlap = words.filter((word) => postingWords.has(word)).length;
+  return overlap / words.length >= 0.75;
+}
+
+function sentenceIsEmployerRisk(
+  sentence: string,
+  postingText: string | null | undefined,
+): boolean {
+  const text = sentence.trim();
+  if (!text) return false;
+  if (POSTING_INCONSISTENCY.test(text)) return false;
+  if (JOB_REQUIREMENT.test(text) && !REAL_EMPLOYER_RISK.test(text)) return false;
+  const posting = postingText?.trim();
+  if (posting && mostlyPostingText(text, posting) && !REAL_EMPLOYER_RISK.test(text)) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Employer risk is only a real risk for a job seeker. Inconsistencies in the
+ * posting and the job's own requirements are removed. A company event such as
+ * layoffs stays even when the posting also mentions it.
+ */
+export function employerRisksForJobSeeker(
+  risks: string[],
+  postingText?: string | null,
+): string[] {
+  const kept: string[] = [];
+  for (const risk of risks) {
+    const sentences = risk
+      .split(/(?<=[.!])\s+/)
+      .map((sentence) => sentence.trim())
+      .filter(Boolean);
+    const good = (sentences.length > 0 ? sentences : [risk]).filter((sentence) =>
+      sentenceIsEmployerRisk(sentence, postingText),
+    );
+    if (good.length > 0) kept.push(good.join(" "));
+  }
+  return kept;
+}
+
 function hasSubstantiveFindings(result: CompanyResearchAiResult): boolean {
   return Boolean(
     result.companySummary ||
@@ -41,6 +100,7 @@ function hasSubstantiveFindings(result: CompanyResearchAiResult): boolean {
 export function validateCompanyResearchResult(
   raw: CompanyResearchAiResult,
   evidence: RetrievedEvidenceBundle,
+  options?: { postingText?: string | null },
 ): CompanyResearchResult {
   const allowed = new Map(
     evidence.sources.map((source) => [normalizeUrl(source.url), source]),
@@ -112,7 +172,7 @@ export function validateCompanyResearchResult(
     relevantTechnologies: raw.relevantTechnologies,
     buyingSignals: [],
     hiringSignals: raw.hiringSignals,
-    riskSignals: raw.riskSignals,
+    riskSignals: employerRisksForJobSeeker(raw.riskSignals, options?.postingText),
     jobFocus: raw.jobFocus,
     jobFocusDetail: raw.jobFocusDetail,
     confidence,

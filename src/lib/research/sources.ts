@@ -2,6 +2,12 @@ import {
   assertSafeExternalHttpUrl,
   safeFetchHttp,
 } from "@/lib/research/url-safety";
+import {
+  distinctiveTokens,
+  hostIsAnchorOrSubdomain,
+  isHomepageResearchUrl,
+  researchSourceHost,
+} from "@/lib/research/source-policy";
 import type {
   CompanyResearchInput,
   ResearchSource,
@@ -17,6 +23,9 @@ export type SourceExcerpt = {
 export type RetrievedEvidenceBundle = {
   sources: ResearchSource[];
   excerpts: SourceExcerpt[];
+  /** Homepage HTML for a later job-focus link lookup. Not sent to the model. */
+  homepageHtml?: string | null;
+  homepageUrl?: string | null;
 };
 
 /** True when at least one first-party page returned usable body text. */
@@ -35,10 +44,16 @@ export const WEBSITE_EVIDENCE_PER_PAGE_CHAR_CAP = 1200;
 /** Homepage shorter than this triggers one-hop canonical-domain follow. */
 export const STUB_HOMEPAGE_MAX_CHARS = 200;
 
-export type WebsitePageSlot = "products" | "about" | "company" | "homepage";
+export type WebsitePageSlot =
+  | "jobFocus"
+  | "products"
+  | "about"
+  | "company"
+  | "homepage";
 
-/** Fill combined budget from highest-value pages first. */
+/** Fill combined budget from highest-value pages first. Job-focus pages lead. */
 export const WEBSITE_PAGE_BUDGET_RANK: WebsitePageSlot[] = [
+  "jobFocus",
   "products",
   "about",
   "company",
@@ -167,6 +182,55 @@ export function parseStubCanonicalUrl(
     return safety.href;
   }
   return null;
+}
+
+function urlsMatch(left: string, right: string): boolean {
+  return left.replace(/\/$/, "").toLowerCase() === right.replace(/\/$/, "").toLowerCase();
+}
+
+/**
+ * Same-host page linked from the homepage whose path or anchor text names the
+ * part of the company (job focus, or the posting when the focus is not known yet).
+ * Homepages and off-site links are skipped. One best match.
+ */
+export function selectJobFocusPageUrl(input: {
+  html: string;
+  pageUrl: string;
+  anchorHost: string | null;
+  subject: string;
+}): string | null {
+  const tokens = distinctiveTokens(input.subject);
+  if (!input.anchorHost || tokens.length === 0) return null;
+
+  const hrefRe = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let best: { url: string; score: number } | null = null;
+  let match: RegExpExecArray | null;
+  while ((match = hrefRe.exec(input.html))) {
+    const raw = match[1]?.trim() ?? "";
+    if (!raw || raw.startsWith("#") || /^javascript:/i.test(raw) || /^mailto:/i.test(raw)) {
+      continue;
+    }
+    let resolved: URL;
+    try {
+      resolved = new URL(raw, input.pageUrl);
+    } catch {
+      continue;
+    }
+    if (resolved.protocol !== "https:" && resolved.protocol !== "http:") continue;
+    const host = researchSourceHost(resolved.href);
+    if (!host || !hostIsAnchorOrSubdomain(host, input.anchorHost)) continue;
+    const safety = assertSafeExternalHttpUrl(resolved.href);
+    if (!safety.ok) continue;
+    if (isHomepageResearchUrl(safety.href)) continue;
+    if (urlsMatch(safety.href, input.pageUrl)) continue;
+
+    const anchorText = match[2]!.replace(/<[^>]+>/g, " ");
+    const haystack = `${resolved.pathname} ${anchorText}`.toLowerCase();
+    const score = tokens.filter((token) => haystack.includes(token)).length;
+    if (score === 0) continue;
+    if (!best || score > best.score) best = { url: safety.href, score };
+  }
+  return best?.url ?? null;
 }
 
 export function allocateExcerptBudget(
@@ -302,6 +366,23 @@ export async function retrieveWebsiteEvidence(
     }
   }
 
+  const homePage = pages.find((page) => page.slot === "homepage") ?? homepage;
+  const anchorHost = researchSourceHost(homePage.url);
+  const subject = [input.postingTitle, input.postingText]
+    .map((value) => value?.trim() ?? "")
+    .filter(Boolean)
+    .join(" ");
+  const jobFocusUrl = selectJobFocusPageUrl({
+    html: homePage.html,
+    pageUrl: homePage.url,
+    anchorHost,
+    subject,
+  });
+  const jobFocusPage = jobFocusUrl
+    ? await fetchWebsitePage(jobFocusUrl, "jobFocus", timeoutMs)
+    : null;
+  if (jobFocusPage) pages.push(jobFocusPage);
+
   const [products, about, company] = await Promise.all([
     fetchFirstPathOk(
       origin,
@@ -350,7 +431,58 @@ export async function retrieveWebsiteEvidence(
       supports: [],
     }));
 
-  return { sources, excerpts };
+  const keptHome = pages.find((page) => page.slot === "homepage") ?? homepage;
+  return {
+    sources,
+    excerpts,
+    homepageHtml: keptHome.html,
+    homepageUrl: keptHome.url,
+  };
+}
+
+/**
+ * Fetch one anchor-host job-focus page linked from homepage HTML.
+ * Used after the model names the part of the company, when the posting
+ * text did not already select that link. Stays inside the per-page cap.
+ */
+export async function fetchJobFocusPageFromHomepage(input: {
+  html: string;
+  pageUrl: string;
+  anchorHost: string | null;
+  subject: string;
+  timeoutMs?: number;
+  skipUrls?: string[];
+}): Promise<RetrievedEvidenceBundle | null> {
+  const url = selectJobFocusPageUrl({
+    html: input.html,
+    pageUrl: input.pageUrl,
+    anchorHost: input.anchorHost,
+    subject: input.subject,
+  });
+  if (!url) return null;
+  if ((input.skipUrls ?? []).some((existing) => urlsMatch(existing, url))) {
+    return null;
+  }
+  const page = await fetchWebsitePage(
+    url,
+    "jobFocus",
+    input.timeoutMs ?? 12_000,
+  );
+  if (!page) return null;
+  const retrievedAt = new Date().toISOString();
+  return {
+    sources: [
+      {
+        url: page.url,
+        title: page.title,
+        publisher: null,
+        sourceType: "COMPANY_WEBSITE",
+        retrievedAt,
+        supports: [],
+      },
+    ],
+    excerpts: [{ url: page.url, title: page.title, text: page.text }],
+  };
 }
 
 /** Legacy single-page fetch — used only for before/after retrieval probes. */

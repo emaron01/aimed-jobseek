@@ -164,11 +164,14 @@ describe("tailored application research brief and search", () => {
       companySummary: "CSC provides domain and digital-risk services.",
       whatTheySell: "Digital brand protection",
       jobFocus: "digital brand protection, domain, and digital-risk",
-      jobFocusDetail: "The sales role serves that business.",
+      jobFocusDetail:
+        "The brand-protection business sells domain security to enterprises.",
       postingProvided: true,
+      postingText: "Senior Director of Sales.",
       sources: [
         source({
-          url: "https://www.cscglobal.com/services",
+          url: "https://www.cscglobal.com/services/digital-brand-protection",
+          title: "CSC CEO, 2026 results, public ownership, and competitors",
           supports: ["companySummary", "jobFocus", "jobFocusDetail"],
         }),
       ],
