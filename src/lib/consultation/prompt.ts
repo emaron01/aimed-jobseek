@@ -202,6 +202,16 @@ export function buildConsultationPolishMessages(input: {
     question: string;
     content: string;
   } | null;
+  companyResearch?: {
+    companySummary: string | null;
+    whatTheySell: string | null;
+    businessModel: string | null;
+    companySizeContext: string | null;
+    hiringSignals: string[];
+    riskSignals: string[];
+    jobFocus: string | null;
+    jobFocusDetail: string | null;
+  } | null;
   voiceSamples?: Array<{ label: string; sampleText: string }>;
   careerStage: CareerStage;
   profileItems: Array<{
@@ -246,6 +256,9 @@ export function buildConsultationPolishMessages(input: {
         declinedFollowUp: input.declinedFollowUp,
         confirmedGap: input.confirmedGap === true,
         whyThisCompany: input.whyThisCompany === true,
+        ...(input.whyThisCompany
+          ? { companyResearch: input.companyResearch ?? null }
+          : {}),
         target: input.target ?? null,
         targetStrength: input.targetStrength ?? null,
         supportingEvidence: input.supportingEvidence ?? [],

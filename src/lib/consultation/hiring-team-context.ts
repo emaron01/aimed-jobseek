@@ -21,7 +21,7 @@ import {
 import { isHiringTeamPersonaBuilt } from "@/lib/hiring-team/build";
 import { parsePersonPrepAnswers } from "@/lib/interview/person-prep";
 import { prisma } from "@/lib/prisma-client";
-import { usableEmployerResearch } from "@/lib/job-requirement/identity-verification";
+import { loadApplicationEmployerResearch } from "@/lib/application/employer-research-reader";
 import { parseStringArray } from "@/lib/research";
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -376,31 +376,28 @@ export async function loadCoachCompanyResearch(
   organizationId: string,
   campaignId: string,
 ): Promise<CoachCompanyResearch | null> {
-  const requirement = await prisma.jobRequirement.findFirst({
-    where: { organizationId, campaignId },
-    include: {
-      company: {
-        include: { research: { orderBy: { updatedAt: "desc" }, take: 1 } },
-      },
-    },
+  const research = await loadApplicationEmployerResearch({
+    organizationId,
+    campaignId,
   });
-  if (!requirement) return null;
-  const researchRow = requirement.company?.research[0] ?? null;
-  const research = usableEmployerResearch(requirement, researchRow);
   if (!research) return null;
   const summary = trimmed(research.companySummary);
   const whatTheySell = trimmed(research.whatTheySell);
   const businessModel = trimmed(research.businessModel);
   const companySizeContext = trimmed(research.companySizeContext);
-  const hiringSignals = parseStringArray(research.hiringSignals);
-  const riskSignals = parseStringArray(research.riskSignals);
+  const hiringSignals = research.hiringSignals;
+  const riskSignals = research.riskSignals;
+  const jobFocus = trimmed(research.jobFocus);
+  const jobFocusDetail = trimmed(research.jobFocusDetail);
   if (
     !summary &&
     !whatTheySell &&
     !businessModel &&
     !companySizeContext &&
     hiringSignals.length === 0 &&
-    riskSignals.length === 0
+    riskSignals.length === 0 &&
+    !jobFocus &&
+    !jobFocusDetail
   ) {
     return null;
   }
@@ -411,5 +408,7 @@ export async function loadCoachCompanyResearch(
     companySizeContext,
     hiringSignals,
     riskSignals,
+    jobFocus,
+    jobFocusDetail,
   };
 }

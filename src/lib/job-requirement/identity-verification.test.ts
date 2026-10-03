@@ -244,8 +244,13 @@ describe("employer identity verification", () => {
     const hiringTeam = readFileSync("src/lib/hiring-team/build.ts", "utf8");
     const context = readFileSync("src/lib/generation/context.ts", "utf8");
     const summary = readFileSync("src/lib/application-summary/service.ts", "utf8");
-    expect(hiringTeam).toContain("usableEmployerResearch");
-    expect(context).toContain("usableEmployerResearch");
-    expect(summary).toContain("usableEmployerResearch");
+    const reader = readFileSync(
+      "src/lib/application/employer-research-reader.ts",
+      "utf8",
+    );
+    for (const source of [hiringTeam, context, summary]) {
+      expect(source).toContain("loadApplicationEmployerResearch");
+    }
+    expect(reader).toContain("usableEmployerResearch");
   });
 });

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { generateApplicationPageMetadata } from "@/lib/application/page-metadata";
 import { generateApplicationSummaryAction } from "@/app/actions/application-summary";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
+import { CheatSheetCompanyResearch } from "@/components/ApplicationCompanyBriefing";
 import {
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
@@ -362,12 +363,13 @@ export default async function ApplicationSummaryPage({
 
       <CheatSheetSharedSection>
       <CheatSheetSection id="company" title={applicationSummaryConfig.sections.company}>
-        <div>
-          <h3 className="font-medium text-ink">What they do</h3>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-ink">
-            {view.research?.whatTheySell ?? view.research?.companySummary ?? "Not available."}
-          </p>
-        </div>
+        <CheatSheetCompanyResearch
+          companySummary={view.research?.companySummary ?? null}
+          whatTheySell={view.research?.whatTheySell ?? null}
+          jobFocus={view.research?.jobFocus ?? null}
+          jobFocusDetail={view.research?.jobFocusDetail ?? null}
+          sources={view.research?.researchSources ?? []}
+        />
         <div>
           <h3 className="font-medium text-ink">Customers</h3>
           <TextList items={lines(view.research?.customerTypes)} />

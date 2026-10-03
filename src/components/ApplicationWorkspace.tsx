@@ -11,6 +11,7 @@ import {
   employerSitePrefillFromPostingUrl,
   employerWebsiteAnchor,
 } from "@/lib/application/company-website";
+import { loadApplicationEmployerResearch } from "@/lib/application/employer-research-reader";
 import { ApplicationResearchStatus } from "@/components/ApplicationResearchStatus";
 import { ApplicationFitOverride } from "@/components/ApplicationFitOverride";
 import {
@@ -366,9 +367,17 @@ export async function ApplicationWorkspace({
     organizationId,
     campaignId,
   });
-  const research = requirement.company?.research[0] ?? null;
+  const sharedResearch = requirement.company?.research[0] ?? null;
+  const employerResearch = await loadApplicationEmployerResearch({
+    organizationId,
+    campaignId,
+  });
+  const research = employerResearch ?? sharedResearch;
   const researchAnchored = (() => {
-    const stamped = anchorHostFromResearchTimings(research?.researchStageTimings);
+    if (employerResearch?.source === "tailored") return true;
+    const stamped = anchorHostFromResearchTimings(
+      sharedResearch?.researchStageTimings,
+    );
     return Boolean(
       stamped && researchAnchor && stamped === researchAnchor.domain,
     );
@@ -629,6 +638,8 @@ export async function ApplicationWorkspace({
             relevantTechnologies: research?.relevantTechnologies ?? [],
             hiringSignals: research?.hiringSignals ?? [],
             riskSignals: research?.riskSignals ?? [],
+            jobFocus: employerResearch?.jobFocus ?? null,
+            jobFocusDetail: employerResearch?.jobFocusDetail ?? null,
           }}
           sources={
             Array.isArray(research?.researchSources)

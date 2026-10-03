@@ -6,6 +6,11 @@
 
 import { z } from "zod";
 import {
+  employerResearchModelInput,
+  loadApplicationEmployerResearch,
+  type EmployerResearchModelInput,
+} from "@/lib/application/employer-research-reader";
+import {
   fingerprintPaidCallInputs,
   findPaidCallReceipt,
   runPaidStructuredCall,
@@ -217,9 +222,10 @@ function scorecardFingerprintSlice(scorecardJson: unknown) {
   };
 }
 
-/** Job inputs only — profile changes do not change this fingerprint. */
+/** Job inputs plus employer research. Profile changes do not change this fingerprint. */
 export function roleExpertiseJobFingerprint(
   job: RoleExpertiseJobInputs,
+  employerResearch: EmployerResearchModelInput | null = null,
 ): string {
   return fingerprintPaidCallInputs({
     promptVersion: ROLE_EXPERTISE_PROMPT_VERSION,
@@ -233,6 +239,7 @@ export function roleExpertiseJobFingerprint(
     preferredItems: parseStringArray(job.preferredItems),
     responsibilities: parseStringArray(job.responsibilities),
     scorecard: scorecardFingerprintSlice(job.scorecardJson),
+    employerResearch,
   });
 }
 
@@ -243,6 +250,7 @@ export function roleExpertiseAnswersFingerprint(
     statementId: string | null;
     contentHash: string | null;
   } | null>,
+  employerResearch: EmployerResearchModelInput | null = null,
 ): string {
   return fingerprintPaidCallInputs({
     promptVersion: ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION,
@@ -255,7 +263,27 @@ export function roleExpertiseAnswersFingerprint(
         contentHash: null,
       },
     })),
+    employerResearch,
   });
+}
+
+function employerResearchFromJobSources(
+  jobSources: Record<string, unknown>,
+): EmployerResearchModelInput | null {
+  const value = jobSources.employerResearch;
+  if (!value || typeof value !== "object") return null;
+  return value as EmployerResearchModelInput;
+}
+
+async function employerResearchForCampaign(
+  organizationId: string,
+  campaignId: string,
+): Promise<EmployerResearchModelInput | null> {
+  const view = await loadApplicationEmployerResearch({
+    organizationId,
+    campaignId,
+  });
+  return view ? employerResearchModelInput(view) : null;
 }
 
 /** Ask Harper stores one General question. The tag is required by the answers schema and is not shown. */
@@ -566,7 +594,7 @@ function mergeQuestionsWithAnswers(
   });
 }
 
-function buildRoleExpertiseQuestionsMessages(input: {
+export function buildRoleExpertiseQuestionsMessages(input: {
   minCount: number;
   maxCount: number;
   askedQuestions: AskedConsultationQuestion[];
@@ -599,7 +627,7 @@ ${ROLE_EXPERTISE_QUESTIONS_SYSTEM_INSTRUCTIONS}`,
   ];
 }
 
-function buildRoleExpertiseAnswersMessages(input: {
+export function buildRoleExpertiseAnswersMessages(input: {
   questions: ValidatedRoleExpertiseQuestionChoice[];
   careerStage: CareerStage;
   jobSources: Record<string, unknown>;
@@ -729,7 +757,10 @@ async function generateRoleExpertiseQuestionsStep(input: {
     };
   }
 
-  const fingerprint = roleExpertiseJobFingerprint(input.job);
+  const fingerprint = roleExpertiseJobFingerprint(
+    input.job,
+    employerResearchFromJobSources(input.jobSources),
+  );
   let qualityFeedback: string[] = [];
   let lastValid: ValidatedRoleExpertiseQuestionChoice[] = [];
 
@@ -1007,6 +1038,7 @@ async function generateRoleExpertiseAnswersStep(input: {
   const fingerprint = roleExpertiseAnswersFingerprint(
     choicePayload,
     libraryMatches.map((match) => harperLibraryFingerprintMatch(match)),
+    employerResearchFromJobSources(input.jobSources),
   );
   let qualityFeedback: string[] = [];
   let lastValid: ValidatedRoleExpertiseQuestion[] = [];
@@ -1183,6 +1215,10 @@ export async function generateAskHarperSuggestedAnswer(input: {
     return { ok: false, message: "A role-expertise question was empty." };
   }
   const kind = askHarperAnswerKind(text);
+  const employerResearch = await employerResearchForCampaign(
+    input.organizationId,
+    input.campaignId,
+  );
   const jobSources = {
     title: input.job.title,
     employer: input.job.companyName,
@@ -1193,6 +1229,7 @@ export async function generateAskHarperSuggestedAnswer(input: {
     preferredItems: parseStringArray(input.job.preferredItems),
     responsibilities: parseStringArray(input.job.responsibilities),
     scorecard: scorecardFingerprintSlice(input.job.scorecardJson),
+    employerResearch,
   };
   const answersStep = await generateRoleExpertiseAnswersStep({
     organizationId: input.organizationId,
@@ -1272,6 +1309,10 @@ export async function generateRoleExpertiseWithModel(input: {
     };
   }
 
+  const employerResearch = await employerResearchForCampaign(
+    input.organizationId,
+    input.campaignId,
+  );
   const jobSources = {
     title: input.job.title,
     employer: input.job.companyName,
@@ -1282,6 +1323,7 @@ export async function generateRoleExpertiseWithModel(input: {
     preferredItems: parseStringArray(input.job.preferredItems),
     responsibilities: parseStringArray(input.job.responsibilities),
     scorecard: scorecardFingerprintSlice(input.job.scorecardJson),
+    employerResearch,
   };
 
   const questionsStep = await generateRoleExpertiseQuestionsStep({
@@ -1454,7 +1496,11 @@ export async function hasUsableRoleExpertiseReceipt(input: {
   minCount: number;
   maxCount: number;
 }): Promise<boolean> {
-  const fingerprint = roleExpertiseJobFingerprint(input.job);
+  const employerResearch = await employerResearchForCampaign(
+    input.organizationId,
+    input.campaignId,
+  );
+  const fingerprint = roleExpertiseJobFingerprint(input.job, employerResearch);
   const receipt = await findPaidCallReceipt({
     organizationId: input.organizationId,
     operation: "ROLE_EXPERTISE_QUESTIONS",

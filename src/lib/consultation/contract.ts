@@ -182,6 +182,10 @@ export type CoachCompanyResearch = {
   companySizeContext: string | null;
   hiringSignals: string[];
   riskSignals: string[];
+  /** Part of the company this job serves. Null on shared-company fallback. */
+  jobFocus?: string | null;
+  /** In-depth detail on that part. Null on shared-company fallback. */
+  jobFocusDetail?: string | null;
 };
 
 /** The built general persona for a Hiring Team role. Null until the role is built. */

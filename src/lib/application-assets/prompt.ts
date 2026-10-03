@@ -90,6 +90,8 @@ function companyResearchPrefix(context: ReadyApplicationGenerationContext) {
     companySizeContext: research.companySizeContext,
     hiringSignals: research.hiringSignals,
     riskSignals: research.riskSignals,
+    jobFocus: research.jobFocus ?? null,
+    jobFocusDetail: research.jobFocusDetail ?? null,
   };
 }
 

@@ -4,7 +4,7 @@ import { parseCandidateProfileSafe, type CandidateProfile } from "@/lib/product-
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
 import { vocab } from "@/lib/product-config";
-import { usableEmployerResearch } from "@/lib/job-requirement/identity-verification";
+import { loadApplicationEmployerResearch } from "@/lib/application/employer-research-reader";
 
 export type GenerationSource = {
   id: string;
@@ -80,6 +80,8 @@ export type ApplicationGenerationContext = {
     companySizeContext: string | null;
     hiringSignals: string[];
     riskSignals: string[];
+    jobFocus?: string | null;
+    jobFocusDetail?: string | null;
     researchSources: unknown;
     updatedAt: Date;
   } | null;
@@ -236,10 +238,10 @@ export async function loadApplicationGenerationContext(
     select: { id: true, label: true, sampleText: true, createdAt: true },
   });
   const requirement = campaign.jobRequirement;
-  const research = usableEmployerResearch(
-    requirement ?? {},
-    requirement?.company?.research[0] ?? null,
-  );
+  const research = await loadApplicationEmployerResearch({
+    organizationId,
+    campaignId: campaign.id,
+  });
   const sources: GenerationSource[] = [];
   if (parsedProfile.ok) {
     for (const item of profileEvidenceItems(parsedProfile.profile)) {
@@ -318,6 +320,8 @@ export async function loadApplicationGenerationContext(
         research.whatTheySell,
         research.businessModel,
         research.companySizeContext,
+        research.jobFocus,
+        research.jobFocusDetail,
         ...parseStringArray(research.customerTypes),
         ...parseStringArray(research.primaryMarkets),
         ...parseStringArray(research.hiringSignals),
@@ -401,6 +405,8 @@ export async function loadApplicationGenerationContext(
           companySizeContext: research.companySizeContext,
           hiringSignals: parseStringArray(research.hiringSignals),
           riskSignals: parseStringArray(research.riskSignals),
+          jobFocus: research.jobFocus,
+          jobFocusDetail: research.jobFocusDetail,
           researchSources: research.researchSources,
           updatedAt: research.updatedAt,
         }

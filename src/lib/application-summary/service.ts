@@ -67,7 +67,7 @@ import {
 } from "@/lib/product-research/candidate-profile";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
-import { usableEmployerResearch } from "@/lib/job-requirement/identity-verification";
+import { loadApplicationEmployerResearch } from "@/lib/application/employer-research-reader";
 
 export type SummarySource = {
   id: string;
@@ -387,10 +387,10 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
           orderBy: { createdAt: "asc" },
         })
       : [];
-  const research = usableEmployerResearch(
-    campaign.jobRequirement,
-    campaign.jobRequirement.company?.research[0] ?? null,
-  );
+  const research = await loadApplicationEmployerResearch({
+    organizationId,
+    campaignId,
+  });
   const roles = campaign.hiringTeamRoles.map((role) => ({
     id: role.id,
     name: role.name,
@@ -582,6 +582,13 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
     for (const [index, signal] of parseStringArray(research.riskSignals).entries()) {
       appendSource(sources, `research:risk:${index}`, signal, "COMPANY");
     }
+    appendSource(sources, "research:job-focus", research.jobFocus, "COMPANY");
+    appendSource(
+      sources,
+      "research:job-focus-detail",
+      research.jobFocusDetail,
+      "COMPANY",
+    );
   }
   for (const role of roles) {
     appendSource(sources, `persona:${role.id}:reason`, role.reason, "PERSONA");

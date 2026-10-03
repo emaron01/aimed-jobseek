@@ -27,7 +27,7 @@ import type { ApplicationJobPayload } from "@/lib/application-jobs/types";
 import { mergeExistingHiringTeamRoles } from "@/lib/hiring-team/merge-existing";
 import { prisma } from "@/lib/prisma-client";
 import { hiringTeamConfig, vocab } from "@/lib/product-config";
-import { usableEmployerResearch } from "@/lib/job-requirement/identity-verification";
+import { loadApplicationEmployerResearch } from "@/lib/application/employer-research-reader";
 import type { JobScorecard, ScorecardItem } from "@/lib/job-requirement/types";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
@@ -124,12 +124,14 @@ async function loadApplication(organizationId: string, campaignId: string) {
     },
   });
   if (!requirement) return { campaign, requirement: null, job: null, research: null, includeResearch: false };
-  const researchRow = requirement.company?.research[0] ?? null;
-  const confirmedResearch = usableEmployerResearch(requirement, researchRow);
+  const employerResearch = await loadApplicationEmployerResearch({
+    organizationId,
+    campaignId: campaign.id,
+  });
   const includeResearch =
     requirement.employerDisposition === "IDENTIFIED" &&
-    confirmedResearch != null &&
-    (confirmedResearch.status === "COMPLETED" || confirmedResearch.status === "PARTIAL");
+    employerResearch != null &&
+    (employerResearch.status === "COMPLETED" || employerResearch.status === "PARTIAL");
   const job: HiringTeamJobEvidence = {
     title: requirement.title,
     companyName: requirement.companyName,
@@ -143,15 +145,18 @@ async function loadApplication(organizationId: string, campaignId: string) {
     preferredItems: parseStringArray(requirement.preferredItems),
     scorecard: readScorecard(requirement.scorecardJson),
   };
-  const research: HiringTeamResearchEvidence | null = researchRow
-    ? {
-        companySummary: researchRow.companySummary,
-        whatTheySell: researchRow.whatTheySell,
-        businessModel: researchRow.businessModel,
-        hiringSignals: parseStringArray(researchRow.hiringSignals),
-        riskSignals: parseStringArray(researchRow.riskSignals),
-      }
-    : null;
+  const research: HiringTeamResearchEvidence | null =
+    includeResearch && employerResearch
+      ? {
+          companySummary: employerResearch.companySummary,
+          whatTheySell: employerResearch.whatTheySell,
+          businessModel: employerResearch.businessModel,
+          hiringSignals: employerResearch.hiringSignals,
+          riskSignals: employerResearch.riskSignals,
+          jobFocus: employerResearch.jobFocus,
+          jobFocusDetail: employerResearch.jobFocusDetail,
+        }
+      : null;
   return { campaign, requirement, job, research, includeResearch };
 }
 

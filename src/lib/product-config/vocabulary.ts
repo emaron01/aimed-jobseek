@@ -279,6 +279,9 @@ export const applicationWorkspaceCopy = Object.freeze({
   jobLearnedTooLong: "These notes are too long. Shorten them and save again.",
   scorecardNote:
     "This scorecard is based on your {product} and the job posting. The more {consultant} knows about you, the more it may change.",
+  companyHighlightsTitle: "Company highlights",
+  jobFocusTitle: "The part of the company this job serves",
+  jobFocusDetailTitle: "In depth",
   fieldCompanySummary: "Company summary",
   fieldProducts: "What they sell",
   fieldBusinessModel: "Business model",

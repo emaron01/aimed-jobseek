@@ -21,6 +21,8 @@ export type HiringTeamResearchEvidence = {
   businessModel: string | null;
   hiringSignals: string[];
   riskSignals: string[];
+  jobFocus?: string | null;
+  jobFocusDetail?: string | null;
 };
 
 const JOB_REQUIREMENT_SOURCE_ID = "job-requirement";
@@ -72,6 +74,10 @@ export function companyResearchEvidenceText(
     research.businessModel ? `Business model: ${research.businessModel}` : "",
     ...lines("Hiring and growth", research.hiringSignals),
     ...lines("Employer risk", research.riskSignals),
+    research.jobFocus
+      ? `The part of the company this job serves: ${research.jobFocus}`
+      : "",
+    research.jobFocusDetail ? `In depth: ${research.jobFocusDetail}` : "",
   ]
     .filter(Boolean)
     .join("\n");

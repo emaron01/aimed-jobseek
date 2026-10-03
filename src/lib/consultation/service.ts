@@ -1,4 +1,8 @@
 import { Prisma } from "@prisma/client";
+import {
+  employerResearchModelInput,
+  loadApplicationEmployerResearch,
+} from "@/lib/application/employer-research-reader";
 import type { JobScorecard, ScorecardItem } from "@/lib/job-requirement/types";
 import {
   planConsultationWithModel,
@@ -757,6 +761,19 @@ export async function polishAnswerWithQuality(input: {
       : null;
   let lastFailure: string = consultationConversationCopy.generationFailed;
   let qualityFeedback: string[] = [];
+  const whyOrganizationId =
+    input.libraryQuestion?.organizationId ?? input.usage?.organizationId ?? null;
+  const whyCampaignId =
+    input.libraryQuestion?.campaignId ?? input.usage?.campaignId ?? null;
+  const companyResearch =
+    input.whyThisCompany && whyOrganizationId && whyCampaignId
+      ? await loadApplicationEmployerResearch({
+          organizationId: whyOrganizationId,
+          campaignId: whyCampaignId,
+        }).then((view) => (view ? employerResearchModelInput(view) : null))
+      : input.whyThisCompany
+        ? null
+        : undefined;
   let lastAcceptable: {
     ok: true;
     data: {
@@ -784,6 +801,7 @@ export async function polishAnswerWithQuality(input: {
       declinedFollowUp: input.declinedFollowUp,
       confirmedGap,
       whyThisCompany,
+      companyResearch,
       strengtheningNeeds: input.strengtheningNeeds,
       qualityFeedback,
       target: input.target ?? null,

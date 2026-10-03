@@ -37,7 +37,81 @@ export type ApplicationCompanyBriefingDefaults = {
   relevantTechnologies: unknown;
   hiringSignals: unknown;
   riskSignals: unknown;
+  jobFocus?: string | null;
+  jobFocusDetail?: string | null;
 };
+
+export function CheatSheetCompanyResearch({
+  companySummary,
+  whatTheySell,
+  jobFocus,
+  jobFocusDetail,
+  sources,
+}: {
+  companySummary: string | null;
+  whatTheySell: string | null;
+  jobFocus: string | null;
+  jobFocusDetail: string | null;
+  sources: ResearchSource[];
+}) {
+  const sourceIndex = buildSourceIndex(sources, (source) => source.url);
+  const hasHighlights = Boolean(companySummary?.trim() || whatTheySell?.trim());
+  const hasFocus = Boolean(jobFocus?.trim() || jobFocusDetail?.trim());
+  if (!hasHighlights && !hasFocus) {
+    return <p className="text-sm text-ink">Not available.</p>;
+  }
+  return (
+    <div data-testid="cheat-sheet-company-research" className="space-y-4">
+      {hasHighlights ? (
+        <section>
+          <h3 className="font-medium text-ink">
+            {applicationWorkspaceCopy.companyHighlightsTitle}
+          </h3>
+          {companySummary?.trim() ? (
+            <ResearchProse
+              text={companySummary}
+              sources={sourcesSupportingField(sources, "companySummary")}
+              sourceIndex={sourceIndex}
+            />
+          ) : null}
+          {whatTheySell?.trim() ? (
+            <ResearchProse
+              text={whatTheySell}
+              sources={sourcesSupportingField(sources, "whatTheySell")}
+              sourceIndex={sourceIndex}
+            />
+          ) : null}
+        </section>
+      ) : null}
+      {hasFocus ? (
+        <section>
+          <h3 className="font-medium text-ink">
+            {applicationWorkspaceCopy.jobFocusTitle}
+          </h3>
+          {jobFocus?.trim() ? (
+            <ResearchProse
+              text={jobFocus}
+              sources={sourcesSupportingField(sources, "jobFocus")}
+              sourceIndex={sourceIndex}
+            />
+          ) : null}
+          {jobFocusDetail?.trim() ? (
+            <>
+              <h4 className="mt-3 text-sm font-medium text-ink">
+                {applicationWorkspaceCopy.jobFocusDetailTitle}
+              </h4>
+              <ResearchProse
+                text={jobFocusDetail}
+                sources={sourcesSupportingField(sources, "jobFocusDetail")}
+                sourceIndex={sourceIndex}
+              />
+            </>
+          ) : null}
+        </section>
+      ) : null}
+    </div>
+  );
+}
 
 export function ApplicationCompanyBriefing({
   campaignId,
@@ -278,6 +352,33 @@ export function ApplicationCompanyBriefing({
               ))}
             </ul>
           </ResearchReadSection>
+
+          {defaults.jobFocus?.trim() || defaults.jobFocusDetail?.trim() ? (
+            <ResearchReadSection
+              title={applicationWorkspaceCopy.jobFocusTitle}
+              empty={false}
+            >
+              {defaults.jobFocus?.trim() ? (
+                <ResearchProse
+                  text={defaults.jobFocus}
+                  sources={sourcesSupportingField(sources, "jobFocus")}
+                  sourceIndex={sourceIndex}
+                />
+              ) : null}
+              {defaults.jobFocusDetail?.trim() ? (
+                <div>
+                  <p className="text-sm font-medium text-muted">
+                    {applicationWorkspaceCopy.jobFocusDetailTitle}
+                  </p>
+                  <ResearchProse
+                    text={defaults.jobFocusDetail}
+                    sources={sourcesSupportingField(sources, "jobFocusDetail")}
+                    sourceIndex={sourceIndex}
+                  />
+                </div>
+              ) : null}
+            </ResearchReadSection>
+          ) : null}
         </article>
       ) : (
         <p className="text-sm text-muted">
