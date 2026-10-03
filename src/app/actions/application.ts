@@ -10,6 +10,7 @@ import {
   rescoreApplicationFit,
   retryApplicationResearch,
   saveApplicationCompanyResearchNotes,
+  saveApplicationEmployerWebsite,
   saveApplicationJobLearnedNotes,
   saveApplicationJobPosting,
   updateApplicationCompanyInformation,
@@ -62,7 +63,7 @@ export async function nameApplicationEmployerAction(
     if (!campaignId) {
       return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
     }
-    await nameApplicationEmployer({
+    const named = await nameApplicationEmployer({
       organizationId,
       campaignId,
       employerName,
@@ -70,7 +71,41 @@ export async function nameApplicationEmployerAction(
       companyId: companyId || null,
     });
     revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: applicationResearchCopy.savedQueued };
+    return {
+      ok: true,
+      message: named.conflict
+        ? applicationWorkspaceCopy.companyWebsiteConflict
+        : applicationResearchCopy.savedQueued,
+    };
+  } catch (error) {
+    return fail(error, "The employer could not be saved.");
+  }
+}
+
+export async function saveApplicationEmployerWebsiteAction(
+  _prev: ApplicationActionResult | null,
+  formData: FormData,
+): Promise<ApplicationActionResult> {
+  try {
+    const organizationId = await requireOrganizationId();
+    await requireCurrentUser();
+    const campaignId = String(formData.get("campaignId") ?? "").trim();
+    if (!campaignId) {
+      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
+    }
+    const saved = await saveApplicationEmployerWebsite({
+      organizationId,
+      campaignId,
+      website: String(formData.get("companyWebsite") ?? formData.get("website") ?? ""),
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/campaigns/${campaignId}/company`);
+    return {
+      ok: true,
+      message: saved.conflict
+        ? applicationWorkspaceCopy.companyWebsiteConflict
+        : applicationWorkspaceCopy.companyWebsiteSaved,
+    };
   } catch (error) {
     return fail(error, "The employer could not be saved.");
   }

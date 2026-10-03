@@ -11,7 +11,13 @@ import type {
   ResearchConfidence,
   ResearchMethod,
 } from "@prisma/client";
+import {
+  anchorHostFromResearchTimings,
+  appendAnchorHostTiming,
+  employerWebsiteAnchor,
+} from "@/lib/application/company-website";
 import { markApplicationFitsStaleForCompany } from "@/lib/application/fit-staleness";
+import { applicationResearchCopy } from "@/lib/product-config/vocabulary";
 import { prisma } from "@/lib/prisma-client";
 import { jobSeekerResearchColumns } from "@/lib/research/job-seeker-columns";
 import {
@@ -770,6 +776,7 @@ export async function saveCompanyResearch(input: {
   } | null;
   researchedByUserId?: string | null;
   freshnessDays?: number;
+  anchorHost?: string | null;
 }): Promise<CompanyResearch> {
   const organizationId = await orgId();
   const company = await prisma.company.findFirst({
@@ -847,7 +854,10 @@ export async function saveCompanyResearch(input: {
         researchDurationMs: input.usage?.researchDurationMs ?? null,
         searchStagesUsed: input.telemetry?.searchStagesUsed ?? null,
         researchStoppedReason: input.telemetry?.researchStoppedReason ?? null,
-        researchStageTimings: input.telemetry?.researchStageTimings ?? undefined,
+        researchStageTimings: (appendAnchorHostTiming(
+          input.telemetry?.researchStageTimings ?? null,
+          input.anchorHost,
+        ) ?? undefined) as Prisma.InputJsonValue | undefined,
         researchedByUserId: input.researchedByUserId ?? null,
         firstResearchedByUserId,
       },
@@ -886,6 +896,8 @@ export async function researchCompany(
     evidenceTargets?: string[];
     seekerSuppliedNotes?: string;
     campaignId?: string | null;
+    /** Application site. When set, fresh research that was not anchored to this host is replaced. */
+    anchorWebsite?: string | null;
   },
 ): Promise<ResearchCompanyResult> {
   // Tenant ownership check BEFORE any external API spend.
@@ -894,6 +906,20 @@ export async function researchCompany(
     where: { id: companyId, organizationId },
   });
   if (!company) notFound("Company");
+
+  const anchor = employerWebsiteAnchor({
+    suppliedEmployerWebsite: options?.anchorWebsite,
+    companyWebsite: company.website,
+    companyDomain: company.normalizedDomain,
+  });
+  const latestBeforeAnchor = await getLatestCompanyResearch(company.id);
+  if (!anchor) {
+    return {
+      skipped: true,
+      reason: applicationResearchCopy.websiteRequired,
+      research: latestBeforeAnchor,
+    };
+  }
 
   const researchPolicy = await getResearchPolicy(organizationId);
   const user = await resolveResearchUser();
@@ -907,9 +933,15 @@ export async function researchCompany(
     };
   }
 
-  const latest = await getLatestCompanyResearch(company.id);
+  const latest = latestBeforeAnchor;
+  const stampedHost = latest
+    ? anchorHostFromResearchTimings(latest.researchStageTimings)
+    : null;
+  const replacingUnanchored =
+    Boolean(options?.anchorWebsite) && stampedHost !== anchor.domain;
   if (
     !options?.force &&
+    !replacingUnanchored &&
     latest &&
     isResearchFresh(latest, new Date(), researchPolicy.researchFreshnessDays)
   ) {
@@ -920,8 +952,8 @@ export async function researchCompany(
 
   const fingerprint = companyResearchFingerprint({
     name: company.name,
-    website: company.website,
-    normalizedDomain: company.normalizedDomain,
+    website: anchor.website,
+    normalizedDomain: anchor.domain,
     industry: company.industry,
     employeeCount: company.employeeCount,
     location: company.location,
@@ -1127,8 +1159,8 @@ export async function researchCompany(
           organizationId,
           companyId: company.id,
           name: company.name,
-          website: company.website,
-          normalizedDomain: company.normalizedDomain,
+          website: anchor.website,
+          normalizedDomain: anchor.domain,
           industry: company.industry,
           employeeCount: company.employeeCount,
           location: company.location,
@@ -1186,6 +1218,7 @@ export async function researchCompany(
       telemetry,
       researchedByUserId: user?.id ?? null,
       freshnessDays: researchPolicy.researchFreshnessDays,
+      anchorHost: anchor.domain,
     });
 
     // Per-stage UsageEvents are recorded via aiCallTracking on each

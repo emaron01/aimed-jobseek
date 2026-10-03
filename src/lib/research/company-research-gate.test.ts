@@ -54,6 +54,7 @@ describe("company research fingerprint gate (source)", () => {
         name: "Acme Robotics",
         website: "https://acme.example",
         normalizedDomain: "acme.example",
+        anchorHost: "acme.example",
         industry: "Robotics",
         employeeCount: 120,
         location: "Austin, TX",

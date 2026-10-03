@@ -8,9 +8,13 @@ import {
   type CampaignActionResult,
 } from "@/lib/campaign/save";
 import { formatProductCampaignOmission } from "@/lib/workflow/product-campaign-readiness";
+import {
+  employerSitePrefillFromPostingUrl,
+  parseEmployerWebsite,
+} from "@/lib/application/company-website";
 import { EmailGuidancePromptExamples } from "@/components/EmailGuidancePromptExamples";
 import { Field, SubmitButton } from "@/components/ui";
-import { vocab } from "@/lib/product-config";
+import { applicationWorkspaceCopy, vocab } from "@/lib/product-config";
 
 type ProductOption = {
   id: string;
@@ -32,6 +36,9 @@ export function NewCampaignForm({
     readyProducts.length === 1 ? readyProducts[0]!.id : "",
   );
   const [postingText, setPostingText] = useState("");
+  const [postingUrl, setPostingUrl] = useState("");
+  const [companyWebsite, setCompanyWebsite] = useState("");
+  const [websiteEdited, setWebsiteEdited] = useState(false);
   const [state, formAction, pending] = useActionState(
     createCampaignAction,
     initial,
@@ -45,14 +52,28 @@ export function NewCampaignForm({
 
   const selectedProduct = products.find((product) => product.id === productId);
   const productReady = selectedProduct?.ready ?? false;
+  const websiteCheck = companyWebsite.trim()
+    ? parseEmployerWebsite(companyWebsite)
+    : null;
+  const websiteError =
+    state?.fieldErrors?.companyWebsite ??
+    (websiteCheck && !websiteCheck.ok ? websiteCheck.message : null);
   const canSubmit =
-    Boolean(postingText.trim()) && Boolean(productId) && productReady;
+    Boolean(postingText.trim()) &&
+    Boolean(productId) &&
+    productReady &&
+    Boolean(websiteCheck?.ok);
 
-  const restoreKey = restored ? restored.productId ?? "" : "";
+  const restoreKey = restored
+    ? `${restored.productId ?? ""}|${restored.postingUrl}|${restored.companyWebsite}`
+    : "";
   const [appliedRestoreKey, setAppliedRestoreKey] = useState("");
   if (restoreKey && restoreKey !== appliedRestoreKey) {
     setAppliedRestoreKey(restoreKey);
     if (restored?.productId) setProductId(restored.productId);
+    setPostingUrl(restored?.postingUrl ?? "");
+    setCompanyWebsite(restored?.companyWebsite ?? "");
+    setWebsiteEdited(Boolean(restored?.companyWebsite));
   }
 
   useEffect(() => {
@@ -102,9 +123,35 @@ export function NewCampaignForm({
       <Field
         label="Posting URL"
         name="postingUrl"
-        defaultValue={restored?.postingUrl}
-        hint="Optional. Not opened or fetched."
+        value={postingUrl}
+        onChange={(value) => {
+          setPostingUrl(value);
+          if (!websiteEdited) {
+            setCompanyWebsite(employerSitePrefillFromPostingUrl(value) ?? "");
+          }
+        }}
+        hint="Optional. Not opened or fetched. A company site here fills Company website."
       />
+      <div>
+        <Field
+          label={applicationWorkspaceCopy.companyWebsiteLabel}
+          name="companyWebsite"
+          required
+          value={companyWebsite}
+          onChange={(value) => {
+            setWebsiteEdited(true);
+            setCompanyWebsite(value);
+          }}
+          hint={applicationWorkspaceCopy.companyWebsiteHint}
+          placeholder="https://www.cscglobal.com"
+          testId="company-website"
+        />
+        {websiteError ? (
+          <p className="mt-1 text-sm text-danger" role="alert">
+            {websiteError}
+          </p>
+        ) : null}
+      </div>
       <Field
         label={`${vocab.campaign.Singular} Name`}
         name="name"

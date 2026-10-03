@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  anchorHostFromResearchTimings,
+  employerWebsiteAnchor,
+} from "@/lib/application/company-website";
 import { employerIdentityCopy } from "@/lib/product-config";
 
 export const IDENTITY_CHECK_KEYS = [
@@ -718,6 +722,7 @@ export function usableEmployerResearch<
     businessModel?: string | null;
     companySizeContext?: string | null;
     researchSources?: unknown;
+    researchStageTimings?: unknown;
   },
 >(
   requirement: {
@@ -731,12 +736,24 @@ export function usableEmployerResearch<
     seniority?: string | null;
     compensationRange?: string | null;
     suppliedEmployerWebsite?: string | null;
-    company?: { name?: string | null; location?: string | null; website?: string | null } | null;
+    company?: {
+      name?: string | null;
+      location?: string | null;
+      website?: string | null;
+      normalizedDomain?: string | null;
+    } | null;
   },
   research: T | null,
 ): T | null {
   if (!research) return null;
   if (requirement.identityConfirmation === "REJECTED") return null;
+  const stamped = anchorHostFromResearchTimings(research.researchStageTimings);
+  const anchor = employerWebsiteAnchor({
+    suppliedEmployerWebsite: requirement.suppliedEmployerWebsite,
+    companyWebsite: requirement.company?.website,
+    companyDomain: requirement.company?.normalizedDomain,
+  });
+  if (stamped && anchor && stamped === anchor.domain) return research;
   if (requirement.identityConfirmation === "CONFIRMED") return research;
   if (research.identityAmbiguous === true) return null;
   const stored = parseIdentityVerification(requirement.identityVerificationJson);

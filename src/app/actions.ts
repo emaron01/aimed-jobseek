@@ -547,6 +547,7 @@ export async function createCampaignAction(
         campaignId: campaign.id,
         rawText: parsed.fields.postingText,
         postingUrl: parsed.fields.postingUrl,
+        employerWebsite: parsed.fields.companyWebsite,
         parsed: parsedJob,
         icpId: parsed.fields.icpId || null,
       });

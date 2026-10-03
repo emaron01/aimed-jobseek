@@ -2,6 +2,7 @@
  * Campaign form parsing and safe action results (Node-safe, no server-only).
  */
 
+import { parseEmployerWebsite } from "@/lib/application/company-website";
 import { vocab } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 import {
@@ -59,6 +60,7 @@ export type CampaignFormValues = {
   name: string;
   postingText: string;
   postingUrl: string;
+  companyWebsite: string;
   productId: string;
   icpId: string;
   personaId: string;
@@ -119,6 +121,7 @@ export function readCampaignFormValues(formData: FormData): CampaignFormValues {
     name: readString(formData, "name"),
     postingText: readString(formData, "postingText"),
     postingUrl: readString(formData, "postingUrl"),
+    companyWebsite: readString(formData, "companyWebsite"),
     productId: readString(formData, "productId"),
     icpId: readString(formData, "icpId"),
     personaId: readString(formData, "personaId"),
@@ -157,6 +160,7 @@ export function parseCampaignFormData(formData: FormData): {
     emailGuidance: string | null;
     postingText: string;
     postingUrl: string | null;
+    companyWebsite: string;
   };
   fieldErrors: Partial<Record<keyof CampaignFormValues, string>>;
 } {
@@ -171,6 +175,10 @@ export function parseCampaignFormData(formData: FormData): {
   }
   if (values.postingUrl && !/^https?:\/\//i.test(values.postingUrl)) {
     fieldErrors.postingUrl = "Posting URL must start with http:// or https://.";
+  }
+  const companyWebsite = parseEmployerWebsite(values.companyWebsite);
+  if (!companyWebsite.ok) {
+    fieldErrors.companyWebsite = companyWebsite.message;
   }
   if (!values.productId) {
     fieldErrors.productId = `${vocab.product.Singular} is required.`;
@@ -203,6 +211,7 @@ export function parseCampaignFormData(formData: FormData): {
       emailGuidance: emailSettings.fields.emailGuidance,
       postingText: values.postingText,
       postingUrl: values.postingUrl || null,
+      companyWebsite: companyWebsite.ok ? companyWebsite.website : "",
     },
   };
 }

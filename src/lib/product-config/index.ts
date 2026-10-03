@@ -4,6 +4,7 @@
  */
 export {
   compensationCopy,
+  JOB_BOARD_HOSTS,
   applicationResearchCopy,
   applicationWorkspaceCopy,
   countedNoun,

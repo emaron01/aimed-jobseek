@@ -290,6 +290,7 @@ export function ApplicationCompanyBriefing({
       {canEdit ? (
         <div className="space-y-4" data-print-hide>
           <details
+            open
             className="rounded-lg border border-edge bg-canvas p-4"
             data-testid="company-research-notes"
           >

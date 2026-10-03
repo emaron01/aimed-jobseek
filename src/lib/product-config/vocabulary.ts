@@ -200,7 +200,26 @@ export const applicationResearchCopy = Object.freeze({
   savedQueued: "Researching this employer…",
   retriedQueued: "Researching this employer again…",
   unchanged: "No Changes To Company Research",
+  websiteRequired: "Add the company's website before research can run.",
 });
+
+/** Hosts that are job boards, never the employer's own site. Subdomains count. */
+export const JOB_BOARD_HOSTS = Object.freeze([
+  "linkedin.com",
+  "indeed.com",
+  "glassdoor.com",
+  "ziprecruiter.com",
+  "greenhouse.io",
+  "lever.co",
+  "myworkdayjobs.com",
+  "workday.com",
+  "icims.com",
+  "smartrecruiters.com",
+  "ashbyhq.com",
+  "bamboohr.com",
+  "jobvite.com",
+  "taleo.net",
+] as const);
 
 export const applicationWorkspaceCopy = Object.freeze({
   nextStepTitle: "Let's walk through this application",
@@ -212,9 +231,21 @@ export const applicationWorkspaceCopy = Object.freeze({
   whatTheyDoTitle: "What they do",
   whoTheyServeTitle: "Who they serve",
   howTheyOperateTitle: "How they operate",
+  companyWebsiteLabel: "Company website",
+  companyWebsiteHint: "The company's own site, not the job board where you found the posting.",
+  companyWebsiteRequired: "Enter the company's website.",
+  companyWebsiteInvalid: "Enter the company's website, such as https://www.cscglobal.com.",
+  companyWebsiteJobBoard:
+    "That address is a job board, not the company's website. Enter the company's own site.",
+  companyWebsitePrompt:
+    "Company website is required. Research does not run until you save the company's own site.",
+  companyWebsiteSave: "Save company website",
+  companyWebsiteSaved: "Company website saved. Research will use this site.",
+  companyWebsiteConflict:
+    "This application will use the website you entered. The shared company record already has a different website, so that website was left unchanged.",
   companyNotesTitle: "Add what you know",
   companyNotesHelp:
-    "Paste information research could not find, or an area you want to understand.",
+    "Optional. Paste anything about the company: an About page, an article, or notes. Research uses this text.",
   companyNotesSave: "Save notes",
   companyNotesSaved: "Notes saved.",
   companyNotesFailed: "The notes could not be saved.",

@@ -4,7 +4,13 @@ import {
   rejectApplicationEmployerIdentityAction,
   rescoreApplicationFitAction,
   retryApplicationNextStepAction,
+  saveApplicationEmployerWebsiteAction,
 } from "@/app/actions/application";
+import {
+  anchorHostFromResearchTimings,
+  employerSitePrefillFromPostingUrl,
+  employerWebsiteAnchor,
+} from "@/lib/application/company-website";
 import { ApplicationResearchStatus } from "@/components/ApplicationResearchStatus";
 import { ApplicationFitOverride } from "@/components/ApplicationFitOverride";
 import {
@@ -242,6 +248,7 @@ function IdentityVerificationPanel({
                 <span className="font-medium text-ink">{employerIdentityCopy.supplyWebsite}</span>
                 <input
                   name="website"
+                  required
                   className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
                 />
               </label>
@@ -350,11 +357,22 @@ export async function ApplicationWorkspace({
     );
   }
 
+  const researchAnchor = employerWebsiteAnchor({
+    suppliedEmployerWebsite: requirement.suppliedEmployerWebsite,
+    companyWebsite: requirement.company?.website,
+    companyDomain: requirement.company?.normalizedDomain,
+  });
   const researchStatus = await getApplicationResearchStatus({
     organizationId,
     campaignId,
   });
   const research = requirement.company?.research[0] ?? null;
+  const researchAnchored = (() => {
+    const stamped = anchorHostFromResearchTimings(research?.researchStageTimings);
+    return Boolean(
+      stamped && researchAnchor && stamped === researchAnchor.domain,
+    );
+  })();
   const fit = requirement.campaign.applicationFit;
   const icp = requirement.campaign.icp;
   const stale = fit
@@ -530,11 +548,50 @@ export async function ApplicationWorkspace({
           initialStatus={researchStatus}
           hideRetry
         />
+        {!researchAnchor ? (
+          <div
+            className="space-y-3 rounded-md border border-warning bg-warning-tint p-3"
+            data-testid="company-website-required"
+          >
+            <p className="text-sm text-ink">
+              {applicationWorkspaceCopy.companyWebsitePrompt}
+            </p>
+            {canEdit ? (
+              <ApplicationActionForm
+                action={saveApplicationEmployerWebsiteAction}
+                submitLabel={applicationWorkspaceCopy.companyWebsiteSave}
+                testId="save-company-website"
+              >
+                <input type="hidden" name="campaignId" value={campaignId} />
+                <label className="block text-sm">
+                  <span className="font-medium text-ink">
+                    {applicationWorkspaceCopy.companyWebsiteLabel}
+                  </span>
+                  <span className="mt-0.5 block text-xs font-normal text-muted">
+                    {applicationWorkspaceCopy.companyWebsiteHint}
+                  </span>
+                  <input
+                    name="companyWebsite"
+                    required
+                    data-testid="company-website"
+                    defaultValue={
+                      employerSitePrefillFromPostingUrl(requirement.postingUrl) ?? ""
+                    }
+                    placeholder="https://www.cscglobal.com"
+                    className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm"
+                  />
+                </label>
+              </ApplicationActionForm>
+            ) : null}
+          </div>
+        ) : null}
+        {researchAnchored ? null : (
         <IdentityVerificationPanel
           campaignId={campaignId}
           canEdit={canEdit}
           requirement={requirement}
         />
+        )}
         <ApplicationCompanyBriefing
           campaignId={campaignId}
           canEdit={canEdit}
@@ -654,6 +711,7 @@ export async function ApplicationWorkspace({
             <span className="font-medium text-ink">{employerIdentityCopy.supplyWebsite}</span>
             <input
               name="website"
+              required
               className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
             />
           </label>

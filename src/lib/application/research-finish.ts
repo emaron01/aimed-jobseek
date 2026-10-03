@@ -7,13 +7,17 @@ import type { Prisma } from "@prisma/client";
 import {
   computeApplicationEmployerFit,
 } from "@/lib/application/fit";
+import {
+  anchorHostFromResearchTimings,
+  employerWebsiteAnchor,
+} from "@/lib/application/company-website";
 import { decisionAfterResearchIdentity } from "@/lib/job-requirement/employer";
 import {
   identityMismatchReason,
   identityStaleReason,
-  parseIdentityVerification,
   postingIdentityInput,
   researchIdentityInput,
+  usableEmployerResearch,
   verifyEmployerIdentity,
 } from "@/lib/job-requirement/identity-verification";
 import { normalizeEvidenceClass } from "@/lib/criteria/evidence-class";
@@ -161,20 +165,9 @@ export async function scoreFit(input: {
       campaignId: input.campaignId,
       organizationId: input.organizationId,
     },
-    select: { identityConfirmation: true, identityVerificationJson: true },
+    include: { company: true },
   });
-  const verification = parseIdentityVerification(
-    requirementForUse?.identityVerificationJson,
-  );
-  if (
-    !research ||
-    research.identityAmbiguous ||
-    requirementForUse?.identityConfirmation === "REJECTED" ||
-    (requirementForUse?.identityConfirmation !== "CONFIRMED" &&
-      verification?.verdict === "AMBIGUOUS")
-  ) {
-    return;
-  }
+  if (!research || !usableEmployerResearch(requirementForUse ?? {}, research)) return;
   const requirement = await prisma.jobRequirement.findFirst({
     where: {
       campaignId: input.campaignId,
@@ -276,7 +269,16 @@ export async function finishApplicationAfterResearch(input: {
   }
   const requirement = await prisma.jobRequirement.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
-    include: { company: { select: { name: true, location: true, website: true } } },
+    include: {
+      company: {
+        select: {
+          name: true,
+          location: true,
+          website: true,
+          normalizedDomain: true,
+        },
+      },
+    },
   });
   if (!requirement) {
     throw new TenantError(
@@ -290,6 +292,38 @@ export async function finishApplicationAfterResearch(input: {
       company: requirement.company,
     }),
   });
+  const anchor = employerWebsiteAnchor({
+    suppliedEmployerWebsite: requirement.suppliedEmployerWebsite,
+    companyWebsite: requirement.company?.website,
+    companyDomain: requirement.company?.normalizedDomain,
+  });
+  const stamped = anchorHostFromResearchTimings(research.researchStageTimings);
+  if (stamped && anchor && stamped === anchor.domain) {
+    await prisma.jobRequirement.update({
+      where: { campaignId: input.campaignId },
+      data: {
+        employerDisposition: "IDENTIFIED",
+        employerSkipReason: null,
+        identityVerificationJson: jsonValue(verification),
+        identityConfirmation: "PENDING",
+      },
+    });
+    if (isGatedSurfaceEnabled("employerIcpFit")) {
+      await scoreFit({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        icpId: input.icpId,
+        companyId: input.companyId,
+      });
+    }
+    const { enqueueApplicationJob } = await import("@/lib/application-jobs/service");
+    await enqueueApplicationJob({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      type: "HIRING_TEAM_IDENTIFY",
+    });
+    return;
+  }
   const after = decisionAfterResearchIdentity(
     research.identityAmbiguous === true || verification.verdict === "AMBIGUOUS",
   );

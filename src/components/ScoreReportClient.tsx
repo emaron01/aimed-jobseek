@@ -43,6 +43,7 @@ import {
 } from "@/lib/workflow/qualification";
 import type { QualificationBucket } from "@prisma/client";
 import {
+  applicationWorkspaceCopy,
   countedNoun,
   scoringDimensionLabel,
   vocab,
@@ -1008,6 +1009,24 @@ export function ScoreReportClient({
                 <input type="hidden" name="allPersonas" value="1" />
               )}
               <Field label={`${vocab.campaign.Singular} Name`} name="name" required />
+              <Field
+                label={applicationWorkspaceCopy.companyWebsiteLabel}
+                name="companyWebsite"
+                required
+                hint={applicationWorkspaceCopy.companyWebsiteHint}
+                placeholder="https://www.cscglobal.com"
+                testId="company-website"
+                defaultValue={
+                  campaignState && !campaignState.ok
+                    ? campaignState.values?.companyWebsite
+                    : undefined
+                }
+              />
+              {campaignState?.fieldErrors?.companyWebsite ? (
+                <p className="text-sm text-danger" role="alert">
+                  {campaignState.fieldErrors.companyWebsite}
+                </p>
+              ) : null}
               <Field
                 label="Offer Name"
                 name="offerName"

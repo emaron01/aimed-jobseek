@@ -1,5 +1,10 @@
 import type { Prisma, QualificationBucket } from "@prisma/client";
 import {
+  anchorHostFromResearchTimings,
+  employerWebsiteAnchor,
+  parseEmployerWebsite,
+} from "@/lib/application/company-website";
+import {
   applicationFitStaleReason,
   applyFitOverride,
   displayedFitBucket,
@@ -27,7 +32,12 @@ import {
   researchIdentityInput,
   verifyEmployerIdentity,
 } from "@/lib/job-requirement/identity-verification";
-import { applicationWorkspaceCopy, employerIdentityCopy } from "@/lib/product-config";
+import {
+  applicationResearchCopy,
+  applicationWorkspaceCopy,
+  employerIdentityCopy,
+} from "@/lib/product-config";
+import { normalizeDomain } from "@/lib/research/normalize";
 import type { ParsedJobRequirement } from "@/lib/job-requirement/types";
 import {
   JOB_REQUIREMENT_PROCESSING_VERSION,
@@ -74,12 +84,106 @@ async function companyMatches(
   }));
 }
 
+function isUniqueConstraint(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code: unknown }).code === "P2002"
+  );
+}
+
+async function loadApplicationWebsiteContext(input: {
+  organizationId: string;
+  campaignId: string;
+  companyId: string;
+}) {
+  const [requirement, company] = await Promise.all([
+    prisma.jobRequirement.findFirst({
+      where: {
+        campaignId: input.campaignId,
+        organizationId: input.organizationId,
+      },
+      select: { suppliedEmployerWebsite: true },
+    }),
+    prisma.company.findFirst({
+      where: { id: input.companyId, organizationId: input.organizationId },
+      select: { website: true, normalizedDomain: true },
+    }),
+  ]);
+  return {
+    anchor: employerWebsiteAnchor({
+      suppliedEmployerWebsite: requirement?.suppliedEmployerWebsite,
+      companyWebsite: company?.website,
+      companyDomain: company?.normalizedDomain,
+    }),
+  };
+}
+
+/**
+ * Sets the shared company website only when that record has none.
+ * A different existing website is left unchanged. The application still
+ * stores and researches the site the seeker entered.
+ */
+export async function assignSharedCompanyWebsite(input: {
+  organizationId: string;
+  companyId: string;
+  website: string;
+  domain: string;
+}): Promise<{ conflict: boolean }> {
+  const company = await prisma.company.findFirst({
+    where: { id: input.companyId, organizationId: input.organizationId },
+    select: { id: true, website: true, normalizedDomain: true },
+  });
+  if (!company) throw new TenantError("That employer was not found.");
+  const existingDomain =
+    normalizeDomain(company.normalizedDomain) ?? normalizeDomain(company.website);
+  if (!existingDomain) {
+    try {
+      await prisma.company.update({
+        where: { id: company.id },
+        data: {
+          website: company.website?.trim() ? company.website : input.website,
+          normalizedDomain: input.domain,
+        },
+      });
+      return { conflict: false };
+    } catch (error) {
+      if (isUniqueConstraint(error)) return { conflict: true };
+      throw error;
+    }
+  }
+  if (existingDomain === input.domain) {
+    if (!company.website?.trim() || !company.normalizedDomain?.trim()) {
+      try {
+        await prisma.company.update({
+          where: { id: company.id },
+          data: {
+            website: company.website?.trim() ? company.website : input.website,
+            normalizedDomain: company.normalizedDomain?.trim()
+              ? company.normalizedDomain
+              : input.domain,
+          },
+        });
+      } catch (error) {
+        if (!isUniqueConstraint(error)) throw error;
+      }
+    }
+    return { conflict: false };
+  }
+  return { conflict: true };
+}
+
 async function queueApplicationResearch(input: {
   organizationId: string;
   campaignId: string;
   companyId: string;
   forceRefresh?: boolean;
+  /** Re-run fresh name-only research once a company website anchors this application. */
+  requireAnchoredRun?: boolean;
 }): Promise<void> {
+  const { anchor } = await loadApplicationWebsiteContext(input);
+  if (!anchor) return;
   if (!input.forceRefresh) {
     const latest = await prisma.companyResearch.findFirst({
       where: {
@@ -93,7 +197,8 @@ async function queueApplicationResearch(input: {
       const { isResearchFresh } = await import("@/lib/research/freshness");
       const policy = await getResearchPolicy(input.organizationId);
       if (isResearchFresh(latest, new Date(), policy.researchFreshnessDays)) {
-        return;
+        const stamped = anchorHostFromResearchTimings(latest.researchStageTimings);
+        if (!input.requireAnchoredRun || stamped === anchor.domain) return;
       }
     }
   }
@@ -147,6 +252,12 @@ export async function ensureNamedEmployerResearch(input: {
       data: { companyId, employerDisposition: "IDENTIFIED" },
     });
   }
+  const { anchor } = await loadApplicationWebsiteContext({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    companyId,
+  });
+  if (!anchor) return;
   const latest = requirement.company?.research[0];
   if (latest) {
     const { getResearchPolicy } = await import("@/lib/usage/policy-service");
@@ -205,9 +316,12 @@ export async function attachParsedPosting(input: {
   campaignId: string;
   rawText: string;
   postingUrl: string | null;
+  employerWebsite: string;
   parsed: ParsedJobRequirement;
   icpId: string | null;
 }): Promise<void> {
+  const parsedWebsite = parseEmployerWebsite(input.employerWebsite);
+  if (!parsedWebsite.ok) throw new TenantError(parsedWebsite.message);
   const matches = await companyMatches(
     input.organizationId,
     input.parsed.companyName,
@@ -250,6 +364,14 @@ export async function attachParsedPosting(input: {
       }
       companyId = created.id;
     }
+    if (companyId) {
+      await assignSharedCompanyWebsite({
+        organizationId: input.organizationId,
+        companyId,
+        website: parsedWebsite.website,
+        domain: parsedWebsite.domain,
+      });
+    }
   }
 
   await prisma.jobRequirement.create({
@@ -265,6 +387,7 @@ export async function attachParsedPosting(input: {
       organizationId: input.organizationId,
       campaignId: input.campaignId,
       companyId,
+      requireAnchoredRun: true,
     });
     await ingestNamedJobContacts({
       organizationId: input.organizationId,
@@ -292,6 +415,7 @@ function jobRequirementData(
     campaignId: string;
     rawText: string;
     postingUrl: string | null;
+    employerWebsite: string;
     parsed: ParsedJobRequirement;
   },
   employer: {
@@ -301,11 +425,13 @@ function jobRequirementData(
   },
 ): Prisma.JobRequirementCreateInput {
   const parsed = input.parsed;
+  const website = parseEmployerWebsite(input.employerWebsite);
   return {
     organization: { connect: { id: input.organizationId } },
     campaign: { connect: { id: input.campaignId } },
     rawText: input.rawText,
     postingUrl: input.postingUrl,
+    suppliedEmployerWebsite: website.ok ? website.website : null,
     title: parsed.title,
     companyName: parsed.companyName,
     location: parsed.location,
@@ -335,7 +461,7 @@ export async function nameApplicationEmployer(input: {
   employerName: string;
   website?: string | null;
   companyId?: string | null;
-}): Promise<void> {
+}): Promise<{ conflict: boolean }> {
   const requirement = await prisma.jobRequirement.findFirst({
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
@@ -344,6 +470,8 @@ export async function nameApplicationEmployer(input: {
       `This ${vocab.campaign.singular} has no job requirement.`,
     );
   }
+  const parsedWebsite = parseEmployerWebsite(input.website);
+  if (!parsedWebsite.ok) throw new TenantError(parsedWebsite.message);
   const name = input.employerName.trim();
   if (!name && !input.companyId) {
     throw new TenantError("Enter the employer's name.");
@@ -361,12 +489,17 @@ export async function nameApplicationEmployer(input: {
     }
     companyId = created.id;
   }
-  const website = input.website?.trim() || null;
+  const assigned = await assignSharedCompanyWebsite({
+    organizationId: input.organizationId,
+    companyId,
+    website: parsedWebsite.website,
+    domain: parsedWebsite.domain,
+  });
   await prisma.jobRequirement.update({
     where: { id: requirement.id },
     data: {
       suppliedEmployerName: name || undefined,
-      suppliedEmployerWebsite: website,
+      suppliedEmployerWebsite: parsedWebsite.website,
       companyName: name || requirement.companyName,
       companyId,
       employerDisposition: "IDENTIFIED",
@@ -379,7 +512,49 @@ export async function nameApplicationEmployer(input: {
     organizationId: input.organizationId,
     campaignId: input.campaignId,
     companyId,
+    requireAnchoredRun: true,
   });
+  return { conflict: assigned.conflict };
+}
+
+export async function saveApplicationEmployerWebsite(input: {
+  organizationId: string;
+  campaignId: string;
+  website: string;
+}): Promise<{ conflict: boolean }> {
+  const requirement = await prisma.jobRequirement.findFirst({
+    where: { campaignId: input.campaignId, organizationId: input.organizationId },
+  });
+  if (!requirement) {
+    throw new TenantError(
+      `This ${vocab.campaign.singular} has no job requirement.`,
+    );
+  }
+  const parsedWebsite = parseEmployerWebsite(input.website);
+  if (!parsedWebsite.ok) throw new TenantError(parsedWebsite.message);
+  let conflict = false;
+  if (requirement.companyId) {
+    const assigned = await assignSharedCompanyWebsite({
+      organizationId: input.organizationId,
+      companyId: requirement.companyId,
+      website: parsedWebsite.website,
+      domain: parsedWebsite.domain,
+    });
+    conflict = assigned.conflict;
+  }
+  await prisma.jobRequirement.update({
+    where: { id: requirement.id },
+    data: { suppliedEmployerWebsite: parsedWebsite.website },
+  });
+  if (requirement.companyId && requirement.employerDisposition === "IDENTIFIED") {
+    await queueApplicationResearch({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      companyId: requirement.companyId,
+      requireAnchoredRun: true,
+    });
+  }
+  return { conflict };
 }
 
 export async function rescoreApplicationFit(input: {
@@ -463,6 +638,13 @@ export async function ensureIdentityVerification(input: {
   if (!research || (research.status !== "COMPLETED" && research.status !== "PARTIAL")) {
     return;
   }
+  const anchor = employerWebsiteAnchor({
+    suppliedEmployerWebsite: requirement.suppliedEmployerWebsite,
+    companyWebsite: requirement.company?.website,
+    companyDomain: requirement.company?.normalizedDomain,
+  });
+  const stamped = anchorHostFromResearchTimings(research.researchStageTimings);
+  if (stamped && anchor && stamped === anchor.domain) return;
   const stored = parseIdentityVerification(requirement.identityVerificationJson);
   if (stored && requirement.identityConfirmation !== "PENDING") {
     return;
@@ -632,6 +814,17 @@ export async function retryApplicationResearch(input: {
       data: { companyId, employerDisposition: "IDENTIFIED" },
     });
   }
+  const company = await prisma.company.findFirst({
+    where: { id: companyId, organizationId: input.organizationId },
+  });
+  const anchor = employerWebsiteAnchor({
+    suppliedEmployerWebsite: requirement.suppliedEmployerWebsite,
+    companyWebsite: company?.website,
+    companyDomain: company?.normalizedDomain,
+  });
+  if (!anchor) {
+    throw new TenantError(applicationResearchCopy.websiteRequired);
+  }
   await prisma.jobRequirement.update({
     where: { id: requirement.id },
     data: {
@@ -644,9 +837,6 @@ export async function retryApplicationResearch(input: {
   const campaign = await prisma.campaign.findFirst({
     where: { id: input.campaignId, organizationId: input.organizationId },
     select: { companyResearchNotes: true },
-  });
-  const company = await prisma.company.findFirst({
-    where: { id: companyId, organizationId: input.organizationId },
   });
   if (company) {
     const { getResearchPolicy } = await import("@/lib/usage/policy-service");
@@ -661,8 +851,8 @@ export async function retryApplicationResearch(input: {
     const latest = await getLatestCompanyResearch(company.id);
     const fingerprint = companyResearchFingerprint({
       name: company.name,
-      website: company.website,
-      normalizedDomain: company.normalizedDomain,
+      website: anchor.website,
+      normalizedDomain: anchor.domain,
       industry: company.industry,
       employeeCount: company.employeeCount,
       location: company.location,

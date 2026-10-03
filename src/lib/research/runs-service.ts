@@ -649,7 +649,9 @@ async function failApplicationResearchRun(
 }
 
 async function processApplicationResearchRun(run: ResearchRun): Promise<void> {
-  if (!run.campaignId || !run.currentCompanyId) {
+  const campaignId = run.campaignId;
+  const companyId = run.currentCompanyId;
+  if (!campaignId || !companyId) {
     await failApplicationResearchRun(
       run.id,
       "Application research run is missing campaign or company.",
@@ -658,7 +660,7 @@ async function processApplicationResearchRun(run: ResearchRun): Promise<void> {
   }
 
   const campaign = await prisma.campaign.findFirst({
-    where: { id: run.campaignId, organizationId: run.organizationId },
+    where: { id: campaignId, organizationId: run.organizationId },
     select: { icpId: true, companyResearchNotes: true },
   });
   if (!campaign) {
@@ -687,11 +689,30 @@ async function processApplicationResearchRun(run: ResearchRun): Promise<void> {
           data: { workerHeartbeatAt: new Date() },
         });
 
-        const result = await researchCompany(run.currentCompanyId!, {
+        const { employerWebsiteAnchor } = await import(
+          "@/lib/application/company-website"
+        );
+        const requirement = await prisma.jobRequirement.findFirst({
+          where: {
+            campaignId,
+            organizationId: run.organizationId,
+          },
+          select: {
+            suppliedEmployerWebsite: true,
+            company: { select: { website: true, normalizedDomain: true } },
+          },
+        });
+        const anchor = employerWebsiteAnchor({
+          suppliedEmployerWebsite: requirement?.suppliedEmployerWebsite,
+          companyWebsite: requirement?.company?.website,
+          companyDomain: requirement?.company?.normalizedDomain,
+        });
+        const result = await researchCompany(companyId, {
           force: run.forceRefresh,
           seekerSuppliedNotes:
             campaign.companyResearchNotes?.trim() || undefined,
-          campaignId: run.campaignId,
+          campaignId,
+          anchorWebsite: anchor?.website ?? null,
         });
 
         const { finishApplicationAfterResearch } = await import(
@@ -699,9 +720,9 @@ async function processApplicationResearchRun(run: ResearchRun): Promise<void> {
         );
         await finishApplicationAfterResearch({
           organizationId: run.organizationId,
-          campaignId: run.campaignId!,
+          campaignId,
           icpId: campaign.icpId,
-          companyId: run.currentCompanyId!,
+          companyId,
           result,
         });
 

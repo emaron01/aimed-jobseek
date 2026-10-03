@@ -9,6 +9,7 @@ import {
   type PaidCallOperation,
 } from "@/lib/ai/paid-call-gate";
 import { RESEARCH_PROMPT_VERSION } from "@/lib/research/config";
+import { normalizeDomain } from "@/lib/research/normalize";
 import {
   hasUsableCompanyResearchFields,
   type CompanyResearchContent,
@@ -47,12 +48,15 @@ export function companyResearchFingerprint(input: {
   depthPolicy: CompanyResearchDepthPolicy;
   evidenceTargets?: string[] | null;
 }): string {
+  const website = input.website?.trim() || null;
+  const normalizedDomain = input.normalizedDomain?.trim() || null;
   return fingerprintPaidCallInputs({
     promptVersion: RESEARCH_PROMPT_VERSION,
     schemaName,
     name: input.name.trim(),
-    website: input.website?.trim() || null,
-    normalizedDomain: input.normalizedDomain?.trim() || null,
+    website,
+    normalizedDomain,
+    anchorHost: normalizedDomain?.toLowerCase() || normalizeDomain(website) || null,
     industry: input.industry?.trim() || null,
     employeeCount: input.employeeCount,
     location: input.location?.trim() || null,

@@ -35,6 +35,7 @@ describe("workflow audit fixes", () => {
       formFrom({
         name: "Northline engineer",
         postingText: NORMAL_JOB_POSTING,
+        companyWebsite: "https://northline.example",
         productId: "prod_1",
       }),
     );
@@ -311,6 +312,7 @@ describe.skipIf(!hasTestDatabase())("workflow audit database behavior", { timeou
         campaignId: campaign.id,
         rawText: NORMAL_JOB_POSTING,
         postingUrl: null,
+        employerWebsite: "https://northline.example",
         parsed,
         icpId: null,
       });
@@ -339,6 +341,7 @@ describe.skipIf(!hasTestDatabase())("workflow audit database behavior", { timeou
         rawText: NORMAL_JOB_POSTING,
         title: parsed.title,
         companyName: parsed.companyName,
+        suppliedEmployerWebsite: "https://northline.example",
         scorecardJson: parsed.scorecard,
       },
     });

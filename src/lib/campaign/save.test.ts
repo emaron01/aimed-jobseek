@@ -25,6 +25,7 @@ describe("parseCampaignFormData", () => {
       formFrom({
         name: "Q1 Outreach",
         postingText: "Senior engineer at Acme",
+        companyWebsite: "https://acme.example",
         productId: "prod_1",
         icpId: "icp_1",
         personaId: "persona_1",
@@ -55,6 +56,7 @@ describe("parseCampaignFormData", () => {
       formFrom({
         name: "Q1 Outreach",
         postingText: "Senior engineer at Acme",
+        companyWebsite: "https://acme.example",
         productId: "prod_1",
         icpId: "icp_1",
         allPersonas: "1",

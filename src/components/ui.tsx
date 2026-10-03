@@ -84,22 +84,28 @@ export function Field({
   label,
   name,
   defaultValue,
+  value,
+  onChange,
   type = "text",
   required,
   placeholder,
   hint,
   as = "input",
   rows = 3,
+  testId,
 }: {
   label: string;
   name: string;
   defaultValue?: string | number | null;
+  value?: string;
+  onChange?: (value: string) => void;
   type?: string;
   required?: boolean;
   placeholder?: string;
   hint?: string;
   as?: "input" | "textarea";
   rows?: number;
+  testId?: string;
 }) {
   const shared =
     "mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-focus placeholder:text-subtle focus:ring-2";
@@ -115,19 +121,25 @@ export function Field({
       {as === "textarea" ? (
         <AutosizeTextarea
           name={name}
-          defaultValue={defaultValue ?? ""}
+          {...(value !== undefined
+            ? { value, onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => onChange?.(event.target.value) }
+            : { defaultValue: defaultValue ?? "" })}
           required={required}
           placeholder={placeholder}
           minRows={rows}
+          data-testid={testId}
           className={`${shared} resize-none overflow-hidden`}
         />
       ) : (
         <input
           name={name}
           type={type}
-          defaultValue={defaultValue ?? ""}
+          {...(value !== undefined
+            ? { value, onChange: (event: React.ChangeEvent<HTMLInputElement>) => onChange?.(event.target.value) }
+            : { defaultValue: defaultValue ?? "" })}
           required={required}
           placeholder={placeholder}
+          data-testid={testId}
           className={shared}
         />
       )}
