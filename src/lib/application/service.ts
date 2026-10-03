@@ -13,6 +13,7 @@ import {
   markIdentityDependentsStale,
   scoreFit,
 } from "@/lib/application/research-finish";
+import { applicationResearchFingerprint } from "@/lib/research/company-research-paid-inputs";
 import { enqueueApplicationResearch } from "@/lib/research/runs-service";
 import { interpretJobPosting } from "@/lib/job-requirement/parse";
 import {
@@ -174,6 +175,42 @@ export async function assignSharedCompanyWebsite(input: {
   return { conflict: true };
 }
 
+async function applicationResearchFingerprintMatches(input: {
+  organizationId: string;
+  campaignId: string;
+  anchorHost: string;
+  anchorWebsite: string;
+}): Promise<boolean> {
+  const [campaign, requirement, stored] = await Promise.all([
+    prisma.campaign.findFirst({
+      where: { id: input.campaignId, organizationId: input.organizationId },
+      select: { companyResearchNotes: true },
+    }),
+    prisma.jobRequirement.findFirst({
+      where: { campaignId: input.campaignId, organizationId: input.organizationId },
+      select: { title: true, postingUrl: true, rawText: true },
+    }),
+    prisma.applicationEmployerResearch.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+      },
+      orderBy: { updatedAt: "desc" },
+    }),
+  ]);
+  if (!stored) return false;
+  if (stored.status !== "COMPLETED" && stored.status !== "PARTIAL") return false;
+  const fingerprint = applicationResearchFingerprint({
+    anchorHost: input.anchorHost,
+    website: input.anchorWebsite,
+    postingTitle: requirement?.title ?? null,
+    postingUrl: requirement?.postingUrl ?? null,
+    postingText: requirement?.rawText ?? null,
+    seekerSuppliedNotes: campaign?.companyResearchNotes,
+  });
+  return stored.inputFingerprint === fingerprint;
+}
+
 async function queueApplicationResearch(input: {
   organizationId: string;
   campaignId: string;
@@ -196,10 +233,24 @@ async function queueApplicationResearch(input: {
       const { getResearchPolicy } = await import("@/lib/usage/policy-service");
       const { isResearchFresh } = await import("@/lib/research/freshness");
       const policy = await getResearchPolicy(input.organizationId);
-      if (isResearchFresh(latest, new Date(), policy.researchFreshnessDays)) {
-        const stamped = anchorHostFromResearchTimings(latest.researchStageTimings);
-        if (!input.requireAnchoredRun || stamped === anchor.domain) return;
-      }
+      // Shared-company freshness is not a reason to reuse another application's research.
+      const companyRowFresh = isResearchFresh(
+        latest,
+        new Date(),
+        policy.researchFreshnessDays,
+      );
+      void companyRowFresh;
+      void input.requireAnchoredRun;
+    }
+    if (
+      await applicationResearchFingerprintMatches({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        anchorHost: anchor.domain,
+        anchorWebsite: anchor.website,
+      })
+    ) {
+      return;
     }
   }
   await enqueueApplicationResearch({
@@ -263,7 +314,20 @@ export async function ensureNamedEmployerResearch(input: {
     const { getResearchPolicy } = await import("@/lib/usage/policy-service");
     const { isResearchFresh } = await import("@/lib/research/freshness");
     const policy = await getResearchPolicy(input.organizationId);
-    if (isResearchFresh(latest, new Date(), policy.researchFreshnessDays)) {
+    const companyRowFresh = isResearchFresh(
+      latest,
+      new Date(),
+      policy.researchFreshnessDays,
+    );
+    if (
+      companyRowFresh &&
+      (await applicationResearchFingerprintMatches({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        anchorHost: anchor.domain,
+        anchorWebsite: anchor.website,
+      }))
+    ) {
       return;
     }
   }

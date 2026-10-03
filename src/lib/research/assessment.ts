@@ -16,13 +16,14 @@ export const companyResearchAiResultSchema = z.object({
   customerTypes: z.array(z.string()),
   primaryMarkets: z.array(z.string()),
   businessModel: z.string().nullable(),
-  estimatedAov: z.string().nullable(),
-  aovReasoning: z.string().nullable(),
   companySizeContext: z.string().nullable(),
   relevantTechnologies: z.array(z.string()),
-  buyingSignals: z.array(z.string()),
   hiringSignals: z.array(z.string()),
   riskSignals: z.array(z.string()),
+  /** Part of the company the job serves. */
+  jobFocus: z.string().nullable(),
+  /** In-depth research on that part of the company. */
+  jobFocusDetail: z.string().nullable(),
   confidence: z.enum(["HIGH", "MEDIUM", "LOW"]),
   /** Identity certainty — AMBIGUOUS forces partial/low-confidence handling. */
   identityCertainty: z.enum(["HIGH", "MEDIUM", "LOW", "AMBIGUOUS"]).optional(),

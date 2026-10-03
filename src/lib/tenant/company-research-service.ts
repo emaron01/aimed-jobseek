@@ -4,6 +4,7 @@
  */
 
 import type {
+  ApplicationEmployerResearch,
   Company,
   CompanyResearch,
   CompanyResearchStatus,
@@ -46,6 +47,8 @@ import {
 import { isDevTenantBypassEnabled } from "@/lib/auth/config-core";
 import {
   COMPANY_RESEARCH_UNCHANGED_REASON,
+  applicationResearchFingerprint,
+  applicationResearchSubjectKey,
   companyResearchFingerprint,
   companyResearchFingerprintUnchanged,
   runGatedCompanyResearch,
@@ -867,6 +870,96 @@ export async function saveCompanyResearch(input: {
   });
 }
 
+export async function saveApplicationEmployerResearch(input: {
+  campaignId: string;
+  companyId: string;
+  result: CompanyResearchResult;
+  identityAmbiguous?: boolean;
+  status?: CompanyResearchStatus;
+  provenance?: CompanyResearchProvenance | null;
+  usage?: {
+    inputTokens?: number | null;
+    outputTokens?: number | null;
+    webSearchCallCount?: number | null;
+    researchDurationMs?: number | null;
+  } | null;
+  telemetry?: {
+    searchStagesUsed?: number | null;
+    researchStoppedReason?: string | null;
+    researchStageTimings?: Prisma.InputJsonValue | null;
+  } | null;
+  researchedByUserId?: string | null;
+  anchorHost: string;
+  inputFingerprint: string;
+}): Promise<ApplicationEmployerResearch> {
+  const organizationId = await orgId();
+  const now = new Date();
+  const sources = input.result.sources ?? [];
+  return prisma.applicationEmployerResearch.create({
+    data: {
+      organizationId,
+      campaignId: input.campaignId,
+      companyId: input.companyId,
+      status: input.status ?? "COMPLETED",
+      companySummary: input.result.companySummary,
+      whatTheySell: input.result.whatTheySell,
+      customerTypes: input.result.customerTypes,
+      primaryMarkets: input.result.primaryMarkets,
+      businessModel: input.result.businessModel,
+      companySizeContext: input.result.companySizeContext,
+      relevantTechnologies: input.result.relevantTechnologies,
+      hiringSignals: input.result.hiringSignals ?? [],
+      riskSignals: input.result.riskSignals,
+      jobFocus: input.result.jobFocus?.trim() || null,
+      jobFocusDetail: input.result.jobFocusDetail?.trim() || null,
+      identityAmbiguous: input.identityAmbiguous ?? false,
+      researchConfidence: input.result.confidence,
+      sourceCount: sources.length,
+      researchSources: sources,
+      promptVersion: input.provenance?.promptVersion ?? null,
+      anchorHost: input.anchorHost,
+      inputFingerprint: input.inputFingerprint,
+      researchedAt: now,
+      aiProvider: input.provenance?.aiProvider ?? null,
+      aiModel: input.provenance?.aiModel ?? null,
+      aiModelUrlIdentifier: input.provenance?.aiModelUrlIdentifier ?? null,
+      inputTokens: input.usage?.inputTokens ?? null,
+      outputTokens: input.usage?.outputTokens ?? null,
+      webSearchCallCount: input.usage?.webSearchCallCount ?? null,
+      researchDurationMs: input.usage?.researchDurationMs ?? null,
+      searchStagesUsed: input.telemetry?.searchStagesUsed ?? null,
+      researchStoppedReason: input.telemetry?.researchStoppedReason ?? null,
+      researchStageTimings: (appendAnchorHostTiming(
+        input.telemetry?.researchStageTimings ?? null,
+        input.anchorHost,
+      ) ?? undefined) as Prisma.InputJsonValue | undefined,
+      researchedByUserId: input.researchedByUserId ?? null,
+    },
+  });
+}
+
+async function latestApplicationEmployerResearch(
+  organizationId: string,
+  campaignId: string,
+): Promise<ApplicationEmployerResearch | null> {
+  return prisma.applicationEmployerResearch.findFirst({
+    where: { organizationId, campaignId },
+    orderBy: { updatedAt: "desc" },
+  });
+}
+
+function applicationResearchIsReusable(
+  research: ApplicationEmployerResearch | null,
+  fingerprint: string,
+): research is ApplicationEmployerResearch {
+  if (!research) return false;
+  if (research.status !== "COMPLETED" && research.status !== "PARTIAL") return false;
+  if (research.inputFingerprint !== fingerprint) return false;
+  return (
+    hasUsableCompanyResearchFields(research) || Boolean(research.jobFocus?.trim())
+  );
+}
+
 function isSuccessfulResearch(
   research: CompanyResearch | null,
 ): research is CompanyResearch {
@@ -880,7 +973,7 @@ function isSuccessfulResearch(
 export type ResearchCompanyResult = {
   skipped: boolean;
   reason?: string;
-  research: CompanyResearch | null;
+  research: CompanyResearch | ApplicationEmployerResearch | null;
   refreshFailed?: boolean;
   researchFailed?: boolean;
   failure?: ResearchFailureInfo;
@@ -934,36 +1027,64 @@ export async function researchCompany(
   }
 
   const latest = latestBeforeAnchor;
+  const campaignId = options?.campaignId?.trim() || null;
+  const posting = campaignId
+    ? await prisma.jobRequirement.findFirst({
+        where: { campaignId, organizationId },
+        select: { title: true, postingUrl: true, rawText: true },
+      })
+    : null;
   const stampedHost = latest
     ? anchorHostFromResearchTimings(latest.researchStageTimings)
     : null;
   const replacingUnanchored =
     Boolean(options?.anchorWebsite) && stampedHost !== anchor.domain;
   if (
+    !campaignId &&
     !options?.force &&
     !replacingUnanchored &&
     latest &&
     isResearchFresh(latest, new Date(), researchPolicy.researchFreshnessDays)
   ) {
-    // Fresh reusable research: access does not consume a new active-company slot
-    // and does not create duplicate UsageEvents.
+    // Company-level freshness still applies to a shared company run.
+    // An application reuses only its own fingerprint, not another application's row.
     return { skipped: true, reason: "fresh", research: latest };
   }
 
-  const fingerprint = companyResearchFingerprint({
-    name: company.name,
-    website: anchor.website,
-    normalizedDomain: anchor.domain,
-    industry: company.industry,
-    employeeCount: company.employeeCount,
-    location: company.location,
-    seekerSuppliedNotes: options?.seekerSuppliedNotes,
-    depthPolicy: researchPolicy,
-    evidenceTargets: options?.evidenceTargets,
-  });
+  const fingerprint = campaignId
+    ? applicationResearchFingerprint({
+        anchorHost: anchor.domain,
+        website: anchor.website,
+        postingTitle: posting?.title ?? null,
+        postingUrl: posting?.postingUrl ?? null,
+        postingText: posting?.rawText ?? null,
+        seekerSuppliedNotes: options?.seekerSuppliedNotes,
+      })
+    : companyResearchFingerprint({
+        name: company.name,
+        website: anchor.website,
+        normalizedDomain: anchor.domain,
+        industry: company.industry,
+        employeeCount: company.employeeCount,
+        location: company.location,
+        seekerSuppliedNotes: options?.seekerSuppliedNotes,
+        depthPolicy: researchPolicy,
+        evidenceTargets: options?.evidenceTargets,
+      });
 
-  // forceRefresh ignores the freshness window, not identical inputs.
-  if (
+  if (campaignId) {
+    const stored = await latestApplicationEmployerResearch(
+      organizationId,
+      campaignId,
+    );
+    if (applicationResearchIsReusable(stored, fingerprint)) {
+      return {
+        skipped: true,
+        reason: COMPANY_RESEARCH_UNCHANGED_REASON,
+        research: stored,
+      };
+    }
+  } else if (
     isSuccessfulResearch(latest) &&
     (await companyResearchFingerprintUnchanged({
       organizationId,
@@ -972,6 +1093,7 @@ export async function researchCompany(
       research: latest,
     }))
   ) {
+    // forceRefresh ignores the freshness window, not identical inputs.
     return {
       skipped: true,
       reason: COMPANY_RESEARCH_UNCHANGED_REASON,
@@ -990,7 +1112,7 @@ export async function researchCompany(
   // Advisory lock covers check + claim INSERT so two concurrent firsts cannot both win.
   const lockKey = `company-research-intro:${organizationId}:${company.id}`;
   let isFirstIntroducer = false;
-  if (user) {
+  if (user && !campaignId) {
     try {
       isFirstIntroducer = await prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
@@ -1089,12 +1211,43 @@ export async function researchCompany(
       }
       throw error;
     }
-  } else if (!(await orgHasAnyCompanyResearch(organizationId, company.id))) {
+  } else if (
+    !campaignId &&
+    !(await orgHasAnyCompanyResearch(organizationId, company.id))
+  ) {
     isFirstIntroducer = true;
   }
 
+  // Application runs do not insert a shared CompanyResearch row.
+  // The allowance is still checked. A matching fingerprint already returned above.
+  if (user && campaignId) {
+    try {
+      await assertUsageAllowed({
+        organizationId,
+        userId: user.id,
+        resource: "ACTIVE_RESEARCHED_COMPANY",
+        wouldConsumeNewActiveCompanySlot: !alreadyHasActiveSlot,
+        companyId: company.id,
+      });
+    } catch (error) {
+      if (
+        error instanceof UsageQuotaError ||
+        error instanceof PaymentLockError ||
+        error instanceof OrganizationReadOnlyError
+      ) {
+        return {
+          skipped: true,
+          reason: error.message,
+          research: priorSuccessful ?? latest,
+          quotaBlocked: true,
+        };
+      }
+      throw error;
+    }
+  }
+
   // Non-first refresh: payment-lock gate only (no net-new slot).
-  if (user && !isFirstIntroducer) {
+  if (user && !campaignId && !isFirstIntroducer) {
     try {
       await assertUsageAllowed({
         organizationId,
@@ -1127,6 +1280,16 @@ export async function researchCompany(
     provider instanceof UnconfiguredCompanyResearchProvider ||
     !isResearchAiConfigured()
   ) {
+    if (campaignId) {
+      return {
+        skipped: true,
+        reason: "provider_unconfigured",
+        research: await latestApplicationEmployerResearch(
+          organizationId,
+          campaignId,
+        ),
+      };
+    }
     const afterClaim = await getLatestCompanyResearch(company.id);
     if (afterClaim) {
       return {
@@ -1154,6 +1317,9 @@ export async function researchCompany(
       organizationId,
       companyId: company.id,
       fingerprint,
+      subjectKey: campaignId
+        ? applicationResearchSubjectKey(organizationId, campaignId)
+        : undefined,
       callProvider: async () =>
         (await provider.research({
           organizationId,
@@ -1167,12 +1333,27 @@ export async function researchCompany(
           depthPolicy: researchPolicy,
           evidenceTargets: options?.evidenceTargets,
           seekerSuppliedNotes: options?.seekerSuppliedNotes,
-          campaignId: options?.campaignId ?? null,
+          campaignId,
           userId: user?.id ?? null,
+          postingTitle: posting?.title ?? null,
+          postingUrl: posting?.postingUrl ?? null,
+          postingText: posting?.rawText ?? null,
         })) as CompanyResearchResult,
     });
 
-    if (gated.skipped) {
+    if (gated.skipped && campaignId) {
+      const stored = await latestApplicationEmployerResearch(
+        organizationId,
+        campaignId,
+      );
+      if (applicationResearchIsReusable(stored, fingerprint)) {
+        return {
+          skipped: true,
+          reason: COMPANY_RESEARCH_UNCHANGED_REASON,
+          research: stored,
+        };
+      }
+    } else if (gated.skipped) {
       const current = await getLatestCompanyResearch(company.id);
       if (isSuccessfulResearch(current)) {
         return {
@@ -1202,24 +1383,40 @@ export async function researchCompany(
                 : null,
           }
         : null;
-    const status: CompanyResearchStatus = hasUsableCompanyResearchFields(result)
-      ? "COMPLETED"
-      : "PARTIAL";
+    const status: CompanyResearchStatus =
+      hasUsableCompanyResearchFields(result) || Boolean(result.jobFocus?.trim())
+        ? "COMPLETED"
+        : "PARTIAL";
 
-    const saved = await saveCompanyResearch({
-      companyId: company.id,
-      result,
-      identityAmbiguous:
-        "identityAmbiguous" in result && result.identityAmbiguous === true,
-      researchMethod: "AUTOMATED",
-      status,
-      provenance,
-      usage,
-      telemetry,
-      researchedByUserId: user?.id ?? null,
-      freshnessDays: researchPolicy.researchFreshnessDays,
-      anchorHost: anchor.domain,
-    });
+    const saved = campaignId
+      ? await saveApplicationEmployerResearch({
+          campaignId,
+          companyId: company.id,
+          result,
+          identityAmbiguous:
+            "identityAmbiguous" in result && result.identityAmbiguous === true,
+          status,
+          provenance,
+          usage,
+          telemetry,
+          researchedByUserId: user?.id ?? null,
+          anchorHost: anchor.domain,
+          inputFingerprint: fingerprint,
+        })
+      : await saveCompanyResearch({
+          companyId: company.id,
+          result,
+          identityAmbiguous:
+            "identityAmbiguous" in result && result.identityAmbiguous === true,
+          researchMethod: "AUTOMATED",
+          status,
+          provenance,
+          usage,
+          telemetry,
+          researchedByUserId: user?.id ?? null,
+          freshnessDays: researchPolicy.researchFreshnessDays,
+          anchorHost: anchor.domain,
+        });
 
     // Per-stage UsageEvents are recorded via aiCallTracking on each
     // generateStructured call (tokens, cached tokens, cost, campaignId).

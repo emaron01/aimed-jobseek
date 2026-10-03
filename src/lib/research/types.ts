@@ -49,6 +49,11 @@ export type CompanyResearchResult = {
 
   confidence: ResearchConfidenceValue;
 
+  /** Part of the company the job serves. */
+  jobFocus?: string | null;
+  /** In-depth research on that part of the company. */
+  jobFocusDetail?: string | null;
+
   sources: ResearchSource[];
 };
 
@@ -98,6 +103,12 @@ export type CompanyResearchInput = {
   campaignId?: string | null;
   /** Seeker who initiated research, when known. */
   userId?: string | null;
+  /** Job title from the application posting. */
+  postingTitle?: string | null;
+  /** URL of the job posting. */
+  postingUrl?: string | null;
+  /** Posting text, or the stored job requirement text. */
+  postingText?: string | null;
 };
 
 export interface CompanyResearchProvider {

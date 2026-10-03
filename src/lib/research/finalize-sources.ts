@@ -3,7 +3,14 @@
  * Keep official website + sources with supports; near-dedupe; rank.
  */
 
+import {
+  hostIsAnchorOrSubdomain,
+  hostIsApprovedNews,
+  researchSourceHost,
+  textNamesCompanyOrJobFocus,
+} from "@/lib/research/source-policy";
 import type { ResearchSource, ResearchSourceType } from "@/lib/research/types";
+import type { SourceExcerpt } from "@/lib/research/sources";
 
 function normalizeUrlKey(url: string): string | null {
   try {
@@ -104,10 +111,54 @@ export function researchSourceQualityScore(
   );
 }
 
+function sourceNamesSubject(
+  source: ResearchSource,
+  excerpts: SourceExcerpt[],
+  names: Array<string | null | undefined>,
+): boolean {
+  const excerptText = excerpts
+    .filter((excerpt) => excerpt.url === source.url)
+    .map((excerpt) => excerpt.text)
+    .join(" ");
+  return textNamesCompanyOrJobFocus(
+    [source.title, source.publisher, excerptText, ...source.supports]
+      .filter((part) => part && part.trim())
+      .join(" "),
+    names,
+  );
+}
+
+/**
+ * Keep the anchor host and its subdomains.
+ * Keep an approved news host only when its title or text names the company
+ * or the part of the company the job serves.
+ * Drop every other host before save, including fundraisers and lookalikes.
+ */
+export function sourceKeptForEmployerResearch(input: {
+  source: ResearchSource;
+  anchorHost: string | null;
+  companyName?: string | null;
+  jobFocus?: string | null;
+  excerpts?: SourceExcerpt[];
+}): boolean {
+  const host = researchSourceHost(input.source.url);
+  if (!host) return false;
+  if (hostIsAnchorOrSubdomain(host, input.anchorHost)) return true;
+  if (!hostIsApprovedNews(host)) return false;
+  if (input.source.supports.length === 0) return false;
+  return sourceNamesSubject(input.source, input.excerpts ?? [], [
+    input.companyName,
+    input.jobFocus,
+  ]);
+}
+
 export function finalizeResearchSources(input: {
   sources: ResearchSource[];
   companyWebsiteUrl?: string | null;
   companyDomain?: string | null;
+  companyName?: string | null;
+  jobFocus?: string | null;
+  excerpts?: SourceExcerpt[];
   maxSources: number;
 }): ResearchSource[] {
   const websiteUrl = input.companyWebsiteUrl ?? null;
@@ -124,9 +175,17 @@ export function finalizeResearchSources(input: {
     }
   }
 
+  const anchorHost = domain?.trim() || hostOf(websiteUrl ?? "") || null;
   const candidates = [...exact.values()].filter((source) => {
     const official = isOfficialWebsite(source, websiteUrl, domain);
-    return official || source.supports.length > 0;
+    if (!(official || source.supports.length > 0)) return false;
+    return sourceKeptForEmployerResearch({
+      source,
+      anchorHost,
+      companyName: input.companyName,
+      jobFocus: input.jobFocus,
+      excerpts: input.excerpts,
+    });
   });
 
   // Near-dedupe: keep the best-scoring URL per story key.

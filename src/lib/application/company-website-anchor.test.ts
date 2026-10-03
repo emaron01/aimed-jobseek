@@ -579,9 +579,6 @@ describe.skipIf(!hasTestDatabase())("company website anchor against postgres", (
     });
     try {
       const { researchCompany } = await import("@/lib/tenant/company-research-service");
-      const { companyResearchFingerprint } = await import(
-        "@/lib/research/company-research-paid-inputs"
-      );
       const result = await withTestTenant(organizationId, () =>
         researchCompany(company.id, {
           anchorWebsite: `https://www.anchor-${suffix}.example`,
@@ -596,11 +593,12 @@ describe.skipIf(!hasTestDatabase())("company website anchor against postgres", (
         normalizedDomain: `anchor-${suffix}.example`,
         seekerSuppliedNotes: "Paste: the About page describes digital brand protection.",
         campaignId: campaign.id,
+        postingText: "Senior Director of Sales",
+        postingTitle: null,
+        postingUrl: null,
       });
-      expect(seen).not.toHaveProperty("postingText");
-      expect(seen).not.toHaveProperty("rawText");
-      const stamped = await prisma.companyResearch.findFirstOrThrow({
-        where: { companyId: company.id },
+      const stamped = await prisma.applicationEmployerResearch.findFirstOrThrow({
+        where: { campaignId: campaign.id },
         orderBy: { updatedAt: "desc" },
       });
       expect(stamped.researchStageTimings).toEqual(
@@ -608,26 +606,24 @@ describe.skipIf(!hasTestDatabase())("company website anchor against postgres", (
           expect.objectContaining({ anchorHost: `anchor-${suffix}.example` }),
         ]),
       );
-      const { getResearchPolicy } = await import("@/lib/usage/policy-service");
-      const policy = await getResearchPolicy(organizationId);
-      const fingerprint = companyResearchFingerprint({
-        name: company.name,
+      expect(
+        await prisma.companyResearch.count({ where: { companyId: company.id } }),
+      ).toBe(0);
+      const { applicationResearchFingerprint, applicationResearchSubjectKey, COMPANY_RESEARCH_OPERATION } =
+        await import("@/lib/research/company-research-paid-inputs");
+      const fingerprint = applicationResearchFingerprint({
+        anchorHost: `anchor-${suffix}.example`,
         website: `https://anchor-${suffix}.example`,
-        normalizedDomain: `anchor-${suffix}.example`,
-        industry: company.industry,
-        employeeCount: company.employeeCount,
-        location: company.location,
+        postingTitle: null,
+        postingUrl: null,
+        postingText: "Senior Director of Sales",
         seekerSuppliedNotes: "Paste: the About page describes digital brand protection.",
-        depthPolicy: policy,
       });
-      const { COMPANY_RESEARCH_OPERATION } = await import(
-        "@/lib/research/company-research-paid-inputs"
-      );
       const receipt = await prisma.paidCallReceipt.findFirst({
         where: {
           organizationId,
           operation: COMPANY_RESEARCH_OPERATION,
-          subjectKey: `${organizationId}:${company.id}`,
+          subjectKey: applicationResearchSubjectKey(organizationId, campaign.id),
         },
       });
       expect(receipt?.inputHash).toBe(fingerprint);

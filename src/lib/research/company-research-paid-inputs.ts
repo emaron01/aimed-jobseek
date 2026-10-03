@@ -37,6 +37,38 @@ export function companyResearchSubjectKey(
   return `${organizationId}:${companyId}`;
 }
 
+/** One paid-call receipt per application, not per shared company. */
+export function applicationResearchSubjectKey(
+  organizationId: string,
+  campaignId: string,
+): string {
+  return `${organizationId}:campaign:${campaignId}`;
+}
+
+/**
+ * Reuse only when the anchor, posting, notes, and prompt version match.
+ * Key order is part of the hash.
+ */
+export function applicationResearchFingerprint(input: {
+  anchorHost: string;
+  website: string | null;
+  postingTitle: string | null;
+  postingUrl: string | null;
+  postingText: string | null;
+  seekerSuppliedNotes?: string | null;
+}): string {
+  return fingerprintPaidCallInputs({
+    promptVersion: RESEARCH_PROMPT_VERSION,
+    schemaName,
+    anchorHost: input.anchorHost.trim().toLowerCase(),
+    website: input.website?.trim() || null,
+    postingTitle: input.postingTitle?.trim() || null,
+    postingUrl: input.postingUrl?.trim() || null,
+    postingText: input.postingText?.trim() || null,
+    seekerSuppliedNotes: input.seekerSuppliedNotes?.trim() || null,
+  });
+}
+
 export function companyResearchFingerprint(input: {
   name: string;
   website: string | null;
@@ -103,15 +135,15 @@ export async function runGatedCompanyResearch(input: {
   organizationId: string;
   companyId: string;
   fingerprint: string;
+  subjectKey?: string;
   callProvider: () => Promise<CompanyResearchResult>;
 }): Promise<{ data: CompanyResearchResult; skipped: boolean }> {
   return runPaidStructuredCall({
     organizationId: input.organizationId,
     operation: COMPANY_RESEARCH_OPERATION,
-    subjectKey: companyResearchSubjectKey(
-      input.organizationId,
-      input.companyId,
-    ),
+    subjectKey:
+      input.subjectKey ??
+      companyResearchSubjectKey(input.organizationId, input.companyId),
     inputFingerprint: input.fingerprint,
     parseStored: (json) => json as CompanyResearchResult,
     isResultUsable: isUsableCompanyResearchResult,

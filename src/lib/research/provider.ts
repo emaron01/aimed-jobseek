@@ -17,6 +17,11 @@ import {
   mergeEvidenceBundles,
 } from "@/lib/research/evidence";
 import { finalizeResearchSources } from "@/lib/research/finalize-sources";
+import {
+  anchorHostEvidenceEnough,
+  employerSearchBudget,
+  shouldRunAnotherEmployerSearch,
+} from "@/lib/research/source-policy";
 import { buildCompanyResearchMessages } from "@/lib/research/prompt";
 import { appendSeekerSuppliedResearchEvidence } from "@/lib/research/seeker-supplied-notes";
 import {
@@ -169,7 +174,25 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
       let current: CompanyResearchResult | undefined;
       let websitePrefetchGatePass: boolean | undefined;
 
-      const maxQueries = Math.max(1, depth.maxSearchQueriesPerCompany);
+      const maxQueries = employerSearchBudget(depth.maxSearchQueriesPerCompany);
+      const postingProvided = Boolean(
+        input.postingTitle?.trim() ||
+          input.postingUrl?.trim() ||
+          input.postingText?.trim(),
+      );
+      const evidenceEnough = (result: CompanyResearchResult | undefined) =>
+        Boolean(
+          result &&
+            anchorHostEvidenceEnough({
+              anchorHost: input.normalizedDomain,
+              sources: result.sources,
+              companySummary: result.companySummary,
+              whatTheySell: result.whatTheySell,
+              jobFocus: result.jobFocus ?? null,
+              jobFocusDetail: result.jobFocusDetail ?? null,
+              postingProvided,
+            }),
+        );
 
       const runStage = async (opts: {
         stage: "initial" | "follow_up";
@@ -249,34 +272,44 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
 
       const runWebSearchStages = async (
         initialFocus: string,
-        searchBudget: number,
         firstStage: "initial" | "follow_up",
       ): Promise<void> => {
+        if (
+          !shouldRunAnotherEmployerSearch({
+            searchesUsed: totalWebSearchCalls,
+            budget: maxQueries,
+            enough: evidenceEnough(current),
+          })
+        ) {
+          stoppedReason = evidenceEnough(current) ? "sufficient" : "max_queries";
+          return;
+        }
+
         current = await runStage({
           stage: firstStage,
           searchFocus: initialFocus,
-          searchesRemaining: searchBudget,
+          searchesRemaining: Math.max(0, maxQueries - totalWebSearchCalls),
           webSearchEnabled: true,
         });
 
-        let sufficiency = evaluateEvidenceSufficiency({
-          sources: current.sources,
-          fields: current,
-          maxSourcesPerCompany: depth.maxSourcesPerCompany,
-        });
-
         while (
-          !sufficiency.sufficient &&
-          totalWebSearchCalls < maxQueries &&
-          searchStagesUsed < maxQueries + 1
+          shouldRunAnotherEmployerSearch({
+            searchesUsed: totalWebSearchCalls,
+            budget: maxQueries,
+            enough: evidenceEnough(current),
+          })
         ) {
-          if (
-            sufficiency.missingPrimary.length === 0 &&
-            sufficiency.missingSecondary.every((k) => k === "estimatedAov")
-          ) {
-            break;
-          }
-
+          const sufficiency = evaluateEvidenceSufficiency({
+            sources: current?.sources ?? [],
+            fields: current ?? {
+              companySummary: null,
+              whatTheySell: null,
+              customerTypes: [],
+              businessModel: null,
+              companySizeContext: null,
+            },
+            maxSourcesPerCompany: depth.maxSourcesPerCompany,
+          });
           const focus = buildTargetedSearchFocus(
             sufficiency.missingPrimary,
             sufficiency.missingSecondary,
@@ -287,14 +320,9 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
             searchesRemaining: Math.max(0, maxQueries - totalWebSearchCalls),
             webSearchEnabled: true,
           });
-          sufficiency = evaluateEvidenceSufficiency({
-            sources: current.sources,
-            fields: current,
-            maxSourcesPerCompany: depth.maxSourcesPerCompany,
-          });
         }
 
-        stoppedReason = sufficiency.sufficient ? "sufficient" : "max_queries";
+        stoppedReason = evidenceEnough(current) ? "sufficient" : "max_queries";
       };
 
       if (!webSearchAvailable) {
@@ -305,11 +333,7 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
         });
         stoppedReason = "no_web_search";
       } else if (skipWebsiteOnlySynthesis) {
-        await runWebSearchStages(
-          WEBSITE_FETCH_UNAVAILABLE_FOCUS,
-          maxQueries,
-          "initial",
-        );
+        await runWebSearchStages(WEBSITE_FETCH_UNAVAILABLE_FOCUS, "initial");
       } else {
         current = await runStage({
           stage: "initial",
@@ -324,16 +348,15 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
         });
         websitePrefetchGatePass = websiteGate.sufficient;
 
-        const searchFocus = websiteGate.sufficient
-          ? "First-party website evidence is available; use web search to corroborate findings and fill gaps (especially employee count, revenue, and third-party directory sources)."
-          : websiteGate.failReasons.join("; ") ||
-            "Website evidence insufficient; find official and reputable third-party sources for primary company dimensions.";
-
-        await runWebSearchStages(
-          searchFocus,
-          Math.max(0, maxQueries - 1),
-          "follow_up",
-        );
+        if (evidenceEnough(current)) {
+          stoppedReason = "website_sufficient";
+        } else {
+          const searchFocus = websiteGate.sufficient
+            ? "Company highlights and the part of the company this job serves."
+            : websiteGate.failReasons.join("; ") ||
+              "Company highlights and the part of the company this job serves.";
+          await runWebSearchStages(searchFocus, "follow_up");
+        }
       }
 
       // Prefer the latest stage result (`current`); `lastValidated` is only a
@@ -347,6 +370,9 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
         sources: validatedResult.sources,
         companyWebsiteUrl: input.website,
         companyDomain: input.normalizedDomain,
+        companyName: input.name,
+        jobFocus: validatedResult.jobFocus,
+        excerpts: evidence.excerpts,
         maxSources: depth.maxSourcesPerCompany,
       });
 

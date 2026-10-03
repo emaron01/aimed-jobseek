@@ -12,13 +12,12 @@ describe("research source / confidence validation", () => {
         customerTypes: [],
         primaryMarkets: [],
         businessModel: null,
-        estimatedAov: "$1",
-        aovReasoning: null,
         companySizeContext: null,
         relevantTechnologies: [],
-        buyingSignals: [],
         hiringSignals: [],
         riskSignals: [],
+        jobFocus: null,
+        jobFocusDetail: null,
         confidence: "HIGH",
         sources: [
           {
@@ -69,13 +68,12 @@ describe("research source / confidence validation", () => {
         customerTypes: ["mid-market"],
         primaryMarkets: [],
         businessModel: "B2B SaaS",
-        estimatedAov: null,
-        aovReasoning: null,
         companySizeContext: null,
         relevantTechnologies: [],
-        buyingSignals: [],
         hiringSignals: [],
         riskSignals: [],
+        jobFocus: null,
+        jobFocusDetail: null,
         confidence: "MEDIUM",
         sources: [
           {

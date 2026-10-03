@@ -21,12 +21,12 @@ function hasSubstantiveFindings(result: CompanyResearchAiResult): boolean {
     result.companySummary ||
       result.whatTheySell ||
       result.businessModel ||
-      result.estimatedAov ||
       result.companySizeContext ||
+      result.jobFocus ||
+      result.jobFocusDetail ||
       result.customerTypes.length ||
       result.primaryMarkets.length ||
       result.relevantTechnologies.length ||
-      result.buyingSignals.length ||
       result.hiringSignals.length ||
       result.riskSignals.length,
   );
@@ -87,30 +87,17 @@ export function validateCompanyResearchResult(
       primaryMarkets: [],
       businessModel: null,
       estimatedAov: null,
-      aovReasoning:
-        "Insufficient reliable sources to support company findings.",
+      aovReasoning: null,
       companySizeContext: null,
       relevantTechnologies: [],
       buyingSignals: [],
       hiringSignals: [],
       riskSignals: [],
+      jobFocus: null,
+      jobFocusDetail: null,
       confidence: "LOW",
       sources: [],
     };
-  }
-
-  let estimatedAov = raw.estimatedAov;
-  let aovReasoning = raw.aovReasoning;
-  const aovSupported = sources.some((s) =>
-    s.supports.some((item) => /aov|deal|pricing|contract/i.test(item)),
-  );
-  if (estimatedAov && sources.length > 0 && !aovSupported && confidence === "HIGH") {
-    // Keep estimate but confidence already constrained; prefer explicit unknown if weak.
-    confidence = confidence === "HIGH" ? "MEDIUM" : confidence;
-  }
-  if (!estimatedAov && !aovReasoning) {
-    estimatedAov = null;
-    aovReasoning = null;
   }
 
   return {
@@ -119,13 +106,15 @@ export function validateCompanyResearchResult(
     customerTypes: raw.customerTypes,
     primaryMarkets: raw.primaryMarkets,
     businessModel: raw.businessModel,
-    estimatedAov,
-    aovReasoning,
+    estimatedAov: null,
+    aovReasoning: null,
     companySizeContext: raw.companySizeContext,
     relevantTechnologies: raw.relevantTechnologies,
-    buyingSignals: raw.buyingSignals,
+    buyingSignals: [],
     hiringSignals: raw.hiringSignals,
     riskSignals: raw.riskSignals,
+    jobFocus: raw.jobFocus,
+    jobFocusDetail: raw.jobFocusDetail,
     confidence,
     sources,
   };

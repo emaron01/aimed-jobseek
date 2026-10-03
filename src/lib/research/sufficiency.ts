@@ -162,20 +162,20 @@ export function buildTargetedSearchFocus(
     (k) => k !== "estimatedAov",
   );
   if (targets.length === 0) {
-    return "Confirm company identity, products sold, and customer segments with official sources.";
+    return "Find company highlights and the part of the company this job serves on the company website.";
   }
 
   const labels: Record<keyof EvidenceDimensions, string> = {
     companyIdentity: "company identity and official description",
-    whatTheySell: "products and services sold",
-    customerTypes: "customer types and buyer segments",
-    businessModel: "business model and pricing model",
+    whatTheySell: "products and services",
+    customerTypes: "customers and markets",
+    businessModel: "business model",
     companySizeContext: "company size, employees, or scale",
-    primaryMarkets: "primary markets and geographies",
+    primaryMarkets: "markets and geographies",
     relevantTechnologies: "technologies and integrations used",
     buyingSignals: "hiring and growth signals",
-    riskSignals: "risk or churn signals",
-    estimatedAov: "average order value",
+    riskSignals: "layoffs, restructuring, or funding trouble",
+    estimatedAov: "financial health or funding",
   };
 
   return `Find evidence specifically for: ${targets.map((t) => labels[t]).join("; ")}. Prefer the official company website.`;

@@ -119,18 +119,13 @@ describe("finalizeResearchSources", () => {
         }),
       ],
     });
-    expect(finalized.map((s) => s.url).sort()).toEqual(
-      [
-        "https://acme.example/",
-        "https://news.example/acme-raises",
-      ].sort(),
-    );
+    expect(finalized.map((s) => s.url)).toEqual(["https://acme.example/"]);
     expect(
       finalized.some((s) => s.url.includes("linkedin.com")),
     ).toBe(false);
   });
 
-  it("near-dedupes LinkedIn posts about the same author, keeping supports", () => {
+  it("near-dedupes LinkedIn keys, then the host rule drops LinkedIn and other hosts", () => {
     expect(
       researchSourceNearDedupeKey(
         "https://www.linkedin.com/posts/stoneeagle-activity-111",
@@ -166,15 +161,12 @@ describe("finalizeResearchSources", () => {
         }),
       ],
     });
-    const linkedin = finalized.filter((s) =>
-      s.url.includes("linkedin.com"),
-    );
-    expect(linkedin).toHaveLength(1);
-    expect(linkedin[0]?.supports).toEqual(["riskSignals"]);
+    expect(finalized).toEqual([]);
   });
 
-  it("ranks supporting news above unsupported linkedin before the cap", () => {
+  it("keeps approved news that names the company and drops other hosts", () => {
     const finalized = finalizeResearchSources({
+      companyName: "Acme",
       maxSources: 2,
       sources: [
         source({
@@ -184,8 +176,9 @@ describe("finalizeResearchSources", () => {
         }),
         source({
           url: "https://reuters.com/acme",
+          title: "Acme raises a new round",
           sourceType: "NEWS",
-          supports: ["riskSignals", "buyingSignals"],
+          supports: ["riskSignals", "companySummary"],
         }),
         source({
           url: "https://directory.example/acme",
@@ -194,7 +187,6 @@ describe("finalizeResearchSources", () => {
         }),
       ],
     });
-    expect(finalized[0]?.url).toContain("reuters.com");
-    expect(finalized).toHaveLength(2);
+    expect(finalized.map((row) => row.url)).toEqual(["https://reuters.com/acme"]);
   });
 });

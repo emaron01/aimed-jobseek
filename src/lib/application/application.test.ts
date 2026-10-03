@@ -346,7 +346,7 @@ describe("job-seeker research columns", () => {
     expect(source).toContain("hiringSignals:");
     expect(source).toContain("markApplicationFitsStaleForCompany");
     const prompt = readFileSync("src/lib/prompt-content/company-research.ts", "utf8");
-    expect(prompt).toContain("hiringSignals");
+    expect(prompt).toContain("leadership team and any recent leadership changes");
     expect(prompt).not.toContain("Book a demo");
     expect(criterionFlags.disqualifier).toBe("Deal-breaker");
   });

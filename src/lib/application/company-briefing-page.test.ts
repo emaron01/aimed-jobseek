@@ -111,15 +111,15 @@ describe("seeker-supplied research notes", () => {
   });
 });
 
-describe("company research prompt v5", () => {
-  it("bumps the version and asks for detailed products and services", () => {
-    expect(RESEARCH_PROMPT_VERSION).toBe("5");
-    expect(COMPANY_RESEARCH_SYSTEM_INSTRUCTIONS).toMatch(/What they do/i);
-    expect(COMPANY_RESEARCH_SYSTEM_INSTRUCTIONS).toMatch(
-      /named offerings|services and products/i,
+describe("company research prompt v6", () => {
+  it("uses the approved brief as the system instructions", () => {
+    expect(RESEARCH_PROMPT_VERSION).toBe("6");
+    expect(COMPANY_RESEARCH_SYSTEM_INSTRUCTIONS).toContain(
+      "identify the part of the company this job serves",
     );
-    const { prompt } = sourceFiles();
-    expect(prompt).toMatch(/as much detail as public evidence allows/);
+    expect(COMPANY_RESEARCH_SYSTEM_INSTRUCTIONS).toContain(
+      "Do not look for sales-prospecting information",
+    );
 
     const messages = buildCompanyResearchMessages({
       company: {
@@ -132,18 +132,36 @@ describe("company research prompt v5", () => {
         employeeCount: null,
         location: null,
         seekerSuppliedNotes: "Interested in the governance suite.",
+        postingTitle: "Senior Director of Sales",
+        postingUrl: "https://www.cscglobal.com/careers/senior-director-of-sales",
+        postingText: "Sell digital brand protection, domain, and digital-risk services.",
       },
       evidence: { sources: [], excerpts: [] },
       webSearchEnabled: true,
+      stage: "follow_up",
+      searchFocus: "Company highlights and the part of the company this job serves.",
     });
     const user = JSON.parse(String(messages[1]?.content ?? "{}")) as {
       seekerSuppliedNotes: string | null;
-      responseSchema: { whatTheySell: string };
-      instruction: string;
+      searchFocus: string | null;
+      posting: { title: string | null; url: string | null; text: string | null };
+      responseSchema: {
+        whatTheySell?: string;
+        estimatedAov?: string;
+        buyingSignals?: unknown;
+        jobFocus: string;
+        jobFocusDetail: string;
+      };
     };
-    expect(messages[0]?.content).toContain("Prompt version: 5");
+    expect(messages[0]?.content).toBe(COMPANY_RESEARCH_SYSTEM_INSTRUCTIONS);
     expect(user.seekerSuppliedNotes).toBe("Interested in the governance suite.");
-    expect(user.responseSchema.whatTheySell).toMatch(/most important field/);
-    expect(user.instruction).toMatch(/named services and products/);
+    expect(user.posting.title).toBe("Senior Director of Sales");
+    expect(user.responseSchema.jobFocus).toMatch(/part of the company/);
+    expect(user.responseSchema.jobFocusDetail).toMatch(/in-depth/);
+    expect(user.responseSchema).not.toHaveProperty("estimatedAov");
+    expect(user.responseSchema).not.toHaveProperty("buyingSignals");
+    expect(user.searchFocus?.toLowerCase()).not.toContain("products sold");
+    expect(user.searchFocus?.toLowerCase()).not.toContain("buyer segments");
+    expect(user.searchFocus?.toLowerCase()).not.toContain("churn");
   });
 });

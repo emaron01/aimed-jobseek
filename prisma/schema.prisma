@@ -599,6 +599,7 @@ model Organization {
   contacts                      Contact[]
   companies                     Company[]
   companyResearch               CompanyResearch[]
+  applicationEmployerResearch   ApplicationEmployerResearch[]
   contactResearch               ContactResearch[]
   icpCriteria                   IcpCriterion[]
   personaCriteria               PersonaCriterion[]
@@ -745,6 +746,7 @@ model User {
   invitationsSent                OrganizationInvitation[]      @relation("InvitedBy")
   companyResearchInitiated       CompanyResearch[]             @relation("ResearchInitiatedBy")
   companyResearchFirstIntroduced CompanyResearch[]             @relation("ResearchFirstIntroducedBy")
+  applicationResearchInitiated   ApplicationEmployerResearch[] @relation("ApplicationResearchInitiatedBy")
   adminAuditEvents               AdminAuditEvent[]
   transactionalEmailEvents       TransactionalEmailEvent[]
   voiceSamples                   VoiceSample[]
@@ -1950,10 +1952,11 @@ model Company {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  contacts        Contact[]
-  research        CompanyResearch[]
-  jobRequirements JobRequirement[]
+  organization                Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contacts                    Contact[]
+  research                    CompanyResearch[]
+  applicationEmployerResearch ApplicationEmployerResearch[]
+  jobRequirements             JobRequirement[]
 
   @@unique([organizationId, normalizedDomain])
   @@index([organizationId])
@@ -2025,6 +2028,59 @@ model CompanyResearch {
   @@index([researchedByUserId])
   @@index([firstResearchedByUserId])
   @@index([organizationId, firstResearchedByUserId])
+}
+
+/// Tailored employer research for one application. CompanyResearch rows are not rewritten.
+model ApplicationEmployerResearch {
+  id                   String                @id @default(cuid())
+  organizationId       String
+  campaignId           String
+  companyId            String
+  status               CompanyResearchStatus @default(NOT_STARTED)
+  companySummary       String?
+  whatTheySell         String?
+  customerTypes        Json?
+  primaryMarkets       Json?
+  businessModel        String?
+  companySizeContext   String?
+  relevantTechnologies Json?
+  hiringSignals        Json?
+  riskSignals          Json?
+  /// Part of the company the job serves.
+  jobFocus             String?
+  /// In-depth research on that part of the company.
+  jobFocusDetail       String?
+  identityAmbiguous    Boolean               @default(false)
+  researchConfidence   ResearchConfidence?
+  sourceCount          Int                   @default(0)
+  researchSources      Json?
+  promptVersion        String?
+  anchorHost           String?
+  inputFingerprint     String?
+  researchedAt         DateTime?
+  aiProvider           String?
+  aiModel              String?
+  aiModelUrlIdentifier String?
+  inputTokens          Int?
+  outputTokens         Int?
+  webSearchCallCount   Int?
+  researchDurationMs   Int?
+  searchStagesUsed     Int?
+  researchStoppedReason String?
+  researchStageTimings Json?
+  researchedByUserId   String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  researchedBy User?        @relation("ApplicationResearchInitiatedBy", fields: [researchedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, campaignId])
+  @@index([organizationId, companyId])
+  @@index([campaignId])
+  @@index([researchedByUserId])
 }
 
 /// Contact-level role research (separate from CompanyResearch). Answers "what are they responsible for?"
@@ -2389,7 +2445,8 @@ model Campaign {
   applicationSummary  ApplicationSummary?
   applicationAssets   ApplicationAsset[]
   interviewStages     InterviewStage[]
-  researchRuns        ResearchRun[]
+  researchRuns                ResearchRun[]
+  applicationEmployerResearch ApplicationEmployerResearch[]
   presentationPlans   ApplicationPresentationPlan[]
   applicationJobs     ApplicationJob[]
   /// Harper-written next step for the current application state.
