@@ -203,6 +203,9 @@ export function ApplicationCompanyBriefing({
 
       {hasBriefing ? (
         <article className="space-y-8">
+          <h3 className="text-sm font-semibold tracking-wide text-subtle uppercase">
+            {applicationWorkspaceCopy.companyHighlightsTitle}
+          </h3>
           <ResearchReadSection
             title={applicationWorkspaceCopy.whatTheyDoTitle}
             empty={!defaults.whatTheySell}

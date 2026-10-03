@@ -278,6 +278,7 @@ describe("tailored employer research reader", () => {
       careerStage: "mid_career",
       profileItems: [],
     });
+    expect(polish.at(-1)?.content).toContain('"companyResearch"');
     expect(polish.at(-1)?.content).toContain(JOB_FOCUS);
     const ordinaryPolish = buildConsultationPolishMessages({
       answer: "I rebuilt the forecast.",
@@ -495,9 +496,12 @@ describe("tailored employer research reader", () => {
         sources: [SOURCE],
       }),
     );
-    expect(html).toContain(applicationWorkspaceCopy.companyHighlightsTitle);
-    expect(html).toContain(applicationWorkspaceCopy.jobFocusTitle);
-    expect(html).toContain(applicationWorkspaceCopy.jobFocusDetailTitle);
+    expect(applicationWorkspaceCopy.companyHighlightsTitle).toBe("Company highlights");
+    expect(applicationWorkspaceCopy.jobFocusTitle).toBe("Where this job fits");
+    expect(applicationWorkspaceCopy.jobFocusDetailTitle).toBe("In depth");
+    expect(html).toContain("Company highlights");
+    expect(html).toContain("Where this job fits");
+    expect(html).toContain("In depth");
     expect(html).toContain(JOB_FOCUS);
     expect(html).toContain(JOB_FOCUS_DETAIL);
     expect(html).toContain(SOURCE.url);
@@ -538,7 +542,9 @@ describe("tailored employer research reader", () => {
     expect(briefing).toContain(JOB_FOCUS);
     expect(briefing).toContain(JOB_FOCUS_DETAIL);
     expect(briefing).toContain(SOURCE.url);
-    expect(briefing).toContain(applicationWorkspaceCopy.jobFocusTitle);
+    expect(briefing).toContain("Company highlights");
+    expect(briefing).toContain("Where this job fits");
+    expect(briefing).toContain("In depth");
 
     const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
     const summary = readFileSync("src/app/(app)/campaigns/[id]/summary/page.tsx", "utf8");
@@ -553,8 +559,10 @@ describe("tailored employer research reader", () => {
     }
     expect(workspace).toContain("loadApplicationEmployerResearch");
     expect(summary).toContain("CheatSheetCompanyResearch");
+    const whyThisCompanyInstruction =
+      'When whyThisCompany is true: the answer is motivation for wanting this company, not a work story. Write one first-person interview answer to "Why do you want to work here?" using that motivation. When companyResearch is supplied, connect the person\'s motivation to the part of the company this job serves, using the company highlights as context. Company facts may come only from companyResearch; never invent them. Facts about the person come only from their answer and Personal Profile. resumeBullet is always null. Do not invent a work story or a resume bullet.';
     expect(readFileSync("src/lib/prompt-content/consultation.ts", "utf8")).toContain(
-      "using only that motivation",
+      whyThisCompanyInstruction,
     );
   });
 });

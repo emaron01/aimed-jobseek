@@ -28,7 +28,7 @@ const HIRING_TEAM_OPENING =
 
 describe("Harper Batch D7 — learnings fingerprint + HM routing", () => {
   it("bumps CONSULTATION_PROMPT_VERSION for the Hiring Team learnings sentence", () => {
-    expect(CONSULTATION_PROMPT_VERSION).toBe("36");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("37");
   });
 
   it("coach prompt contains the exact new Hiring Team learnings sentence", () => {
