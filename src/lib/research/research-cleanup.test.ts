@@ -23,6 +23,7 @@ import {
   getCompanySourceRetriever,
   retrieveWebsiteEvidence,
   selectCompanyKeyPageUrl,
+  sisterHostsFromPageHtml,
   setCompanySourceRetriever,
   WEBSITE_EVIDENCE_PER_PAGE_CHAR_CAP,
   WEBSITE_EVIDENCE_TOTAL_CHAR_BUDGET,
@@ -123,7 +124,7 @@ function renderBoth(detail: string, sources: ResearchSource[]) {
 describe("research cleanup", () => {
   it("keeps the approved research brief and a matching fingerprint", () => {
     expect(COMPANY_RESEARCH_SYSTEM_INSTRUCTIONS).toBe(APPROVED_BRIEF);
-    expect(RESEARCH_PROMPT_VERSION).toBe("7");
+    expect(RESEARCH_PROMPT_VERSION).toBe("8");
     const input = {
       anchorHost: "cscglobal.com",
       website: "https://cscglobal.com",
@@ -152,6 +153,50 @@ describe("research cleanup", () => {
       expect(page).not.toContain("web_search");
     }
     expect(readFileSync("src/lib/research/sources.ts", "utf8")).not.toContain("web_search");
+  });
+
+  it("counts a linked domain as a sister site only when it shares the company name", () => {
+    const linked = (hrefs: string[]) =>
+      hrefs.map((href) => `<a href="${href}">link</a>`).join("");
+    const sisters = sisterHostsFromPageHtml({
+      html: linked([
+        "https://www.cscdbs.com/",
+        "https://www.crowdstrike.com/",
+        "https://www.globalpartners.com/",
+        "https://www.linkedin.com/company/csc",
+        "https://www.reuters.com/world/csc",
+        "https://www.indeed.com/cmp/csc",
+      ]),
+      pageUrl: "https://www.cscglobal.com/",
+      anchorHost: "cscglobal.com",
+      companyName: "CSC",
+    });
+    expect(sisters).toEqual(["cscdbs.com"]);
+
+    expect(
+      sisterHostsFromPageHtml({
+        html: linked(["https://www.linkedin.com/company/linkedin"]),
+        pageUrl: "https://www.linkedincorp.com/",
+        anchorHost: "linkedincorp.com",
+        companyName: "LinkedIn",
+      }),
+    ).toEqual([]);
+    expect(
+      sisterHostsFromPageHtml({
+        html: linked(["https://www.reuters.com/"]),
+        pageUrl: "https://www.reutersmedia.com/",
+        anchorHost: "reutersmedia.com",
+        companyName: "Reuters",
+      }),
+    ).toEqual([]);
+    expect(
+      sisterHostsFromPageHtml({
+        html: linked(["https://www.indeed.com/"]),
+        pageUrl: "https://www.indeedglobal.com/",
+        anchorHost: "indeedglobal.com",
+        companyName: "Indeed",
+      }),
+    ).toEqual([]);
   });
 
   it("renders stored newline escapes as paragraphs on both company sections", () => {

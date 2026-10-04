@@ -307,15 +307,169 @@ export function selectCompanyKeyPageUrl(input: {
   return best?.url ?? null;
 }
 
+/** A company-name token shorter than this does not identify a sister site. "csc" counts. */
+const SISTER_SITE_MIN_TOKEN_LENGTH = 3;
+
 /**
- * Sister sites are other domains linked from an anchor-host page.
- * Social, news, and job-board hosts are not sister sites.
+ * Words too generic to identify a company. A linked domain that shares only
+ * one of these with the company name or the anchor domain is not a sister site.
+ */
+const SISTER_SITE_GENERIC_TOKENS = new Set([
+  "and",
+  "capital",
+  "cloud",
+  "co",
+  "companies",
+  "company",
+  "consultants",
+  "consulting",
+  "corp",
+  "corporation",
+  "digital",
+  "enterprise",
+  "enterprises",
+  "finance",
+  "financial",
+  "global",
+  "group",
+  "health",
+  "healthcare",
+  "holding",
+  "holdings",
+  "inc",
+  "incorporated",
+  "industries",
+  "industry",
+  "international",
+  "limited",
+  "llc",
+  "ltd",
+  "management",
+  "media",
+  "network",
+  "networks",
+  "official",
+  "online",
+  "partner",
+  "partners",
+  "plc",
+  "service",
+  "services",
+  "software",
+  "solution",
+  "solutions",
+  "system",
+  "systems",
+  "tech",
+  "technologies",
+  "technology",
+  "the",
+  "ventures",
+  "world",
+]);
+
+const SISTER_SITE_GENERIC_BY_LENGTH = [...SISTER_SITE_GENERIC_TOKENS].sort(
+  (left, right) => right.length - left.length || left.localeCompare(right),
+);
+
+/** Public suffixes of more than one label. The registrable label is the label before these. */
+const SISTER_SITE_MULTI_PART_SUFFIXES = [
+  "ac.uk",
+  "co.in",
+  "co.jp",
+  "co.nz",
+  "co.uk",
+  "co.za",
+  "com.au",
+  "com.br",
+  "com.hk",
+  "com.mx",
+  "com.sg",
+  "com.tr",
+  "net.au",
+  "org.au",
+  "org.uk",
+];
+
+function registrableDomainLabel(host: string): string {
+  const bare = host.trim().replace(/^www\./i, "").toLowerCase().replace(/\.$/, "");
+  const parts = bare.split(".").filter(Boolean);
+  if (parts.length === 0) return "";
+  const joined = parts.join(".");
+  const suffix = SISTER_SITE_MULTI_PART_SUFFIXES.find(
+    (item) => joined === item || joined.endsWith(`.${item}`),
+  );
+  if (suffix) {
+    const head = joined.slice(0, joined.length - suffix.length).replace(/\.$/, "");
+    const headParts = head.split(".").filter(Boolean);
+    return headParts[headParts.length - 1] ?? "";
+  }
+  return parts.length >= 2 ? parts[parts.length - 2]! : "";
+}
+
+function isDistinctiveSisterToken(token: string): boolean {
+  return (
+    token.length >= SISTER_SITE_MIN_TOKEN_LENGTH &&
+    !SISTER_SITE_GENERIC_TOKENS.has(token)
+  );
+}
+
+function longestGenericAffix(value: string): string | null {
+  for (const word of SISTER_SITE_GENERIC_BY_LENGTH) {
+    if (value.length <= word.length) continue;
+    if (value.startsWith(word) || value.endsWith(word)) return word;
+  }
+  return null;
+}
+
+/**
+ * Distinctive tokens from a company name or a registrable domain label.
+ * Split on non-alphanumeric characters, then peel generic words from either
+ * end of a concatenated label (cscglobal yields csc).
+ */
+function sisterSiteNameTokens(value: string): string[] {
+  const pieces = value.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const tokens = new Set<string>();
+  for (const piece of pieces) {
+    if (isDistinctiveSisterToken(piece)) tokens.add(piece);
+    let rest = piece;
+    for (let pass = 0; pass < 8 && rest.length > SISTER_SITE_MIN_TOKEN_LENGTH; pass += 1) {
+      const generic = longestGenericAffix(rest);
+      if (!generic) break;
+      rest = rest.startsWith(generic)
+        ? rest.slice(generic.length)
+        : rest.slice(0, -generic.length);
+      if (isDistinctiveSisterToken(rest)) tokens.add(rest);
+    }
+  }
+  return [...tokens];
+}
+
+function linkedDomainSharesCompanyName(
+  host: string,
+  companyName: string | null,
+  anchorHost: string,
+): boolean {
+  const label = registrableDomainLabel(host);
+  if (!isDistinctiveSisterToken(label)) return false;
+  const tokens = [
+    ...sisterSiteNameTokens(companyName ?? ""),
+    ...sisterSiteNameTokens(registrableDomainLabel(anchorHost)),
+  ];
+  return tokens.some((token) => label === token || label.startsWith(token));
+}
+
+/**
+ * Sister sites are other domains linked from an anchor-host page that share a
+ * distinctive name token with the company name or the anchor's registrable
+ * domain. Social, news, and job-board hosts are never sister sites.
  * The list is stored on the research timing JSON, not a new column.
  */
 export function sisterHostsFromPageHtml(input: {
   html: string;
   pageUrl: string;
   anchorHost: string | null;
+  companyName?: string | null;
 }): string[] {
   if (!input.anchorHost) return [];
   const hosts = new Set<string>();
@@ -337,6 +491,9 @@ export function sisterHostsFromPageHtml(input: {
     if (!host) continue;
     if (hostIsAnchorOrSubdomain(host, input.anchorHost)) continue;
     if (hostIsApprovedNews(host) || hostIsDeniedSister(host) || isJobBoardHost(host)) {
+      continue;
+    }
+    if (!linkedDomainSharesCompanyName(host, input.companyName ?? null, input.anchorHost)) {
       continue;
     }
     hosts.add(host);
@@ -573,6 +730,7 @@ export async function retrieveWebsiteEvidence(
           html: page.html,
           pageUrl: page.url,
           anchorHost,
+          companyName: input.name,
         }),
       ),
     ),
