@@ -8,6 +8,7 @@ import {
 } from "@/app/actions/application-jobs";
 import { AppIcon, ErrorState, Skeleton } from "@/components/design";
 import {
+  sidebarNavItemBranchClass,
   sidebarNavItemCurrentClass,
   sidebarNavItemIdleClass,
   sidebarNavItemLayoutClass,
@@ -20,13 +21,35 @@ import {
   workspaceCampaignHref,
 } from "@/lib/application/workspace-links";
 import {
+  applicationStepByKey,
   applicationStepCopy,
+  applicationStepFromPathname,
+  applicationStepHref,
   polishCopy,
   vocab,
 } from "@/lib/product-config";
 import { cn } from "@/lib/utils";
 
 const POLL_MS = 3_000;
+
+function applicationPageBranch(
+  campaignId: string,
+  pathname: string,
+): { href: string; label: string } | null {
+  if (pathname === "/contacts") {
+    return {
+      href: workspaceApplicationContactsHref(campaignId),
+      label: vocab.contact.Plural,
+    };
+  }
+  const step = applicationStepFromPathname(pathname);
+  if (!step || step === "overview") return null;
+  const page = applicationStepByKey(step);
+  return {
+    href: applicationStepHref(campaignId, page.key),
+    label: page.title,
+  };
+}
 
 function stateTone(state: ApplicationStepState): string {
   switch (state) {
@@ -236,7 +259,8 @@ export function ApplicationSidebarTracker({
   }, [campaignId, pathname]);
 
   const href = workspaceCampaignHref(campaignId);
-  const current = pathname === href;
+  const branch = applicationPageBranch(campaignId, pathname);
+  const current = !branch && pathname === href;
 
   return (
     <div
@@ -272,6 +296,21 @@ export function ApplicationSidebarTracker({
       >
         {applicationStepCopy.dashboardTitle}
       </Link>
+      {branch ? (
+        <div
+          className="ml-3 mt-1 border-l border-on-nav/40 pl-2"
+          data-testid="sidebar-application-page-branch"
+        >
+          <Link
+            href={branch.href}
+            data-testid="sidebar-application-page"
+            aria-current="page"
+            className={cn(sidebarNavItemBranchClass, sidebarNavItemCurrentClass)}
+          >
+            {branch.label}
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -9,6 +9,7 @@
   --color-on-nav: #ffffff;
   --color-primary: #1d4ed8;
   --color-primary-hover: #1e40af;
+  --color-primary-tint: #e7f3ff;
   --color-on-primary: #ffffff;
   --color-success: #166534;
   --color-success-tint: #dcfce7;
@@ -44,6 +45,7 @@
   --color-on-nav: var(--color-on-nav);
   --color-primary: var(--color-primary);
   --color-primary-hover: var(--color-primary-hover);
+  --color-primary-tint: var(--color-primary-tint);
   --color-on-primary: var(--color-on-primary);
   --color-success: var(--color-success);
   --color-success-tint: var(--color-success-tint);
