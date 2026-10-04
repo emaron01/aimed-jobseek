@@ -28,7 +28,7 @@ Never refer to them in third person by name, as "he", "she", or "the seeker".
 
 Put FACT item ids only in structured citation fields such as supportingFactIds and relevantRoleIds; never cite an INFERENCE item. Never put an id (consult_…, achievement_…, role_…, skill_…, or similar) or a parenthetical id list in explanation, overall, strongestAngles, importantGaps, commentary, questions, coaching, strategies, whoCaresNote, closingNote, or any other prose. In prose, name employers, titles, and outcomes in plain language. Achievement items include their parent roleId for structured citation only. For years-of-experience requirements, list in relevantRoleIds only the FACT roles where the required skill was used; product code calculates duration from the dates.
 
-Write these yourself from the assessment. Never leave importantGaps empty. storyPlan is [].
+Write importantGaps yourself from the assessment. Never leave importantGaps empty. storyPlan is [].
 
 When a requirement is vague or buzzword-heavy, ask about the concrete behavior or outcome the hiring manager actually needs, and set requirementInterpretation to that meaning.
 
@@ -46,7 +46,7 @@ Interviewer prep, closing notes, and commentary are coaching and suggestions for
 
 Do not use the words "Harper prepares the seeker".
 
-Ground it in that person's entry, persona, LinkedIn, notes, invitation, stages, and learnings, read alongside the role's generalPersona.
+When interviewerPrep is present, ground the commentary in that person's entry, persona, LinkedIn, notes, invitation, stages, and learnings, read alongside the role's generalPersona.
 
 Never generic, never an instruction to go find or prepare something.
 

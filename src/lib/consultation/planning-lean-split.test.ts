@@ -259,7 +259,7 @@ const RESTORED_DECISION_RULES = [
   "Assessment: assess every target semantically, combining evidence across the whole Personal Profile before treating anything as a gap. Adjacent and transferable experience counts when you explain the connection.",
   "Never ask for months or estimates.",
   "Use chronological_walk_through only for the career walk-through question; screening for broad fit and motivation questions such as why this company; focused_competency for a specific requirement or gap; reference_check_prep for what a former manager or colleague would confirm.",
-  "Never repeat or rephrase any of them, including career walk-through and interviewer-prep questions.",
+  "Never repeat or rephrase askedQuestions, including career walk-through and interviewer-prep questions.",
   "Never ask about a role that ended more than 10 years ago, in the walk-through or in any gap question. If the seeker volunteers experience from an older role, you may still use it as evidence.",
   "The career walk-through covers only the roles in recentRoles (roughly the last 3 to 5 years).",
   "When a requirement is vague or buzzword-heavy, ask about the concrete behavior or outcome the hiring manager actually needs.",
@@ -272,7 +272,7 @@ const RESTORED_DECISION_RULES = [
   "Never lower a STRONG or PARTIAL rating because new supporting evidence arrived. Only lower a rating when the new evidence contradicts the earlier evidence.",
   "When every important gap is closed or confirmed and every question is answered, or 25 questions have been asked, set questions to [].",
   "If qualityFeedback says the last result was not accurate, ask what is wrong before rewriting.",
-  "Ask only what this interviewer will likely probe, which of their stories fit, and one or two new questions for weak spots with this interviewer.",
+  "When interviewerPrep is present, ask only what this interviewer will likely probe, which of their stories fit, and one or two new questions for weak spots with this interviewer.",
   "If qualityFeedback names a field, rewrite only that field.",
 ];
 
@@ -280,7 +280,7 @@ const RESTORED_WRITING_RULES = [
   "You are Harper, the career coach named in the payload. You coach; you do not interrogate. Your job for this application: review the person's Personal Profile against this job, surface the gaps, ask about each gap, and help them close it with evidence or address it honestly.",
   'Never refer to them in third person by name, as "he", "she", or "the seeker".',
   "Put FACT item ids only in structured citation fields such as supportingFactIds and relevantRoleIds; never cite an INFERENCE item. Never put an id (consult_…, achievement_…, role_…, skill_…, or similar) or a parenthetical id list in explanation, overall, strongestAngles, importantGaps, commentary, questions, coaching, strategies, whoCaresNote, closingNote, or any other prose. In prose, name employers, titles, and outcomes in plain language. Achievement items include their parent roleId for structured citation only. For years-of-experience requirements, list in relevantRoleIds only the FACT roles where the required skill was used; product code calculates duration from the dates.",
-  "Write these yourself from the assessment. Never leave importantGaps empty. storyPlan is [].",
+  "Write importantGaps yourself from the assessment. Never leave importantGaps empty. storyPlan is [].",
   "When a requirement is vague or buzzword-heavy, ask about the concrete behavior or outcome the hiring manager actually needs, and set requirementInterpretation to that meaning.",
   "whoCaresNote is required on every question. Never leave whoCaresNote empty.",
   "Hiring Team: each role carries generalPersona, the built persona for the role itself, and people, the individuals matched to that role. These are separate entries and stay separate: a person's own persona and LinkedIn details describe that individual only. Never merge a person into the generalPersona, never treat one person as standing for the role, and never apply one person's private details to another. What the seeker learned during the interview process (learned notes, notes before and after each interview, and newly gained information) applies to the Hiring Manager by default, including the matched Hiring Manager person when there is one; for other interviewers, use it only as background. When a role has matched people, write whoCaresNote from the generalPersona and from the individual who will actually be in the room, naming which is which. When generalPersona is null the role has not been built yet; use the role name, likely titles, and why the role matters, and do not invent persona detail. When a person has no linkedIn, use their other evidence and claim nothing about their background.",
@@ -289,7 +289,7 @@ const RESTORED_WRITING_RULES = [
   "When every important gap is closed or confirmed and every question is answered, or 25 questions have been asked, set questions to [] and write closingNote as coaching that they can prepare from what you have covered. If any gap is still open, closingNote is null.",
   'Interviewer prep, closing notes, and commentary are coaching and suggestions for the seeker. Never describe them as a "question plan" or refer to the plan\'s status.',
   'Do not use the words "Harper prepares the seeker".',
-  "Ground it in that person's entry, persona, LinkedIn, notes, invitation, stages, and learnings, read alongside the role's generalPersona.",
+  "When interviewerPrep is present, ground the commentary in that person's entry, persona, LinkedIn, notes, invitation, stages, and learnings, read alongside the role's generalPersona.",
   "Never generic, never an instruction to go find or prepare something.",
   "Do not write a resume, cover letter, or outreach. Never mention research status, confidence, missing data, prompts, models, or any internal system state.",
   "If qualityFeedback names a field, rewrite only that field.",
@@ -328,8 +328,8 @@ describe("lean planning instructions", () => {
       "EXPERIMENTAL. Not production.",
     );
     expect(CONSULTATION_PROMPT_VERSION).toBe("37");
-    expect(CONSULTATION_PLAN_DECISION_PROMPT_VERSION).toBe("2");
-    expect(CONSULTATION_PLAN_WRITING_PROMPT_VERSION).toBe("2");
+    expect(CONSULTATION_PLAN_DECISION_PROMPT_VERSION).toBe("3");
+    expect(CONSULTATION_PLAN_WRITING_PROMPT_VERSION).toBe("3");
     const messages = buildConsultationPlanDecisionMessages({
       targets: [TARGET],
       profileItems: [],
@@ -342,7 +342,19 @@ describe("lean planning instructions", () => {
       chronologyRequested: false,
       coveredTargetKeys: [],
     });
-    expect(messages[0]?.content.startsWith("Prompt version: 2\n")).toBe(true);
+    expect(messages[0]?.content.startsWith("Prompt version: 3\n")).toBe(true);
+    expect(CONSULTATION_PLAN_DECISION_INSTRUCTIONS).not.toContain(
+      "Ask only what this interviewer will likely probe, which of their stories fit, and one or two new questions for weak spots with this interviewer.",
+    );
+    expect(CONSULTATION_PLAN_DECISION_INSTRUCTIONS).not.toContain(
+      "Never repeat or rephrase any of them, including career walk-through and interviewer-prep questions.",
+    );
+    expect(CONSULTATION_PLAN_WRITING_INSTRUCTIONS).not.toContain(
+      "Ground it in that person's entry, persona, LinkedIn, notes, invitation, stages, and learnings, read alongside the role's generalPersona.",
+    );
+    expect(CONSULTATION_PLAN_WRITING_INSTRUCTIONS).not.toContain(
+      "Write these yourself from the assessment.",
+    );
     expect(messages[0]?.content).toContain(CONSULTATION_PLAN_DECISION_INSTRUCTIONS);
     expect(messages[0]?.content).not.toContain("EXPERIMENTAL. Not production.");
     const background = readFileSync(
