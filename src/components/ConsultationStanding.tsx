@@ -107,8 +107,8 @@ function GapShareDetailsForm({
           onSubmitStart={(formData) => {
             const answer = String(formData.get("answer") ?? "").trim();
             if (!answer) return false;
-            draft.clear();
           }}
+          onSuccess={() => draft.clear()}
         >
           <input type="hidden" name="campaignId" value={campaignId} />
           <input type="hidden" name="targetKey" value={targetKey} />

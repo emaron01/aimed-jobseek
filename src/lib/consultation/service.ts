@@ -55,6 +55,7 @@ import {
   recordLearningsReassessFingerprint,
 } from "@/lib/consultation/learnings";
 import { recordSeekerBackgroundReassessFingerprint } from "@/lib/consultation/seeker-background-reassess";
+import { findPaidCallReceipt } from "@/lib/ai/paid-call-gate";
 import type { AiCallUsageContext, AiMessage } from "@/lib/ai/types";
 import {
   askedQuestionsFromTurns,
@@ -1933,6 +1934,49 @@ async function maybeFillRoleExpertiseAfterGapPlan(input: {
   });
 }
 
+/**
+ * Best-practice questions that were never stored. Runs from a seeker Harper
+ * action (a processed reply, or Continue), including when the session is
+ * already done. Does nothing once a role-expertise question exists, and does
+ * not run from a page view.
+ */
+async function recoverBestPracticeFillIfEmpty(input: {
+  organizationId: string;
+  campaignId: string;
+  sessionId: string;
+}): Promise<void> {
+  const turns = await loadSessionTurns(input.sessionId);
+  const stored = turns.some(
+    (turn) =>
+      turn.speaker === "CONSULTANT" &&
+      Boolean(turn.targetKey?.startsWith("role-expertise:")),
+  );
+  if (stored) return;
+  // Only a fill that already paid for questions (and stored none) is recovered.
+  // A session with no receipt waits for the normal planning fill.
+  const receipt = await findPaidCallReceipt({
+    organizationId: input.organizationId,
+    operation: "ROLE_EXPERTISE_QUESTIONS",
+    subjectKey: input.campaignId,
+  });
+  if (!receipt) return;
+  const { requirement, profile } = await requireApplication(
+    input.organizationId,
+    input.campaignId,
+  );
+  const careerStage = deriveCareerStage(profile);
+  await maybeFillRoleExpertiseAfterGapPlan({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    sessionId: input.sessionId,
+    profile,
+    requirement,
+    careerStage,
+    recentRoles: deriveRecentRoles(profile, new Date(), careerStage),
+    profileItems: profileEvidenceItems(profile),
+  });
+}
+
 async function finishIfPlanningIsComplete(
   sessionId: string,
   questions: QuestionRoundPlan["questions"],
@@ -3697,6 +3741,7 @@ export async function processConsultationReply(input: {
   if (session.status === "PAUSED" || session.status === "DONE") {
     session = { ...session, status: "IN_PROGRESS" };
   }
+  try {
   let { turns, view } = await loadSessionQaView(session.id);
   if (input.turnId) {
     const targeted = turns.find((turn) => turn.id === input.turnId);
@@ -3927,6 +3972,22 @@ export async function processConsultationReply(input: {
     wroteResult: processed.wroteResult,
     followUpAdded,
   });
+  } finally {
+    try {
+      await recoverBestPracticeFillIfEmpty({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        sessionId: session.id,
+      });
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: "role_expertise_fill_failed",
+          message: error instanceof Error ? error.message : "unknown",
+        }),
+      );
+    }
+  }
 }
 
 function declinedPolishInput(value: unknown): {
@@ -4736,11 +4797,14 @@ export async function recordConsultationAnswerEdit(input: {
       id: input.turnId,
       organizationId: input.organizationId,
       speaker: "SEEKER",
-      skipped: false,
     },
     include: { session: true },
   });
   if (!turn || turn.session.campaignId !== input.campaignId) {
+    throw new TenantError(consultationConversationCopy.replyFailed);
+  }
+  // Ignore stays closed. A Skip is a placeholder the seeker can answer later.
+  if (isIgnoredSeekerTurn(turn)) {
     throw new TenantError(consultationConversationCopy.replyFailed);
   }
   await ensureConsultationAcceptsSeekerInput(turn.session);
@@ -4753,6 +4817,7 @@ export async function recordConsultationAnswerEdit(input: {
     where: { id: turn.id },
     data: {
       body,
+      skipped: false,
       analysisJson: {
         ...prior,
         status: "PENDING",
@@ -4994,6 +5059,20 @@ export async function continueConsultationPlanning(input: {
     where: { campaignId: input.campaignId, organizationId: input.organizationId },
   });
   if (!session) throw new TenantError("The consultation has not started.");
+  try {
+    await recoverBestPracticeFillIfEmpty({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      sessionId: session.id,
+    });
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "role_expertise_fill_failed",
+        message: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+  }
   if (session.status === "SKIPPED" || session.status === "PAUSED") return;
   if (session.status === "DONE") {
     // Planning already finished; seeker replies reopen via the reply path.

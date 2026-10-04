@@ -332,8 +332,8 @@ function QuestionReplyForm({
             const answer = String(formData.get("answer") ?? "").trim();
             if (!answer) return false;
             onSubmitStart(answer);
-            draft.clear();
           }}
+          onSuccess={() => draft.clear()}
         >
           <input type="hidden" name="campaignId" value={campaignId} />
           <input type="hidden" name="targetKey" value={replyKey} />
