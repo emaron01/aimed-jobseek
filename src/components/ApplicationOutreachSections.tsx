@@ -8,6 +8,7 @@ import {
   markApplicationAppliedAction,
   setApplicationProgressAction,
   markOutreachSentAction,
+  saveOutreachMessageEditAction,
   updateApplicationContactRoleAction,
   type ApplicationOutreachActionResult,
 } from "@/app/actions/application-outreach";
@@ -516,6 +517,7 @@ export function ApplicationOutreachSection({
   assets,
   interviewStages = [],
   approvedResumeId,
+  emailSignature = null,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -524,6 +526,7 @@ export function ApplicationOutreachSection({
   assets: OutreachRow[];
   interviewStages?: InterviewStageRow[];
   approvedResumeId: string | null;
+  emailSignature?: string | null;
 }) {
   const [addState, addAction] = useActionState(
     addApplicationContactAction,
@@ -958,6 +961,7 @@ export function ApplicationOutreachSection({
                 approvedResumeId={approvedResumeId}
                 sentAction={sentAction}
                 generateAction={generateAction}
+                emailSignature={emailSignature}
               />
             ) : (
               <p className="text-sm text-muted">
@@ -1302,6 +1306,7 @@ export function OutreachMessageCard({
   approvedResumeId,
   sentAction,
   generateAction,
+  emailSignature = null,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -1310,22 +1315,45 @@ export function OutreachMessageCard({
   approvedResumeId: string | null;
   sentAction: (formData: FormData) => void;
   generateAction: (formData: FormData) => void;
+  emailSignature?: string | null;
 }) {
   const content = parsedContent(asset.content);
-  const composed = content ? composeOutreachText(content) : null;
+  const composed = content
+    ? composeOutreachText(content, { emailSignature })
+    : null;
+  const [editState, editAction, editPending] = useActionState(
+    saveOutreachMessageEditAction,
+    initial,
+  );
   const contact =
     contacts.find((row) => row.contactId === asset.contactId) ?? null;
   const [copied, setCopied] = useState<string | null>(null);
   const [askSent, setAskSent] = useState(false);
   const sentFormRef = useRef<HTMLFormElement>(null);
   const sentDateRef = useRef<HTMLInputElement>(null);
-  const handoff = composed
+  const savedEdit =
+    editState?.ok && editState.assetId === asset.id && editState.body != null
+      ? { subject: editState.subject ?? null, body: editState.body }
+      : null;
+  const shown = savedEdit ?? composed;
+  const handoff = shown
     ? outreachEmailHandoff({
         to: contact?.email ?? "",
-        subject: composed.subject ?? "",
-        body: composed.body,
+        subject: shown.subject ?? "",
+        body: shown.body,
       })
     : null;
+  const [draftSubject, setDraftSubject] = useState(shown?.subject ?? "");
+  const [draftBody, setDraftBody] = useState(shown?.body ?? "");
+  const shownKey = shown
+    ? `${asset.id}\0${shown.subject ?? ""}\0${shown.body}`
+    : asset.id;
+  const [appliedShownKey, setAppliedShownKey] = useState<string | null>(null);
+  if (shown && shownKey !== appliedShownKey) {
+    setAppliedShownKey(shownKey);
+    setDraftSubject(shown.subject ?? "");
+    setDraftBody(shown.body);
+  }
   const regenerateKind: OutreachGeneratorKind =
     asset.purpose === "THANK_YOU" ? "INTERVIEW_THANK_YOU" : asset.type;
 
@@ -1374,23 +1402,68 @@ export function OutreachMessageCard({
           ? ` · ${outreachConfig.labels.sentStatus} ${todayInputValue(asset.sentAt)}`
           : ` · ${outreachConfig.labels.contactStatusDraft}`}
       </p>
-      {composed ? (
+      {shown && canEdit ? (
+        <form
+          action={editAction}
+          className={`space-y-2 text-sm text-ink ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
+          data-testid={`outreach-edit-${asset.id}`}
+        >
+          <input type="hidden" name="campaignId" value={campaignId} />
+          <input type="hidden" name="assetId" value={asset.id} />
+          {shown.subject != null ? (
+            <label className="block">
+              <span className="font-medium">{outreachConfig.labels.messageSubject}</span>
+              <input
+                name="subject"
+                value={draftSubject}
+                onChange={(event) => setDraftSubject(event.target.value)}
+                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
+                data-testid={`outreach-edit-subject-${asset.id}`}
+              />
+            </label>
+          ) : null}
+          <label className="block">
+            <span className="sr-only">Message</span>
+            <textarea
+              name="body"
+              value={draftBody}
+              onChange={(event) => setDraftBody(event.target.value)}
+              rows={12}
+              className="mt-1 w-full whitespace-pre-wrap rounded-md border border-edge-strong px-3 py-2 font-sans"
+              data-testid={`outreach-edit-body-${asset.id}`}
+            />
+          </label>
+          <AppButton type="submit" disabled={editPending}>
+            {editPending
+              ? "Saving…"
+              : outreachConfig.labels.saveMessage}
+          </AppButton>
+          {editState && editState.assetId === asset.id ? (
+            <p
+              role="status"
+              className={editState.ok ? "text-sm text-success" : "text-sm text-danger"}
+            >
+              {editState.message}
+            </p>
+          ) : null}
+        </form>
+      ) : shown ? (
         <div
           className={`space-y-2 text-sm text-ink ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
         >
-          {composed.subject ? (
+          {shown.subject ? (
             <p>
-              <span className="font-medium">Subject:</span> {composed.subject}
+              <span className="font-medium">Subject:</span> {shown.subject}
             </p>
           ) : null}
-          <pre className="whitespace-pre-wrap font-sans">{composed.body}</pre>
+          <pre className="whitespace-pre-wrap font-sans">{shown.body}</pre>
         </div>
       ) : (
         <p className={`text-sm text-danger ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>
           This message could not be displayed.
         </p>
       )}
-      {canEdit && composed && asset.type === "EMAIL" && handoff ? (
+      {canEdit && shown && asset.type === "EMAIL" && handoff ? (
         <div className="flex flex-wrap items-end gap-2" data-testid="email-handoff">
           <AppButton
             type="button"
@@ -1413,6 +1486,14 @@ export function OutreachMessageCard({
           >
             {outreachConfig.labels.openGmail}
           </AppButton>
+          <AppButton
+            type="button"
+            variant="secondary"
+            data-testid={`outreach-copy-body-${asset.id}`}
+            onClick={() => void copy("body", shown.body)}
+          >
+            {outreachConfig.labels.copyBody}
+          </AppButton>
           {approvedResumeId ? (
             <AppActionLink href={workspaceAssetDocxHref(approvedResumeId)}>
               {outreachConfig.labels.downloadResume}
@@ -1430,13 +1511,13 @@ export function OutreachMessageCard({
           </p>
         </div>
       ) : null}
-      {canEdit && composed && asset.type !== "EMAIL" ? (
+      {canEdit && shown && asset.type !== "EMAIL" ? (
         <div className="flex flex-wrap items-end gap-2" data-testid="linkedin-handoff">
-          {composed.subject ? (
+          {shown.subject ? (
             <AppButton
               type="button"
               variant="secondary"
-              onClick={() => void copy("subject", composed.subject ?? "")}
+              onClick={() => void copy("subject", shown.subject ?? "")}
             >
               {outreachConfig.labels.copySubject}
             </AppButton>
@@ -1444,7 +1525,8 @@ export function OutreachMessageCard({
           <AppButton
             type="button"
             variant="secondary"
-            onClick={() => void copy("body", composed.body)}
+            data-testid={`outreach-copy-body-${asset.id}`}
+            onClick={() => void copy("body", shown.body)}
           >
             {outreachConfig.labels.copyBody}
           </AppButton>

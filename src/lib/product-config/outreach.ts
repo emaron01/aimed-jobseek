@@ -56,6 +56,8 @@ export const outreachConfig = Object.freeze({
     downloadResume: "Download approved resume",
     copySubject: "Copy subject",
     copyBody: "Copy message",
+    saveMessage: "Save",
+    messageSubject: "Subject",
     openLinkedIn: "Open LinkedIn profile",
     changeInstruction: `What should ${consultationConfig.displayName} change?`,
     purposeProactive: "Proactive outreach",

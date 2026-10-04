@@ -30,6 +30,11 @@ import {
   shouldIncludeRedirect,
   vocab,
 } from "@/lib/product-config";
+import {
+  EMAIL_BODY_MAX_CHARS,
+  EMAIL_SUBJECT_MAX_CHARS,
+  normalizeEmailBody,
+} from "@/lib/email-generation/email-body";
 import { TenantError } from "@/lib/tenant/errors";
 import { generateInterviewThankYouClarifyingQuestions } from "@/lib/interview/ai";
 import { generateOutreachWithModel, validateAssetClaimsWithModel } from "./ai";
@@ -1385,6 +1390,69 @@ function lastOutreachMessage(feedback: string[]): string {
     feedback[0] ??
     "The model did not return a usable message."
   );
+}
+
+export async function saveOutreachMessageEdit(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  assetId: string;
+  subject: string | null;
+  body: string;
+}): Promise<{ subject: string | null; body: string }> {
+  const campaign = await prisma.campaign.findFirst({
+    where: {
+      id: input.campaignId,
+      organizationId: input.organizationId,
+      ownerUserId: input.userId,
+    },
+    select: { id: true },
+  });
+  if (!campaign) throw new TenantError(`${vocab.campaign.Singular} was not found.`);
+  const asset = await prisma.applicationAsset.findFirst({
+    where: {
+      id: input.assetId,
+      campaignId: input.campaignId,
+      organizationId: input.organizationId,
+    },
+    select: { id: true, type: true, contentJson: true },
+  });
+  if (!asset || !isOutreachAssetType(asset.type)) {
+    throw new TenantError("Outreach message was not found.");
+  }
+  const parsed = applicationAssetContentSchema.safeParse(asset.contentJson);
+  if (!parsed.success || !isOutreachAssetType(parsed.data.type)) {
+    throw new TenantError("Outreach message was not found.");
+  }
+  const body = normalizeEmailBody(input.body);
+  if (!body.trim()) throw new TenantError("Message text is required.");
+  if (body.length > EMAIL_BODY_MAX_CHARS) {
+    throw new TenantError(
+      `Message text must be ${EMAIL_BODY_MAX_CHARS} characters or fewer.`,
+    );
+  }
+  const hasSubject =
+    parsed.data.type === "EMAIL" || parsed.data.type === "LINKEDIN_INMAIL";
+  const subject = hasSubject
+    ? (input.subject ?? "").replace(/\s+/g, " ").trim()
+    : null;
+  if (hasSubject && !subject) throw new TenantError("Subject is required.");
+  if (subject && subject.length > EMAIL_SUBJECT_MAX_CHARS) {
+    throw new TenantError(
+      `Subject must be ${EMAIL_SUBJECT_MAX_CHARS} characters or fewer.`,
+    );
+  }
+  const content = {
+    ...parsed.data,
+    seekerEdit: { subject, body },
+  };
+  await prisma.applicationAsset.update({
+    where: { id: asset.id },
+    data: {
+      contentJson: content as unknown as Prisma.InputJsonValue,
+    },
+  });
+  return { subject, body };
 }
 
 export async function markOutreachSent(input: {

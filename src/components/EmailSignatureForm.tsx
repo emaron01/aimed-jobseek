@@ -8,11 +8,15 @@ import {
   saveEmailSignatureAction,
   type SignatureActionResult,
 } from "@/app/actions/signature";
+import { emailSignatureCopy } from "@/lib/product-config/signature";
 import {
   EMAIL_SIGNATURE_HTML_MAX_CHARS,
   EMAIL_SIGNATURE_MAX_CHARS,
   type EmailSignatureView,
 } from "@/lib/signature/types";
+
+/** Outlook and Gmail handoff cannot carry HTML. The editor stays in source and is not shown. */
+const SHOW_HTML_SIGNATURE = false;
 
 const initial: SignatureActionResult | null = null;
 
@@ -72,6 +76,12 @@ export function EmailSignatureForm({
           <span className="font-medium text-ink">
             Plain text (required for Outlook / Gmail open)
           </span>
+          <p className="mt-2 text-sm text-ink" data-testid="signature-outlook-guidance">
+            {emailSignatureCopy.outlookLine}
+          </p>
+          <p className="mt-1 text-sm text-ink" data-testid="signature-gmail-guidance">
+            {emailSignatureCopy.gmailLine}
+          </p>
           <textarea
             name="body"
             value={body}
@@ -86,6 +96,7 @@ export function EmailSignatureForm({
             desktop compose cannot carry HTML.
           </span>
         </label>
+        {SHOW_HTML_SIGNATURE ? (
         <label className="block text-sm">
           <span className="font-medium text-ink">
             HTML (optional)
@@ -107,6 +118,7 @@ export function EmailSignatureForm({
             that supports HTML.
           </span>
         </label>
+        ) : null}
         <div>
           <p className="text-sm font-medium text-ink">Plain preview</p>
           <pre
@@ -117,7 +129,7 @@ export function EmailSignatureForm({
               "Nothing will be appended to Outlook/Gmail opens until you save plain text."}
           </pre>
         </div>
-        {htmlBody.trim() ? (
+        {SHOW_HTML_SIGNATURE && htmlBody.trim() ? (
           <div>
             <p className="text-sm font-medium text-ink">
               HTML preview

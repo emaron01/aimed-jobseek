@@ -74,6 +74,7 @@ vi.mock("@/app/actions/application-outreach", () => ({
   markApplicationAppliedAction: vi.fn(),
   setApplicationProgressAction: vi.fn(),
   markOutreachSentAction: vi.fn(),
+  saveOutreachMessageEditAction: vi.fn(),
   updateApplicationContactRoleAction: vi.fn(),
 }));
 

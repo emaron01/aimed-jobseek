@@ -32,6 +32,7 @@ vi.mock("@/app/actions/application-outreach", () => ({
     message: "",
   })),
   markOutreachSentAction: vi.fn(async () => ({ ok: true, message: "" })),
+  saveOutreachMessageEditAction: vi.fn(async () => ({ ok: true, message: "" })),
   markApplicationAppliedAction: vi.fn(async () => ({ ok: true, message: "" })),
   setApplicationProgressAction: vi.fn(async () => ({ ok: true, message: "" })),
 }));
@@ -275,11 +276,11 @@ describe("Send Outreach role, spacing, and status", () => {
   it("separates paragraphs with a blank line on screen and in every handoff", () => {
     const composed = composeOutreachText(emailContent);
     expect(composed.body).toBe(
-      "Hello,\n\nFirst paragraph.\n\nSecond paragraph.\n\nBest,\nAlex Chen",
+      "Hello,\n\nFirst paragraph.\n\nSecond paragraph.",
     );
     expect(composed.body.startsWith("Hello,\n\n")).toBe(true);
-    expect(composed.body.endsWith("Best,\nAlex Chen")).toBe(true);
-    expect(composed.body).not.toContain("Best,\n\nAlex Chen");
+    expect(composed.body).not.toContain("Best,");
+    expect(composed.body).not.toContain("Alex Chen");
 
     const view = mount(
       section([
@@ -297,10 +298,10 @@ describe("Send Outreach role, spacing, and status", () => {
       ]),
     );
     root = view.root;
-    const emailPre = view.host.querySelector(
-      "[data-testid='outreach-message'] pre",
-    );
-    expect(emailPre?.textContent).toBe(composed.body);
+    const emailBody = view.host.querySelector(
+      "[data-testid='outreach-edit-body-asset_email']",
+    ) as HTMLTextAreaElement;
+    expect(emailBody.value).toBe(composed.body);
 
     const handoff = outreachEmailHandoff({
       to: christina.email ?? "",
@@ -316,15 +317,19 @@ describe("Send Outreach role, spacing, and status", () => {
       const body = decodedBody(href ?? "");
       expect(body).toContain("Hello,\r\n\r\n");
       expect(body).toContain("First paragraph.\r\n\r\nSecond paragraph.");
-      expect(body).toContain("Best,\r\nAlex Chen");
-      expect(body).not.toContain("Best,\r\n\r\nAlex Chen");
+      expect(body).not.toContain("Best,");
+      expect(body).not.toContain("Alex Chen");
     }
 
     clickContact(view.host, maroney.contactId);
     const linkedIn = composeOutreachText(inmailContent);
     expect(linkedIn.body).toBe("Hello,\n\nFirst paragraph.\n\nSecond paragraph.");
     expect(
-      view.host.querySelector("[data-testid='outreach-message'] pre")?.textContent,
+      (
+        view.host.querySelector(
+          "[data-testid='outreach-edit-body-asset_inmail']",
+        ) as HTMLTextAreaElement
+      ).value,
     ).toBe(linkedIn.body);
     expect(enqueueApplicationJob).not.toHaveBeenCalled();
     expect(runPaidStructuredCall).not.toHaveBeenCalled();

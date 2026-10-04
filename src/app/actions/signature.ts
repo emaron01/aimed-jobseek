@@ -27,11 +27,12 @@ export async function saveEmailSignatureAction(
   try {
     const user = await requireCurrentUser();
     const organizationId = await requireOrganizationId();
+    const htmlField = formData.get("htmlBody");
     const signature = await upsertEmailSignatureForUser({
       organizationId,
       userId: user.id,
       body: String(formData.get("body") ?? ""),
-      htmlBody: String(formData.get("htmlBody") ?? ""),
+      ...(htmlField == null ? {} : { htmlBody: String(htmlField) }),
     });
     revalidatePath("/settings/voice");
     revalidatePath("/settings/email");

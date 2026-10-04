@@ -175,7 +175,7 @@ export async function sendEmailDraftWithConnectedMailbox(input: {
       subject,
       body,
       signatureText: signature.text,
-      signatureHtml: signature.html,
+      signatureHtml: null,
     });
     await prisma.$transaction(async (tx) => {
       const completed = await tx.emailDraft.updateMany({

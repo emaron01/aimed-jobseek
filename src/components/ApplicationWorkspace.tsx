@@ -36,6 +36,8 @@ import {
   NEEDS_REVIEW_PERSONA_DETAILS_CLASS,
 } from "@/lib/hiring-team/review-group";
 import { profileJsonAwaitingSeekerInput } from "@/lib/hiring-team/synthesize-outcome";
+import { requireCurrentUser } from "@/lib/auth/session";
+import { getActiveEmailSignatureBody } from "@/lib/signature/signature";
 import { AppPendingIndicator } from "@/components/AppButton";
 import { getApplicationResearchStatus } from "@/lib/application/research-status";
 import {
@@ -439,6 +441,13 @@ export async function ApplicationWorkspace({
         )
       : [],
   });
+  const emailSignature =
+    focus === "all" || focus === "outreach"
+      ? await getActiveEmailSignatureBody({
+          organizationId,
+          userId: (await requireCurrentUser()).id,
+        })
+      : null;
   await supersedeObsoleteWorkspaceFailures({ organizationId, campaignId });
   const [nextStep, live] = await Promise.all([
     readApplicationNextStep({
@@ -939,6 +948,7 @@ export async function ApplicationWorkspace({
           emailLength: asset.emailLength,
           content: asset.contentJson,
         }))}
+      emailSignature={emailSignature}
     />
     </div>
     ) : null}

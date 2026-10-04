@@ -144,13 +144,9 @@ export async function getEmailSignatureForSend(input: {
     return { text: null, html: null };
   }
   const text = row.body.trim() || null;
-  const html =
-    row.htmlBody && !isBlankSignatureHtml(row.htmlBody)
-      ? sanitizeEmailSignatureHtml(row.htmlBody)
-      : null;
   return {
-    text: text || (html ? stripHtmlToText(html) || null : null),
-    html,
+    text,
+    html: null,
   };
 }
 
@@ -161,20 +157,21 @@ export async function upsertEmailSignatureForUser(input: {
   htmlBody?: string;
 }): Promise<EmailSignatureView> {
   const body = input.body.replace(/\r\n?/g, "\n").trim();
-  const rawHtml = (input.htmlBody ?? "").trim();
+  const updateHtml = input.htmlBody !== undefined;
+  const rawHtml = updateHtml ? (input.htmlBody ?? "").trim() : "";
   if (body.length > EMAIL_SIGNATURE_MAX_CHARS) {
     throw new TenantError(
       `Plain-text signature must be ${EMAIL_SIGNATURE_MAX_CHARS} characters or fewer.`,
     );
   }
-  if (rawHtml.length > EMAIL_SIGNATURE_HTML_MAX_CHARS) {
+  if (updateHtml && rawHtml.length > EMAIL_SIGNATURE_HTML_MAX_CHARS) {
     throw new TenantError(
       `HTML signature must be ${EMAIL_SIGNATURE_HTML_MAX_CHARS} characters or fewer.`,
     );
   }
 
   let htmlBody: string | null = null;
-  if (rawHtml && !isBlankSignatureHtml(rawHtml)) {
+  if (updateHtml && rawHtml && !isBlankSignatureHtml(rawHtml)) {
     htmlBody = sanitizeEmailSignatureHtml(rawHtml);
   }
 
@@ -191,8 +188,8 @@ export async function upsertEmailSignatureForUser(input: {
     throw new TenantError("You are not a member of this organization.");
   }
 
-  // Blank save keeps a row with active=false — same send behavior as no row.
-  const active = body.length > 0 || Boolean(htmlBody);
+  // The plain-text block is the signature. A missing htmlBody leaves stored HTML in place.
+  const active = body.length > 0;
   const row = await prisma.emailSignature.upsert({
     where: {
       organizationId_userId: {
@@ -204,13 +201,13 @@ export async function upsertEmailSignatureForUser(input: {
       organizationId: input.organizationId,
       userId: input.userId,
       body,
-      htmlBody,
+      htmlBody: updateHtml ? htmlBody : null,
       active,
     },
     update: {
       body,
-      htmlBody,
       active,
+      ...(updateHtml ? { htmlBody } : {}),
     },
   });
 

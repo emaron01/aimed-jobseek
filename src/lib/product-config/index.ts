@@ -105,6 +105,7 @@ export type {
   InterviewStageTypeValue,
 } from "./interview";
 export { applicationAssetConfig } from "./application-assets";
+export { emailSignatureCopy } from "./signature";
 export type { ApplicationAssetTypeValue } from "./application-assets";
 export { candidateProfileEditCopy } from "./candidate-profile";
 export {

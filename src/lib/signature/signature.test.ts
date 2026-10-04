@@ -191,7 +191,7 @@ describe.skipIf(!hasDatabase)(
         }),
       ).toMatchObject({
         text: "Alex Rivera\nhttps://example.com/meet",
-        html: expect.stringContaining("logo.png"),
+        html: null,
       });
 
       const updated = await upsertEmailSignatureForUser({

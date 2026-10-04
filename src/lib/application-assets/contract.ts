@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  appendEmailSignature,
+  normalizeEmailBody,
+} from "@/lib/email-generation/email-body";
 
 export const RESUME_ASSET_PROMPT_VERSION = "10";
 export const COVER_LETTER_ASSET_PROMPT_VERSION = "16";
@@ -50,6 +54,12 @@ export const resumeAssetContentSchema = z.object({
   credentials: z.array(assetClaimSchema),
 });
 
+/** Seeker edit of a generated outreach message. Absent until they save one. */
+export const outreachSeekerEditSchema = z.object({
+  subject: z.string().nullable(),
+  body: z.string(),
+});
+
 const coverLetterParagraphSchema = z.object({
   id: z.string().trim().min(1),
   text: z.string().trim().min(1),
@@ -71,12 +81,14 @@ export const emailAssetContentSchema = z.object({
   paragraphs: z.array(outreachClaimSchema).min(1),
   signoff: z.string().trim().min(1),
   signerName: z.string().trim().min(1),
+  seekerEdit: outreachSeekerEditSchema.optional(),
 });
 
 export const linkedinNoteAssetContentSchema = z.object({
   type: z.literal("LINKEDIN_CONNECTION_NOTE"),
   greeting: z.string().trim().min(1),
   body: outreachClaimSchema,
+  seekerEdit: outreachSeekerEditSchema.optional(),
 });
 
 export const linkedinInmailAssetContentSchema = z.object({
@@ -84,6 +96,7 @@ export const linkedinInmailAssetContentSchema = z.object({
   subject: z.string().trim().min(1),
   greeting: z.string().trim().min(1),
   paragraphs: z.array(outreachClaimSchema).min(1),
+  seekerEdit: outreachSeekerEditSchema.optional(),
 });
 
 export const applicationAssetContentSchema = z.discriminatedUnion("type", [
@@ -138,30 +151,49 @@ export function assetClaims(content: ApplicationAssetContent): AssetClaim[] {
   ];
 }
 
-export function composeOutreachText(content: ApplicationAssetContent): {
+export function composeOutreachText(
+  content: ApplicationAssetContent,
+  options?: { emailSignature?: string | null },
+): {
   subject: string | null;
   body: string;
 } {
   if (content.type === "EMAIL") {
+    if (content.seekerEdit) {
+      return {
+        subject: content.seekerEdit.subject,
+        body: normalizeEmailBody(content.seekerEdit.body),
+      };
+    }
+    const message = [
+      content.greeting,
+      "",
+      content.paragraphs.map((claim) => claim.text).join("\n\n"),
+    ].join("\n");
     return {
       subject: content.subject,
-      body: [
-        content.greeting,
-        "",
-        content.paragraphs.map((claim) => claim.text).join("\n\n"),
-        "",
-        content.signoff,
-        content.signerName,
-      ].join("\n"),
+      body: appendEmailSignature(message, options?.emailSignature),
     };
   }
   if (content.type === "LINKEDIN_CONNECTION_NOTE") {
+    if (content.seekerEdit) {
+      return {
+        subject: null,
+        body: normalizeEmailBody(content.seekerEdit.body),
+      };
+    }
     return {
       subject: null,
       body: `${content.greeting} ${content.body.text}`.trim(),
     };
   }
   if (content.type === "LINKEDIN_INMAIL") {
+    if (content.seekerEdit) {
+      return {
+        subject: content.seekerEdit.subject,
+        body: normalizeEmailBody(content.seekerEdit.body),
+      };
+    }
     return {
       subject: content.subject,
       body: [content.greeting, ...content.paragraphs.map((claim) => claim.text)]

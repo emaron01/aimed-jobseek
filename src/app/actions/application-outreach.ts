@@ -7,6 +7,7 @@ import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import {
   markApplicationApplied,
   markOutreachSent,
+  saveOutreachMessageEdit,
 } from "@/lib/application-assets/outreach";
 import {
   isHiringTeamPersonaBuilt,
@@ -43,6 +44,8 @@ export type ApplicationOutreachActionResult = {
   violations?: string[];
   questions?: Array<{ id: string; text: string }>;
   needsPersonaBuild?: boolean;
+  subject?: string | null;
+  body?: string;
 };
 
 function campaignId(formData: FormData): string {
@@ -421,6 +424,41 @@ export async function markOutreachSentAction(
     });
     revalidate(id);
     return { ok: true, message: "Marked sent.", assetId };
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
+export async function saveOutreachMessageEditAction(
+  _previous: ApplicationOutreachActionResult | null,
+  formData: FormData,
+): Promise<ApplicationOutreachActionResult> {
+  try {
+    const [user, organizationId] = await Promise.all([
+      requireCurrentUser(),
+      requireOrganizationId(),
+    ]);
+    const id = campaignId(formData);
+    const assetId = String(formData.get("assetId") ?? "").trim();
+    if (!assetId) throw new TenantError("Outreach message is required.");
+    const saved = await saveOutreachMessageEdit({
+      organizationId,
+      campaignId: id,
+      userId: user.id,
+      assetId,
+      subject: formData.has("subject")
+        ? String(formData.get("subject") ?? "")
+        : null,
+      body: String(formData.get("body") ?? ""),
+    });
+    revalidate(id);
+    return {
+      ok: true,
+      message: "Message saved.",
+      assetId,
+      subject: saved.subject,
+      body: saved.body,
+    };
   } catch (error) {
     return errorResult(error);
   }
