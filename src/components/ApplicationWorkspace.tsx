@@ -349,7 +349,7 @@ export async function ApplicationWorkspace({
         : applicationStepByKey(focus);
     return (
       <EmptyState
-        title={step?.title ?? applicationStepCopy.overviewTitle}
+        title={step?.title ?? applicationStepCopy.dashboardTitle}
         description={step?.emptyGuidance ?? applicationStepCopy.factMissing}
         actions={
           <AppActionLink href="/campaigns" variant="secondary">

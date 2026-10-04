@@ -29,6 +29,7 @@ import { openEmailClientHref } from "@/lib/email-generation/email-body";
 import {
   applicationSummaryConfig,
   outreachConfig,
+  polishCopy,
   vocab,
 } from "@/lib/product-config";
 import { SubmitButton, AppButton, AppActionLink, PageHeader } from "@/components/ui";
@@ -378,7 +379,7 @@ export function ApplicationContactsPageHeader({
                 href={backHref}
                 data-testid="contacts-page-back-to-application"
               >
-                Back to application
+                {polishCopy.backToDashboard}
               </AppActionLink>
             ) : null}
             {trailingActions}

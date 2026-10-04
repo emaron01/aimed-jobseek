@@ -18,7 +18,7 @@ export async function generateApplicationPageMetadata(
   }
   const page =
     step === "overview"
-      ? applicationStepCopy.overviewTitle
+      ? applicationStepCopy.dashboardTitle
       : applicationStepByKey(step).title;
   return {
     title: {

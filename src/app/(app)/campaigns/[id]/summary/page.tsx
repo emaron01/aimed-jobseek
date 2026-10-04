@@ -7,7 +7,6 @@ import { CheatSheetCompanyResearch } from "@/components/ApplicationCompanyBriefi
 import {
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
-import { AppActionLink } from "@/components/AppButton";
 import { CheatSheetPrintBanner, CheatSheetSection } from "@/components/CheatSheetCollapsible";
 import { CheatSheetInterviewNotes } from "@/components/CheatSheetInterviewNotes";
 import { CheatSheetEmptyState } from "@/components/CheatSheetEmptyState";
@@ -201,9 +200,6 @@ export default async function ApplicationSummaryPage({
         actions={
           <div className="flex flex-wrap gap-2 print:hidden">
             {summaryStatus === "READY" ? <CheatSheetPrintButton /> : null}
-            <AppActionLink href={`/campaigns/${id}`}>
-              Back to application
-            </AppActionLink>
           </div>
         }
       />

@@ -7,10 +7,18 @@ import {
   getApplicationTrackerAction,
 } from "@/app/actions/application-jobs";
 import { AppIcon, ErrorState, Skeleton } from "@/components/design";
+import {
+  sidebarNavItemCurrentClass,
+  sidebarNavItemIdleClass,
+  sidebarNavItemLayoutClass,
+} from "@/components/sidebar-nav-style";
 import { AppButton } from "@/components/ui";
 import type { ApplicationTrackerView } from "@/lib/application/tracker";
 import type { ApplicationStepState } from "@/lib/application/step-progress";
-import { workspaceApplicationContactsHref } from "@/lib/application/workspace-links";
+import {
+  workspaceApplicationContactsHref,
+  workspaceCampaignHref,
+} from "@/lib/application/workspace-links";
 import {
   applicationStepCopy,
   polishCopy,
@@ -227,42 +235,43 @@ export function ApplicationSidebarTracker({
     };
   }, [campaignId, pathname]);
 
-  if (!loaded) {
-    return (
-      <div className="px-3 py-3" data-testid="application-tracker-loading">
-        <p className="text-xs font-medium uppercase tracking-[0.14em] text-on-nav/70">
-          {applicationStepCopy.trackerLabel}
+  const href = workspaceCampaignHref(campaignId);
+  const current = pathname === href;
+
+  return (
+    <div
+      className="border-b border-on-nav/15 px-3 py-3"
+      data-testid="application-sidebar-section"
+    >
+      {tracker ? (
+        <p
+          className="min-w-0 break-words text-sm font-semibold text-on-nav line-clamp-2"
+          title={tracker.campaignName}
+        >
+          {tracker.campaignName}
         </p>
-        <Skeleton className="mt-2" lines={4} />
-      </div>
-    );
-  }
-  if (failed && !tracker) {
-    return (
-      <div className="px-3 py-3">
+      ) : !loaded ? (
+        <div data-testid="application-tracker-loading">
+          <Skeleton lines={2} />
+        </div>
+      ) : failed ? (
         <ErrorState
           description={polishCopy.trackerLoadFailed}
           onRetry={() => window.location.reload()}
         />
-      </div>
-    );
-  }
-  if (!tracker) return null;
-
-  return (
-    <div className="border-b border-on-nav/15 px-3 py-3">
-      <p
-        className="min-w-0 break-words text-sm font-semibold text-on-nav line-clamp-2"
-        title={tracker.campaignName}
+      ) : null}
+      <Link
+        href={href}
+        data-testid="sidebar-application-dashboard"
+        aria-current={current ? "page" : undefined}
+        className={cn(
+          "mt-2",
+          sidebarNavItemLayoutClass,
+          current ? sidebarNavItemCurrentClass : sidebarNavItemIdleClass,
+        )}
       >
-        {tracker.campaignName}
-      </p>
-      <p className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-on-nav/70">
-        {applicationStepCopy.trackerLabel}
-      </p>
-      <div className="mt-2">
-        <ApplicationTrackerList tracker={tracker} variant="sidebar" />
-      </div>
+        {applicationStepCopy.dashboardTitle}
+      </Link>
     </div>
   );
 }

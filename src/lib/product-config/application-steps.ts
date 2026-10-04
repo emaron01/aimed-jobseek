@@ -102,6 +102,7 @@ export const applicationStepList: readonly ApplicationStepDefinition[] =
 
 export const applicationStepCopy = Object.freeze({
   overviewTitle: vocab.campaign.Singular,
+  dashboardTitle: "Application Dashboard",
   trackerLabel: "Application steps",
   newMarker: "New",
   notStarted: "Not started",

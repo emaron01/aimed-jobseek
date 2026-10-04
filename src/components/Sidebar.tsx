@@ -27,15 +27,38 @@ function campaignIdFromPathname(pathname: string): string | null {
   return id;
 }
 
-function isSidebarItemActive(item: SidebarNavItem, pathname: string): boolean {
-  if (item.href === "/") {
-    return pathname === "/";
+function sidebarItemMatchLength(item: SidebarNavItem, pathname: string): number {
+  if (item.href === "/") return pathname === "/" ? 1 : 0;
+  // An open application has its own nav item. Applications is the list page.
+  if (item.href === "/campaigns") {
+    return pathname === "/campaigns" || pathname === "/campaigns/new"
+      ? item.href.length
+      : 0;
   }
-
   const prefixes = [item.href, ...(item.activePrefixes ?? [])];
-  return prefixes.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
+  let best = 0;
+  for (const prefix of prefixes) {
+    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
+      best = Math.max(best, prefix.length);
+    }
+  }
+  return best;
+}
+
+function currentSidebarHref(
+  items: SidebarNavItem[],
+  pathname: string,
+): string | null {
+  let href: string | null = null;
+  let length = 0;
+  for (const item of items) {
+    const match = sidebarItemMatchLength(item, pathname);
+    if (match > length) {
+      length = match;
+      href = item.href;
+    }
+  }
+  return href;
 }
 
 function ApplicationSidebarSlot() {
@@ -55,6 +78,7 @@ function ApplicationSidebarSlot() {
 
 export function Sidebar({ items }: { items: SidebarNavItem[] }) {
   const pathname = usePathname() || "";
+  const currentHref = currentSidebarHref(items, pathname);
 
   return (
     <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-on-nav/15 bg-nav text-on-nav print:hidden">
@@ -71,7 +95,7 @@ export function Sidebar({ items }: { items: SidebarNavItem[] }) {
       </Suspense>
       <nav className="flex flex-1 flex-col gap-0.5 p-3" data-testid="app-sidebar">
         {items.map((item) => {
-          const active = isSidebarItemActive(item, pathname);
+          const current = item.href === currentHref;
 
           return (
             <div key={item.href}>
@@ -84,9 +108,12 @@ export function Sidebar({ items }: { items: SidebarNavItem[] }) {
               <Link
                 href={item.href}
                 data-testid={`sidebar-${item.href}`}
+                aria-current={current ? "page" : undefined}
                 className={cn(
-                  "block rounded-md bg-surface px-3 py-2 text-sm font-medium text-ink transition-colors",
-                  active ? "bg-surface text-ink" : "hover:bg-surface",
+                  "block rounded-md px-3 py-2 text-sm font-medium text-ink transition-colors",
+                  current
+                    ? "bg-primary/10 text-ink"
+                    : "bg-surface text-ink hover:bg-surface",
                 )}
               >
                 {item.label}

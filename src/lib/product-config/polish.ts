@@ -29,6 +29,7 @@ export const polishCopy = Object.freeze({
     "The signature could not be loaded. Retry, or contact support if this continues.",
   offerNotes: "Offer notes",
   backToApplications: `Back to ${vocab.campaign.plural}`,
+  backToDashboard: "Back to dashboard",
   factLabel: "Stated",
   inferredLabel: "Inferred",
   editedByYou: "Edited by you",

@@ -154,7 +154,7 @@ describe("Contacts page Add Contact", () => {
     expect(enqueueApplicationJob).not.toHaveBeenCalled();
     expect(runPaidStructuredCall).not.toHaveBeenCalled();
     expect(view.host.textContent).toContain("Add Contact");
-    expect(view.host.textContent).toContain("Back to application");
+    expect(view.host.textContent).toContain("Back to dashboard");
     expect(view.host.querySelector("[data-testid='add-application-contact']")).toBeNull();
 
     act(() => {
