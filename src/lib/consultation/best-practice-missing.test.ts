@@ -289,9 +289,7 @@ describe.skipIf(!hasTestDatabase())(
       const result = await generateRoleExpertiseWithModel(input(failCampaignId));
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(callsFor("role_expertise_answers")).toBe(
-        consultationConfig.qualityRegenerationAttempts + 1,
-      );
+      expect(callsFor("role_expertise_answers")).toBe(1);
       expect(result.questions).toHaveLength(1);
       expect(result.questions[0]?.text).toBe(FAILED);
       expect(result.questions[0]?.content).toContain(FACT);
@@ -384,6 +382,66 @@ describe.skipIf(!hasTestDatabase())(
       expect(story?.grounding.result).toContain("forecast I stood behind");
       expect(failed?.content).toContain(FACT);
       expect(story?.content).not.toContain(FACT);
+    });
+
+    it("passes a point-of-view result on the first attempt and still retries a story", async () => {
+      const attract = "What attracts you to CSC's Senior Director of Sales role?";
+      const story = "Describe a time when you inherited an unhealthy pipeline?";
+      const povId = await seedCampaign(icpId, "PovFirst");
+      questionsGenerate.mockReset();
+      answersGenerate.mockReset();
+      questionsGenerate.mockResolvedValue({
+        data: { questions: [{ text: attract, interviewTypeTag: "screening" }] },
+      });
+      answersGenerate.mockResolvedValue({
+        data: {
+          answers: [
+            car(attract, {
+              action: "",
+              result:
+                "I am drawn to this role because it owns forecast discipline and manager standards.",
+            }),
+          ],
+        },
+      });
+      const pov = await generateRoleExpertiseWithModel({
+        ...input(povId),
+        minCount: 1,
+        maxCount: 1,
+      });
+      expect(pov.ok).toBe(true);
+      if (!pov.ok) return;
+      expect(callsFor("role_expertise_answers")).toBe(1);
+      expect(pov.questions[0]?.content).toContain("forecast discipline");
+
+      const storyId = await seedCampaign(icpId, "StoryStill");
+      questionsGenerate.mockReset();
+      answersGenerate.mockReset();
+      questionsGenerate.mockResolvedValue({
+        data: { questions: [{ text: story, interviewTypeTag: "focused_competency" }] },
+      });
+      answersGenerate.mockResolvedValue({
+        data: {
+          answers: [
+            car(story, {
+              challenge: "I inherited an unhealthy pipeline.",
+              action: "I reset the inspection rhythm with the managers.",
+              result: "Better.",
+            }),
+          ],
+        },
+      });
+      const storyResult = await generateRoleExpertiseWithModel({
+        ...input(storyId),
+        minCount: 1,
+        maxCount: 1,
+      });
+      expect(storyResult.ok).toBe(true);
+      if (!storyResult.ok) return;
+      expect(callsFor("role_expertise_answers")).toBe(
+        consultationConfig.qualityRegenerationAttempts + 1,
+      );
+      expect(storyResult.questions[0]?.content).not.toBe("Better.");
     });
 
     it("stores a draft for each reported point-of-view and story question", async () => {

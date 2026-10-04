@@ -1062,15 +1062,27 @@ function bestPracticePassingDraft(
     };
   }
   if (kind === "point-of-view") {
-    const pointOfView = composedPointOfViewAnswer(raw);
-    if (pointOfView && !draftIsRawProfileFact(pointOfView.content, sourceTexts)) {
+    const content = askHarperAttemptProse(raw);
+    const words = content.split(/\s+/).filter(Boolean);
+    if (
+      content.trim() &&
+      words.length >= 4 &&
+      !containsFrameworkOrPartLabel(content)
+    ) {
       return {
         question: {
           text: choice.text,
           targetKey: choice.targetKey,
           interviewTypeTag: choice.interviewTypeTag,
-          content: pointOfView.content,
-          grounding: pointOfView.grounding,
+          content,
+          grounding: {
+            answerFramework: answer.answerFramework,
+            challenge: fieldText(answer.challenge) || undefined,
+            situation: fieldText(answer.situation) || undefined,
+            task: fieldText(answer.task) || undefined,
+            action: fieldText(answer.action) || content,
+            result: fieldText(answer.result),
+          },
           followUpQuestion: followUpText(answer),
         },
         issue: null,
