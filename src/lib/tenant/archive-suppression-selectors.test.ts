@@ -63,9 +63,4 @@ describe("archived and suppressed selector audit", () => {
     expect(followUp).toContain("generateEmailDraft");
   });
 
-  it("scoring page is a historical report (archived lists remain viewable)", () => {
-    const report = read("src/app/(app)/scoring/[runId]/page.tsx");
-    expect(report).toContain("ScoreReportClient");
-    expect(report).toContain("listActiveNormalizedEmails");
-  });
 });

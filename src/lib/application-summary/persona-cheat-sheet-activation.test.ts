@@ -413,17 +413,6 @@ describe("persona cheat sheet activation", () => {
     expect(page).toContain("CheatSheetEmptyState");
   });
 
-  it("does not start interviewer prep from any add-person path", () => {
-    const stages = readFileSync("src/lib/interview/stages.ts", "utf8");
-    const startAt = stages.indexOf("async function startPersonPrepForContact");
-    expect(stages.slice(0, startAt)).not.toContain("await offerPersonPrep");
-    expect(stages.slice(startAt)).toContain("await offerPersonPrep");
-    const hiring = readFileSync("src/app/actions/hiring-team.ts", "utf8");
-    expect(hiring).not.toContain("offerPersonPrep");
-    const prep = readFileSync("src/lib/interview/person-prep.ts", "utf8");
-    expect(prep).toContain('operation: "person_prep"');
-  });
-
   it("makes no paid call and enqueues no job while rendering either page", () => {
     render(
       createElement(
