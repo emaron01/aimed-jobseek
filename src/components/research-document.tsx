@@ -6,6 +6,11 @@ import {
   formatSourceMarkerLabel,
   sourceMarkerNumbers,
 } from "@/lib/research/source-index";
+import {
+  citationNumbersInParts,
+  researchParagraphParts,
+  type ResearchTextPart,
+} from "@/lib/research/research-prose";
 import type { ResearchSource } from "@/lib/research/types";
 import { sourceLabelForCompany } from "@/lib/research/company-briefing";
 
@@ -128,6 +133,81 @@ export function ResearchListItem({
       {text}
       <ResearchSourceChip sources={sources} sourceIndex={sourceIndex} />
     </li>
+  );
+}
+
+function ResearchMarkerLink({
+  number,
+  url,
+}: {
+  number: number;
+  url: string;
+}) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      data-citation={number}
+      className="research-source-marker ml-0.5 text-ink underline"
+    >
+      [{number}]
+    </a>
+  );
+}
+
+function renderParts(parts: ResearchTextPart[]) {
+  return parts.map((part, index) =>
+    part.type === "text" ? (
+      <span key={index}>{part.value}</span>
+    ) : (
+      <ResearchMarkerLink key={index} number={part.number} url={part.url} />
+    ),
+  );
+}
+
+export function CompanyResearchProse({
+  text,
+  sources,
+  fieldSources = [],
+}: {
+  text: string;
+  sources: ResearchSource[];
+  fieldSources?: ResearchSource[];
+}) {
+  const paragraphs = researchParagraphParts(text, sources);
+  if (paragraphs.length === 0) return null;
+  const linked = new Set(citationNumbersInParts(paragraphs));
+  const extra = fieldSources.flatMap((source) => {
+    const number =
+      sources.findIndex(
+        (row) => row.url.replace(/\/$/, "") === source.url.replace(/\/$/, ""),
+      ) + 1;
+    if (number <= 0 || linked.has(number)) return [];
+    linked.add(number);
+    return [{ number, url: source.url }];
+  });
+  return (
+    <div className="space-y-3" data-testid="company-research-prose">
+      {paragraphs.map((parts, index) => (
+        <p
+          key={index}
+          className="text-[17px] leading-7 text-ink"
+          data-testid="research-paragraph"
+        >
+          {renderParts(parts)}
+          {index === paragraphs.length - 1
+            ? extra.map((marker) => (
+                <ResearchMarkerLink
+                  key={marker.number}
+                  number={marker.number}
+                  url={marker.url}
+                />
+              ))
+            : null}
+        </p>
+      ))}
+    </div>
   );
 }
 

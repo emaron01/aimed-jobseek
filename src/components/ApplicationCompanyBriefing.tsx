@@ -1,14 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   retryApplicationResearchAction,
   saveApplicationCompanyResearchNotesAction,
 } from "@/app/actions/application";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import {
-  ResearchListItem,
-  ResearchProse,
+  CompanyResearchProse,
   ResearchReadSection,
   ResearchSourcesAppendix,
 } from "@/components/research-document";
@@ -19,6 +18,7 @@ import {
   sourcesSupportingField,
 } from "@/lib/research/company-briefing";
 import { parseStringArray } from "@/lib/research";
+import { presentCompanyResearch } from "@/lib/research/research-prose";
 import { COMPANY_RESEARCH_NOTES_MAX_CHARS } from "@/lib/research/seeker-supplied-notes";
 import { buildSourceIndex } from "@/lib/research/source-index";
 import type { ResearchSource } from "@/lib/research/types";
@@ -54,9 +54,18 @@ export function CheatSheetCompanyResearch({
   jobFocusDetail: string | null;
   sources: ResearchSource[];
 }) {
-  const sourceIndex = buildSourceIndex(sources, (source) => source.url);
-  const hasHighlights = Boolean(companySummary?.trim() || whatTheySell?.trim());
-  const hasFocus = Boolean(jobFocus?.trim() || jobFocusDetail?.trim());
+  const presented = presentCompanyResearch({
+    companySummary,
+    whatTheySell,
+    jobFocus,
+    jobFocusDetail,
+    sources,
+  });
+  const sourceIndex = buildSourceIndex(presented.sources, (source) => source.url);
+  const hasHighlights = Boolean(
+    presented.companySummary.trim() || presented.whatTheySell.trim(),
+  );
+  const hasFocus = Boolean(presented.jobFocus.trim() || presented.jobFocusDetail.trim());
   if (!hasHighlights && !hasFocus) {
     return <p className="text-sm text-ink">Not available.</p>;
   }
@@ -67,18 +76,18 @@ export function CheatSheetCompanyResearch({
           <h3 className="font-medium text-ink">
             {applicationWorkspaceCopy.companyHighlightsTitle}
           </h3>
-          {companySummary?.trim() ? (
-            <ResearchProse
-              text={companySummary}
-              sources={sourcesSupportingField(sources, "companySummary")}
-              sourceIndex={sourceIndex}
+          {presented.companySummary.trim() ? (
+            <CompanyResearchProse
+              text={presented.companySummary}
+              sources={presented.sources}
+              fieldSources={sourcesSupportingField(presented.sources, "companySummary")}
             />
           ) : null}
-          {whatTheySell?.trim() ? (
-            <ResearchProse
-              text={whatTheySell}
-              sources={sourcesSupportingField(sources, "whatTheySell")}
-              sourceIndex={sourceIndex}
+          {presented.whatTheySell.trim() ? (
+            <CompanyResearchProse
+              text={presented.whatTheySell}
+              sources={presented.sources}
+              fieldSources={sourcesSupportingField(presented.sources, "whatTheySell")}
             />
           ) : null}
         </section>
@@ -88,27 +97,28 @@ export function CheatSheetCompanyResearch({
           <h3 className="font-medium text-ink">
             {applicationWorkspaceCopy.jobFocusTitle}
           </h3>
-          {jobFocus?.trim() ? (
-            <ResearchProse
-              text={jobFocus}
-              sources={sourcesSupportingField(sources, "jobFocus")}
-              sourceIndex={sourceIndex}
+          {presented.jobFocus.trim() ? (
+            <CompanyResearchProse
+              text={presented.jobFocus}
+              sources={presented.sources}
+              fieldSources={sourcesSupportingField(presented.sources, "jobFocus")}
             />
           ) : null}
-          {jobFocusDetail?.trim() ? (
+          {presented.jobFocusDetail.trim() ? (
             <>
               <h4 className="mt-3 text-sm font-medium text-ink">
                 {applicationWorkspaceCopy.jobFocusDetailTitle}
               </h4>
-              <ResearchProse
-                text={jobFocusDetail}
-                sources={sourcesSupportingField(sources, "jobFocusDetail")}
-                sourceIndex={sourceIndex}
+              <CompanyResearchProse
+                text={presented.jobFocusDetail}
+                sources={presented.sources}
+                fieldSources={sourcesSupportingField(presented.sources, "jobFocusDetail")}
               />
             </>
           ) : null}
         </section>
       ) : null}
+      <ResearchSourcesAppendix sources={presented.sources} sourceIndex={sourceIndex} />
     </div>
   );
 }
@@ -144,32 +154,49 @@ export function ApplicationCompanyBriefing({
   researchLive: boolean;
 }) {
   const [notesValue, setNotesValue] = useState(notes);
+  const presented = presentCompanyResearch(
+    {
+      companySummary: defaults.companySummary,
+      whatTheySell: defaults.whatTheySell,
+      businessModel: defaults.businessModel,
+      companySizeContext: defaults.companySizeContext,
+      jobFocus: defaults.jobFocus,
+      jobFocusDetail: defaults.jobFocusDetail,
+      customerTypes: parseStringArray(defaults.customerTypes),
+      primaryMarkets: parseStringArray(defaults.primaryMarkets),
+      relevantTechnologies: parseStringArray(defaults.relevantTechnologies),
+      hiringSignals: parseStringArray(defaults.hiringSignals),
+      riskSignals: parseStringArray(defaults.riskSignals),
+      sources,
+    },
+    { anchorHost: meta.domain },
+  );
   const sourceLead = describeCompanySourceLead({
-    sources,
+    sources: presented.sources,
     researchMethod,
   });
-
-  const customerTypes = parseStringArray(defaults.customerTypes);
-  const primaryMarkets = parseStringArray(defaults.primaryMarkets);
-  const relevantTechnologies = parseStringArray(defaults.relevantTechnologies);
-  const hiringSignals = parseStringArray(defaults.hiringSignals);
-  const riskSignals = parseStringArray(defaults.riskSignals);
+  const {
+    customerTypes,
+    primaryMarkets,
+    relevantTechnologies,
+    hiringSignals,
+    riskSignals,
+  } = presented;
 
   const metaLine = formatCompanyBriefingMeta(meta);
-  const sourceIndex = useMemo(
-    () => buildSourceIndex(sources, (source) => source.url),
-    [sources],
-  );
+  const sourceIndex = buildSourceIndex(presented.sources, (source) => source.url);
   const hasBriefing =
-    Boolean(defaults.companySummary) ||
-    Boolean(defaults.whatTheySell) ||
+    Boolean(presented.companySummary) ||
+    Boolean(presented.whatTheySell) ||
     customerTypes.length > 0 ||
     primaryMarkets.length > 0 ||
-    Boolean(defaults.businessModel) ||
-    Boolean(defaults.companySizeContext) ||
+    Boolean(presented.businessModel) ||
+    Boolean(presented.companySizeContext) ||
     relevantTechnologies.length > 0 ||
     hiringSignals.length > 0 ||
-    riskSignals.length > 0;
+    riskSignals.length > 0 ||
+    Boolean(presented.jobFocus) ||
+    Boolean(presented.jobFocusDetail);
 
   return (
     <div
@@ -208,26 +235,29 @@ export function ApplicationCompanyBriefing({
           </h3>
           <ResearchReadSection
             title={applicationWorkspaceCopy.whatTheyDoTitle}
-            empty={!defaults.whatTheySell}
+            empty={!presented.whatTheySell}
           >
-            {defaults.whatTheySell ? (
-              <ResearchProse
-                text={defaults.whatTheySell}
-                sources={sourcesSupportingField(sources, "whatTheySell")}
-                sourceIndex={sourceIndex}
+            {presented.whatTheySell ? (
+              <CompanyResearchProse
+                text={presented.whatTheySell}
+                sources={presented.sources}
+                fieldSources={sourcesSupportingField(presented.sources, "whatTheySell")}
               />
             ) : null}
           </ResearchReadSection>
 
           <ResearchReadSection
             title={applicationWorkspaceCopy.fieldCompanySummary}
-            empty={!defaults.companySummary}
+            empty={!presented.companySummary}
           >
-            {defaults.companySummary ? (
-              <ResearchProse
-                text={defaults.companySummary}
-                sources={sourcesSupportingField(sources, "companySummary")}
-                sourceIndex={sourceIndex}
+            {presented.companySummary ? (
+              <CompanyResearchProse
+                text={presented.companySummary}
+                sources={presented.sources}
+                fieldSources={sourcesSupportingField(
+                  presented.sources,
+                  "companySummary",
+                )}
               />
             ) : null}
           </ResearchReadSection>
@@ -243,16 +273,17 @@ export function ApplicationCompanyBriefing({
                 </p>
                 <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px]">
                   {customerTypes.map((item) => (
-                    <ResearchListItem
-                      key={item}
-                      text={item}
-                      sources={sourcesSupportingClaim(
-                        sources,
-                        item,
-                        "customerTypes",
-                      )}
-                      sourceIndex={sourceIndex}
-                    />
+                    <li key={item}>
+                      <CompanyResearchProse
+                        text={item}
+                        sources={presented.sources}
+                        fieldSources={sourcesSupportingClaim(
+                          presented.sources,
+                          item,
+                          "customerTypes",
+                        )}
+                      />
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -264,16 +295,17 @@ export function ApplicationCompanyBriefing({
                 </p>
                 <ul className="mt-1 list-disc space-y-1 pl-5 text-[17px]">
                   {primaryMarkets.map((item) => (
-                    <ResearchListItem
-                      key={item}
-                      text={item}
-                      sources={sourcesSupportingClaim(
-                        sources,
-                        item,
-                        "primaryMarkets",
-                      )}
-                      sourceIndex={sourceIndex}
-                    />
+                    <li key={item}>
+                      <CompanyResearchProse
+                        text={item}
+                        sources={presented.sources}
+                        fieldSources={sourcesSupportingClaim(
+                          presented.sources,
+                          item,
+                          "primaryMarkets",
+                        )}
+                      />
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -282,20 +314,23 @@ export function ApplicationCompanyBriefing({
 
           <ResearchReadSection
             title={applicationWorkspaceCopy.howTheyOperateTitle}
-            empty={!defaults.businessModel && !defaults.companySizeContext}
+            empty={!presented.businessModel && !presented.companySizeContext}
           >
-            {defaults.businessModel ? (
-              <ResearchProse
-                text={defaults.businessModel}
-                sources={sourcesSupportingField(sources, "businessModel")}
-                sourceIndex={sourceIndex}
+            {presented.businessModel ? (
+              <CompanyResearchProse
+                text={presented.businessModel}
+                sources={presented.sources}
+                fieldSources={sourcesSupportingField(presented.sources, "businessModel")}
               />
             ) : null}
-            {defaults.companySizeContext ? (
-              <ResearchProse
-                text={defaults.companySizeContext}
-                sources={sourcesSupportingField(sources, "companySizeContext")}
-                sourceIndex={sourceIndex}
+            {presented.companySizeContext ? (
+              <CompanyResearchProse
+                text={presented.companySizeContext}
+                sources={presented.sources}
+                fieldSources={sourcesSupportingField(
+                  presented.sources,
+                  "companySizeContext",
+                )}
               />
             ) : null}
           </ResearchReadSection>
@@ -306,16 +341,17 @@ export function ApplicationCompanyBriefing({
           >
             <ul className="list-disc space-y-2 pl-5 text-[17px]">
               {relevantTechnologies.map((item) => (
-                <ResearchListItem
-                  key={item}
-                  text={item}
-                  sources={sourcesSupportingClaim(
-                    sources,
-                    item,
-                    "relevantTechnologies",
-                  )}
-                  sourceIndex={sourceIndex}
-                />
+                <li key={item}>
+                  <CompanyResearchProse
+                    text={item}
+                    sources={presented.sources}
+                    fieldSources={sourcesSupportingClaim(
+                      presented.sources,
+                      item,
+                      "relevantTechnologies",
+                    )}
+                  />
+                </li>
               ))}
             </ul>
           </ResearchReadSection>
@@ -326,16 +362,17 @@ export function ApplicationCompanyBriefing({
           >
             <ul className="list-disc space-y-2 pl-5 text-[17px]">
               {hiringSignals.map((item) => (
-                <ResearchListItem
-                  key={item}
-                  text={item}
-                  sources={sourcesSupportingClaim(
-                    sources,
-                    item,
-                    "hiringSignals",
-                  )}
-                  sourceIndex={sourceIndex}
-                />
+                <li key={item}>
+                  <CompanyResearchProse
+                    text={item}
+                    sources={presented.sources}
+                    fieldSources={sourcesSupportingClaim(
+                      presented.sources,
+                      item,
+                      "hiringSignals",
+                    )}
+                  />
+                </li>
               ))}
             </ul>
           </ResearchReadSection>
@@ -346,37 +383,45 @@ export function ApplicationCompanyBriefing({
           >
             <ul className="list-disc space-y-2 pl-5 text-[17px]">
               {riskSignals.map((item) => (
-                <ResearchListItem
-                  key={item}
-                  text={item}
-                  sources={sourcesSupportingClaim(sources, item, "riskSignals")}
-                  sourceIndex={sourceIndex}
-                />
+                <li key={item}>
+                  <CompanyResearchProse
+                    text={item}
+                    sources={presented.sources}
+                    fieldSources={sourcesSupportingClaim(
+                      presented.sources,
+                      item,
+                      "riskSignals",
+                    )}
+                  />
+                </li>
               ))}
             </ul>
           </ResearchReadSection>
 
-          {defaults.jobFocus?.trim() || defaults.jobFocusDetail?.trim() ? (
+          {presented.jobFocus.trim() || presented.jobFocusDetail.trim() ? (
             <ResearchReadSection
               title={applicationWorkspaceCopy.jobFocusTitle}
               empty={false}
             >
-              {defaults.jobFocus?.trim() ? (
-                <ResearchProse
-                  text={defaults.jobFocus}
-                  sources={sourcesSupportingField(sources, "jobFocus")}
-                  sourceIndex={sourceIndex}
+              {presented.jobFocus.trim() ? (
+                <CompanyResearchProse
+                  text={presented.jobFocus}
+                  sources={presented.sources}
+                  fieldSources={sourcesSupportingField(presented.sources, "jobFocus")}
                 />
               ) : null}
-              {defaults.jobFocusDetail?.trim() ? (
+              {presented.jobFocusDetail.trim() ? (
                 <div>
                   <p className="text-sm font-medium text-muted">
                     {applicationWorkspaceCopy.jobFocusDetailTitle}
                   </p>
-                  <ResearchProse
-                    text={defaults.jobFocusDetail}
-                    sources={sourcesSupportingField(sources, "jobFocusDetail")}
-                    sourceIndex={sourceIndex}
+                  <CompanyResearchProse
+                    text={presented.jobFocusDetail}
+                    sources={presented.sources}
+                    fieldSources={sourcesSupportingField(
+                      presented.sources,
+                      "jobFocusDetail",
+                    )}
                   />
                 </div>
               ) : null}
@@ -389,7 +434,10 @@ export function ApplicationCompanyBriefing({
         </p>
       )}
 
-      <ResearchSourcesAppendix sources={sources} sourceIndex={sourceIndex} />
+      <ResearchSourcesAppendix
+        sources={presented.sources}
+        sourceIndex={sourceIndex}
+      />
 
       {canEdit ? (
         <div className="space-y-4" data-print-hide>

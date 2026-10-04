@@ -780,6 +780,7 @@ export async function saveCompanyResearch(input: {
   researchedByUserId?: string | null;
   freshnessDays?: number;
   anchorHost?: string | null;
+  sisterHosts?: string[] | null;
 }): Promise<CompanyResearch> {
   const organizationId = await orgId();
   const company = await prisma.company.findFirst({
@@ -860,6 +861,7 @@ export async function saveCompanyResearch(input: {
         researchStageTimings: (appendAnchorHostTiming(
           input.telemetry?.researchStageTimings ?? null,
           input.anchorHost,
+          input.sisterHosts,
         ) ?? undefined) as Prisma.InputJsonValue | undefined,
         researchedByUserId: input.researchedByUserId ?? null,
         firstResearchedByUserId,
@@ -890,6 +892,7 @@ export async function saveApplicationEmployerResearch(input: {
   } | null;
   researchedByUserId?: string | null;
   anchorHost: string;
+  sisterHosts?: string[] | null;
   inputFingerprint: string;
 }): Promise<ApplicationEmployerResearch> {
   const organizationId = await orgId();
@@ -932,6 +935,7 @@ export async function saveApplicationEmployerResearch(input: {
       researchStageTimings: (appendAnchorHostTiming(
         input.telemetry?.researchStageTimings ?? null,
         input.anchorHost,
+        input.sisterHosts,
       ) ?? undefined) as Prisma.InputJsonValue | undefined,
       researchedByUserId: input.researchedByUserId ?? null,
     },
@@ -1388,6 +1392,12 @@ export async function researchCompany(
         ? "COMPLETED"
         : "PARTIAL";
 
+    const sisterHosts =
+      "sisterHosts" in result && Array.isArray(result.sisterHosts)
+        ? result.sisterHosts.filter(
+            (host): host is string => typeof host === "string" && host.trim().length > 0,
+          )
+        : undefined;
     const saved = campaignId
       ? await saveApplicationEmployerResearch({
           campaignId,
@@ -1401,6 +1411,7 @@ export async function researchCompany(
           telemetry,
           researchedByUserId: user?.id ?? null,
           anchorHost: anchor.domain,
+          sisterHosts,
           inputFingerprint: fingerprint,
         })
       : await saveCompanyResearch({
@@ -1416,6 +1427,7 @@ export async function researchCompany(
           researchedByUserId: user?.id ?? null,
           freshnessDays: researchPolicy.researchFreshnessDays,
           anchorHost: anchor.domain,
+          sisterHosts,
         });
 
     // Per-stage UsageEvents are recorded via aiCallTracking on each

@@ -2,9 +2,12 @@ import {
   assertSafeExternalHttpUrl,
   safeFetchHttp,
 } from "@/lib/research/url-safety";
+import { isJobBoardHost } from "@/lib/application/company-website";
 import {
   distinctiveTokens,
   hostIsAnchorOrSubdomain,
+  hostIsApprovedNews,
+  hostIsDeniedSister,
   isHomepageResearchUrl,
   researchSourceHost,
 } from "@/lib/research/source-policy";
@@ -26,6 +29,11 @@ export type RetrievedEvidenceBundle = {
   /** Homepage HTML for a later job-focus link lookup. Not sent to the model. */
   homepageHtml?: string | null;
   homepageUrl?: string | null;
+  /**
+   * Other company domains linked from the anchor host's own pages.
+   * Stored on the research timing record. Not a new column.
+   */
+  sisterHosts?: string[];
 };
 
 /** True when at least one first-party page returned usable body text. */
@@ -46,19 +54,34 @@ export const STUB_HOMEPAGE_MAX_CHARS = 200;
 
 export type WebsitePageSlot =
   | "jobFocus"
-  | "products"
+  | "leadership"
   | "about"
+  | "careers"
+  | "products"
   | "company"
   | "homepage";
 
-/** Fill combined budget from highest-value pages first. Job-focus pages lead. */
+/**
+ * Fill combined budget from highest-value pages first.
+ * Key company pages sit with the job-focus page, still inside the 16,000-character budget.
+ */
 export const WEBSITE_PAGE_BUDGET_RANK: WebsitePageSlot[] = [
   "jobFocus",
+  "leadership",
   "products",
   "about",
+  "careers",
   "company",
   "homepage",
 ];
+
+export type CompanyKeyPageKind = "leadership" | "about" | "careers";
+
+const KEY_PAGE_PATTERN: Record<CompanyKeyPageKind, RegExp> = {
+  leadership: /leadership|executive[-_\s]?team|management[-_\s]?team|our[-_\s]?team/i,
+  about: /\babout(?:[-_\s]?us)?\b|who[-_\s]?we[-_\s]?are|our[-_\s]?company/i,
+  careers: /careers|culture|our[-_\s]?mission|\bmission\b|\bvalues\b|life[-_\s]?at|working[-_\s]?(?:at|here)/i,
+};
 
 /**
  * Abstract source retrieval — keeps CompanyResearch independent of
@@ -236,6 +259,91 @@ export function selectJobFocusPageUrl(input: {
   return best?.url ?? null;
 }
 
+/**
+ * Anchor-host page linked from the homepage for leadership, about, or careers.
+ * One best match per kind. Stays on the anchor host. No web search.
+ */
+export function selectCompanyKeyPageUrl(input: {
+  html: string;
+  pageUrl: string;
+  anchorHost: string | null;
+  kind: CompanyKeyPageKind;
+  skipUrls?: string[];
+}): string | null {
+  if (!input.anchorHost) return null;
+  const hrefRe = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let best: { url: string; score: number } | null = null;
+  let match: RegExpExecArray | null;
+  while ((match = hrefRe.exec(input.html))) {
+    const raw = match[1]?.trim() ?? "";
+    if (!raw || raw.startsWith("#") || /^javascript:/i.test(raw) || /^mailto:/i.test(raw)) {
+      continue;
+    }
+    let resolved: URL;
+    try {
+      resolved = new URL(raw, input.pageUrl);
+    } catch {
+      continue;
+    }
+    if (resolved.protocol !== "https:" && resolved.protocol !== "http:") continue;
+    const host = researchSourceHost(resolved.href);
+    if (!host || !hostIsAnchorOrSubdomain(host, input.anchorHost)) continue;
+    const safety = assertSafeExternalHttpUrl(resolved.href);
+    if (!safety.ok) continue;
+    if (isHomepageResearchUrl(safety.href)) continue;
+    if (urlsMatch(safety.href, input.pageUrl)) continue;
+    if ((input.skipUrls ?? []).some((existing) => urlsMatch(existing, safety.href))) {
+      continue;
+    }
+    const anchorText = match[2]!.replace(/<[^>]+>/g, " ");
+    const haystack = `${resolved.pathname} ${anchorText}`;
+    if (input.kind === "about" && KEY_PAGE_PATTERN.leadership.test(haystack)) {
+      continue;
+    }
+    if (!KEY_PAGE_PATTERN[input.kind].test(haystack)) continue;
+    const score = (haystack.match(KEY_PAGE_PATTERN[input.kind]) ?? []).length;
+    if (!best || score > best.score) best = { url: safety.href, score };
+  }
+  return best?.url ?? null;
+}
+
+/**
+ * Sister sites are other domains linked from an anchor-host page.
+ * Social, news, and job-board hosts are not sister sites.
+ * The list is stored on the research timing JSON, not a new column.
+ */
+export function sisterHostsFromPageHtml(input: {
+  html: string;
+  pageUrl: string;
+  anchorHost: string | null;
+}): string[] {
+  if (!input.anchorHost) return [];
+  const hosts = new Set<string>();
+  const hrefRe = /<a\b[^>]*href=["']([^"']+)["']/gi;
+  let match: RegExpExecArray | null;
+  while ((match = hrefRe.exec(input.html))) {
+    const raw = match[1]?.trim() ?? "";
+    if (!raw || raw.startsWith("#") || /^javascript:/i.test(raw) || /^mailto:/i.test(raw)) {
+      continue;
+    }
+    let resolved: URL;
+    try {
+      resolved = new URL(raw, input.pageUrl);
+    } catch {
+      continue;
+    }
+    if (resolved.protocol !== "https:" && resolved.protocol !== "http:") continue;
+    const host = researchSourceHost(resolved.href);
+    if (!host) continue;
+    if (hostIsAnchorOrSubdomain(host, input.anchorHost)) continue;
+    if (hostIsApprovedNews(host) || hostIsDeniedSister(host) || isJobBoardHost(host)) {
+      continue;
+    }
+    hosts.add(host);
+  }
+  return [...hosts];
+}
+
 export function allocateExcerptBudget(
   pages: Array<{
     slot: WebsitePageSlot;
@@ -386,15 +494,38 @@ export async function retrieveWebsiteEvidence(
     : null;
   if (jobFocusPage) pages.push(jobFocusPage);
 
+  const skipUrls = pages.map((page) => page.url);
+  for (const kind of ["leadership", "about", "careers"] as const) {
+    const url = selectCompanyKeyPageUrl({
+      html: homePage.html,
+      pageUrl: homePage.url,
+      anchorHost,
+      kind,
+      skipUrls,
+    });
+    if (!url) continue;
+    const page = await fetchWebsitePage(url, kind, timeoutMs);
+    if (!page) continue;
+    pages.push(page);
+    skipUrls.push(page.url);
+  }
+
+  const hasSlot = (slot: WebsitePageSlot) => pages.some((page) => page.slot === slot);
   const [products, about, company] = await Promise.all([
-    fetchFirstPathOk(
-      origin,
-      "products",
-      ["/products", "/solutions", "/services"],
-      timeoutMs,
-    ),
-    fetchFirstPathOk(origin, "about", ["/about", "/about-us"], timeoutMs),
-    fetchFirstPathOk(origin, "company", ["/company"], timeoutMs),
+    hasSlot("products")
+      ? Promise.resolve(null)
+      : fetchFirstPathOk(
+          origin,
+          "products",
+          ["/products", "/solutions", "/services"],
+          timeoutMs,
+        ),
+    hasSlot("about")
+      ? Promise.resolve(null)
+      : fetchFirstPathOk(origin, "about", ["/about", "/about-us"], timeoutMs),
+    hasSlot("company")
+      ? Promise.resolve(null)
+      : fetchFirstPathOk(origin, "company", ["/company"], timeoutMs),
   ]);
 
   for (const page of [products, about, company]) {
@@ -435,11 +566,23 @@ export async function retrieveWebsiteEvidence(
     }));
 
   const keptHome = pages.find((page) => page.slot === "homepage") ?? homepage;
+  const sisterHosts = [
+    ...new Set(
+      pages.flatMap((page) =>
+        sisterHostsFromPageHtml({
+          html: page.html,
+          pageUrl: page.url,
+          anchorHost,
+        }),
+      ),
+    ),
+  ];
   return {
     sources,
     excerpts,
     homepageHtml: keptHome.html,
     homepageUrl: keptHome.url,
+    sisterHosts,
   };
 }
 

@@ -4,8 +4,8 @@
  */
 
 import {
-  hostIsAnchorOrSubdomain,
   hostIsApprovedNews,
+  hostIsEmployerSite,
   researchSourceHost,
   textNamesCompanyOrJobFocus,
 } from "@/lib/research/source-policy";
@@ -137,13 +137,14 @@ function sourceNamesSubject(
 export function sourceKeptForEmployerResearch(input: {
   source: ResearchSource;
   anchorHost: string | null;
+  sisterHosts?: readonly string[] | null;
   companyName?: string | null;
   jobFocus?: string | null;
   excerpts?: SourceExcerpt[];
 }): boolean {
   const host = researchSourceHost(input.source.url);
   if (!host) return false;
-  if (hostIsAnchorOrSubdomain(host, input.anchorHost)) return true;
+  if (hostIsEmployerSite(host, input.anchorHost, input.sisterHosts)) return true;
   if (!hostIsApprovedNews(host)) return false;
   if (input.source.supports.length === 0) return false;
   return sourceNamesSubject(input.source, input.excerpts ?? [], [
@@ -159,6 +160,7 @@ export function finalizeResearchSources(input: {
   companyName?: string | null;
   jobFocus?: string | null;
   excerpts?: SourceExcerpt[];
+  sisterHosts?: readonly string[] | null;
   maxSources: number;
 }): ResearchSource[] {
   const websiteUrl = input.companyWebsiteUrl ?? null;
@@ -182,6 +184,7 @@ export function finalizeResearchSources(input: {
     return sourceKeptForEmployerResearch({
       source,
       anchorHost,
+      sisterHosts: input.sisterHosts,
       companyName: input.companyName,
       jobFocus: input.jobFocus,
       excerpts: input.excerpts,
