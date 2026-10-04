@@ -63,7 +63,7 @@ const basePlan = {
 
 describe("Harper Batch D2 — WHO interview-type tags", () => {
   it("requires interviewTypeTag on plan questions and rejects unknown values", () => {
-    expect(CONSULTATION_PROMPT_VERSION).toBe("37");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("38");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
       "Every question includes interviewTypeTag, one of: screening, chronological_walk_through, focused_competency, reference_check_prep. Use chronological_walk_through only for the career walk-through question; screening for broad fit and motivation questions such as why this company; focused_competency for a specific requirement or gap; reference_check_prep for what a former manager or colleague would confirm.",
     );

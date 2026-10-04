@@ -35,9 +35,9 @@ import {
 } from "@/lib/consultation/ask-harper-answer";
 import type { CareerStage } from "@/lib/consultation/career-stage";
 import {
-  findHarperLibraryMatch,
-  harperLibraryFingerprintMatch,
-  type HarperLibraryMatch,
+  harperLibraryContentHash,
+  loadApprovedAnswersForTargets,
+  type ApprovedAnswerEvidence,
 } from "@/lib/consultation/harper-library";
 import {
   ASK_HARPER_TARGET_PREFIX,
@@ -80,7 +80,7 @@ export const ROLE_EXPERTISE_PROMPT_VERSION = "3";
  * Questions stay on ROLE_EXPERTISE_PROMPT_VERSION, so a bump here does not
  * invalidate a stored questions receipt or rewrite stored suggested answers.
  */
-export const ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION = "5";
+export const ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION = "6";
 
 export const COACHING_SET_MIN = 20;
 export const COACHING_SET_MAX = 25;
@@ -246,10 +246,10 @@ export function roleExpertiseJobFingerprint(
   });
 }
 
-/** Chosen questions plus each library match, or an explicit empty match. */
+/** Chosen questions plus the selected approved answers, or an explicit empty list. */
 export function roleExpertiseAnswersFingerprint(
   questions: RoleExpertiseQuestionChoice[],
-  libraryMatches?: ReadonlyArray<{
+  approvedAnswers?: ReadonlyArray<{
     statementId: string | null;
     contentHash: string | null;
   } | null>,
@@ -258,14 +258,11 @@ export function roleExpertiseAnswersFingerprint(
   return fingerprintPaidCallInputs({
     promptVersion: ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION,
     schemaName: "role_expertise_answers",
-    questions: questions.map((question, index) => ({
+    questions: questions.map((question) => ({
       text: question.text.trim(),
       interviewTypeTag: question.interviewTypeTag,
-      libraryMatch: libraryMatches?.[index] ?? {
-        statementId: null,
-        contentHash: null,
-      },
     })),
+    approvedAnswers: approvedAnswers ?? [],
     employerResearch,
   });
 }
@@ -688,7 +685,7 @@ export function buildRoleExpertiseAnswersMessages(input: {
   careerStage: CareerStage;
   jobSources: Record<string, unknown>;
   profileItems: unknown[];
-  libraryMatches: Array<HarperLibraryMatch | null>;
+  approvedAnswers?: readonly ApprovedAnswerEvidence[];
   qualityFeedback?: string[];
 }) {
   return [
@@ -702,20 +699,11 @@ ${ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS}`,
       role: "user" as const,
       content: JSON.stringify({
         careerStage: input.careerStage,
-        questions: input.questions.map((question, index) => {
-          const match = input.libraryMatches[index] ?? null;
-          return {
-            text: question.text,
-            interviewTypeTag: question.interviewTypeTag,
-            priorApprovedAnswer: match
-              ? {
-                  statementId: match.statementId,
-                  question: match.question,
-                  content: match.content,
-                }
-              : null,
-          };
-        }),
+        questions: input.questions.map((question) => ({
+          text: question.text,
+          interviewTypeTag: question.interviewTypeTag,
+        })),
+        approvedAnswers: input.approvedAnswers ?? [],
         jobSources: input.jobSources,
         personalProfileItems: input.profileItems,
         qualityFeedback: input.qualityFeedback ?? [],
@@ -1172,7 +1160,7 @@ function normalizeAnswer(
 
 function askHarperSourceTexts(
   profileItems: readonly unknown[],
-  libraryMatches: ReadonlyArray<{ content?: string | null } | null>,
+  approvedAnswers: ReadonlyArray<{ content?: string | null }>,
   jobSources: Record<string, unknown>,
 ): string[] {
   const texts: string[] = [];
@@ -1183,8 +1171,8 @@ function askHarperSourceTexts(
     const text = row.text.trim();
     if (text) texts.push(text);
   }
-  for (const match of libraryMatches) {
-    const content = match?.content?.trim() ?? "";
+  for (const answer of approvedAnswers) {
+    const content = answer.content?.trim() ?? "";
     if (content) texts.push(content);
   }
   for (const key of ["title", "employer"] as const) {
@@ -1241,26 +1229,27 @@ async function generateRoleExpertiseAnswersStep(input: {
     text: choice.text,
     interviewTypeTag: choice.interviewTypeTag,
   }));
-  const libraryMatches = await Promise.all(
-    input.choices.map((choice) =>
-      findHarperLibraryMatch({
-        organizationId: input.organizationId,
-        campaignId: input.campaignId,
-        question: choice.text,
-        interviewTypeTag: choice.interviewTypeTag,
-      }),
-    ),
-  );
+  const approvedAnswers = await loadApprovedAnswersForTargets({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    targets: input.choices.map((choice) => ({
+      key: choice.targetKey,
+      text: choice.text,
+    })),
+  });
   const fingerprint = roleExpertiseAnswersFingerprint(
     choicePayload,
-    libraryMatches.map((match) => harperLibraryFingerprintMatch(match)),
+    approvedAnswers.map((answer) => ({
+      statementId: answer.statementId,
+      contentHash: harperLibraryContentHash(answer.content),
+    })),
     employerResearchFromJobSources(input.jobSources),
   );
   let qualityFeedback: string[] = [];
   let lastValid: ValidatedRoleExpertiseQuestion[] = [];
   const sourceTexts = askHarperSourceTexts(
     input.profileItems,
-    libraryMatches,
+    approvedAnswers,
     input.jobSources,
   );
 
@@ -1298,7 +1287,7 @@ async function generateRoleExpertiseAnswersStep(input: {
                 careerStage: input.careerStage,
                 jobSources: input.jobSources,
                 profileItems: input.profileItems,
-                libraryMatches,
+                approvedAnswers,
                 qualityFeedback,
               }),
               parseOutput: (raw) => ({

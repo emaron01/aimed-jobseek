@@ -327,9 +327,9 @@ describe("lean planning instructions", () => {
     expect(CONSULTATION_PLAN_WRITING_INSTRUCTIONS).not.toContain(
       "EXPERIMENTAL. Not production.",
     );
-    expect(CONSULTATION_PROMPT_VERSION).toBe("37");
-    expect(CONSULTATION_PLAN_DECISION_PROMPT_VERSION).toBe("3");
-    expect(CONSULTATION_PLAN_WRITING_PROMPT_VERSION).toBe("3");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("38");
+    expect(CONSULTATION_PLAN_DECISION_PROMPT_VERSION).toBe("4");
+    expect(CONSULTATION_PLAN_WRITING_PROMPT_VERSION).toBe("4");
     const messages = buildConsultationPlanDecisionMessages({
       targets: [TARGET],
       profileItems: [],
@@ -342,7 +342,7 @@ describe("lean planning instructions", () => {
       chronologyRequested: false,
       coveredTargetKeys: [],
     });
-    expect(messages[0]?.content.startsWith("Prompt version: 3\n")).toBe(true);
+    expect(messages[0]?.content.startsWith("Prompt version: 4\n")).toBe(true);
     expect(CONSULTATION_PLAN_DECISION_INSTRUCTIONS).not.toContain(
       "Ask only what this interviewer will likely probe, which of their stories fit, and one or two new questions for weak spots with this interviewer.",
     );
@@ -713,7 +713,7 @@ describe.skipIf(!hasTestDatabase())(
       expect(session?.generationError).toBeNull();
       expect(session?.briefingJson).toBeNull();
       expect(session?.coachNote).toBeNull();
-      expect(session?.promptVersion).toBe("37");
+      expect(session?.promptVersion).toBe("38");
       expect(session?.turns.map((turn) => turn.body)).toContain(QUESTION);
       expect(session?.assessments[0]?.strength).toBe("PARTIAL");
       expect(callsFor(decisionGenerate, "consultation_plan_decision")).toBe(1);

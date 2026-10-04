@@ -158,11 +158,24 @@ type EvidenceRow = {
   roleId?: string | null;
 };
 
+function addApprovedAnswerIds(
+  factIds: Set<string>,
+  answers: ReadonlyArray<{ id?: string | null }> | undefined,
+): void {
+  for (const answer of answers ?? []) {
+    const id = answer?.id?.trim() ?? "";
+    if (id.startsWith("approved:") && id.length > "approved:".length) {
+      factIds.add(id);
+    }
+  }
+}
+
 /** Fact and role ids the coach was given. Anything else luna returns is dropped. */
 export function suppliedProfileEvidenceIds(input: {
   profileItems: EvidenceRow[];
   recentRoles: Array<{ id: string }>;
   seekerStatedFacts?: Array<{ id: string }>;
+  approvedAnswers?: ReadonlyArray<{ id: string }>;
 }): { factIds: Set<string>; roleIds: Set<string> } {
   const factIds = new Set<string>();
   const roleIds = new Set<string>();
@@ -177,6 +190,7 @@ export function suppliedProfileEvidenceIds(input: {
   for (const fact of input.seekerStatedFacts ?? []) {
     if (fact.id) factIds.add(fact.id);
   }
+  addApprovedAnswerIds(factIds, input.approvedAnswers);
   return { factIds, roleIds };
 }
 
@@ -206,6 +220,9 @@ export function suppliedEvidenceIdsFromMessages(messages: AiMessage[]): {
     const seekerStatedFacts = Array.isArray(record.seekerStatedFacts)
       ? (record.seekerStatedFacts as Array<{ id?: string }>)
       : [];
+    const approvedAnswers = Array.isArray(record.approvedAnswers)
+      ? (record.approvedAnswers as Array<{ id?: string }>)
+      : [];
     const collected = suppliedProfileEvidenceIds({
       profileItems,
       recentRoles: recentRoles.flatMap((role) =>
@@ -213,6 +230,9 @@ export function suppliedEvidenceIdsFromMessages(messages: AiMessage[]): {
       ),
       seekerStatedFacts: seekerStatedFacts.flatMap((fact) =>
         fact?.id ? [{ id: fact.id }] : [],
+      ),
+      approvedAnswers: approvedAnswers.flatMap((answer) =>
+        answer?.id ? [{ id: answer.id }] : [],
       ),
     });
     for (const id of collected.factIds) factIds.add(id);

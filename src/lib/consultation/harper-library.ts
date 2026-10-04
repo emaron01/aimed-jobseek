@@ -1,13 +1,17 @@
 import { createHash } from "node:crypto";
 
-import type { InterviewTypeTag } from "@/lib/consultation/contract";
+import { sameRequirementMeaning } from "@/lib/consultation/assess";
+import {
+  WHY_THIS_COMPANY_TARGET_KEY,
+  type InterviewTypeTag,
+} from "@/lib/consultation/contract";
 import { interviewerQuestionMatchesGeneral } from "@/lib/consultation/general-question-match";
 import { interviewTypeTagFromQuestionContext } from "@/lib/consultation/qa-view";
 import { prisma } from "@/lib/prisma-client";
 
 /** Approved wording added to the role-expertise answers prompt and Harper's polish prompt. */
 export const HARPER_LIBRARY_TAILOR_INSTRUCTION =
-  "When a prior approved answer is supplied, tailor it to this company and role. Replace anything about the previous company with this company's information; never carry it over. Do not add employers, numbers, titles, or outcomes that are not in the supplied answer or the Personal Profile.";
+  "Combine as many approved answers and profile facts as the question needs. Keep every employer, number, title, and outcome exactly as stated; a result achieved at one company stays at that company. Use this company and role only to frame why the experience matters here.";
 
 export type HarperLibraryMatch = {
   statementId: string;
@@ -38,6 +42,144 @@ export function harperLibraryFingerprintMatch(
     statementId: match.statementId,
     contentHash: harperLibraryContentHash(match.content),
   };
+}
+
+/** One approved answer from another application, cited as approved:<statementId>. */
+export type ApprovedAnswerEvidence = {
+  id: string;
+  statementId: string;
+  question: string;
+  content: string;
+  approvedAt: string;
+  sourceApplicationId: string;
+};
+
+/** A stored approved answer before target matching. STAR fields are never loaded. */
+export type ApprovedAnswerCandidate = {
+  statementId: string;
+  question: string;
+  content: string;
+  approvedAt: Date;
+  sourceCampaignId: string;
+  targetKey: string | null;
+  whyThisCompany: string | null;
+};
+
+export function approvedAnswerEvidenceId(statementId: string): string {
+  return `approved:${statementId}`;
+}
+
+function approvedAnswerIsEligible(
+  answer: ApprovedAnswerCandidate,
+  campaignId: string,
+): boolean {
+  if (answer.sourceCampaignId === campaignId) return false;
+  if (!answer.content.trim() || !answer.question.trim()) return false;
+  if (answer.targetKey === WHY_THIS_COMPANY_TARGET_KEY) return false;
+  const whyThisCompany = answer.whyThisCompany?.trim() ?? "";
+  if (!whyThisCompany) return true;
+  return (
+    answer.content.trim() !== whyThisCompany &&
+    answer.question.trim() !== whyThisCompany
+  );
+}
+
+function newerApprovedAnswer(
+  left: ApprovedAnswerCandidate,
+  right: ApprovedAnswerCandidate,
+): number {
+  const byTime = right.approvedAt.getTime() - left.approvedAt.getTime();
+  if (byTime !== 0) return byTime;
+  return right.statementId.localeCompare(left.statementId);
+}
+
+/**
+ * At most one approved answer per current target. Newest approvedAt wins when
+ * two answers match the same target. This application's own statements, empty
+ * content, why-this-company answers, and another campaign's whyThisCompany
+ * text are left out. No provider call.
+ */
+export function selectApprovedAnswersForTargets(input: {
+  campaignId: string;
+  targets: ReadonlyArray<{ key: string; text: string }>;
+  answers: ReadonlyArray<ApprovedAnswerCandidate>;
+}): ApprovedAnswerEvidence[] {
+  const eligible = input.answers.filter((answer) =>
+    approvedAnswerIsEligible(answer, input.campaignId),
+  );
+  const used = new Set<string>();
+  const selected: ApprovedAnswerEvidence[] = [];
+  for (const target of input.targets) {
+    if (target.key === WHY_THIS_COMPANY_TARGET_KEY) continue;
+    const text = target.text.trim();
+    if (!text) continue;
+    const winner = eligible
+      .filter(
+        (answer) =>
+          !used.has(answer.statementId) &&
+          (sameRequirementMeaning(answer.question, text) ||
+            sameRequirementMeaning(answer.content, text)),
+      )
+      .sort(newerApprovedAnswer)[0];
+    if (!winner) continue;
+    used.add(winner.statementId);
+    selected.push({
+      id: approvedAnswerEvidenceId(winner.statementId),
+      statementId: winner.statementId,
+      question: winner.question.trim(),
+      content: winner.content.trim(),
+      approvedAt: winner.approvedAt.toISOString(),
+      sourceApplicationId: winner.sourceCampaignId,
+    });
+  }
+  return selected;
+}
+
+/** Load other applications' approved answers and keep one match per target. */
+export async function loadApprovedAnswersForTargets(input: {
+  organizationId: string;
+  campaignId: string;
+  targets: ReadonlyArray<{ key: string; text: string }>;
+}): Promise<ApprovedAnswerEvidence[]> {
+  const rows = await prisma.consultationStatement.findMany({
+    where: {
+      organizationId: input.organizationId,
+      kind: "INTERVIEW_ANSWER",
+      status: "APPROVED",
+      approvedAt: { not: null },
+      session: { campaignId: { not: input.campaignId } },
+    },
+    select: {
+      id: true,
+      content: true,
+      approvedAt: true,
+      session: {
+        select: {
+          campaignId: true,
+          campaign: { select: { whyThisCompany: true } },
+        },
+      },
+      turn: { select: { body: true, targetKey: true } },
+    },
+  });
+  const answers: ApprovedAnswerCandidate[] = [];
+  for (const row of rows) {
+    if (!(row.approvedAt instanceof Date)) continue;
+    answers.push({
+      statementId: row.id,
+      question: row.turn.body,
+      content: row.content,
+      approvedAt: row.approvedAt,
+      sourceCampaignId: row.session.campaignId,
+      targetKey: row.turn.targetKey,
+      whyThisCompany: row.session.campaign.whyThisCompany,
+    });
+  }
+  return selectApprovedAnswersForTargets({
+    campaignId: input.campaignId,
+    targets: input.targets,
+    answers,
+  });
 }
 
 /**

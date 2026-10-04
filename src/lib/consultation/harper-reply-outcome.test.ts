@@ -73,7 +73,7 @@ describe("Harper reply outcome, fact preservation, and approved-plus-draft", () 
     expect(CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS).toContain(FACT_SENTENCE);
     expect(ROLE_EXPERTISE_SYSTEM_INSTRUCTIONS).toContain(FACT_SENTENCE);
     expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain(FACT_SENTENCE);
-    expect(CONSULTATION_PROMPT_VERSION).toBe("37");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("38");
     expect(ROLE_EXPERTISE_PROMPT_VERSION).toBe("3");
     expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("16");
   });

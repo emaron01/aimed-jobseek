@@ -54,6 +54,8 @@ Do not write a resume, cover letter, or outreach. Never mention research status,
 
 If qualityFeedback names a field, rewrite only that field.
 
+You may cite approvedAnswers ids in supportingFactIds. Facts about the person may come only from the Personal Profile and approvedAnswers.
+
 Return JSON matching the schema only.`;
 }
 

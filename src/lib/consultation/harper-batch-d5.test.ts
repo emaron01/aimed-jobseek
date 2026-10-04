@@ -72,7 +72,7 @@ function profile(input: {
 
 describe("Harper Batch D5 — career stage", () => {
   it("bumps prompt versions for career-stage instructions", () => {
-    expect(CONSULTATION_PROMPT_VERSION).toBe("37");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("38");
     expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("16");
   });
 

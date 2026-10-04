@@ -22,7 +22,7 @@ import {
   type EvidenceTarget,
 } from "@/lib/consultation/assess";
 import { deriveCareerStage, type CareerStage } from "@/lib/consultation/career-stage";
-import { findHarperLibraryMatch } from "@/lib/consultation/harper-library";
+import { loadApprovedAnswersForTargets } from "@/lib/consultation/harper-library";
 import { careerWalkThroughAlreadyAsked } from "@/lib/consultation/question-detection";
 import { deriveRecentRoles } from "@/lib/consultation/recent-roles";
 import {
@@ -756,15 +756,19 @@ export async function polishAnswerWithQuality(input: {
     input.careerStage ??
     deriveCareerStage({ experience: [], education: [] });
   const voiceSamples = await voiceSamplesForUsage(input.usage);
-  const priorApprovedAnswer =
+  const approvedAnswers =
     seekerReplies.length > 0 && input.libraryQuestion?.question.trim()
-      ? await findHarperLibraryMatch({
+      ? await loadApprovedAnswersForTargets({
           organizationId: input.libraryQuestion.organizationId,
           campaignId: input.libraryQuestion.campaignId,
-          question: input.libraryQuestion.question,
-          interviewTypeTag: input.libraryQuestion.interviewTypeTag,
+          targets: [
+            {
+              key: input.target?.key ?? "polish-question",
+              text: input.libraryQuestion.question,
+            },
+          ],
         })
-      : null;
+      : [];
   let lastFailure: string = consultationConversationCopy.generationFailed;
   let qualityFeedback: string[] = [];
   const whyOrganizationId =
@@ -813,13 +817,7 @@ export async function polishAnswerWithQuality(input: {
       target: input.target ?? null,
       targetStrength: input.targetStrength ?? null,
       supportingEvidence: input.supportingEvidence ?? [],
-      priorApprovedAnswer: priorApprovedAnswer
-        ? {
-            statementId: priorApprovedAnswer.statementId,
-            question: priorApprovedAnswer.question,
-            content: priorApprovedAnswer.content,
-          }
-        : null,
+      approvedAnswers,
       voiceSamples,
       careerStage,
       profileItems: input.profileItems,
@@ -1482,9 +1480,15 @@ async function planAndStoreRound(input: {
       where: { sessionId: input.sessionId },
     })
   ).map(storedAssessment);
+  const approvedAnswers = await loadApprovedAnswersForTargets({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    targets: input.targets,
+  });
   const coachPayload = {
     targets: input.targets,
     profileItems,
+    approvedAnswers,
     careerStage,
     recentRoles,
     seekerStatedFacts,
@@ -2127,18 +2131,27 @@ export async function buildConsultationCoachMessagesForCampaign(input: {
     whyThisCompany: campaign.whyThisCompany,
     profile,
   });
-  const [{ roles, applicationLearningsPendingHiringManager }, companyResearch, interviewStages] =
-    await Promise.all([
-      loadCoachHiringTeamWithLearnings(input.organizationId, input.campaignId),
-      loadCoachCompanyResearch(input.organizationId, input.campaignId),
-      prisma.interviewStage.findMany({
-        where: {
-          organizationId: input.organizationId,
-          campaignId: input.campaignId,
-        },
-        select: { id: true, notesBefore: true, notesAfter: true },
-      }),
-    ]);
+  const [
+    { roles, applicationLearningsPendingHiringManager },
+    companyResearch,
+    interviewStages,
+    approvedAnswers,
+  ] = await Promise.all([
+    loadCoachHiringTeamWithLearnings(input.organizationId, input.campaignId),
+    loadCoachCompanyResearch(input.organizationId, input.campaignId),
+    prisma.interviewStage.findMany({
+      where: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+      },
+      select: { id: true, notesBefore: true, notesAfter: true },
+    }),
+    loadApprovedAnswersForTargets({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      targets,
+    }),
+  ]);
   const careerStage = deriveCareerStage(profile);
   const recentRoles = deriveRecentRoles(profile, new Date(), careerStage);
   return buildConsultationCoachMessages({
@@ -2148,6 +2161,7 @@ export async function buildConsultationCoachMessagesForCampaign(input: {
       ...learnedNotesEvidence(input.campaignId, requirement.seekerLearnedNotes),
       ...interviewNotesEvidence(interviewStages),
     ],
+    approvedAnswers,
     careerStage,
     recentRoles,
     seekerStatedFacts: seekerStatedFactsForCoach({

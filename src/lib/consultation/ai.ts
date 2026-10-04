@@ -12,6 +12,7 @@ import {
   isConsultationReplyAiConfigured,
 } from "@/lib/ai";
 import type { CareerStage } from "@/lib/consultation/career-stage";
+import type { ApprovedAnswerEvidence } from "@/lib/consultation/harper-library";
 import {
   CONSULTATION_PROMPT_VERSION,
   consultationPlanSchema,
@@ -138,6 +139,7 @@ type PlanModelInput = {
   hiringTeam: CoachHiringTeamRole[];
   applicationLearningsPendingHiringManager?: ApplicationLearningsForCoach | null;
   seekerStatedFacts: SeekerStatedFactPayload[];
+  approvedAnswers?: readonly ApprovedAnswerEvidence[];
   companyResearch: CoachCompanyResearch | null;
   askedQuestions: AskedConsultationQuestion[];
   chronologyRequested: boolean;
@@ -332,6 +334,7 @@ export async function runConsultationPlanWriting(
     profileItems: input.profileItems,
     recentRoles: input.recentRoles,
     seekerStatedFacts: input.seekerStatedFacts,
+    approvedAnswers: input.approvedAnswers,
   });
   const messages = buildConsultationPlanWritingMessages(input, input.decision);
   const callProvider = async () => {
@@ -492,11 +495,13 @@ export async function polishAnswerWithModel(input: {
   target?: { key: string; kind: string; text: string } | null;
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
   supportingEvidence?: string[];
-  priorApprovedAnswer?: {
-    statementId: string;
+  approvedAnswers?: ReadonlyArray<{
+    id: string;
     question: string;
     content: string;
-  } | null;
+    approvedAt: string;
+    sourceApplicationId: string;
+  }>;
   companyResearch?: {
     companySummary: string | null;
     whatTheySell: string | null;

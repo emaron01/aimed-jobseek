@@ -88,7 +88,7 @@ describe("Harper context finish", () => {
   });
 
   it("bumps the consultation prompt version", () => {
-    expect(CONSULTATION_PROMPT_VERSION).toBe("37");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("38");
   });
 
   it("passes whyThisCompany into polish messages", () => {

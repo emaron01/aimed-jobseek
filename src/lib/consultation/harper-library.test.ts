@@ -76,10 +76,10 @@ describe("Harper library instructions and fingerprint", () => {
       HARPER_LIBRARY_TAILOR_INSTRUCTION,
     );
     expect(HARPER_LIBRARY_TAILOR_INSTRUCTION).toBe(
-      "When a prior approved answer is supplied, tailor it to this company and role. Replace anything about the previous company with this company's information; never carry it over. Do not add employers, numbers, titles, or outcomes that are not in the supplied answer or the Personal Profile.",
+      "Combine as many approved answers and profile facts as the question needs. Keep every employer, number, title, and outcome exactly as stated; a result achieved at one company stays at that company. Use this company and role only to frame why the experience matters here.",
     );
     expect(ROLE_EXPERTISE_PROMPT_VERSION).toBe("3");
-    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("5");
+    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("6");
   });
 
   it("puts an explicit empty library match in the answers fingerprint and changes it when the source content changes", () => {
@@ -123,9 +123,11 @@ describe("Harper library instructions and fingerprint", () => {
 
   it("passes a prior answer to polish only beside seeker replies, and seeker replies take precedence", () => {
     const prior = {
-      statementId: "stmt_prior",
+      id: "approved:stmt_prior",
       question: FORECAST,
       content: "At Northwind I rebuilt the Monday forecast review.",
+      approvedAt: "2026-06-01T00:00:00.000Z",
+      sourceApplicationId: "past-application",
     };
     const withReply = buildConsultationPolishMessages({
       answer: "I rebuilt the forecast review at Contoso.",
@@ -135,15 +137,15 @@ describe("Harper library instructions and fingerprint", () => {
       strengtheningNeeds: [],
       careerStage: "mid_career",
       profileItems: [],
-      priorApprovedAnswer: prior,
+      approvedAnswers: [prior],
     });
     const payload = JSON.parse(withReply[2]?.content ?? "{}") as {
       seekerReplies: string[];
-      priorApprovedAnswer: typeof prior | null;
+      approvedAnswers: Array<typeof prior>;
       seekerRepliesTakePrecedenceOverPriorApprovedAnswer: boolean;
       latestReplyTakesPrecedence: boolean;
     };
-    expect(payload.priorApprovedAnswer).toEqual(prior);
+    expect(payload.approvedAnswers).toEqual([prior]);
     expect(payload.seekerReplies).toEqual([
       "I rebuilt the forecast review at Contoso.",
     ]);
@@ -160,10 +162,10 @@ describe("Harper library instructions and fingerprint", () => {
       profileItems: [],
     });
     const emptyPayload = JSON.parse(withoutReply[2]?.content ?? "{}") as {
-      priorApprovedAnswer: unknown;
+      approvedAnswers: unknown;
       seekerRepliesTakePrecedenceOverPriorApprovedAnswer: boolean;
     };
-    expect(emptyPayload.priorApprovedAnswer).toBeNull();
+    expect(emptyPayload.approvedAnswers).toEqual([]);
     expect(emptyPayload.seekerRepliesTakePrecedenceOverPriorApprovedAnswer).toBe(
       false,
     );
@@ -483,13 +485,11 @@ describe.skipIf(!hasTestDatabase())("Harper library lookup", { timeout: 60_000 }
       messages?: Array<{ content: string }>;
     };
     const user = JSON.parse(answerCall.messages?.[1]?.content ?? "{}") as {
-      questions: Array<{
-        priorApprovedAnswer: { statementId: string; content: string } | null;
-      }>;
+      approvedAnswers: Array<{ content: string }>;
     };
-    expect(user.questions[0]?.priorApprovedAnswer?.content).toBe(
-      "At Northwind I rebuilt the Monday forecast review.",
-    );
+    expect(user.approvedAnswers.map((answer) => answer.content)).toEqual([
+      "A different tag must not win.",
+    ]);
     const receipt = await prisma.paidCallReceipt.findFirst({
       where: {
         organizationId,
@@ -543,9 +543,9 @@ describe.skipIf(!hasTestDatabase())("Harper library lookup", { timeout: 60_000 }
       where: {
         organizationId,
         sessionId: { not: currentSessionId },
-        content: "At Northwind I rebuilt the Monday forecast review.",
+        content: "A different tag must not win.",
       },
-      data: { content: "At Northwind I rebuilt the Monday forecast review and named a single owner." },
+      data: { content: "A different tag must not win, and the owner is named." },
     });
     const third = await generateRoleExpertiseWithModel({
       organizationId,
@@ -569,7 +569,7 @@ describe.skipIf(!hasTestDatabase())("Harper library lookup", { timeout: 60_000 }
       messages?: Array<{ content: string }>;
     };
     expect(editedCall.messages?.[1]?.content).toContain(
-      "named a single owner",
+      "the owner is named",
     );
   });
 
@@ -607,11 +607,13 @@ describe.skipIf(!hasTestDatabase())("Harper library lookup", { timeout: 60_000 }
     const payload = JSON.parse(
       generateReplyStructured.mock.calls[0]?.[0]?.messages?.[2]?.content ?? "{}",
     ) as {
-      priorApprovedAnswer: { content: string } | null;
+      approvedAnswers: Array<{ content: string }>;
       seekerReplies: string[];
       seekerRepliesTakePrecedenceOverPriorApprovedAnswer: boolean;
     };
-    expect(payload.priorApprovedAnswer?.content).toContain("Northwind");
+    expect(payload.approvedAnswers.map((answer) => answer.content).join("\n")).toContain(
+      "A different tag must not win",
+    );
     expect(payload.seekerReplies[0]).toContain("Contoso");
     expect(payload.seekerRepliesTakePrecedenceOverPriorApprovedAnswer).toBe(true);
 
@@ -633,8 +635,8 @@ describe.skipIf(!hasTestDatabase())("Harper library lookup", { timeout: 60_000 }
     });
     const empty = JSON.parse(
       generateReplyStructured.mock.calls[0]?.[0]?.messages?.[2]?.content ?? "{}",
-    ) as { priorApprovedAnswer: unknown };
-    expect(empty.priorApprovedAnswer).toBeNull();
+    ) as { approvedAnswers: unknown };
+    expect(empty.approvedAnswers).toEqual([]);
   });
 
   it("returns nothing from an organization after wipeOrganizationAccount", async () => {

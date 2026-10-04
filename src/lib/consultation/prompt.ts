@@ -12,6 +12,7 @@ import {
   type SeekerStatedFactPayload,
 } from "@/lib/consultation/contract";
 import type { RecentRole } from "@/lib/consultation/recent-roles";
+import type { ApprovedAnswerEvidence } from "@/lib/consultation/harper-library";
 import type { ConsultationPlanDecision } from "@/lib/consultation/plan-split";
 import {
   CONSULTATION_COACH_SYSTEM_INSTRUCTIONS,
@@ -71,6 +72,7 @@ type CoachMessageInput = {
   /** When no Hiring Manager role exists yet — learnings stay on the application. */
   applicationLearningsPendingHiringManager?: ApplicationLearningsForCoach | null;
   seekerStatedFacts: SeekerStatedFactPayload[];
+  approvedAnswers?: readonly ApprovedAnswerEvidence[];
   companyResearch: CoachCompanyResearch | null;
   askedQuestions: AskedConsultationQuestion[];
   chronologyRequested: boolean;
@@ -89,6 +91,7 @@ function coachUserMessages(input: CoachMessageInput): AiMessage[] {
         careerStage: input.careerStage,
         recentRoles: input.recentRoles,
         personalProfileItems: input.profileItems,
+        approvedAnswers: input.approvedAnswers ?? [],
         seekerStatedFacts: input.seekerStatedFacts,
         companyResearch: input.companyResearch,
         targets: input.targets,
@@ -258,11 +261,13 @@ export function buildConsultationPolishMessages(input: {
   target?: { key: string; kind: string; text: string } | null;
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
   supportingEvidence?: string[];
-  priorApprovedAnswer?: {
-    statementId: string;
+  approvedAnswers?: ReadonlyArray<{
+    id: string;
     question: string;
     content: string;
-  } | null;
+    approvedAt: string;
+    sourceApplicationId: string;
+  }>;
   companyResearch?: {
     companySummary: string | null;
     whatTheySell: string | null;
@@ -323,10 +328,9 @@ export function buildConsultationPolishMessages(input: {
         target: input.target ?? null,
         targetStrength: input.targetStrength ?? null,
         supportingEvidence: input.supportingEvidence ?? [],
-        priorApprovedAnswer: input.priorApprovedAnswer ?? null,
-        seekerRepliesTakePrecedenceOverPriorApprovedAnswer: Boolean(
-          input.priorApprovedAnswer,
-        ),
+        approvedAnswers: input.approvedAnswers ?? [],
+        seekerRepliesTakePrecedenceOverPriorApprovedAnswer:
+          (input.approvedAnswers?.length ?? 0) > 0,
         strengtheningNeeds: input.strengtheningNeeds,
         qualityFeedback: input.qualityFeedback ?? [],
       }),

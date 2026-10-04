@@ -312,7 +312,7 @@ describe("tailored employer research reader", () => {
       careerStage: "mid_career",
       jobSources: { employerResearch: researchInput },
       profileItems: [{ kind: "FACT", text: "I sold domain security services." }],
-      libraryMatches: [],
+      approvedAnswers: [],
     });
     expect(answers[1]?.content).toContain(JOB_FOCUS);
     expect(answers[1]?.content).toContain("I sold domain security services.");

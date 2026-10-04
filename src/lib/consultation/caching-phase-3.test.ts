@@ -226,11 +226,15 @@ describe.skipIf(!hasTestDatabase())(
       const polishCallsAfterFirst = generateStructured.mock.calls.length;
       await polishAnswerWithModel({
         ...basePolish,
-        priorApprovedAnswer: {
-          statementId: "stmt_prior",
-          question: "What happened when the quarter slipped?",
-          content: "I recovered a slipped quarter by rebuilding the forecast.",
-        },
+        approvedAnswers: [
+          {
+            id: "approved:stmt_prior",
+            question: "What happened when the quarter slipped?",
+            content: "I recovered a slipped quarter by rebuilding the forecast.",
+            approvedAt: "2026-06-01T00:00:00.000Z",
+            sourceApplicationId: "other-application",
+          },
+        ],
       });
       await polishAnswerWithModel({
         ...basePolish,
