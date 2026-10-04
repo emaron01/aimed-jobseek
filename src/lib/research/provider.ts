@@ -18,6 +18,7 @@ import {
   mergeEvidenceBundles,
 } from "@/lib/research/evidence";
 import { finalizeResearchSources } from "@/lib/research/finalize-sources";
+import { cleanResearchForSave } from "@/lib/research/research-prose";
 import {
   anchorHostEvidenceEnough,
   coverageSearchFocus,
@@ -89,6 +90,8 @@ export type AutomatedCompanyResearchResult = CompanyResearchResult & {
   websitePrefetchGatePass?: boolean;
   stoppedReason?: ResearchStoppedReason;
   stageTimings?: ResearchStageTiming[];
+  /** Sister domains linked from the anchor host. Stored in research timings. */
+  sisterHosts?: string[];
 };
 
 function sleep(ms: number): Promise<void> {
@@ -433,6 +436,7 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
         throw new AiValidationError("Research produced no validated result.");
       }
 
+      const sisterHosts = websiteEvidence.sisterHosts ?? [];
       const finalizedSources = finalizeResearchSources({
         sources: validatedResult.sources,
         companyWebsiteUrl: input.website,
@@ -440,13 +444,20 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
         companyName: input.name,
         jobFocus: validatedResult.jobFocus,
         excerpts: evidence.excerpts,
+        sisterHosts,
         maxSources: depth.maxSourcesPerCompany,
       });
 
-      const finalized: CompanyResearchResult = {
-        ...validatedResult,
-        sources: finalizedSources,
-      };
+      const finalized = cleanResearchForSave(
+        {
+          ...validatedResult,
+          sources: finalizedSources,
+        },
+        {
+          anchorHost: input.normalizedDomain,
+          sisterHosts,
+        },
+      );
 
       const result: AutomatedCompanyResearchResult = {
         ...finalized,
@@ -477,6 +488,7 @@ export class AiCompanyResearchProvider implements CompanyResearchProvider {
         websitePrefetchGatePass,
         stoppedReason,
         stageTimings,
+        sisterHosts,
       };
 
       logResearchTelemetry({

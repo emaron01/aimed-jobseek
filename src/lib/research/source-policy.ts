@@ -37,6 +37,58 @@ export function hostIsApprovedNews(host: string): boolean {
   );
 }
 
+/**
+ * Hosts linked from a company page that are never that company's own site.
+ * Social, analytics, and platform hosts stay out of the sister-site list.
+ */
+const SISTER_HOST_DENY = [
+  "linkedin.com",
+  "facebook.com",
+  "fb.com",
+  "instagram.com",
+  "twitter.com",
+  "x.com",
+  "youtube.com",
+  "youtu.be",
+  "tiktok.com",
+  "google.com",
+  "gstatic.com",
+  "googleapis.com",
+  "googletagmanager.com",
+  "google-analytics.com",
+  "doubleclick.net",
+  "facebook.net",
+  "apple.com",
+  "microsoft.com",
+  "github.com",
+  "wikipedia.org",
+  "wikimedia.org",
+  "cloudflare.com",
+  "schema.org",
+  "w3.org",
+] as const;
+
+export function hostIsDeniedSister(host: string): boolean {
+  const bare = host.replace(/^www\./i, "").toLowerCase();
+  return SISTER_HOST_DENY.some(
+    (root) => bare === root || bare.endsWith(`.${root}`),
+  );
+}
+
+/** Anchor host, its subdomains, or a sister host linked from the anchor's own pages. */
+export function hostIsEmployerSite(
+  host: string,
+  anchorHost: string | null | undefined,
+  sisterHosts?: readonly string[] | null,
+): boolean {
+  if (hostIsAnchorOrSubdomain(host, anchorHost)) return true;
+  const bare = host.replace(/^www\./i, "").toLowerCase();
+  return (sisterHosts ?? []).some((sister) => {
+    const root = sister.trim().replace(/^www\./i, "").toLowerCase();
+    return root.length > 0 && (bare === root || bare.endsWith(`.${root}`));
+  });
+}
+
 function subjectNeedles(names: Array<string | null | undefined>): string[] {
   return names
     .map((name) => name?.trim().toLowerCase() ?? "")

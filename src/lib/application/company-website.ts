@@ -118,9 +118,38 @@ export function anchorHostFromResearchTimings(value: unknown): string | null {
 export function appendAnchorHostTiming(
   timings: unknown,
   anchorHost: string | null | undefined,
+  sisterHosts?: readonly string[] | null,
 ): unknown {
   const host = anchorHost?.trim().toLowerCase();
   if (!host) return timings ?? null;
+  const sisters = [
+    ...new Set(
+      (sisterHosts ?? [])
+        .map((item) => item.trim().toLowerCase().replace(/^www\./, ""))
+        .filter(Boolean),
+    ),
+  ];
   const existing = Array.isArray(timings) ? timings : [];
-  return [...existing, { [ANCHOR_TIMING_KEY]: host }];
+  return [
+    ...existing,
+    {
+      [ANCHOR_TIMING_KEY]: host,
+      ...(sisters.length > 0 ? { sisterHosts: sisters } : {}),
+    },
+  ];
+}
+
+export function sisterHostsFromResearchTimings(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  for (let index = value.length - 1; index >= 0; index -= 1) {
+    const entry = value[index];
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const hosts = (entry as Record<string, unknown>).sisterHosts;
+    if (!Array.isArray(hosts)) continue;
+    const clean = hosts
+      .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      .map((item) => item.trim().toLowerCase());
+    if (clean.length > 0) return clean;
+  }
+  return [];
 }

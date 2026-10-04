@@ -585,8 +585,8 @@ describe.skipIf(!hasTestDatabase())(
       }
     });
 
-    it("makes no paid call when the stored fingerprint matches version 7", async () => {
-      expect(RESEARCH_PROMPT_VERSION).toBe("7");
+    it("makes no paid call when the stored fingerprint matches version 8", async () => {
+      expect(RESEARCH_PROMPT_VERSION).toBe("8");
       const company = await prisma.company.findFirstOrThrow({
         where: { organizationId, normalizedDomain: `csc-${suffix}.example` },
       });
