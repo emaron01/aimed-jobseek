@@ -22,6 +22,12 @@ import {
   consultationPolishSchema,
 } from "@/lib/consultation/contract";
 import {
+  CONSULTATION_PLAN_DECISION_SCHEMA_NAME,
+  CONSULTATION_PLAN_WRITING_SCHEMA_NAME,
+  consultationPlanDecisionSchema,
+  consultationPlanWritingSchema,
+} from "@/lib/consultation/plan-split";
+import {
   roleExpertiseAnswersResultSchema,
   roleExpertiseQuestionsResultSchema,
 } from "@/lib/consultation/role-expertise";
@@ -167,6 +173,16 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
     schemaName: "consultation_plan",
     schema: consultationPlanSchema,
     usageOperations: ["CONSULTATION"],
+  },
+  consultationPlanDecision: {
+    schemaName: CONSULTATION_PLAN_DECISION_SCHEMA_NAME,
+    schema: consultationPlanDecisionSchema,
+    usageOperations: ["CONSULTATION"],
+  },
+  consultationPlanWriting: {
+    schemaName: CONSULTATION_PLAN_WRITING_SCHEMA_NAME,
+    schema: consultationPlanWritingSchema,
+    usageOperations: ["CONSULTATION_REPLY"],
   },
   consultationExtract: {
     schemaName: "consultation_extract",

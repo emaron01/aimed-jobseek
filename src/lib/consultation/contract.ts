@@ -1,6 +1,16 @@
 import { z } from "zod";
 
 export const CONSULTATION_PROMPT_VERSION = "37";
+/**
+ * Lean planning decision instructions. Not part of CONSULTATION_PROMPT_VERSION,
+ * so a change here does not enqueue a seeker-background reassess.
+ */
+export const CONSULTATION_PLAN_DECISION_PROMPT_VERSION = "1";
+/**
+ * Lean planning writing instructions. A bump retries writing only.
+ * It does not invalidate the decision receipt.
+ */
+export const CONSULTATION_PLAN_WRITING_PROMPT_VERSION = "1";
 
 export const WHY_THIS_COMPANY_TARGET_KEY = "why-this-company";
 export const PERSON_PREP_TARGET_PREFIX = "person-prep:";

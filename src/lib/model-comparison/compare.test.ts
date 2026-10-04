@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { CONSULTATION_COACH_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content";
+import { CONSULTATION_PLAN_DECISION_INSTRUCTIONS } from "@/lib/prompt-content/consultation-plan-decision";
 import { ROLE_EXPERTISE_QUESTIONS_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content/role-expertise";
 import { hasTestDatabase } from "@/test/database";
 
@@ -155,6 +155,64 @@ vi.mock("@/lib/ai/provider", async (importOriginal) => {
                 hiringTeamRoleId: "other-role",
                 interviewTypeTag: "screening",
                 whoCaresNote: "Ignore me.",
+                requirementInterpretation: null,
+              },
+            ],
+          },
+          usage: tokenUsage(false),
+          provider: "openai-responses",
+          model: stamp,
+          modelUrlIdentifier: "example",
+          rawText: "",
+        };
+      }
+      if (request.schemaName === "consultation_plan_decision") {
+        return {
+          data: {
+            assessments: [
+              {
+                targetKey: "gap-1",
+                strength: "PARTIAL",
+                strategyMode: "PROVE_WITH_STORY",
+              },
+            ],
+            questions: [
+              {
+                targetKey: "gap-1",
+                text: "production decision question",
+                hiringTeamRoleId: "role-ht",
+                interviewTypeTag: "focused_competency",
+              },
+            ],
+          },
+          usage: tokenUsage(false),
+          provider: "openai-responses",
+          model: stamp,
+          modelUrlIdentifier: "example",
+          rawText: "",
+        };
+      }
+      if (request.schemaName === "consultation_plan_writing") {
+        return {
+          data: {
+            overall: "You stand well for this job.",
+            strongestAngles: ["Angle one", "Angle two"],
+            importantGaps: ["A gap remains."],
+            commentary: "production lean plan",
+            closingNote: null,
+            assessments: [
+              {
+                targetKey: "gap-1",
+                supportingFactIds: [],
+                relevantRoleIds: [],
+                explanation: "Partial evidence.",
+                strategy: "Prove it with the payroll story.",
+              },
+            ],
+            questions: [
+              {
+                targetKey: "gap-1",
+                whoCaresNote: "The hiring manager needs this.",
                 requirementInterpretation: null,
               },
             ],
@@ -503,7 +561,6 @@ describe.skipIf(!hasTestDatabase())(
       const bySchema = (schemaName: string) =>
         calls.filter((call) => call.schemaName === schemaName);
       for (const schemaName of [
-        "consultation_plan",
         "role_expertise_questions",
         "application_summary_shell",
       ]) {
@@ -525,10 +582,22 @@ describe.skipIf(!hasTestDatabase())(
       }
       expect(calls.every((call) => call.usage == null)).toBe(true);
 
-      const planning = calls.find((call) => call.schemaName === "consultation_plan");
-      expect(planning?.messages[0]?.content).toContain(
-        CONSULTATION_COACH_SYSTEM_INSTRUCTIONS,
+      const decisionCall = calls.find(
+        (call) => call.schemaName === "consultation_plan_decision",
       );
+      const writingCall = calls.find(
+        (call) => call.schemaName === "consultation_plan_writing",
+      );
+      expect(decisionCall?.model).toBe("gpt-5.6-terra");
+      expect(writingCall?.model).toBe("gpt-5.6-luna");
+      expect(writingCall?.role).toBe("consultation_reply");
+      expect(decisionCall?.messages[0]?.content).toContain(
+        CONSULTATION_PLAN_DECISION_INSTRUCTIONS,
+      );
+      expect(decisionCall?.messages[0]?.content).not.toContain(
+        "EXPERIMENTAL. Not production.",
+      );
+      const planning = decisionCall;
       expect(
         planning?.messages.some((message) => message.content.includes("payroll")),
       ).toBe(true);
@@ -560,8 +629,8 @@ describe.skipIf(!hasTestDatabase())(
         ),
       ).toBe(true);
 
-      expect(report.markdown).toContain("gpt-5.6-terra plan");
-      expect(report.markdown).toContain("gpt-5.6-luna plan");
+      expect(report.markdown).toContain("production decision question");
+      expect(report.markdown).toContain("production lean plan");
       expect(report.markdown).toContain("gpt-5.6-terra best-practice question");
       expect(report.markdown).toContain("gpt-5.6-luna best-practice question");
       expect(report.markdown).toContain("gpt-5.6-terra overview");
@@ -625,11 +694,13 @@ describe.skipIf(!hasTestDatabase())(
       expect(report.fresh).toBe(false);
       expect(report.wroteToDatabase).toBe(false);
       const planningCalls = calls.filter(
-        (call) => call.schemaName === "consultation_plan",
+        (call) =>
+          call.schemaName === "consultation_plan_decision" ||
+          call.schemaName === "consultation_plan_writing",
       );
-      expect(planningCalls.map((call) => call.model).sort()).toEqual([
-        "gpt-5.6-luna",
-        "gpt-5.6-terra",
+      expect(planningCalls.map((call) => `${call.model}:${call.schemaName}`)).toEqual([
+        "gpt-5.6-terra:consultation_plan_decision",
+        "gpt-5.6-luna:consultation_plan_writing",
       ]);
       expect(
         calls.some((call) =>
@@ -872,7 +943,9 @@ describe.skipIf(!hasTestDatabase())(
       expect(fresh.fresh).toBe(true);
       expect(fresh.wroteToDatabase).toBe(false);
 
-      const planning = calls.find((call) => call.schemaName === "consultation_plan");
+      const planning = calls.find(
+        (call) => call.schemaName === "consultation_plan_decision",
+      );
       const planningText = planning?.messages.map((message) => message.content).join("\n") ?? "";
       expect(planningText).toContain("PROFILE_MARKER hospital payroll lead");
       expect(planningText).toContain("PROFILE_ROLE_MARKER Nurse Manager");
@@ -929,15 +1002,16 @@ describe.skipIf(!hasTestDatabase())(
 
       const names = calls.map((call) => `${call.model}:${call.schemaName}`);
       expect(names).toEqual([
-        "gpt-5.6-terra:consultation_plan",
+        "gpt-5.6-terra:consultation_plan_decision",
+        "gpt-5.6-luna:consultation_plan_writing",
         "gpt-5.6-terra:consultation_plan_decision_experiment",
         "gpt-5.6-luna:consultation_plan_writing_experiment",
         "gpt-5.6-luna:consultation_plan",
         "gpt-5.6-terra:consultation_plan_lean_decision_experiment",
         "gpt-5.6-luna:consultation_plan_lean_writing_experiment",
       ]);
-      const decision = calls[1];
-      const writing = calls[2];
+      const decision = calls[2];
+      const writing = calls[3];
       expect(writing?.role).toBe("consultation_reply");
       const decisionJson = zodToOpenAiStrictJsonSchema(
         decision?.schema as Parameters<typeof zodToOpenAiStrictJsonSchema>[0],
@@ -978,7 +1052,8 @@ describe.skipIf(!hasTestDatabase())(
       expect(writing?.messages[0]?.content).toContain("EXPERIMENTAL. Not production.");
       expect(split.markdown).toContain("terra decision question");
       expect(split.markdown).toContain("luna writing note");
-      expect(split.markdown).toContain("gpt-5.6-terra plan");
+      expect(split.markdown).toContain("production decision question");
+      expect(split.markdown).toContain("production lean plan");
       expect(split.markdown).toContain("gpt-5.6-luna plan");
       expect(split.markdown).toContain("Reasoning tokens");
       expect(split.markdown).toContain("128");
@@ -1033,8 +1108,8 @@ describe.skipIf(!hasTestDatabase())(
         "luna-today",
         "lean-split",
       ]);
-      const leanDecisionCall = calls[4];
-      const leanWritingCall = calls[5];
+      const leanDecisionCall = calls[5];
+      const leanWritingCall = calls[6];
       expect(leanWritingCall?.role).toBe("consultation_reply");
       expect(leanWritingCall?.model).toBe("gpt-5.6-luna");
       expect(leanDecisionCall?.model).toBe("gpt-5.6-terra");

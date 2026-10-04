@@ -1,4 +1,6 @@
 import {
+  createAiProvider,
+  getConsultationAiConfig,
   getConsultationAiProvider,
   getConsultationReplyAiProvider,
   isConsultationAiConfigured,
@@ -50,8 +52,15 @@ export async function generateApplicationSummaryShell(input: {
   if (!isConsultationAiConfigured()) return unavailable();
   const organizationId = input.usage?.organizationId;
   const campaignId = input.usage?.campaignId?.trim();
+  const shellModel = process.env.APPLICATION_SUMMARY_SHELL_AI_MODEL?.trim();
+  const shellProvider = shellModel
+    ? createAiProvider({
+        ...getConsultationAiConfig(),
+        model: shellModel,
+      })
+    : getConsultationAiProvider();
   const callProvider = async () => {
-    const response = await getConsultationAiProvider().generateStructured({
+    const response = await shellProvider.generateStructured({
       ...structuredOutputRequest("applicationSummaryShell"),
       ...(input.usage ? aiCallTracking(input.usage) : {}),
       messages: buildApplicationSummaryGuidanceMessages({

@@ -46,6 +46,7 @@ vi.mock("@/lib/consultation/role-expertise", async (importOriginal) => {
 
 import {
   CONSULTATION_PLAN_OPERATION,
+  CONSULTATION_PLAN_WRITING_OPERATION,
   planConsultationWithModel,
 } from "@/lib/consultation/ai";
 import { startConsultation } from "@/lib/consultation/service";
@@ -89,9 +90,9 @@ const PLAN = {
   ],
 };
 
-function planCalls(): number {
+function callsFor(schemaName: string): number {
   return generateStructured.mock.calls.filter(
-    (call) => call[0]?.schemaName === "consultation_plan",
+    (call) => call[0]?.schemaName === schemaName,
   ).length;
 }
 
@@ -223,10 +224,47 @@ describe.skipIf(!hasTestDatabase())(
       });
       userId = user.id;
       generateStructured.mockImplementation(async (request: { schemaName?: string }) => {
-        if (request.schemaName !== "consultation_plan") {
-          throw new Error(`unexpected schema ${request.schemaName ?? ""}`);
+        if (request.schemaName === "consultation_plan_decision") {
+          return {
+            data: {
+              assessments: PLAN.assessments.map((assessment) => ({
+                targetKey: assessment.targetKey,
+                strength: assessment.strength,
+                strategyMode: assessment.strategyMode,
+              })),
+              questions: PLAN.questions.map((question) => ({
+                targetKey: question.targetKey,
+                text: question.text,
+                hiringTeamRoleId: question.hiringTeamRoleId,
+                interviewTypeTag: question.interviewTypeTag,
+              })),
+            },
+          };
         }
-        return { data: PLAN };
+        if (request.schemaName === "consultation_plan_writing") {
+          return {
+            data: {
+              overall: PLAN.briefing.overall,
+              strongestAngles: PLAN.briefing.strongestAngles,
+              importantGaps: PLAN.briefing.importantGaps,
+              commentary: PLAN.commentary,
+              closingNote: PLAN.closingNote,
+              assessments: PLAN.assessments.map((assessment) => ({
+                targetKey: assessment.targetKey,
+                supportingFactIds: assessment.supportingFactIds,
+                relevantRoleIds: assessment.relevantRoleIds,
+                explanation: assessment.explanation,
+                strategy: assessment.strategy,
+              })),
+              questions: PLAN.questions.map((question) => ({
+                targetKey: question.targetKey,
+                whoCaresNote: question.whoCaresNote,
+                requirementInterpretation: question.requirementInterpretation,
+              })),
+            },
+          };
+        }
+        throw new Error(`unexpected schema ${request.schemaName ?? ""}`);
       });
     });
 
@@ -247,23 +285,34 @@ describe.skipIf(!hasTestDatabase())(
         planInput({ organizationId, campaignId, sessionId }),
       );
       expect(first.ok).toBe(true);
-      if (!first.ok) return;
+      if (!first.ok || first.writingFailed) return;
       expect(first.data.questions[0]?.text).toBe(QUESTION);
-      expect(planCalls()).toBe(1);
+      expect(callsFor("consultation_plan_decision")).toBe(1);
+      expect(callsFor("consultation_plan_writing")).toBe(1);
       expect(generateStructured.mock.calls[0]?.[0]?.usage?.metadata).toEqual({
-        step: "plan",
+        step: "plan_decision",
+        attempt: 1,
+      });
+      expect(generateStructured.mock.calls[1]?.[0]?.usage?.metadata).toEqual({
+        step: "plan_writing",
         attempt: 1,
       });
       const receipts = await prisma.paidCallReceipt.findMany({
         where: { organizationId, operation: CONSULTATION_PLAN_OPERATION },
       });
       expect(receipts).toHaveLength(1);
+      expect(
+        await prisma.paidCallReceipt.count({
+          where: { organizationId, operation: CONSULTATION_PLAN_WRITING_OPERATION },
+        }),
+      ).toBe(1);
 
       const second = await planConsultationWithModel(
         planInput({ organizationId, campaignId, sessionId }),
       );
       expect(second).toEqual(first);
-      expect(planCalls()).toBe(1);
+      expect(callsFor("consultation_plan_decision")).toBe(1);
+      expect(callsFor("consultation_plan_writing")).toBe(1);
       expect(
         await prisma.paidCallReceipt.count({
           where: { organizationId, operation: CONSULTATION_PLAN_OPERATION },
@@ -272,7 +321,7 @@ describe.skipIf(!hasTestDatabase())(
     });
 
     it("calls the model again when quality feedback changes", async () => {
-      const before = planCalls();
+      const before = callsFor("consultation_plan_decision");
       const again = await planConsultationWithModel(
         planInput({
           organizationId,
@@ -285,12 +334,20 @@ describe.skipIf(!hasTestDatabase())(
         }),
       );
       expect(again.ok).toBe(true);
-      if (!again.ok) return;
+      if (!again.ok || again.writingFailed) return;
       expect(again.data.questions[0]?.text).toBe(QUESTION);
-      expect(planCalls()).toBe(before + 1);
-      const feedbackCall = generateStructured.mock.calls.at(-1)?.[0];
-      expect(feedbackCall?.schemaName).toBe("consultation_plan");
-      expect(feedbackCall?.usage?.metadata).toEqual({ step: "plan", attempt: 2 });
+      expect(callsFor("consultation_plan_decision")).toBe(before + 1);
+      expect(callsFor("consultation_plan_writing")).toBe(2);
+      const feedbackCall = generateStructured.mock.calls.find(
+        (call) =>
+          call[0]?.schemaName === "consultation_plan_decision" &&
+          call[0]?.usage?.metadata?.attempt === 2,
+      )?.[0];
+      expect(feedbackCall?.schemaName).toBe("consultation_plan_decision");
+      expect(feedbackCall?.usage?.metadata).toEqual({
+        step: "plan_decision",
+        attempt: 2,
+      });
       expect(
         await prisma.paidCallReceipt.count({
           where: { organizationId, operation: CONSULTATION_PLAN_OPERATION },
@@ -338,9 +395,10 @@ describe.skipIf(!hasTestDatabase())(
       });
 
       await startConsultation({ organizationId, campaignId: campaign.id });
-      expect(planCalls()).toBe(1);
+      expect(callsFor("consultation_plan_decision")).toBe(1);
+      expect(callsFor("consultation_plan_writing")).toBe(1);
       expect(generateStructured.mock.calls[0]?.[0]?.usage?.metadata).toMatchObject({
-        step: "plan",
+        step: "plan_decision",
         attempt: 1,
       });
 
@@ -367,7 +425,7 @@ describe.skipIf(!hasTestDatabase())(
           generationError: null,
         },
       });
-      const callsAfterStoredPlan = planCalls();
+      const callsAfterStoredPlan = callsFor("consultation_plan_decision");
       await startConsultation({ organizationId, campaignId: campaign.id });
       const restored = await prisma.consultationTurn.findMany({
         where: {
@@ -378,7 +436,7 @@ describe.skipIf(!hasTestDatabase())(
       });
       expect(restored).toHaveLength(1);
       expect(restored[0]?.body).toBe(QUESTION);
-      expect(planCalls()).toBe(callsAfterStoredPlan);
+      expect(callsFor("consultation_plan_decision")).toBe(callsAfterStoredPlan);
 
       await prisma.consultationSession.update({
         where: { id: session.id },
@@ -402,7 +460,9 @@ describe.skipIf(!hasTestDatabase())(
       // The saved question is now part of the planner payload, so this retry is
       // not an identical plan. It may call the model again, and it must not
       // insert a second copy of the question already stored.
-      expect(planCalls()).toBeGreaterThanOrEqual(callsAfterStoredPlan);
+      expect(callsFor("consultation_plan_decision")).toBeGreaterThanOrEqual(
+        callsAfterStoredPlan,
+      );
     });
   },
 );

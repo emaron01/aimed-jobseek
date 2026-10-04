@@ -448,7 +448,8 @@ describe("Harper model-split — role-expertise providers + usage metadata", () 
       expect(text).not.toContain("ROLE_EXPERTISE_ANSWERS");
     }
     const service = src("src/lib/consultation/service.ts");
-    expect(service).toContain('? "reassess" : "plan"');
+    expect(service).toContain('"plan_decision"');
+    expect(service).toContain('"plan_writing"');
     expect(service).toContain('"extract"');
     expect(service).toContain('"polish"');
     expect(service).toContain('"statement_regeneration"');

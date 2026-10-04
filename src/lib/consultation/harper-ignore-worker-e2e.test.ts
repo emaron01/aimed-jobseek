@@ -307,9 +307,12 @@ describe.skipIf(!hasTestDatabase())(
       questionTurnId = question.id;
 
       generateStructured.mockImplementation(async (request: { schemaName: string }) => {
-        if (request.schemaName === "consultation_plan") {
-          return {
-            data: {
+        if (
+          request.schemaName === "consultation_plan" ||
+          request.schemaName === "consultation_plan_decision" ||
+          request.schemaName === "consultation_plan_writing"
+        ) {
+          const plan = {
               commentary: "Keep probing gaps.",
               briefing: {
                 overall: "Forecast remains open unless ignored.",
@@ -356,8 +359,48 @@ describe.skipIf(!hasTestDatabase())(
                   interviewTypeTag: "focused_competency",
                 },
               ],
-            },
           };
+          if (request.schemaName === "consultation_plan_decision") {
+            return {
+              data: {
+                assessments: plan.assessments.map((assessment) => ({
+                  targetKey: assessment.targetKey,
+                  strength: assessment.strength,
+                  strategyMode: assessment.strategyMode,
+                })),
+                questions: plan.questions.map((question) => ({
+                  targetKey: question.targetKey,
+                  text: question.text,
+                  hiringTeamRoleId: question.hiringTeamRoleId,
+                  interviewTypeTag: question.interviewTypeTag,
+                })),
+              },
+            };
+          }
+          if (request.schemaName === "consultation_plan_writing") {
+            return {
+              data: {
+                overall: plan.briefing.overall,
+                strongestAngles: plan.briefing.strongestAngles,
+                importantGaps: plan.briefing.importantGaps,
+                commentary: plan.commentary,
+                closingNote: plan.closingNote,
+                assessments: plan.assessments.map((assessment) => ({
+                  targetKey: assessment.targetKey,
+                  supportingFactIds: assessment.supportingFactIds,
+                  relevantRoleIds: assessment.relevantRoleIds,
+                  explanation: assessment.explanation,
+                  strategy: assessment.strategy,
+                })),
+                questions: plan.questions.map((question) => ({
+                  targetKey: question.targetKey,
+                  whoCaresNote: question.whoCaresNote,
+                  requirementInterpretation: question.requirementInterpretation,
+                })),
+              },
+            };
+          }
+          return { data: plan };
         }
         if (request.schemaName === "consultation_extract") {
           return {

@@ -188,7 +188,11 @@ function installConsultationModelFixture() {
       followUpAlreadyUsed?: boolean;
       interviewerPrep?: { contactId: string; name: string; roleName: string } | null;
     };
-    if (request.schemaName === "consultation_plan") {
+    if (
+      request.schemaName === "consultation_plan" ||
+      request.schemaName === "consultation_plan_decision" ||
+      request.schemaName === "consultation_plan_writing"
+    ) {
       const targets = payload.targets ?? [];
       const askedQuestions = payload.askedQuestions ?? [];
       const stated = (payload.seekerStatedFacts ?? [])
@@ -219,8 +223,7 @@ function installConsultationModelFixture() {
         (question) =>
           !askedQuestions.some((asked) => asked.text === question.text),
       );
-      return {
-        data: {
+      const plan = {
           commentary:
             "Your production ownership is relevant here; the main questions are duration, robotics transfer, and measurable outcomes.",
           briefing: {
@@ -291,8 +294,48 @@ function installConsultationModelFixture() {
             };
           }),
           questions,
-        },
       };
+      if (request.schemaName === "consultation_plan_decision") {
+        return {
+          data: {
+            assessments: plan.assessments.map((assessment) => ({
+              targetKey: assessment.targetKey,
+              strength: assessment.strength,
+              strategyMode: assessment.strategyMode,
+            })),
+            questions: plan.questions.map((question) => ({
+              targetKey: question.targetKey,
+              text: question.text,
+              hiringTeamRoleId: question.hiringTeamRoleId,
+              interviewTypeTag: question.interviewTypeTag,
+            })),
+          },
+        };
+      }
+      if (request.schemaName === "consultation_plan_writing") {
+        return {
+          data: {
+            overall: plan.briefing.overall,
+            strongestAngles: plan.briefing.strongestAngles,
+            importantGaps: plan.briefing.importantGaps,
+            commentary: plan.commentary,
+            closingNote: plan.closingNote,
+            assessments: plan.assessments.map((assessment) => ({
+              targetKey: assessment.targetKey,
+              supportingFactIds: assessment.supportingFactIds,
+              relevantRoleIds: assessment.relevantRoleIds,
+              explanation: assessment.explanation,
+              strategy: assessment.strategy,
+            })),
+            questions: plan.questions.map((question) => ({
+              targetKey: question.targetKey,
+              whoCaresNote: question.whoCaresNote,
+              requirementInterpretation: question.requirementInterpretation,
+            })),
+          },
+        };
+      }
+      return { data: plan };
     }
     if (request.schemaName === "consultation_polish") {
       const answerText = payload.answer ?? "";
@@ -3617,7 +3660,7 @@ describe.skipIf(!hasTestDatabase())("consultation session", { timeout: 60_000 },
     generateStructured.mockClear();
     await startConsultation({ organizationId, campaignId: campaign.id });
     const coachCall = generateStructured.mock.calls.find(
-      (call) => call[0]?.schemaName === "consultation_plan",
+      (call) => call[0]?.schemaName === "consultation_plan_decision",
     );
     expect(coachCall).toBeTruthy();
     const payload = (coachCall![0].messages as Array<{ content: string }>).reduce(

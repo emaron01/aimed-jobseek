@@ -22,7 +22,7 @@ describe("generated content is not rejected", () => {
       expect(source).not.toContain('check: "assessment_verification"');
     }
     const plan = readFileSync("src/lib/consultation/service.ts", "utf8");
-    expect(plan).toContain("if (!plan.ok)");
+    expect(plan).toContain("if (!decision.ok)");
     expect(plan).toContain("failGeneration");
     expect(plan).not.toContain("mentionsInternalSystemState");
     expect(readFileSync("src/lib/interview/ai.ts", "utf8")).not.toContain(

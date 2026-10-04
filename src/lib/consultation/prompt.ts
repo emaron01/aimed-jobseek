@@ -1,6 +1,8 @@
 import type { AiMessage } from "@/lib/ai/types";
 import type { CareerStage } from "@/lib/consultation/career-stage";
 import {
+  CONSULTATION_PLAN_DECISION_PROMPT_VERSION,
+  CONSULTATION_PLAN_WRITING_PROMPT_VERSION,
   CONSULTATION_PROMPT_VERSION,
   type ApplicationLearningsForCoach,
   type AskedConsultationQuestion,
@@ -10,11 +12,14 @@ import {
   type SeekerStatedFactPayload,
 } from "@/lib/consultation/contract";
 import type { RecentRole } from "@/lib/consultation/recent-roles";
+import type { ConsultationPlanDecision } from "@/lib/consultation/plan-split";
 import {
   CONSULTATION_COACH_SYSTEM_INSTRUCTIONS,
   CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS,
   CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS,
 } from "@/lib/prompt-content";
+import { CONSULTATION_PLAN_DECISION_INSTRUCTIONS } from "@/lib/prompt-content/consultation-plan-decision";
+import { CONSULTATION_PLAN_WRITING_INSTRUCTIONS } from "@/lib/prompt-content/consultation-plan-writing";
 import { consultationConfig } from "@/lib/product-config/consultation";
 
 function coachSystem() {
@@ -35,7 +40,19 @@ function polishSystem() {
 ${CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS}`;
 }
 
-export function buildConsultationCoachMessages(input: {
+function decisionSystem() {
+  return `Prompt version: ${CONSULTATION_PLAN_DECISION_PROMPT_VERSION}
+
+${CONSULTATION_PLAN_DECISION_INSTRUCTIONS}`;
+}
+
+function writingSystem() {
+  return `Prompt version: ${CONSULTATION_PLAN_WRITING_PROMPT_VERSION}
+
+${CONSULTATION_PLAN_WRITING_INSTRUCTIONS}`;
+}
+
+type CoachMessageInput = {
   targets: Array<{ key: string; kind: string; text: string }>;
   profileItems: Array<{
     id: string;
@@ -61,9 +78,10 @@ export function buildConsultationCoachMessages(input: {
   focusTargetKey?: string | null;
   interviewerPrep?: InterviewerPrepPayload | null;
   qualityFeedback?: string[];
-}): AiMessage[] {
+};
+
+function coachUserMessages(input: CoachMessageInput): AiMessage[] {
   return [
-    { role: "system", content: coachSystem() },
     {
       role: "user",
       content: JSON.stringify({
@@ -122,6 +140,49 @@ export function buildConsultationCoachMessages(input: {
         qualityFeedback: input.qualityFeedback ?? [],
       }),
     },
+  ];
+}
+
+export function buildConsultationCoachMessages(input: CoachMessageInput): AiMessage[] {
+  return [{ role: "system", content: coachSystem() }, ...coachUserMessages(input)];
+}
+
+export function buildConsultationPlanDecisionMessages(
+  input: CoachMessageInput,
+): AiMessage[] {
+  return [{ role: "system", content: decisionSystem() }, ...coachUserMessages(input)];
+}
+
+export function buildConsultationPlanWritingMessages(
+  input: CoachMessageInput,
+  decision: ConsultationPlanDecision,
+): AiMessage[] {
+  return [
+    { role: "system", content: writingSystem() },
+    ...coachUserMessages(input),
+    { role: "user", content: JSON.stringify({ decision }) },
+  ];
+}
+
+/** Replace the coach system prompt with the production lean decision instructions. */
+export function productionPlanDecisionMessages(
+  coachMessages: AiMessage[],
+): AiMessage[] {
+  return [
+    { role: "system", content: decisionSystem() },
+    ...coachMessages.filter((message) => message.role !== "system"),
+  ];
+}
+
+/** Replace the coach system prompt and append the decision for the writing call. */
+export function productionPlanWritingMessages(
+  coachMessages: AiMessage[],
+  decision: ConsultationPlanDecision,
+): AiMessage[] {
+  return [
+    { role: "system", content: writingSystem() },
+    ...coachMessages.filter((message) => message.role !== "system"),
+    { role: "user", content: JSON.stringify({ decision }) },
   ];
 }
 

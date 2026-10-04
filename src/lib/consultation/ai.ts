@@ -27,17 +27,37 @@ import {
   type InterviewerPrepPayload,
   type SeekerStatedFactPayload,
 } from "@/lib/consultation/contract";
+import {
+  combinePlanDecisionAndWriting,
+  consultationPlanDecisionFingerprint,
+  consultationPlanDecisionSchema,
+  consultationPlanWritingSchema,
+  consultationPlanWritingFingerprint,
+  consultationPlanWritingSubjectKey,
+  isPlanDecisionUsable,
+  isPlanWritingUsable,
+  logPlanWritingAdjustments,
+  suppliedProfileEvidenceIds,
+  type ConsultationPlanDecision,
+} from "@/lib/consultation/plan-split";
 import type { RecentRole } from "@/lib/consultation/recent-roles";
 import {
-  buildConsultationCoachMessages,
   buildConsultationExtractMessages,
+  buildConsultationPlanDecisionMessages,
+  buildConsultationPlanWritingMessages,
   buildConsultationPolishMessages,
 } from "@/lib/consultation/prompt";
 import { consultationConversationCopy } from "@/lib/product-config";
 import { aiCallTracking } from "@/lib/usage/ai-call";
 
 export type ConsultationPlanAiResult =
-  | { ok: true; data: ConsultationPlanResult }
+  | { ok: true; data: ConsultationPlanResult; writingFailed: false }
+  | {
+      ok: true;
+      writingFailed: true;
+      decision: ConsultationPlanDecision;
+      message: string;
+    }
   | { ok: false; message: string };
 
 const UNCONFIGURED = consultationConversationCopy.modelUnavailable;
@@ -48,6 +68,19 @@ function tracking(usage?: AiCallUsageContext) {
   return usage ? aiCallTracking(usage) : {};
 }
 
+function planStepUsage(
+  usage: AiCallUsageContext | undefined,
+  operation: "CONSULTATION" | "CONSULTATION_REPLY",
+  step: "plan_decision" | "plan_writing",
+): AiCallUsageContext | undefined {
+  if (!usage) return undefined;
+  return {
+    ...usage,
+    operation,
+    metadata: { ...(usage.metadata ?? {}), step },
+  };
+}
+
 export const CONSULTATION_EXTRACT_OPERATION =
   "CONSULTATION_EXTRACT" satisfies PaidCallOperation;
 export const CONSULTATION_POLISH_OPERATION =
@@ -56,6 +89,8 @@ export const CONSULTATION_STATEMENT_REGENERATE_OPERATION =
   "CONSULTATION_STATEMENT_REGENERATE" satisfies PaidCallOperation;
 export const CONSULTATION_PLAN_OPERATION =
   "CONSULTATION_PLAN" satisfies PaidCallOperation;
+export const CONSULTATION_PLAN_WRITING_OPERATION =
+  "CONSULTATION_PLAN_WRITING" satisfies PaidCallOperation;
 
 function planModelIdentity(): { provider: string; model: string } {
   return {
@@ -85,14 +120,34 @@ export function consultationPlanSubjectKey(input: {
   return `${input.campaignId}:${input.sessionId}:${input.inputFingerprint}`;
 }
 
-function usableConsultationPlan(stored: ConsultationPlanResult): boolean {
-  return (
-    typeof stored.commentary === "string" &&
-    stored.briefing != null &&
-    typeof stored.briefing.overall === "string" &&
-    Array.isArray(stored.questions)
-  );
-}
+type PlanModelInput = {
+  targets: Array<{ key: string; kind: string; text: string }>;
+  profileItems: Array<{
+    id: string;
+    kind: string;
+    text: string;
+    itemType: string;
+    employer?: string | null;
+    title?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    roleId?: string | null;
+  }>;
+  careerStage: CareerStage;
+  recentRoles: RecentRole[];
+  hiringTeam: CoachHiringTeamRole[];
+  applicationLearningsPendingHiringManager?: ApplicationLearningsForCoach | null;
+  seekerStatedFacts: SeekerStatedFactPayload[];
+  companyResearch: CoachCompanyResearch | null;
+  askedQuestions: AskedConsultationQuestion[];
+  chronologyRequested: boolean;
+  coveredTargetKeys: string[];
+  focusTargetKey?: string | null;
+  interviewerPrep?: InterviewerPrepPayload | null;
+  qualityFeedback?: string[];
+  sessionId?: string | null;
+  usage?: AiCallUsageContext;
+};
 
 function replyModelIdentity(): { provider: string; model: string } {
   return {
@@ -163,35 +218,32 @@ async function runReplyPaidCall<T>(input: {
   return gated.data;
 }
 
-export async function planConsultationWithModel(input: {
-  targets: Array<{ key: string; kind: string; text: string }>;
-  profileItems: Array<{
-    id: string;
-    kind: string;
-    text: string;
-    itemType: string;
-    employer?: string | null;
-    title?: string | null;
-    startDate?: string | null;
-    endDate?: string | null;
-    roleId?: string | null;
-  }>;
-  careerStage: CareerStage;
-  recentRoles: RecentRole[];
-  hiringTeam: CoachHiringTeamRole[];
-  applicationLearningsPendingHiringManager?: ApplicationLearningsForCoach | null;
-  seekerStatedFacts: SeekerStatedFactPayload[];
-  companyResearch: CoachCompanyResearch | null;
-  askedQuestions: AskedConsultationQuestion[];
-  chronologyRequested: boolean;
-  coveredTargetKeys: string[];
-  focusTargetKey?: string | null;
-  interviewerPrep?: InterviewerPrepPayload | null;
-  qualityFeedback?: string[];
-  /** Session the plan belongs to. Required for the paid-call receipt. */
-  sessionId?: string | null;
-  usage?: AiCallUsageContext;
-}): Promise<ConsultationPlanAiResult> {
+export async function planConsultationWithModel(
+  input: PlanModelInput,
+): Promise<ConsultationPlanAiResult> {
+  const decision = await runConsultationPlanDecision(input);
+  if (!decision.ok) return decision;
+  const writing = await runConsultationPlanWriting({
+    ...input,
+    decision: decision.data,
+  });
+  if (!writing.ok) {
+    return {
+      ok: true,
+      writingFailed: true,
+      decision: decision.data,
+      message: writing.message,
+    };
+  }
+  return { ok: true, writingFailed: false, data: writing.data };
+}
+
+export async function runConsultationPlanDecision(
+  input: PlanModelInput,
+): Promise<
+  | { ok: true; data: ConsultationPlanDecision; skipped: boolean }
+  | { ok: false; message: string }
+> {
   if (!isConsultationAiConfigured()) {
     console.error(
       JSON.stringify({
@@ -202,14 +254,14 @@ export async function planConsultationWithModel(input: {
     );
     return { ok: false, message: UNCONFIGURED };
   }
-  const messages = buildConsultationCoachMessages(input);
+  const messages = buildConsultationPlanDecisionMessages(input);
   const callProvider = async () => {
     const response = await getConsultationAiProvider().generateStructured({
-      ...structuredOutputRequest("consultationPlan"),
-      ...tracking(input.usage),
+      ...structuredOutputRequest("consultationPlanDecision"),
+      ...tracking(planStepUsage(input.usage, "CONSULTATION", "plan_decision")),
       messages,
       parseOutput: (raw) => ({
-        data: consultationPlanSchema.parse(raw),
+        data: consultationPlanDecisionSchema.parse(raw),
         coercedFields: [],
       }),
     });
@@ -220,9 +272,13 @@ export async function planConsultationWithModel(input: {
     const campaignId = input.usage?.campaignId?.trim();
     const sessionId = input.sessionId?.trim();
     if (!organizationId || !campaignId || !sessionId) {
-      return { ok: true, data: await callProvider() };
+      const data = await callProvider();
+      if (!isPlanDecisionUsable(data)) {
+        return { ok: false, message: consultationConversationCopy.planUnusable };
+      }
+      return { ok: true, data, skipped: false };
     }
-    const inputFingerprint = consultationPlanCallFingerprint(messages);
+    const inputFingerprint = consultationPlanDecisionFingerprint(messages);
     const gated = await runPaidStructuredCall({
       organizationId,
       operation: CONSULTATION_PLAN_OPERATION,
@@ -232,11 +288,14 @@ export async function planConsultationWithModel(input: {
         inputFingerprint,
       }),
       inputFingerprint,
-      parseStored: (json) => consultationPlanSchema.parse(json),
-      isResultUsable: usableConsultationPlan,
+      parseStored: (json) => consultationPlanDecisionSchema.parse(json),
+      isResultUsable: isPlanDecisionUsable,
       callProvider,
     });
-    return { ok: true, data: gated.data };
+    if (!isPlanDecisionUsable(gated.data)) {
+      return { ok: false, message: consultationConversationCopy.planUnusable };
+    }
+    return { ok: true, data: gated.data, skipped: gated.skipped };
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
     const cause =
@@ -250,6 +309,100 @@ export async function planConsultationWithModel(input: {
       ok: false,
       message: consultationConversationCopy.planUnusable,
     };
+  }
+}
+
+export async function runConsultationPlanWriting(
+  input: PlanModelInput & { decision: ConsultationPlanDecision },
+): Promise<
+  | { ok: true; data: ConsultationPlanResult; skipped: boolean }
+  | { ok: false; message: string }
+> {
+  if (!isConsultationReplyAiConfigured()) {
+    console.error(
+      JSON.stringify({
+        event: "consultation_plan_writing_failed",
+        cause: "CONSULTATION_REPLY_AI_not_configured",
+        message: REPLY_UNCONFIGURED,
+      }),
+    );
+    return { ok: false, message: REPLY_UNCONFIGURED };
+  }
+  const supplied = suppliedProfileEvidenceIds({
+    profileItems: input.profileItems,
+    recentRoles: input.recentRoles,
+    seekerStatedFacts: input.seekerStatedFacts,
+  });
+  const messages = buildConsultationPlanWritingMessages(input, input.decision);
+  const callProvider = async () => {
+    let rawPayload: unknown;
+    const response = await getConsultationReplyAiProvider().generateStructured({
+      ...structuredOutputRequest("consultationPlanWriting"),
+      ...tracking(planStepUsage(input.usage, "CONSULTATION_REPLY", "plan_writing")),
+      messages,
+      parseOutput: (raw) => {
+        rawPayload = raw;
+        return {
+          data: consultationPlanWritingSchema.parse(raw),
+          coercedFields: [],
+        };
+      },
+    });
+    return combineWritingOrThrow(rawPayload ?? response.data);
+  };
+  function combineWritingOrThrow(raw: unknown): ConsultationPlanResult {
+    const combined = combinePlanDecisionAndWriting({
+      decision: input.decision,
+      writingRaw: raw,
+      suppliedFactIds: supplied.factIds,
+      suppliedRoleIds: supplied.roleIds,
+    });
+    logPlanWritingAdjustments(combined.notes);
+    if (!combined.plan) {
+      throw new Error(
+        combined.notes.join(" ") || "Planning writing did not match today's shape.",
+      );
+    }
+    return combined.plan;
+  }
+  try {
+    const organizationId = input.usage?.organizationId?.trim();
+    const campaignId = input.usage?.campaignId?.trim();
+    const sessionId = input.sessionId?.trim();
+    if (!organizationId || !campaignId || !sessionId) {
+      const data = await callProvider();
+      if (!isPlanWritingUsable(data, input.decision)) {
+        return { ok: false, message: consultationConversationCopy.planUnusable };
+      }
+      return { ok: true, data, skipped: false };
+    }
+    const inputFingerprint = consultationPlanWritingFingerprint({
+      messages,
+      decision: input.decision,
+    });
+    const gated = await runPaidStructuredCall({
+      organizationId,
+      operation: CONSULTATION_PLAN_WRITING_OPERATION,
+      subjectKey: consultationPlanWritingSubjectKey({
+        campaignId,
+        sessionId,
+        inputFingerprint,
+      }),
+      inputFingerprint,
+      parseStored: (json) => consultationPlanSchema.parse(json),
+      isResultUsable: (stored) => isPlanWritingUsable(stored, input.decision),
+      callProvider,
+    });
+    if (!isPlanWritingUsable(gated.data, input.decision)) {
+      return { ok: false, message: consultationConversationCopy.planUnusable };
+    }
+    return { ok: true, data: gated.data, skipped: gated.skipped };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown";
+    console.error(
+      JSON.stringify({ event: "consultation_plan_writing_failed", message }),
+    );
+    return { ok: false, message: consultationConversationCopy.planUnusable };
   }
 }
 

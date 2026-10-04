@@ -118,7 +118,7 @@ describe("Harper Batch D2 — WHO interview-type tags", () => {
     expect(planFn).toContain(
       "attempt <= consultationConfig.qualityRegenerationAttempts",
     );
-    expect(planFn).toMatch(/if \(!plan\.ok\)[\s\S]*continue/);
+    expect(planFn).toMatch(/if \(!decision\.ok\)[\s\S]*continue/);
     expect(consultationConfig.qualityRegenerationAttempts).toBe(2);
   });
 
@@ -239,7 +239,12 @@ describe("Harper Batch D2 — WHO interview-type tags", () => {
     expect(storeBlock).toContain("interviewTypeTag:");
     expect(storeBlock).toContain("question.interviewTypeTag");
     expect(storeBlock).toContain("questionContext:");
-    expect(storeBlock).toContain("whoCaresNote: question.whoCaresNote");
+    expect(storeBlock).toContain('whoCaresNote: ""');
+    const writingAt = service.indexOf("whoCaresNote: written?.whoCaresNote");
+    expect(writingAt).toBeGreaterThanOrEqual(0);
+    const writingUpdate = service.slice(writingAt - 400, writingAt + 200);
+    expect(writingUpdate).toContain("interviewTypeTag: question.interviewTypeTag");
+    expect(writingUpdate).toContain("whoCaresNote: written?.whoCaresNote");
   });
 
   it("orders interviewer questions by WHO tag; missing tag sorts as focused_competency", () => {

@@ -22,6 +22,16 @@ import { applicationSummaryShellSchema } from "@/lib/application-summary/contrac
 import { applicationSummaryShellModelMessages } from "@/lib/application-summary/service";
 import { employerWebsiteAnchor } from "@/lib/application/company-website";
 import { consultationPlanSchema } from "@/lib/consultation/contract";
+import {
+  combinePlanDecisionAndWriting,
+  consultationPlanDecisionSchema,
+  suppliedEvidenceIdsFromMessages,
+  type ConsultationPlanDecision,
+} from "@/lib/consultation/plan-split";
+import {
+  productionPlanDecisionMessages,
+  productionPlanWritingMessages,
+} from "@/lib/consultation/prompt";
 import { buildConsultationCoachMessagesForCampaign } from "@/lib/consultation/service";
 import {
   EXPERIMENTAL_LEAN_DECISION_INSTRUCTIONS,
@@ -453,7 +463,12 @@ async function callStructured(input: {
   config: AiConfig;
   model: ComparisonModel;
   messages: AiMessage[];
-  schemaKey: "consultationPlan" | "roleExpertiseQuestions" | "applicationSummaryShell";
+  schemaKey:
+    | "consultationPlan"
+    | "consultationPlanDecision"
+    | "consultationPlanWriting"
+    | "roleExpertiseQuestions"
+    | "applicationSummaryShell";
   schemaOverride?: {
     schema: AiStructuredRequest<unknown>["schema"];
     schemaName: string;
@@ -498,6 +513,137 @@ function pricedCall(input: {
   };
 }
 
+function formatProductionDecision(decision: ConsultationPlanDecision): string {
+  const questions = decision.questions
+    .map((question, index) => `${index + 1}. ${question.text}`)
+    .join("\n");
+  return ["Decision:", questions || "(none)"].join("\n");
+}
+
+/** Production Harper planning: terra decision, then luna writing. */
+async function runProductionLeanPlanning(input: {
+  campaign: Awaited<ReturnType<typeof loadCampaign>>;
+  rates: AiModelRateRow[];
+  dryRun: boolean;
+  fresh: boolean;
+}): Promise<{
+  decision: ModelStepResult;
+  writing: ModelStepResult;
+  calls: VariantCall[];
+}> {
+  const messages = await planningMessages(
+    input.campaign.id,
+    input.campaign.organizationId,
+    input.fresh,
+  );
+  const emptyDecision: ConsultationPlanDecision = {
+    assessments: [],
+    questions: [],
+  };
+  if (input.dryRun) {
+    return {
+      decision: {
+        model: "gpt-5.6-terra",
+        output: "",
+        inputPreview: previewMessages(productionPlanDecisionMessages(messages)),
+        usage: EMPTY_USAGE,
+        costUsd: 0,
+        rated: true,
+        skippedReason: null,
+      },
+      writing: {
+        model: "gpt-5.6-luna",
+        output: "",
+        inputPreview: previewMessages(
+          productionPlanWritingMessages(messages, emptyDecision),
+        ),
+        usage: EMPTY_USAGE,
+        costUsd: 0,
+        rated: true,
+        skippedReason: null,
+      },
+      calls: [],
+    };
+  }
+  const decisionCalled = await callStructured({
+    config: getConsultationAiConfig(),
+    model: "gpt-5.6-terra",
+    messages: productionPlanDecisionMessages(messages),
+    schemaKey: "consultationPlanDecision",
+  });
+  const decision = consultationPlanDecisionSchema.parse(decisionCalled.data);
+  let writingRaw: unknown = null;
+  let writingError: string | null = null;
+  let writingUsage: UsageTotals | null = null;
+  try {
+    const writingCalled = await callStructured({
+      config: getConsultationReplyAiConfig(),
+      model: "gpt-5.6-luna",
+      messages: productionPlanWritingMessages(messages, decision),
+      schemaKey: "consultationPlanWriting",
+    });
+    writingUsage = writingCalled.usage;
+    writingRaw = writingCalled.data;
+  } catch (error) {
+    writingError = error instanceof Error ? error.message : "Writing call failed.";
+  }
+  const supplied = suppliedEvidenceIdsFromMessages(messages);
+  const combined = writingRaw
+    ? combinePlanDecisionAndWriting({
+        decision,
+        writingRaw,
+        suppliedFactIds: supplied.factIds,
+        suppliedRoleIds: supplied.roleIds,
+      })
+    : { plan: null, notes: [] };
+  const decisionPriced = costFor(
+    "gpt-5.6-terra",
+    "openai-responses",
+    decisionCalled.usage,
+    input.rates,
+  );
+  const writingPriced = writingUsage
+    ? costFor("gpt-5.6-luna", "openai-responses", writingUsage, input.rates)
+    : { costUsd: 0, rated: true };
+  const decisionCall = pricedCall({
+    label: "Decision",
+    model: "gpt-5.6-terra",
+    usage: decisionCalled.usage,
+    rates: input.rates,
+  });
+  const writingCall = writingUsage
+    ? pricedCall({
+        label: "Writing",
+        model: "gpt-5.6-luna",
+        usage: writingUsage,
+        rates: input.rates,
+      })
+    : null;
+  return {
+    decision: {
+      model: "gpt-5.6-terra",
+      output: formatProductionDecision(decision),
+      inputPreview: "",
+      usage: decisionCalled.usage,
+      costUsd: decisionPriced.costUsd,
+      rated: decisionPriced.rated,
+      skippedReason: null,
+    },
+    writing: {
+      model: "gpt-5.6-luna",
+      output: combined.plan
+        ? formatPlan(combined.plan)
+        : `Writing call failed: ${writingError ?? combined.notes.join(" ")}`,
+      inputPreview: "",
+      usage: writingUsage ?? EMPTY_USAGE,
+      costUsd: writingPriced.costUsd,
+      rated: writingPriced.rated,
+      skippedReason: null,
+    },
+    calls: writingCall ? [decisionCall, writingCall] : [decisionCall],
+  };
+}
+
 async function runPlanningSplit(input: {
   campaign: Awaited<ReturnType<typeof loadCampaign>>;
   rates: AiModelRateRow[];
@@ -520,11 +666,16 @@ async function runPlanningSplit(input: {
     return [
       {
         id: "terra-today",
-        label: "Today's planning on gpt-5.6-terra",
+        label: "Production lean split (terra decision, luna writing)",
         output: "",
         calls: [],
         costUsd: 0,
-        inputPreview: previewMessages(messages),
+        inputPreview: `${previewMessages(productionPlanDecisionMessages(messages))}\n\n---\n\n${previewMessages(
+          productionPlanWritingMessages(messages, {
+            assessments: [],
+            questions: [],
+          }),
+        )}`,
       },
       {
         id: "split",
@@ -555,12 +706,7 @@ async function runPlanningSplit(input: {
     ];
   }
 
-  const terraToday = await callStructured({
-    config: getConsultationAiConfig(),
-    model: "gpt-5.6-terra",
-    messages,
-    schemaKey: "consultationPlan",
-  });
+  const production = await runProductionLeanPlanning(input);
   const decisionCalled = await callStructured({
     config: getConsultationAiConfig(),
     model: "gpt-5.6-terra",
@@ -596,12 +742,6 @@ async function runPlanningSplit(input: {
     model: "gpt-5.6-luna",
     messages,
     schemaKey: "consultationPlan",
-  });
-  const terraCall = pricedCall({
-    label: "Today's planning",
-    model: "gpt-5.6-terra",
-    usage: terraToday.usage,
-    rates: input.rates,
   });
   const decisionCall = pricedCall({
     label: "Decision",
@@ -680,10 +820,12 @@ async function runPlanningSplit(input: {
   return [
     {
       id: "terra-today",
-      label: "Today's planning on gpt-5.6-terra",
-      output: formatPlan(terraToday.data),
-      calls: [terraCall],
-      costUsd: terraCall.costUsd,
+      label: "Production lean split (terra decision, luna writing)",
+      output: [production.decision.output, production.writing.output]
+        .filter(Boolean)
+        .join("\n\n"),
+      calls: production.calls,
+      costUsd: production.decision.costUsd + production.writing.costUsd,
       inputPreview: "",
     },
     {
@@ -728,41 +870,6 @@ async function runOneModel(input: {
   fresh: boolean;
 }): Promise<ModelStepResult> {
   const providerName = "openai-responses";
-  if (input.step === "planning") {
-    const messages = await planningMessages(
-      input.campaign.id,
-      input.campaign.organizationId,
-      input.fresh,
-    );
-    if (input.dryRun) {
-      return {
-        model: input.model,
-        output: "",
-        inputPreview: previewMessages(messages),
-        usage: EMPTY_USAGE,
-        costUsd: 0,
-        rated: true,
-        skippedReason: null,
-      };
-    }
-    const called = await callStructured({
-      config: getConsultationAiConfig(),
-      model: input.model,
-      messages,
-      schemaKey: "consultationPlan",
-    });
-    const priced = costFor(input.model, providerName, called.usage, input.rates);
-    return {
-      model: input.model,
-      output: formatPlan(called.data),
-      inputPreview: "",
-      usage: called.usage,
-      costUsd: priced.costUsd,
-      rated: priced.rated,
-      skippedReason: null,
-    };
-  }
-
   if (input.step === "questions") {
     const built = await questionMessages(input.campaign, input.fresh);
     if (built.skippedReason) {
@@ -1041,6 +1148,16 @@ function renderMarkdown(input: {
     }
     if (input.dryRun) {
       lines.push("### Input this step would send", "", "```", left.inputPreview, "```", "");
+      if (right.inputPreview && right.inputPreview !== left.inputPreview) {
+        lines.push(
+          `### Input ${right.model} would send`,
+          "",
+          "```",
+          right.inputPreview,
+          "```",
+          "",
+        );
+      }
       lines.push(
         `| Model | Estimated token cost |`,
         `| --- | --- |`,
@@ -1131,6 +1248,19 @@ export async function runModelComparison(input: {
         fresh,
       });
       comparisons.push({ step, models: [], planningVariants });
+      continue;
+    }
+    if (step === "planning") {
+      const production = await runProductionLeanPlanning({
+        campaign,
+        rates,
+        dryRun,
+        fresh,
+      });
+      comparisons.push({
+        step,
+        models: [production.decision, production.writing],
+      });
       continue;
     }
     const models: ModelStepResult[] = [];

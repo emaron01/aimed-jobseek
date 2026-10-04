@@ -5,10 +5,12 @@ import {
 } from "@/lib/application/employer-research-reader";
 import type { JobScorecard, ScorecardItem } from "@/lib/job-requirement/types";
 import {
-  planConsultationWithModel,
+  runConsultationPlanDecision,
+  runConsultationPlanWriting,
   extractWithModel,
   polishAnswerWithModel,
 } from "@/lib/consultation/ai";
+import type { ConsultationPlanDecision } from "@/lib/consultation/plan-split";
 import { buildConsultationCoachMessages } from "@/lib/consultation/prompt";
 import {
   evidenceTargets,
@@ -208,6 +210,8 @@ function consultationUsage(
   operation: "CONSULTATION" | "CONSULTATION_REPLY",
   step:
     | "plan"
+    | "plan_decision"
+    | "plan_writing"
     | "reassess"
     | "role_expertise_questions"
     | "role_expertise_answers"
@@ -1197,15 +1201,25 @@ function profileFirstName(
   return seekerFirstName(profile.identity.name?.text);
 }
 
-function consultationPlanQualityIssues(input: {
-  briefing: {
-    overall: string;
-    strongestAngles: string[];
-    importantGaps: string[];
-    storyPlan: string[];
-  };
-  commentary: string;
-  closingNote: string | null;
+function proseQualityIssues(texts: string[], firstName: string | null): string[] {
+  const issues: string[] = [];
+  for (const text of texts) {
+    issues.push(
+      ...harperCoachingVoiceViolations({
+        text,
+        firstName,
+      }),
+      ...seekerPrepInstructionViolations(text),
+    );
+    if (proseContainsInternalId(text)) {
+      issues.push(INTERNAL_ID_PROSE_QUALITY_FEEDBACK);
+    }
+  }
+  return issues;
+}
+
+/** Decision retries only. Prose and whoCaresNote belong to the writing call. */
+function decisionQualityIssues(input: {
   questions: QuestionRoundPlan["questions"];
   assessments: EvidenceAssessment[];
   dropped: QuestionRoundPlan["dropped"];
@@ -1223,11 +1237,6 @@ function consultationPlanQualityIssues(input: {
     );
   }
   for (const question of input.questions) {
-    if (!question.whoCaresNote.trim()) {
-      issues.push(
-        "whoCaresNote is required on every question: name the Hiring Team role and what that person needs to hear.",
-      );
-    }
     const assessment = input.assessments.find(
       (item) => item.key === question.targetKey,
     );
@@ -1244,32 +1253,54 @@ function consultationPlanQualityIssues(input: {
       );
     }
   }
-  const texts = [
-    input.commentary,
-    input.briefing.overall,
-    ...input.briefing.strongestAngles,
-    ...input.briefing.importantGaps,
-    ...input.briefing.storyPlan,
-    input.closingNote ?? "",
-    ...input.questions.map((question) => question.text),
-    ...input.questions.map((question) => question.whoCaresNote),
-    ...input.assessments.map((assessment) => assessment.explanation),
-    ...input.assessments
-      .map((assessment) => assessment.strategyText)
-      .filter((text) => Boolean(text?.trim())),
-  ];
-  for (const text of texts) {
-    issues.push(
-      ...harperCoachingVoiceViolations({
-        text,
-        firstName: input.firstName,
-      }),
-      ...seekerPrepInstructionViolations(text),
-    );
-    if (proseContainsInternalId(text)) {
-      issues.push(INTERNAL_ID_PROSE_QUALITY_FEEDBACK);
+  issues.push(
+    ...proseQualityIssues(
+      input.questions.map((question) => question.text),
+      input.firstName,
+    ),
+  );
+  return [...new Set(issues)];
+}
+
+function writingQualityIssues(input: {
+  briefing: {
+    overall: string;
+    strongestAngles: string[];
+    importantGaps: string[];
+    storyPlan: string[];
+  };
+  commentary: string;
+  closingNote: string | null;
+  questions: QuestionRoundPlan["questions"];
+  assessments: EvidenceAssessment[];
+  firstName: string | null;
+}): string[] {
+  const issues: string[] = [];
+  for (const question of input.questions) {
+    if (!question.whoCaresNote.trim()) {
+      issues.push(
+        "whoCaresNote is required on every question: name the Hiring Team role and what that person needs to hear.",
+      );
     }
   }
+  issues.push(
+    ...proseQualityIssues(
+      [
+        input.commentary,
+        input.briefing.overall,
+        ...input.briefing.strongestAngles,
+        ...input.briefing.importantGaps,
+        ...input.briefing.storyPlan,
+        input.closingNote ?? "",
+        ...input.questions.map((question) => question.whoCaresNote),
+        ...input.assessments.map((assessment) => assessment.explanation),
+        ...input.assessments
+          .map((assessment) => assessment.strategyText)
+          .filter((text) => Boolean(text?.trim())),
+      ],
+      input.firstName,
+    ),
+  );
   return [...new Set(issues)];
 }
 
@@ -1278,6 +1309,76 @@ function followUpBody(coaching: string | null | undefined, question: string): st
   const ask = question.trim();
   if (note && ask && note !== ask) return `${note}\n\n${ask}`;
   return note || ask;
+}
+
+function assessmentsFromDecision(
+  targets: EvidenceTarget[],
+  decision: ConsultationPlanDecision,
+): EvidenceAssessment[] {
+  return targets.map((target) => {
+    const model = decision.assessments.find(
+      (item) => item.targetKey === target.key,
+    );
+    const strength = model?.strength ?? "NONE";
+    const strategy = model?.strategyMode ?? "ACKNOWLEDGE";
+    return {
+      key: target.key,
+      kind: target.kind,
+      text: target.text,
+      strength,
+      supportingFactIds: [],
+      strategy,
+      explanation: "",
+      strategyText: "",
+      verification: {
+        originalStrength: strength,
+        invalidSupportingFactIds: [],
+        invalidRoleIds: [],
+        downgradeReasons: [],
+      },
+      experienceCalculation: null,
+    };
+  });
+}
+
+function decisionQuestionsForRound(decision: ConsultationPlanDecision) {
+  return decision.questions.map((question) => ({
+    targetKey: question.targetKey,
+    text: question.text,
+    requirementInterpretation: null,
+    hiringTeamRoleId: question.hiringTeamRoleId,
+    whoCaresNote: "",
+    interviewTypeTag: question.interviewTypeTag,
+  }));
+}
+
+function whoCaresNoteFromTurn(turn: { questionContextJson?: unknown }): string {
+  const json = turn.questionContextJson;
+  if (!json || typeof json !== "object") return "";
+  const note = (json as { whoCaresNote?: unknown }).whoCaresNote;
+  return typeof note === "string" ? note.trim() : "";
+}
+
+/**
+ * Questions stored from terra before luna writes have an empty who-cares note.
+ * While the briefing is still missing they are this round, not prior questions,
+ * so a writing retry rebuilds the same decision input and does not pay again.
+ */
+function turnsPendingPlanWriting<T extends {
+  id: string;
+  speaker: string;
+  intent?: string | null;
+  targetKey: string | null;
+  questionContextJson?: unknown;
+}>(turns: T[]): T[] {
+  return turns.filter(
+    (turn) =>
+      turn.speaker === "CONSULTANT" &&
+      turn.intent !== "CLOSING" &&
+      turn.intent !== "COACHING" &&
+      Boolean(turn.targetKey) &&
+      whoCaresNoteFromTurn(turn) === "",
+  );
 }
 
 async function planAndStoreRound(input: {
@@ -1317,7 +1418,8 @@ async function planAndStoreRound(input: {
   });
   const careerStage = deriveCareerStage(input.profile);
   const recentRoles = deriveRecentRoles(input.profile, new Date(), careerStage);
-  const [existingTurns, interviewStages, companyResearch] = await Promise.all([
+  const [existingTurns, interviewStages, companyResearch, sessionBeforePlan] =
+    await Promise.all([
     loadSessionTurns(input.sessionId),
     prisma.interviewStage.findMany({
       where: {
@@ -1327,8 +1429,28 @@ async function planAndStoreRound(input: {
       select: { id: true, notesBefore: true, notesAfter: true },
     }),
     loadCoachCompanyResearch(input.organizationId, input.campaignId),
+    prisma.consultationSession.findUnique({
+      where: { id: input.sessionId },
+      select: { briefingJson: true },
+    }),
   ]);
-  const askedQuestions = askedQuestionsFromTurns(existingTurns);
+  const askedKeys = new Set(input.askedKeys);
+  const skippedKeys = new Set(input.skippedKeys);
+  let turnsForDecision = existingTurns;
+  if (sessionBeforePlan?.briefingJson == null) {
+    const pendingIds = new Set(
+      turnsPendingPlanWriting(existingTurns).map((turn) => turn.id),
+    );
+    if (pendingIds.size > 0) {
+      turnsForDecision = existingTurns.filter((turn) => !pendingIds.has(turn.id));
+      for (const turn of existingTurns) {
+        if (pendingIds.has(turn.id) && turn.targetKey) {
+          askedKeys.delete(turn.targetKey);
+        }
+      }
+    }
+  }
+  const askedQuestions = askedQuestionsFromTurns(turnsForDecision);
   const seekerStatedFacts = seekerStatedFactsForCoach({
     profile: input.profile,
     campaignId: input.campaignId,
@@ -1345,88 +1467,78 @@ async function planAndStoreRound(input: {
     title: input.requirement.title,
   });
   let lastFailure: string = consultationConversationCopy.planUnusable;
-  let qualityFeedback = [...(input.focusGuidance ?? [])];
+  let decisionFeedback = [...(input.focusGuidance ?? [])];
   const firstName = profileFirstName(input.profile);
-  let accepted:
-    | {
-        plan: Extract<
-          Awaited<ReturnType<typeof planConsultationWithModel>>,
-          { ok: true }
-        >;
-        assessments: EvidenceAssessment[];
-        questions: QuestionRoundPlan["questions"];
-      }
-    | null = null;
+  const coveredTargetKeys = [
+    ...new Set(
+      [...askedKeys, ...skippedKeys].filter(
+        (key) => key !== input.focusTargetKey,
+      ),
+    ),
+  ];
+  const previousAssessments = (
+    await prisma.consultationAssessment.findMany({
+      where: { sessionId: input.sessionId },
+    })
+  ).map(storedAssessment);
+  const coachPayload = {
+    targets: input.targets,
+    profileItems,
+    careerStage,
+    recentRoles,
+    seekerStatedFacts,
+    askedQuestions,
+    hiringTeam: input.roles,
+    applicationLearningsPendingHiringManager:
+      input.applicationLearningsPendingHiringManager ?? null,
+    companyResearch,
+    chronologyRequested,
+    sessionId: input.sessionId,
+    coveredTargetKeys,
+    focusTargetKey: input.focusTargetKey ?? null,
+    interviewerPrep: input.interviewerPrep ?? null,
+  };
+  let acceptedDecision: {
+    decision: ConsultationPlanDecision;
+    assessments: EvidenceAssessment[];
+    questions: QuestionRoundPlan["questions"];
+  } | null = null;
   for (
     let attempt = 0;
     attempt <= consultationConfig.qualityRegenerationAttempts;
     attempt += 1
   ) {
-    const plan = await planConsultationWithModel({
-      targets: input.targets,
-      profileItems,
-      careerStage,
-      recentRoles,
-      seekerStatedFacts,
-      askedQuestions,
-      hiringTeam: input.roles,
-      applicationLearningsPendingHiringManager:
-        input.applicationLearningsPendingHiringManager ?? null,
-      companyResearch,
+    const decision = await runConsultationPlanDecision({
+      ...coachPayload,
       usage: withHarperUsageAttempt(
         consultationUsage(
           input.organizationId,
           input.campaignId,
           "CONSULTATION",
-          input.additiveReassess ? "reassess" : "plan",
+          "plan_decision",
         ),
         attempt,
       ),
-      chronologyRequested,
-      sessionId: input.sessionId,
-      coveredTargetKeys: [
-        ...new Set(
-          [...input.askedKeys, ...input.skippedKeys].filter(
-            (key) => key !== input.focusTargetKey,
-          ),
-        ),
-      ],
-      focusTargetKey: input.focusTargetKey ?? null,
-      interviewerPrep: input.interviewerPrep ?? null,
-      qualityFeedback,
+      qualityFeedback: decisionFeedback,
     });
-    if (!plan.ok) {
-      lastFailure = plan.message;
+    if (!decision.ok) {
+      lastFailure = decision.message;
       continue;
     }
-    const previousAssessments = (
-      await prisma.consultationAssessment.findMany({
-        where: { sessionId: input.sessionId },
-      })
-    ).map(storedAssessment);
-    const assessments = verifyModelAssessments({
-      targets: input.targets,
-      profileItems,
-      assessments: plan.data.assessments,
-      asOf: new Date(),
-      previousAssessments,
-    });
+    const assessments = assessmentsFromDecision(input.targets, decision.data);
     const planned = planQuestionRound({
       assessments,
-      modelQuestions: plan.data.questions,
+      modelQuestions: decisionQuestionsForRound(decision.data),
       hiringTeam: input.roles,
-      askedKeys: input.askedKeys,
-      skippedKeys: input.skippedKeys,
+      askedKeys,
+      skippedKeys,
       includeChronology: chronologyRequested,
-      chronologyAsked: input.askedKeys.has("chronology"),
+      chronologyAsked: askedKeys.has("chronology"),
       askedQuestions,
       focusTargetKey: input.focusTargetKey ?? null,
       profileItems,
     });
-    const issues = consultationPlanQualityIssues({
-      briefing: plan.data.briefing,
-      commentary: plan.data.commentary,
-      closingNote: plan.data.closingNote,
+    const issues = decisionQualityIssues({
       questions: planned.questions,
       assessments,
       dropped: planned.dropped,
@@ -1435,25 +1547,26 @@ async function planAndStoreRound(input: {
     });
     const lastAttempt = attempt === consultationConfig.qualityRegenerationAttempts;
     if (issues.length > 0 && !lastAttempt) {
-      qualityFeedback = [
-        ...qualityFeedback,
+      decisionFeedback = [
+        ...decisionFeedback,
         ...issues,
         "Write one question for every remaining gap, most important first. Speak to the person as you. Never write instructions to close a gap or prepare a story.",
       ];
       lastFailure = consultationConversationCopy.planUnusable;
       continue;
     }
-    accepted = { plan, assessments, questions: planned.questions };
+    acceptedDecision = {
+      decision: decision.data,
+      assessments,
+      questions: planned.questions,
+    };
     break;
   }
-  if (!accepted) {
+  if (!acceptedDecision) {
     await failGeneration(input.sessionId, lastFailure);
     throw new Error(lastFailure);
   }
-  const { plan, assessments, questions } = accepted;
-  const voicedAssessments = assessments.map((assessment) => ({
-    ...assessment,
-  }));
+  const { decision, assessments, questions } = acceptedDecision;
   // Additive reassess (Batch D7): skip the initial 25-cap so new gap questions
   // may be added beyond 25. Never rewrite or delete answered questions —
   // only non-duplicate texts are added as new consultant turns.
@@ -1485,13 +1598,7 @@ async function planAndStoreRound(input: {
       },
     });
   }
-  const briefing = {
-    overall: plan.data.briefing.overall,
-    strongestAngles: plan.data.briefing.strongestAngles,
-    importantGaps: plan.data.briefing.importantGaps,
-    storyPlan: [],
-  };
-  await saveAssessments(input.organizationId, input.sessionId, voicedAssessments);
+  await saveAssessments(input.organizationId, input.sessionId, assessments);
   for (const question of voicedQuestions) {
     if (
       await consultantTurnStored({
@@ -1511,9 +1618,9 @@ async function planAndStoreRound(input: {
       targetKey: question.targetKey,
       followUp: question.followUp,
       questionContext: {
-        requirementInterpretation: question.requirementInterpretation,
+        requirementInterpretation: null,
         hiringTeamRoleId: question.hiringTeamRoleId,
-        whoCaresNote: question.whoCaresNote,
+        whoCaresNote: "",
         interviewTypeTag: question.interviewTypeTag,
       },
     });
@@ -1540,45 +1647,174 @@ async function planAndStoreRound(input: {
       );
     }
   }
+  // Questions are stored and the session is usable before luna writes.
+  // A writing failure leaves this decision in place.
   await prisma.consultationSession.update({
     where: { id: input.sessionId },
     data: {
-      coachNote: plan.data.commentary.trim() || null,
-      briefingJson: briefing as Prisma.InputJsonValue,
+      coachNote: null,
+      briefingJson: Prisma.JsonNull,
       promptVersion: CONSULTATION_PROMPT_VERSION,
       generationStatus: "READY",
       generationError: null,
     },
   });
-  const remainingGaps = voicedAssessments.filter(
-    (assessment) =>
-      isStandingRequirement(assessment) && assessment.strength !== "STRONG",
-  );
-  const alreadyClosed = await prisma.consultationTurn.findFirst({
-    where: { sessionId: input.sessionId, intent: "CLOSING" },
-    select: { id: true },
-  });
-  const closingBody = plan.data.closingNote?.trim() ?? "";
-  if (
-    voicedQuestions.length === 0 &&
-    remainingGaps.length === 0 &&
-    !alreadyClosed &&
-    closingBody &&
-    !(await consultantTurnStored({
-      sessionId: input.sessionId,
-      body: closingBody,
-      targetKey: null,
-      intent: "CLOSING",
-    }))
+  let writingFeedback = [...(input.focusGuidance ?? [])];
+  let writingPlan: Awaited<
+    ReturnType<typeof runConsultationPlanWriting>
+  > | null = null;
+  for (
+    let attempt = 0;
+    attempt <= consultationConfig.qualityRegenerationAttempts;
+    attempt += 1
   ) {
-    await addTurn({
-      organizationId: input.organizationId,
-      sessionId: input.sessionId,
-      speaker: "CONSULTANT",
-      body: closingBody,
-      targetKey: null,
-      intent: "CLOSING",
+    const writing = await runConsultationPlanWriting({
+      ...coachPayload,
+      decision,
+      usage: withHarperUsageAttempt(
+        consultationUsage(
+          input.organizationId,
+          input.campaignId,
+          "CONSULTATION_REPLY",
+          "plan_writing",
+        ),
+        attempt,
+      ),
+      qualityFeedback: writingFeedback,
     });
+    if (!writing.ok) {
+      const lastAttempt = attempt === consultationConfig.qualityRegenerationAttempts;
+      if (lastAttempt) {
+        writingPlan = writing;
+        break;
+      }
+      writingFeedback = [
+        ...writingFeedback,
+        "Write the standing, explanations, strategies, and who-cares notes for the decision. Do not change the decision.",
+      ];
+      continue;
+    }
+    const verified = verifyModelAssessments({
+      targets: input.targets,
+      profileItems,
+      assessments: writing.data.assessments,
+      asOf: new Date(),
+      previousAssessments,
+    });
+    const planned = planQuestionRound({
+      assessments: verified,
+      modelQuestions: writing.data.questions,
+      hiringTeam: input.roles,
+      askedKeys,
+      skippedKeys,
+      includeChronology: chronologyRequested,
+      chronologyAsked: askedKeys.has("chronology"),
+      askedQuestions,
+      focusTargetKey: input.focusTargetKey ?? null,
+      profileItems,
+    });
+    const issues = writingQualityIssues({
+      briefing: writing.data.briefing,
+      commentary: writing.data.commentary,
+      closingNote: writing.data.closingNote,
+      questions: planned.questions,
+      assessments: verified,
+      firstName,
+    });
+    const lastAttempt = attempt === consultationConfig.qualityRegenerationAttempts;
+    if (issues.length > 0 && !lastAttempt) {
+      writingFeedback = [
+        ...writingFeedback,
+        ...issues,
+        "Speak to the person as you. Never write instructions to close a gap or prepare a story.",
+      ];
+      continue;
+    }
+    await saveAssessments(input.organizationId, input.sessionId, verified);
+    for (const question of voicedQuestions) {
+      const written = writing.data.questions.find(
+        (item) =>
+          item.targetKey === question.targetKey && item.text === question.text,
+      );
+      await prisma.consultationTurn.updateMany({
+        where: {
+          sessionId: input.sessionId,
+          speaker: "CONSULTANT",
+          body: question.text,
+          targetKey: question.targetKey,
+          intent: null,
+        },
+        data: {
+          questionContextJson: {
+            requirementInterpretation:
+              written?.requirementInterpretation ??
+              question.requirementInterpretation,
+            hiringTeamRoleId: question.hiringTeamRoleId,
+            whoCaresNote: written?.whoCaresNote ?? "",
+            interviewTypeTag: question.interviewTypeTag,
+          },
+        },
+      });
+    }
+    const briefing = {
+      overall: writing.data.briefing.overall,
+      strongestAngles: writing.data.briefing.strongestAngles,
+      importantGaps: writing.data.briefing.importantGaps,
+      storyPlan: [],
+    };
+    await prisma.consultationSession.update({
+      where: { id: input.sessionId },
+      data: {
+        coachNote: writing.data.commentary.trim() || null,
+        briefingJson: briefing as Prisma.InputJsonValue,
+        promptVersion: CONSULTATION_PROMPT_VERSION,
+        generationStatus: "READY",
+        generationError: null,
+      },
+    });
+    const remainingGaps = verified.filter(
+      (assessment) =>
+        isStandingRequirement(assessment) && assessment.strength !== "STRONG",
+    );
+    const alreadyClosed = await prisma.consultationTurn.findFirst({
+      where: { sessionId: input.sessionId, intent: "CLOSING" },
+      select: { id: true },
+    });
+    const closingBody = writing.data.closingNote?.trim() ?? "";
+    if (
+      voicedQuestions.length === 0 &&
+      remainingGaps.length === 0 &&
+      !alreadyClosed &&
+      closingBody &&
+      !(await consultantTurnStored({
+        sessionId: input.sessionId,
+        body: closingBody,
+        targetKey: null,
+        intent: "CLOSING",
+      }))
+    ) {
+      await addTurn({
+        organizationId: input.organizationId,
+        sessionId: input.sessionId,
+        speaker: "CONSULTANT",
+        body: closingBody,
+        targetKey: null,
+        intent: "CLOSING",
+      });
+    }
+    writingPlan = writing;
+    break;
+  }
+  if (!writingPlan || !writingPlan.ok) {
+    console.error(
+      JSON.stringify({
+        event: "consultation_plan_writing_failed",
+        message:
+          writingPlan && !writingPlan.ok
+            ? writingPlan.message
+            : consultationConversationCopy.planUnusable,
+      }),
+    );
   }
   if (!input.interviewerPrep) {
     await maybeFillRoleExpertiseAfterGapPlan({

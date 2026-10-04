@@ -18,6 +18,8 @@ import {
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import type { AiCallUsageContext } from "@/lib/ai/types";
 import {
+  createAiProvider,
+  getConsultationAiConfig,
   getConsultationAiProvider,
   getConsultationReplyAiProvider,
   isConsultationAiConfigured,
@@ -841,7 +843,14 @@ async function generateRoleExpertiseQuestionsStep(input: {
             "role_expertise_questions",
             attempt,
           );
-          const response = await getConsultationAiProvider().generateStructured({
+          const roleExpertiseModel = process.env.ROLE_EXPERTISE_AI_MODEL?.trim();
+          const questionsProvider = roleExpertiseModel
+            ? createAiProvider({
+                ...getConsultationAiConfig(),
+                model: roleExpertiseModel,
+              })
+            : getConsultationAiProvider();
+          const response = await questionsProvider.generateStructured({
             ...structuredOutputRequest("roleExpertiseQuestions"),
             ...(attemptUsage ? aiCallTracking(attemptUsage) : {}),
             messages: buildRoleExpertiseQuestionsMessages({
