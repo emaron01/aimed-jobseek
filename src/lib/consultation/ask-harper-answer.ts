@@ -151,14 +151,28 @@ function isFirstPersonClaim(sentence: string): boolean {
  * or a name/employer that is not already in the seeker's sources. General
  * expertise, including numbers and names, is kept.
  */
+function withoutTerminalPunctuation(value: string): string {
+  return value.replace(/[.!?]+$/g, "").trim();
+}
+
+function isPlaceholderSentence(sentence: string): boolean {
+  return (
+    withoutTerminalPunctuation(sentence) ===
+    withoutTerminalPunctuation(ASK_HARPER_PLACEHOLDER_ANSWER)
+  );
+}
+
 function sentenceIsUnsupportedPersonalClaim(sentence: string, sources: string): boolean {
   const value = sentence.trim();
   if (!value) return true;
-  if (value.replace(/[.!?]+$/g, "").trim() === ASK_HARPER_PLACEHOLDER_ANSWER) return true;
+  if (isPlaceholderSentence(value)) return true;
   if (!isFirstPersonClaim(value)) return false;
   const numbers = value.match(/\$?\d[\d,]*(?:\.\d+)?%?/g) ?? [];
   if (numbers.some((number) => !sources.includes(number.toLowerCase()))) return true;
-  const names = value.match(/\b[A-Z][A-Za-z0-9]+\b/g) ?? [];
+  // The first word is the sentence capital, not a name. Scanning it dropped
+  // usable first-person drafts such as "Leading indicators I would use...".
+  const afterFirstWord = value.replace(/^\W*\w+/, "");
+  const names = afterFirstWord.match(/\b[A-Z][A-Za-z0-9]+\b/g) ?? [];
   return names.some(
     (name) =>
       !NAME_STOP_WORDS.has(name.toLowerCase()) && !sources.includes(name.toLowerCase()),
@@ -173,32 +187,47 @@ function isRawProfileFact(text: string, sourceTexts: readonly string[]): boolean
   );
 }
 
+function attemptSentences(answer: PointOfViewParts): string[] {
+  return [...povParts(answer), partText(answer.result)]
+    .join(" ")
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => {
+      if (!sentence) return false;
+      return !isPlaceholderSentence(sentence);
+    });
+}
+
+/**
+ * Every non-placeholder sentence in the attempt, including a result.
+ * Used when claim-stripping leaves nothing, so the closest attempt is still
+ * stored instead of an empty draft.
+ */
+export function askHarperAttemptProse(answer: PointOfViewParts): string {
+  return composeInterviewAnswerFromParts(attemptSentences(answer));
+}
+
 /**
  * Model prose for a failed attempt. Removes the placeholder sentence and
  * first-person claims that contain a number, employer, or name not in the
- * seeker's sources. General expertise is kept. A point-of-view draft omits the
- * result part. A story draft omits a result that is not already in the sources.
+ * seeker's sources. General expertise is kept. The result is included for both
+ * point-of-view and story questions, then the same claim filter applies, so a
+ * view or outcome written only in the result is not discarded.
  * Returns "" when nothing usable remains, including when the remainder is only
- * one raw profile fact.
+ * one raw profile fact. Callers then keep askHarperAttemptProse.
  */
 export function askHarperUnpassedDraft(input: {
   answer: PointOfViewParts;
   kind: AskHarperAnswerKind;
   sourceTexts: readonly string[];
 }): string {
+  void input.kind;
   const sources = sourceBlob(input.sourceTexts);
-  const parts = povParts(input.answer);
-  if (input.kind === "story") {
-    const result = partText(input.answer.result);
-    if (result && sources.includes(result.toLowerCase())) parts.push(result);
-  }
-  const sentences = parts
-    .join(" ")
-    .split(/(?<=[.!?])\s+/)
-    .map((sentence) => sentence.trim())
-    .filter((sentence) => sentence && !sentenceIsUnsupportedPersonalClaim(sentence, sources));
+  const sentences = attemptSentences(input.answer).filter(
+    (sentence) => !sentenceIsUnsupportedPersonalClaim(sentence, sources),
+  );
   const content = composeInterviewAnswerFromParts(sentences);
-  if (!content.trim() || content.trim() === ASK_HARPER_PLACEHOLDER_ANSWER) return "";
+  if (!content.trim() || isPlaceholderSentence(content)) return "";
   if (isRawProfileFact(content, input.sourceTexts)) return "";
   return content;
 }
@@ -221,6 +250,10 @@ export function chooseAskHarperFallbackAnswer<T extends PointOfViewParts>(input:
       kind: input.kind,
       sourceTexts: input.sourceTexts,
     });
+    if (content) return { attempt: candidate.attempt, content };
+  }
+  for (const candidate of ranked) {
+    const content = askHarperAttemptProse(candidate.attempt);
     if (content) return { attempt: candidate.attempt, content };
   }
   return null;

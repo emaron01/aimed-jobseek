@@ -112,6 +112,7 @@ describe.skipIf(!hasTestDatabase())(
     let storyCampaignId = "";
     let recoverCampaignId = "";
     let hiringRoleId = "";
+    let icpId = "";
 
     beforeAll(async () => {
       process.env.CONSULTATION_AI_PROVIDER = "openai-responses";
@@ -146,6 +147,7 @@ describe.skipIf(!hasTestDatabase())(
       const icp = await prisma.icp.create({
         data: { organizationId, productId, name: `Employer ${suffix}` },
       });
+      icpId = icp.id;
       const persona = await prisma.persona.create({
         data: {
           organizationId,
@@ -292,7 +294,7 @@ describe.skipIf(!hasTestDatabase())(
       );
       expect(result.questions).toHaveLength(1);
       expect(result.questions[0]?.text).toBe(FAILED);
-      expect(result.questions[0]?.content).toBe("");
+      expect(result.questions[0]?.content).toContain(FACT);
       const session = await prisma.consultationSession.create({
         data: {
           organizationId,
@@ -311,7 +313,8 @@ describe.skipIf(!hasTestDatabase())(
         include: { statements: true },
       });
       expect(turn.targetKey?.startsWith("role-expertise:")).toBe(true);
-      expect(turn.statements).toHaveLength(0);
+      expect(turn.statements).toHaveLength(1);
+      expect(turn.statements[0]?.content).toContain(FACT);
       enqueueApplicationJob.mockClear();
       questionsGenerate.mockClear();
       answersGenerate.mockClear();
@@ -325,7 +328,7 @@ describe.skipIf(!hasTestDatabase())(
       );
       expect(html).toContain("philosophy on discounting");
       expect(html).not.toContain(EMPTY_COPY);
-      expect(html).not.toContain(FACT);
+      expect(html).toContain(FACT);
       expect(questionsGenerate).not.toHaveBeenCalled();
       expect(answersGenerate).not.toHaveBeenCalled();
       expect(enqueueApplicationJob).not.toHaveBeenCalled();
@@ -379,8 +382,94 @@ describe.skipIf(!hasTestDatabase())(
       const failed = result.questions.find((question) => question.text === FAILED);
       expect(story?.content).toContain("forecast I stood behind");
       expect(story?.grounding.result).toContain("forecast I stood behind");
-      expect(failed?.content).toBe("");
-      expect(result.questions.map((question) => question.content).join(" ")).not.toContain(FACT);
+      expect(failed?.content).toContain(FACT);
+      expect(story?.content).not.toContain(FACT);
+    });
+
+    it("stores a draft for each reported point-of-view and story question", async () => {
+      const attract = "What attracts you to CSC's Senior Director of Sales role?";
+      const pipeline = "Describe a time when you inherited an unhealthy pipeline?";
+      const indicators =
+        "Which leading and lagging indicators would you use to inspect the forecast?";
+      const campaignId = await seedCampaign(icpId, "Kinds");
+      questionsGenerate.mockReset();
+      answersGenerate.mockReset();
+      questionsGenerate.mockResolvedValue({
+        data: {
+          questions: [
+            { text: attract, interviewTypeTag: "screening" },
+            { text: pipeline, interviewTypeTag: "focused_competency" },
+            { text: indicators, interviewTypeTag: "focused_competency" },
+          ],
+        },
+      });
+      answersGenerate.mockResolvedValue({
+        data: {
+          answers: [
+            car(attract, {
+              action: "",
+              result:
+                "I am drawn to CSC's Senior Director of Sales role because it owns forecast discipline and manager standards.",
+            }),
+            car(pipeline, {
+              action: "",
+              result:
+                "I inherited an unhealthy pipeline and reset inspection so the forecast became reliable.",
+            }),
+            car(indicators, {
+              action:
+                "Leading indicators I would use are activity and pipeline creation, and lagging indicators are win rate and cycle time.",
+              result: "",
+            }),
+          ],
+        },
+      });
+      const result = await generateRoleExpertiseWithModel({
+        ...input(campaignId),
+        job: {
+          ...JOB,
+          title: "Senior Director of Sales",
+          companyName: "CSC",
+        },
+        profileItems: [
+          { kind: "FACT", text: "CSC" },
+          { kind: "FACT", text: "Senior Director of Sales" },
+        ],
+        minCount: 3,
+        maxCount: 3,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const byText = new Map(result.questions.map((question) => [question.text, question.content]));
+      expect(byText.get(attract)).toContain("forecast discipline");
+      expect(byText.get(pipeline)).toContain("unhealthy pipeline");
+      expect(byText.get(indicators)).toContain("Leading indicators");
+      const session = await prisma.consultationSession.create({
+        data: {
+          organizationId,
+          campaignId,
+          productId,
+          promptVersion: "37",
+        },
+      });
+      await storeRoleExpertiseQuestions({
+        organizationId,
+        sessionId: session.id,
+        questions: result.questions,
+      });
+      const statements = await prisma.consultationStatement.findMany({
+        where: { sessionId: session.id, status: "DRAFT" },
+      });
+      expect(statements).toHaveLength(3);
+      expect(statements.map((statement) => statement.content).join(" ")).toContain(
+        "forecast discipline",
+      );
+      expect(statements.map((statement) => statement.content).join(" ")).toContain(
+        "unhealthy pipeline",
+      );
+      expect(statements.map((statement) => statement.content).join(" ")).toContain(
+        "Leading indicators",
+      );
     });
 
     it("re-runs a fill that stored nothing on the next Harper round and then makes no paid call", async () => {

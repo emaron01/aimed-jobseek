@@ -29,6 +29,7 @@ import {
   ASK_HARPER_PLACEHOLDER_ANSWER,
   askHarperAnswerCloseness,
   askHarperAnswerKind,
+  askHarperAttemptProse,
   askHarperUnpassedDraft,
   chooseAskHarperFallbackAnswer,
   composedPointOfViewAnswer,
@@ -1088,7 +1089,8 @@ function bestPracticeDraftForChoice(
   if (!passed.issue && passed.question.content.trim()) return passed.question;
   const kind = askHarperAnswerKind(choice.text);
   const content = answer
-    ? askHarperUnpassedDraft({ answer, kind, sourceTexts })
+    ? askHarperUnpassedDraft({ answer, kind, sourceTexts }) ||
+      askHarperAttemptProse(answer)
     : "";
   if (!content) return unansweredRoleExpertiseQuestion(choice);
   return {
@@ -1407,7 +1409,7 @@ async function generateRoleExpertiseAnswersStep(input: {
             answer,
             kind: input.answerMode,
             sourceTexts,
-          })
+          }) || askHarperAttemptProse(answer)
         : "";
       if (choice && content) {
         return {

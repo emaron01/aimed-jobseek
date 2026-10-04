@@ -14,6 +14,7 @@ import {
   ASK_HARPER_PLACEHOLDER_ANSWER,
   askHarperAnswerCloseness,
   askHarperAnswerKind,
+  askHarperAttemptProse,
   askHarperUnpassedDraft,
   chooseAskHarperFallbackAnswer,
   composedPointOfViewAnswer,
@@ -348,6 +349,89 @@ describe("Ask Harper question shape", () => {
     expect(draft).toContain("I closed 14 deals at Northwind.");
     expect(draft).not.toContain(ASK_HARPER_PLACEHOLDER_ANSWER);
     expect(draft).not.toBe(`${FACT}.`);
+  });
+
+  it("keeps usable drafts for the CSC point-of-view and story questions the strict checks drop", () => {
+    const attract = "What attracts you to CSC's Senior Director of Sales role?";
+    const pipeline = "Describe a time when you inherited an unhealthy pipeline?";
+    const indicators =
+      "Which leading and lagging indicators would you use to inspect the forecast?";
+    expect(askHarperAnswerKind(attract)).toBe("point-of-view");
+    expect(askHarperAnswerKind(pipeline)).toBe("story");
+    expect(askHarperAnswerKind(indicators)).toBe("point-of-view");
+
+    const sources = ["CSC", "Senior Director of Sales"];
+    const attractDraft = askHarperUnpassedDraft({
+      answer: {
+        answerFramework: "CAR",
+        challenge: null,
+        situation: null,
+        task: null,
+        action: "",
+        result:
+          "I am drawn to CSC's Senior Director of Sales role because it owns forecast discipline and manager standards.",
+      },
+      kind: "point-of-view",
+      sourceTexts: sources,
+    });
+    expect(attractDraft).toContain("forecast discipline");
+
+    const pipelineDraft = askHarperUnpassedDraft({
+      answer: {
+        answerFramework: "CAR",
+        challenge: null,
+        situation: null,
+        task: null,
+        action: "",
+        result:
+          "I inherited an unhealthy pipeline and reset inspection so the forecast became reliable.",
+      },
+      kind: "story",
+      sourceTexts: sources,
+    });
+    expect(pipelineDraft).toContain("unhealthy pipeline");
+    expect(pipelineDraft).toContain("forecast became reliable");
+
+    const indicatorDraft = askHarperUnpassedDraft({
+      answer: {
+        answerFramework: "CAR",
+        challenge: null,
+        situation: null,
+        task: null,
+        action:
+          "Leading indicators I would use are activity and pipeline creation, and lagging indicators are win rate and cycle time.",
+        result: "",
+      },
+      kind: "point-of-view",
+      sourceTexts: sources,
+    });
+    expect(indicatorDraft).toContain("Leading indicators");
+    expect(indicatorDraft).toContain("lagging indicators");
+  });
+
+  it("stores the closest attempt when claim-stripping leaves only a profile fact", () => {
+    const factOnly = {
+      answerFramework: "CAR" as const,
+      challenge: null,
+      situation: null,
+      task: null,
+      action: FACT,
+      result: "",
+    };
+    expect(
+      askHarperUnpassedDraft({
+        answer: factOnly,
+        kind: "point-of-view",
+        sourceTexts: [FACT],
+      }),
+    ).toBe("");
+    const chosen = chooseAskHarperFallbackAnswer({
+      attempts: [factOnly],
+      kind: "point-of-view",
+      sourceTexts: [FACT],
+    });
+    expect(chosen?.content).toBe(askHarperAttemptProse(factOnly));
+    expect(chosen?.content).toContain("Closed 14 deals at Northwind");
   });
 });
 

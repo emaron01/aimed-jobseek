@@ -295,11 +295,6 @@ function QuestionReplyForm({
   return (
     <div className="min-w-0 space-y-2" data-testid="consultation-reply-compose">
       <label className="block text-sm">
-        <span className="sr-only">
-          {hasPriorReply
-            ? consultationConversationCopy.editAnswer
-            : consultationConversationCopy.threadReply}
-        </span>
         <textarea
           name="answer"
           required
@@ -310,6 +305,7 @@ function QuestionReplyForm({
           className={fieldClass}
           data-testid="consultation-reply-box"
           form={`harper-reply-${item.questionTurnId}`}
+          aria-label={consultationConversationCopy.yourAnswer}
         />
       </label>
       <div

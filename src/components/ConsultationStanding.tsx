@@ -77,9 +77,6 @@ function GapShareDetailsForm({
   return (
     <div className="space-y-2" data-testid={`standing-share-form-${targetKey}`}>
       <label className="block text-sm">
-        <span className="sr-only">
-          {consultationConversationCopy.shareSomeDetails}
-        </span>
         <textarea
           name="answer"
           required
@@ -90,6 +87,7 @@ function GapShareDetailsForm({
           className={fieldClass}
           form={`harper-gap-${targetKey}`}
           data-testid={`share-gap-details-box-${targetKey}`}
+          aria-label={consultationConversationCopy.yourAnswer}
         />
         <span className="mt-1 block text-xs text-muted">
           {consultationConversationCopy.shareSomeDetailsHelp}

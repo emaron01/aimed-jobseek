@@ -11,8 +11,10 @@ vi.mock("next/navigation", () => ({
 import { AdditionalInterviewPrepQa } from "@/components/AdditionalInterviewPrepQa";
 import { CheatSheetCoachItems } from "@/components/CheatSheetCoachItems";
 import { CheatSheetPersonBody } from "@/components/CheatSheetPersonBody";
+import { ConsultationStanding } from "@/components/ConsultationStanding";
 import { QuestionList } from "@/components/ConsultationThread";
 import { HarperDraftProvider } from "@/components/HarperDraftStore";
+import type { StandingListEntry } from "@/lib/consultation/standing-entries";
 import type { CheatSheetPersonSection } from "@/lib/application-summary/contract";
 import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
 import { consultationConversationCopy } from "@/lib/product-config";
@@ -281,3 +283,85 @@ function providerStatus(
   }
   return sawProvided ? "provided" : "not-rendered";
 }
+
+function sectionBody(html: string, testId: string): string {
+  const marker = `data-testid="${testId}"`;
+  const start = html.indexOf(marker);
+  const end = html.indexOf("</section>", start);
+  return html.slice(start, end);
+}
+
+describe("Harper question cards show Save Answer once", () => {
+  it("shows one Save Answer on a gap card, a best-practice card, and a gap share form", () => {
+    const gap: StandingListEntry = {
+      id: "gap",
+      targetKey: "required:forecast",
+      mergedTargetKeys: ["required:forecast"],
+      label: "Forecast discipline",
+      strength: "NONE",
+      kind: "REQUIRED",
+      explanation: null,
+      experience: null,
+      facts: [],
+      questions: [
+        openQuestion(
+          "q-gap",
+          "required:forecast",
+          "Which leading and lagging indicators would you use to inspect the forecast?",
+        ),
+      ],
+      showShareForm: false,
+    };
+    const practice: StandingListEntry = {
+      id: "topic:role-expertise:attract",
+      targetKey: "role-expertise:attract",
+      mergedTargetKeys: ["role-expertise:attract"],
+      label: "What attracts you to CSC's Senior Director of Sales role?",
+      strength: "NONE",
+      kind: "TOPIC",
+      explanation: null,
+      experience: null,
+      facts: [],
+      questions: [
+        openQuestion(
+          "q-role",
+          "role-expertise:attract",
+          "What attracts you to CSC's Senior Director of Sales role?",
+        ),
+      ],
+      showShareForm: false,
+    };
+    const share: StandingListEntry = {
+      id: "share",
+      targetKey: "required:coverage",
+      mergedTargetKeys: ["required:coverage"],
+      label: "Pipeline coverage",
+      strength: "NONE",
+      kind: "REQUIRED",
+      explanation: null,
+      experience: null,
+      facts: [],
+      questions: [],
+      showShareForm: true,
+    };
+    const html = renderToStaticMarkup(
+      createElement(
+        HarperDraftProvider,
+        null,
+        createElement(ConsultationStanding, {
+          campaignId: "camp_1",
+          canEdit: true,
+          acceptingReplies: true,
+          sessionStatus: "IN_PROGRESS",
+          jobsActive: false,
+          overall: null,
+          jobTitle: "Senior Director of Sales",
+          entries: [gap, practice, share],
+        }),
+      ),
+    );
+    expect(sectionBody(html, "harper-section-needs-info-body").match(/Save Answer/g)).toHaveLength(1);
+    expect(sectionBody(html, "harper-section-best-practice-body").match(/Save Answer/g)).toHaveLength(1);
+    expect(sectionBody(html, "harper-section-standing-body").match(/Save Answer/g)).toHaveLength(1);
+  });
+});
