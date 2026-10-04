@@ -3,9 +3,9 @@
  * company section. Display applies this to stored rows without rewriting them.
  * Save applies the same text cleanup before a new row is written.
  *
- * A sentence with no citation stays when it names no other company, person,
- * number, or date. A sentence attributed to the job posting stays. A real
- * employer risk stays. An employer-risk sentence about the job is removed.
+ * A sentence with no citation stays, including one that names a company, a
+ * number, or a date. A real employer risk stays. An employer-risk sentence
+ * about the job is removed.
  */
 
 import {
@@ -145,133 +145,6 @@ export function sentenceCitesOnlyDroppedSources(
   return hosts.every((host) => !kept.employer(host) && !kept.listed.has(host));
 }
 
-const POSTING_ATTRIBUTION =
-  /\b(?:job posting|the posting|this posting|according to the (?:job )?posting|the (?:job )?posting (?:says|states|lists|describes|requires|calls for|emphasizes|notes))\b/i;
-
-const REAL_EMPLOYER_RISK_TEXT =
-  /\b(layoffs?|laid off|restructur\w*|bankrupt\w*|insolven\w*|lawsuits?|litigation|sued|regulatory|regulators?|investigation|turnover|resign\w*|stepped down|financial trouble|funding trouble|debt|shutdown|shut down)\b/i;
-
-const ORDINARY_CAPITALS = new Set([
-  "a",
-  "an",
-  "and",
-  "available",
-  "before",
-  "brand",
-  "company",
-  "culture",
-  "domain",
-  "during",
-  "enterprise",
-  "evidence",
-  "for",
-  "from",
-  "global",
-  "however",
-  "it",
-  "its",
-  "leadership",
-  "market",
-  "markets",
-  "or",
-  "our",
-  "recent",
-  "sales",
-  "security",
-  "service",
-  "services",
-  "that",
-  "the",
-  "their",
-  "these",
-  "this",
-  "those",
-  "we",
-  "while",
-  "with",
-]);
-
-function nameTokens(value: string): Set<string> {
-  const tokens = new Set<string>();
-  for (const token of value.toLowerCase().split(/[^a-z0-9]+/)) {
-    if (token.length >= 2) tokens.add(token);
-  }
-  return tokens;
-}
-
-function isEmployerOrBrand(name: string, allowed: Set<string>): boolean {
-  const parts = name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
-  if (parts.length === 0) return false;
-  const compact = parts.join("");
-  if (allowed.has(compact)) return true;
-  return parts.every((part) => allowed.has(part));
-}
-
-function sentenceHasQuantity(sentence: string): boolean {
-  return /(?:^|[^A-Za-z])\d+(?:[.,]\d+)*(?:%|\b)/.test(sentence);
-}
-
-/**
- * An uncited sentence names a specific other company, person, number, or date.
- * The employer and its brands are not other companies. A short all-caps token
- * such as B2B or CSC is not a company name.
- */
-export function sentenceHasUnsupportedSpecific(
-  sentence: string,
-  context: ResearchCleanupContext = {},
-): boolean {
-  if (sentenceHasQuantity(sentence)) return true;
-  const allowed = nameTokens(
-    `${context.companyName ?? ""} ${context.brandText ?? ""} ${context.anchorHost ?? ""} ${(context.sisterHosts ?? []).join(" ")}`,
-  );
-  const internalCap = (sentence.match(/\b[A-Z][a-z0-9]*[A-Z][A-Za-z0-9]*\b/g) ?? []).filter(
-    (name) => /[a-z]/.test(name),
-  );
-  if (internalCap.some((name) => !isEmployerOrBrand(name, allowed))) return true;
-  const words = sentence.match(/\b[A-Z][a-z]{2,}\b/g) ?? [];
-  const sentenceStart = sentence.match(/[A-Za-z][A-Za-z0-9]*/)?.[0] ?? "";
-  let skippedStart = false;
-  for (const word of words) {
-    if (!skippedStart && word === sentenceStart) {
-      skippedStart = true;
-      continue;
-    }
-    const lower = word.toLowerCase();
-    if (ORDINARY_CAPITALS.has(lower)) continue;
-    if (isEmployerOrBrand(word, allowed)) continue;
-    return true;
-  }
-  const person = sentence.match(/\b[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}\b/g) ?? [];
-  return person.some((name) => !isEmployerOrBrand(name, allowed));
-}
-
-function sentenceIsPostingAttributed(
-  sentence: string,
-  context: ResearchCleanupContext,
-): boolean {
-  if (POSTING_ATTRIBUTION.test(sentence)) return true;
-  const posting = context.postingText?.toLowerCase().replace(/\s+/g, " ").trim();
-  if (!posting) return false;
-  const text = sentence.toLowerCase().replace(/\s+/g, " ").trim();
-  if (text.length >= 12 && posting.includes(text)) return true;
-  const words = text.match(/[a-z0-9]{3,}/g) ?? [];
-  if (words.length < 4) return false;
-  const postingWords = new Set(posting.match(/[a-z0-9]{3,}/g) ?? []);
-  const overlap = words.filter((word) => postingWords.has(word)).length;
-  return overlap / words.length >= 0.75;
-}
-
-function sentenceLacksCitation(
-  sentence: string,
-  sources: ResearchSource[],
-): boolean {
-  if (hostsInText(sentence).length > 0) return false;
-  return !sources.some((source) => {
-    const title = source.title?.trim().toLowerCase() ?? "";
-    return title.length >= 8 && sentence.toLowerCase().includes(title);
-  });
-}
-
 export function cleanResearchProse(
   text: string,
   sources: ResearchSource[],
@@ -281,15 +154,10 @@ export function cleanResearchProse(
   const kept = paragraphs
     .map((paragraph) =>
       sentencesOf(paragraph)
-        .filter((sentence) => {
-          if (sentenceCitesOnlyDroppedSources(sentence, sources, context)) {
-            return false;
-          }
-          if (REAL_EMPLOYER_RISK_TEXT.test(sentence)) return true;
-          if (!sentenceLacksCitation(sentence, sources)) return true;
-          if (sentenceIsPostingAttributed(sentence, context)) return true;
-          return !sentenceHasUnsupportedSpecific(sentence, context);
-        })
+        .filter(
+          (sentence) =>
+            !sentenceCitesOnlyDroppedSources(sentence, sources, context),
+        )
         .join(" ")
         .trim(),
     )

@@ -276,17 +276,21 @@ describe("research cleanup 2", () => {
     ]);
   });
 
-  it("removes an uncited competitor sentence and keeps a summary and a posting sentence", () => {
+  it("keeps an uncited sentence that names a company, a number, or a date", () => {
+    const numberSentence = "The unit grew revenue by 18% last cycle.";
+    const dateSentence = "The partnership was announced on June 4, 2026.";
     const presented = presentCompanyResearch(
       {
-        companySummary: `${COMPETITORS}. ${SUMMARY} ${POSTING_SENTENCE}`,
+        companySummary: `${COMPETITORS}. ${numberSentence} ${dateSentence} ${SUMMARY} ${POSTING_SENTENCE}`,
         sources: [source({ url: "https://www.cscglobal.com/about", title: "About CSC" })],
       },
       { companyName: "CSC", anchorHost: "cscglobal.com" },
     );
-    expect(presented.companySummary).not.toContain("MarkMonitor");
-    expect(presented.companySummary).not.toContain("OpSec");
-    expect(presented.companySummary).not.toContain("Corsearch");
+    expect(presented.companySummary).toContain("MarkMonitor");
+    expect(presented.companySummary).toContain("OpSec");
+    expect(presented.companySummary).toContain("Corsearch");
+    expect(presented.companySummary).toContain("18%");
+    expect(presented.companySummary).toContain("June 4, 2026");
     expect(presented.companySummary).toContain(SUMMARY);
     expect(presented.companySummary).toContain(POSTING_SENTENCE);
   });
