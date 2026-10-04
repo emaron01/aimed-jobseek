@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { BackToDashboardLink } from "@/components/BackToDashboardLink";
 import { ApplicationCompactTracker } from "@/components/ApplicationSidebarTracker";
 import { WorkspaceJobRefresh } from "@/components/ApplicationWorkspaceLive";
 import { WorkspaceJobsProvider } from "@/components/workspace-jobs-context";
 import { markApplicationStepViewedAction } from "@/app/actions/application-jobs";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
+import { workspaceCampaignHref } from "@/lib/application/workspace-links";
 import { applicationStepFromPathname } from "@/lib/product-config";
 
 export function ApplicationWorkspaceChrome({
@@ -18,9 +20,10 @@ export function ApplicationWorkspaceChrome({
   campaignId: string;
   initialSignature: string;
   initialJobs: WorkspaceJobStatusView[];
-  children: React.ReactNode;
+  children?: ReactNode;
 }) {
   const pathname = usePathname() || "";
+  const onDashboard = pathname === workspaceCampaignHref(campaignId);
 
   useEffect(() => {
     const step = applicationStepFromPathname(pathname);
@@ -47,7 +50,14 @@ export function ApplicationWorkspaceChrome({
           initialJobs={initialJobs}
         />
         <ApplicationCompactTracker campaignId={campaignId} />
-        <div className="min-w-0 flex-1 space-y-4">{children}</div>
+        <div className="min-w-0 flex-1 space-y-4">
+          {onDashboard ? null : (
+            <div className="print:hidden">
+              <BackToDashboardLink campaignId={campaignId} />
+            </div>
+          )}
+          {children}
+        </div>
       </div>
     </WorkspaceJobsProvider>
   );

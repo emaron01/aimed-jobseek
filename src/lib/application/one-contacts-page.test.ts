@@ -208,7 +208,7 @@ describe("one Contacts page", () => {
     );
   });
 
-  it("shows Add Contact and Back to application only when filtered from an application", () => {
+  it("shows Add Contact and Back to dashboard only when filtered from an application", () => {
     const filtered = mount(directory({ campaignId: "camp_1", search: "Ada" }));
     root = filtered.root;
     expect(filtered.host.textContent).toContain("Add Contact");
@@ -216,7 +216,7 @@ describe("one Contacts page", () => {
       "[data-testid='contacts-page-back-to-application']",
     ) as HTMLAnchorElement;
     expect(back).toBeTruthy();
-    expect(back.textContent).toBe("Back to application");
+    expect(back.textContent).toBe("Back to dashboard");
     expect(back.getAttribute("href")).toBe("/campaigns/camp_1");
     expect(filtered.host.textContent).not.toContain("Back to applications");
 
