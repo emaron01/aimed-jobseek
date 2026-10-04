@@ -166,6 +166,7 @@ import {
 } from "@/lib/application/step-progress";
 import { applicationStepCopy, designTokens } from "@/lib/product-config";
 import {
+  sidebarNavItemBranchClass,
   sidebarNavItemCurrentClass,
   sidebarNavItemIdleClass,
 } from "@/components/sidebar-nav-style";
@@ -264,9 +265,10 @@ function expectIdle(tag: string) {
 
 function expectCurrent(tag: string) {
   expect(tag).toContain(sidebarNavItemCurrentClass);
-  expect(tag).toContain("bg-primary/10");
+  expect(tag).toContain("bg-primary-tint");
   expect(tag).toContain("text-ink");
   expect(tag).toContain('aria-current="page"');
+  expect(tag).not.toContain("bg-primary/10");
   expect(tag).not.toContain("text-primary");
   expect(tag).not.toContain("border-l-primary");
   expect(tag).not.toContain("bg-surface");
@@ -434,23 +436,32 @@ describe("application dashboard navigation", () => {
     expect(runPaidStructuredCall).not.toHaveBeenCalled();
   });
 
-  it("shows only Application Dashboard in the side navigation when an application is selected", () => {
+  it("shows Application Dashboard and a smaller branch for the current page", () => {
     const html = sidebar(`${DASHBOARD}/job`);
     const section = applicationSection(html);
     const links = anchors(section);
-    expect(links).toHaveLength(1);
+    expect(links).toHaveLength(2);
     expect(links[0]).toContain("Application Dashboard");
     expect(openingTag(links[0] ?? "")).toContain(`href="${DASHBOARD}"`);
+    expectIdle(openingTag(links[0] ?? ""));
+    expect(section).toContain('data-testid="sidebar-application-page-branch"');
+    expect(links[1]).toContain("Job requirements");
+    expect(openingTag(links[1] ?? "")).toContain(`href="${DASHBOARD}/job"`);
+    expect(openingTag(links[1] ?? "")).toContain(sidebarNavItemBranchClass);
+    expect(openingTag(links[1] ?? "")).toContain("text-xs");
+    expectCurrent(openingTag(links[1] ?? ""));
     expect(section).not.toContain("tracker-step-");
     expect(section).not.toContain("tracker-application-contacts");
     expect(section).not.toContain("tracker-new-");
-    expect(section).not.toContain("Job requirements");
     expect(section).not.toContain("Interview cheat sheet");
     expect(section).not.toContain(">Contacts<");
     expect(section).not.toContain("<svg");
     expect(section).not.toContain("border-l-primary");
     expect(section).not.toContain("text-primary");
-    expectIdle(openingTag(links[0] ?? ""));
+
+    const onDashboard = applicationSection(sidebar(DASHBOARD));
+    expect(anchors(onDashboard)).toHaveLength(1);
+    expect(onDashboard).not.toContain("sidebar-application-page-branch");
   });
 
   it("omits the application section when no application is selected", () => {
@@ -460,13 +471,21 @@ describe("application dashboard navigation", () => {
       expect(html, pathname).not.toContain("sidebar-application-dashboard");
     }
     const filtered = sidebar("/contacts", "campaignId=camp_1");
-    expect(applicationSection(filtered)).toContain("Application Dashboard");
+    const section = applicationSection(filtered);
+    expect(section).toContain("Application Dashboard");
+    const branch = anchors(section)[1] ?? "";
+    expect(branch).toContain(">Contacts<");
+    expect(openingTag(branch)).toContain("text-xs");
+    expect(openingTag(branch)).toContain('href="/contacts?campaignId=camp_1"');
+    expectCurrent(openingTag(branch));
   });
 
-  it("uses white text-on-ink for idle items and light blue primary/10 with aria-current for the current page", () => {
+  it("uses white text-on-ink for idle items and light blue primary tint with aria-current for the current page", () => {
     expect(designTokens.color.surface).toBe("#FFFFFF");
     expect(designTokens.color.ink).toBe("#0B1220");
     expect(designTokens.color.primary).toBe("#1D4ED8");
+    expect(designTokens.color.primaryTint).toBe("#E7F3FF");
+    expect(sidebarNavItemIdleClass).toContain("active:bg-primary-tint");
 
     const items = buildSidebarNavItems({
       hasOrganization: true,
@@ -506,7 +525,10 @@ describe("application dashboard navigation", () => {
     }
 
     const onJob = sidebar(`${DASHBOARD}/job`);
-    expectIdle(openingTag(anchors(applicationSection(onJob))[0] ?? ""));
+    const jobLinks = anchors(applicationSection(onJob));
+    expectIdle(openingTag(jobLinks[0] ?? ""));
+    expect(jobLinks[1]).toContain("Job requirements");
+    expectCurrent(openingTag(jobLinks[1] ?? ""));
     for (const tag of mainNavAnchors(onJob).map(openingTag)) {
       expectIdle(tag);
     }

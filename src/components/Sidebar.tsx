@@ -112,8 +112,8 @@ export function Sidebar({ items }: { items: SidebarNavItem[] }) {
                 className={cn(
                   "block rounded-md px-3 py-2 text-sm font-medium text-ink transition-colors",
                   current
-                    ? "bg-primary/10 text-ink"
-                    : "bg-surface text-ink hover:bg-surface",
+                    ? "bg-primary-tint text-ink"
+                    : "bg-surface text-ink hover:bg-surface active:bg-primary-tint",
                 )}
               >
                 {item.label}
