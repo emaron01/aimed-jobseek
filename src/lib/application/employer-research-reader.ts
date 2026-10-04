@@ -7,7 +7,6 @@
 import {
   anchorHostFromResearchTimings,
   employerWebsiteAnchor,
-  sisterHostsFromResearchTimings,
 } from "@/lib/application/company-website";
 import { usableEmployerResearch } from "@/lib/job-requirement/identity-verification";
 import type { CompanyResearchStatus } from "@prisma/client";
@@ -47,7 +46,6 @@ export type ApplicationEmployerResearchView = EmployerResearchModelInput & {
   researchedAt: Date | null;
   researchMethod: string | null;
   anchorHost: string | null;
-  sisterHosts: string[];
 };
 
 type ResearchRow = {
@@ -164,7 +162,6 @@ function toView(
     anchorHost:
       trimmed(row.anchorHost) ??
       anchorHostFromResearchTimings(row.researchStageTimings),
-    sisterHosts: sisterHostsFromResearchTimings(row.researchStageTimings),
   };
 }
 

@@ -124,7 +124,7 @@ function renderBoth(detail: string, sources: ResearchSource[]) {
 describe("research cleanup", () => {
   it("keeps the approved research brief and a matching fingerprint", () => {
     expect(COMPANY_RESEARCH_SYSTEM_INSTRUCTIONS).toBe(APPROVED_BRIEF);
-    expect(RESEARCH_PROMPT_VERSION).toBe("9");
+    expect(RESEARCH_PROMPT_VERSION).toBe("8");
     const input = {
       anchorHost: "cscglobal.com",
       website: "https://cscglobal.com",

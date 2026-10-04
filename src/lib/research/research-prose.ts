@@ -3,9 +3,9 @@
  * company section. Display applies this to stored rows without rewriting them.
  * Save applies the same text cleanup before a new row is written.
  *
- * A sentence with no citation stays when it names no other company, person,
- * number, or date. A sentence attributed to the job posting stays. A real
- * employer risk stays. An employer-risk sentence about the job is removed.
+ * A sentence with no citation is kept. That is the current behavior:
+ * validateCompanyResearchResult does not remove uncited sentences, and this
+ * module does not start removing them.
  */
 
 import {
@@ -13,7 +13,6 @@ import {
   researchSourceHost,
 } from "@/lib/research/source-policy";
 import type { CompanyResearchResult, ResearchSource } from "@/lib/research/types";
-import { employerRisksForJobSeeker } from "@/lib/research/validate";
 
 const PROSE_FIELDS = [
   "companySummary",
@@ -42,10 +41,6 @@ export type ResearchTextPart =
 export type ResearchCleanupContext = {
   anchorHost?: string | null;
   sisterHosts?: readonly string[] | null;
-  companyName?: string | null;
-  postingText?: string | null;
-  /** Employer products and brands. Names found here are not other companies. */
-  brandText?: string | null;
 };
 
 /** Model text sometimes stores the two characters "\" and "n" instead of a newline. */
@@ -145,133 +140,6 @@ export function sentenceCitesOnlyDroppedSources(
   return hosts.every((host) => !kept.employer(host) && !kept.listed.has(host));
 }
 
-const POSTING_ATTRIBUTION =
-  /\b(?:job posting|the posting|this posting|according to the (?:job )?posting|the (?:job )?posting (?:says|states|lists|describes|requires|calls for|emphasizes|notes))\b/i;
-
-const REAL_EMPLOYER_RISK_TEXT =
-  /\b(layoffs?|laid off|restructur\w*|bankrupt\w*|insolven\w*|lawsuits?|litigation|sued|regulatory|regulators?|investigation|turnover|resign\w*|stepped down|financial trouble|funding trouble|debt|shutdown|shut down)\b/i;
-
-const ORDINARY_CAPITALS = new Set([
-  "a",
-  "an",
-  "and",
-  "available",
-  "before",
-  "brand",
-  "company",
-  "culture",
-  "domain",
-  "during",
-  "enterprise",
-  "evidence",
-  "for",
-  "from",
-  "global",
-  "however",
-  "it",
-  "its",
-  "leadership",
-  "market",
-  "markets",
-  "or",
-  "our",
-  "recent",
-  "sales",
-  "security",
-  "service",
-  "services",
-  "that",
-  "the",
-  "their",
-  "these",
-  "this",
-  "those",
-  "we",
-  "while",
-  "with",
-]);
-
-function nameTokens(value: string): Set<string> {
-  const tokens = new Set<string>();
-  for (const token of value.toLowerCase().split(/[^a-z0-9]+/)) {
-    if (token.length >= 2) tokens.add(token);
-  }
-  return tokens;
-}
-
-function isEmployerOrBrand(name: string, allowed: Set<string>): boolean {
-  const parts = name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
-  if (parts.length === 0) return false;
-  const compact = parts.join("");
-  if (allowed.has(compact)) return true;
-  return parts.every((part) => allowed.has(part));
-}
-
-function sentenceHasQuantity(sentence: string): boolean {
-  return /(?:^|[^A-Za-z])\d+(?:[.,]\d+)*(?:%|\b)/.test(sentence);
-}
-
-/**
- * An uncited sentence names a specific other company, person, number, or date.
- * The employer and its brands are not other companies. A short all-caps token
- * such as B2B or CSC is not a company name.
- */
-export function sentenceHasUnsupportedSpecific(
-  sentence: string,
-  context: ResearchCleanupContext = {},
-): boolean {
-  if (sentenceHasQuantity(sentence)) return true;
-  const allowed = nameTokens(
-    `${context.companyName ?? ""} ${context.brandText ?? ""} ${context.anchorHost ?? ""} ${(context.sisterHosts ?? []).join(" ")}`,
-  );
-  const internalCap = (sentence.match(/\b[A-Z][a-z0-9]*[A-Z][A-Za-z0-9]*\b/g) ?? []).filter(
-    (name) => /[a-z]/.test(name),
-  );
-  if (internalCap.some((name) => !isEmployerOrBrand(name, allowed))) return true;
-  const words = sentence.match(/\b[A-Z][a-z]{2,}\b/g) ?? [];
-  const sentenceStart = sentence.match(/[A-Za-z][A-Za-z0-9]*/)?.[0] ?? "";
-  let skippedStart = false;
-  for (const word of words) {
-    if (!skippedStart && word === sentenceStart) {
-      skippedStart = true;
-      continue;
-    }
-    const lower = word.toLowerCase();
-    if (ORDINARY_CAPITALS.has(lower)) continue;
-    if (isEmployerOrBrand(word, allowed)) continue;
-    return true;
-  }
-  const person = sentence.match(/\b[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}\b/g) ?? [];
-  return person.some((name) => !isEmployerOrBrand(name, allowed));
-}
-
-function sentenceIsPostingAttributed(
-  sentence: string,
-  context: ResearchCleanupContext,
-): boolean {
-  if (POSTING_ATTRIBUTION.test(sentence)) return true;
-  const posting = context.postingText?.toLowerCase().replace(/\s+/g, " ").trim();
-  if (!posting) return false;
-  const text = sentence.toLowerCase().replace(/\s+/g, " ").trim();
-  if (text.length >= 12 && posting.includes(text)) return true;
-  const words = text.match(/[a-z0-9]{3,}/g) ?? [];
-  if (words.length < 4) return false;
-  const postingWords = new Set(posting.match(/[a-z0-9]{3,}/g) ?? []);
-  const overlap = words.filter((word) => postingWords.has(word)).length;
-  return overlap / words.length >= 0.75;
-}
-
-function sentenceLacksCitation(
-  sentence: string,
-  sources: ResearchSource[],
-): boolean {
-  if (hostsInText(sentence).length > 0) return false;
-  return !sources.some((source) => {
-    const title = source.title?.trim().toLowerCase() ?? "";
-    return title.length >= 8 && sentence.toLowerCase().includes(title);
-  });
-}
-
 export function cleanResearchProse(
   text: string,
   sources: ResearchSource[],
@@ -281,15 +149,10 @@ export function cleanResearchProse(
   const kept = paragraphs
     .map((paragraph) =>
       sentencesOf(paragraph)
-        .filter((sentence) => {
-          if (sentenceCitesOnlyDroppedSources(sentence, sources, context)) {
-            return false;
-          }
-          if (REAL_EMPLOYER_RISK_TEXT.test(sentence)) return true;
-          if (!sentenceLacksCitation(sentence, sources)) return true;
-          if (sentenceIsPostingAttributed(sentence, context)) return true;
-          return !sentenceHasUnsupportedSpecific(sentence, context);
-        })
+        .filter(
+          (sentence) =>
+            !sentenceCitesOnlyDroppedSources(sentence, sources, context),
+        )
         .join(" ")
         .trim(),
     )
@@ -350,36 +213,6 @@ export function sourcesCitedByKeptFacts(
   return cited;
 }
 
-function fieldContext(
-  key: string,
-  input: Pick<CompanyResearchResult, ProseField | ListField>,
-  context: ResearchCleanupContext,
-): ResearchCleanupContext {
-  const brandText = [
-    context.companyName,
-    context.brandText,
-    key === "whatTheySell" ? "" : input.whatTheySell,
-  ]
-    .filter(Boolean)
-    .join(" ");
-  return { ...context, brandText };
-}
-
-function labelEmployerWebsiteSources(
-  sources: ResearchSource[],
-  context: ResearchCleanupContext,
-): ResearchSource[] {
-  return sources.map((source) => {
-    const host = researchSourceHost(stripTrackingParameters(source.url));
-    if (!host || !hostIsEmployerSite(host, context.anchorHost, context.sisterHosts)) {
-      return source;
-    }
-    return source.sourceType === "COMPANY_WEBSITE"
-      ? source
-      : { ...source, sourceType: "COMPANY_WEBSITE" };
-  });
-}
-
 function cleanedFields(
   input: Pick<CompanyResearchResult, ProseField | ListField>,
   sources: ResearchSource[],
@@ -387,21 +220,11 @@ function cleanedFields(
 ): Record<string, string> {
   const fields: Record<string, string> = {};
   for (const key of PROSE_FIELDS) {
-    fields[key] = cleanResearchProse(
-      input[key] ?? "",
-      sources,
-      fieldContext(key, input, context),
-    );
+    fields[key] = cleanResearchProse(input[key] ?? "", sources, context);
   }
   for (const key of LIST_FIELDS) {
-    const rawItems =
-      key === "riskSignals"
-        ? employerRisksForJobSeeker(input.riskSignals ?? [], context.postingText)
-        : (input[key] ?? []);
-    const items = rawItems
-      .map((item) =>
-        cleanResearchProse(item, sources, fieldContext(key, input, context)),
-      )
+    const items = (input[key] ?? [])
+      .map((item) => cleanResearchProse(item, sources, context))
       .filter(Boolean);
     fields[key] = items.join("\n");
     for (const [index, item] of items.entries()) {
@@ -415,24 +238,15 @@ export function cleanResearchForSave(
   result: CompanyResearchResult,
   context: ResearchCleanupContext = {},
 ): CompanyResearchResult {
-  const sources = labelEmployerWebsiteSources(
-    result.sources.map((source) => ({
-      ...source,
-      url: stripTrackingParameters(source.url),
-    })),
-    context,
-  );
+  const sources = result.sources.map((source) => ({
+    ...source,
+    url: stripTrackingParameters(source.url),
+  }));
   const fields = cleanedFields(result, sources, context);
   const lists = {} as Record<ListField, string[]>;
   for (const key of LIST_FIELDS) {
-    const rawItems =
-      key === "riskSignals"
-        ? employerRisksForJobSeeker(result.riskSignals ?? [], context.postingText)
-        : (result[key] ?? []);
-    lists[key] = rawItems
-      .map((item) =>
-        cleanResearchProse(item, sources, fieldContext(key, result, context)),
-      )
+    lists[key] = (result[key] ?? [])
+      .map((item) => cleanResearchProse(item, sources, context))
       .filter(Boolean);
   }
   const prose: Record<string, string> = {};
@@ -573,41 +387,6 @@ function markerParts(
   return parts;
 }
 
-function tidyCitationParts(parts: ResearchTextPart[]): ResearchTextPart[] {
-  const next = parts.map((part) => (part.type === "text" ? { ...part } : part));
-  for (let index = 0; index < next.length; index += 1) {
-    if (next[index]?.type !== "cite") continue;
-    const previous = next[index - 1];
-    if (previous?.type === "text") {
-      previous.value = previous.value.replace(
-        /(?:\s*\[[^\[\]\n]{0,120}\])?\s*\(?\s*$/u,
-        "",
-      );
-    }
-    const following = next[index + 1];
-    if (following?.type === "text") {
-      following.value = following.value.replace(/^[\s)\](]+/u, (lead) => {
-        const rest = following.value.slice(lead.length);
-        if (!rest) return "";
-        return /^[A-Za-z0-9]/.test(rest) ? " " : "";
-      });
-    }
-  }
-  const compacted: ResearchTextPart[] = [];
-  for (const part of next) {
-    if (part.type === "text") {
-      if (!part.value) continue;
-      const last = compacted[compacted.length - 1];
-      if (last?.type === "text") {
-        last.value += part.value;
-        continue;
-      }
-    }
-    compacted.push(part);
-  }
-  return compacted;
-}
-
 function citeInline(sentence: string, sources: ResearchSource[]): ResearchTextPart[] {
   const pattern = /\(([^)]+)\)|https?:\/\/[^\s)<>"']+/gi;
   const parts: ResearchTextPart[] = [];
@@ -651,9 +430,7 @@ export function citeResearchParagraph(
   const parts: ResearchTextPart[] = [];
   for (const sentence of sentencesOf(paragraph)) {
     const only = citationOnlySources(sentence, sources);
-    const next = tidyCitationParts(
-      only.length > 0 ? markerParts(only, sources) : citeInline(sentence, sources),
-    );
+    const next = only.length > 0 ? markerParts(only, sources) : citeInline(sentence, sources);
     if (parts.length > 0) parts.push({ type: "text", value: " " });
     parts.push(...next);
   }

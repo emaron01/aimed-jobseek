@@ -20,7 +20,7 @@ const POSTING_INCONSISTENCY =
   /\b(inconsist\w*|discrepan\w*|contradict\w*|workforce figures|conflicting (figures|numbers|headcount|employee counts)|posting (lists|says|states|claims|shows))\b/i;
 
 const JOB_REQUIREMENT =
-  /\b((role|job|position) (requires|demands|needs)|must have|years of experience|qualifications?|job(?:'s|’s)? demands|role requirements|(?:the|this)\s+(?:job|role|position|posting)|(?:job|role|position|posting)(?:'s|’s)|(?:job|role|position|posting)\s+(?:emphasis|mandate|requirements?)|(?:scaling|sales-execution)\s+mandate)\b/i;
+  /\b((role|job|position) (requires|demands|needs)|must have|years of experience|qualifications?|job(?:'s|’s)? demands|role requirements)\b/i;
 
 /** Company events a job seeker should see. Posting noise is not in this list. */
 const REAL_EMPLOYER_RISK =

@@ -655,9 +655,6 @@ export async function ApplicationWorkspace({
               ? (research.researchSources as ResearchSource[])
               : []
           }
-          anchorHost={employerResearch?.anchorHost ?? researchAnchor?.domain ?? null}
-          sisterHosts={employerResearch?.sisterHosts ?? null}
-          postingText={requirement.rawText}
           researchMethod={research?.researchMethod ?? null}
           researchStatus={
             research &&

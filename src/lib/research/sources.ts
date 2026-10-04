@@ -63,16 +63,16 @@ export type WebsitePageSlot =
 
 /**
  * Fill combined budget from highest-value pages first.
- * The homepage and its leadership, about, and careers pages are sent before other pages, still inside the 16,000-character budget.
+ * Key company pages sit with the job-focus page, still inside the 16,000-character budget.
  */
 export const WEBSITE_PAGE_BUDGET_RANK: WebsitePageSlot[] = [
-  "homepage",
+  "jobFocus",
   "leadership",
+  "products",
   "about",
   "careers",
-  "jobFocus",
-  "products",
   "company",
+  "homepage",
 ];
 
 export type CompanyKeyPageKind = "leadership" | "about" | "careers";
@@ -260,54 +260,8 @@ export function selectJobFocusPageUrl(input: {
 }
 
 /**
- * Prefer the section page itself over a deeper page that only contains the
- * word in a parent directory. /service/about/ beats /service/about/offices/.
- */
-function keyPageScore(
-  pathname: string,
-  anchorText: string,
-  kind: CompanyKeyPageKind,
-): number {
-  const segments = pathname.split("/").filter(Boolean);
-  const last = (segments[segments.length - 1] ?? "").toLowerCase();
-  if (
-    kind === "about" &&
-    KEY_PAGE_PATTERN.leadership.test(`${last} ${anchorText}`)
-  ) {
-    return 0;
-  }
-  const haystack = `${pathname} ${anchorText}`;
-  if (!KEY_PAGE_PATTERN[kind].test(haystack)) return 0;
-  let score = KEY_PAGE_PATTERN[kind].test(pathname) ? 10 : 0;
-  if (last && KEY_PAGE_PATTERN[kind].test(last)) {
-    score += 100 - Math.min(segments.length, 8);
-  }
-  if (KEY_PAGE_PATTERN[kind].test(anchorText)) score += 20;
-  return score;
-}
-
-const KEY_PAGE_FALLBACK_PATHS: Record<CompanyKeyPageKind, string[]> = {
-  leadership: [
-    "/leadership",
-    "/leadership-team",
-    "/our-team",
-    "/team",
-    "/about/leadership-team",
-    "/service/about/leadership-team",
-  ],
-  about: ["/about", "/about-us", "/company/about", "/service/about"],
-  careers: [
-    "/careers",
-    "/culture",
-    "/life-at",
-    "/service/careers",
-    "/service/careers/our-mission",
-  ],
-};
-
-/**
- * Anchor-host page linked from a fetched company page for leadership, about,
- * or careers. One best match per kind. Stays on the anchor host. No web search.
+ * Anchor-host page linked from the homepage for leadership, about, or careers.
+ * One best match per kind. Stays on the anchor host. No web search.
  */
 export function selectCompanyKeyPageUrl(input: {
   html: string;
@@ -342,8 +296,12 @@ export function selectCompanyKeyPageUrl(input: {
       continue;
     }
     const anchorText = match[2]!.replace(/<[^>]+>/g, " ");
-    const score = keyPageScore(resolved.pathname, anchorText, input.kind);
-    if (score === 0) continue;
+    const haystack = `${resolved.pathname} ${anchorText}`;
+    if (input.kind === "about" && KEY_PAGE_PATTERN.leadership.test(haystack)) {
+      continue;
+    }
+    if (!KEY_PAGE_PATTERN[input.kind].test(haystack)) continue;
+    const score = (haystack.match(KEY_PAGE_PATTERN[input.kind]) ?? []).length;
     if (!best || score > best.score) best = { url: safety.href, score };
   }
   return best?.url ?? null;
@@ -590,7 +548,6 @@ async function fetchWebsitePage(
       },
     });
 
-    // Blocked, missing, or unreachable: skip this page and keep the others.
     if (!response.ok) return null;
 
     const contentType = response.headers.get("content-type") ?? "";
@@ -598,9 +555,7 @@ async function fetchWebsitePage(
 
     const html = await response.text();
     const text = htmlToTextSnippet(html, perPageCap);
-    // A blocked or non-HTML response already returned null. A script-rendered
-    // page with no visible text and no links cannot be read or followed.
-    if (!text && !/<a\b[^>]*href=/i.test(html)) return null;
+    if (!text) return null;
 
     const finalUrl = response.url || safety.href;
     const finalSafety = assertSafeExternalHttpUrl(finalUrl);
@@ -697,12 +652,6 @@ export async function retrieveWebsiteEvidence(
   if (jobFocusPage) pages.push(jobFocusPage);
 
   const skipUrls = pages.map((page) => page.url);
-  const hasSlot = (slot: WebsitePageSlot) => pages.some((page) => page.slot === slot);
-  const remember = (page: FetchedWebsitePage | null) => {
-    if (!page) return;
-    pages.push(page);
-    skipUrls.push(page.url);
-  };
   for (const kind of ["leadership", "about", "careers"] as const) {
     const url = selectCompanyKeyPageUrl({
       html: homePage.html,
@@ -712,32 +661,13 @@ export async function retrieveWebsiteEvidence(
       skipUrls,
     });
     if (!url) continue;
-    remember(await fetchWebsitePage(url, kind, timeoutMs));
+    const page = await fetchWebsitePage(url, kind, timeoutMs);
+    if (!page) continue;
+    pages.push(page);
+    skipUrls.push(page.url);
   }
 
-  // Leadership and culture links often live on the about page, not the homepage.
-  const aboutPage = pages.find((page) => page.slot === "about");
-  if (aboutPage) {
-    for (const kind of ["leadership", "careers"] as const) {
-      if (hasSlot(kind)) continue;
-      const url = selectCompanyKeyPageUrl({
-        html: aboutPage.html,
-        pageUrl: aboutPage.url,
-        anchorHost,
-        kind,
-        skipUrls,
-      });
-      if (!url) continue;
-      remember(await fetchWebsitePage(url, kind, timeoutMs));
-    }
-  }
-
-  for (const kind of ["leadership", "about", "careers"] as const) {
-    if (hasSlot(kind)) continue;
-    remember(
-      await fetchFirstPathOk(origin, kind, KEY_PAGE_FALLBACK_PATHS[kind], timeoutMs),
-    );
-  }
+  const hasSlot = (slot: WebsitePageSlot) => pages.some((page) => page.slot === slot);
   const [products, about, company] = await Promise.all([
     hasSlot("products")
       ? Promise.resolve(null)

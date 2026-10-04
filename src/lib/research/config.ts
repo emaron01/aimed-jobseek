@@ -2,7 +2,6 @@ import { RESEARCH_RUN_QUEUED_STALE_MS_DEFAULT } from "@/lib/research/run-types";
 
 /**
  * Research AI prompt versioning (application constant — not env).
- * v9: clean citation markers, label anchor and sister pages as the company website, fetch the homepage and its leadership, about, and careers pages, and drop job-demand employer risks and uncited specifics. The brief text is unchanged.
  * v8: read leadership, about, and careers pages, and keep a sister site only when its domain shares the company name.
  * v7: stop only when job-focus coverage is met, and read longer page excerpts.
  * v6: tailored research per application, using the approved brief.
@@ -10,7 +9,7 @@ import { RESEARCH_RUN_QUEUED_STALE_MS_DEFAULT } from "@/lib/research/run-types";
  * v3: job-seeker employer research. Hiring signals are separate from buyingSignals.
  * v2: OpenAI Responses + web_search production research prompt.
  */
-export const RESEARCH_PROMPT_VERSION = "9";
+export const RESEARCH_PROMPT_VERSION = "8";
 
 /** Default when RESEARCH_CONCURRENCY is unset. Tuned for Starter web (512 MB). */
 export const RESEARCH_CONCURRENCY_DEFAULT = 5;
