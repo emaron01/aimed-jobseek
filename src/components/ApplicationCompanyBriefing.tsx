@@ -47,20 +47,31 @@ export function CheatSheetCompanyResearch({
   jobFocus,
   jobFocusDetail,
   sources,
+  companyName = null,
+  anchorHost = null,
+  sisterHosts = null,
+  postingText = null,
 }: {
   companySummary: string | null;
   whatTheySell: string | null;
   jobFocus: string | null;
   jobFocusDetail: string | null;
   sources: ResearchSource[];
+  companyName?: string | null;
+  anchorHost?: string | null;
+  sisterHosts?: readonly string[] | null;
+  postingText?: string | null;
 }) {
-  const presented = presentCompanyResearch({
-    companySummary,
-    whatTheySell,
-    jobFocus,
-    jobFocusDetail,
-    sources,
-  });
+  const presented = presentCompanyResearch(
+    {
+      companySummary,
+      whatTheySell,
+      jobFocus,
+      jobFocusDetail,
+      sources,
+    },
+    { companyName, anchorHost, sisterHosts, postingText },
+  );
   const sourceIndex = buildSourceIndex(presented.sources, (source) => source.url);
   const hasHighlights = Boolean(
     presented.companySummary.trim() || presented.whatTheySell.trim(),
@@ -134,6 +145,9 @@ export function ApplicationCompanyBriefing({
   researchStatus,
   notes,
   researchLive,
+  anchorHost = null,
+  sisterHosts = null,
+  postingText = null,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -152,6 +166,9 @@ export function ApplicationCompanyBriefing({
   researchStatus: string;
   notes: string;
   researchLive: boolean;
+  anchorHost?: string | null;
+  sisterHosts?: readonly string[] | null;
+  postingText?: string | null;
 }) {
   const [notesValue, setNotesValue] = useState(notes);
   const presented = presentCompanyResearch(
@@ -169,7 +186,12 @@ export function ApplicationCompanyBriefing({
       riskSignals: parseStringArray(defaults.riskSignals),
       sources,
     },
-    { anchorHost: meta.domain },
+    {
+      companyName,
+      anchorHost: anchorHost ?? meta.domain,
+      sisterHosts,
+      postingText,
+    },
   );
   const sourceLead = describeCompanySourceLead({
     sources: presented.sources,

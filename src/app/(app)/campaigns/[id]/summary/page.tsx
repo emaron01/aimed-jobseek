@@ -365,6 +365,10 @@ export default async function ApplicationSummaryPage({
           jobFocus={view.research?.jobFocus ?? null}
           jobFocusDetail={view.research?.jobFocusDetail ?? null}
           sources={view.research?.researchSources ?? []}
+          companyName={view.requirement.companyName}
+          anchorHost={view.research?.anchorHost ?? null}
+          sisterHosts={view.research?.sisterHosts ?? null}
+          postingText={view.requirement.rawText}
         />
         <div>
           <h3 className="font-medium text-ink">Customers</h3>

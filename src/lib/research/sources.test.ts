@@ -9,7 +9,7 @@ import {
 } from "@/lib/research/sources";
 
 describe("website evidence budget", () => {
-  it("fills combined budget from products before homepage", () => {
+  it("keeps the homepage and about page ahead of products within the combined budget", () => {
     const excerpts = allocateExcerptBudget([
       {
         slot: "homepage",
@@ -34,10 +34,10 @@ describe("website evidence budget", () => {
     expect(excerpts.reduce((n, e) => n + e.text.length, 0)).toBe(
       WEBSITE_EVIDENCE_TOTAL_CHAR_BUDGET,
     );
-    expect(excerpts[0]?.url).toContain("/products");
+    expect(excerpts[0]?.url).toBe("https://acme.example/");
     expect(excerpts[1]?.url).toContain("/about");
-    const homepage = excerpts.find((e) => e.url === "https://acme.example/");
-    expect(homepage?.text.length).toBe(8_000);
+    expect(excerpts[2]?.url).toContain("/products");
+    expect(excerpts[2]?.text.length).toBe(2_000);
   });
 
   it("cuts one page at 4,000 characters and the combined excerpts at 16,000", () => {
@@ -81,8 +81,9 @@ describe("website evidence budget", () => {
     expect(excerpts.reduce((n, excerpt) => n + excerpt.text.length, 0)).toBe(16_000);
     expect(excerpts.every((excerpt) => excerpt.text.length === 4_000)).toBe(true);
     expect(excerpts.some((excerpt) => excerpt.url === "https://acme.example/")).toBe(
-      false,
+      true,
     );
+    expect(excerpts.some((excerpt) => excerpt.url.endsWith("/company"))).toBe(false);
   });
 
   it("caps per-page text via htmlToTextSnippet", () => {
