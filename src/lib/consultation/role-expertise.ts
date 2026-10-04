@@ -26,6 +26,7 @@ import {
   isConsultationReplyAiConfigured,
 } from "@/lib/ai";
 import {
+  ASK_HARPER_PLACEHOLDER_ANSWER,
   askHarperAnswerCloseness,
   askHarperAnswerKind,
   askHarperUnpassedDraft,
@@ -987,6 +988,158 @@ function validateAnswersForMode(
   return { valid, issues };
 }
 
+function unansweredRoleExpertiseQuestion(
+  choice: ValidatedRoleExpertiseQuestionChoice,
+): ValidatedRoleExpertiseQuestion {
+  return {
+    text: choice.text,
+    targetKey: choice.targetKey,
+    interviewTypeTag: choice.interviewTypeTag,
+    content: "",
+    grounding: { answerFramework: "CAR", action: "", result: "" },
+    followUpQuestion: null,
+  };
+}
+
+function answerForChoice(
+  answers: readonly RoleExpertiseAnswerParts[],
+  text: string,
+): RoleExpertiseAnswerParts | undefined {
+  const key = text.trim().toLowerCase();
+  return (
+    answers.find((answer) => answer.text.trim().toLowerCase() === key) ??
+    answers.find(
+      (answer) =>
+        questionNearDuplicate(answer.text, text) || answer.text.trim() === text.trim(),
+    )
+  );
+}
+
+/**
+ * Best-practice fill uses the same question kinds as Ask Harper.
+ * A story question still needs every CAR or STAR part and an outcome.
+ * A point-of-view, approach, or knowledge question does not.
+ */
+function draftIsRawProfileFact(
+  content: string,
+  sourceTexts: readonly string[],
+): boolean {
+  const normalized = content.replace(/[.!?]+$/g, "").trim().toLowerCase();
+  if (!normalized || normalized === ASK_HARPER_PLACEHOLDER_ANSWER.toLowerCase()) {
+    return true;
+  }
+  return sourceTexts.some(
+    (source) => source.replace(/[.!?]+$/g, "").trim().toLowerCase() === normalized,
+  );
+}
+
+function bestPracticePassingDraft(
+  choice: ValidatedRoleExpertiseQuestionChoice,
+  answer: RoleExpertiseAnswerParts | undefined,
+  sourceTexts: readonly string[],
+): { question: ValidatedRoleExpertiseQuestion; issue: string | null } {
+  const kind = askHarperAnswerKind(choice.text);
+  const issue =
+    kind === "story"
+      ? "Every question needs a suggested answer with all CAR or STAR parts, a result that states an outcome, and no framework or part labels."
+      : "A point-of-view answer needs the seeker's view in the answer, without a required outcome.";
+  if (!answer) return { question: unansweredRoleExpertiseQuestion(choice), issue };
+  const raw = {
+    text: choice.text,
+    interviewTypeTag: choice.interviewTypeTag,
+    answerFramework: answer.answerFramework,
+    challenge: answer.challenge,
+    situation: answer.situation,
+    task: answer.task,
+    action: answer.action,
+    result: answer.result,
+  };
+  const story = composedAnswerFromRoleExpertiseQuestion(raw);
+  if (
+    story &&
+    !draftIsRawProfileFact(story.content, sourceTexts) &&
+    (kind === "story" || kind === "point-of-view")
+  ) {
+    return {
+      question: {
+        text: choice.text,
+        targetKey: choice.targetKey,
+        interviewTypeTag: choice.interviewTypeTag,
+        content: story.content,
+        grounding: story.grounding,
+        followUpQuestion: followUpText(answer),
+      },
+      issue: null,
+    };
+  }
+  if (kind === "point-of-view") {
+    const pointOfView = composedPointOfViewAnswer(raw);
+    if (pointOfView && !draftIsRawProfileFact(pointOfView.content, sourceTexts)) {
+      return {
+        question: {
+          text: choice.text,
+          targetKey: choice.targetKey,
+          interviewTypeTag: choice.interviewTypeTag,
+          content: pointOfView.content,
+          grounding: pointOfView.grounding,
+          followUpQuestion: followUpText(answer),
+        },
+        issue: null,
+      };
+    }
+  }
+  return { question: unansweredRoleExpertiseQuestion(choice), issue };
+}
+
+function bestPracticeDraftForChoice(
+  choice: ValidatedRoleExpertiseQuestionChoice,
+  answer: RoleExpertiseAnswerParts | undefined,
+  sourceTexts: readonly string[],
+): ValidatedRoleExpertiseQuestion {
+  const passed = bestPracticePassingDraft(choice, answer, sourceTexts);
+  if (!passed.issue && passed.question.content.trim()) return passed.question;
+  const kind = askHarperAnswerKind(choice.text);
+  const content = answer
+    ? askHarperUnpassedDraft({ answer, kind, sourceTexts })
+    : "";
+  if (!content) return unansweredRoleExpertiseQuestion(choice);
+  return {
+    text: choice.text,
+    targetKey: choice.targetKey,
+    interviewTypeTag: choice.interviewTypeTag,
+    content,
+    grounding: {
+      answerFramework: answer?.answerFramework ?? "CAR",
+      action: content,
+      result: "",
+    },
+    followUpQuestion: followUpText(answer),
+  };
+}
+
+function answerHasDraftMaterial(answer: RoleExpertiseAnswerParts): boolean {
+  const parts = [
+    answer.challenge,
+    answer.situation,
+    answer.task,
+    answer.action,
+    answer.result,
+  ];
+  return parts.some((part) => {
+    const text = part?.trim() ?? "";
+    return text.length > 0 && text !== ASK_HARPER_PLACEHOLDER_ANSWER;
+  });
+}
+
+function bestPracticeAnswersReceiptIsUsable(
+  stored: RoleExpertiseAnswersResult,
+  choices: ValidatedRoleExpertiseQuestionChoice[],
+): boolean {
+  if (choices.length === 0) return true;
+  if (stored.answers.length === 0) return false;
+  return stored.answers.some(answerHasDraftMaterial);
+}
+
 function mappedAnswers(questions: ValidatedRoleExpertiseQuestion[]) {
   return questions.map((item) => ({
     text: item.text,
@@ -1052,9 +1205,10 @@ async function generateRoleExpertiseAnswersStep(input: {
   /** Defaults to the campaign so the batch fill keeps one receipt. Ask Harper passes a per-question key. */
   subjectKey?: string;
   /**
-   * Ask Harper only. Point-of-view answers do not need a story outcome.
-   * Either mode still stores a parsed answer so an identical question does not pay again,
-   * and the caller can show a best-available draft when the checks do not pass.
+   * Ask Harper passes one kind. The best-practice fill leaves this unset and
+   * classifies each question the same way. Point-of-view answers do not need
+   * a story outcome. A parsed answer is stored so an identical question does
+   * not pay again, and a failed check still keeps the closest real attempt.
    */
   answerMode?: "story" | "point-of-view";
 }): Promise<
@@ -1120,10 +1274,11 @@ async function generateRoleExpertiseAnswersStep(input: {
       isResultUsable: (stored) =>
         input.answerMode
           ? stored.answers.length > 0
-          : isRoleExpertiseAnswersResultUsable(stored, input.choices),
+          : bestPracticeAnswersReceiptIsUsable(stored, input.choices),
       callProvider: async () => {
         let data: RoleExpertiseAnswersResult = { answers: [] };
         const failedAttempts: RoleExpertiseAnswerParts[] = [];
+        const attemptSets: RoleExpertiseAnswerParts[][] = [];
         for (
           let attempt = 0;
           attempt <= consultationConfig.qualityRegenerationAttempts;
@@ -1154,9 +1309,25 @@ async function generateRoleExpertiseAnswersStep(input: {
           data = {
             answers: response.data.answers.map((answer) => normalizeAnswer(answer)),
           };
+          attemptSets.push(data.answers);
           if (input.answerMode && data.answers[0]) failedAttempts.push(data.answers[0]);
           const merged = mergeQuestionsWithAnswers(input.choices, data.answers);
-          const checked = validateAnswersForMode(merged, input.answerMode);
+          const checked = input.answerMode
+            ? validateAnswersForMode(merged, input.answerMode)
+            : (() => {
+                const issues: string[] = [];
+                const valid: ValidatedRoleExpertiseQuestion[] = [];
+                for (const choice of input.choices) {
+                  const judged = bestPracticePassingDraft(
+                    choice,
+                    answerForChoice(data.answers, choice.text),
+                    sourceTexts,
+                  );
+                  if (judged.issue) issues.push(judged.issue);
+                  else valid.push(judged.question);
+                }
+                return { valid, issues };
+              })();
           lastValid = checked.valid;
           const lastAttempt =
             attempt === consultationConfig.qualityRegenerationAttempts;
@@ -1164,7 +1335,43 @@ async function generateRoleExpertiseAnswersStep(input: {
             return { answers: mappedAnswers(checked.valid) };
           }
           if (lastAttempt) {
-            if (!input.answerMode) return { answers: mappedAnswers(checked.valid) };
+            if (!input.answerMode) {
+              return {
+                answers: input.choices.map((choice) => {
+                  const passed = checked.valid.find(
+                    (question) => question.text === choice.text,
+                  );
+                  if (passed) return mappedAnswers([passed])[0]!;
+                  const attempts = attemptSets
+                    .map((set) => answerForChoice(set, choice.text))
+                    .filter((answer): answer is RoleExpertiseAnswerParts =>
+                      Boolean(answer),
+                    );
+                  const earlierPass = [...attempts].reverse().find((answer) => {
+                    const judged = bestPracticePassingDraft(choice, answer, sourceTexts);
+                    return !judged.issue && judged.question.content.trim().length > 0;
+                  });
+                  if (earlierPass) return normalizeAnswer(earlierPass);
+                  const chosen = chooseAskHarperFallbackAnswer({
+                    attempts,
+                    kind: askHarperAnswerKind(choice.text),
+                    sourceTexts,
+                  });
+                  return chosen
+                    ? normalizeAnswer(chosen.attempt)
+                    : {
+                        text: choice.text,
+                        answerFramework: "CAR" as const,
+                        challenge: null,
+                        situation: null,
+                        task: null,
+                        action: "",
+                        result: "",
+                        followUpQuestion: null,
+                      };
+                }),
+              };
+            }
             const chosen = chooseAskHarperFallbackAnswer({
               attempts: failedAttempts,
               kind: input.answerMode,
@@ -1185,6 +1392,22 @@ async function generateRoleExpertiseAnswersStep(input: {
       },
     });
 
+    if (!input.answerMode) {
+      const questions = input.choices.map((choice) =>
+        bestPracticeDraftForChoice(
+          choice,
+          answerForChoice(gated.data.answers, choice.text),
+          sourceTexts,
+        ),
+      );
+      const withDraft = questions.filter((question) => question.content.trim()).length;
+      return {
+        ok: true,
+        questions,
+        skipped: gated.skipped,
+        keptAfterPartial: withDraft < input.choices.length ? withDraft : null,
+      };
+    }
     const merged = mergeQuestionsWithAnswers(input.choices, gated.data.answers);
     const checked = validateAnswersForMode(merged, input.answerMode);
     if (input.answerMode && checked.valid.length === 0) {
@@ -1228,11 +1451,22 @@ async function generateRoleExpertiseAnswersStep(input: {
       skipped: gated.skipped,
       keptAfterPartial: partial,
     };
-  } catch (error) {
-    if (lastValid.length > 0) {
+  } catch {
+    if (lastValid.length > 0 && input.answerMode) {
       return {
         ok: true,
         questions: lastValid,
+        skipped: false,
+        keptAfterPartial: lastValid.length,
+      };
+    }
+    if (!input.answerMode) {
+      return {
+        ok: true,
+        questions: input.choices.map((choice) => {
+          const recovered = lastValid.find((question) => question.text === choice.text);
+          return recovered ?? unansweredRoleExpertiseQuestion(choice);
+        }),
         skipped: false,
         keptAfterPartial: lastValid.length,
       };
@@ -1246,12 +1480,10 @@ async function generateRoleExpertiseAnswersStep(input: {
       };
     }
     return {
-      ok: false,
+      ok: true,
+      questions: input.choices.map(unansweredRoleExpertiseQuestion),
       skipped: false,
-      message:
-        error instanceof Error
-          ? error.message
-          : "Role-expertise answers could not be generated.",
+      keptAfterPartial: 0,
     };
   }
 }
@@ -1441,9 +1673,12 @@ export async function generateRoleExpertiseWithModel(input: {
   });
   if (!answersStep.ok) {
     return {
-      ok: false,
+      ok: true,
+      questions: questionsStep.choices.map(unansweredRoleExpertiseQuestion),
       skipped: false,
-      message: answersStep.message,
+      questionsSkipped: questionsStep.skipped,
+      answersSkipped: false,
+      keptAfterPartial: 0,
     };
   }
 
@@ -1502,6 +1737,7 @@ export async function storeRoleExpertiseQuestions(input: {
         } as Prisma.InputJsonValue,
       },
     });
+    if (!question.content.trim()) continue;
     await prisma.consultationStatement.create({
       data: {
         organizationId: input.organizationId,
