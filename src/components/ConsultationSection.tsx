@@ -520,14 +520,16 @@ export async function ConsultationSection({
           </p>
         ) : null}
         {canEdit && !session && !consultationBusy ? (
-          <div className="mt-3 flex flex-wrap gap-3">
-            <ApplicationActionForm
-              action={skipConsultationAction}
-              submitLabel="Skip consultation"
-              testId="skip-consultation"
-            >
-              <input type="hidden" name="campaignId" value={campaignId} />
-            </ApplicationActionForm>
+          <div className="hidden" data-testid="skip-consultation-hidden">
+            <div className="mt-3 flex flex-wrap gap-3">
+              <ApplicationActionForm
+                action={skipConsultationAction}
+                submitLabel="Skip consultation"
+                testId="skip-consultation"
+              >
+                <input type="hidden" name="campaignId" value={campaignId} />
+              </ApplicationActionForm>
+            </div>
           </div>
         ) : null}
         {hasStanding ? (

@@ -25,7 +25,7 @@ function src(rel: string): string {
 describe("Harper start button and Ask Harper availability", () => {
   it("places the green coaching button above Ask Harper and keeps the start action", () => {
     expect(consultationConversationCopy.prepareCoaching).toBe(
-      "Have Harper Prepare Coaching Against the Job Requirements",
+      "Click Here to Start Harper's Coaching Against the Job Requirements",
     );
     const section = src("src/components/ConsultationSection.tsx");
     const buttonAt = section.indexOf("consultationConversationCopy.prepareCoaching");
@@ -44,6 +44,23 @@ describe("Harper start button and Ask Harper availability", () => {
     const success = button.slice(button.indexOf("success:"), button.indexOf("chip:"));
     expect(success).toContain("bg-success");
     expect(success).toContain("text-on-ink");
+    expect(success).toContain("cursor-pointer");
+    expect(success).toContain("hover:bg-success-tint");
+    expect(success).toContain("focus-visible:bg-success-tint");
+    expect(success).toContain("hover:text-success");
+    expect(success).toContain("focus-visible:text-success");
+    const skipAt = section.indexOf('submitLabel="Skip consultation"');
+    const hideAt = section.lastIndexOf('className="hidden"', skipAt);
+    expect(skipAt).toBeGreaterThan(-1);
+    expect(hideAt).toBeGreaterThan(-1);
+    expect(skipAt - hideAt).toBeLessThan(500);
+    expect(section).toContain("skipConsultationAction");
+    expect(src("src/app/actions/consultation.ts")).toContain(
+      "export async function skipConsultationAction",
+    );
+    expect(src("src/lib/consultation/service.ts")).toContain(
+      "export async function skipConsultation",
+    );
   });
 
   it("treats a consultant question as Harper having asked, and ignores notes", () => {

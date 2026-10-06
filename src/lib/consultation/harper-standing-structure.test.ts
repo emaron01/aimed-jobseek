@@ -268,9 +268,13 @@ describe("ITEM 4: no consultation asset side effects; DONE stays an open hub", (
     expect(section).not.toContain("skip-consultation-open");
     expect(section).not.toContain("enqueueAssetsAfterConsultation");
     expect(section).not.toContain("queueAssetsForCampaign");
-    // Pre-start Skip consultation control remains for product-owner decision.
+    // Pre-start Skip consultation stays in the page and is hidden from seekers.
     expect(section).toContain('submitLabel="Skip consultation"');
     expect(section).toContain("skipConsultationAction");
+    const skipAt = section.indexOf('submitLabel="Skip consultation"');
+    const hideAt = section.lastIndexOf('className="hidden"', skipAt);
+    expect(hideAt).toBeGreaterThan(-1);
+    expect(skipAt - hideAt).toBeLessThan(500);
   });
 
   it("consultation service never enqueues resume/cover assets on completion paths", () => {

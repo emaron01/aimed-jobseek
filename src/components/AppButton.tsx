@@ -30,7 +30,7 @@ const VARIANT_CLASS: Record<AppButtonVariant, string> = {
   orange:
     "border border-bright-orange bg-bright-orange text-on-bright-orange hover:bg-bright-orange active:bg-bright-orange focus-visible:outline-focus disabled:bg-edge-strong disabled:text-on-ink",
   success:
-    "bg-success text-on-ink hover:bg-success active:bg-success focus-visible:outline-focus disabled:bg-edge-strong disabled:text-on-ink",
+    "cursor-pointer bg-success text-on-ink hover:bg-success-tint hover:text-success focus-visible:bg-success-tint focus-visible:text-success active:bg-success-tint active:text-success focus-visible:outline-focus disabled:bg-edge-strong disabled:text-on-ink",
   chip:
     "border border-edge-strong bg-surface px-2 py-0.5 text-[11px] text-ink underline decoration-edge-strong underline-offset-2 shadow-sm hover:bg-canvas active:bg-canvas focus-visible:outline-focus disabled:border-edge disabled:text-subtle disabled:no-underline",
 };
