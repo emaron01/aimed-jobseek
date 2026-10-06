@@ -384,12 +384,11 @@ export function planQuestionRound(input: {
   askedQuestions?: readonly AskedConsultationQuestion[];
   focusTargetKey?: string | null;
   profileItems?: GapProfileItem[];
+  questionLimit?: number;
 }): QuestionRoundPlan {
   const askedQuestions = input.askedQuestions ?? [];
-  const remainingQuestionSlots = Math.max(
-    0,
-    consultationConfig.applicationQuestionLimit - askedQuestions.length,
-  );
+  const questionLimit = input.questionLimit ?? consultationConfig.applicationQuestionLimit;
+  const remainingQuestionSlots = Math.max(0, questionLimit - askedQuestions.length);
   const selected = selectGapsForRound({
     assessments: input.assessments,
     askedKeys: input.askedKeys,

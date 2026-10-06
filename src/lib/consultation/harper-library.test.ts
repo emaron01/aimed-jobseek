@@ -79,7 +79,7 @@ describe("Harper library instructions and fingerprint", () => {
       "Combine as many approved answers and profile facts as the question needs. Keep every employer, number, title, and outcome exactly as stated; a result achieved at one company stays at that company. Use this company and role only to frame why the experience matters here.",
     );
     expect(ROLE_EXPERTISE_PROMPT_VERSION).toBe("3");
-    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("8");
+    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("9");
   });
 
   it("puts an explicit empty library match in the answers fingerprint and changes it when the source content changes", () => {

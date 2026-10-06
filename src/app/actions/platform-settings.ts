@@ -23,11 +23,17 @@ import {
   PLATFORM_SETTING_BILLING_TRIAL,
 } from "@/lib/billing/trial-period";
 import {
+  DEFAULT_HARPER_DRAFT_SETTINGS,
+  HARPER_DRAFT_SETTINGS_KEY,
+  parseHarperDraftSettings,
+} from "@/lib/consultation/harper-draft-settings";
+import {
   deletePlatformSetting,
   getBillingTrialPlatformSetting,
   upsertBillingCatalogSetting,
   upsertBillingPricesSetting,
   upsertBillingTrialSetting,
+  upsertPlatformSetting,
 } from "@/lib/platform/settings";
 import { TenantError } from "@/lib/tenant/errors";
 
@@ -401,6 +407,43 @@ export async function updateBillingCatalogSettingAction(
     return {
       ok: true,
       message: `Catalog saved for ${entry.displayName}. New Checkout and Stripe sync use these floors; existing orgs keep their stored policies.`,
+    };
+  } catch (error) {
+    return { ok: false, message: toSafeError(error) };
+  }
+}
+
+export async function updateHarperDraftSettingsAction(
+  _prev: PlatformSettingsActionResult | null,
+  formData: FormData,
+): Promise<PlatformSettingsActionResult> {
+  try {
+    const user = await requirePlatformSuperAdmin();
+    const intent = String(formData.get("intent") || "save").trim();
+    if (intent === "clear") {
+      await deletePlatformSetting({
+        key: HARPER_DRAFT_SETTINGS_KEY,
+        actorUserId: user.id,
+      });
+      revalidatePath("/platform/harper");
+      return {
+        ok: true,
+        message: "Harper draft settings cleared. Defaults apply on the next Harper run.",
+      };
+    }
+    const raw = Object.fromEntries(
+      Object.keys(DEFAULT_HARPER_DRAFT_SETTINGS).map((key) => [key, formData.get(key)]),
+    );
+    const settings = parseHarperDraftSettings(raw);
+    await upsertPlatformSetting({
+      key: HARPER_DRAFT_SETTINGS_KEY,
+      value: settings,
+      actorUserId: user.id,
+    });
+    revalidatePath("/platform/harper");
+    return {
+      ok: true,
+      message: "Harper draft settings saved. Harper reads them the next time it plans or drafts.",
     };
   } catch (error) {
     return { ok: false, message: toSafeError(error) };

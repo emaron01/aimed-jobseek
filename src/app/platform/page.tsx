@@ -93,6 +93,12 @@ export default async function PlatformHomePage() {
       body: "Publish End User License Agreement versions users must accept.",
       superAdminOnly: true,
     },
+    {
+      href: "/platform/harper",
+      title: "Harper drafts",
+      body: "Best-practice count, question limit, and spoken-answer length targets.",
+      superAdminOnly: true,
+    },
   ].filter((a) => !a.superAdminOnly || canEditTemplates);
 
   return (

@@ -37,6 +37,12 @@ const PLATFORM_NAV_ITEMS = [
     match: "exact" as const,
     superAdminOnly: true,
   },
+  {
+    href: "/platform/harper",
+    label: "Harper drafts",
+    match: "exact" as const,
+    superAdminOnly: true,
+  },
 ] as const;
 
 function itemsForRole(platformRole: PlatformRole) {

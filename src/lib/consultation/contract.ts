@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONSULTATION_PROMPT_VERSION = "38";
+export const CONSULTATION_PROMPT_VERSION = "39";
 /**
  * Lean planning decision instructions. Not part of CONSULTATION_PROMPT_VERSION,
  * so a change here does not enqueue a seeker-background reassess.
@@ -134,6 +134,7 @@ export const consultationPolishSchema = z.object({
   result: z.string().nullable(),
   resumeBullet: z.string().nullable(),
   strengtheningNote: z.string().nullable(),
+  keyPoints: z.array(z.string()).default([]),
 });
 
 export type ConsultationPlanResult = z.infer<typeof consultationPlanSchema>;
@@ -146,7 +147,10 @@ export type ConsultationExtractAnswer = ConsultationExtractResult & {
   replyType: "answer";
   gapDecision: "evidence" | "no_evidence" | "incomplete";
 };
-export type ConsultationPolishResult = z.infer<typeof consultationPolishSchema>;
+type ParsedConsultationPolish = z.output<typeof consultationPolishSchema>;
+export type ConsultationPolishResult = Omit<ParsedConsultationPolish, "keyPoints"> & {
+  keyPoints?: string[];
+};
 
 export function isConsultationPolishPartsResult(
   value: ConsultationPolishResult,

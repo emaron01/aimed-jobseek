@@ -46,6 +46,7 @@ export async function loadCheatSheetCoachQaByContact(input: {
           content: true,
           strengtheningNote: true,
           createdAt: true,
+          groundingJson: true,
         },
       },
     },
@@ -72,6 +73,7 @@ export async function loadCheatSheetCoachQaByContact(input: {
       content: statement.content,
       strengtheningNote: statement.strengtheningNote,
       createdAt: statement.createdAt,
+      groundingJson: statement.groundingJson,
     })),
   });
 

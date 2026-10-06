@@ -89,6 +89,7 @@ export async function loadAskHarperDrafts(input: {
           content: true,
           strengtheningNote: true,
           createdAt: true,
+          groundingJson: true,
         },
       },
     },

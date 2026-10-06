@@ -327,7 +327,7 @@ describe("lean planning instructions", () => {
     expect(CONSULTATION_PLAN_WRITING_INSTRUCTIONS).not.toContain(
       "EXPERIMENTAL. Not production.",
     );
-    expect(CONSULTATION_PROMPT_VERSION).toBe("38");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("39");
     expect(CONSULTATION_PLAN_DECISION_PROMPT_VERSION).toBe("6");
     expect(CONSULTATION_PLAN_WRITING_PROMPT_VERSION).toBe("6");
     const messages = buildConsultationPlanDecisionMessages({

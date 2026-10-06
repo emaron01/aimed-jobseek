@@ -249,7 +249,7 @@ describe("Ask Harper question shape", () => {
     expect(ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS).toContain(
       "Combine as many approved answers and profile facts as the question needs. Keep every employer, number, title, and outcome exactly as stated; a result achieved at one company stays at that company. Use this company and role only to frame why the experience matters here.",
     );
-    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("8");
+    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("9");
     expect(ROLE_EXPERTISE_PROMPT_VERSION).toBe("3");
     const roleExpertise = readFileSync("src/lib/consultation/role-expertise.ts", "utf8");
     const jobFn = roleExpertise.slice(

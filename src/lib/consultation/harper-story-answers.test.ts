@@ -85,7 +85,7 @@ describe("story answer instructions", () => {
     expect(at).toBeGreaterThanOrEqual(0);
     const after = ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS.slice(at + STORY_SENTENCE.length);
     expect(after.trimStart().startsWith(STORY_ADDITION)).toBe(true);
-    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("8");
+    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("9");
   });
 });
 
@@ -136,7 +136,7 @@ describe("per-question approved-answer matching", () => {
 });
 
 describe("whole stored drafts", () => {
-  it("keeps the opening when the challenge lived only in the text field", () => {
+  it("stores the model parts once and does not splice an opening that lived only in the text field", () => {
     const question = SELLER_QUESTION;
     const drafts = bestPracticeDraftsForAnswers(
       [
@@ -148,26 +148,24 @@ describe("whole stored drafts", () => {
       ],
       [
         {
-          text: "The company had just been acquired. I led North American sales for the Series A company during that transition. The team kept its largest accounts.",
+          questionId: "role-expertise:seller",
+          text: "The company had just been acquired. I led North American sales at OpenText during that transition. The team kept its largest accounts.",
           answerFramework: "CAR",
           challenge: null,
           situation: null,
           task: null,
-          action: "I led North American sales for the Series A company during that transition.",
+          action: "I led North American sales at OpenText during that transition.",
           result: "The team kept its largest accounts.",
           followUpQuestion: null,
         },
       ],
       [],
+      [{ employer: "OpenText", text: "VP Sales at OpenText", itemType: "EXPERIENCE" }],
     );
     const content = drafts[0]?.content ?? "";
-    expect(content.startsWith("The company had just been acquired")).toBe(true);
-    expect(content).toContain(
-      "I led North American sales for the Series A company during that transition",
-    );
-    expect(content.indexOf("The company had just been acquired")).toBeLessThan(
-      content.indexOf("I led North American"),
-    );
+    expect(content.startsWith("I led North American sales at OpenText")).toBe(true);
+    expect(content).not.toContain("The company had just been acquired");
+    expect(content).toContain("The team kept its largest accounts");
   });
 
   it("keeps a story opening the claim filter would otherwise drop", () => {
@@ -181,17 +179,19 @@ describe("whole stored drafts", () => {
       ],
       [
         {
+          questionId: "role-expertise:seller",
           text: SELLER_QUESTION,
           answerFramework: "CAR",
           challenge: "I joined OpenText as the region changed hands.",
           situation: null,
           task: null,
           action: "I led North American sales for the Series A company during that transition.",
-          result: "Done.",
+          result: "The team kept its largest accounts.",
           followUpQuestion: null,
         },
       ],
       ["North American sales for the Series A company"],
+      [{ employer: "OpenText", text: "VP Sales at OpenText", itemType: "EXPERIENCE" }],
     );
     const content = drafts[0]?.content ?? "";
     expect(content.startsWith("I joined OpenText")).toBe(true);
@@ -237,6 +237,7 @@ describe("gap question drafts from a question match", () => {
       return {
         data: {
           answers: payload.questions.map((question) => ({
+            questionId: "id" in question ? question.id : question.text,
             text: question.text,
             answerFramework: "CAR",
             challenge: "At OpenText two experienced sellers were missing plan.",
@@ -259,7 +260,13 @@ describe("gap question drafts from a question match", () => {
       careerStage: "late_career",
       jobSources: { title: "Director of Sales", employer: "Sift" },
       approvedAnswers: [],
-      profileItems: [],
+      profileItems: [
+        {
+          employer: "OpenText",
+          text: "VP Enterprise Sales at OpenText",
+          itemType: "EXPERIENCE",
+        },
+      ],
       questions: [
         {
           text: SELLER_QUESTION,
@@ -313,6 +320,7 @@ describe("gap question drafts from a question match", () => {
         ],
         [
           {
+            questionId: "required:0",
             text: question,
             answerFramework: "CAR",
             challenge: action,
@@ -324,6 +332,7 @@ describe("gap question drafts from a question match", () => {
           },
         ],
         sources,
+        [{ employer: "OpenText", text: "VP Enterprise Sales at OpenText", itemType: "EXPERIENCE" }],
       );
       return drafts[0]?.content ?? "";
     }
@@ -333,27 +342,21 @@ describe("gap question drafts from a question match", () => {
       "I would convene Sales, Product, Marketing, and Customer Success to respond to the enterprise SaaS market shift.",
       "Win rate rose after that response.",
     );
-    expect(hypothetical).toBe(market);
-    expect(hypothetical).not.toMatch(/^\s*I would\b/i);
-    expect(hypothetical).toContain("OpenText");
+    expect(hypothetical).toBe("");
 
     const midThought = storyDraft(
       "Tell me about a time the forecast lacked consistency.",
       "The lack of consistency made it difficult to forecast the quarter.",
       "Forecast accuracy rose after the rebuild.",
     );
-    expect(midThought).toBe(forecast);
-    expect(midThought).not.toMatch(/^\s*The lack of consistency\b/);
-    expect(midThought).toContain("OpenText");
+    expect(midThought).toBe("");
 
     const unnamed = storyDraft(
       SELLER_QUESTION,
       "Two individuals were underperforming on the team.",
       "Those representatives became top performers.",
     );
-    expect(unnamed).toBe(sellers);
-    expect(unnamed).not.toMatch(/^\s*Two individuals\b/);
-    expect(unnamed).toContain("OpenText");
+    expect(unnamed).toBe("");
 
     const alreadyGrounded = storyDraft(
       "Tell me about a time you coached sellers at a company.",
@@ -373,6 +376,7 @@ describe("gap question drafts from a question match", () => {
       ],
       [
         {
+          questionId: "required:1",
           text: "Tell me about a time you ran deal reviews.",
           answerFramework: "CAR",
           challenge: "I ran weekly deal reviews at OpenText so the forecast the leadership team saw was one I would stand behind.",
@@ -383,7 +387,8 @@ describe("gap question drafts from a question match", () => {
           followUpQuestion: null,
         },
       ],
-      sources,
+        sources,
+      [{ employer: "OpenText", text: "VP Enterprise Sales at OpenText", itemType: "EXPERIENCE" }],
     );
     expect(withIncidentalWould[0]?.content).toContain("I would stand behind");
     expect(withIncidentalWould[0]?.content).toContain("OpenText");
@@ -399,6 +404,7 @@ describe("gap question drafts from a question match", () => {
       ],
       [
         {
+          questionId: "required:2",
           text: "Which leading indicators would you use to inspect the forecast?",
           answerFramework: "CAR",
           challenge: null,

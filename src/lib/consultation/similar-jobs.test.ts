@@ -198,6 +198,18 @@ describe("best-practice drafts", () => {
       ],
       [
         {
+          questionId: "role-expertise:2",
+          text: "pipeline story",
+          answerFramework: "CAR",
+          challenge: "At OpenText I inherited an unhealthy pipeline.",
+          situation: null,
+          task: null,
+          action: "I reset the inspection rhythm with the managers.",
+          result: "The forecast I stood behind was the one we shipped.",
+          followUpQuestion: null,
+        },
+        {
+          questionId: "role-expertise:1",
           text: "I am drawn to this role because it owns forecast discipline and manager standards.",
           answerFramework: "CAR",
           challenge: null,
@@ -207,18 +219,9 @@ describe("best-practice drafts", () => {
           result: "",
           followUpQuestion: null,
         },
-        {
-          text: "pipeline story",
-          answerFramework: "CAR",
-          challenge: "I inherited an unhealthy pipeline.",
-          situation: null,
-          task: null,
-          action: "I reset the inspection rhythm with the managers.",
-          result: "The forecast I stood behind was the one we shipped.",
-          followUpQuestion: null,
-        },
       ],
       [],
+      [{ employer: "OpenText", text: "Director of Sales at OpenText", itemType: "EXPERIENCE" }],
     );
     expect(drafts[0]?.content).toContain("forecast discipline");
     expect(drafts[1]?.content).toContain("forecast I stood behind");
@@ -262,6 +265,7 @@ describe("gap drafts in one answers call", () => {
       return {
         data: {
           answers: payload.questions.map((question) => ({
+            questionId: "id" in question ? question.id : question.text,
             text: question.text,
             answerFramework: "CAR",
             challenge: "The rep was missing quota.",

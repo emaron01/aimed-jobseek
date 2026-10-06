@@ -527,6 +527,7 @@ export async function polishAnswerWithModel(input: {
   }>;
   /** Question turn id, or the target key when the turn is not known. */
   questionKey?: string | null;
+  spokenAnswerWords?: number;
   usage?: AiCallUsageContext;
 }): Promise<
   | { ok: true; data: ConsultationPolishResult }

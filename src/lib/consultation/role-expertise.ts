@@ -50,6 +50,24 @@ import {
   type InterviewTypeTag,
 } from "@/lib/consultation/contract";
 import {
+  dropRepeatedSentences,
+  matchAnswersByQuestionId,
+  normalizeKeyPoints,
+  profilePlaceNames,
+  questionLooksMultipart,
+  storyGroundedInProfile,
+  storyNamesUnknownPlace,
+  type ProfilePlaceSource,
+} from "@/lib/consultation/answer-binding";
+import {
+  answerLengthInstruction,
+  DEFAULT_HARPER_DRAFT_SETTINGS,
+  exceedsLengthTarget,
+  getHarperDraftSettings,
+  spokenWordsForQuestion,
+  type HarperDraftSettings,
+} from "@/lib/consultation/harper-draft-settings";
+import {
   composeInterviewAnswerFromParts,
   narrativeAnswerParts,
   containsFrameworkOrPartLabel,
@@ -83,7 +101,7 @@ export const ROLE_EXPERTISE_PROMPT_VERSION = "3";
  * Questions stay on ROLE_EXPERTISE_PROMPT_VERSION, so a bump here does not
  * invalidate a stored questions receipt or rewrite stored suggested answers.
  */
-export const ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION = "8";
+export const ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION = "9";
 
 export const COACHING_SET_MIN = 20;
 export const COACHING_SET_MAX = 25;
@@ -99,6 +117,8 @@ export const roleExpertiseQuestionsResultSchema = z.object({
 
 export const roleExpertiseAnswerPartsSchema = z.object({
   text: z.string(),
+  questionId: z.string().default(""),
+  keyPoints: z.array(z.string()).default([]),
   answerFramework: z.enum(["CAR", "STAR"]),
   challenge: z.string().nullable(),
   situation: z.string().nullable(),
@@ -135,9 +155,14 @@ export type RoleExpertiseQuestionChoice = z.infer<
 export type RoleExpertiseQuestionsResult = z.infer<
   typeof roleExpertiseQuestionsResultSchema
 >;
-export type RoleExpertiseAnswerParts = z.infer<
-  typeof roleExpertiseAnswerPartsSchema
->;
+type ParsedRoleExpertiseAnswer = z.output<typeof roleExpertiseAnswerPartsSchema>;
+export type RoleExpertiseAnswerParts = Omit<
+  ParsedRoleExpertiseAnswer,
+  "questionId" | "keyPoints"
+> & {
+  questionId?: string;
+  keyPoints?: string[];
+};
 export type RoleExpertiseAnswersResult = z.infer<
   typeof roleExpertiseAnswersResultSchema
 >;
@@ -182,17 +207,20 @@ export function countAllCountedCoachingQuestions(
 }
 
 /**
- * G = counted non-role-expertise after the gap plan.
- * Fill band: [max(0, 20−G), max(0, 25−G)].
+ * G = counted non-role-expertise questions already asked.
+ * Best-practice questions fill up to the Super Admin count, and never past
+ * the overall question limit.
  */
-export function roleExpertiseFillRange(G: number): {
+export function roleExpertiseFillRange(
+  G: number,
+  settings?: Pick<HarperDraftSettings, "bestPracticeCount" | "questionLimit">,
+): {
   minCount: number;
   maxCount: number;
 } {
-  return {
-    minCount: Math.max(0, COACHING_SET_MIN - G),
-    maxCount: Math.max(0, COACHING_SET_MAX - G),
-  };
+  const room = Math.max(0, (settings?.questionLimit ?? 25) - G);
+  const count = Math.min(settings?.bestPracticeCount ?? 8, room);
+  return { minCount: count, maxCount: count };
 }
 
 export type RoleExpertiseJobInputs = {
@@ -412,7 +440,7 @@ export function composedAnswerFromRoleExpertiseQuestion(
   for (const part of parts) {
     if (containsFrameworkOrPartLabel(part)) return null;
   }
-  const content = composeInterviewAnswerFromParts(parts);
+  const content = dropRepeatedSentences(composeInterviewAnswerFromParts(parts));
   if (!content.trim() || containsFrameworkOrPartLabel(content)) return null;
   return { content, grounding };
 }
@@ -422,7 +450,7 @@ export type ValidatedRoleExpertiseQuestion = {
   targetKey: string;
   interviewTypeTag: InterviewTypeTag;
   content: string;
-  grounding: AnswerPartsGrounding;
+  grounding: AnswerPartsGrounding & { keyPoints?: string[] };
   followUpQuestion: string | null;
 };
 
@@ -468,6 +496,12 @@ export function validateRoleExpertiseQuestionChoices(input: {
     }
     if (looksLikeContextFreeTemplateQuestion(text)) {
       issues.push("Drop context-free template questions.");
+      continue;
+    }
+    if (bestPracticeRepeatsGapTarget(text, input.askedQuestions)) {
+      issues.push(
+        "Do not add a best-practice question for a target that already has a gap question.",
+      );
       continue;
     }
     if (questionDuplicatesAsked(text, input.askedQuestions)) {
@@ -606,21 +640,26 @@ export function validateRoleExpertiseQuestions(input: {
   return { valid, issues };
 }
 
+const GAP_QUESTION_TARGET = /^(required|outcome|competency|preferred|mission):/;
+
+function bestPracticeRepeatsGapTarget(
+  text: string,
+  askedQuestions: readonly AskedConsultationQuestion[],
+): boolean {
+  return askedQuestions.some((asked) => {
+    const key = asked.targetKey ?? "";
+    if (!GAP_QUESTION_TARGET.test(key)) return false;
+    return questionNearDuplicate(text, asked.text);
+  });
+}
+
 function mergeQuestionsWithAnswers(
   choices: ValidatedRoleExpertiseQuestionChoice[],
   answers: RoleExpertiseAnswerParts[],
 ): Array<RoleExpertiseQuestion & { followUpQuestion: string | null }> {
-  const byText = new Map(
-    answers.map((answer) => [answer.text.trim().toLowerCase(), answer]),
-  );
-  return choices.map((choice) => {
-    const answer =
-      byText.get(choice.text.toLowerCase()) ??
-      answers.find(
-        (item) =>
-          questionNearDuplicate(item.text, choice.text) ||
-          item.text.trim() === choice.text,
-      );
+  const { matched } = matchAnswersByQuestionId(choices, answers);
+  return choices.map((choice, index) => {
+    const answer = matched[index];
     if (!answer) {
       return {
         text: choice.text,
@@ -688,21 +727,38 @@ export function buildRoleExpertiseAnswersMessages(input: {
   profileItems: unknown[];
   approvedAnswers?: readonly ApprovedAnswerEvidence[];
   qualityFeedback?: string[];
+  settings?: HarperDraftSettings;
+  recentRoleCount?: number;
 }) {
+  const settings = input.settings ?? DEFAULT_HARPER_DRAFT_SETTINGS;
+  const wordsFor = (question: ValidatedRoleExpertiseQuestionChoice) =>
+    spokenWordsForQuestion({
+      settings,
+      text: question.text,
+      targetKey: question.targetKey,
+      walkThrough: looksLikeCareerWalkThrough(question.text),
+      recentRoleCount: input.recentRoleCount,
+    });
+  const wordTargets = [...new Set(input.questions.map((question) => wordsFor(question)))];
+  const lengthInstructions = wordTargets.map((words) => answerLengthInstruction(words)).join("\n\n");
   return [
     {
       role: "system" as const,
       content: `Prompt version: ${ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION}
 
-${ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS}`,
+${ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS}
+
+${lengthInstructions}`,
     },
     {
       role: "user" as const,
       content: JSON.stringify({
         careerStage: input.careerStage,
         questions: input.questions.map((question) => ({
+          id: question.targetKey,
           text: question.text,
           interviewTypeTag: question.interviewTypeTag,
+          words: wordsFor(question),
         })),
         approvedAnswers: input.approvedAnswers ?? [],
         jobSources: input.jobSources,
@@ -990,164 +1046,34 @@ function unansweredRoleExpertiseQuestion(
   };
 }
 
-function answerEchoesQuestion(answerText: string, questionText: string): boolean {
-  const left = answerText.trim().toLowerCase();
-  const right = questionText.trim().toLowerCase();
-  if (!left || !right) return false;
-  if (left === right) return true;
-  return questionNearDuplicate(answerText, questionText);
-}
-
-function answerHasParts(answer: RoleExpertiseAnswerParts): boolean {
-  return [answer.challenge, answer.situation, answer.task, answer.action, answer.result].some(
-    (part) => (part ?? "").trim().length > 0,
-  );
-}
-
-/**
- * Sentences in `text` that come before the action. The answers schema uses
- * `text` as the question echo, so an opening written only there is otherwise
- * discarded once any later part is set.
- */
-function leadingProse(prose: string, later: string): string {
-  const needle = later.replace(/\s+/g, " ").trim().slice(0, 40).toLowerCase();
-  if (needle.length < 12) return "";
-  const index = prose.toLowerCase().indexOf(needle);
-  if (index <= 0) return "";
-  return prose.slice(0, index).trim();
-}
-
-/**
- * A story whose challenge or situation is empty still has that opening when
- * the model wrote it in `text` ahead of the action. Point-of-view answers are
- * left as they are.
- */
-function restoreStoryOpening(
-  answer: RoleExpertiseAnswerParts,
-  questionText: string,
-): RoleExpertiseAnswerParts {
-  if (askHarperAnswerKind(questionText) !== "story") return answer;
-  const openingField = answer.answerFramework === "STAR" ? "situation" : "challenge";
-  if (fieldText(answer[openingField])) return answer;
-  const prose = answer.text.trim();
-  if (!prose || answerEchoesQuestion(prose, questionText)) return answer;
-  const action = fieldText(answer.action);
-  const lead = action ? leadingProse(prose, action) : "";
-  if (lead) return { ...answer, [openingField]: lead };
-  if (
-    action &&
-    prose.length > action.length &&
-    !prose.toLowerCase().startsWith(action.toLowerCase().slice(0, 24))
-  ) {
-    return { ...answer, [openingField]: prose };
-  }
-  return answer;
-}
-
-/** Stored content keeps every opening part, so it does not start at a later sentence. */
-function withStoryOpening(answer: RoleExpertiseAnswerParts, content: string): string {
-  const openings = [fieldText(answer.situation), fieldText(answer.challenge)].filter(Boolean);
-  let next = content;
-  for (const opening of [...openings].reverse()) {
-    const needle = opening.toLowerCase().slice(0, 40);
-    if (!needle || next.toLowerCase().includes(needle)) continue;
-    next = composeInterviewAnswerFromParts([opening, next]);
-  }
-  return next;
-}
-
-/**
- * When the full answer is in `text` and a later part repeats its middle, keep
- * the sentences that come first. Those sentences are what name the thing a
- * later sentence calls "the transition".
- */
-function keepEarlierProse(
-  answer: RoleExpertiseAnswerParts,
-  questionText: string,
-): RoleExpertiseAnswerParts {
-  const prose = answer.text.trim();
-  if (!prose || answerEchoesQuestion(prose, questionText)) return answer;
-  const firstPart = [
-    fieldText(answer.situation),
+function answerBody(answer: RoleExpertiseAnswerParts, questionText: string): string {
+  const parts = [
     fieldText(answer.challenge),
+    fieldText(answer.situation),
     fieldText(answer.task),
     fieldText(answer.action),
-  ].find(Boolean);
-  if (!firstPart) return answer;
-  const needle = firstPart.replace(/\s+/g, " ").trim().slice(0, 40).toLowerCase();
-  if (needle.length < 12) return answer;
-  const index = prose.toLowerCase().indexOf(needle);
-  if (index <= 0) return answer;
-  const lead = prose.slice(0, index).trim();
-  if (!lead) return answer;
-  const situation = fieldText(answer.situation);
-  if (!situation) return { ...answer, situation: lead };
-  if (situation.toLowerCase().includes(lead.toLowerCase().slice(0, 24))) return answer;
-  return { ...answer, situation: `${lead} ${situation}` };
-}
-
-/**
- * The answers schema calls the question echo `text`. When the model puts the
- * answer there, or returns one answer per question in order, keep that prose
- * and store the question on `text` so the draft can be joined.
- */
-function withProseFromTextField(
-  answer: RoleExpertiseAnswerParts,
-  questionText: string,
-): RoleExpertiseAnswerParts {
-  if (answerHasParts(answer)) {
-    const restored = keepEarlierProse(
-      restoreStoryOpening(answer, questionText),
-      questionText,
-    );
-    return answerEchoesQuestion(restored.text, questionText)
-      ? restored
-      : { ...restored, text: questionText };
+    fieldText(answer.result),
+  ].filter(Boolean);
+  let body = composeInterviewAnswerFromParts(parts);
+  if (!body.trim()) {
+    const prose = answer.text.trim();
+    if (prose && prose.toLowerCase() !== questionText.trim().toLowerCase()) {
+      body = prose;
+    }
   }
-  const prose = answer.text.trim();
-  if (!prose || prose.toLowerCase() === questionText.trim().toLowerCase()) {
-    return { ...answer, text: questionText };
-  }
-  return { ...answer, text: questionText, action: prose };
+  return dropRepeatedSentences(body);
 }
 
-export function alignAnswersToChoices(
-  choices: readonly { text: string }[],
-  answers: readonly RoleExpertiseAnswerParts[],
-): Array<RoleExpertiseAnswerParts | undefined> {
-  const used = new Set<number>();
-  const aligned: Array<RoleExpertiseAnswerParts | undefined> = choices.map(
-    () => undefined,
-  );
-  choices.forEach((choice, index) => {
-    const found = answers.findIndex(
-      (answer, answerIndex) =>
-        !used.has(answerIndex) && answerEchoesQuestion(answer.text, choice.text),
-    );
-    if (found < 0) return;
-    used.add(found);
-    aligned[index] = withProseFromTextField(answers[found]!, choice.text);
-  });
-  if (answers.length !== choices.length) return aligned;
-  const unused = answers.map((_, index) => index).filter((index) => !used.has(index));
-  choices.forEach((choice, index) => {
-    if (aligned[index]) return;
-    const next = unused.shift();
-    if (next == null) return;
-    aligned[index] = withProseFromTextField(answers[next]!, choice.text);
-  });
-  return aligned;
-}
-
-/** Drafts for a best-practice answers receipt, including prose that did not echo the question. */
+/** Drafts stored only on the question id each answer names. */
 export function bestPracticeDraftsForAnswers(
   choices: readonly ValidatedRoleExpertiseQuestionChoice[],
   answers: readonly RoleExpertiseAnswerParts[],
   sourceTexts: readonly string[],
+  profileItems: readonly ProfilePlaceSource[] = [],
 ): ValidatedRoleExpertiseQuestion[] {
-  const aligned = alignAnswersToChoices(choices, answers);
+  const { matched } = matchAnswersByQuestionId(choices, answers);
   return choices.map((choice, index) =>
-    bestPracticeDraftForChoice(choice, aligned[index], sourceTexts),
+    bestPracticeDraftForChoice(choice, matched[index], sourceTexts, profileItems),
   );
 }
 
@@ -1242,61 +1168,6 @@ function bestPracticePassingDraft(
 const STORY_HYPOTHETICAL_SENTENCE = /^\s*I would\b/i;
 const STORY_MID_THOUGHT_OPENING =
   /^\s*(?:the|that|this)\s+(?:lack|purchase|transition|change|shift|move|acquisition|merger|reorganization|rotation|handoff|handover|deal|process|gap|issue|problem)\b/i;
-const STORY_PLACE_STOP = new Set([
-  "the",
-  "this",
-  "that",
-  "when",
-  "after",
-  "before",
-  "during",
-  "while",
-  "with",
-  "from",
-  "into",
-  "over",
-  "then",
-  "they",
-  "there",
-  "these",
-  "those",
-  "what",
-  "where",
-  "which",
-  "your",
-  "their",
-  "about",
-  "through",
-  "between",
-  "across",
-  "within",
-  "without",
-  "sales",
-  "product",
-  "marketing",
-  "customer",
-  "success",
-  "enterprise",
-  "recent",
-  "senior",
-  "director",
-  "manager",
-  "nurse",
-  "charge",
-  "vice",
-  "president",
-  "head",
-  "lead",
-  "leader",
-  "team",
-  "company",
-  "north",
-  "american",
-  "series",
-  "role",
-  "job",
-]);
-
 function storySentences(content: string): string[] {
   return content
     .split(/(?<=[.!?])\s+/)
@@ -1315,137 +1186,47 @@ function isHypotheticalStory(content: string): boolean {
   return leading.length > 0 && leading.length * 2 >= sentences.length;
 }
 
-function storyPlaceNames(sourceTexts: readonly string[]): string[] {
-  const names = new Set<string>();
-  for (const source of sourceTexts) {
-    const trimmed = source.trim();
-    if (!trimmed) continue;
-    const words = trimmed.split(/\s+/).filter(Boolean);
-    if (words.length <= 4 && trimmed.length <= 80 && !/[.!?]/.test(trimmed)) {
-      names.add(trimmed);
-    }
-    for (const sentence of storySentences(trimmed)) {
-      const rest = sentence.replace(/^\s*\S+\s*/, "");
-      for (const match of rest.matchAll(/\b[A-Z][A-Za-z0-9&.'+-]{2,}\b/g)) {
-        const word = match[0];
-        if (!STORY_PLACE_STOP.has(word.toLowerCase())) names.add(word);
-      }
-    }
-  }
-  return [...names].filter((name) => name.length >= 3);
-}
-
-function textNamesPlace(content: string, places: readonly string[]): boolean {
-  if (places.length === 0) return true;
-  const lower = content.toLowerCase();
-  return places.some((place) => lower.includes(place.toLowerCase()));
-}
-
-function opensMidThought(content: string, places: readonly string[]): boolean {
+function opensMidThought(content: string, names: readonly string[]): boolean {
   const first = storySentences(content)[0] ?? content;
   if (!STORY_MID_THOUGHT_OPENING.test(first)) return false;
-  return !textNamesPlace(first, places);
+  return !storyGroundedInProfile(first, names);
 }
 
-function storyWordOverlap(left: string, right: string): number {
-  const stems = (value: string) =>
-    new Set(
-      value
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, " ")
-        .split(/\s+/)
-        .filter((word) => word.length >= 5)
-        .map((word) => word.slice(0, 6)),
-    );
-  const leftStems = stems(left);
-  let hits = 0;
-  for (const stem of stems(right)) {
-    if (leftStems.has(stem)) hits += 1;
-  }
-  return hits;
-}
-
-function storyDraftFollowsRules(
-  content: string,
-  sourceTexts: readonly string[],
-): boolean {
-  const text = content.trim();
-  if (!text) return false;
-  if (isHypotheticalStory(text)) return false;
-  const places = storyPlaceNames(sourceTexts);
-  if (!textNamesPlace(text, places)) return false;
-  if (opensMidThought(text, places)) return false;
-  return true;
-}
-
-function repairMidThoughtOpening(
-  content: string,
-  places: readonly string[],
-): string {
-  const place = places.find((name) =>
-    content.toLowerCase().includes(name.toLowerCase()),
-  );
-  if (!place) return "";
-  const lowered = content.charAt(0).toLowerCase() + content.slice(1);
-  const repaired = `At ${place}, ${lowered}`;
-  return opensMidThought(repaired, places) ? "" : repaired;
-}
-
-function groundedStoryFromSources(
-  draft: string,
-  sourceTexts: readonly string[],
-): string {
-  let best = "";
-  let bestScore = 0;
-  for (const source of sourceTexts) {
-    const text = source.trim();
-    if (text.split(/\s+/).filter(Boolean).length < 12) continue;
-    if (!storyDraftFollowsRules(text, sourceTexts)) continue;
-    const score = storyWordOverlap(draft, text);
-    if (score > bestScore) {
-      best = text;
-      bestScore = score;
-    }
-  }
-  return best;
-}
-
-/**
- * Gap drafts and best-practice drafts share this gate.
- * A story is a real experience: not hypothetical, not a mid-thought opening,
- * and it names a place from the seeker's sources when one is known.
- * When the model draft fails, the closest stated experience is used.
- * A story that still cannot be grounded is left unanswered.
- */
 function storyDraftContent(
   content: string,
-  sourceTexts: readonly string[],
+  profileItems: readonly ProfilePlaceSource[],
 ): string {
-  const text = content.trim();
-  if (!text) return "";
-  const places = storyPlaceNames(sourceTexts);
-  if (
-    !isHypotheticalStory(text) &&
-    textNamesPlace(text, places) &&
-    !opensMidThought(text, places)
-  ) {
-    return text;
-  }
-  if (
-    !isHypotheticalStory(text) &&
-    textNamesPlace(text, places) &&
-    opensMidThought(text, places)
-  ) {
-    const repaired = repairMidThoughtOpening(text, places);
-    if (repaired && storyDraftFollowsRules(repaired, sourceTexts)) return repaired;
-  }
-  return groundedStoryFromSources(text, sourceTexts);
+  const text = dropRepeatedSentences(content.trim());
+  if (!text || isHypotheticalStory(text)) return "";
+  const names = profilePlaceNames(profileItems);
+  if (!storyGroundedInProfile(text, names)) return "";
+  if (storyNamesUnknownPlace(text, names)) return "";
+  if (opensMidThought(text, names)) return "";
+  return text;
+}
+
+function attachKeyPoints(
+  question: ValidatedRoleExpertiseQuestion,
+  answer: RoleExpertiseAnswerParts | undefined,
+): ValidatedRoleExpertiseQuestion {
+  const keyPoints = normalizeKeyPoints(answer?.keyPoints);
+  const content = dropRepeatedSentences(question.content);
+  if (!keyPoints.length && content === question.content) return question;
+  return {
+    ...question,
+    content,
+    grounding: {
+      ...question.grounding,
+      ...(keyPoints.length ? { keyPoints } : {}),
+    },
+  };
 }
 
 function bestPracticeDraftForChoice(
   choice: ValidatedRoleExpertiseQuestionChoice,
   answer: RoleExpertiseAnswerParts | undefined,
   sourceTexts: readonly string[],
+  profileItems: readonly ProfilePlaceSource[] = [],
 ): ValidatedRoleExpertiseQuestion {
   const kind = askHarperAnswerKind(choice.text);
   const passed = bestPracticePassingDraft(choice, answer, sourceTexts);
@@ -1454,11 +1235,11 @@ function bestPracticeDraftForChoice(
     question = passed.question;
   } else {
     const assembled = answer
-      ? askHarperUnpassedDraft({ answer, kind, sourceTexts }) ||
+      ? answerBody(answer, choice.text) ||
+        askHarperUnpassedDraft({ answer, kind, sourceTexts }) ||
         askHarperAttemptProse(answer)
       : "";
-    const content =
-      answer && kind === "story" ? withStoryOpening(answer, assembled) : assembled;
+    const content = dropRepeatedSentences(assembled);
     if (!content) return unansweredRoleExpertiseQuestion(choice);
     question = {
       text: choice.text,
@@ -1470,11 +1251,12 @@ function bestPracticeDraftForChoice(
         action: content,
         result: "",
       },
-      followUpQuestion: followUpText(answer),
+      followUpQuestion: answer ? followUpText(answer) : null,
     };
   }
+  question = attachKeyPoints(question, answer);
   if (kind !== "story") return question;
-  const content = storyDraftContent(question.content, sourceTexts);
+  const content = storyDraftContent(question.content, profileItems);
   if (!content.trim()) return unansweredRoleExpertiseQuestion(choice);
   if (content === question.content) return question;
   return {
@@ -1517,6 +1299,8 @@ function mappedAnswers(questions: ValidatedRoleExpertiseQuestion[]) {
     challenge: item.grounding.challenge ?? null,
     situation: item.grounding.situation ?? null,
     task: item.grounding.task ?? null,
+    questionId: item.targetKey,
+    keyPoints: item.grounding.keyPoints ?? [],
     action: item.grounding.action,
     result: item.grounding.result,
     followUpQuestion: item.followUpQuestion,
@@ -1527,13 +1311,15 @@ function normalizeAnswer(
   answer: Omit<RoleExpertiseAnswerParts, "followUpQuestion"> & {
     followUpQuestion?: string | null;
   },
-): RoleExpertiseAnswerParts {
+): z.output<typeof roleExpertiseAnswerPartsSchema> {
   return {
     text: answer.text,
     answerFramework: answer.answerFramework,
     challenge: answer.challenge ?? null,
     situation: answer.situation ?? null,
     task: answer.task ?? null,
+    questionId: answer.questionId ?? "",
+    keyPoints: normalizeKeyPoints(answer.keyPoints),
     action: answer.action ?? "",
     result: answer.result ?? "",
     followUpQuestion: followUpText(answer),
@@ -1564,6 +1350,78 @@ function askHarperSourceTexts(
   return texts;
 }
 
+function profilePlaceSources(items: readonly unknown[]): ProfilePlaceSource[] {
+  const sources: ProfilePlaceSource[] = [];
+  for (const item of items) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as ProfilePlaceSource;
+    sources.push({
+      employer: row.employer ?? null,
+      title: row.title ?? null,
+      text: row.text ?? null,
+      itemType: row.itemType ?? null,
+    });
+  }
+  return sources;
+}
+
+function judgeAnswersForChoices(input: {
+  choices: readonly ValidatedRoleExpertiseQuestionChoice[];
+  answers: readonly RoleExpertiseAnswerParts[];
+  sourceTexts: readonly string[];
+  profileItems: readonly ProfilePlaceSource[];
+  settings: HarperDraftSettings;
+  recentRoleCount?: number;
+  enforceShape: boolean;
+}): { valid: ValidatedRoleExpertiseQuestion[]; issues: string[] } {
+  const issues: string[] = [];
+  const valid: ValidatedRoleExpertiseQuestion[] = [];
+  const { matched, unknownIds } = matchAnswersByQuestionId(input.choices, input.answers);
+  if (unknownIds.length > 0) {
+    issues.push(
+      `Each answer must include questionId set to the id of the question it answers. Missing or unknown ids were discarded: ${unknownIds.join(", ")}.`,
+    );
+  }
+  for (const [index, choice] of input.choices.entries()) {
+    const answer = matched[index];
+    if (!answer) continue;
+    const judged = bestPracticeDraftForChoice(
+      choice,
+      answer,
+      input.sourceTexts,
+      input.profileItems,
+    );
+    if (!judged.content.trim()) {
+      issues.push(
+        `The answer for question id ${choice.targetKey} was not stored.`,
+      );
+      continue;
+    }
+    const words = spokenWordsForQuestion({
+      settings: input.settings,
+      text: choice.text,
+      targetKey: choice.targetKey,
+      walkThrough: looksLikeCareerWalkThrough(choice.text),
+      recentRoleCount: input.recentRoleCount,
+    });
+    if (input.enforceShape && exceedsLengthTarget(judged.content, words)) {
+      issues.push(
+        `The spoken answer for question id ${choice.targetKey} is longer than about ${words} words. ${answerLengthInstruction(words)}`,
+      );
+    }
+    if (input.enforceShape && questionLooksMultipart(choice.text)) {
+      const points = judged.grounding.keyPoints ?? [];
+      if (points.length < 3 || points.length > 5) {
+        issues.push(
+          `Question id ${choice.targetKey} is complex. ${answerLengthInstruction(words)}`,
+        );
+      }
+    }
+    valid.push(judged);
+  }
+  return { valid, issues };
+}
+
 async function generateRoleExpertiseAnswersStep(input: {
   organizationId: string;
   campaignId: string;
@@ -1586,6 +1444,8 @@ async function generateRoleExpertiseAnswersStep(input: {
    * entries set `question` so the match uses that question's own wording.
    */
   evidenceTargets?: ReadonlyArray<{ key: string; text: string; question?: boolean }>;
+  settings?: HarperDraftSettings;
+  recentRoleCount?: number;
 }): Promise<
   | {
       ok: true;
@@ -1642,6 +1502,9 @@ async function generateRoleExpertiseAnswersStep(input: {
     approvedAnswers,
     input.jobSources,
   );
+  const settings = input.settings ?? (await getHarperDraftSettings());
+  const placeSources = profilePlaceSources(input.profileItems);
+  let shapeRewriteUsed = false;
 
   try {
     const gated = await runPaidStructuredCall<RoleExpertiseAnswersResult>({
@@ -1679,6 +1542,8 @@ async function generateRoleExpertiseAnswersStep(input: {
                 profileItems: input.profileItems,
                 approvedAnswers,
                 qualityFeedback,
+                settings,
+                recentRoleCount: input.recentRoleCount,
               }),
               parseOutput: (raw) => ({
                 data: roleExpertiseAnswersResultSchema.parse(raw),
@@ -1689,25 +1554,30 @@ async function generateRoleExpertiseAnswersStep(input: {
             answers: response.data.answers.map((answer) => normalizeAnswer(answer)),
           };
           attemptSets.push(data.answers);
-          if (input.answerMode && data.answers[0]) failedAttempts.push(data.answers[0]);
+          const matchedForAttempt = matchAnswersByQuestionId(input.choices, data.answers);
+          if (input.answerMode && matchedForAttempt.matched[0]) {
+            failedAttempts.push(matchedForAttempt.matched[0]);
+          }
           const merged = mergeQuestionsWithAnswers(input.choices, data.answers);
           const checked = input.answerMode
             ? validateAnswersForMode(merged, input.answerMode)
-            : (() => {
-                const issues: string[] = [];
-                const valid: ValidatedRoleExpertiseQuestion[] = [];
-                const aligned = alignAnswersToChoices(input.choices, data.answers);
-                for (const [index, choice] of input.choices.entries()) {
-                  const judged = bestPracticePassingDraft(
-                    choice,
-                    aligned[index],
-                    sourceTexts,
-                  );
-                  if (judged.issue) issues.push(judged.issue);
-                  else valid.push(judged.question);
-                }
-                return { valid, issues };
-              })();
+            : judgeAnswersForChoices({
+                choices: input.choices,
+                answers: data.answers,
+                sourceTexts,
+                profileItems: placeSources,
+                settings,
+                recentRoleCount: input.recentRoleCount,
+                enforceShape: !shapeRewriteUsed,
+              });
+          if (
+            checked.issues.some(
+              (issue) =>
+                issue.includes("longer than about") || issue.includes("is complex"),
+            )
+          ) {
+            shapeRewriteUsed = true;
+          }
           lastValid = checked.valid;
           const lastAttempt =
             attempt === consultationConfig.qualityRegenerationAttempts;
@@ -1723,7 +1593,7 @@ async function generateRoleExpertiseAnswersStep(input: {
                   );
                   if (passed) return mappedAnswers([passed])[0]!;
                   const attempts = attemptSets
-                    .map((set) => alignAnswersToChoices(input.choices, set)[index])
+                    .map((set) => matchAnswersByQuestionId([choice], set).matched[0])
                     .filter((answer): answer is RoleExpertiseAnswerParts =>
                       Boolean(answer),
                     );
@@ -1741,6 +1611,8 @@ async function generateRoleExpertiseAnswersStep(input: {
                     ? normalizeAnswer(chosen.attempt)
                     : {
                         text: choice.text,
+                        questionId: choice.targetKey,
+                        keyPoints: [],
                         answerFramework: "CAR" as const,
                         challenge: null,
                         situation: null,
@@ -1777,6 +1649,7 @@ async function generateRoleExpertiseAnswersStep(input: {
         input.choices,
         gated.data.answers,
         sourceTexts,
+        placeSources,
       );
       const withDraft = questions.filter((question) => question.content.trim()).length;
       return {
@@ -1790,19 +1663,23 @@ async function generateRoleExpertiseAnswersStep(input: {
     const checked = validateAnswersForMode(merged, input.answerMode);
     if (input.answerMode && checked.valid.length === 0) {
       const choice = input.choices[0];
-      const rawAnswer = gated.data.answers[0];
-      const answer =
-        rawAnswer && choice
-          ? keepEarlierProse(restoreStoryOpening(rawAnswer, choice.text), choice.text)
-          : rawAnswer;
-      const content = answer
-        ? askHarperUnpassedDraft({
-            answer,
-            kind: input.answerMode,
-            sourceTexts,
-          }) || askHarperAttemptProse(answer)
+      const answer = choice
+        ? matchAnswersByQuestionId([choice], gated.data.answers).matched[0]
+        : undefined;
+      const drafted = answer
+        ? dropRepeatedSentences(
+            askHarperUnpassedDraft({
+              answer,
+              kind: input.answerMode,
+              sourceTexts,
+            }) || askHarperAttemptProse(answer),
+          )
         : "";
-      if (choice && content) {
+      const content =
+        choice && input.answerMode === "story"
+          ? storyDraftContent(drafted, placeSources)
+          : drafted;
+      if (choice && answer && content) {
         return {
           ok: true,
           questions: [
@@ -2052,6 +1929,7 @@ export async function generateRoleExpertiseWithModel(input: {
     jobSources,
     profileItems: input.profileItems,
     usage: answersUsageBase,
+    recentRoleCount: input.recentRoles.length,
   });
   if (!answersStep.ok) {
     return {
@@ -2207,7 +2085,7 @@ export async function draftSupportedGapQuestions(input: {
     interviewTypeTag: InterviewTypeTag;
     targetText: string;
   }>;
-  profileItems: ReadonlyArray<{ kind?: string; text?: string }>;
+  profileItems: ReadonlyArray<ProfilePlaceSource & { kind?: string }>;
   approvedAnswers: ReadonlyArray<{ question: string; content: string }>;
   careerStage: CareerStage;
   jobSources: Record<string, unknown>;
@@ -2236,7 +2114,10 @@ export async function draftSupportedGapQuestions(input: {
         question: question.text,
         targetText: question.targetText,
         approvedAnswers,
-        profileItems: input.profileItems,
+        profileItems: input.profileItems.map((item) => ({
+          kind: item.kind,
+          text: item.text ?? undefined,
+        })),
       })
     ) {
       continue;

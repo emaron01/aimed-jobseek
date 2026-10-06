@@ -1,3 +1,4 @@
+import { keyPointsFromGrounding } from "@/lib/consultation/answer-binding";
 import {
   INTERVIEW_TYPE_TAGS,
   type InterviewTypeTag,
@@ -24,6 +25,8 @@ export type QaStatement = {
   content: string;
   strengtheningNote: string | null;
   createdAt?: Date | string | null;
+  keyPoints?: string[];
+  groundingJson?: unknown;
 };
 
 export type ConsultationQaItem = {
@@ -471,7 +474,13 @@ export function buildConsultationQaView(input: {
 }): ConsultationQaView {
   const turns = [...input.turns].sort((left, right) => left.sequence - right.sequence);
   const byTurn = new Map<string, QaStatement[]>();
-  for (const statement of input.statements) {
+  const statements = input.statements.map((statement) => ({
+    ...statement,
+    keyPoints: statement.keyPoints?.length
+      ? statement.keyPoints
+      : keyPointsFromGrounding(statement.groundingJson),
+  }));
+  for (const statement of statements) {
     const existing = byTurn.get(statement.turnId) ?? [];
     existing.push(statement);
     byTurn.set(statement.turnId, existing);

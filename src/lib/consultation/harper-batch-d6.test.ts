@@ -42,8 +42,6 @@ import { deriveCareerStage } from "@/lib/consultation/career-stage";
 import { careerWalkThroughAlreadyAsked } from "@/lib/consultation/question-detection";
 import { deriveRecentRoles } from "@/lib/consultation/recent-roles";
 import {
-  COACHING_SET_MAX,
-  COACHING_SET_MIN,
   ROLE_EXPERTISE_PROMPT_VERSION,
   countNonRoleExpertiseQuestions,
   generateRoleExpertiseWithModel,
@@ -283,7 +281,7 @@ describe("Harper Batch D6 — role-expertise + recentRoles", () => {
   });
 
   it("bumps consultation prompt version and adds the recentRoles coach line", () => {
-    expect(CONSULTATION_PROMPT_VERSION).toBe("38");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("39");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(COACH_RECENT_ROLES_LINE);
     expect(ROLE_EXPERTISE_PROMPT_VERSION).toBe("3");
     expect(ROLE_EXPERTISE_SYSTEM_INSTRUCTIONS).toContain(
@@ -298,12 +296,12 @@ describe("Harper Batch D6 — role-expertise + recentRoles", () => {
   });
 
   it("computes fill counts from G (follow-ups and person-prep excluded)", () => {
-    expect(roleExpertiseFillRange(5)).toEqual({ minCount: 15, maxCount: 20 });
-    expect(roleExpertiseFillRange(0)).toEqual({
-      minCount: COACHING_SET_MIN,
-      maxCount: COACHING_SET_MAX,
-    });
+    expect(roleExpertiseFillRange(5)).toEqual({ minCount: 8, maxCount: 8 });
+    expect(roleExpertiseFillRange(0)).toEqual({ minCount: 8, maxCount: 8 });
     expect(roleExpertiseFillRange(25)).toEqual({ minCount: 0, maxCount: 0 });
+    expect(
+      roleExpertiseFillRange(20, { bestPracticeCount: 8, questionLimit: 25 }),
+    ).toEqual({ minCount: 5, maxCount: 5 });
     expect(
       countNonRoleExpertiseQuestions([
         { text: "Gap?", targetKey: "required:0", followUp: false },

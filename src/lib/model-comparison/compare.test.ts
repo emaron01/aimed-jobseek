@@ -689,7 +689,7 @@ describe.skipIf(!hasTestDatabase())(
       });
       expect(await snapshotOrganizationTables(organizationId)).toEqual(beforeTables);
       expect(envSnapshot()).toBe(beforeEnv);
-      expect(CONSULTATION_PROMPT_VERSION).toBe("38");
+      expect(CONSULTATION_PROMPT_VERSION).toBe("39");
       expect(report.mode).toBe("current");
       expect(report.fresh).toBe(false);
       expect(report.wroteToDatabase).toBe(false);
@@ -939,7 +939,7 @@ describe.skipIf(!hasTestDatabase())(
       });
       expect(await snapshotOrganizationTables(organizationId)).toEqual(beforeTables);
       expect(envSnapshot()).toBe(beforeEnv);
-      expect(CONSULTATION_PROMPT_VERSION).toBe("38");
+      expect(CONSULTATION_PROMPT_VERSION).toBe("39");
       expect(fresh.fresh).toBe(true);
       expect(fresh.wroteToDatabase).toBe(false);
 
@@ -996,7 +996,7 @@ describe.skipIf(!hasTestDatabase())(
       });
       expect(await snapshotOrganizationTables(organizationId)).toEqual(beforeTables);
       expect(envSnapshot()).toBe(beforeEnv);
-      expect(CONSULTATION_PROMPT_VERSION).toBe("38");
+      expect(CONSULTATION_PROMPT_VERSION).toBe("39");
       expect(split.mode).toBe("split");
       expect(split.wroteToDatabase).toBe(false);
 

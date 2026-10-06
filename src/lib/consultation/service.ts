@@ -36,6 +36,10 @@ import {
 } from "@/lib/consultation/question-detection";
 import { deriveRecentRoles } from "@/lib/consultation/recent-roles";
 import {
+  getHarperDraftSettings,
+  spokenWordsForQuestion,
+} from "@/lib/consultation/harper-draft-settings";
+import {
   countAllCountedCoachingQuestions,
   countNonRoleExpertiseQuestions,
   draftSupportedGapQuestions,
@@ -656,10 +660,19 @@ async function extractAnswerWithQuality(input: {
 }
 
 function interviewAnswerGroundingJson(
-  grounding: AnswerPartsGrounding | null,
+  grounding: (AnswerPartsGrounding & { keyPoints?: string[] }) | null,
+  keyPoints?: readonly string[],
 ): Prisma.InputJsonValue {
-  if (!grounding) return [];
-  return grounding as Prisma.InputJsonValue;
+  const points = (keyPoints ?? grounding?.keyPoints ?? [])
+    .map((point) => point.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, 5);
+  if (!grounding && points.length === 0) return [];
+  if (!grounding) return { keyPoints: points } as Prisma.InputJsonValue;
+  return {
+    ...grounding,
+    ...(points.length > 0 ? { keyPoints: points } : {}),
+  } as Prisma.InputJsonValue;
 }
 
 async function libraryQuestionForPolish(input: {
@@ -736,6 +749,7 @@ export async function polishAnswerWithQuality(input: {
         resumeBullet: string | null;
         strengtheningNote: string | null;
         answerPartsGrounding: AnswerPartsGrounding | null;
+        keyPoints?: string[];
       };
     }
   | {
@@ -746,6 +760,7 @@ export async function polishAnswerWithQuality(input: {
         resumeBullet: string | null;
         strengtheningNote: string | null;
         answerPartsGrounding: AnswerPartsGrounding | null;
+        keyPoints?: string[];
       };
     }
 > {
@@ -805,7 +820,19 @@ export async function polishAnswerWithQuality(input: {
     resumeBullet: string | null;
     strengtheningNote: string | null;
     answerPartsGrounding: AnswerPartsGrounding | null;
+    keyPoints?: string[];
   } | null = null;
+  const harperSettings = await getHarperDraftSettings();
+  const spokenAnswerWords = spokenWordsForQuestion({
+    settings: harperSettings,
+    text: input.target?.text ?? "",
+    targetKey: input.whyThisCompany
+      ? "why-this-company"
+      : (input.target?.key ?? input.questionKey ?? ""),
+    walkThrough: looksLikeCareerWalkThrough(input.target?.text ?? ""),
+    recentRoleCount: input.profileItems.filter((item) => item.itemType === "EXPERIENCE").length,
+  });
+  let shapeRewriteUsed = false;
   for (
     let attempt = 0;
     attempt <= consultationConfig.qualityRegenerationAttempts;
@@ -829,6 +856,7 @@ export async function polishAnswerWithQuality(input: {
       careerStage,
       profileItems: input.profileItems,
       questionKey: input.questionKey,
+      spokenAnswerWords,
       usage: withHarperUsageAttempt(input.usage, attempt),
     });
     if (!polished.ok) {
@@ -841,9 +869,22 @@ export async function polishAnswerWithQuality(input: {
       data: polished.data,
       whyThisCompany,
       confirmedGap,
-      maxWords: consultationConfig.interviewAnswerMaxWords,
+      maxWords: shapeRewriteUsed ? Number.POSITIVE_INFINITY : spokenAnswerWords,
+      resumeBulletMaxWords: shapeRewriteUsed
+        ? Number.POSITIVE_INFINITY
+        : harperSettings.resumeBulletWords,
     });
-    if (partIssues.length > 0) {
+    const shapeIssue = partIssues.some(
+      (issue) =>
+        issue.startsWith("The composed interview answer exceeded") ||
+        issue.startsWith("The resume bullet exceeded"),
+    );
+    if (shapeIssue) shapeRewriteUsed = true;
+    if (partIssues.length > 0 && !(shapeIssue && shapeRewriteUsed && partIssues.every(
+      (issue) =>
+        issue.startsWith("The composed interview answer exceeded") ||
+        issue.startsWith("The resume bullet exceeded"),
+    ) && attempt > 0)) {
       lastFailure = consultationConversationCopy.generationFailed;
       qualityFeedback = partIssues;
       const salvage = bestEffortNormalizedPolish({
@@ -1412,6 +1453,7 @@ async function planAndStoreRound(input: {
       select: { briefingJson: true },
     }),
   ]);
+  const harperSettings = await getHarperDraftSettings();
   const askedKeys = new Set(input.askedKeys);
   const skippedKeys = new Set(input.skippedKeys);
   let turnsForDecision = existingTurns;
@@ -1534,6 +1576,7 @@ async function planAndStoreRound(input: {
       askedQuestions,
       focusTargetKey: input.focusTargetKey ?? null,
       profileItems,
+      questionLimit: harperSettings.questionLimit,
     });
     const issues = decisionQualityIssues({
       questions: planned.questions,
@@ -1576,7 +1619,7 @@ async function planAndStoreRound(input: {
         0,
         Math.max(
           0,
-          consultationConfig.applicationQuestionLimit - askedQuestions.length,
+          harperSettings.questionLimit - askedQuestions.length,
         ),
       );
   // Additive lock: never mutate APPROVED statements or existing role-expertise /
@@ -1745,6 +1788,7 @@ async function planAndStoreRound(input: {
       askedQuestions,
       focusTargetKey: input.focusTargetKey ?? null,
       profileItems,
+      questionLimit: harperSettings.questionLimit,
     });
     const issues = writingQualityIssues({
       briefing: writing.data.briefing,
@@ -1859,6 +1903,7 @@ async function planAndStoreRound(input: {
       careerStage,
       recentRoles,
       profileItems,
+      settings: harperSettings,
     });
   }
   return voicedQuestions;
@@ -1883,14 +1928,16 @@ async function maybeFillRoleExpertiseAfterGapPlan(input: {
   careerStage: CareerStage;
   recentRoles: ReturnType<typeof deriveRecentRoles>;
   profileItems: ReturnType<typeof profileEvidenceItems>;
+  settings?: Awaited<ReturnType<typeof getHarperDraftSettings>>;
 }): Promise<void> {
+  const settings = input.settings ?? (await getHarperDraftSettings());
   const turns = await loadSessionTurns(input.sessionId);
   const asked = askedQuestionsFromTurns(turns);
   const counted = countAllCountedCoachingQuestions(asked);
-  if (counted >= 20) return;
+  if (counted >= settings.questionLimit) return;
 
   const G = countNonRoleExpertiseQuestions(asked);
-  const { minCount, maxCount } = roleExpertiseFillRange(G);
+  const { minCount, maxCount } = roleExpertiseFillRange(G, settings);
   if (maxCount === 0) return;
 
   const job: RoleExpertiseJobInputs = {
@@ -2638,6 +2685,7 @@ async function processAnswerGeneration(input: {
           strengtheningNote: null,
           groundingJson: interviewAnswerGroundingJson(
             polished.data.answerPartsGrounding,
+            polished.data.keyPoints,
           ),
           promptVersion: CONSULTATION_PROMPT_VERSION,
         },
@@ -2647,6 +2695,7 @@ async function processAnswerGeneration(input: {
           strengtheningNote: null,
           groundingJson: interviewAnswerGroundingJson(
             polished.data.answerPartsGrounding,
+            polished.data.keyPoints,
           ),
           promptVersion: CONSULTATION_PROMPT_VERSION,
           generation: { increment: 1 },
@@ -2823,6 +2872,7 @@ async function processAnswerGeneration(input: {
             strengtheningNote: best.strengtheningNote?.trim() || null,
             groundingJson: interviewAnswerGroundingJson(
               best.answerPartsGrounding,
+              best.keyPoints,
             ),
             promptVersion: CONSULTATION_PROMPT_VERSION,
           },
@@ -2832,6 +2882,7 @@ async function processAnswerGeneration(input: {
             strengtheningNote: best.strengtheningNote?.trim() || null,
             groundingJson: interviewAnswerGroundingJson(
               best.answerPartsGrounding,
+              best.keyPoints,
             ),
             promptVersion: CONSULTATION_PROMPT_VERSION,
             generation: { increment: 1 },
@@ -3143,6 +3194,7 @@ async function processAnswerGeneration(input: {
       content: interviewText,
       note: polished.data.strengtheningNote?.trim() || null,
       grounding: polished.data.answerPartsGrounding,
+      keyPoints: polished.data.keyPoints,
     },
     ...(confirmedGap || !polished.data.resumeBullet || !bulletText
       ? []
@@ -3152,6 +3204,7 @@ async function processAnswerGeneration(input: {
             content: bulletText,
             note: null,
             grounding: null as AnswerPartsGrounding | null,
+            keyPoints: undefined as string[] | undefined,
           },
         ]),
   ];
@@ -3186,7 +3239,7 @@ async function processAnswerGeneration(input: {
           strengtheningNote: statement.note,
           groundingJson:
             statement.kind === "INTERVIEW_ANSWER"
-              ? interviewAnswerGroundingJson(statement.grounding)
+              ? interviewAnswerGroundingJson(statement.grounding, statement.keyPoints)
               : [],
           promptVersion: CONSULTATION_PROMPT_VERSION,
         },
@@ -3196,7 +3249,7 @@ async function processAnswerGeneration(input: {
           strengtheningNote: statement.note,
           groundingJson:
             statement.kind === "INTERVIEW_ANSWER"
-              ? interviewAnswerGroundingJson(statement.grounding)
+              ? interviewAnswerGroundingJson(statement.grounding, statement.keyPoints)
               : [],
           promptVersion: CONSULTATION_PROMPT_VERSION,
           generation: { increment: 1 },
@@ -3491,6 +3544,7 @@ function toQaStatements(
     content: string;
     strengtheningNote: string | null;
     createdAt?: Date;
+    groundingJson?: unknown;
   }>,
 ): QaStatement[] {
   return statements.map((statement) => ({
@@ -3501,6 +3555,7 @@ function toQaStatements(
     content: statement.content,
     strengtheningNote: statement.strengtheningNote,
     createdAt: statement.createdAt ?? null,
+    groundingJson: statement.groundingJson,
   }));
 }
 
@@ -3999,11 +4054,12 @@ export async function processConsultationReply(input: {
   // Follow-up may accompany a draft when usable content is missing a detail.
   const askFollowUp = Boolean(processed.followUpQuestion) && allowFollowUp;
   const askedQuestions = askedQuestionsFromTurns(turns);
+  const harperSettings = await getHarperDraftSettings();
   let followUpAdded = false;
   if (
     askFollowUp &&
     processed.followUpQuestion &&
-    askedQuestions.length < consultationConfig.applicationQuestionLimit &&
+    askedQuestions.length < harperSettings.questionLimit &&
     !questionDuplicatesAsked(processed.followUpQuestion, askedQuestions)
   ) {
     await addTurn({
@@ -4184,6 +4240,7 @@ async function declineConsultationFollowUp(input: {
     value: { text: string };
     strengtheningNote: string | null;
     grounding: AnswerPartsGrounding | null;
+    keyPoints?: string[];
   }> = [];
   if (polished.data.interviewAnswer.trim()) {
     statements.push({
@@ -4191,6 +4248,7 @@ async function declineConsultationFollowUp(input: {
       value: { text: polished.data.interviewAnswer.trim() },
       strengtheningNote: polished.data.strengtheningNote?.trim() || null,
       grounding: polished.data.answerPartsGrounding,
+      keyPoints: polished.data.keyPoints,
     });
   }
   if (!confirmedGap && polished.data.resumeBullet?.trim()) {
@@ -4199,6 +4257,7 @@ async function declineConsultationFollowUp(input: {
       value: { text: polished.data.resumeBullet.trim() },
       strengtheningNote: null,
       grounding: null,
+      keyPoints: undefined,
     });
   }
   await prisma.$transaction([
@@ -4244,7 +4303,7 @@ async function declineConsultationFollowUp(input: {
           strengtheningNote: statement.strengtheningNote,
           groundingJson:
             statement.kind === "INTERVIEW_ANSWER"
-              ? interviewAnswerGroundingJson(statement.grounding)
+              ? interviewAnswerGroundingJson(statement.grounding, statement.keyPoints)
               : [],
           promptVersion: CONSULTATION_PROMPT_VERSION,
         },
@@ -4254,7 +4313,7 @@ async function declineConsultationFollowUp(input: {
           strengtheningNote: statement.strengtheningNote,
           groundingJson:
             statement.kind === "INTERVIEW_ANSWER"
-              ? interviewAnswerGroundingJson(statement.grounding)
+              ? interviewAnswerGroundingJson(statement.grounding, statement.keyPoints)
               : [],
           promptVersion: CONSULTATION_PROMPT_VERSION,
           generation: { increment: 1 },
@@ -4596,7 +4655,10 @@ export async function regenerateConsultationStatement(input: {
             : null,
         groundingJson:
           statement.kind === "INTERVIEW_ANSWER"
-            ? interviewAnswerGroundingJson(polished.data.answerPartsGrounding)
+            ? interviewAnswerGroundingJson(
+                polished.data.answerPartsGrounding,
+                polished.data.keyPoints,
+              )
             : [],
         promptVersion: CONSULTATION_PROMPT_VERSION,
         generation: { increment: 1 },

@@ -1,8 +1,10 @@
+import { normalizeKeyPoints } from "@/lib/consultation/answer-binding";
 import type {
   AnswerFramework,
   ConsultationPolishResult,
 } from "@/lib/consultation/contract";
 import { isConsultationPolishPartsResult } from "@/lib/consultation/contract";
+import { exceedsLengthTarget } from "@/lib/consultation/harper-draft-settings";
 
 /** Additive groundingJson shape for INTERVIEW_ANSWER statements (Batch D3). */
 export type AnswerPartsGrounding = {
@@ -19,6 +21,7 @@ export type NormalizedPolishAnswer = {
   resumeBullet: string | null;
   strengtheningNote: string | null;
   answerPartsGrounding: AnswerPartsGrounding | null;
+  keyPoints?: string[];
 };
 
 /**
@@ -191,6 +194,7 @@ export function validatePolishPartsQuality(input: {
   whyThisCompany: boolean;
   confirmedGap: boolean;
   maxWords: number;
+  resumeBulletMaxWords?: number;
 }): string[] {
   const issues: string[] = [];
   const exception = input.whyThisCompany || input.confirmedGap;
@@ -225,6 +229,11 @@ export function validatePolishPartsQuality(input: {
           "Do not name CAR, STAR, or label parts in the strengthening note.",
         );
       }
+    }
+    if (exceedsLengthTarget(answer, input.maxWords)) {
+      issues.push(
+        `The composed interview answer exceeded ${input.maxWords} words. Keep only as long as the facts support.`,
+      );
     }
     return issues;
   }
@@ -272,10 +281,16 @@ export function validatePolishPartsQuality(input: {
     const composed = composeInterviewAnswerFromParts(
       partsInFrameworkOrder(parts),
     );
-    const wordCount = composed.split(/\s+/).filter(Boolean).length;
-    if (wordCount > input.maxWords) {
+    if (exceedsLengthTarget(composed, input.maxWords)) {
       issues.push(
         `The composed interview answer exceeded ${input.maxWords} words. Keep only as long as the facts support.`,
+      );
+    }
+    const bullet = fieldText(parts.resumeBullet);
+    const bulletTarget = input.resumeBulletMaxWords;
+    if (bullet && bulletTarget && exceedsLengthTarget(bullet, bulletTarget)) {
+      issues.push(
+        `The resume bullet exceeded ${bulletTarget} words. Keep it to one line.`,
       );
     }
   }
@@ -299,6 +314,7 @@ export function normalizePolishAnswer(input: {
           : input.data.resumeBullet,
       strengtheningNote: input.data.strengtheningNote,
       answerPartsGrounding: null,
+      keyPoints: normalizeKeyPoints(input.data.keyPoints),
     };
   }
 
@@ -313,6 +329,7 @@ export function normalizePolishAnswer(input: {
         : input.data.resumeBullet,
     strengtheningNote: input.data.strengtheningNote,
     answerPartsGrounding: answerPartsGroundingFromPolish(input.data),
+    keyPoints: normalizeKeyPoints(input.data.keyPoints),
   };
 }
 

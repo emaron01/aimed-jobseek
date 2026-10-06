@@ -1742,7 +1742,7 @@ describe("consultation evidence and questions", () => {
 
   it("names the consultant from product configuration and keeps prompt content honest", () => {
     expect(consultationConfig.displayName).toBe("Harper");
-    expect(CONSULTATION_PROMPT_VERSION).toBe("38");
+    expect(CONSULTATION_PROMPT_VERSION).toBe("39");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("You coach; you do not interrogate");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain("askedQuestions");
     expect(CONSULTATION_COACH_SYSTEM_INSTRUCTIONS).toContain(
@@ -2354,7 +2354,7 @@ describe("consultation evidence and questions", () => {
     expect(questions).toContain("questionDuplicatesAsked");
     expect(questions).toContain("consultationConfig.applicationQuestionLimit");
     expect(service).toContain("questionDuplicatesAsked");
-    expect(service).toContain("consultationConfig.applicationQuestionLimit");
+    expect(service).toContain("getHarperDraftSettings");
     expect(consultationConfig.applicationQuestionLimit).toBe(25);
   });
 

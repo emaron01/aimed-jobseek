@@ -333,9 +333,10 @@ describe("approving a requirement answer moves the score", () => {
 });
 
 describe("whole drafts", () => {
-  it("keeps the introducing sentence ahead of a later reference to the transition", () => {
+  it("stores the model answer once on its question id and drops a repeated sentence", () => {
     const story = "Describe a situation in which you led a regional transition.";
-    const droppedOpening = bestPracticeDraftsForAnswers(
+    const employer = [{ employer: "OpenText", text: "Director at OpenText", itemType: "EXPERIENCE" }];
+    const stored = bestPracticeDraftsForAnswers(
       [
         {
           text: story,
@@ -345,82 +346,49 @@ describe("whole drafts", () => {
       ],
       [
         {
-          text: story,
+          questionId: "role-expertise:transition",
+          text: "The company had just been acquired. At OpenText I led the regional transition. At OpenText I led the regional transition.",
           answerFramework: "CAR",
-          challenge:
-            "As Director, North America Sales, I led the sales strategy and execution for the transition.",
-          situation: "The company had just been acquired.",
-          task: null,
-          action: "I reset the operating rhythm with the remaining team.",
-          result: "The team kept its largest accounts through the first year.",
-          followUpQuestion: null,
-        },
-      ],
-      [],
-    );
-    const fromSituation = droppedOpening[0]?.content ?? "";
-    expect(fromSituation.startsWith("The company had just been acquired")).toBe(true);
-    expect(fromSituation.indexOf("The company had just been acquired")).toBeLessThan(
-      fromSituation.indexOf("for the transition"),
-    );
-
-    const fromText = bestPracticeDraftsForAnswers(
-      [
-        {
-          text: story,
-          targetKey: "role-expertise:transition",
-          interviewTypeTag: "focused_competency",
-        },
-      ],
-      [
-        {
-          text: "The company had just been acquired. As Director, North America Sales, I led the sales strategy and execution for the transition. The team kept its largest accounts.",
-          answerFramework: "CAR",
-          challenge:
-            "As Director, North America Sales, I led the sales strategy and execution for the transition.",
+          challenge: "At OpenText I led the regional transition.",
           situation: null,
           task: null,
           action: "I reset the operating rhythm with the remaining team.",
-          result: "The team kept its largest accounts through the first year.",
+          result: "The team kept its largest accounts through the first year. At OpenText I led the regional transition.",
           followUpQuestion: null,
         },
       ],
       [],
+      employer,
     );
-    const fromProse = fromText[0]?.content ?? "";
-    expect(fromProse.startsWith("The company had just been acquired")).toBe(true);
-    expect(fromProse.indexOf("for the transition")).toBeGreaterThan(
-      fromProse.indexOf("The company had just been acquired"),
-    );
+    const content = stored[0]?.content ?? "";
+    expect(content.startsWith("At OpenText I led the regional transition")).toBe(true);
+    expect(content).not.toContain("The company had just been acquired");
+    expect(content.match(/At OpenText I led the regional transition/g)?.length).toBe(1);
 
-    const nursing = "Describe a situation in which you covered a staffing change.";
-    const star = bestPracticeDraftsForAnswers(
+    const missingId = bestPracticeDraftsForAnswers(
       [
         {
-          text: nursing,
-          targetKey: "role-expertise:rotation",
+          text: story,
+          targetKey: "role-expertise:transition",
           interviewTypeTag: "focused_competency",
         },
       ],
       [
         {
-          text: nursing,
-          answerFramework: "STAR",
-          challenge: "The unit had just changed its staffing model.",
-          situation: "As charge nurse, I led the nursing plan for the transition.",
-          task: "I had to restaff the night rotation.",
-          action: "I rebuilt the rotation with the remaining nurses.",
-          result: "The unit kept full coverage the next month.",
+          text: "At OpenText I led the regional transition.",
+          answerFramework: "CAR",
+          challenge: "At OpenText I led the regional transition.",
+          situation: null,
+          task: null,
+          action: "I reset the operating rhythm.",
+          result: "The team kept its largest accounts.",
           followUpQuestion: null,
         },
       ],
       [],
+      employer,
     );
-    const nursingDraft = star[0]?.content ?? "";
-    expect(nursingDraft.startsWith("The unit had just changed its staffing model")).toBe(true);
-    expect(nursingDraft.indexOf("for the transition")).toBeGreaterThan(
-      nursingDraft.indexOf("The unit had just changed"),
-    );
+    expect(missingId[0]?.content ?? "").toBe("");
   });
 });
 

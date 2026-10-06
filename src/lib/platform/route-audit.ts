@@ -13,4 +13,5 @@ export const PLATFORM_ROUTE_AUDIT = [
   "/platform/billing",
   "/platform/catalog",
   "/platform/eula",
+  "/platform/harper",
 ] as const;

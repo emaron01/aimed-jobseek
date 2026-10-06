@@ -35,10 +35,12 @@ function extractSystem() {
 ${CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS}`;
 }
 
-function polishSystem() {
+function polishSystem(words = 150) {
   return `Prompt version: ${CONSULTATION_PROMPT_VERSION}
 
-${CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS}`;
+${CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS}
+
+Write the spoken answer in about ${words} words. For a complex or multi-part question, also return 3 to 5 key points: short bullets with the names, numbers, and steps to mention if the interviewer asks for more.`;
 }
 
 function decisionSystem() {
@@ -291,6 +293,7 @@ export function buildConsultationPolishMessages(input: {
     endDate?: string | null;
     roleId?: string | null;
   }>;
+  spokenAnswerWords?: number;
 }): AiMessage[] {
   const seekerReplies =
     input.seekerReplies?.map((reply) => reply.trim()).filter(Boolean) ??
@@ -299,7 +302,7 @@ export function buildConsultationPolishMessages(input: {
       .map((reply) => reply.trim())
       .filter(Boolean);
   return [
-    { role: "system", content: polishSystem() },
+    { role: "system", content: polishSystem(input.spokenAnswerWords) },
     {
       role: "user",
       content: JSON.stringify({

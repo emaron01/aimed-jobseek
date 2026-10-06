@@ -259,6 +259,13 @@ export function ResultBody({
           {stripInternalIdsFromDisplayText(statement.content)}
         </p>
       )}
+      {statement.keyPoints && statement.keyPoints.length > 0 ? (
+        <ul className="list-disc space-y-1 pl-5 text-sm text-ink" data-testid="consultation-key-points">
+          {statement.keyPoints.map((point) => (
+            <li key={point}>{stripInternalIdsFromDisplayText(point)}</li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }

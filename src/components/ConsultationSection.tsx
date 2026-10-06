@@ -223,6 +223,7 @@ export async function ConsultationSection({
     content: statement.content,
     strengtheningNote: statement.strengtheningNote,
     createdAt: statement.createdAt,
+    groundingJson: statement.groundingJson,
   }));
   const qaView = buildConsultationQaView({
     turns: threadTurns,
