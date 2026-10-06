@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma-client";
 import type { ApplicationJob, ApplicationJobType } from "@prisma/client";
 import { readJobPayload } from "@/lib/application-jobs/service";
+import { getApplicationResearchStatus } from "@/lib/application/research-status";
+import { JOB_REQUIREMENT_PROCESSING_VERSION } from "@/lib/job-requirement/types";
 import {
   isObsoleteWorkspaceFailure,
   sanitizeWorkspaceFailure,
@@ -27,6 +29,12 @@ export type WorkspaceJobStatusView = {
 export type WorkspaceLiveView = {
   jobs: WorkspaceJobStatusView[];
   signature: string;
+  /**
+   * True while a background job, employer research, posting parse, or Harper
+   * generation is still unfinished. The existing refresher keeps polling
+   * while this is true.
+   */
+  active: boolean;
 };
 
 function toWorkspaceJobStatusView(
@@ -70,7 +78,7 @@ export async function getApplicationWorkspaceLive(input: {
   organizationId: string;
   campaignId: string;
 }): Promise<WorkspaceLiveView> {
-  const [jobs, names] = await Promise.all([
+  const [jobs, names, research, requirement, session] = await Promise.all([
     prisma.applicationJob.findMany({
       where: {
         organizationId: input.organizationId,
@@ -80,12 +88,44 @@ export async function getApplicationWorkspaceLive(input: {
       take: 40,
     }),
     roleNamesForCampaign(input),
+    getApplicationResearchStatus(input),
+    prisma.jobRequirement.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+      },
+      select: { title: true, parserPromptVersion: true },
+    }),
+    prisma.consultationSession.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+      },
+      select: { generationStatus: true, updatedAt: true },
+    }),
   ]);
   const views = jobs.map((job) => toWorkspaceJobStatusView(job, names));
-  const signature = views
+  const jobSignature = views
     .map((job) => `${job.id}:${job.status}:${job.error ?? ""}`)
     .join("|");
-  return { jobs: views, signature };
+  const posting = requirement?.parserPromptVersion === JOB_REQUIREMENT_PROCESSING_VERSION
+    ? "processing"
+    : requirement?.title?.trim()
+      ? "ready"
+      : "empty";
+  const signature = [
+    jobSignature,
+    `research:${research.phase}`,
+    `posting:${posting}`,
+    `harper:${session?.generationStatus ?? "none"}:${session?.updatedAt?.toISOString() ?? ""}`,
+  ].join("||");
+  const active =
+    views.some((job) => job.status === "PENDING" || job.status === "IN_PROGRESS") ||
+    research.phase === "queued" ||
+    research.phase === "researching" ||
+    posting === "processing" ||
+    session?.generationStatus === "GENERATING";
+  return { jobs: views, signature, active };
 }
 
 /** Read specific jobs by id. Does not enqueue work or call a model. */

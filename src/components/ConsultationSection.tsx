@@ -9,6 +9,7 @@ import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import {
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
+import { HarperLiveStatus } from "@/components/HarperLiveStatus";
 import {
   buildConsultationQaView,
   consultationHasUnansweredQuestions,
@@ -457,17 +458,19 @@ export async function ConsultationSection({
             initialText={parsed.ok ? seekerBackgroundText(parsed.profile) : ""}
           />
         ) : null}
-        <WorkspaceProgress jobs={jobs} type="CONSULTATION" stayAndWatch />
-        {consultationBusy ? (
-          <div className="space-y-1 text-sm text-muted" data-testid="harper-typing">
-            <p>
-              <AppPendingIndicator label={workspaceJobCopy.typing} />
-            </p>
-            <p data-testid="harper-processing-minutes">
-              {consultationConversationCopy.processingCanTakeMinutes}
-            </p>
-          </div>
-        ) : null}
+        <HarperLiveStatus serverJobs={jobs}>
+          <WorkspaceProgress jobs={jobs} type="CONSULTATION" stayAndWatch />
+          {consultationBusy ? (
+            <div className="space-y-1 text-sm text-muted" data-testid="harper-typing">
+              <p>
+                <AppPendingIndicator label={workspaceJobCopy.typing} />
+              </p>
+              <p data-testid="harper-processing-minutes">
+                {consultationConversationCopy.processingCanTakeMinutes}
+              </p>
+            </div>
+          ) : null}
+        </HarperLiveStatus>
         <HarperDraftProvider>
         <HarperFilterProvider options={[]} initialPersonKey={null}>
           <HarperStandingView>

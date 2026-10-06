@@ -172,6 +172,7 @@ describe("Harper planner page render", () => {
               statusNote: null,
               hasNew: false,
               hasActiveJob: false,
+              workDone: false,
               isCurrent: false,
               isPage: false,
             },

@@ -1,6 +1,7 @@
 import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-status";
 import { getApplicationResearchStatus } from "@/lib/application/research-status";
 import {
+  applicationProgressLine,
   buildApplicationStepViews,
   initialWorkspaceSeen,
   migrateWorkspaceSeen,
@@ -232,6 +233,33 @@ export async function getApplicationTracker(input: {
       jobs: live.jobs,
       seen: seenState.keys,
     }),
+  };
+}
+
+/** Read-only heading for the application top bar. Does not enqueue work or write seen state. */
+export async function getApplicationWorkspaceHeading(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<{ title: string; line: string | null } | null> {
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: { id: true, name: true },
+  });
+  if (!campaign) return null;
+  const facts = await loadApplicationStepFacts(input);
+  if (!facts) return null;
+  const live = await getApplicationWorkspaceLive(input);
+  const steps = buildApplicationStepViews({
+    campaignId: campaign.id,
+    currentStep: null,
+    facts,
+    jobs: live.jobs,
+    seen: {},
+  });
+  const name = campaign.name.trim();
+  return {
+    title: name ? `${name} Workspace` : "Workspace",
+    line: applicationProgressLine(steps),
   };
 }
 

@@ -93,12 +93,14 @@ export function WorkspaceJobRefresh({
   const jobs = useWorkspaceJobs();
   const replaceJobs = useReplaceWorkspaceJobs();
   const signature = useRef<string | null>(initialSignature ?? null);
+  const initialJobsRef = useRef(initialJobs);
   const pollRef = useRef<(() => void) | null>(null);
   const ensurePollingRef = useRef<(() => void) | null>(null);
   const pollingRef = useRef(false);
 
   useEffect(() => {
-    if (initialSignature != null) {
+    if (initialSignature == null) return;
+    if (signature.current == null || signature.current === initialSignature) {
       signature.current = initialSignature;
     }
   }, [initialSignature]);
@@ -107,8 +109,12 @@ export function WorkspaceJobRefresh({
     let interval: number | null = null;
     let cancelled = false;
 
-    function hasActive(jobs: WorkspaceJobStatusView[]): boolean {
-      return jobs.some(
+    function hasActive(latest: {
+      jobs: WorkspaceJobStatusView[];
+      active?: boolean;
+    }): boolean {
+      if (typeof latest.active === "boolean") return latest.active;
+      return latest.jobs.some(
         (job) => job.status === "PENDING" || job.status === "IN_PROGRESS",
       );
     }
@@ -145,7 +151,7 @@ export function WorkspaceJobRefresh({
           signature.current = latest.signature;
           router.refresh();
         }
-        if (hasActive(latest.jobs)) {
+        if (hasActive(latest)) {
           startPolling();
         } else {
           stopPolling();
@@ -160,7 +166,8 @@ export function WorkspaceJobRefresh({
       }
     }
 
-    if (initialJobs && hasActive(initialJobs)) {
+    const startingJobs = initialJobsRef.current;
+    if (startingJobs && hasActive({ jobs: startingJobs })) {
       startPolling();
     }
     void poll();
@@ -171,7 +178,7 @@ export function WorkspaceJobRefresh({
       ensurePollingRef.current = null;
       stopPolling();
     };
-  }, [campaignId, replaceJobs, router, initialSignature, initialJobs]);
+  }, [campaignId, replaceJobs, router]);
 
   const activeKey = jobs
     .filter((job) => job.status === "PENDING" || job.status === "IN_PROGRESS")

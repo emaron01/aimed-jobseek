@@ -58,6 +58,8 @@ export type ApplicationStepView = {
   statusNote: string | null;
   hasNew: boolean;
   hasActiveJob: boolean;
+  /** The step's own work is finished. Unread "new" does not clear this. */
+  workDone: boolean;
   isCurrent: boolean;
   isPage: boolean;
 };
@@ -407,6 +409,7 @@ export function buildApplicationStepViews(input: {
       statusNote: null,
       hasNew,
       hasActiveJob,
+      workDone: stepIsDone(step.key, input.facts),
       isCurrent:
         input.currentStep === step.key ||
         (input.currentStep === "overview" && step.key === "applied"),
@@ -439,4 +442,52 @@ function jobsForStep(
 ): WorkspaceJobStatusView[] {
   const types = new Set(STEP_JOBS[key]);
   return jobs.filter((job) => types.has(job.type));
+}
+
+function jobIsRunning(job: WorkspaceJobStatusView): boolean {
+  return job.status === "PENDING" || job.status === "IN_PROGRESS";
+}
+
+/** Live job rows for this step are queued or running. */
+export function stepActiveFromJobs(
+  key: ApplicationStepKey,
+  jobs: readonly WorkspaceJobStatusView[],
+): boolean {
+  return jobsForStep(key, [...jobs]).some(jobIsRunning);
+}
+
+/** This step has job rows and none of them are still running. */
+export function stepJobsSettled(
+  key: ApplicationStepKey,
+  jobs: readonly WorkspaceJobStatusView[],
+): boolean {
+  const rows = jobsForStep(key, [...jobs]);
+  return rows.length > 0 && rows.every((job) => !jobIsRunning(job));
+}
+
+/**
+ * Dashboard card spinner. Live job rows win over the server snapshot so a
+ * finished job does not keep spinning, and a job that started after render
+ * starts spinning before the next refresh.
+ */
+export function dashboardStepShowsSpinner(
+  step: { key: ApplicationStepKey; hasActiveJob: boolean },
+  jobs: readonly WorkspaceJobStatusView[],
+): boolean {
+  if (stepActiveFromJobs(step.key, jobs)) return true;
+  if (stepJobsSettled(step.key, jobs)) return false;
+  return step.hasActiveJob;
+}
+
+/** First running step, otherwise the first step whose work is not done. */
+export function applicationProgressLine(
+  steps: readonly { title: string; hasActiveJob: boolean; workDone: boolean }[],
+): string | null {
+  const running = steps.find((step) => step.hasActiveJob && !step.workDone);
+  const current = running ?? steps.find((step) => !step.workDone);
+  if (!current) return null;
+  const currentLabel = `${applicationStepCopy.currentlyCompleting}: ${current.title}`;
+  const next = steps.slice(steps.indexOf(current) + 1).find((step) => !step.workDone);
+  if (!next) return currentLabel;
+  return `${currentLabel} · ${applicationStepCopy.nextUp}: ${next.title}`;
 }

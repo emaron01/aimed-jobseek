@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { headers } from "next/headers";
+import { getApplicationWorkspaceHeading } from "@/lib/application/tracker";
+import { campaignIdFromPathname } from "@/lib/application/workspace-links";
 import {
   readDismissedPersonalBillingOrgIds,
 } from "@/app/actions/workspace";
@@ -114,6 +117,16 @@ export async function AppShell({
 
   void paymentLocked;
 
+  const pathname = (await headers()).get("x-pathname")?.trim() || "";
+  const campaignId = organization ? campaignIdFromPathname(pathname) : null;
+  const workspaceHeading =
+    organization && campaignId
+      ? await getApplicationWorkspaceHeading({
+          organizationId: organization.id,
+          campaignId,
+        })
+      : null;
+
   return (
     <div className="flex min-h-screen bg-surface text-ink">
       <Sidebar items={sidebarItems} />
@@ -123,6 +136,8 @@ export async function AppShell({
           showReferrals={
             features.referralProgram && planAllowsReferrals(billingPlanCode)
           }
+          workspaceTitle={workspaceHeading?.title ?? null}
+          progressLine={workspaceHeading?.line ?? null}
         />
         {accountReadOnly ? (
           <div

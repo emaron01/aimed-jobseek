@@ -35,6 +35,22 @@ function isTerminal(job: WorkspaceJobStatusView): boolean {
   return job.status === "COMPLETED" || job.status === "FAILED";
 }
 
+/**
+ * A slower server render can arrive after the poll already saw a job finish.
+ * Keep that finished status so Harper does not go back to a spinner.
+ */
+export function mergeWorkspaceJobSnapshots(
+  previous: readonly WorkspaceJobStatusView[],
+  next: readonly WorkspaceJobStatusView[],
+): WorkspaceJobStatusView[] {
+  const previousById = new Map(previous.map((job) => [job.id, job]));
+  return next.map((job) => {
+    const earlier = previousById.get(job.id);
+    if (earlier && isTerminal(earlier) && !isTerminal(job)) return earlier;
+    return job;
+  });
+}
+
 export function WorkspaceJobsProvider({
   initialJobs,
   campaignId,
@@ -61,10 +77,11 @@ export function WorkspaceJobsProvider({
           return [...merged.values()];
         }
         const incoming = new Set(next.map((job) => job.id));
+        const merged = mergeWorkspaceJobSnapshots(prev, next);
         const kept = prev.filter(
           (job) => watchedRef.current.has(job.id) && !incoming.has(job.id) && isTerminal(job),
         );
-        return [...next, ...kept];
+        return [...merged, ...kept];
       })();
       if (workspaceJobListSignature(prev) === workspaceJobListSignature(published)) return prev;
       return published;

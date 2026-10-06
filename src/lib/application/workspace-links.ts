@@ -99,6 +99,14 @@ export function workspaceConsultationHrefFromPathname(pathname: string): string 
   return applicationStepHref(id, "consultation");
 }
 
+/** Application routes are /campaigns/{id} and its pages. The list and new-application routes are not. */
+export function campaignIdFromPathname(pathname: string): string | null {
+  const match = pathname.match(/^\/campaigns\/([^/]+)/);
+  const id = match?.[1]?.trim() ?? "";
+  if (!id || id === "new") return null;
+  return id;
+}
+
 export function workspaceCampaignHref(campaignId: string): string {
   const id = campaignId.trim();
   if (!id) {
