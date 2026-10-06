@@ -10,11 +10,13 @@ import {
   editConsultationAnswerAction,
   regenerateConsultationQaResultAction,
   replyConsultationAction,
+  saveEditedConsultationStatementAction,
   skipConsultationQuestionAction,
   ignoreConsultationQuestionAction,
   reopenIgnoredConsultationTargetAction,
 } from "@/app/actions/consultation";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
+import { AppButton } from "@/components/AppButton";
 import { useHarperDraft } from "@/components/HarperDraftStore";
 import {
   consultationConversationCopy,
@@ -50,11 +52,27 @@ export function ResultActions({
   campaignId,
   statements,
   testId,
+  editing: editingProp,
+  onStartEdit,
+  onSaved,
+  editFormId,
+  draftValues,
 }: {
   campaignId: string;
   statements: QaStatement[];
   testId: string;
+  editing?: boolean;
+  onStartEdit?: () => void;
+  onSaved?: () => void;
+  editFormId?: string;
+  draftValues?: Record<string, string>;
 }) {
+  const [internalEditing, setInternalEditing] = useState(false);
+  const [localValues, setLocalValues] = useState<Record<string, string>>({});
+  const editing = editingProp ?? internalEditing;
+  const startEdit = onStartEdit ?? (() => setInternalEditing(true));
+  const values = draftValues ?? localValues;
+  const formId = editFormId ?? `harper-draft-edit-${testId}`;
   if (statements.length === 0) return null;
   const draft = statements.filter((statement) => statement.status !== "APPROVED");
   if (draft.length === 0) {
@@ -70,40 +88,107 @@ export function ResultActions({
     );
   }
   statements = draft;
+  const editorHere = editing && draftValues == null;
   return (
-    <div className="mt-3 flex flex-wrap gap-2" data-testid={testId}>
-      <ApplicationActionForm
-        action={approveConsultationQaResultAction}
-        submitLabel={consultationConversationCopy.approve}
-        testId={`${testId}-approve`}
-        variant="primary"
-        compact
-        formClassName={actionFormClass}
-      >
-        <input type="hidden" name="campaignId" value={campaignId} />
-        {statements.map((statement) => (
-          <input key={statement.id} type="hidden" name="statementId" value={statement.id} />
-        ))}
-      </ApplicationActionForm>
-      <ApplicationActionForm
-        action={regenerateConsultationQaResultAction}
-        submitLabel={polishCopy.regenerate}
-        testId={`${testId}-regenerate`}
-        variant="secondary"
-        compact
-        formClassName={actionFormClass}
-      >
-        <input type="hidden" name="campaignId" value={campaignId} />
-        {statements.map((statement) => (
-          <input
-            key={`regen-${statement.id}`}
-            type="hidden"
-            name="statementId"
-            value={statement.id}
-          />
-        ))}
-      </ApplicationActionForm>
-    </div>
+    <>
+      {editorHere ? (
+        <div className="mt-3 space-y-2">
+          {statements.map((statement) => (
+            <textarea
+              key={statement.id}
+              rows={4}
+              required
+              value={values[statement.id] ?? statement.content}
+              aria-label={consultationConversationCopy.editAnswer}
+              data-testid={`consultation-draft-editor-${statement.id}`}
+              className={fieldClass}
+              onChange={(event) =>
+                setLocalValues((current) => ({
+                  ...current,
+                  [statement.id]: event.target.value,
+                }))
+              }
+            />
+          ))}
+        </div>
+      ) : null}
+      <div className="mt-3 flex flex-nowrap items-center gap-2" data-testid={testId}>
+        <ApplicationActionForm
+          action={approveConsultationQaResultAction}
+          submitLabel={consultationConversationCopy.approve}
+          testId={`${testId}-approve`}
+          variant="primary"
+          compact
+          formClassName={actionFormClass}
+        >
+          <input type="hidden" name="campaignId" value={campaignId} />
+          {statements.map((statement) => (
+            <input key={statement.id} type="hidden" name="statementId" value={statement.id} />
+          ))}
+        </ApplicationActionForm>
+        <ApplicationActionForm
+          action={regenerateConsultationQaResultAction}
+          submitLabel={polishCopy.regenerate}
+          testId={`${testId}-regenerate`}
+          variant="secondary"
+          compact
+          formClassName={actionFormClass}
+        >
+          <input type="hidden" name="campaignId" value={campaignId} />
+          {statements.map((statement) => (
+            <input
+              key={`regen-${statement.id}`}
+              type="hidden"
+              name="statementId"
+              value={statement.id}
+            />
+          ))}
+        </ApplicationActionForm>
+        {editing ? (
+          <ApplicationActionForm
+            action={saveEditedConsultationStatementAction}
+            submitLabel={consultationConversationCopy.saveAnswer}
+            testId={`${testId}-save`}
+            variant="secondary"
+            compact
+            formClassName={actionFormClass}
+            formId={formId}
+            onSuccess={() => {
+              if (onSaved) onSaved();
+              else setInternalEditing(false);
+            }}
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+            {statements.map((statement) => (
+              <input
+                key={`edit-${statement.id}`}
+                type="hidden"
+                name="statementId"
+                value={statement.id}
+              />
+            ))}
+            {statements.map((statement) => (
+              <input
+                key={`content-${statement.id}`}
+                type="hidden"
+                name={`content:${statement.id}`}
+                value={values[statement.id] ?? statement.content}
+              />
+            ))}
+          </ApplicationActionForm>
+        ) : (
+          <AppButton
+            type="button"
+            variant="secondary"
+            className="!px-2.5 !py-1.5 !text-xs"
+            data-testid={`${testId}-edit`}
+            onClick={startEdit}
+          >
+            {consultationConversationCopy.editAnswer}
+          </AppButton>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -117,8 +202,19 @@ function questionHasVisibleOutcome(item: ConsultationQaItem): boolean {
   return Boolean(item.resumeBullet || item.talkingPoint || item.followUp || item.needsMoreDetail);
 }
 
-export function ResultBody({ statement }: { statement: QaStatement }) {
+export function ResultBody({
+  statement,
+  editing = false,
+  value,
+  onValueChange,
+}: {
+  statement: QaStatement;
+  editing?: boolean;
+  value?: string;
+  onValueChange?: (statementId: string, value: string) => void;
+}) {
   const draft = statement.status === "DRAFT";
+  const showEditor = editing && draft;
   return (
     <div
       className="mt-3 min-w-0 space-y-1 overflow-hidden border-t border-edge pt-3"
@@ -142,9 +238,21 @@ export function ResultBody({ statement }: { statement: QaStatement }) {
           {stripInternalIdsFromDisplayText(statement.strengtheningNote)}
         </p>
       ) : null}
-      <p className={`text-sm text-ink ${wrapClass}`}>
-        {stripInternalIdsFromDisplayText(statement.content)}
-      </p>
+      {showEditor ? (
+        <textarea
+          rows={4}
+          required
+          value={value ?? statement.content}
+          aria-label={consultationConversationCopy.editAnswer}
+          data-testid={`consultation-draft-editor-${statement.id}`}
+          className={fieldClass}
+          onChange={(event) => onValueChange?.(statement.id, event.target.value)}
+        />
+      ) : (
+        <p className={`text-sm text-ink ${wrapClass}`}>
+          {stripInternalIdsFromDisplayText(statement.content)}
+        </p>
+      )}
     </div>
   );
 }
@@ -430,6 +538,40 @@ function QuestionCard({
       (collapseWhenIgnored && item.ignored)
     ),
   );
+  const [editingDraft, setEditingDraft] = useState(false);
+  const [draftText, setDraftText] = useState<Record<string, string>>({});
+  const editFormId = `harper-draft-edit-${item.questionTurnId}`;
+  const pendingDraftStatements = [
+    item.pendingDraftTalkingPoint,
+    item.pendingDraftResumeBullet,
+  ].filter((statement): statement is QaStatement => Boolean(statement));
+  function draftValue(statement: QaStatement): string {
+    return draftText[statement.id] ?? statement.content;
+  }
+  function onDraftValue(statementId: string, value: string) {
+    setDraftText((current) => ({ ...current, [statementId]: value }));
+  }
+  const editingMain = editingDraft && pendingDraftStatements.length === 0;
+  function bodyProps(statement: QaStatement, editing: boolean) {
+    return {
+      statement,
+      editing,
+      value: draftValue(statement),
+      onValueChange: onDraftValue,
+    };
+  }
+  function draftActions(statements: QaStatement[]) {
+    return {
+      campaignId,
+      statements,
+      testId: `consultation-result-${item.questionTurnId}`,
+      editing: editingDraft,
+      onStartEdit: () => setEditingDraft(true),
+      onSaved: () => setEditingDraft(false),
+      editFormId,
+      draftValues: draftText,
+    };
+  }
   const expanded = approvedControlled ? approvedExpanded : localExpanded;
   function setExpanded(next: boolean) {
     if (approvedControlled) {
@@ -628,36 +770,17 @@ function QuestionCard({
                 <p className="text-xs font-medium uppercase tracking-wide text-subtle">
                   {consultationConversationCopy.newDraft}
                 </p>
-                {item.pendingDraftTalkingPoint ? (
-                  <ResultBody statement={item.pendingDraftTalkingPoint} />
-                ) : null}
-                {item.pendingDraftResumeBullet ? (
-                  <ResultBody statement={item.pendingDraftResumeBullet} />
-                ) : null}
-                {canEdit ? (
-                  <ResultActions
-                    campaignId={campaignId}
-                    statements={
-                      [
-                        item.pendingDraftTalkingPoint,
-                        item.pendingDraftResumeBullet,
-                      ].filter(Boolean) as QaStatement[]
-                    }
-                    testId={`consultation-result-${item.questionTurnId}`}
-                  />
-                ) : null}
+                {item.pendingDraftTalkingPoint ? <ResultBody {...bodyProps(item.pendingDraftTalkingPoint, editingDraft)} /> : null}
+                {item.pendingDraftResumeBullet ? <ResultBody {...bodyProps(item.pendingDraftResumeBullet, editingDraft)} /> : null}
+                {canEdit ? <ResultActions {...draftActions(pendingDraftStatements)} /> : null}
               </div>
             ) : null}
-            {item.talkingPoint ? <ResultBody statement={item.talkingPoint} /> : null}
-            {item.resumeBullet ? <ResultBody statement={item.resumeBullet} /> : null}
+            {item.talkingPoint ? <ResultBody {...bodyProps(item.talkingPoint, editingMain)} /> : null}
+            {item.resumeBullet ? <ResultBody {...bodyProps(item.resumeBullet, editingMain)} /> : null}
             {canEdit &&
             !item.pendingDraftTalkingPoint &&
             !item.pendingDraftResumeBullet ? (
-              <ResultActions
-                campaignId={campaignId}
-                statements={item.statements}
-                testId={`consultation-result-${item.questionTurnId}`}
-              />
+              <ResultActions {...draftActions(item.statements)} />
             ) : null}
           </>
         ) : null}

@@ -449,15 +449,21 @@ export async function saveEditedConsultationStatementAction(
     const organizationId = await requireOrganizationId();
     await requireCurrentUser();
     const campaignId = campaignIdFrom(formData);
-    const statementId = String(formData.get("statementId") ?? "").trim();
-    if (!statementId) {
+    const statementIds = statementIdsFrom(formData);
+    if (statementIds.length === 0) {
       return { ok: false, message: "That polished statement was not found." };
     }
-    await saveEditedConsultationStatement({
-      organizationId,
-      statementId,
-      content: String(formData.get("content") ?? ""),
-    });
+    for (const statementId of statementIds) {
+      const keyed = formData.get(`content:${statementId}`);
+      const content = String(
+        keyed ?? (statementIds.length === 1 ? formData.get("content") ?? "" : ""),
+      );
+      await saveEditedConsultationStatement({
+        organizationId,
+        statementId,
+        content,
+      });
+    }
     if (campaignId) revalidateHarperAndCheatSheet(campaignId);
     return { ok: true, message: applicationAssetConfig.labels.saveNewVersion };
   } catch (error) {

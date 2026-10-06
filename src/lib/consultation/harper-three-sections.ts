@@ -12,6 +12,7 @@ import {
 } from "@/lib/consultation/contract";
 import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
 import type { StandingListEntry } from "@/lib/consultation/standing-entries";
+import { consultationConversationCopy } from "@/lib/product-config/consultation";
 
 export type HarperPageSectionId =
   | "where-you-stand"
@@ -57,15 +58,32 @@ export function isDedicatedPrepQuestion(item: ConsultationQaItem): boolean {
 }
 
 /**
+ * A seeker answer typed into the Where you stand share box.
+ * That reply has no consultant question, so the card is titled "Your answer"
+ * and its id is the seeker turn. Harper-asked questions keep their own id.
+ */
+export function isStandingShareAnswer(item: ConsultationQaItem): boolean {
+  if (item.ignored) return false;
+  if (isRoleExpertiseQuestion(item)) return false;
+  if (item.targetKey?.startsWith(ASK_HARPER_TARGET_PREFIX)) return false;
+  if (item.question.trim() !== consultationConversationCopy.yourAnswer) return false;
+  return item.seekerAnswers.some((answer) => answer.id === item.questionTurnId);
+}
+
+/**
  * Section assignment for a question (exactly one section).
  * Role-expertise → always Section 3.
- * Why / career / requirement gaps → Section 2 until APPROVED, then Section 1.
+ * Answers typed in Where you stand stay in Section 1, draft or approved.
+ * Harper-asked why / career / requirement gaps → Section 2 until APPROVED, then Section 1.
  */
 export function harperSectionForQuestion(
   item: ConsultationQaItem,
 ): HarperPageSectionId {
   if (isRoleExpertiseQuestion(item) || isApprovedAskHarperQuestion(item)) {
     return HARPER_SECTION_IDS.bestPractice;
+  }
+  if (isStandingShareAnswer(item)) {
+    return HARPER_SECTION_IDS.standing;
   }
   if (questionHasApprovedResult(item) && !item.ignored) {
     return HARPER_SECTION_IDS.standing;
@@ -131,19 +149,41 @@ export function partitionHarperThreeSections(
     if (isRoleTopic) {
       continue;
     }
-    if (entry.kind === "TOPIC" && forStanding.length === 0) {
-      // Why / career still open → Section 2 only; do not show empty topic in S1.
-      continue;
+    let questions = forStanding;
+    if (entry.kind === "TOPIC") {
+      const host = standingEntries.find(
+        (row) =>
+          row.kind !== "TOPIC" &&
+          (row.targetKey === entry.targetKey ||
+            row.mergedTargetKeys.includes(entry.targetKey)),
+      );
+      if (host) {
+        const share = questions.filter(isStandingShareAnswer);
+        questions = questions.filter((question) => !isStandingShareAnswer(question));
+        if (share.length > 0) {
+          for (const question of share) {
+            if (
+              !host.questions.some(
+                (existing) => existing.questionTurnId === question.questionTurnId,
+              )
+            ) {
+              host.questions.push(question);
+            }
+          }
+          host.showShareForm = false;
+        }
+      }
+      // Why / career still open as a Harper question → Section 2 only.
+      if (questions.length === 0) continue;
     }
     standingEntries.push({
       ...entry,
-      questions: forStanding,
-      // Share form stays on the requirement when no open inline question remains
-      // in Section 1 and the gap still needs seeker input.
+      questions,
+      // Share form stays on the requirement when no answer is showing there yet.
       showShareForm:
         entry.kind !== "TOPIC" &&
         entry.showShareForm &&
-        forStanding.length === 0,
+        questions.length === 0,
     });
   }
 
