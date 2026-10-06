@@ -484,14 +484,39 @@ export type ApplicationProgressLabels = {
   next: string | null;
 };
 
-/** First running step, otherwise the first step whose work is not done. */
+/**
+ * Seeker workflow for the top-bar pills. Dashboard cards keep applicationStepList.
+ * New Application is only the create page; inside an application it is already done.
+ */
+const PROGRESS_PILL_ORDER: readonly ApplicationStepKey[] = [
+  "job",
+  "company",
+  "consultation",
+  "assets",
+  "applied",
+  "hiring-team",
+  "outreach",
+  "interviews",
+  "summary",
+];
+
+/** First running step in the seeker workflow, otherwise the first step in that order that is not done. */
 export function applicationProgressLine(
-  steps: readonly { title: string; hasActiveJob: boolean; workDone: boolean }[],
+  steps: readonly {
+    key: ApplicationStepKey;
+    title: string;
+    hasActiveJob: boolean;
+    workDone: boolean;
+  }[],
 ): ApplicationProgressLabels | null {
-  const running = steps.find((step) => step.hasActiveJob && !step.workDone);
-  const current = running ?? steps.find((step) => !step.workDone);
+  const rank = new Map(PROGRESS_PILL_ORDER.map((key, index) => [key, index]));
+  const ordered = [...steps].sort(
+    (left, right) => (rank.get(left.key) ?? 0) - (rank.get(right.key) ?? 0),
+  );
+  const running = ordered.find((step) => step.hasActiveJob && !step.workDone);
+  const current = running ?? ordered.find((step) => !step.workDone);
   if (!current) return null;
-  const next = steps.slice(steps.indexOf(current) + 1).find((step) => !step.workDone);
+  const next = ordered.slice(ordered.indexOf(current) + 1).find((step) => !step.workDone);
   return {
     current: `${applicationStepCopy.currentlyCompleting}: ${current.title}`,
     next: next ? `${applicationStepCopy.nextUp}: ${next.title}` : null,
@@ -500,8 +525,9 @@ export function applicationProgressLine(
 
 /** Create-page labels only. They are not application steps and do not change what the page does. */
 export function newApplicationProgressLabels(): ApplicationProgressLabels {
+  const job = applicationStepList.find((step) => step.key === "job");
   return {
     current: `${applicationStepCopy.currentlyCompleting}: ${applicationStepCopy.newApplication}`,
-    next: `${applicationStepCopy.nextUp}: ${applicationStepCopy.companyMatchAndResearch}`,
+    next: job ? `${applicationStepCopy.nextUp}: ${job.title}` : null,
   };
 }

@@ -133,10 +133,29 @@ describe("application progress line", () => {
     ).toBeNull();
   });
 
+  it("keeps Harper current when Application Status is still not done", () => {
+    const workflow = [
+      step({ key: "applied", title: "Application Status", number: 1, workDone: false }),
+      step({ key: "job", title: "Job requirements", number: 2, workDone: true }),
+      step({ key: "company", title: "Company", number: 3, workDone: true }),
+      step({ key: "consultation", title: "Harper", number: 4, workDone: false }),
+      step({
+        key: "assets",
+        title: "Resume and cover letter",
+        number: 5,
+        workDone: false,
+      }),
+    ];
+    expect(applicationProgressLine(workflow)).toEqual({
+      current: `${applicationStepCopy.currentlyCompleting}: Harper`,
+      next: `${applicationStepCopy.nextUp}: Resume and cover letter`,
+    });
+  });
+
   it("labels New Application without treating that page as an application", () => {
     expect(newApplicationProgressLabels()).toEqual({
       current: `${applicationStepCopy.currentlyCompleting}: ${applicationStepCopy.newApplication}`,
-      next: `${applicationStepCopy.nextUp}: ${applicationStepCopy.companyMatchAndResearch}`,
+      next: `${applicationStepCopy.nextUp}: Job requirements`,
     });
     expect(isNewApplicationPath("/campaigns/new")).toBe(true);
     expect(campaignIdFromPathname("/campaigns/camp_1/consultation")).toBe("camp_1");
