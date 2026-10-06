@@ -4,6 +4,7 @@ import {
   applicationProgressLine,
   buildApplicationStepViews,
   initialWorkspaceSeen,
+  type ApplicationProgressLabels,
   migrateWorkspaceSeen,
   parseWorkspaceSeenJson,
   serializeWorkspaceSeen,
@@ -240,7 +241,7 @@ export async function getApplicationTracker(input: {
 export async function getApplicationWorkspaceHeading(input: {
   organizationId: string;
   campaignId: string;
-}): Promise<{ title: string; line: string | null } | null> {
+}): Promise<{ title: string; progress: ApplicationProgressLabels | null } | null> {
   const campaign = await prisma.campaign.findFirst({
     where: { id: input.campaignId, organizationId: input.organizationId },
     select: { id: true, name: true },
@@ -259,7 +260,7 @@ export async function getApplicationWorkspaceHeading(input: {
   const name = campaign.name.trim();
   return {
     title: name ? `${name} Workspace` : "Workspace",
-    line: applicationProgressLine(steps),
+    progress: applicationProgressLine(steps),
   };
 }
 

@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { getApplicationWorkspaceHeading } from "@/lib/application/tracker";
-import { campaignIdFromPathname } from "@/lib/application/workspace-links";
+import { newApplicationProgressLabels } from "@/lib/application/step-progress";
+import {
+  campaignIdFromPathname,
+  isNewApplicationPath,
+} from "@/lib/application/workspace-links";
 import {
   readDismissedPersonalBillingOrgIds,
 } from "@/app/actions/workspace";
@@ -126,6 +130,11 @@ export async function AppShell({
           campaignId,
         })
       : null;
+  const progress =
+    workspaceHeading?.progress ??
+    (organization && isNewApplicationPath(pathname)
+      ? newApplicationProgressLabels()
+      : null);
 
   return (
     <div className="flex min-h-screen bg-surface text-ink">
@@ -137,7 +146,7 @@ export async function AppShell({
             features.referralProgram && planAllowsReferrals(billingPlanCode)
           }
           workspaceTitle={workspaceHeading?.title ?? null}
-          progressLine={workspaceHeading?.line ?? null}
+          progress={progress}
         />
         {accountReadOnly ? (
           <div

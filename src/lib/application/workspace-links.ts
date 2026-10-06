@@ -107,6 +107,10 @@ export function campaignIdFromPathname(pathname: string): string | null {
   return id;
 }
 
+export function isNewApplicationPath(pathname: string): boolean {
+  return pathname === "/campaigns/new" || pathname.startsWith("/campaigns/new/");
+}
+
 export function workspaceCampaignHref(campaignId: string): string {
   const id = campaignId.trim();
   if (!id) {

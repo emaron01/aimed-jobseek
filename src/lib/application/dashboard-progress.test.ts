@@ -3,14 +3,19 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ApplicationStepCards } from "@/components/ApplicationStepCards";
+import { TopBar } from "@/components/TopBar";
 import { harperLivePresentation } from "@/components/HarperLiveStatus";
 import { mergeWorkspaceJobSnapshots } from "@/components/workspace-jobs-context";
 import {
   applicationProgressLine,
   dashboardStepShowsSpinner,
+  newApplicationProgressLabels,
   type ApplicationStepView,
 } from "@/lib/application/step-progress";
-import { campaignIdFromPathname } from "@/lib/application/workspace-links";
+import {
+  campaignIdFromPathname,
+  isNewApplicationPath,
+} from "@/lib/application/workspace-links";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
 import { applicationStepCopy } from "@/lib/product-config";
 
@@ -114,9 +119,10 @@ describe("application progress line", () => {
   ];
 
   it("names the running step and the next unfinished step", () => {
-    expect(applicationProgressLine(steps)).toBe(
-      `${applicationStepCopy.currentlyCompleting}: Company · ${applicationStepCopy.nextUp}: Harper`,
-    );
+    expect(applicationProgressLine(steps)).toEqual({
+      current: `${applicationStepCopy.currentlyCompleting}: Company`,
+      next: `${applicationStepCopy.nextUp}: Harper`,
+    });
   });
 
   it("returns nothing when every step is done", () => {
@@ -127,9 +133,32 @@ describe("application progress line", () => {
     ).toBeNull();
   });
 
-  it("reads an application id only from an application page", () => {
+  it("labels New Application without treating that page as an application", () => {
+    expect(newApplicationProgressLabels()).toEqual({
+      current: `${applicationStepCopy.currentlyCompleting}: ${applicationStepCopy.newApplication}`,
+      next: `${applicationStepCopy.nextUp}: ${applicationStepCopy.companyMatchAndResearch}`,
+    });
+    expect(isNewApplicationPath("/campaigns/new")).toBe(true);
     expect(campaignIdFromPathname("/campaigns/camp_1/consultation")).toBe("camp_1");
     expect(campaignIdFromPathname("/campaigns")).toBeNull();
     expect(campaignIdFromPathname("/campaigns/new")).toBeNull();
+  });
+
+  it("shows the workspace name and the step pills on one line", () => {
+    const progress = applicationProgressLine(steps);
+    const html = renderToStaticMarkup(
+      createElement(TopBar, {
+        menuModel: null,
+        workspaceTitle: "Acme Workspace",
+        progress,
+      }),
+    );
+    expect(html).toContain('data-testid="workspace-heading"');
+    expect(html).toContain("Acme Workspace");
+    expect(html).toContain("bg-success-tint");
+    expect(html).toContain("Currently Completing: Company");
+    expect(html).toContain("bg-danger-tint");
+    expect(html).toContain("Next Up: Harper");
+    expect(html).toContain("items-center");
   });
 });

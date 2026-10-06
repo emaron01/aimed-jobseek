@@ -1,4 +1,5 @@
 import { ReferAFriendButton } from "@/components/billing/ReferAFriendButton";
+import { StatusPill } from "@/components/design";
 import { UserMenu } from "@/components/UserMenu";
 import type { UserMenuModel } from "@/lib/auth/user-menu";
 
@@ -6,14 +7,14 @@ export function TopBar({
   menuModel,
   showReferrals = false,
   workspaceTitle = null,
-  progressLine = null,
+  progress = null,
 }: {
   menuModel: UserMenuModel | null;
   /** Paid or comped Standard — Team / Enterprise hide Refer a Friend. */
   showReferrals?: boolean;
   /** Set on application pages. Other pages keep Workspace, Platform, or Account. */
   workspaceTitle?: string | null;
-  progressLine?: string | null;
+  progress?: { current: string; next: string | null } | null;
 }) {
   const fallback = menuModel?.organizationName
     ? "Workspace"
@@ -22,10 +23,20 @@ export function TopBar({
       : "Account";
   return (
     <header className="flex min-h-14 items-center justify-between border-b border-edge bg-surface px-6 print:hidden">
-      <div className="py-2 text-sm text-muted">
-        <div data-testid="workspace-heading">{workspaceTitle ?? fallback}</div>
-        {progressLine ? (
-          <div data-testid="application-progress-line">{progressLine}</div>
+      <div className="flex min-w-0 items-center gap-3 py-2 text-sm text-muted">
+        <div className="shrink-0" data-testid="workspace-heading">
+          {workspaceTitle ?? fallback}
+        </div>
+        {progress ? (
+          <div
+            className="flex min-w-0 items-center gap-2"
+            data-testid="application-progress-line"
+          >
+            <StatusPill tone="done">{progress.current}</StatusPill>
+            {progress.next ? (
+              <StatusPill tone="attention">{progress.next}</StatusPill>
+            ) : null}
+          </div>
         ) : null}
       </div>
       <div className="flex items-center gap-3">

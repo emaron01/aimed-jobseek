@@ -112,6 +112,8 @@ export const applicationStepCopy = Object.freeze({
   done: "Done",
   currentlyCompleting: "Currently Completing",
   nextUp: "Next Up",
+  newApplication: "New Application",
+  companyMatchAndResearch: "Company match and research",
   newApplicationDate: "New: application date",
   newCompanyResearch: "New: company research",
   newJobRequirements: "New: job requirements",

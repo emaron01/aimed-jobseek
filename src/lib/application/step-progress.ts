@@ -479,15 +479,29 @@ export function dashboardStepShowsSpinner(
   return step.hasActiveJob;
 }
 
+export type ApplicationProgressLabels = {
+  current: string;
+  next: string | null;
+};
+
 /** First running step, otherwise the first step whose work is not done. */
 export function applicationProgressLine(
   steps: readonly { title: string; hasActiveJob: boolean; workDone: boolean }[],
-): string | null {
+): ApplicationProgressLabels | null {
   const running = steps.find((step) => step.hasActiveJob && !step.workDone);
   const current = running ?? steps.find((step) => !step.workDone);
   if (!current) return null;
-  const currentLabel = `${applicationStepCopy.currentlyCompleting}: ${current.title}`;
   const next = steps.slice(steps.indexOf(current) + 1).find((step) => !step.workDone);
-  if (!next) return currentLabel;
-  return `${currentLabel} · ${applicationStepCopy.nextUp}: ${next.title}`;
+  return {
+    current: `${applicationStepCopy.currentlyCompleting}: ${current.title}`,
+    next: next ? `${applicationStepCopy.nextUp}: ${next.title}` : null,
+  };
+}
+
+/** Create-page labels only. They are not application steps and do not change what the page does. */
+export function newApplicationProgressLabels(): ApplicationProgressLabels {
+  return {
+    current: `${applicationStepCopy.currentlyCompleting}: ${applicationStepCopy.newApplication}`,
+    next: `${applicationStepCopy.nextUp}: ${applicationStepCopy.companyMatchAndResearch}`,
+  };
 }
