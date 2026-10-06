@@ -274,7 +274,7 @@ describe("Harper drafts stay put and can be edited", () => {
   it("puts Edit in the same row as Approve and Regenerate", () => {
     const thread = src("src/components/ConsultationThread.tsx");
     const start = thread.indexOf(
-      'className="mt-3 flex flex-nowrap items-center gap-2" data-testid={testId}',
+      "className={cardButtonRowClass} data-testid={testId}",
     );
     expect(start).toBeGreaterThan(-1);
     const row = thread.slice(start, thread.indexOf("</div>", start));

@@ -47,6 +47,12 @@ const textLinkClass =
 const actionRowClass =
   "flex flex-wrap items-center gap-2";
 const actionFormClass = "inline-flex flex-wrap items-center gap-2";
+const outerQuestionCardClass =
+  "min-w-0 overflow-hidden rounded-md border-2 border-edge-strong bg-surface p-4";
+const innerQuestionCardClass =
+  "min-w-0 overflow-hidden rounded-md border border-edge bg-canvas p-4";
+/** One row on wide screens; wraps only on a narrow screen. */
+const cardButtonRowClass = "mt-3 flex flex-wrap items-center gap-2 sm:flex-nowrap";
 
 export type ThreadTurn = QaTurn;
 export type ThreadStatement = QaStatement;
@@ -60,6 +66,7 @@ export function ResultActions({
   onSaved,
   editFormId,
   draftValues,
+  trailing,
 }: {
   campaignId: string;
   statements: QaStatement[];
@@ -69,6 +76,7 @@ export function ResultActions({
   onSaved?: () => void;
   editFormId?: string;
   draftValues?: Record<string, string>;
+  trailing?: ReactNode;
 }) {
   const [internalEditing, setInternalEditing] = useState(false);
   const [localValues, setLocalValues] = useState<Record<string, string>>({});
@@ -115,7 +123,7 @@ export function ResultActions({
           ))}
         </div>
       ) : null}
-      <div className="mt-3 flex flex-nowrap items-center gap-2" data-testid={testId}>
+      <div className={cardButtonRowClass} data-testid={testId}>
         <ApplicationActionForm
           action={approveConsultationQaResultAction}
           submitLabel={consultationConversationCopy.approve}
@@ -193,6 +201,7 @@ export function ResultActions({
             {consultationConversationCopy.editAnswer}
           </AppButton>
         )}
+        {trailing}
       </div>
     </>
   );
@@ -345,6 +354,51 @@ function SeekerRepliesSection({
   );
 }
 
+function SkipIgnoreButtons({
+  campaignId,
+  replyKey,
+  showSkip,
+  showIgnore,
+}: {
+  campaignId: string;
+  replyKey: string;
+  showSkip: boolean;
+  showIgnore: boolean;
+}) {
+  return (
+    <>
+      {showSkip ? (
+        <ApplicationActionForm
+          action={skipConsultationQuestionAction}
+          submitLabel={consultationConversationCopy.skipQuestion}
+          pendingLabel={consultationConversationCopy.thinking}
+          testId="consultation-skip-question"
+          variant="secondary"
+          compact
+          formClassName={actionFormClass}
+        >
+          <input type="hidden" name="campaignId" value={campaignId} />
+          <input type="hidden" name="targetKey" value={replyKey} />
+        </ApplicationActionForm>
+      ) : null}
+      {showIgnore ? (
+        <ApplicationActionForm
+          action={ignoreConsultationQuestionAction}
+          submitLabel={consultationConversationCopy.ignoreQuestion}
+          pendingLabel={consultationConversationCopy.thinking}
+          testId="consultation-ignore-question"
+          variant="secondary"
+          compact
+          formClassName={actionFormClass}
+        >
+          <input type="hidden" name="campaignId" value={campaignId} />
+          <input type="hidden" name="targetKey" value={replyKey} />
+        </ApplicationActionForm>
+      ) : null}
+    </>
+  );
+}
+
 function RepliesToggle({
   open,
   onToggle,
@@ -394,7 +448,7 @@ function QuestionReplyForm({
   if (hasPriorReply && !editing) {
     return (
       <div
-        className={actionRowClass}
+        className={cardButtonRowClass}
         data-testid="consultation-question-actions"
       >
         <a
@@ -408,6 +462,12 @@ function QuestionReplyForm({
         >
           {consultationConversationCopy.editAnswer}
         </a>
+        <SkipIgnoreButtons
+          campaignId={campaignId}
+          replyKey={replyKey}
+          showSkip={showSkip}
+          showIgnore={showIgnore}
+        />
         {repliesToggle}
       </div>
     );
@@ -430,7 +490,7 @@ function QuestionReplyForm({
         />
       </label>
       <div
-        className={actionRowClass}
+        className={cardButtonRowClass}
         data-testid="consultation-question-actions"
       >
         <ApplicationActionForm
@@ -457,34 +517,12 @@ function QuestionReplyForm({
           {/* Visible textarea uses form=; keep a sync field for browsers that omit form= */}
           <input type="hidden" name="answer" value={draft.value} />
         </ApplicationActionForm>
-        {showSkip ? (
-          <ApplicationActionForm
-            action={skipConsultationQuestionAction}
-            submitLabel={consultationConversationCopy.skipQuestion}
-            pendingLabel={consultationConversationCopy.thinking}
-            testId="consultation-skip-question"
-            variant="secondary"
-            compact
-            formClassName={actionFormClass}
-          >
-            <input type="hidden" name="campaignId" value={campaignId} />
-            <input type="hidden" name="targetKey" value={replyKey} />
-          </ApplicationActionForm>
-        ) : null}
-        {showIgnore ? (
-          <ApplicationActionForm
-            action={ignoreConsultationQuestionAction}
-            submitLabel={consultationConversationCopy.ignoreQuestion}
-            pendingLabel={consultationConversationCopy.thinking}
-            testId="consultation-ignore-question"
-            variant="secondary"
-            compact
-            formClassName={actionFormClass}
-          >
-            <input type="hidden" name="campaignId" value={campaignId} />
-            <input type="hidden" name="targetKey" value={replyKey} />
-          </ApplicationActionForm>
-        ) : null}
+        <SkipIgnoreButtons
+          campaignId={campaignId}
+          replyKey={replyKey}
+          showSkip={showSkip}
+          showIgnore={showIgnore}
+        />
         {repliesToggle}
       </div>
     </div>
@@ -520,6 +558,7 @@ function QuestionCard({
   collapseWhenIgnored = false,
   approvedExpanded = false,
   onApprovedExpandedChange,
+  outerCard = true,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -535,6 +574,8 @@ function QuestionCard({
   /** Lifted with the page-level Collapse/Expand all approved control. */
   approvedExpanded?: boolean;
   onApprovedExpandedChange?: (questionTurnId: string, expanded: boolean) => void;
+  /** False when this question sits inside a requirement or cheat-sheet card. */
+  outerCard?: boolean;
 }) {
   const hasResult = Boolean(item.resumeBullet || item.talkingPoint);
   const approved =
@@ -609,7 +650,17 @@ function QuestionCard({
   const showReplyBox = canAnswer && !answerShowing;
   const canSkip = canEdit && actionsEnabled && !item.ignored && !approved;
   const canIgnore = canSkip;
+  const skipPlacedWithDraft =
+    canEdit &&
+    !showReplyBox &&
+    (pendingDraftStatements.length > 0 ||
+      (!item.pendingDraftTalkingPoint &&
+        !item.pendingDraftResumeBullet &&
+        Boolean(item.talkingPoint || item.resumeBullet) &&
+        item.statements.some((statement) => statement.status !== "APPROVED")));
+  const skipPlaced = showReplyBox || skipPlacedWithDraft;
   const replyKey = consultationReplyTargetKey(item.questionTurnId);
+  const questionCardClass = outerCard ? outerQuestionCardClass : innerQuestionCardClass;
   const oneLineLabel =
     item.talkingPoint?.content?.trim() ||
     item.resumeBullet?.content?.trim() ||
@@ -633,7 +684,7 @@ function QuestionCard({
     return (
       <article
         id={harperQuestionAnchorId(item.questionTurnId)}
-        className="min-w-0 overflow-hidden rounded-md border border-edge bg-canvas p-4"
+        className={questionCardClass}
         data-testid="consultation-ignored-question"
         data-harper-question={item.questionTurnId}
         tabIndex={-1}
@@ -692,7 +743,7 @@ function QuestionCard({
     return (
       <article
         id={harperQuestionAnchorId(item.questionTurnId)}
-        className="min-w-0 overflow-hidden rounded-md border border-edge bg-canvas p-4"
+        className={questionCardClass}
         data-testid="consultation-answered"
         data-harper-question={item.questionTurnId}
         tabIndex={-1}
@@ -730,7 +781,7 @@ function QuestionCard({
   return (
     <article
       id={harperQuestionAnchorId(item.questionTurnId)}
-      className="min-w-0 overflow-hidden rounded-md border border-edge bg-canvas p-4"
+      className={questionCardClass}
       data-testid={
         item.ignored
           ? "consultation-ignored-question"
@@ -794,7 +845,19 @@ function QuestionCard({
                 </p>
                 {item.pendingDraftTalkingPoint ? <ResultBody {...bodyProps(item.pendingDraftTalkingPoint, editingDraft)} /> : null}
                 {item.pendingDraftResumeBullet ? <ResultBody {...bodyProps(item.pendingDraftResumeBullet, editingDraft)} /> : null}
-                {canEdit ? <ResultActions {...draftActions(pendingDraftStatements)} /> : null}
+                {canEdit ? (
+                  <ResultActions
+                    {...draftActions(pendingDraftStatements)}
+                    trailing={
+                      <SkipIgnoreButtons
+                        campaignId={campaignId}
+                        replyKey={replyKey}
+                        showSkip={canSkip}
+                        showIgnore={canIgnore}
+                      />
+                    }
+                  />
+                ) : null}
               </div>
             ) : null}
             {item.talkingPoint ? <ResultBody {...bodyProps(item.talkingPoint, editingMain)} /> : null}
@@ -802,7 +865,17 @@ function QuestionCard({
             {canEdit &&
             !item.pendingDraftTalkingPoint &&
             !item.pendingDraftResumeBullet ? (
-              <ResultActions {...draftActions(item.statements)} />
+              <ResultActions
+                {...draftActions(item.statements)}
+                trailing={
+                  <SkipIgnoreButtons
+                    campaignId={campaignId}
+                    replyKey={replyKey}
+                    showSkip={canSkip}
+                    showIgnore={canIgnore}
+                  />
+                }
+              />
             ) : null}
           </>
         ) : null}
@@ -819,44 +892,24 @@ function QuestionCard({
             campaignId={campaignId}
             item={item}
             actionsEnabled={actionsEnabled}
-            showSkip={false}
-            showIgnore={false}
+            showSkip={canSkip}
+            showIgnore={canIgnore}
             onSubmitStart={onSubmitStart}
             repliesToggle={repliesToggle}
           />
         ) : null}
-        {showWorking ? null : canSkip || canIgnore || (!showReplyBox && repliesToggle) ? (
+        {showWorking ? null : (!skipPlaced && (canSkip || canIgnore)) || (!showReplyBox && repliesToggle) ? (
           <div
             className={actionRowClass}
             data-testid="consultation-secondary-actions"
           >
-            {canSkip ? (
-              <ApplicationActionForm
-                action={skipConsultationQuestionAction}
-                submitLabel={consultationConversationCopy.skipQuestion}
-                pendingLabel={consultationConversationCopy.thinking}
-                testId="consultation-skip-question"
-                variant="secondary"
-                compact
-                formClassName={actionFormClass}
-              >
-                <input type="hidden" name="campaignId" value={campaignId} />
-                <input type="hidden" name="targetKey" value={replyKey} />
-              </ApplicationActionForm>
-            ) : null}
-            {canIgnore ? (
-              <ApplicationActionForm
-                action={ignoreConsultationQuestionAction}
-                submitLabel={consultationConversationCopy.ignoreQuestion}
-                pendingLabel={consultationConversationCopy.thinking}
-                testId="consultation-ignore-question"
-                variant="secondary"
-                compact
-                formClassName={actionFormClass}
-              >
-                <input type="hidden" name="campaignId" value={campaignId} />
-                <input type="hidden" name="targetKey" value={replyKey} />
-              </ApplicationActionForm>
+            {!skipPlaced ? (
+              <SkipIgnoreButtons
+                campaignId={campaignId}
+                replyKey={replyKey}
+                showSkip={canSkip}
+                showIgnore={canIgnore}
+              />
             ) : null}
             {!showReplyBox ? repliesToggle : null}
           </div>
@@ -932,6 +985,7 @@ export function QuestionList({
   approvedExpandedIds,
   onApprovedExpandedChange,
   onSubmitStart,
+  outerCard = true,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -946,6 +1000,8 @@ export function QuestionList({
   approvedExpandedIds?: ReadonlySet<string>;
   onApprovedExpandedChange?: (questionTurnId: string, expanded: boolean) => void;
   onSubmitStart: (replyKey: string, answer: string) => void;
+  /** False when these questions sit inside another card. */
+  outerCard?: boolean;
 }) {
   const actionsEnabled = showReply && !jobsActive;
   const label = suppressQuestionTextWhenMatchesLabel?.trim() ?? "";
@@ -971,6 +1027,7 @@ export function QuestionList({
             collapseWhenIgnored={collapseWhenIgnored}
             approvedExpanded={approvedExpandedIds?.has(item.questionTurnId) ?? false}
             onApprovedExpandedChange={onApprovedExpandedChange}
+            outerCard={outerCard}
             onSubmitStart={(answer) => {
               onSubmitStart(consultationReplyTargetKey(item.questionTurnId), answer);
             }}

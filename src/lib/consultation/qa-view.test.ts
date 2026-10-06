@@ -84,7 +84,7 @@ describe("Harper question-limit coach", () => {
     expect(thread).toContain("consultationConversationCopy.showYourReplies");
     expect(thread).toContain("consultationConversationCopy.hideYourReplies");
     expect(consultationConversationCopy.skipQuestion).toBe("Skip");
-    expect(consultationConversationCopy.ignoreQuestion).toBe("Ignore");
+    expect(consultationConversationCopy.ignoreQuestion).toBe("Permanently Ignore");
   });
 
   it("keeps an ignored question on the list with Ignored state until reopened", () => {

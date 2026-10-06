@@ -127,7 +127,7 @@ describe("Harper Batch A standing Answer / Ignore / reopen", () => {
     expect(standing).toContain(
       "submitLabel={consultationConversationCopy.shareSomeDetails}",
     );
-    expect(consultationConversationCopy.ignoreQuestion).toBe("Ignore");
+    expect(consultationConversationCopy.ignoreQuestion).toBe("Permanently Ignore");
     expect(harperQuestionAnchorId("turn-1")).toBe("harper-q:turn-1");
   });
 

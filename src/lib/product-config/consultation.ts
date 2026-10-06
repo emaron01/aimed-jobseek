@@ -101,7 +101,7 @@ export const consultationConversationCopy = Object.freeze({
   showYourReplies: "Show your replies",
   hideYourReplies: "Hide your replies",
   skipQuestion: "Skip",
-  ignoreQuestion: "Ignore",
+  ignoreQuestion: "Permanently Ignore",
   questionIgnored: "Ignored",
   gapIgnored: "Ignored",
   reopenIgnored: "Ignored",

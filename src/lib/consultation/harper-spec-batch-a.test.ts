@@ -88,6 +88,7 @@ describe("Harper spec batch A cards", () => {
     const standing = src("src/components/ConsultationStanding.tsx");
     expect(standing).not.toContain("expandEvidence");
     expect(standing).not.toContain("toggle-evidence-");
+    expect(standing).toContain("border-2 border-edge-strong bg-surface");
     expect(standing).toContain("border border-edge bg-canvas");
     expect(standing).toContain("entry.questions.length === 0");
     expect(standing).toContain("GapShareDetailsForm");
@@ -125,11 +126,29 @@ describe("Harper spec batch A cards", () => {
     expect(sales?.textContent).toContain(consultationConversationCopy.approve);
     expect(sales?.textContent).toContain(polishCopy.regenerate);
     expect(sales?.textContent).toContain(consultationConversationCopy.editAnswer);
-    expect(sales?.querySelector("[data-testid=consultation-secondary-actions]")).toBeTruthy();
+    expect(sales?.className).toContain("border-2");
+    expect(sales?.className).toContain("border-edge-strong");
+    expect(sales?.className).toContain("bg-surface");
+    const salesRow = sales?.querySelector("[data-testid=consultation-result-q-sales]");
+    expect(salesRow?.className).toContain("sm:flex-nowrap");
+    expect(salesRow?.textContent).toContain(consultationConversationCopy.approve);
+    expect(salesRow?.textContent).toContain(consultationConversationCopy.skipQuestion);
+    expect(salesRow?.textContent).toContain(consultationConversationCopy.ignoreQuestion);
+    expect(consultationConversationCopy.ignoreQuestion).toBe("Permanently Ignore");
+    expect(sales?.querySelector("[data-testid=consultation-secondary-actions]")).toBeNull();
+    expect(sales?.querySelector("[data-testid=consultation-reply-box]")).toBeNull();
 
-    expect(nursing?.textContent).toContain(nursingOpen.question);
-    expect(nursing?.querySelector("[data-testid=consultation-reply-box]")).toBeTruthy();
-    expect(nursing?.textContent).not.toContain(polishCopy.regenerate);
+    expect(nursing?.className).toContain("bg-surface");
+    expect(nursing?.className).toContain("border-2");
+    const nursingRow = nursing?.querySelector("[data-testid=consultation-question-actions]");
+    expect(nursingRow?.className).toContain("sm:flex-nowrap");
+    expect(nursingRow?.textContent).toContain(consultationConversationCopy.threadReply);
+    expect(nursingRow?.textContent).toContain(consultationConversationCopy.ignoreQuestion);
+    const replyBox = nursing?.querySelector("[data-testid=consultation-reply-box]");
+    expect(replyBox).toBeTruthy();
+    expect(replyBox?.className).toContain("border");
+    expect(replyBox?.className).toContain("border-edge-strong");
+    expect(replyBox?.className).not.toContain("border-2");
 
     expect(graduate?.textContent).toContain(graduateApproved.question);
     expect(graduate?.querySelector("[data-testid=consultation-reply-box]")).toBeNull();
@@ -143,7 +162,8 @@ describe("Harper spec batch A cards", () => {
 
   it("uses the Harper action row for a cheat-sheet sample and keeps place when a job finishes", () => {
     const sheet = src("src/components/CheatSheetCoachItems.tsx");
-    expect(sheet).toContain("flex flex-nowrap items-center gap-2");
+    expect(sheet).toContain("flex flex-wrap items-center gap-2 sm:flex-nowrap");
+    expect(sheet).toContain("border-2 border-edge-strong bg-surface");
     expect(sheet).toContain("polishCopy.regenerate");
     expect(sheet).toContain("consultationConversationCopy.approve");
     expect(sheet).toContain("consultationConversationCopy.editAnswer");

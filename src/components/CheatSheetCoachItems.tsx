@@ -53,7 +53,7 @@ function SampleDraftActions({
         />
       ) : null}
       <div
-        className="mt-3 flex flex-nowrap items-center gap-2"
+        className="mt-3 flex flex-wrap items-center gap-2 sm:flex-nowrap"
         data-testid={`cheat-sheet-sample-actions-${itemId}`}
       >
         <ApplicationActionForm
@@ -179,7 +179,7 @@ export function CheatSheetCoachItems({
           <li
             key={item.id ?? item.prompt}
             id={anchorId}
-            className="rounded-md border border-edge bg-canvas p-4"
+            className="rounded-md border-2 border-edge-strong bg-surface p-4"
             data-testid={`cheat-sheet-coach-${item.id ?? "item"}`}
           >
             {shared ? (
@@ -198,6 +198,7 @@ export function CheatSheetCoachItems({
                   showReply={showReply}
                   pendingTarget={pendingTarget}
                   jobsActive={jobsActive}
+                  outerCard={false}
                   onSubmitStart={(replyKey, answerText) => {
                     setPendingTarget(replyKey);
                     void answerText;
@@ -217,6 +218,7 @@ export function CheatSheetCoachItems({
                     showReply={showReply}
                     pendingTarget={pendingTarget}
                     jobsActive={jobsActive}
+                    outerCard={false}
                     suppressQuestionTextWhenMatchesLabel={item.prompt}
                     onSubmitStart={(replyKey, answerText) => {
                       setPendingTarget(replyKey);

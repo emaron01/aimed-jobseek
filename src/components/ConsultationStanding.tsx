@@ -93,7 +93,7 @@ function GapShareDetailsForm({
           {consultationConversationCopy.shareSomeDetailsHelp}
         </span>
       </label>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
         <ApplicationActionForm
           action={replyConsultationAction}
           submitLabel={consultationConversationCopy.shareSomeDetails}
@@ -260,7 +260,7 @@ function StandingRequirementList({
         return (
           <li
             key={entry.id}
-            className="min-w-0 space-y-2 overflow-hidden rounded-md border border-edge bg-canvas p-4 text-sm text-ink"
+            className="min-w-0 space-y-2 overflow-hidden rounded-md border-2 border-edge-strong bg-surface p-4 text-sm text-ink"
             data-testid="consultation-standing-entry"
             data-standing-target={entry.targetKey}
             data-strength={entry.strength}
@@ -293,6 +293,7 @@ function StandingRequirementList({
                   collapseWhenApproved={collapseWhenApproved}
                   approvedExpandedIds={approvedExpandedIds}
                   onApprovedExpandedChange={onApprovedExpandedChange}
+                  outerCard={false}
                   suppressQuestionTextWhenMatchesLabel={
                     labelMatchesQuestion ? entry.label : null
                   }
