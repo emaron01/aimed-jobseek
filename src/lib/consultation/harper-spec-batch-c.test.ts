@@ -146,7 +146,7 @@ describe("Harper spec batch C", () => {
     expect(dropRepeatedSentences(repeated).match(/rebuilt the Monday forecast/g)?.length).toBe(1);
   });
 
-  it("stores a story that names the profile school or employer and drops one that names another workplace", () => {
+  it("stores a story that names a profile place, including a customer named with at", () => {
     const names = profilePlaceNames([salesEmployer, nursingSchool, graduateProject]);
     expect(storyGroundedInProfile("I trained at State University.", names)).toBe(true);
     expect(storyGroundedInProfile("At OpenText I owned the forecast.", names)).toBe(true);
@@ -182,7 +182,25 @@ describe("Harper spec batch C", () => {
     );
     expect(school[0]?.content).toContain("State University");
 
-    const rejected = bestPracticeDraftsForAnswers(
+    const customer = bestPracticeDraftsForAnswers(
+      [choice("Tell me about a time you won an enterprise deal.", "required:deal")],
+      [
+        answer({
+          questionId: "required:deal",
+          challenge: "At OpenText I worked a $1.3MM opportunity at Bank of America.",
+          action: "I ran the evaluation with the buying group.",
+          result: "We won the contract.",
+        }),
+      ],
+      [],
+      [salesEmployer],
+    );
+    expect(customer[0]?.content).toContain(
+      "At OpenText I worked a $1.3MM opportunity at Bank of America.",
+    );
+    expect(customer[0]?.content).toContain("We won the contract.");
+
+    const otherWorkplace = bestPracticeDraftsForAnswers(
       [choice("Tell me about a time you covered a unit.", "required:unit")],
       [
         answer({
@@ -195,7 +213,7 @@ describe("Harper spec batch C", () => {
       [],
       [nursingSchool],
     );
-    expect(rejected[0]?.content ?? "").toBe("");
+    expect(otherWorkplace[0]?.content).toContain("At Mercy General I covered the night shift.");
 
     const hypothetical = bestPracticeDraftsForAnswers(
       [choice("Tell me about a time you would handle a new account.", "required:would")],
@@ -210,7 +228,7 @@ describe("Harper spec batch C", () => {
       [],
       [salesEmployer],
     );
-    expect(hypothetical[0]?.content ?? "").toBe("");
+    expect(hypothetical[0]?.content).toContain("I would start with two customer visits at OpenText.");
   });
 
   it("does not add a best-practice question for a target that already has a gap question", () => {

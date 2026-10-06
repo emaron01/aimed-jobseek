@@ -297,7 +297,131 @@ describe("gap question drafts from a question match", () => {
     });
   });
 
-  it("stores a real story for a gap question instead of a hypothetical or mid-thought draft", () => {
+  it("retries a story with no profile place or an I would opening once, then stores the best attempt", async () => {
+    const profileItems = [
+      {
+        employer: "OpenText",
+        text: "VP Enterprise Sales at OpenText",
+        itemType: "EXPERIENCE",
+      },
+    ];
+    const questions = [
+      {
+        text: SELLER_QUESTION,
+        targetKey: "gap:seller",
+        interviewTypeTag: "focused_competency" as const,
+        targetText: "Own a multi-product revenue number",
+      },
+    ];
+
+    function answerFor(
+      question: { id?: string; text: string },
+      parts: { challenge: string; action: string; result: string },
+    ) {
+      return {
+        questionId: question.id ?? question.text,
+        text: question.text,
+        answerFramework: "CAR" as const,
+        situation: null,
+        task: null,
+        followUpQuestion: null,
+        ...parts,
+      };
+    }
+
+    let calls = 0;
+    answersGenerate.mockImplementation(async (request: { messages: { content: string }[] }) => {
+      calls += 1;
+      const payload = JSON.parse(request.messages[1]!.content) as {
+        questions: Array<{ id?: string; text: string }>;
+        qualityFeedback?: string[];
+      };
+      if (calls === 2) {
+        expect(payload.qualityFeedback?.join(" ")).toContain("name where it happened");
+        expect(payload.qualityFeedback?.join(" ")).toContain("tell it as what happened");
+      }
+      const stillShort = calls === 1;
+      return {
+        data: {
+          answers: payload.questions.map((question) =>
+            answerFor(
+              question,
+              stillShort
+                ? {
+                    challenge: "Two individuals were underperforming on the team.",
+                    action: "I met with each of them about the missed number.",
+                    result: "Both left the team that quarter.",
+                  }
+                : {
+                    challenge: "The same two individuals were still missing plan.",
+                    action: "I met with each of them again about the missed number.",
+                    result: "Both left the team the next month.",
+                  },
+            ),
+          ),
+        },
+      };
+    });
+
+    const unnamed = await draftSupportedGapQuestions({
+      organizationId: "org-1",
+      campaignId: "sift",
+      sessionId: "session-1",
+      careerStage: "late_career",
+      jobSources: { title: "Director of Sales", employer: "Sift" },
+      approvedAnswers: [],
+      profileItems,
+      questions,
+    });
+    expect(unnamed).toEqual({ drafted: 1, called: true });
+    expect(calls).toBe(2);
+    expect(createStatement.mock.calls.at(-1)?.[0].data.content).toContain(
+      "The same two individuals were still missing plan.",
+    );
+
+    calls = 0;
+    createStatement.mockClear();
+    answersGenerate.mockImplementation(async (request: { messages: { content: string }[] }) => {
+      calls += 1;
+      const payload = JSON.parse(request.messages[1]!.content) as {
+        questions: Array<{ id?: string; text: string }>;
+      };
+      return {
+        data: {
+          answers: payload.questions.map((question) =>
+            answerFor(
+              question,
+              calls === 1
+                ? {
+                    challenge: "I would convene the team to fix the forecast.",
+                    action: "I would map the buying group.",
+                    result: "The plan would be ready.",
+                  }
+                : { challenge: "", action: "", result: "" },
+            ),
+          ),
+        },
+      };
+    });
+
+    const hypothetical = await draftSupportedGapQuestions({
+      organizationId: "org-1",
+      campaignId: "sift",
+      sessionId: "session-1",
+      careerStage: "late_career",
+      jobSources: { title: "Director of Sales", employer: "Sift" },
+      approvedAnswers: [],
+      profileItems,
+      questions,
+    });
+    expect(hypothetical).toEqual({ drafted: 1, called: true });
+    expect(calls).toBe(2);
+    expect(createStatement.mock.calls.at(-1)?.[0].data.content).toContain(
+      "I would convene the team to fix the forecast.",
+    );
+  });
+
+  it("keeps usable story text, including a draft that names no profile place", () => {
     const market =
       "At OpenText I led the response to an enterprise SaaS market shift and convened Sales and Product. Win rate rose.";
     const forecast =
@@ -342,21 +466,21 @@ describe("gap question drafts from a question match", () => {
       "I would convene Sales, Product, Marketing, and Customer Success to respond to the enterprise SaaS market shift.",
       "Win rate rose after that response.",
     );
-    expect(hypothetical).toBe("");
+    expect(hypothetical).toContain("I would convene Sales, Product, Marketing, and Customer Success");
 
     const midThought = storyDraft(
       "Tell me about a time the forecast lacked consistency.",
       "The lack of consistency made it difficult to forecast the quarter.",
       "Forecast accuracy rose after the rebuild.",
     );
-    expect(midThought).toBe("");
+    expect(midThought).toContain("The lack of consistency made it difficult to forecast the quarter.");
 
     const unnamed = storyDraft(
       SELLER_QUESTION,
       "Two individuals were underperforming on the team.",
       "Those representatives became top performers.",
     );
-    expect(unnamed).toBe("");
+    expect(unnamed).toContain("Two individuals were underperforming on the team.");
 
     const alreadyGrounded = storyDraft(
       "Tell me about a time you coached sellers at a company.",

@@ -56,7 +56,6 @@ import {
   profilePlaceNames,
   questionLooksMultipart,
   storyGroundedInProfile,
-  storyNamesUnknownPlace,
   type ProfilePlaceSource,
 } from "@/lib/consultation/answer-binding";
 import {
@@ -1166,8 +1165,9 @@ function bestPracticePassingDraft(
 }
 
 const STORY_HYPOTHETICAL_SENTENCE = /^\s*I would\b/i;
-const STORY_MID_THOUGHT_OPENING =
-  /^\s*(?:the|that|this)\s+(?:lack|purchase|transition|change|shift|move|acquisition|merger|reorganization|rotation|handoff|handover|deal|process|gap|issue|problem)\b/i;
+const STORY_PLACE_REWRITE =
+  "name where it happened and tell it as what happened";
+
 function storySentences(content: string): string[] {
   return content
     .split(/(?<=[.!?])\s+/)
@@ -1186,23 +1186,26 @@ function isHypotheticalStory(content: string): boolean {
   return leading.length > 0 && leading.length * 2 >= sentences.length;
 }
 
-function opensMidThought(content: string, names: readonly string[]): boolean {
-  const first = storySentences(content)[0] ?? content;
-  if (!STORY_MID_THOUGHT_OPENING.test(first)) return false;
-  return !storyGroundedInProfile(first, names);
-}
-
-function storyDraftContent(
+function storyNamesProfilePlace(
   content: string,
   profileItems: readonly ProfilePlaceSource[],
-): string {
-  const text = dropRepeatedSentences(content.trim());
-  if (!text || isHypotheticalStory(text)) return "";
-  const names = profilePlaceNames(profileItems);
-  if (!storyGroundedInProfile(text, names)) return "";
-  if (storyNamesUnknownPlace(text, names)) return "";
-  if (opensMidThought(text, names)) return "";
-  return text;
+): boolean {
+  return storyGroundedInProfile(content, profilePlaceNames(profileItems));
+}
+
+/** A usable story that still needs one rewrite: no stored place, or it opens with "I would". */
+function storyNeedsPlaceRewrite(
+  content: string,
+  profileItems: readonly ProfilePlaceSource[],
+): boolean {
+  const text = content.trim();
+  if (!text) return false;
+  if (isHypotheticalStory(text)) return true;
+  return !storyNamesProfilePlace(text, profileItems);
+}
+
+function storyDraftContent(content: string): string {
+  return dropRepeatedSentences(content.trim());
 }
 
 function attachKeyPoints(
@@ -1256,7 +1259,7 @@ function bestPracticeDraftForChoice(
   }
   question = attachKeyPoints(question, answer);
   if (kind !== "story") return question;
-  const content = storyDraftContent(question.content, profileItems);
+  const content = storyDraftContent(question.content);
   if (!content.trim()) return unansweredRoleExpertiseQuestion(choice);
   if (content === question.content) return question;
   return {
@@ -1373,6 +1376,8 @@ function judgeAnswersForChoices(input: {
   settings: HarperDraftSettings;
   recentRoleCount?: number;
   enforceShape: boolean;
+  /** After the one place rewrite, keep a usable story even if it is still short. */
+  acceptShortStory?: boolean;
 }): { valid: ValidatedRoleExpertiseQuestion[]; issues: string[] } {
   const issues: string[] = [];
   const valid: ValidatedRoleExpertiseQuestion[] = [];
@@ -1396,6 +1401,15 @@ function judgeAnswersForChoices(input: {
         `The answer for question id ${choice.targetKey} was not stored.`,
       );
       continue;
+    }
+    if (
+      !input.acceptShortStory &&
+      askHarperAnswerKind(choice.text) === "story" &&
+      storyNeedsPlaceRewrite(judged.content, input.profileItems)
+    ) {
+      issues.push(
+        `Question id ${choice.targetKey}: ${STORY_PLACE_REWRITE}.`,
+      );
     }
     const words = spokenWordsForQuestion({
       settings: input.settings,
@@ -1505,6 +1519,8 @@ async function generateRoleExpertiseAnswersStep(input: {
   const settings = input.settings ?? (await getHarperDraftSettings());
   const placeSources = profilePlaceSources(input.profileItems);
   let shapeRewriteUsed = false;
+  let storyPlaceRewriteUsed = false;
+  const bestStoryByKey = new Map<string, ValidatedRoleExpertiseQuestion>();
 
   try {
     const gated = await runPaidStructuredCall<RoleExpertiseAnswersResult>({
@@ -1559,6 +1575,7 @@ async function generateRoleExpertiseAnswersStep(input: {
             failedAttempts.push(matchedForAttempt.matched[0]);
           }
           const merged = mergeQuestionsWithAnswers(input.choices, data.answers);
+          const acceptingShortStory = storyPlaceRewriteUsed;
           const checked = input.answerMode
             ? validateAnswersForMode(merged, input.answerMode)
             : judgeAnswersForChoices({
@@ -1569,7 +1586,24 @@ async function generateRoleExpertiseAnswersStep(input: {
                 settings,
                 recentRoleCount: input.recentRoleCount,
                 enforceShape: !shapeRewriteUsed,
+                acceptShortStory: acceptingShortStory,
               });
+          if (
+            input.answerMode === "story" &&
+            !acceptingShortStory
+          ) {
+            for (const question of checked.valid) {
+              if (!storyNeedsPlaceRewrite(question.content, placeSources)) continue;
+              checked.issues.push(
+                `Question id ${question.targetKey}: ${STORY_PLACE_REWRITE}.`,
+              );
+            }
+          }
+          for (const question of checked.valid) {
+            if (question.content.trim()) {
+              bestStoryByKey.set(question.targetKey, question);
+            }
+          }
           if (
             checked.issues.some(
               (issue) =>
@@ -1578,9 +1612,34 @@ async function generateRoleExpertiseAnswersStep(input: {
           ) {
             shapeRewriteUsed = true;
           }
+          const storyPlaceIssues = checked.issues.filter((issue) =>
+            issue.includes(STORY_PLACE_REWRITE),
+          );
+          const otherIssues = checked.issues.filter(
+            (issue) => !issue.includes(STORY_PLACE_REWRITE),
+          );
+          if (!acceptingShortStory && storyPlaceIssues.length > 0) {
+            storyPlaceRewriteUsed = true;
+          }
           lastValid = checked.valid;
           const lastAttempt =
             attempt === consultationConfig.qualityRegenerationAttempts;
+          const blockingIssues = otherIssues.filter(
+            (issue) => !issue.includes("was not stored"),
+          );
+          if (acceptingShortStory && blockingIssues.length === 0) {
+            return {
+              answers: input.choices.flatMap((choice) => {
+                const current = checked.valid.find(
+                  (question) =>
+                    question.targetKey === choice.targetKey &&
+                    question.content.trim(),
+                );
+                const chosen = current ?? bestStoryByKey.get(choice.targetKey);
+                return chosen?.content.trim() ? mappedAnswers([chosen]) : [];
+              }),
+            };
+          }
           if (checked.issues.length === 0) {
             return { answers: mappedAnswers(checked.valid) };
           }
@@ -1677,7 +1736,7 @@ async function generateRoleExpertiseAnswersStep(input: {
         : "";
       const content =
         choice && input.answerMode === "story"
-          ? storyDraftContent(drafted, placeSources)
+          ? storyDraftContent(drafted)
           : drafted;
       if (choice && answer && content) {
         return {
