@@ -37,7 +37,7 @@ describe("Harper answer quality", () => {
   it("puts the story and named-method rules on the answer-drafting instructions", () => {
     expect(ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS).toContain(STORY_INSTRUCTION);
     expect(ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS).toContain(METHOD_INSTRUCTION);
-    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("7");
+    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("8");
   });
 
   it("puts the named-method rule on the planning writing instructions", () => {

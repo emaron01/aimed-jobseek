@@ -82,7 +82,7 @@ export const ROLE_EXPERTISE_PROMPT_VERSION = "3";
  * Questions stay on ROLE_EXPERTISE_PROMPT_VERSION, so a bump here does not
  * invalidate a stored questions receipt or rewrite stored suggested answers.
  */
-export const ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION = "7";
+export const ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION = "8";
 
 export const COACHING_SET_MIN = 20;
 export const COACHING_SET_MAX = 25;
@@ -1006,6 +1006,57 @@ function answerHasParts(answer: RoleExpertiseAnswerParts): boolean {
 }
 
 /**
+ * Sentences in `text` that come before the action. The answers schema uses
+ * `text` as the question echo, so an opening written only there is otherwise
+ * discarded once any later part is set.
+ */
+function leadingProse(prose: string, later: string): string {
+  const needle = later.replace(/\s+/g, " ").trim().slice(0, 40).toLowerCase();
+  if (needle.length < 12) return "";
+  const index = prose.toLowerCase().indexOf(needle);
+  if (index <= 0) return "";
+  return prose.slice(0, index).trim();
+}
+
+/**
+ * A story whose challenge or situation is empty still has that opening when
+ * the model wrote it in `text` ahead of the action. Point-of-view answers are
+ * left as they are.
+ */
+function restoreStoryOpening(
+  answer: RoleExpertiseAnswerParts,
+  questionText: string,
+): RoleExpertiseAnswerParts {
+  if (askHarperAnswerKind(questionText) !== "story") return answer;
+  const openingField = answer.answerFramework === "STAR" ? "situation" : "challenge";
+  if (fieldText(answer[openingField])) return answer;
+  const prose = answer.text.trim();
+  if (!prose || answerEchoesQuestion(prose, questionText)) return answer;
+  const action = fieldText(answer.action);
+  const lead = action ? leadingProse(prose, action) : "";
+  if (lead) return { ...answer, [openingField]: lead };
+  if (
+    action &&
+    prose.length > action.length &&
+    !prose.toLowerCase().startsWith(action.toLowerCase().slice(0, 24))
+  ) {
+    return { ...answer, [openingField]: prose };
+  }
+  return answer;
+}
+
+/** Stored story content keeps its opening part, so it does not start at a later sentence. */
+function withStoryOpening(answer: RoleExpertiseAnswerParts, content: string): string {
+  const opening =
+    answer.answerFramework === "STAR"
+      ? fieldText(answer.situation)
+      : fieldText(answer.challenge);
+  const needle = opening.toLowerCase().slice(0, 40);
+  if (!opening || !needle || content.toLowerCase().includes(needle)) return content;
+  return composeInterviewAnswerFromParts([opening, content]);
+}
+
+/**
  * The answers schema calls the question echo `text`. When the model puts the
  * answer there, or returns one answer per question in order, keep that prose
  * and store the question on `text` so the draft can be joined.
@@ -1015,9 +1066,10 @@ function withProseFromTextField(
   questionText: string,
 ): RoleExpertiseAnswerParts {
   if (answerHasParts(answer)) {
-    return answerEchoesQuestion(answer.text, questionText)
-      ? answer
-      : { ...answer, text: questionText };
+    const restored = restoreStoryOpening(answer, questionText);
+    return answerEchoesQuestion(restored.text, questionText)
+      ? restored
+      : { ...restored, text: questionText };
   }
   const prose = answer.text.trim();
   if (!prose || prose.toLowerCase() === questionText.trim().toLowerCase()) {
@@ -1162,10 +1214,12 @@ function bestPracticeDraftForChoice(
   const passed = bestPracticePassingDraft(choice, answer, sourceTexts);
   if (!passed.issue && passed.question.content.trim()) return passed.question;
   const kind = askHarperAnswerKind(choice.text);
-  const content = answer
+  const assembled = answer
     ? askHarperUnpassedDraft({ answer, kind, sourceTexts }) ||
       askHarperAttemptProse(answer)
     : "";
+  const content =
+    answer && kind === "story" ? withStoryOpening(answer, assembled) : assembled;
   if (!content) return unansweredRoleExpertiseQuestion(choice);
   return {
     text: choice.text,
@@ -1276,10 +1330,10 @@ async function generateRoleExpertiseAnswersStep(input: {
    */
   answerMode?: "story" | "point-of-view";
   /**
-   * Gap drafts pass the requirement text as well as the question so an approved
-   * answer is selected when it covers the requirement, not only the question wording.
+   * Gap drafts pass the requirement text as well as the question. Question
+   * entries set `question` so the match uses that question's own wording.
    */
-  evidenceTargets?: ReadonlyArray<{ key: string; text: string }>;
+  evidenceTargets?: ReadonlyArray<{ key: string; text: string; question?: boolean }>;
 }): Promise<
   | {
       ok: true;
@@ -1318,6 +1372,7 @@ async function generateRoleExpertiseAnswersStep(input: {
       input.choices.map((choice) => ({
         key: choice.targetKey,
         text: choice.text,
+        question: true,
       })),
   });
   const fingerprint = roleExpertiseAnswersFingerprint(
@@ -1483,7 +1538,9 @@ async function generateRoleExpertiseAnswersStep(input: {
     const checked = validateAnswersForMode(merged, input.answerMode);
     if (input.answerMode && checked.valid.length === 0) {
       const choice = input.choices[0];
-      const answer = gated.data.answers[0];
+      const rawAnswer = gated.data.answers[0];
+      const answer =
+        rawAnswer && choice ? restoreStoryOpening(rawAnswer, choice.text) : rawAnswer;
       const content = answer
         ? askHarperUnpassedDraft({
             answer,
@@ -1902,13 +1959,29 @@ export async function draftSupportedGapQuestions(input: {
   jobSources: Record<string, unknown>;
   usage?: AiCallUsageContext;
 }): Promise<{ drafted: number; called: boolean }> {
+  const matchedToQuestions = await loadApprovedAnswersForTargets({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    targets: input.questions.map((question) => ({
+      key: `${question.targetKey}:asked`,
+      text: question.text,
+      question: true,
+    })),
+  });
+  const approvedAnswers = [
+    ...input.approvedAnswers,
+    ...matchedToQuestions.map((answer) => ({
+      question: answer.question,
+      content: answer.content,
+    })),
+  ];
   const pending: typeof input.questions = [];
   for (const question of input.questions) {
     if (
       !gapQuestionIsSupported({
         question: question.text,
         targetText: question.targetText,
-        approvedAnswers: input.approvedAnswers,
+        approvedAnswers,
         profileItems: input.profileItems,
       })
     ) {
@@ -1949,7 +2022,7 @@ export async function draftSupportedGapQuestions(input: {
     subjectKey: gapDraftSubjectKey(input.campaignId),
     evidenceTargets: pending.flatMap((question) => [
       { key: question.targetKey, text: question.targetText },
-      { key: `${question.targetKey}:asked`, text: question.text },
+      { key: `${question.targetKey}:asked`, text: question.text, question: true },
     ]),
   });
   if (!drafted.ok) return { drafted: 0, called: true };

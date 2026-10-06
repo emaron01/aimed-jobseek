@@ -216,17 +216,27 @@ export function askHarperAttemptProse(answer: PointOfViewParts): string {
  * Returns "" when nothing usable remains, including when the remainder is only
  * one raw profile fact. Callers then keep askHarperAttemptProse.
  */
+function storyOpening(answer: PointOfViewParts): string {
+  return partText(answer.answerFramework === "STAR" ? answer.situation : answer.challenge);
+}
+
 export function askHarperUnpassedDraft(input: {
   answer: PointOfViewParts;
   kind: AskHarperAnswerKind;
   sourceTexts: readonly string[];
 }): string {
-  void input.kind;
   const sources = sourceBlob(input.sourceTexts);
   const sentences = attemptSentences(input.answer).filter(
     (sentence) => !sentenceIsUnsupportedPersonalClaim(sentence, sources),
   );
-  const content = composeInterviewAnswerFromParts(sentences);
+  let content = composeInterviewAnswerFromParts(sentences);
+  if (input.kind === "story") {
+    const opening = storyOpening(input.answer);
+    const needle = opening.toLowerCase().slice(0, 40);
+    if (opening && needle && !content.toLowerCase().includes(needle)) {
+      content = composeInterviewAnswerFromParts([opening, content]);
+    }
+  }
   if (!content.trim() || isPlaceholderSentence(content)) return "";
   if (isRawProfileFact(content, input.sourceTexts)) return "";
   return content;

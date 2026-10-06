@@ -165,10 +165,14 @@ const SUBSTANCE_STOPWORDS = new Set([
 /** Selector-only stem. Does not change requirement de-duplication. */
 function substanceStem(token: string): string {
   let value = token;
+  if (value.length > 4 && value.endsWith("s") && !value.endsWith("ss")) {
+    value = value.slice(0, -1);
+  }
   if (value.length > 6 && value.endsWith("ing")) value = value.slice(0, -3);
   else if (value.length > 6 && value.endsWith("ment")) value = value.slice(0, -4);
   else if (value.length > 5 && value.endsWith("ed")) value = value.slice(0, -2);
-  if (value.length > 4 && value.endsWith("s")) value = value.slice(0, -1);
+  // "underperformers" and "underperforming" share a stem. Short agent nouns stay.
+  if (value.length > 10 && value.endsWith("er")) value = value.slice(0, -2);
   return value;
 }
 
@@ -234,6 +238,39 @@ export function approvedAnswerCoversTarget(
   return targetSubstanceCovered(`${answer.question}\n${answer.content}`, text);
 }
 
+/**
+ * Framing that appears in almost every story question. A match on these words
+ * alone does not mean the approved answer is about this question.
+ */
+const QUESTION_FRAMING = new Set([
+  "situation",
+  "example",
+  "experienc",
+  "experience",
+  "experienced",
+]);
+
+/**
+ * A question matches an approved answer by that question's own wording, not
+ * only by a job requirement. The existing target rule still applies. Otherwise
+ * a distinctive word from the question (length 8 or more after stemming,
+ * excluding story framing) must appear in the approved question or answer.
+ * "underperforming" and "underperformers" share a stem, so the OpenText story
+ * reaches "an experienced seller was underperforming".
+ */
+export function approvedAnswerCoversQuestion(
+  answer: { question: string; content: string },
+  question: string,
+): boolean {
+  const text = question.trim();
+  if (!text) return false;
+  if (approvedAnswerCoversTarget(answer, text)) return true;
+  const evidence = substanceTokens(`${answer.question}\n${answer.content}`);
+  return [...substanceTokens(text)].some(
+    (token) => token.length >= 8 && !QUESTION_FRAMING.has(token) && evidence.has(token),
+  );
+}
+
 /** A gap question can be drafted when an approved answer or a profile fact covers it. */
 export function gapQuestionIsSupported(input: {
   question: string;
@@ -241,18 +278,24 @@ export function gapQuestionIsSupported(input: {
   approvedAnswers: ReadonlyArray<{ question: string; content: string }>;
   profileItems: ReadonlyArray<{ kind?: string; text?: string }>;
 }): boolean {
-  const surfaces = [input.targetText, input.question]
-    .map((value) => value.trim())
-    .filter(Boolean);
+  const question = input.question.trim();
+  const targetText = input.targetText.trim();
   const facts = input.profileItems.filter(
     (item) => item.kind === "FACT" && Boolean(item.text?.trim()),
   );
-  return surfaces.some(
-    (surface) =>
+  const coveredByAnswer =
+    (question.length > 0 &&
       input.approvedAnswers.some((answer) =>
-        approvedAnswerCoversTarget(answer, surface),
-      ) || facts.some((fact) => evidenceCoversTarget(fact.text ?? "", surface)),
+        approvedAnswerCoversQuestion(answer, question),
+      )) ||
+    (targetText.length > 0 &&
+      input.approvedAnswers.some((answer) =>
+        approvedAnswerCoversTarget(answer, targetText),
+      ));
+  const coveredByFact = [targetText, question].filter(Boolean).some((surface) =>
+    facts.some((fact) => evidenceCoversTarget(fact.text ?? "", surface)),
   );
+  return coveredByAnswer || coveredByFact;
 }
 
 /**
@@ -263,7 +306,7 @@ export function gapQuestionIsSupported(input: {
  */
 export function selectApprovedAnswersForTargets(input: {
   campaignId: string;
-  targets: ReadonlyArray<{ key: string; text: string }>;
+  targets: ReadonlyArray<{ key: string; text: string; question?: boolean }>;
   answers: ReadonlyArray<ApprovedAnswerCandidate>;
 }): ApprovedAnswerEvidence[] {
   const eligible = input.answers.filter((answer) =>
@@ -275,11 +318,12 @@ export function selectApprovedAnswersForTargets(input: {
     if (target.key === WHY_THIS_COMPANY_TARGET_KEY) continue;
     const text = target.text.trim();
     if (!text) continue;
+    const covers = target.question
+      ? approvedAnswerCoversQuestion
+      : approvedAnswerCoversTarget;
     const winner = eligible
       .filter(
-        (answer) =>
-          !used.has(answer.statementId) &&
-          approvedAnswerCoversTarget(answer, text),
+        (answer) => !used.has(answer.statementId) && covers(answer, text),
       )
       .sort(newerApprovedAnswer)[0];
     if (!winner) continue;
@@ -300,7 +344,7 @@ export function selectApprovedAnswersForTargets(input: {
 export async function loadApprovedAnswersForTargets(input: {
   organizationId: string;
   campaignId: string;
-  targets: ReadonlyArray<{ key: string; text: string }>;
+  targets: ReadonlyArray<{ key: string; text: string; question?: boolean }>;
 }): Promise<ApprovedAnswerEvidence[]> {
   const rows = await prisma.consultationStatement.findMany({
     where: {

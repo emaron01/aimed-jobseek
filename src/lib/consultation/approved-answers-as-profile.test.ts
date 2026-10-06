@@ -293,7 +293,7 @@ describe("approved answers as profile evidence", () => {
     expect(CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS).not.toContain(
       "Replace anything about the previous company",
     );
-    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("7");
+    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("8");
     expect(ROLE_EXPERTISE_PROMPT_VERSION).toBe("3");
 
     const approved = {
