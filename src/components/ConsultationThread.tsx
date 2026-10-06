@@ -583,13 +583,12 @@ function QuestionCard({
   const hasOutcome = questionHasVisibleOutcome(item);
   const showWorking =
     !item.ignored && !hasOutcome && (pending || seekerReplyIsPending(item));
-  const unanswered = !hasResult && !item.ignored;
   const canAnswer =
     canEdit &&
     !item.ignored &&
     (consultationQuestionAcceptsReply(item) || Boolean(item.seekerAnswers.length));
-  const canSkip = canEdit && actionsEnabled && unanswered;
-  const canIgnore = canEdit && actionsEnabled && unanswered;
+  const canSkip = canEdit && actionsEnabled && !item.ignored && !approved;
+  const canIgnore = canSkip;
   const replyKey = consultationReplyTargetKey(item.questionTurnId);
   const oneLineLabel =
     item.talkingPoint?.content?.trim() ||

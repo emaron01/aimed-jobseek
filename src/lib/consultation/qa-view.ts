@@ -1,7 +1,5 @@
 import {
-  ASK_HARPER_TARGET_PREFIX,
   INTERVIEW_TYPE_TAGS,
-  ROLE_EXPERTISE_TARGET_PREFIX,
   type InterviewTypeTag,
 } from "@/lib/consultation/contract";
 import { consultationConversationCopy } from "@/lib/product-config/consultation";
@@ -287,16 +285,12 @@ export function consultationQuestionAcceptsReply(
 ): boolean {
   if (item.ignored) return false;
   if (item.followUp != null) return true;
-  // Role-expertise suggested drafts attach to the question turn with no seeker
-  // reply yet — still open so the seeker can reply and refine (Batch D6).
+  // A suggested draft with no seeker reply yet stays open so the seeker can
+  // answer, skip, or ignore it beside the draft (gap rows and best-practice).
   if (
     item.seekerAnswers.length === 0 &&
     !item.resumeBullet &&
-    item.talkingPoint?.status === "DRAFT" &&
-    Boolean(
-      item.targetKey?.startsWith(ROLE_EXPERTISE_TARGET_PREFIX) ||
-        item.targetKey?.startsWith(ASK_HARPER_TARGET_PREFIX),
-    )
+    item.talkingPoint?.status === "DRAFT"
   ) {
     return true;
   }

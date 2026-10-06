@@ -289,4 +289,128 @@ describe("gap question drafts from a question match", () => {
       content: expect.stringContaining("OpenText"),
     });
   });
+
+  it("stores a real story for a gap question instead of a hypothetical or mid-thought draft", () => {
+    const market =
+      "At OpenText I led the response to an enterprise SaaS market shift and convened Sales and Product. Win rate rose.";
+    const forecast =
+      "At OpenText the forecast process was inconsistent and I rebuilt the inspection cadence. Forecast accuracy rose.";
+    const sellers = OPENTEXT_CONTENT;
+    const sources = [market, forecast, sellers, "OpenText", "Sift"];
+
+    function storyDraft(
+      question: string,
+      action: string,
+      result: string,
+    ): string {
+      const drafts = bestPracticeDraftsForAnswers(
+        [
+          {
+            text: question,
+            targetKey: "required:0",
+            interviewTypeTag: "focused_competency",
+          },
+        ],
+        [
+          {
+            text: question,
+            answerFramework: "CAR",
+            challenge: action,
+            situation: null,
+            task: null,
+            action,
+            result,
+            followUpQuestion: null,
+          },
+        ],
+        sources,
+      );
+      return drafts[0]?.content ?? "";
+    }
+
+    const hypothetical = storyDraft(
+      "Tell me about a recent enterprise SaaS market shift you led.",
+      "I would convene Sales, Product, Marketing, and Customer Success to respond to the enterprise SaaS market shift.",
+      "Win rate rose after that response.",
+    );
+    expect(hypothetical).toBe(market);
+    expect(hypothetical).not.toMatch(/^\s*I would\b/i);
+    expect(hypothetical).toContain("OpenText");
+
+    const midThought = storyDraft(
+      "Tell me about a time the forecast lacked consistency.",
+      "The lack of consistency made it difficult to forecast the quarter.",
+      "Forecast accuracy rose after the rebuild.",
+    );
+    expect(midThought).toBe(forecast);
+    expect(midThought).not.toMatch(/^\s*The lack of consistency\b/);
+    expect(midThought).toContain("OpenText");
+
+    const unnamed = storyDraft(
+      SELLER_QUESTION,
+      "Two individuals were underperforming on the team.",
+      "Those representatives became top performers.",
+    );
+    expect(unnamed).toBe(sellers);
+    expect(unnamed).not.toMatch(/^\s*Two individuals\b/);
+    expect(unnamed).toContain("OpenText");
+
+    const alreadyGrounded = storyDraft(
+      "Tell me about a time you coached sellers at a company.",
+      "I joined OpenText and coached two sellers through a hard quarter.",
+      "Both sellers hit quota the next quarter.",
+    );
+    expect(alreadyGrounded.startsWith("I joined OpenText")).toBe(true);
+    expect(alreadyGrounded).toContain("coached two sellers");
+
+    const withIncidentalWould = bestPracticeDraftsForAnswers(
+      [
+        {
+          text: "Tell me about a time you ran deal reviews.",
+          targetKey: "required:1",
+          interviewTypeTag: "focused_competency",
+        },
+      ],
+      [
+        {
+          text: "Tell me about a time you ran deal reviews.",
+          answerFramework: "CAR",
+          challenge: "I ran weekly deal reviews at OpenText so the forecast the leadership team saw was one I would stand behind.",
+          situation: null,
+          task: null,
+          action: "I ran weekly deal reviews at OpenText so the forecast the leadership team saw was one I would stand behind.",
+          result: "Forecast confidence rose the next quarter.",
+          followUpQuestion: null,
+        },
+      ],
+      sources,
+    );
+    expect(withIncidentalWould[0]?.content).toContain("I would stand behind");
+    expect(withIncidentalWould[0]?.content).toContain("OpenText");
+    expect(withIncidentalWould[0]?.content).not.toMatch(/^\s*I would\b/);
+
+    const pointOfView = bestPracticeDraftsForAnswers(
+      [
+        {
+          text: "Which leading indicators would you use to inspect the forecast?",
+          targetKey: "required:2",
+          interviewTypeTag: "focused_competency",
+        },
+      ],
+      [
+        {
+          text: "Which leading indicators would you use to inspect the forecast?",
+          answerFramework: "CAR",
+          challenge: null,
+          situation: null,
+          task: null,
+          action: "Leading indicators I would use are activity and pipeline creation.",
+          result: "",
+          followUpQuestion: null,
+        },
+      ],
+      sources,
+    );
+    expect(pointOfView[0]?.content).toContain("I would use");
+  });
 });

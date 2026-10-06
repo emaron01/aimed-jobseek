@@ -101,8 +101,40 @@ describe("consistent ratings", () => {
         asOf: AS_OF,
       });
       expect(assessment?.strength).toBe("PARTIAL");
-      expect(assessment?.explanation).toBe(item.explanation);
+      expect(assessment?.explanation).toMatch(/^Supported:/);
+      expect(assessment?.explanation).toContain("Missing:");
+      expect(assessment?.explanation).not.toMatch(/clearly meet/i);
+      const missingPart = item.text.split(/\s+and\s+/i)[1] ?? "";
+      expect(assessment?.explanation).toContain(missingPart);
     }
+
+    const [fullyMet] = verifyModelAssessments({
+      targets: [
+        {
+          key: "required:scope",
+          kind: "REQUIRED",
+          text: "Enterprise sales experience and leadership scope",
+        },
+      ],
+      profileItems: [fact("fact-sales", "Led enterprise sales at OpenText.")],
+      assessments: [
+        {
+          targetKey: "required:scope",
+          strength: "PARTIAL",
+          supportingFactIds: ["fact-sales"],
+          relevantRoleIds: [],
+          explanation: "You clearly meet the experience and leadership scope.",
+          strategyMode: "REFRAME_ADJACENT",
+          strategy: "Use the stated sales experience.",
+        },
+      ],
+      asOf: AS_OF,
+    });
+    expect(fullyMet?.strength).toBe("PARTIAL");
+    expect(fullyMet?.explanation).toBe(
+      "Supported: Enterprise sales experience. Missing: leadership scope.",
+    );
+    expect(fullyMet?.explanation).not.toMatch(/clearly meet/i);
 
     const [unsupported] = verifyModelAssessments({
       targets: [

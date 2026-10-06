@@ -1,7 +1,7 @@
 /**
  * Harper default view: partition questions into three sections.
- * Section 1 — Where you stand (requirements + approved gap/why/career answers)
- * Section 2 — Questions that need more information (until APPROVED)
+ * Section 1 — Where you stand (requirements, including each row's question)
+ * Section 2 — Questions not tied to a Where you stand row (career walk-through)
  * Section 3 — Best-practice interview questions (role-expertise, always)
  */
 import {
@@ -71,10 +71,26 @@ export function isStandingShareAnswer(item: ConsultationQaItem): boolean {
 }
 
 /**
+ * A requirement-row question stays in Where you stand, draft or approved.
+ * Career walk-through and why stay in Section 2 until approved, unless a
+ * requirement row hosts them (partition attaches those to the row).
+ */
+function questionStaysOnStandingRow(item: ConsultationQaItem): boolean {
+  const key = item.targetKey ?? "";
+  if (!key) return false;
+  if (key.startsWith(ROLE_EXPERTISE_TARGET_PREFIX)) return false;
+  if (key.startsWith(ASK_HARPER_TARGET_PREFIX)) return false;
+  if (key === CHRONOLOGY_TARGET_KEY) return false;
+  if (key === WHY_THIS_COMPANY_TARGET_KEY) return false;
+  return true;
+}
+
+/**
  * Section assignment for a question (exactly one section).
  * Role-expertise → always Section 3.
  * Answers typed in Where you stand stay in Section 1, draft or approved.
- * Harper-asked why / career / requirement gaps → Section 2 until APPROVED, then Section 1.
+ * A question tied to a requirement row stays in Section 1 with its draft.
+ * Career walk-through and an open why with no requirement row stay in Section 2.
  */
 export function harperSectionForQuestion(
   item: ConsultationQaItem,
@@ -85,7 +101,13 @@ export function harperSectionForQuestion(
   if (isStandingShareAnswer(item)) {
     return HARPER_SECTION_IDS.standing;
   }
-  if (questionHasApprovedResult(item) && !item.ignored) {
+  if (item.ignored) {
+    return HARPER_SECTION_IDS.needsInfo;
+  }
+  if (questionHasApprovedResult(item)) {
+    return HARPER_SECTION_IDS.standing;
+  }
+  if (questionStaysOnStandingRow(item)) {
     return HARPER_SECTION_IDS.standing;
   }
   return HARPER_SECTION_IDS.needsInfo;
@@ -158,22 +180,33 @@ export function partitionHarperThreeSections(
             row.mergedTargetKeys.includes(entry.targetKey)),
       );
       if (host) {
-        const share = questions.filter(isStandingShareAnswer);
-        questions = questions.filter((question) => !isStandingShareAnswer(question));
-        if (share.length > 0) {
-          for (const question of share) {
-            if (
-              !host.questions.some(
-                (existing) => existing.questionTurnId === question.questionTurnId,
-              )
-            ) {
-              host.questions.push(question);
-            }
+        const moving = entry.questions.filter(
+          (question) => !question.ignored && !isRoleExpertiseQuestion(question),
+        );
+        for (const question of moving) {
+          const needsIndex = needsInfoQuestions.findIndex(
+            (item) => item.questionTurnId === question.questionTurnId,
+          );
+          if (needsIndex >= 0) needsInfoQuestions.splice(needsIndex, 1);
+          sectionByQuestionTurnId.set(
+            question.questionTurnId,
+            HARPER_SECTION_IDS.standing,
+          );
+          if (
+            !host.questions.some(
+              (existing) => existing.questionTurnId === question.questionTurnId,
+            )
+          ) {
+            host.questions.push(question);
           }
-          host.showShareForm = false;
         }
+        if (moving.length > 0) host.showShareForm = false;
+        questions = questions.filter(
+          (question) =>
+            !moving.some((item) => item.questionTurnId === question.questionTurnId),
+        );
       }
-      // Why / career still open as a Harper question → Section 2 only.
+      // Career walk-through, and why with no requirement row, stay in Section 2.
       if (questions.length === 0) continue;
     }
     standingEntries.push({

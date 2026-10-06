@@ -183,7 +183,7 @@ describe("Harper drafts stay put and can be edited", () => {
     );
   });
 
-  it("keeps a Harper-asked gap in Questions that need more information until approval", () => {
+  it("keeps a Harper-asked gap in its Where you stand row through the draft and after approval", () => {
     const question = turn({
       id: "q-gap",
       speaker: "CONSULTANT",
@@ -213,7 +213,7 @@ describe("Harper drafts stay put and can be edited", () => {
       ],
     });
     expect(drafted.questions[0]?.question).toBe("Tell me about leading incidents.");
-    expect(harperSectionForQuestion(drafted.questions[0]!)).toBe("needs-more-info");
+    expect(harperSectionForQuestion(drafted.questions[0]!)).toBe("where-you-stand");
     const entries = buildStandingListEntries({
       requirements: [
         {
@@ -231,8 +231,10 @@ describe("Harper drafts stay put and can be edited", () => {
       questionsByTargetKey: new Map([["required:0", drafted.questions]]),
     });
     const model = partitionHarperThreeSections(entries);
-    expect(model.needsInfoQuestions.map((item) => item.questionTurnId)).toEqual(["q-gap"]);
-    expect(model.standingEntries[0]?.questions).toEqual([]);
+    expect(model.needsInfoQuestions).toEqual([]);
+    expect(model.standingEntries[0]?.questions.map((item) => item.questionTurnId)).toEqual([
+      "q-gap",
+    ]);
 
     const approved = buildConsultationQaView({
       turns: [question, seeker],

@@ -1239,32 +1239,251 @@ function bestPracticePassingDraft(
   return { question: unansweredRoleExpertiseQuestion(choice), issue };
 }
 
+const STORY_HYPOTHETICAL_SENTENCE = /^\s*I would\b/i;
+const STORY_MID_THOUGHT_OPENING =
+  /^\s*(?:the|that|this)\s+(?:lack|purchase|transition|change|shift|move|acquisition|merger|reorganization|rotation|handoff|handover|deal|process|gap|issue|problem)\b/i;
+const STORY_PLACE_STOP = new Set([
+  "the",
+  "this",
+  "that",
+  "when",
+  "after",
+  "before",
+  "during",
+  "while",
+  "with",
+  "from",
+  "into",
+  "over",
+  "then",
+  "they",
+  "there",
+  "these",
+  "those",
+  "what",
+  "where",
+  "which",
+  "your",
+  "their",
+  "about",
+  "through",
+  "between",
+  "across",
+  "within",
+  "without",
+  "sales",
+  "product",
+  "marketing",
+  "customer",
+  "success",
+  "enterprise",
+  "recent",
+  "senior",
+  "director",
+  "manager",
+  "nurse",
+  "charge",
+  "vice",
+  "president",
+  "head",
+  "lead",
+  "leader",
+  "team",
+  "company",
+  "north",
+  "american",
+  "series",
+  "role",
+  "job",
+]);
+
+function storySentences(content: string): string[] {
+  return content
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+}
+
+/** A story told as what the person would do, not what happened. A later "I would" inside a past event stays. */
+function isHypotheticalStory(content: string): boolean {
+  const sentences = storySentences(content);
+  if (sentences.length === 0) return false;
+  if (STORY_HYPOTHETICAL_SENTENCE.test(sentences[0] ?? "")) return true;
+  const leading = sentences.filter((sentence) =>
+    STORY_HYPOTHETICAL_SENTENCE.test(sentence),
+  );
+  return leading.length > 0 && leading.length * 2 >= sentences.length;
+}
+
+function storyPlaceNames(sourceTexts: readonly string[]): string[] {
+  const names = new Set<string>();
+  for (const source of sourceTexts) {
+    const trimmed = source.trim();
+    if (!trimmed) continue;
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    if (words.length <= 4 && trimmed.length <= 80 && !/[.!?]/.test(trimmed)) {
+      names.add(trimmed);
+    }
+    for (const sentence of storySentences(trimmed)) {
+      const rest = sentence.replace(/^\s*\S+\s*/, "");
+      for (const match of rest.matchAll(/\b[A-Z][A-Za-z0-9&.'+-]{2,}\b/g)) {
+        const word = match[0];
+        if (!STORY_PLACE_STOP.has(word.toLowerCase())) names.add(word);
+      }
+    }
+  }
+  return [...names].filter((name) => name.length >= 3);
+}
+
+function textNamesPlace(content: string, places: readonly string[]): boolean {
+  if (places.length === 0) return true;
+  const lower = content.toLowerCase();
+  return places.some((place) => lower.includes(place.toLowerCase()));
+}
+
+function opensMidThought(content: string, places: readonly string[]): boolean {
+  const first = storySentences(content)[0] ?? content;
+  if (!STORY_MID_THOUGHT_OPENING.test(first)) return false;
+  return !textNamesPlace(first, places);
+}
+
+function storyWordOverlap(left: string, right: string): number {
+  const stems = (value: string) =>
+    new Set(
+      value
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((word) => word.length >= 5)
+        .map((word) => word.slice(0, 6)),
+    );
+  const leftStems = stems(left);
+  let hits = 0;
+  for (const stem of stems(right)) {
+    if (leftStems.has(stem)) hits += 1;
+  }
+  return hits;
+}
+
+function storyDraftFollowsRules(
+  content: string,
+  sourceTexts: readonly string[],
+): boolean {
+  const text = content.trim();
+  if (!text) return false;
+  if (isHypotheticalStory(text)) return false;
+  const places = storyPlaceNames(sourceTexts);
+  if (!textNamesPlace(text, places)) return false;
+  if (opensMidThought(text, places)) return false;
+  return true;
+}
+
+function repairMidThoughtOpening(
+  content: string,
+  places: readonly string[],
+): string {
+  const place = places.find((name) =>
+    content.toLowerCase().includes(name.toLowerCase()),
+  );
+  if (!place) return "";
+  const lowered = content.charAt(0).toLowerCase() + content.slice(1);
+  const repaired = `At ${place}, ${lowered}`;
+  return opensMidThought(repaired, places) ? "" : repaired;
+}
+
+function groundedStoryFromSources(
+  draft: string,
+  sourceTexts: readonly string[],
+): string {
+  let best = "";
+  let bestScore = 0;
+  for (const source of sourceTexts) {
+    const text = source.trim();
+    if (text.split(/\s+/).filter(Boolean).length < 12) continue;
+    if (!storyDraftFollowsRules(text, sourceTexts)) continue;
+    const score = storyWordOverlap(draft, text);
+    if (score > bestScore) {
+      best = text;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+/**
+ * Gap drafts and best-practice drafts share this gate.
+ * A story is a real experience: not hypothetical, not a mid-thought opening,
+ * and it names a place from the seeker's sources when one is known.
+ * When the model draft fails, the closest stated experience is used.
+ * A story that still cannot be grounded is left unanswered.
+ */
+function storyDraftContent(
+  content: string,
+  sourceTexts: readonly string[],
+): string {
+  const text = content.trim();
+  if (!text) return "";
+  const places = storyPlaceNames(sourceTexts);
+  if (
+    !isHypotheticalStory(text) &&
+    textNamesPlace(text, places) &&
+    !opensMidThought(text, places)
+  ) {
+    return text;
+  }
+  if (
+    !isHypotheticalStory(text) &&
+    textNamesPlace(text, places) &&
+    opensMidThought(text, places)
+  ) {
+    const repaired = repairMidThoughtOpening(text, places);
+    if (repaired && storyDraftFollowsRules(repaired, sourceTexts)) return repaired;
+  }
+  return groundedStoryFromSources(text, sourceTexts);
+}
+
 function bestPracticeDraftForChoice(
   choice: ValidatedRoleExpertiseQuestionChoice,
   answer: RoleExpertiseAnswerParts | undefined,
   sourceTexts: readonly string[],
 ): ValidatedRoleExpertiseQuestion {
-  const passed = bestPracticePassingDraft(choice, answer, sourceTexts);
-  if (!passed.issue && passed.question.content.trim()) return passed.question;
   const kind = askHarperAnswerKind(choice.text);
-  const assembled = answer
-    ? askHarperUnpassedDraft({ answer, kind, sourceTexts }) ||
-      askHarperAttemptProse(answer)
-    : "";
-  const content =
-    answer && kind === "story" ? withStoryOpening(answer, assembled) : assembled;
-  if (!content) return unansweredRoleExpertiseQuestion(choice);
+  const passed = bestPracticePassingDraft(choice, answer, sourceTexts);
+  let question: ValidatedRoleExpertiseQuestion;
+  if (!passed.issue && passed.question.content.trim()) {
+    question = passed.question;
+  } else {
+    const assembled = answer
+      ? askHarperUnpassedDraft({ answer, kind, sourceTexts }) ||
+        askHarperAttemptProse(answer)
+      : "";
+    const content =
+      answer && kind === "story" ? withStoryOpening(answer, assembled) : assembled;
+    if (!content) return unansweredRoleExpertiseQuestion(choice);
+    question = {
+      text: choice.text,
+      targetKey: choice.targetKey,
+      interviewTypeTag: choice.interviewTypeTag,
+      content,
+      grounding: {
+        answerFramework: answer?.answerFramework ?? "CAR",
+        action: content,
+        result: "",
+      },
+      followUpQuestion: followUpText(answer),
+    };
+  }
+  if (kind !== "story") return question;
+  const content = storyDraftContent(question.content, sourceTexts);
+  if (!content.trim()) return unansweredRoleExpertiseQuestion(choice);
+  if (content === question.content) return question;
   return {
-    text: choice.text,
-    targetKey: choice.targetKey,
-    interviewTypeTag: choice.interviewTypeTag,
+    ...question,
     content,
     grounding: {
-      answerFramework: answer?.answerFramework ?? "CAR",
+      ...question.grounding,
       action: content,
-      result: "",
     },
-    followUpQuestion: followUpText(answer),
   };
 }
 

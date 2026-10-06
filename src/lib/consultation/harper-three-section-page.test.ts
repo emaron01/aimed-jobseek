@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildConsultationQaView,
+  consultationQuestionAcceptsReply,
   type ConsultationQaItem,
   type QaTurn,
 } from "@/lib/consultation/qa-view";
@@ -205,10 +206,11 @@ describe("Harper three-section partition", () => {
     ignored: true,
   });
 
-  it("moves a draft gap to Section 2 and an approved gap under its requirement in Section 1", () => {
-    expect(harperSectionForQuestion(draftGap)).toBe("needs-more-info");
+  it("keeps a partial row's draft question in the row, with its controls, and out of Section 2", () => {
+    expect(harperSectionForQuestion(draftGap)).toBe("where-you-stand");
     expect(harperSectionForQuestion(approvedGap)).toBe("where-you-stand");
     expect(questionHasApprovedResult(approvedGap)).toBe(true);
+    expect(consultationQuestionAcceptsReply(draftGap)).toBe(true);
 
     const entries = buildStandingListEntries({
       requirements: [
@@ -229,10 +231,34 @@ describe("Harper three-section partition", () => {
       ]),
     });
     const withDraft = partitionHarperThreeSections(entries);
-    expect(withDraft.needsInfoQuestions.map((q) => q.questionTurnId)).toEqual([
+    expect(withDraft.needsInfoQuestions).toEqual([]);
+    expect(withDraft.standingEntries[0]?.questions.map((q) => q.questionTurnId)).toEqual([
       "q-gap",
     ]);
-    expect(withDraft.standingEntries[0]?.questions).toEqual([]);
+    expect(withDraft.standingEntries[0]?.questions[0]?.question).toBe(
+      "Tell me about leading incidents.",
+    );
+    expect(withDraft.standingEntries[0]?.questions[0]?.talkingPoint?.content).toBe(
+      "I led SEV1 response.",
+    );
+    expect(withDraft.standingEntries[0]?.showShareForm).toBe(false);
+
+    const standing = src("src/components/ConsultationStanding.tsx");
+    const explanationAt = standing.indexOf("entry.explanation");
+    const questionListAt = standing.indexOf("<QuestionList");
+    expect(explanationAt).toBeGreaterThan(-1);
+    expect(questionListAt).toBeGreaterThan(explanationAt);
+
+    const thread = src("src/components/ConsultationThread.tsx");
+    expect(thread).toContain(
+      "const canSkip = canEdit && actionsEnabled && !item.ignored && !approved",
+    );
+    expect(thread).toContain("consultationConversationCopy.threadReply");
+    expect(thread).toContain("consultationConversationCopy.approve");
+    expect(thread).toContain("polishCopy.regenerate");
+    expect(thread).toContain("consultationConversationCopy.editAnswer");
+    expect(thread).toContain("consultationConversationCopy.skipQuestion");
+    expect(thread).toContain("consultationConversationCopy.ignoreQuestion");
 
     const approvedEntries = buildStandingListEntries({
       requirements: [
@@ -287,6 +313,47 @@ describe("Harper three-section partition", () => {
     expect(
       model.standingEntries.flatMap((e) => e.questions.map((q) => q.questionTurnId)).sort(),
     ).toEqual(["q-career", "q-why"]);
+  });
+
+  it("keeps an open career walk-through in Section 2 and a partial-row question in the row", () => {
+    const openCareer = qaItem({
+      questionTurnId: "q-career-open",
+      question: consultationConversationCopy.careerWalkThroughTarget,
+      targetKey: CHRONOLOGY_TARGET_KEY,
+    });
+    const entries = buildStandingListEntries({
+      requirements: [
+        {
+          id: "a0",
+          targetKey: "required:0",
+          text: "Leads incident response",
+          strength: "NONE",
+          kind: "REQUIRED",
+          explanation: null,
+          experience: null,
+          facts: [],
+        },
+      ],
+      dedicatedTopics: [
+        {
+          kind: "chronology",
+          targetKey: CHRONOLOGY_TARGET_KEY,
+          label: consultationConversationCopy.careerWalkThroughTarget,
+          questions: [openCareer],
+        },
+      ],
+      questionsByTargetKey: new Map([["required:0", [draftGap]]]),
+    });
+    const model = partitionHarperThreeSections(entries);
+    expect(model.needsInfoQuestions.map((q) => q.questionTurnId)).toEqual([
+      "q-career-open",
+    ]);
+    expect(model.standingEntries[0]?.questions.map((q) => q.questionTurnId)).toEqual([
+      "q-gap",
+    ]);
+    expect(
+      model.standingEntries.some((entry) => entry.targetKey === CHRONOLOGY_TARGET_KEY),
+    ).toBe(false);
   });
 
   it("keeps open why-this-company in Section 2 only", () => {

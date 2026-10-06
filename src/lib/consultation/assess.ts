@@ -755,7 +755,7 @@ export function verifyModelAssessments(input: {
         "A part of this requirement is supported, so the rating is partial.",
       );
     }
-    return preserveAssessmentStrength({
+    const preserved = preserveAssessmentStrength({
       previous: previousByKey.get(target.key),
       next: {
         key: target.key,
@@ -775,7 +775,85 @@ export function verifyModelAssessments(input: {
         experienceCalculation,
       },
     });
+    return {
+      ...preserved,
+      explanation: explanationAlignedToStrength({
+        strength: preserved.strength,
+        explanation: model.explanation.trim(),
+        targetText: target.text,
+        profileItems: input.profileItems,
+        downgradeReasons: preserved.verification.downgradeReasons,
+      }),
+    };
   });
+}
+
+const EXPLANATION_FULLY_MET =
+  /\b(clearly meet|fully meets|fully meet|you meet|meets this|meets the|strong match|complete match|no gap|well covered)\b/i;
+const EXPLANATION_MISSING =
+  /\b(missing|not stated|does not|doesn't|do not|gap|short of|partial|is not|isn't|not yet|not covered|unmet)\b/i;
+const EXPLANATION_SUPPORTED =
+  /\b(supported|support|shows|you have|stated|covers|includes)\b/i;
+
+/**
+ * The stored explanation matches the rating that was saved.
+ * A Partial explanation names what is supported and what is missing.
+ */
+function explanationAlignedToStrength(input: {
+  strength: EvidenceStrengthName;
+  explanation: string;
+  targetText: string;
+  profileItems: readonly ProfileFactRef[];
+  downgradeReasons: readonly string[];
+}): string {
+  const explanation = input.explanation.trim();
+  if (input.strength === "PARTIAL") return partialExplanation(input, explanation);
+  if (input.strength === "NONE") {
+    if (EXPLANATION_FULLY_MET.test(explanation)) {
+      return "Nothing stated supports this requirement.";
+    }
+    return explanation;
+  }
+  if (!EXPLANATION_MISSING.test(explanation)) return explanation;
+  const kept = explanation
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence && !EXPLANATION_MISSING.test(sentence));
+  if (kept.length === 0) return "Your background supports this requirement.";
+  return kept.join(" ");
+}
+
+function partialExplanation(
+  input: {
+    targetText: string;
+    profileItems: readonly ProfileFactRef[];
+    downgradeReasons: readonly string[];
+  },
+  explanation: string,
+): string {
+  const statesBoth =
+    EXPLANATION_SUPPORTED.test(explanation) &&
+    EXPLANATION_MISSING.test(explanation) &&
+    !EXPLANATION_FULLY_MET.test(explanation);
+  if (statesBoth) return explanation;
+  const evidence = input.profileItems
+    .filter((item) => item.kind === "FACT")
+    .map((item) => item.text)
+    .join("\n");
+  const parts = requirementParts(input.targetText);
+  const supported = parts.filter((part) => evidenceCoversPart(evidence, part));
+  const missing = parts.filter((part) => !evidenceCoversPart(evidence, part));
+  if (supported.length > 0 && missing.length > 0) {
+    return `Supported: ${supported.join("; ")}. Missing: ${missing.join("; ")}.`;
+  }
+  const missingClause =
+    input.downgradeReasons.find((reason) => reason.trim()) ??
+    "the rest of this requirement is not stated";
+  const supportedClause = EXPLANATION_FULLY_MET.test(explanation)
+    ? "part of this requirement is in your background"
+    : explanation.replace(/[.]+$/g, "").trim() ||
+      "part of this requirement is in your background";
+  return `Supported: ${supportedClause}. Missing: ${missingClause}.`;
 }
 
 const KIND_RANK: Record<EvidenceKind, number> = {
