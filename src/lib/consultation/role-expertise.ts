@@ -82,7 +82,7 @@ export const ROLE_EXPERTISE_PROMPT_VERSION = "3";
  * Questions stay on ROLE_EXPERTISE_PROMPT_VERSION, so a bump here does not
  * invalidate a stored questions receipt or rewrite stored suggested answers.
  */
-export const ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION = "6";
+export const ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION = "7";
 
 export const COACHING_SET_MIN = 20;
 export const COACHING_SET_MAX = 25;

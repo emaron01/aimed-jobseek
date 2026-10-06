@@ -56,6 +56,8 @@ If qualityFeedback names a field, rewrite only that field.
 
 You may cite approvedAnswers ids in supportingFactIds. Facts about the person may come only from the Personal Profile and approvedAnswers.
 
+You may describe the person's actual practice using the job's terminology (for example, "my discovery-to-value approach, which works like Command of the Message"), but never claim the person formally uses, was trained in, or is certified in a named method, framework, or tool they have not stated.
+
 Return JSON matching the schema only.`;
 }
 

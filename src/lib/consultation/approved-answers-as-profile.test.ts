@@ -185,7 +185,7 @@ describe("approved answers as profile evidence", () => {
     expect(CONSULTATION_PLAN_DECISION_INSTRUCTIONS).toContain(DECISION_RULE);
     expect(CONSULTATION_PLAN_WRITING_INSTRUCTIONS).toContain(WRITING_RULE);
     expect(CONSULTATION_PLAN_DECISION_PROMPT_VERSION).toBe("4");
-    expect(CONSULTATION_PLAN_WRITING_PROMPT_VERSION).toBe("4");
+    expect(CONSULTATION_PLAN_WRITING_PROMPT_VERSION).toBe("5");
     expect(CONSULTATION_PROMPT_VERSION).toBe("38");
 
     const selected = selectGapsForRound({
@@ -293,7 +293,7 @@ describe("approved answers as profile evidence", () => {
     expect(CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS).not.toContain(
       "Replace anything about the previous company",
     );
-    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("6");
+    expect(ROLE_EXPERTISE_ANSWERS_PROMPT_VERSION).toBe("7");
     expect(ROLE_EXPERTISE_PROMPT_VERSION).toBe("3");
 
     const approved = {

@@ -329,7 +329,7 @@ describe("lean planning instructions", () => {
     );
     expect(CONSULTATION_PROMPT_VERSION).toBe("38");
     expect(CONSULTATION_PLAN_DECISION_PROMPT_VERSION).toBe("4");
-    expect(CONSULTATION_PLAN_WRITING_PROMPT_VERSION).toBe("4");
+    expect(CONSULTATION_PLAN_WRITING_PROMPT_VERSION).toBe("5");
     const messages = buildConsultationPlanDecisionMessages({
       targets: [TARGET],
       profileItems: [],

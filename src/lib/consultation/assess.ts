@@ -340,6 +340,66 @@ function formatMonthIndex(index: number): string {
   return `${year}-${String(month).padStart(2, "0")}`;
 }
 
+function yearsSkillText(text: string): string {
+  return text
+    .replace(
+      /\b\d+(?:\.\d+)?\s*(?:to|[-–—])\s*\d+(?:\.\d+)?\+?\s*(?:years?|yrs?)\b/gi,
+      " ",
+    )
+    .replace(/\b\d+(?:\.\d+)?\+?\s*(?:years?|yrs?)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** The role's stated text covers the skill in a years requirement, ignoring the year count. */
+function statedExperienceCoversSkill(stated: string, skillText: string): boolean {
+  if (sameRequirementMeaning(stated, skillText)) return true;
+  const targetTokens = new Set(contentTokens(skillText));
+  if (targetTokens.size < 2) return false;
+  const evidenceTokens = new Set(contentTokens(stated));
+  let hits = 0;
+  for (const token of targetTokens) {
+    if (evidenceTokens.has(token)) hits += 1;
+  }
+  return hits >= 2 && hits * 2 > targetTokens.size;
+}
+
+/**
+ * Years are calculated from role dates. The writing step's relevantRoleIds are
+ * often only some of the roles where that experience was stated. Keep those
+ * ids, and add every other FACT role whose title, summary, or achievements
+ * state the same experience.
+ */
+export function experienceRoleIdsForYearsTarget(input: {
+  targetText: string;
+  profileItems: readonly ProfileFactRef[];
+  modelRoleIds: readonly string[];
+}): string[] {
+  const skillText = yearsSkillText(input.targetText);
+  const experience = input.profileItems.filter(
+    (item) => item.kind === "FACT" && item.itemType === "EXPERIENCE",
+  );
+  const experienceIds = new Set(experience.map((item) => item.id));
+  const selected: string[] = [];
+  const seen = new Set<string>();
+  for (const id of input.modelRoleIds) {
+    if (!experienceIds.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    selected.push(id);
+  }
+  for (const role of experience) {
+    if (seen.has(role.id)) continue;
+    const related = input.profileItems
+      .filter((item) => item.kind === "FACT" && item.roleId === role.id)
+      .map((item) => item.text);
+    const stated = [role.text, ...related].join(" ");
+    if (!statedExperienceCoversSkill(stated, skillText)) continue;
+    seen.add(role.id);
+    selected.push(role.id);
+  }
+  return selected;
+}
+
 export function yearsRequirement(text: string): number | null {
   const match = text.match(/\b(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)\b/i);
   if (!match) return null;
@@ -572,12 +632,20 @@ export function verifyModelAssessments(input: {
       strength = "NONE";
     }
     const requiredYears = yearsRequirement(target.text);
+    const roleIdsForYears =
+      requiredYears == null
+        ? validRoleIds
+        : experienceRoleIdsForYearsTarget({
+            targetText: target.text,
+            profileItems: input.profileItems,
+            modelRoleIds: validRoleIds,
+          });
     const experienceCalculation =
       requiredYears == null
         ? null
         : calculateExperienceYears({
             requiredYears,
-            roleIds: validRoleIds,
+            roleIds: roleIdsForYears,
             profileItems: input.profileItems,
             asOf: input.asOf,
           });

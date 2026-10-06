@@ -10,7 +10,7 @@ export const CONSULTATION_PLAN_DECISION_PROMPT_VERSION = "4";
  * Lean planning writing instructions. A bump retries writing only.
  * It does not invalidate the decision receipt.
  */
-export const CONSULTATION_PLAN_WRITING_PROMPT_VERSION = "4";
+export const CONSULTATION_PLAN_WRITING_PROMPT_VERSION = "5";
 
 export const WHY_THIS_COMPANY_TARGET_KEY = "why-this-company";
 export const PERSON_PREP_TARGET_PREFIX = "person-prep:";
