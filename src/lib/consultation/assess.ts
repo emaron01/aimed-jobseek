@@ -755,7 +755,7 @@ export function verifyModelAssessments(input: {
         "A part of this requirement is supported, so the rating is partial.",
       );
     }
-    const preserved = preserveAssessmentStrength({
+    return preserveAssessmentStrength({
       previous: previousByKey.get(target.key),
       next: {
         key: target.key,
@@ -775,85 +775,92 @@ export function verifyModelAssessments(input: {
         experienceCalculation,
       },
     });
-    return {
-      ...preserved,
-      explanation: explanationAlignedToStrength({
-        strength: preserved.strength,
-        explanation: model.explanation.trim(),
-        targetText: target.text,
-        profileItems: input.profileItems,
-        downgradeReasons: preserved.verification.downgradeReasons,
-      }),
-    };
   });
 }
 
 const EXPLANATION_FULLY_MET =
   /\b(clearly meet|fully meets|fully meet|you meet|meets this|meets the|strong match|complete match|no gap|well covered)\b/i;
-const EXPLANATION_MISSING =
-  /\b(missing|not stated|does not|doesn't|do not|gap|short of|partial|is not|isn't|not yet|not covered|unmet)\b/i;
-const EXPLANATION_SUPPORTED =
-  /\b(supported|support|shows|you have|stated|covers|includes)\b/i;
+const EXPLANATION_CLAIMS_UNMET =
+  /\b(missing|not stated|does not meet|doesn't meet|not covered|nothing stated|unmet)\b/i;
 
 /**
- * The stored explanation matches the rating that was saved.
- * A Partial explanation names what is supported and what is missing.
+ * The explanation claims a different rating than the strength that was saved.
+ * Partial or None plus "you clearly meet" is the reported case.
+ * Strong plus language that the requirement is unmet is the other direction.
  */
-function explanationAlignedToStrength(input: {
-  strength: EvidenceStrengthName;
-  explanation: string;
-  targetText: string;
-  profileItems: readonly ProfileFactRef[];
-  downgradeReasons: readonly string[];
-}): string {
-  const explanation = input.explanation.trim();
-  if (input.strength === "PARTIAL") return partialExplanation(input, explanation);
-  if (input.strength === "NONE") {
-    if (EXPLANATION_FULLY_MET.test(explanation)) {
-      return "Nothing stated supports this requirement.";
-    }
-    return explanation;
+export function explanationContradictsStrength(
+  strength: EvidenceStrengthName,
+  explanation: string,
+): boolean {
+  const text = explanation.trim();
+  if (!text) return false;
+  if (strength === "STRONG") {
+    return EXPLANATION_CLAIMS_UNMET.test(text) && !EXPLANATION_FULLY_MET.test(text);
   }
-  if (!EXPLANATION_MISSING.test(explanation)) return explanation;
-  const kept = explanation
-    .split(/(?<=[.!?])\s+/)
-    .map((sentence) => sentence.trim())
-    .filter((sentence) => sentence && !EXPLANATION_MISSING.test(sentence));
-  if (kept.length === 0) return "Your background supports this requirement.";
-  return kept.join(" ");
+  return EXPLANATION_FULLY_MET.test(text);
 }
 
-function partialExplanation(
-  input: {
-    targetText: string;
-    profileItems: readonly ProfileFactRef[];
-    downgradeReasons: readonly string[];
-  },
-  explanation: string,
-): string {
-  const statesBoth =
-    EXPLANATION_SUPPORTED.test(explanation) &&
-    EXPLANATION_MISSING.test(explanation) &&
-    !EXPLANATION_FULLY_MET.test(explanation);
-  if (statesBoth) return explanation;
-  const evidence = input.profileItems
-    .filter((item) => item.kind === "FACT")
-    .map((item) => item.text)
-    .join("\n");
-  const parts = requirementParts(input.targetText);
-  const supported = parts.filter((part) => evidenceCoversPart(evidence, part));
-  const missing = parts.filter((part) => !evidenceCoversPart(evidence, part));
-  if (supported.length > 0 && missing.length > 0) {
-    return `Supported: ${supported.join("; ")}. Missing: ${missing.join("; ")}.`;
+/** Names the explanation field so the writing step rewrites only that field. */
+export function explanationFieldRewriteFeedback(
+  assessments: ReadonlyArray<{
+    key: string;
+    strength: EvidenceStrengthName;
+    explanation: string;
+  }>,
+): string[] {
+  return assessments
+    .filter((item) => explanationContradictsStrength(item.strength, item.explanation))
+    .map(
+      (item) =>
+        `Rewrite only explanation for target ${item.key}. The strength is ${item.strength}, and the current explanation contradicts that strength.`,
+    );
+}
+
+/**
+ * One writing-step rewrite for contradicting explanations.
+ * The caller makes the paid call. A second contradiction is logged and kept.
+ */
+export async function rewriteContradictingExplanations<
+  T extends { key: string; strength: EvidenceStrengthName; explanation: string },
+>(input: {
+  assessments: T[];
+  rewrite: (
+    feedback: string[],
+  ) => Promise<ReadonlyArray<{ key: string; explanation: string }> | null>;
+}): Promise<T[]> {
+  const feedback = explanationFieldRewriteFeedback(input.assessments);
+  if (feedback.length === 0) return input.assessments;
+  const rewritten = await input.rewrite(feedback);
+  if (!rewritten) {
+    console.error(
+      JSON.stringify({
+        event: "explanation_strength_rewrite_failed",
+        targets: feedback,
+      }),
+    );
+    return input.assessments;
   }
-  const missingClause =
-    input.downgradeReasons.find((reason) => reason.trim()) ??
-    "the rest of this requirement is not stated";
-  const supportedClause = EXPLANATION_FULLY_MET.test(explanation)
-    ? "part of this requirement is in your background"
-    : explanation.replace(/[.]+$/g, "").trim() ||
-      "part of this requirement is in your background";
-  return `Supported: ${supportedClause}. Missing: ${missingClause}.`;
+  const byKey = new Map(rewritten.map((item) => [item.key, item.explanation]));
+  const merged = input.assessments.map((item) => {
+    const explanation = byKey.get(item.key);
+    return explanation == null ? item : { ...item, explanation };
+  });
+  const still = merged.filter((item) =>
+    explanationContradictsStrength(item.strength, item.explanation),
+  );
+  if (still.length > 0) {
+    console.error(
+      JSON.stringify({
+        event: "explanation_strength_contradiction",
+        targets: still.map((item) => ({
+          key: item.key,
+          strength: item.strength,
+          explanation: item.explanation,
+        })),
+      }),
+    );
+  }
+  return merged;
 }
 
 const KIND_RANK: Record<EvidenceKind, number> = {

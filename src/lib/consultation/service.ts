@@ -18,6 +18,7 @@ import {
   isStandingRequirement,
   profileEvidenceForApplication,
   profileEvidenceItems,
+  rewriteContradictingExplanations,
   verifyModelAssessments,
   whyThisCompanyFactId,
   type EvidenceAssessment,
@@ -1761,7 +1762,38 @@ async function planAndStoreRound(input: {
       ];
       continue;
     }
-    await saveAssessments(input.organizationId, input.sessionId, verified);
+    const storedAssessments = await rewriteContradictingExplanations({
+      assessments: verified,
+      rewrite: async (feedback) => {
+        const rewrite = await runConsultationPlanWriting({
+          ...coachPayload,
+          decision,
+          usage: withHarperUsageAttempt(
+            consultationUsage(
+              input.organizationId,
+              input.campaignId,
+              "CONSULTATION_REPLY",
+              "plan_writing",
+            ),
+            consultationConfig.qualityRegenerationAttempts + 1,
+          ),
+          qualityFeedback: feedback,
+        });
+        if (!rewrite.ok) return null;
+        const rewritten = verifyModelAssessments({
+          targets: input.targets,
+          profileItems,
+          assessments: rewrite.data.assessments,
+          asOf: new Date(),
+          previousAssessments,
+        });
+        return rewritten.map((item) => ({
+          key: item.key,
+          explanation: item.explanation,
+        }));
+      },
+    });
+    await saveAssessments(input.organizationId, input.sessionId, storedAssessments);
     for (const question of voicedQuestions) {
       const written = writing.data.questions.find(
         (item) =>
@@ -1803,7 +1835,7 @@ async function planAndStoreRound(input: {
         generationError: null,
       },
     });
-    const remainingGaps = verified.filter(
+    const remainingGaps = storedAssessments.filter(
       (assessment) =>
         isStandingRequirement(assessment) && assessment.strength !== "STRONG",
     );

@@ -5,6 +5,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  buildHarperQaLayout,
+  partitionGeneralQuestionsForStanding,
+} from "@/lib/consultation/harper-layout";
+import {
   buildConsultationQaView,
   consultationQuestionAcceptsReply,
   type ConsultationQaItem,
@@ -530,6 +534,224 @@ describe("Harper three-section partition", () => {
     expect(consultationConversationCopy.showApprovedAnswer).toBe(
       "Show approved answer",
     );
+  });
+});
+
+describe("older stored application shape", () => {
+  it("renders a CSC-shaped application's questions, drafts, and approvals once in the new layout", () => {
+    const campaignId = "cmuna46te0019r52o11wi0zm0";
+    const view = buildConsultationQaView({
+      turns: [
+        turn({
+          id: "csc-shift",
+          speaker: "CONSULTANT",
+          body: "Tell me about a recent enterprise SaaS market shift you led.",
+          targetKey: "required:0",
+          sequence: 1,
+        }),
+        turn({
+          id: "csc-sql",
+          speaker: "CONSULTANT",
+          body: "How do you build SQL reporting for the warehouse?",
+          targetKey: "required:1",
+          sequence: 2,
+        }),
+        turn({
+          id: "csc-coach",
+          speaker: "CONSULTANT",
+          body: "Tell me about a time you coached an underperforming seller.",
+          targetKey: "required:2",
+          sequence: 3,
+        }),
+        turn({
+          id: "csc-coach-reply",
+          speaker: "SEEKER",
+          body: "At OpenText I coached two sellers who then hit quota.",
+          targetKey: "required:2",
+          sequence: 4,
+          analysisJson: { status: "COMPLETE", replyToTurnId: "csc-coach" },
+        }),
+        turn({
+          id: "csc-why",
+          speaker: "CONSULTANT",
+          body: consultationConversationCopy.whyThisCompanyTarget,
+          targetKey: WHY_THIS_COMPANY_TARGET_KEY,
+          sequence: 5,
+        }),
+        turn({
+          id: "csc-why-reply",
+          speaker: "SEEKER",
+          body: "I want this sales leadership role because the motion matches how I already sell.",
+          targetKey: WHY_THIS_COMPANY_TARGET_KEY,
+          sequence: 6,
+          analysisJson: { status: "COMPLETE", replyToTurnId: "csc-why" },
+        }),
+        turn({
+          id: "csc-career",
+          speaker: "CONSULTANT",
+          body: consultationConversationCopy.careerWalkThroughTarget,
+          targetKey: CHRONOLOGY_TARGET_KEY,
+          sequence: 7,
+        }),
+        turn({
+          id: "csc-role",
+          speaker: "CONSULTANT",
+          body: "What would your first 90 days look like?",
+          targetKey: "role-expertise:first-90",
+          sequence: 8,
+        }),
+      ],
+      statements: [
+        {
+          id: "csc-shift-draft",
+          turnId: "csc-shift",
+          kind: "INTERVIEW_ANSWER",
+          status: "DRAFT",
+          content: "I would convene Sales, Product, Marketing, and Customer Success.",
+          strengtheningNote: null,
+        },
+        {
+          id: "csc-coach-approved",
+          turnId: "csc-coach-reply",
+          kind: "INTERVIEW_ANSWER",
+          status: "APPROVED",
+          content: "At OpenText I coached two sellers who then hit quota.",
+          strengtheningNote: null,
+        },
+        {
+          id: "csc-why-approved",
+          turnId: "csc-why-reply",
+          kind: "INTERVIEW_ANSWER",
+          status: "APPROVED",
+          content:
+            "I want this sales leadership role because the motion matches how I already sell.",
+          strengtheningNote: null,
+        },
+        {
+          id: "csc-role-draft",
+          turnId: "csc-role",
+          kind: "INTERVIEW_ANSWER",
+          status: "DRAFT",
+          content: "In the first 90 days I would map the pipeline and ship one forecast win.",
+          strengtheningNote: null,
+        },
+      ],
+    });
+    const storedAssessments = [
+      {
+        id: "csc-a0",
+        targetKey: "required:0",
+        text: "Enterprise sales leadership",
+        strength: "PARTIAL" as const,
+        kind: "REQUIRED" as const,
+        explanation: "You clearly meet the experience and leadership scope.",
+      },
+      {
+        id: "csc-a1",
+        targetKey: "required:1",
+        text: "SQL reporting for the warehouse",
+        strength: "NONE" as const,
+        kind: "REQUIRED" as const,
+        explanation: "Nothing stated covers warehouse reporting.",
+      },
+      {
+        id: "csc-a2",
+        targetKey: "required:2",
+        text: "Coaching underperforming sellers",
+        strength: "PARTIAL" as const,
+        kind: "REQUIRED" as const,
+        explanation: "The OpenText coaching story covers this.",
+      },
+      {
+        id: "csc-why-row",
+        targetKey: WHY_THIS_COMPANY_TARGET_KEY,
+        text: consultationConversationCopy.whyThisCompanyTarget,
+        strength: "PARTIAL" as const,
+        kind: "REQUIRED" as const,
+        explanation: "A reason for this company is still thin.",
+      },
+    ];
+    const layout = buildHarperQaLayout({
+      questions: view.questions,
+      interviewers: [],
+    });
+    const standingInline = partitionGeneralQuestionsForStanding({
+      general: layout.general,
+      requirementTargetKeys: storedAssessments.map((item) => item.targetKey),
+      requirementLabels: new Map(
+        storedAssessments.map((item) => [item.targetKey, item.text]),
+      ),
+    });
+    const questionsByTargetKey = new Map(
+      storedAssessments.map((item) => [
+        item.targetKey,
+        standingInline.byRequirementKey.get(item.targetKey) ?? [],
+      ]),
+    );
+    const model = partitionHarperThreeSections(
+      buildStandingListEntries({
+        requirements: storedAssessments.map((item) => ({
+          id: item.id,
+          targetKey: item.targetKey,
+          text: item.text,
+          strength: item.strength,
+          kind: item.kind,
+          explanation: item.explanation,
+          experience: null,
+          facts: [],
+        })),
+        dedicatedTopics: standingInline.dedicatedTopics,
+        questionsByTargetKey,
+      }),
+    );
+    const rendered = collectThreeSectionQuestionTurnIds(model);
+    const sourceIds = view.questions.map((item) => item.questionTurnId);
+    expect(rendered.sort()).toEqual(sourceIds.sort());
+    expect(new Set(rendered).size).toBe(rendered.length);
+    expect(campaignId).toBe("cmuna46te0019r52o11wi0zm0");
+
+    const shift = model.standingEntries
+      .find((entry) => entry.targetKey === "required:0")
+      ?.questions.find((item) => item.questionTurnId === "csc-shift");
+    expect(shift?.talkingPoint?.status).toBe("DRAFT");
+    expect(shift?.talkingPoint?.content).toContain("I would convene");
+    expect(model.needsInfoQuestions.map((item) => item.questionTurnId)).not.toContain(
+      "csc-shift",
+    );
+
+    const sql = model.standingEntries
+      .find((entry) => entry.targetKey === "required:1")
+      ?.questions.find((item) => item.questionTurnId === "csc-sql");
+    expect(sql?.question).toContain("SQL reporting");
+    expect(sql?.talkingPoint).toBeNull();
+
+    const coach = model.standingEntries
+      .find((entry) => entry.targetKey === "required:2")
+      ?.questions.find((item) => item.questionTurnId === "csc-coach");
+    expect(coach?.talkingPoint?.status).toBe("APPROVED");
+    expect(coach?.talkingPoint?.content).toContain("OpenText");
+
+    const why = model.standingEntries.find(
+      (entry) => entry.targetKey === WHY_THIS_COMPANY_TARGET_KEY,
+    );
+    expect(why?.questions.map((item) => item.questionTurnId)).toEqual(["csc-why"]);
+    expect(why?.questions[0]?.talkingPoint?.status).toBe("APPROVED");
+    expect(model.needsInfoQuestions.map((item) => item.questionTurnId)).not.toContain(
+      "csc-why",
+    );
+
+    expect(model.needsInfoQuestions.map((item) => item.questionTurnId)).toEqual([
+      "csc-career",
+    ]);
+    expect(model.bestPracticeQuestions.map((item) => item.questionTurnId)).toEqual([
+      "csc-role",
+    ]);
+    expect(model.bestPracticeQuestions[0]?.talkingPoint?.status).toBe("DRAFT");
+    expect(
+      model.standingEntries.some((entry) =>
+        entry.questions.some((item) => item.questionTurnId === "csc-role"),
+      ),
+    ).toBe(false);
   });
 });
 

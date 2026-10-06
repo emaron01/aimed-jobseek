@@ -1,6 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it, vi } from "vitest";
 import {
   experienceRoleIdsForYearsTarget,
+  explanationContradictsStrength,
+  rewriteContradictingExplanations,
   verifyModelAssessments,
   type ProfileFactRef,
 } from "@/lib/consultation/assess";
@@ -101,40 +105,10 @@ describe("consistent ratings", () => {
         asOf: AS_OF,
       });
       expect(assessment?.strength).toBe("PARTIAL");
-      expect(assessment?.explanation).toMatch(/^Supported:/);
-      expect(assessment?.explanation).toContain("Missing:");
-      expect(assessment?.explanation).not.toMatch(/clearly meet/i);
-      const missingPart = item.text.split(/\s+and\s+/i)[1] ?? "";
-      expect(assessment?.explanation).toContain(missingPart);
+      expect(assessment?.explanation).toBe(item.explanation);
+      expect(assessment?.explanation).not.toMatch(/^Supported:/);
+      expect(assessment?.explanation).not.toContain("Missing:");
     }
-
-    const [fullyMet] = verifyModelAssessments({
-      targets: [
-        {
-          key: "required:scope",
-          kind: "REQUIRED",
-          text: "Enterprise sales experience and leadership scope",
-        },
-      ],
-      profileItems: [fact("fact-sales", "Led enterprise sales at OpenText.")],
-      assessments: [
-        {
-          targetKey: "required:scope",
-          strength: "PARTIAL",
-          supportingFactIds: ["fact-sales"],
-          relevantRoleIds: [],
-          explanation: "You clearly meet the experience and leadership scope.",
-          strategyMode: "REFRAME_ADJACENT",
-          strategy: "Use the stated sales experience.",
-        },
-      ],
-      asOf: AS_OF,
-    });
-    expect(fullyMet?.strength).toBe("PARTIAL");
-    expect(fullyMet?.explanation).toBe(
-      "Supported: Enterprise sales experience. Missing: leadership scope.",
-    );
-    expect(fullyMet?.explanation).not.toMatch(/clearly meet/i);
 
     const [unsupported] = verifyModelAssessments({
       targets: [
@@ -160,6 +134,129 @@ describe("consistent ratings", () => {
     });
     expect(unsupported?.strength).toBe("NONE");
     expect(unsupported?.explanation).toBe("Nothing stated so far covers either part.");
+  });
+});
+
+describe("explanation matches strength without a template", () => {
+  it("leaves the model's explanation unchanged and never writes a Supported/Missing template", () => {
+    const [assessment] = verifyModelAssessments({
+      targets: [
+        {
+          key: "required:scope",
+          kind: "REQUIRED",
+          text: "Enterprise sales experience and leadership scope",
+        },
+      ],
+      profileItems: [fact("fact-sales", "Led enterprise sales at OpenText.")],
+      assessments: [
+        {
+          targetKey: "required:scope",
+          strength: "PARTIAL",
+          supportingFactIds: ["fact-sales"],
+          relevantRoleIds: [],
+          explanation: "You clearly meet the experience and leadership scope.",
+          strategyMode: "REFRAME_ADJACENT",
+          strategy: "Use the stated sales experience.",
+        },
+      ],
+      asOf: AS_OF,
+    });
+    expect(assessment?.strength).toBe("PARTIAL");
+    expect(assessment?.explanation).toBe(
+      "You clearly meet the experience and leadership scope.",
+    );
+    expect(explanationContradictsStrength("PARTIAL", assessment?.explanation ?? "")).toBe(
+      true,
+    );
+    const assess = readFileSync(resolve("src/lib/consultation/assess.ts"), "utf8");
+    const service = readFileSync(resolve("src/lib/consultation/service.ts"), "utf8");
+    expect(assess).not.toContain("explanationAlignedToStrength");
+    expect(assess).not.toContain("Supported:");
+    expect(service).not.toContain("Supported:");
+    expect(service).toContain("qualityFeedback: feedback");
+    expect(service).toContain("runConsultationPlanWriting");
+  });
+
+  it("re-runs the writing step once for a contradicting explanation and keeps the rewrite", async () => {
+    const calls: string[][] = [];
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const stored = await rewriteContradictingExplanations({
+      assessments: [
+        {
+          key: "required:scope",
+          strength: "PARTIAL",
+          explanation: "You clearly meet the experience and leadership scope.",
+        },
+        {
+          key: "required:years",
+          strength: "STRONG",
+          explanation: "You have the years this role asks for.",
+        },
+      ],
+      rewrite: async (feedback) => {
+        calls.push(feedback);
+        return [
+          {
+            key: "required:scope",
+            explanation: "You clearly meet the experience and leadership scope.",
+          },
+        ];
+      },
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toHaveLength(1);
+    expect(calls[0]?.[0]).toContain("Rewrite only explanation");
+    expect(calls[0]?.[0]).toContain("required:scope");
+    expect(calls[0]?.[0]).toContain("PARTIAL");
+    expect(stored.find((item) => item.key === "required:scope")?.explanation).toBe(
+      "You clearly meet the experience and leadership scope.",
+    );
+    expect(stored.find((item) => item.key === "required:years")?.explanation).toBe(
+      "You have the years this role asks for.",
+    );
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(String(error.mock.calls[0]?.[0])).toContain(
+      "explanation_strength_contradiction",
+    );
+    error.mockRestore();
+
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+    const aligned = await rewriteContradictingExplanations({
+      assessments: [
+        {
+          key: "required:scope",
+          strength: "PARTIAL",
+          explanation: "You clearly meet the experience and leadership scope.",
+        },
+      ],
+      rewrite: async () => [
+        {
+          key: "required:scope",
+          explanation:
+            "Enterprise sales experience is in your background. Leadership scope is not stated.",
+        },
+      ],
+    });
+    expect(aligned[0]?.explanation).toBe(
+      "Enterprise sales experience is in your background. Leadership scope is not stated.",
+    );
+    expect(quiet).not.toHaveBeenCalled();
+    quiet.mockRestore();
+
+    const skipped = vi.fn();
+    const unchanged = await rewriteContradictingExplanations({
+      assessments: [
+        {
+          key: "required:scope",
+          strength: "PARTIAL",
+          explanation:
+            "Enterprise sales experience is in your background. Leadership scope is not stated.",
+        },
+      ],
+      rewrite: skipped,
+    });
+    expect(skipped).not.toHaveBeenCalled();
+    expect(unchanged[0]?.explanation).toContain("not stated");
   });
 });
 
