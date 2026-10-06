@@ -6,6 +6,7 @@
  */
 import {
   composeInterviewAnswerFromParts,
+  narrativeAnswerParts,
   containsFrameworkOrPartLabel,
   resultStatesOutcome,
   type AnswerPartsGrounding,
@@ -54,10 +55,12 @@ function partText(value: string | null | undefined): string {
 export function composedPointOfViewAnswer(
   question: PointOfViewParts,
 ): { content: string; grounding: AnswerPartsGrounding } | null {
-  const parts =
-    question.answerFramework === "STAR"
-      ? [partText(question.situation), partText(question.task), partText(question.action)]
-      : [partText(question.challenge), partText(question.action)];
+  const parts = narrativeAnswerParts({
+    situation: question.situation,
+    challenge: question.challenge,
+    task: question.task,
+    action: question.action,
+  }).slice(0, 4);
   const usable = parts.filter(Boolean);
   if (usable.length === 0) return null;
   if (usable.some((part) => containsFrameworkOrPartLabel(part))) return null;
@@ -188,7 +191,7 @@ function isRawProfileFact(text: string, sourceTexts: readonly string[]): boolean
 }
 
 function attemptSentences(answer: PointOfViewParts): string[] {
-  return [...povParts(answer), partText(answer.result)]
+  return narrativeAnswerParts(answer)
     .join(" ")
     .split(/(?<=[.!?])\s+/)
     .map((sentence) => sentence.trim())
@@ -216,8 +219,8 @@ export function askHarperAttemptProse(answer: PointOfViewParts): string {
  * Returns "" when nothing usable remains, including when the remainder is only
  * one raw profile fact. Callers then keep askHarperAttemptProse.
  */
-function storyOpening(answer: PointOfViewParts): string {
-  return partText(answer.answerFramework === "STAR" ? answer.situation : answer.challenge);
+function storyOpenings(answer: PointOfViewParts): string[] {
+  return [partText(answer.situation), partText(answer.challenge)].filter(Boolean);
 }
 
 export function askHarperUnpassedDraft(input: {
@@ -231,9 +234,9 @@ export function askHarperUnpassedDraft(input: {
   );
   let content = composeInterviewAnswerFromParts(sentences);
   if (input.kind === "story") {
-    const opening = storyOpening(input.answer);
-    const needle = opening.toLowerCase().slice(0, 40);
-    if (opening && needle && !content.toLowerCase().includes(needle)) {
+    for (const opening of [...storyOpenings(input.answer)].reverse()) {
+      const needle = opening.toLowerCase().slice(0, 40);
+      if (!needle || content.toLowerCase().includes(needle)) continue;
       content = composeInterviewAnswerFromParts([opening, content]);
     }
   }

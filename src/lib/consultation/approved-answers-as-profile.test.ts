@@ -184,8 +184,8 @@ describe("approved answers as profile evidence", () => {
   it("does not ask a target rated STRONG and passes approved answers to the decision", () => {
     expect(CONSULTATION_PLAN_DECISION_INSTRUCTIONS).toContain(DECISION_RULE);
     expect(CONSULTATION_PLAN_WRITING_INSTRUCTIONS).toContain(WRITING_RULE);
-    expect(CONSULTATION_PLAN_DECISION_PROMPT_VERSION).toBe("4");
-    expect(CONSULTATION_PLAN_WRITING_PROMPT_VERSION).toBe("5");
+    expect(CONSULTATION_PLAN_DECISION_PROMPT_VERSION).toBe("5");
+    expect(CONSULTATION_PLAN_WRITING_PROMPT_VERSION).toBe("6");
     expect(CONSULTATION_PROMPT_VERSION).toBe("38");
 
     const selected = selectGapsForRound({
@@ -233,7 +233,7 @@ describe("approved answers as profile evidence", () => {
       chronologyRequested: false,
       coveredTargetKeys: [],
     });
-    expect(messages[0]?.content.startsWith("Prompt version: 4\n")).toBe(true);
+    expect(messages[0]?.content.startsWith("Prompt version: 5\n")).toBe(true);
     const payload = JSON.parse(messages[1]?.content ?? "{}") as {
       personalProfileItems: unknown[];
       approvedAnswers: Array<{ id: string; content: string }>;

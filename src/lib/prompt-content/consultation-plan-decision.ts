@@ -68,6 +68,8 @@ When interviewerPrep is present, ask only what this interviewer will likely prob
 
 If qualityFeedback names a field, rewrite only that field.
 
+When a requirement has several parts, rate it PARTIAL if the person's information supports any part; rate it NONE only when nothing supports any part.
+
 Return JSON matching the schema only.`;
 }
 

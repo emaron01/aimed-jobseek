@@ -43,7 +43,7 @@ describe("Harper answer quality", () => {
   it("puts the named-method rule on the planning writing instructions", () => {
     expect(CONSULTATION_PLAN_WRITING_INSTRUCTIONS).toContain(METHOD_INSTRUCTION);
     expect(CONSULTATION_PLAN_WRITING_INSTRUCTIONS).not.toContain(STORY_INSTRUCTION);
-    expect(CONSULTATION_PLAN_WRITING_PROMPT_VERSION).toBe("5");
+    expect(CONSULTATION_PLAN_WRITING_PROMPT_VERSION).toBe("6");
   });
 
   it("counts every stated enterprise-sales role when the writing step listed only three", () => {

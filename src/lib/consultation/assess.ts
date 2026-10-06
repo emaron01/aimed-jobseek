@@ -364,37 +364,112 @@ function statedExperienceCoversSkill(stated: string, skillText: string): boolean
   return hits >= 2 && hits * 2 > targetTokens.size;
 }
 
+const COVERAGE_STOPWORDS = new Set([
+  ...STOPWORDS,
+  "year",
+  "years",
+  "experience",
+  "required",
+  "requirement",
+  "including",
+  "preferably",
+  "progressive",
+  "plus",
+]);
+
+/** Stem used only to match experience to a requirement. Not requirement de-duplication. */
+function coverageStem(token: string): string {
+  let value = token;
+  if (value.length > 4 && value.endsWith("s") && !value.endsWith("ss")) {
+    value = value.slice(0, -1);
+  }
+  if (value.length > 6 && value.endsWith("ing")) value = value.slice(0, -3);
+  else if (value.length > 5 && value.endsWith("ed")) value = value.slice(0, -2);
+  if (value.length > 6 && value.endsWith("er")) value = value.slice(0, -2);
+  if (value.length > 4 && value.length <= 6 && value.endsWith("e")) {
+    value = value.slice(0, -1);
+  }
+  return value;
+}
+
+function coverageTokens(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .map(coverageStem)
+      .filter((token) => token.length >= 4 && !COVERAGE_STOPWORDS.has(token)),
+  );
+}
+
+function evidenceCoversPart(evidence: string, part: string): boolean {
+  const partTokens = coverageTokens(part);
+  if (partTokens.size === 0) return false;
+  const evidenceTokens = coverageTokens(evidence);
+  let hits = 0;
+  for (const token of partTokens) {
+    if (evidenceTokens.has(token)) hits += 1;
+  }
+  if (partTokens.size === 1) return hits === 1;
+  return hits >= 2 && hits * 2 > partTokens.size;
+}
+
+/** Split a requirement into parts. One part means the rating is left to the model. */
+function requirementParts(text: string): string[] {
+  const parts = text
+    .split(/\s+and\s+|\s+or\s+|\s+&\s+|\/|;|,/i)
+    .map((part) => part.trim())
+    .filter((part) => coverageTokens(yearsSkillText(part)).size > 0);
+  return parts.length >= 2 ? parts : [];
+}
+
 /**
- * Years are calculated from role dates. The writing step's relevantRoleIds are
- * often only some of the roles where that experience was stated. Keep those
- * ids, and add every other FACT role whose title, summary, or achievements
- * state the same experience.
+ * A multi-part requirement is PARTIAL when any part is stated in the profile.
+ * NONE stays NONE only when no part is stated. STRONG is left as the model set it.
+ */
+export function strengthForMultipartSupport(input: {
+  targetText: string;
+  strength: EvidenceStrengthName;
+  profileItems: readonly ProfileFactRef[];
+}): EvidenceStrengthName {
+  if (input.strength !== "NONE") return input.strength;
+  const parts = requirementParts(input.targetText);
+  if (parts.length < 2) return input.strength;
+  const evidence = input.profileItems
+    .filter((item) => item.kind === "FACT")
+    .map((item) => item.text)
+    .join("\n");
+  const supported = parts.some((part) => evidenceCoversPart(evidence, part));
+  return supported ? "PARTIAL" : "NONE";
+}
+
+/**
+ * Years are calculated from role dates. The writing model's relevantRoleIds
+ * are ignored. Every FACT experience role whose title, summary, achievements,
+ * school placement, internship, or project states the required experience is
+ * included, in profile order. The same profile and requirement always select
+ * the same roles.
  */
 export function experienceRoleIdsForYearsTarget(input: {
   targetText: string;
   profileItems: readonly ProfileFactRef[];
   modelRoleIds: readonly string[];
 }): string[] {
+  void input.modelRoleIds;
   const skillText = yearsSkillText(input.targetText);
   const experience = input.profileItems.filter(
     (item) => item.kind === "FACT" && item.itemType === "EXPERIENCE",
   );
-  const experienceIds = new Set(experience.map((item) => item.id));
   const selected: string[] = [];
-  const seen = new Set<string>();
-  for (const id of input.modelRoleIds) {
-    if (!experienceIds.has(id) || seen.has(id)) continue;
-    seen.add(id);
-    selected.push(id);
-  }
   for (const role of experience) {
-    if (seen.has(role.id)) continue;
     const related = input.profileItems
       .filter((item) => item.kind === "FACT" && item.roleId === role.id)
       .map((item) => item.text);
     const stated = [role.text, ...related].join(" ");
-    if (!statedExperienceCoversSkill(stated, skillText)) continue;
-    seen.add(role.id);
+    if (!evidenceCoversPart(stated, skillText) && !statedExperienceCoversSkill(stated, skillText)) {
+      continue;
+    }
     selected.push(role.id);
   }
   return selected;
@@ -668,6 +743,17 @@ export function verifyModelAssessments(input: {
         strength = experienceCalculation.totalMonths > 0 ? "PARTIAL" : "NONE";
         downgradeReasons.push("Verified, non-overlapping role dates do not meet the required duration.");
       }
+    }
+    const strengthBeforeParts = strength;
+    strength = strengthForMultipartSupport({
+      targetText: target.text,
+      strength,
+      profileItems: input.profileItems,
+    });
+    if (strength === "PARTIAL" && strengthBeforeParts === "NONE") {
+      downgradeReasons.push(
+        "A part of this requirement is supported, so the rating is partial.",
+      );
     }
     return preserveAssessmentStrength({
       previous: previousByKey.get(target.key),

@@ -38,18 +38,43 @@ export function composeInterviewAnswerFromParts(parts: string[]): string {
     .join(" ");
 }
 
+const UNINTRODUCED_REFERENCE =
+  /\b(?:the|that|this)\s+(?:transition|change|shift|move|acquisition|merger|reorganization|rotation|handoff|handover)\b/i;
+
+/**
+ * Situation and challenge are both kept. When the situation only refers back
+ * ("the transition") and the challenge names what happened, the challenge
+ * comes first so the stored answer introduces that thing.
+ */
+export function narrativeAnswerParts(input: {
+  situation?: string | null;
+  challenge?: string | null;
+  task?: string | null;
+  action?: string | null;
+  result?: string | null;
+}): string[] {
+  const situation = input.situation ?? "";
+  const challenge = input.challenge ?? "";
+  const openings =
+    situation.trim() &&
+    challenge.trim() &&
+    UNINTRODUCED_REFERENCE.test(situation) &&
+    !UNINTRODUCED_REFERENCE.test(challenge)
+      ? [challenge, situation]
+      : [situation, challenge];
+  return [...openings, input.task ?? "", input.action ?? "", input.result ?? ""];
+}
+
+/**
+ * Every filled slot, including an opening stored on the other framework's
+ * field. CAR assembly used to drop situation, and STAR assembly used to drop
+ * challenge, so a later sentence could refer to a transition the draft never
+ * introduced.
+ */
 export function partsInFrameworkOrder(
   result: ConsultationPolishResult & { answerFramework: AnswerFramework },
 ): string[] {
-  if (result.answerFramework === "CAR") {
-    return [result.challenge ?? "", result.action ?? "", result.result ?? ""];
-  }
-  return [
-    result.situation ?? "",
-    result.task ?? "",
-    result.action ?? "",
-    result.result ?? "",
-  ];
+  return narrativeAnswerParts(result);
 }
 
 export function answerPartsGroundingFromPolish(

@@ -51,6 +51,7 @@ import {
 } from "@/lib/consultation/contract";
 import {
   composeInterviewAnswerFromParts,
+  narrativeAnswerParts,
   containsFrameworkOrPartLabel,
   resultStatesOutcome,
   type AnswerPartsGrounding,
@@ -401,15 +402,13 @@ export function composedAnswerFromRoleExpertiseQuestion(
   const grounding = answerPartsFromQuestion(question);
   if (!grounding) return null;
   if (!resultStatesOutcome(grounding.result)) return null;
-  const parts =
-    grounding.answerFramework === "CAR"
-      ? [grounding.challenge ?? "", grounding.action, grounding.result]
-      : [
-          grounding.situation ?? "",
-          grounding.task ?? "",
-          grounding.action,
-          grounding.result,
-        ];
+  const parts = narrativeAnswerParts({
+    situation: question.situation,
+    challenge: question.challenge,
+    task: question.task,
+    action: grounding.action,
+    result: grounding.result,
+  });
   for (const part of parts) {
     if (containsFrameworkOrPartLabel(part)) return null;
   }
@@ -1045,15 +1044,46 @@ function restoreStoryOpening(
   return answer;
 }
 
-/** Stored story content keeps its opening part, so it does not start at a later sentence. */
+/** Stored content keeps every opening part, so it does not start at a later sentence. */
 function withStoryOpening(answer: RoleExpertiseAnswerParts, content: string): string {
-  const opening =
-    answer.answerFramework === "STAR"
-      ? fieldText(answer.situation)
-      : fieldText(answer.challenge);
-  const needle = opening.toLowerCase().slice(0, 40);
-  if (!opening || !needle || content.toLowerCase().includes(needle)) return content;
-  return composeInterviewAnswerFromParts([opening, content]);
+  const openings = [fieldText(answer.situation), fieldText(answer.challenge)].filter(Boolean);
+  let next = content;
+  for (const opening of [...openings].reverse()) {
+    const needle = opening.toLowerCase().slice(0, 40);
+    if (!needle || next.toLowerCase().includes(needle)) continue;
+    next = composeInterviewAnswerFromParts([opening, next]);
+  }
+  return next;
+}
+
+/**
+ * When the full answer is in `text` and a later part repeats its middle, keep
+ * the sentences that come first. Those sentences are what name the thing a
+ * later sentence calls "the transition".
+ */
+function keepEarlierProse(
+  answer: RoleExpertiseAnswerParts,
+  questionText: string,
+): RoleExpertiseAnswerParts {
+  const prose = answer.text.trim();
+  if (!prose || answerEchoesQuestion(prose, questionText)) return answer;
+  const firstPart = [
+    fieldText(answer.situation),
+    fieldText(answer.challenge),
+    fieldText(answer.task),
+    fieldText(answer.action),
+  ].find(Boolean);
+  if (!firstPart) return answer;
+  const needle = firstPart.replace(/\s+/g, " ").trim().slice(0, 40).toLowerCase();
+  if (needle.length < 12) return answer;
+  const index = prose.toLowerCase().indexOf(needle);
+  if (index <= 0) return answer;
+  const lead = prose.slice(0, index).trim();
+  if (!lead) return answer;
+  const situation = fieldText(answer.situation);
+  if (!situation) return { ...answer, situation: lead };
+  if (situation.toLowerCase().includes(lead.toLowerCase().slice(0, 24))) return answer;
+  return { ...answer, situation: `${lead} ${situation}` };
 }
 
 /**
@@ -1066,7 +1096,10 @@ function withProseFromTextField(
   questionText: string,
 ): RoleExpertiseAnswerParts {
   if (answerHasParts(answer)) {
-    const restored = restoreStoryOpening(answer, questionText);
+    const restored = keepEarlierProse(
+      restoreStoryOpening(answer, questionText),
+      questionText,
+    );
     return answerEchoesQuestion(restored.text, questionText)
       ? restored
       : { ...restored, text: questionText };
@@ -1540,7 +1573,9 @@ async function generateRoleExpertiseAnswersStep(input: {
       const choice = input.choices[0];
       const rawAnswer = gated.data.answers[0];
       const answer =
-        rawAnswer && choice ? restoreStoryOpening(rawAnswer, choice.text) : rawAnswer;
+        rawAnswer && choice
+          ? keepEarlierProse(restoreStoryOpening(rawAnswer, choice.text), choice.text)
+          : rawAnswer;
       const content = answer
         ? askHarperUnpassedDraft({
             answer,

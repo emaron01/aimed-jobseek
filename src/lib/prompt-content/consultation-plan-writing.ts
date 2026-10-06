@@ -58,6 +58,8 @@ You may cite approvedAnswers ids in supportingFactIds. Facts about the person ma
 
 You may describe the person's actual practice using the job's terminology (for example, "my discovery-to-value approach, which works like Command of the Message"), but never claim the person formally uses, was trained in, or is certified in a named method, framework, or tool they have not stated.
 
+Write each explanation consistent with that target's strength.
+
 Return JSON matching the schema only.`;
 }
 

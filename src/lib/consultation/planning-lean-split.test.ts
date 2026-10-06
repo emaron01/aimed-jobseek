@@ -328,8 +328,8 @@ describe("lean planning instructions", () => {
       "EXPERIMENTAL. Not production.",
     );
     expect(CONSULTATION_PROMPT_VERSION).toBe("38");
-    expect(CONSULTATION_PLAN_DECISION_PROMPT_VERSION).toBe("4");
-    expect(CONSULTATION_PLAN_WRITING_PROMPT_VERSION).toBe("5");
+    expect(CONSULTATION_PLAN_DECISION_PROMPT_VERSION).toBe("5");
+    expect(CONSULTATION_PLAN_WRITING_PROMPT_VERSION).toBe("6");
     const messages = buildConsultationPlanDecisionMessages({
       targets: [TARGET],
       profileItems: [],
@@ -342,7 +342,7 @@ describe("lean planning instructions", () => {
       chronologyRequested: false,
       coveredTargetKeys: [],
     });
-    expect(messages[0]?.content.startsWith("Prompt version: 4\n")).toBe(true);
+    expect(messages[0]?.content.startsWith("Prompt version: 5\n")).toBe(true);
     expect(CONSULTATION_PLAN_DECISION_INSTRUCTIONS).not.toContain(
       "Ask only what this interviewer will likely probe, which of their stories fit, and one or two new questions for weak spots with this interviewer.",
     );
