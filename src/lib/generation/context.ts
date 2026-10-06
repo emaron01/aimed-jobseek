@@ -1,4 +1,8 @@
-import { profileEvidenceItems } from "@/lib/consultation/assess";
+import {
+  isWhyThisCompanyFactId,
+  profileEvidenceForApplication,
+  whyThisCompanyFactId,
+} from "@/lib/consultation/assess";
 import { prisma } from "@/lib/prisma-client";
 import { parseCandidateProfileSafe, type CandidateProfile } from "@/lib/product-research/candidate-profile";
 import { parseStringArray } from "@/lib/research";
@@ -41,6 +45,35 @@ function addSource(
   source: GenerationSource,
 ): void {
   if (source.text.trim()) sources.push({ ...source, text: source.text.trim() });
+}
+
+/** Profile facts for one application's drafting. Another application's why-this-company answer is omitted. */
+export function profileFactSourcesForApplication(input: {
+  profile: CandidateProfile;
+  campaignId: string;
+  whyThisCompany: string | null | undefined;
+}): GenerationSource[] {
+  const scoped = profileEvidenceForApplication(input.profile, input);
+  const sources: GenerationSource[] = [];
+  for (const item of scoped) {
+    if (item.kind !== "FACT" || isWhyThisCompanyFactId(item.id)) continue;
+    addSource(sources, {
+      id: `profile:${item.id}`,
+      text: item.text,
+      category: "PROFILE_FACT",
+      url: null,
+    });
+  }
+  const own = scoped.find((item) => item.id === whyThisCompanyFactId(input.campaignId));
+  if (own) {
+    addSource(sources, {
+      id: own.id,
+      text: own.text,
+      category: "PROFILE_FACT",
+      url: null,
+    });
+  }
+  return sources;
 }
 
 export type ApplicationGenerationContext = {
@@ -244,16 +277,13 @@ export async function loadApplicationGenerationContext(
   });
   const sources: GenerationSource[] = [];
   if (parsedProfile.ok) {
-    for (const item of profileEvidenceItems(parsedProfile.profile)) {
-      if (item.kind === "FACT") {
-        addSource(sources, {
-          id: `profile:${item.id}`,
-          text: item.text,
-          category: "PROFILE_FACT",
-          url: null,
-        });
-      }
-    }
+    sources.push(
+      ...profileFactSourcesForApplication({
+        profile: parsedProfile.profile,
+        campaignId: campaign.id,
+        whyThisCompany: campaign.whyThisCompany,
+      }),
+    );
   }
   for (const statement of campaign.consultationSession?.statements ?? []) {
     addSource(sources, {
@@ -291,14 +321,6 @@ export async function loadApplicationGenerationContext(
       id: "application:status",
       text: `Applied through the employer portal on ${campaign.appliedAt.toISOString().slice(0, 10)}.`,
       category: "APPLICATION",
-      url: null,
-    });
-  }
-  if (campaign.whyThisCompany?.trim()) {
-    addSource(sources, {
-      id: `why-this-company:${campaign.id}`,
-      text: campaign.whyThisCompany.trim(),
-      category: "PROFILE_FACT",
       url: null,
     });
   }

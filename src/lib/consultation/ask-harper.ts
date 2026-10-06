@@ -6,7 +6,7 @@
 import { isRealAskHarperQuestion } from "@/lib/consultation/ask-harper-answer";
 import { ASK_HARPER_TARGET_PREFIX, CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
 import { deriveCareerStage } from "@/lib/consultation/career-stage";
-import { profileEvidenceItems } from "@/lib/consultation/assess";
+import { profileEvidenceForApplication } from "@/lib/consultation/assess";
 import {
   buildConsultationQaView,
   type ConsultationQaItem,
@@ -96,7 +96,7 @@ export async function askHarper(input: {
 
   const campaign = await prisma.campaign.findFirst({
     where: { id: input.campaignId, organizationId: input.organizationId },
-    select: { id: true, productId: true },
+    select: { id: true, productId: true, whyThisCompany: true },
   });
   if (!campaign) {
     throw new TenantError(`${vocab.campaign.Singular} was not found.`);
@@ -142,7 +142,10 @@ export async function askHarper(input: {
     questionText: question,
     careerStage: deriveCareerStage(parsed.profile),
     job,
-    profileItems: profileEvidenceItems(parsed.profile),
+    profileItems: profileEvidenceForApplication(parsed.profile, {
+      campaignId: input.campaignId,
+      whyThisCompany: campaign.whyThisCompany,
+    }),
   });
   if (!generated.ok) {
     return {

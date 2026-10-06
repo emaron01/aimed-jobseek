@@ -69,19 +69,33 @@ export function approvedAnswerEvidenceId(statementId: string): string {
   return `approved:${statementId}`;
 }
 
+function approvedAnswerCarriesWhyThisCompany(input: {
+  targetKey: string | null;
+  content: string;
+  question: string;
+  whyThisCompany: string | null;
+}): boolean {
+  if (input.targetKey === WHY_THIS_COMPANY_TARGET_KEY) return true;
+  const whyThisCompany = input.whyThisCompany?.trim() ?? "";
+  if (!whyThisCompany) return false;
+  return (
+    input.content.trim() === whyThisCompany ||
+    input.question.trim() === whyThisCompany
+  );
+}
+
 function approvedAnswerIsEligible(
   answer: ApprovedAnswerCandidate,
   campaignId: string,
 ): boolean {
   if (answer.sourceCampaignId === campaignId) return false;
   if (!answer.content.trim() || !answer.question.trim()) return false;
-  if (answer.targetKey === WHY_THIS_COMPANY_TARGET_KEY) return false;
-  const whyThisCompany = answer.whyThisCompany?.trim() ?? "";
-  if (!whyThisCompany) return true;
-  return (
-    answer.content.trim() !== whyThisCompany &&
-    answer.question.trim() !== whyThisCompany
-  );
+  return !approvedAnswerCarriesWhyThisCompany({
+    targetKey: answer.targetKey,
+    content: answer.content,
+    question: answer.question,
+    whyThisCompany: answer.whyThisCompany,
+  });
 }
 
 function newerApprovedAnswer(
@@ -207,7 +221,10 @@ export async function findHarperLibraryMatch(input: {
       id: true,
       content: true,
       approvedAt: true,
-      turn: { select: { body: true, questionContextJson: true } },
+      turn: { select: { body: true, questionContextJson: true, targetKey: true } },
+      session: {
+        select: { campaign: { select: { whyThisCompany: true } } },
+      },
     },
   });
 
@@ -216,7 +233,13 @@ export async function findHarperLibraryMatch(input: {
       (row): row is typeof row & { approvedAt: Date } =>
         row.approvedAt instanceof Date &&
         row.content.trim().length > 0 &&
-        row.turn.body.trim().length > 0,
+        row.turn.body.trim().length > 0 &&
+        !approvedAnswerCarriesWhyThisCompany({
+          targetKey: row.turn.targetKey,
+          content: row.content,
+          question: row.turn.body,
+          whyThisCompany: row.session.campaign.whyThisCompany,
+        }),
     )
     .sort((left, right) => right.approvedAt.getTime() - left.approvedAt.getTime());
 

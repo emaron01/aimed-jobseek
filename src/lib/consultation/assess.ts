@@ -198,6 +198,48 @@ export function profileFactEvidence(profile: CandidateProfile): ProfileFactRef[]
   return profileEvidenceItems(profile).filter((item) => item.kind === "FACT");
 }
 
+/** Stored on the shared profile by an older write. The id names the owning application. */
+export function whyThisCompanyFactId(campaignId: string): string {
+  return `why-this-company:${campaignId}`;
+}
+
+export function isWhyThisCompanyFactId(id: string): boolean {
+  return id.startsWith("why-this-company:");
+}
+
+/**
+ * Personal Profile evidence for one application.
+ * Another application's why-this-company answer is omitted.
+ * This application's answer is included from Campaign.whyThisCompany, or from
+ * the matching stored fact when that field is empty.
+ */
+export function profileEvidenceForApplication(
+  profile: CandidateProfile,
+  input: { campaignId: string; whyThisCompany: string | null | undefined },
+): ProfileFactRef[] {
+  const ownId = whyThisCompanyFactId(input.campaignId);
+  const items = profileEvidenceItems(profile).filter(
+    (item) => !isWhyThisCompanyFactId(item.id) || item.id === ownId,
+  );
+  const text = input.whyThisCompany?.trim() ?? "";
+  if (!text) return items;
+  const existing = items.find((item) => item.id === ownId);
+  if (!existing) {
+    return [
+      ...items,
+      {
+        id: ownId,
+        kind: "FACT",
+        text,
+        itemType: "ITEM",
+        source: "profile",
+      },
+    ];
+  }
+  if (existing.text === text) return items;
+  return items.map((item) => (item.id === ownId ? { ...item, text } : item));
+}
+
 export function requirementMeaning(text: string): string {
   return contentTokens(text).join(" ");
 }

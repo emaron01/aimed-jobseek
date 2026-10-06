@@ -40,7 +40,11 @@ import {
   interviewerWorkExperience,
 } from "@/lib/contact-profile/contract";
 import { parseLinkedInExtracted } from "@/lib/contact-profile/service";
-import { profileEvidenceItems } from "@/lib/consultation/assess";
+import {
+  isWhyThisCompanyFactId,
+  profileEvidenceForApplication,
+  whyThisCompanyFactId,
+} from "@/lib/consultation/assess";
 import {
   deriveCareerStage,
   type CareerStage,
@@ -513,11 +517,31 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
     ? parseCandidateProfileSafe(campaign.product.profileJson)
     : null;
   if (profile?.ok) {
-    for (const item of profileEvidenceItems(profile.profile)) {
-      if (item.kind === "FACT") {
+    const scoped = profileEvidenceForApplication(profile.profile, {
+      campaignId: campaign.id,
+      whyThisCompany: campaign.whyThisCompany,
+    });
+    for (const item of scoped) {
+      if (item.kind === "FACT" && !isWhyThisCompanyFactId(item.id)) {
         appendSource(sources, `profile:${item.id}`, item.text, "SEEKER");
       }
     }
+    const ownWhy = scoped.find(
+      (item) => item.id === whyThisCompanyFactId(campaign.id),
+    );
+    appendSource(
+      sources,
+      "seeker:why-this-company",
+      ownWhy?.text ?? campaign.whyThisCompany,
+      "SEEKER",
+    );
+  } else {
+    appendSource(
+      sources,
+      "seeker:why-this-company",
+      campaign.whyThisCompany,
+      "SEEKER",
+    );
   }
   const requirement = campaign.jobRequirement;
   appendSource(sources, "job:title", requirement.title, "JOB");
@@ -633,12 +657,6 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
       "APPROVED_STORY",
     );
   }
-  appendSource(
-    sources,
-    "seeker:why-this-company",
-    campaign.whyThisCompany,
-    "SEEKER",
-  );
   for (const prep of personPreps) {
     appendSource(
       sources,

@@ -12,7 +12,7 @@ import {
   type CandidateProfile,
   type ProfileFactItem,
 } from "@/lib/product-research/candidate-profile";
-import { profileEvidenceItems } from "@/lib/consultation/assess";
+import { isWhyThisCompanyFactId, profileEvidenceItems } from "@/lib/consultation/assess";
 
 export type StoryDraft = {
   situation: string;
@@ -207,7 +207,7 @@ export function meaningGroundedInAnswer(
   if (profile) {
     sources.push(
       ...profileEvidenceItems(profile)
-        .filter((item) => item.kind === "FACT")
+        .filter((item) => item.kind === "FACT" && !isWhyThisCompanyFactId(item.id))
         .map((item) => item.text),
     );
   }

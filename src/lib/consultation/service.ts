@@ -16,8 +16,10 @@ import {
   evidenceTargets,
   gapsAreCovered,
   isStandingRequirement,
+  profileEvidenceForApplication,
   profileEvidenceItems,
   verifyModelAssessments,
+  whyThisCompanyFactId,
   type EvidenceAssessment,
   type EvidenceTarget,
 } from "@/lib/consultation/assess";
@@ -270,10 +272,6 @@ function whyThisCompanyTarget(): EvidenceTarget {
     kind: "MISSION",
     text: consultationConversationCopy.whyThisCompanyTarget,
   };
-}
-
-function whyThisCompanyFactId(campaignId: string): string {
-  return `why-this-company:${campaignId}`;
 }
 
 function whyThisCompanyAlreadyAnswered(input: {
@@ -966,19 +964,6 @@ function companyMotivationFromExtract(
   return text || null;
 }
 
-function profileWithoutWhyThisCompanyFact(
-  profile: ReturnType<typeof parseCandidateProfile>,
-  campaignId: string,
-): ReturnType<typeof parseCandidateProfile> {
-  const factId = whyThisCompanyFactId(campaignId);
-  const next = parseCandidateProfile(profile);
-  next.skills = next.skills.filter((item) => item.id !== factId);
-  for (const role of next.experience) {
-    role.achievements = role.achievements.filter((item) => item.id !== factId);
-  }
-  return parseCandidateProfile(next);
-}
-
 async function persistWhyThisCompany(input: {
   organizationId: string;
   campaignId: string;
@@ -986,25 +971,9 @@ async function persistWhyThisCompany(input: {
 }): Promise<void> {
   const text = companyMotivationFromExtract(input.companyMotivation);
   if (!text) return;
-  await prisma.campaign.update({
-    where: { id: input.campaignId },
+  await prisma.campaign.updateMany({
+    where: { id: input.campaignId, organizationId: input.organizationId },
     data: { whyThisCompany: text },
-  });
-  const { product, profile } = await requireApplication(
-    input.organizationId,
-    input.campaignId,
-  );
-  const next = appendConfirmedFact(
-    profileWithoutWhyThisCompanyFact(profile, input.campaignId),
-    {
-      id: whyThisCompanyFactId(input.campaignId),
-      text,
-      turnId: WHY_THIS_COMPANY_TARGET_KEY,
-    },
-  );
-  await prisma.product.update({
-    where: { id: product.id },
-    data: { profileJson: next },
   });
 }
 
@@ -1401,6 +1370,7 @@ async function planAndStoreRound(input: {
   };
   targets: EvidenceTarget[];
   roles: CoachHiringTeamRole[];
+  whyThisCompany: string | null;
   applicationLearningsPendingHiringManager?: ApplicationLearningsForCoach | null;
   focusTargetKey?: string | null;
   focusGuidance?: string[];
@@ -1457,7 +1427,10 @@ async function planAndStoreRound(input: {
     stages: interviewStages,
   });
   const profileItems = [
-    ...profileEvidenceItems(input.profile),
+    ...profileEvidenceForApplication(input.profile, {
+      campaignId: input.campaignId,
+      whyThisCompany: input.whyThisCompany,
+    }),
     ...learnedNotesEvidence(input.campaignId, input.requirement.seekerLearnedNotes),
     ...interviewNotesEvidence(interviewStages),
   ];
@@ -1964,7 +1937,7 @@ async function recoverBestPracticeFillIfEmpty(input: {
     subjectKey: input.campaignId,
   });
   if (!receipt) return;
-  const { requirement, profile } = await requireApplication(
+  const { campaign, requirement, profile } = await requireApplication(
     input.organizationId,
     input.campaignId,
   );
@@ -1977,7 +1950,10 @@ async function recoverBestPracticeFillIfEmpty(input: {
     requirement,
     careerStage,
     recentRoles: deriveRecentRoles(profile, new Date(), careerStage),
-    profileItems: profileEvidenceItems(profile),
+    profileItems: profileEvidenceForApplication(profile, {
+      campaignId: input.campaignId,
+      whyThisCompany: campaign.whyThisCompany,
+    }),
   });
 }
 
@@ -2157,7 +2133,10 @@ export async function buildConsultationCoachMessagesForCampaign(input: {
   return buildConsultationCoachMessages({
     targets,
     profileItems: [
-      ...profileEvidenceItems(profile),
+      ...profileEvidenceForApplication(profile, {
+        campaignId: input.campaignId,
+        whyThisCompany: campaign.whyThisCompany,
+      }),
       ...learnedNotesEvidence(input.campaignId, requirement.seekerLearnedNotes),
       ...interviewNotesEvidence(interviewStages),
     ],
@@ -2258,6 +2237,7 @@ export async function startConsultation(input: {
       requirement,
       targets,
       roles,
+      whyThisCompany: campaign.whyThisCompany,
       applicationLearningsPendingHiringManager,
       focusTargetKey,
       interviewerPrep: input.interviewerPrep,
@@ -2309,6 +2289,7 @@ async function processAnswerGeneration(input: {
   target: EvidenceTarget | null;
   targets: EvidenceTarget[];
   profile: ReturnType<typeof parseCandidateProfile>;
+  whyThisCompany: string | null;
   replyToTurnId?: string | null;
   allowFollowUp?: boolean;
 }): Promise<
@@ -2339,7 +2320,10 @@ async function processAnswerGeneration(input: {
     "CONSULTATION_REPLY",
     "polish",
   );
-  const profileItems = profileEvidenceItems(input.profile);
+  const profileItems = profileEvidenceForApplication(input.profile, {
+    campaignId: input.campaignId,
+    whyThisCompany: input.whyThisCompany,
+  });
   const seekerReplies = input.seekerReplies
     .map((reply) => reply.trim())
     .filter(Boolean);
@@ -3262,7 +3246,7 @@ export async function retryConsultationGeneration(input: {
     if (!question) {
       throw new TenantError(consultationConversationCopy.generationFailed);
     }
-    const { requirement, profile } = await requireApplication(
+    const { campaign, requirement, profile } = await requireApplication(
       input.organizationId,
       input.campaignId,
     );
@@ -3291,6 +3275,7 @@ export async function retryConsultationGeneration(input: {
       target: target ?? null,
       targets,
       profile,
+      whyThisCompany: campaign.whyThisCompany,
       replyToTurnId: question.id,
     });
     if (!processed.ok) {
@@ -3863,7 +3848,7 @@ export async function processConsultationReply(input: {
     throw new Error(consultationConversationCopy.generationFailed);
   }
   const seekerTurnId = seekerTurn.id;
-  const { requirement, profile } = await requireApplication(
+  const { campaign, requirement, profile } = await requireApplication(
     input.organizationId,
     input.campaignId,
   );
@@ -3942,6 +3927,7 @@ export async function processConsultationReply(input: {
     target: target ?? null,
     targets,
     profile,
+    whyThisCompany: campaign.whyThisCompany,
     replyToTurnId: questionTurnId || null,
     allowFollowUp,
   });
@@ -4078,7 +4064,7 @@ async function declineConsultationFollowUp(input: {
       "The answer behind this follow-up could not be prepared. Answer the follow-up or retry.",
     );
   }
-  const { profile } = await requireApplication(
+  const { campaign, profile } = await requireApplication(
     input.organizationId,
     input.campaignId,
   );
@@ -4118,7 +4104,10 @@ async function declineConsultationFollowUp(input: {
     firstName: profileFirstName(profile),
     careerStage: deriveCareerStage(profile),
     strengtheningNeeds: analyzed.missingStarElements,
-    profileItems: profileEvidenceItems(profile),
+    profileItems: profileEvidenceForApplication(profile, {
+      campaignId: input.campaignId,
+      whyThisCompany: campaign.whyThisCompany,
+    }),
     libraryQuestion,
     questionKey:
       questionTurn?.id ?? input.question.targetKey ?? priorAnswer.id,
@@ -4299,6 +4288,7 @@ export async function skipConsultationQuestion(input: {
     requirement,
     targets: targetsFromRequirement(requirement),
     roles,
+    whyThisCompany: campaign.whyThisCompany,
     applicationLearningsPendingHiringManager,
   });
   await finishIfPlanningIsComplete(session.id, next);
@@ -4475,7 +4465,7 @@ export async function regenerateConsultationStatement(input: {
   if (!answer) {
     throw new TenantError(consultationConversationCopy.generationFailed);
   }
-  const { profile } = await requireApplication(
+  const { campaign, profile } = await requireApplication(
     input.organizationId,
     statement.session.campaignId,
   );
@@ -4511,7 +4501,10 @@ export async function regenerateConsultationStatement(input: {
     firstName: profileFirstName(profile),
     careerStage: deriveCareerStage(profile),
     strengtheningNeeds: analyzed?.missingStarElements ?? [],
-    profileItems: profileEvidenceItems(profile),
+    profileItems: profileEvidenceForApplication(profile, {
+      campaignId: statement.session.campaignId,
+      whyThisCompany: campaign.whyThisCompany,
+    }),
     libraryQuestion,
     questionKey: statement.turn.targetKey ?? statement.turnId,
     usage: consultationUsage(
@@ -5132,6 +5125,7 @@ export async function continueConsultationPlanning(input: {
     requirement,
     targets: targetsFromRequirement(requirement),
     roles,
+    whyThisCompany: campaign.whyThisCompany,
     applicationLearningsPendingHiringManager,
   });
   await finishIfPlanningIsComplete(session.id, next);
@@ -5170,7 +5164,7 @@ export async function reviseConsultationResult(input: {
     seekerAuthored: true,
     intent: "CHANGE",
   });
-  const { requirement, profile } = await requireApplication(
+  const { campaign, requirement, profile } = await requireApplication(
     input.organizationId,
     input.campaignId,
   );
@@ -5207,6 +5201,7 @@ export async function reviseConsultationResult(input: {
     target: targets.find((item) => item.key === turn.targetKey) ?? null,
     targets,
     profile,
+    whyThisCompany: campaign.whyThisCompany,
   });
 }
 
@@ -5263,6 +5258,7 @@ export async function flagConsultationInaccuracy(input: {
     requirement,
     targets: targetsFromRequirement(requirement),
     roles,
+    whyThisCompany: campaign.whyThisCompany,
     applicationLearningsPendingHiringManager,
     focusTargetKey: draft.turn.targetKey,
     focusGuidance: [
