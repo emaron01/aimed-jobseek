@@ -36,6 +36,34 @@ export async function runApplicationFormAction(
 
 const SM_BUTTON_CLASS = "!px-2.5 !py-1.5 !text-xs";
 
+/**
+ * Replies and approvals restore the viewport after router.refresh.
+ * Draft Edit and Save also remove the focused control, which scrolls the
+ * document to the top. Move focus onto the question card first, then restore
+ * the same scroll position.
+ */
+export function keepHarperQuestionInPlace(
+  source: Element | null,
+  saved?: { x: number; y: number },
+): { x: number; y: number } {
+  if (typeof window === "undefined") return saved ?? { x: 0, y: 0 };
+  const point = saved ?? { x: window.scrollX, y: window.scrollY };
+  const card = source?.closest("[data-harper-question]");
+  if (card instanceof HTMLElement) {
+    if (!card.hasAttribute("tabindex")) card.setAttribute("tabindex", "-1");
+    card.focus({ preventScroll: true });
+  }
+  const restore = () => window.scrollTo(point.x, point.y);
+  restore();
+  requestAnimationFrame(() => {
+    restore();
+    requestAnimationFrame(restore);
+    window.setTimeout(restore, 0);
+    window.setTimeout(restore, 50);
+  });
+  return point;
+}
+
 export function ApplicationActionForm({
   action,
   submitLabel,
@@ -80,26 +108,18 @@ export function ApplicationActionForm({
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     if (onSubmitStart?.(formData) === false) return;
     setPending(true);
-    const scrollX = typeof window !== "undefined" ? window.scrollX : 0;
-    const scrollY = typeof window !== "undefined" ? window.scrollY : 0;
+    const place = preserveScroll ? keepHarperQuestionInPlace(form) : null;
     try {
       const result = await runApplicationFormAction(action, state, formData);
       setState(result);
       if (result.ok) {
+        if (place) keepHarperQuestionInPlace(form, place);
         onSuccess?.();
         router.refresh();
-        if (preserveScroll && typeof window !== "undefined") {
-          const restore = () => window.scrollTo(scrollX, scrollY);
-          requestAnimationFrame(() => {
-            restore();
-            requestAnimationFrame(restore);
-            window.setTimeout(restore, 0);
-            window.setTimeout(restore, 50);
-          });
-        }
       }
     } finally {
       setPending(false);

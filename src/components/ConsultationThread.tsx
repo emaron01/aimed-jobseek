@@ -15,7 +15,10 @@ import {
   ignoreConsultationQuestionAction,
   reopenIgnoredConsultationTargetAction,
 } from "@/app/actions/consultation";
-import { ApplicationActionForm } from "@/components/ApplicationActionForm";
+import {
+  ApplicationActionForm,
+  keepHarperQuestionInPlace,
+} from "@/components/ApplicationActionForm";
 import { AppButton } from "@/components/AppButton";
 import { useHarperDraft } from "@/components/HarperDraftStore";
 import {
@@ -182,7 +185,10 @@ export function ResultActions({
             variant="secondary"
             className="!px-2.5 !py-1.5 !text-xs"
             data-testid={`${testId}-edit`}
-            onClick={startEdit}
+            onClick={(event) => {
+              keepHarperQuestionInPlace(event.currentTarget);
+              startEdit();
+            }}
           >
             {consultationConversationCopy.editAnswer}
           </AppButton>
@@ -616,6 +622,7 @@ function QuestionCard({
         className="min-w-0 overflow-hidden rounded-md border border-edge bg-canvas p-4"
         data-testid="consultation-ignored-question"
         data-harper-question={item.questionTurnId}
+        tabIndex={-1}
         data-harper-collapsed="ignored"
       >
         <QuestionPrintView item={item} />
@@ -674,6 +681,7 @@ function QuestionCard({
         className="min-w-0 overflow-hidden rounded-md border border-edge bg-canvas p-4"
         data-testid="consultation-answered"
         data-harper-question={item.questionTurnId}
+        tabIndex={-1}
         data-harper-collapsed="approved"
       >
         <QuestionPrintView item={item} />
@@ -717,6 +725,7 @@ function QuestionCard({
             : "consultation-question-item"
       }
       data-harper-question={item.questionTurnId}
+      tabIndex={-1}
     >
       <QuestionPrintView item={item} />
       <div className="consultation-question-screen">
