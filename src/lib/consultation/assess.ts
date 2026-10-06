@@ -415,35 +415,6 @@ function evidenceCoversPart(evidence: string, part: string): boolean {
   return hits >= 2 && hits * 2 > partTokens.size;
 }
 
-/** Split a requirement into parts. One part means the rating is left to the model. */
-function requirementParts(text: string): string[] {
-  const parts = text
-    .split(/\s+and\s+|\s+or\s+|\s+&\s+|\/|;|,/i)
-    .map((part) => part.trim())
-    .filter((part) => coverageTokens(yearsSkillText(part)).size > 0);
-  return parts.length >= 2 ? parts : [];
-}
-
-/**
- * A multi-part requirement is PARTIAL when any part is stated in the profile.
- * NONE stays NONE only when no part is stated. STRONG is left as the model set it.
- */
-export function strengthForMultipartSupport(input: {
-  targetText: string;
-  strength: EvidenceStrengthName;
-  profileItems: readonly ProfileFactRef[];
-}): EvidenceStrengthName {
-  if (input.strength !== "NONE") return input.strength;
-  const parts = requirementParts(input.targetText);
-  if (parts.length < 2) return input.strength;
-  const evidence = input.profileItems
-    .filter((item) => item.kind === "FACT")
-    .map((item) => item.text)
-    .join("\n");
-  const supported = parts.some((part) => evidenceCoversPart(evidence, part));
-  return supported ? "PARTIAL" : "NONE";
-}
-
 /**
  * Years are calculated from role dates. The writing model's relevantRoleIds
  * are ignored. Every FACT experience role whose title, summary, achievements,
@@ -601,12 +572,6 @@ export type ModelAssessment = {
 };
 
 /** Verifies model reasoning without writing replacement assessment or strategy prose. */
-const STRENGTH_RANK: Record<EvidenceStrengthName, number> = {
-  NONE: 0,
-  PARTIAL: 1,
-  STRONG: 2,
-};
-
 export function assessmentContradictsPrior(input: {
   previous: Pick<EvidenceAssessment, "explanation" | "supportingFactIds">;
   next: Pick<EvidenceAssessment, "explanation" | "supportingFactIds" | "verification">;
@@ -617,32 +582,13 @@ export function assessmentContradictsPrior(input: {
   );
 }
 
+/** The current assessment is stored. An older rating does not replace it. */
 export function preserveAssessmentStrength(input: {
   previous: EvidenceAssessment | undefined;
   next: EvidenceAssessment;
 }): EvidenceAssessment {
-  const previous = input.previous;
-  if (!previous) return input.next;
-  if (STRENGTH_RANK[input.next.strength] >= STRENGTH_RANK[previous.strength]) {
-    return input.next;
-  }
-  if (assessmentContradictsPrior({ previous, next: input.next })) {
-    return input.next;
-  }
-  return {
-    ...input.next,
-    strength: previous.strength,
-    supportingFactIds: [
-      ...new Set([...previous.supportingFactIds, ...input.next.supportingFactIds]),
-    ],
-    verification: {
-      ...input.next.verification,
-      originalStrength: previous.strength,
-      downgradeReasons: input.next.verification.downgradeReasons.filter(
-        (reason) => !/missing or was not FACT/i.test(reason),
-      ),
-    },
-  };
+  void input.previous;
+  return input.next;
 }
 
 export function verifyModelAssessments(input: {
@@ -724,36 +670,9 @@ export function verifyModelAssessments(input: {
             profileItems: input.profileItems,
             asOf: input.asOf,
           });
-    if (experienceCalculation) {
-      if (invalidRoleIds.length > 0) {
-        strength = downgrade(strength);
-        downgradeReasons.push("A cited experience role was missing or was not FACT.");
-      }
-      if (
-        experienceCalculation.missingDateRoleIds.length > 0 &&
-        strength !== "NONE"
-      ) {
-        strength = downgrade(strength);
-        downgradeReasons.push("One or more relevant roles have missing or invalid dates.");
-      } else if (
-        strength !== "NONE" &&
-        experienceCalculation.totalMonths <
-        experienceCalculation.requiredYears * 12
-      ) {
-        strength = experienceCalculation.totalMonths > 0 ? "PARTIAL" : "NONE";
-        downgradeReasons.push("Verified, non-overlapping role dates do not meet the required duration.");
-      }
-    }
-    const strengthBeforeParts = strength;
-    strength = strengthForMultipartSupport({
-      targetText: target.text,
-      strength,
-      profileItems: input.profileItems,
-    });
-    if (strength === "PARTIAL" && strengthBeforeParts === "NONE") {
-      downgradeReasons.push(
-        "A part of this requirement is supported, so the rating is partial.",
-      );
+    if (experienceCalculation && invalidRoleIds.length > 0) {
+      strength = downgrade(strength);
+      downgradeReasons.push("A cited experience role was missing or was not FACT.");
     }
     return preserveAssessmentStrength({
       previous: previousByKey.get(target.key),
@@ -798,69 +717,6 @@ export function explanationContradictsStrength(
     return EXPLANATION_CLAIMS_UNMET.test(text) && !EXPLANATION_FULLY_MET.test(text);
   }
   return EXPLANATION_FULLY_MET.test(text);
-}
-
-/** Names the explanation field so the writing step rewrites only that field. */
-export function explanationFieldRewriteFeedback(
-  assessments: ReadonlyArray<{
-    key: string;
-    strength: EvidenceStrengthName;
-    explanation: string;
-  }>,
-): string[] {
-  return assessments
-    .filter((item) => explanationContradictsStrength(item.strength, item.explanation))
-    .map(
-      (item) =>
-        `Rewrite only explanation for target ${item.key}. The strength is ${item.strength}, and the current explanation contradicts that strength.`,
-    );
-}
-
-/**
- * One writing-step rewrite for contradicting explanations.
- * The caller makes the paid call. A second contradiction is logged and kept.
- */
-export async function rewriteContradictingExplanations<
-  T extends { key: string; strength: EvidenceStrengthName; explanation: string },
->(input: {
-  assessments: T[];
-  rewrite: (
-    feedback: string[],
-  ) => Promise<ReadonlyArray<{ key: string; explanation: string }> | null>;
-}): Promise<T[]> {
-  const feedback = explanationFieldRewriteFeedback(input.assessments);
-  if (feedback.length === 0) return input.assessments;
-  const rewritten = await input.rewrite(feedback);
-  if (!rewritten) {
-    console.error(
-      JSON.stringify({
-        event: "explanation_strength_rewrite_failed",
-        targets: feedback,
-      }),
-    );
-    return input.assessments;
-  }
-  const byKey = new Map(rewritten.map((item) => [item.key, item.explanation]));
-  const merged = input.assessments.map((item) => {
-    const explanation = byKey.get(item.key);
-    return explanation == null ? item : { ...item, explanation };
-  });
-  const still = merged.filter((item) =>
-    explanationContradictsStrength(item.strength, item.explanation),
-  );
-  if (still.length > 0) {
-    console.error(
-      JSON.stringify({
-        event: "explanation_strength_contradiction",
-        targets: still.map((item) => ({
-          key: item.key,
-          strength: item.strength,
-          explanation: item.explanation,
-        })),
-      }),
-    );
-  }
-  return merged;
 }
 
 const KIND_RANK: Record<EvidenceKind, number> = {

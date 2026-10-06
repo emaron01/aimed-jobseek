@@ -97,6 +97,21 @@ export function isRequirementLikeTargetKey(targetKey: string): boolean {
   return /^(required|outcome|competency|preferred|mission):/.test(targetKey.trim());
 }
 
+/**
+ * Target key whose standing row becomes STRONG when this interview answer is
+ * approved. An acknowledge-the-gap track and any non-requirement card return
+ * an empty key so the current strength is left as stored.
+ */
+export function approvedRequirementTargetKey(input: {
+  statementKind: string;
+  targetKey: string | null | undefined;
+  confirmedGap: boolean;
+}): string {
+  if (input.statementKind !== "INTERVIEW_ANSWER" || input.confirmedGap) return "";
+  const key = input.targetKey?.trim() ?? "";
+  return isRequirementLikeTargetKey(key) ? key : "";
+}
+
 /** True when the item must appear somewhere on Harper (answers, statements, or open Q). */
 export function harperItemNeedsRender(item: ConsultationQaItem): boolean {
   // Ask Harper drafts render only in the Ask Harper box, not the three sections.

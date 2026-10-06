@@ -5,7 +5,7 @@ export const CONSULTATION_PROMPT_VERSION = "38";
  * Lean planning decision instructions. Not part of CONSULTATION_PROMPT_VERSION,
  * so a change here does not enqueue a seeker-background reassess.
  */
-export const CONSULTATION_PLAN_DECISION_PROMPT_VERSION = "5";
+export const CONSULTATION_PLAN_DECISION_PROMPT_VERSION = "6";
 /**
  * Lean planning writing instructions. A bump retries writing only.
  * It does not invalidate the decision receipt.

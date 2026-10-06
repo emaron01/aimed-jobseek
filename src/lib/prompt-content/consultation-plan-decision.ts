@@ -68,7 +68,7 @@ When interviewerPrep is present, ask only what this interviewer will likely prob
 
 If qualityFeedback names a field, rewrite only that field.
 
-When a requirement has several parts, rate it PARTIAL if the person's information supports any part; rate it NONE only when nothing supports any part.
+Rate a requirement STRONG when the person's information supports every part of it, PARTIAL when it supports some parts (and name the missing part), and NONE when it supports no part. Never lower a rating because a story has not been written yet, a date is missing, or the wording differs.
 
 Return JSON matching the schema only.`;
 }

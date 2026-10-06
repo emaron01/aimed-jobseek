@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   experienceRoleIdsForYearsTarget,
   explanationContradictsStrength,
-  rewriteContradictingExplanations,
   verifyModelAssessments,
   type ProfileFactRef,
 } from "@/lib/consultation/assess";
+import { approvedRequirementTargetKey } from "@/lib/consultation/harper-layout";
 import {
   CONSULTATION_PLAN_DECISION_PROMPT_VERSION,
   CONSULTATION_PLAN_WRITING_PROMPT_VERSION,
@@ -17,7 +17,7 @@ import { CONSULTATION_PLAN_DECISION_INSTRUCTIONS } from "@/lib/prompt-content/co
 import { CONSULTATION_PLAN_WRITING_INSTRUCTIONS } from "@/lib/prompt-content/consultation-plan-writing";
 
 const DECISION_RATING =
-  "When a requirement has several parts, rate it PARTIAL if the person's information supports any part; rate it NONE only when nothing supports any part.";
+  "Rate a requirement STRONG when the person's information supports every part of it, PARTIAL when it supports some parts (and name the missing part), and NONE when it supports no part. Never lower a rating because a story has not been written yet, a date is missing, or the wording differs.";
 
 const WRITING_RATING = "Write each explanation consistent with that target's strength.";
 
@@ -51,89 +51,185 @@ describe("consistent ratings", () => {
     expect(CONSULTATION_PLAN_WRITING_INSTRUCTIONS.endsWith(
       `${WRITING_RATING}\n\nReturn JSON matching the schema only.`,
     )).toBe(true);
-    expect(CONSULTATION_PLAN_DECISION_PROMPT_VERSION).toBe("5");
+    expect(CONSULTATION_PLAN_DECISION_PROMPT_VERSION).toBe("6");
     expect(CONSULTATION_PLAN_WRITING_PROMPT_VERSION).toBe("6");
   });
 
-  it("rates a multi-part requirement PARTIAL when any part is supported, for sales, nursing, and a new graduate", () => {
-    const cases = [
+  it("keeps STRONG when every part is supported and PARTIAL when a named part is missing, for sales, nursing, software, and a new graduate", () => {
+    const strong = [
       {
         key: "required:methods",
         text: "MEDDPICC and Command of the Message",
         profile: [
-          fact(
-            "fact-meddpicc",
-            "Led a MEDDPICC implementation and held 95% forecast accuracy.",
-          ),
+          fact("fact-meddpicc", "Led a MEDDPICC implementation and held 95% forecast accuracy."),
+          fact("fact-command", "Ran discovery with Command of the Message."),
         ],
         explanation:
-          "You directly support this through MEDDPICC implementation and 95% forecast accuracy.",
+          "You support both parts through MEDDPICC implementation and Command of the Message discovery.",
       },
       {
         key: "required:nursing",
         text: "Inpatient nursing and surgical first assist",
-        profile: [fact("fact-nurse", "Inpatient nursing on a medical unit at County Hospital.")],
-        explanation: "You have inpatient nursing experience on a medical unit.",
+        profile: [
+          fact("fact-nurse", "Inpatient nursing on a medical unit at County Hospital."),
+          fact("fact-assist", "Surgical first assist on general surgery cases."),
+        ],
+        explanation: "You have inpatient nursing and surgical first assist experience.",
+      },
+      {
+        key: "required:software",
+        text: "API design and production on-call",
+        profile: [
+          fact("fact-api", "Designed the public billing API."),
+          fact("fact-oncall", "Took production on-call for the billing service."),
+        ],
+        explanation: "You have API design and production on-call for the billing service.",
       },
       {
         key: "required:teaching",
         text: "Classroom teaching and published research",
         profile: [
-          fact(
-            "fact-student",
-            "Student teaching placement in a public school classroom.",
-          ),
+          fact("fact-student", "Student teaching placement in a public school classroom."),
+          fact("fact-paper", "Published a research paper on classroom assessment."),
         ],
-        explanation: "You have classroom teaching from a student teaching placement.",
+        explanation: "You have classroom teaching and a published research paper.",
       },
     ];
-    for (const item of cases) {
+    for (const item of strong) {
       const [assessment] = verifyModelAssessments({
         targets: [{ key: item.key, kind: "REQUIRED", text: item.text }],
         profileItems: item.profile,
         assessments: [
           {
             targetKey: item.key,
-            strength: "NONE",
+            strength: "STRONG",
+            supportingFactIds: item.profile.map((row) => row.id),
+            relevantRoleIds: [],
+            explanation: item.explanation,
+            strategyMode: "PROVE_WITH_STORY",
+            strategy: "Use the stated experience.",
+          },
+        ],
+        asOf: AS_OF,
+      });
+      expect(assessment?.strength).toBe("STRONG");
+      expect(assessment?.explanation).toBe(item.explanation);
+    }
+
+    const partial = [
+      {
+        key: "required:methods",
+        text: "MEDDPICC and Command of the Message",
+        profile: [
+          fact("fact-meddpicc", "Led a MEDDPICC implementation and held 95% forecast accuracy."),
+        ],
+        explanation:
+          "MEDDPICC is in your background. Command of the Message is the missing part.",
+      },
+      {
+        key: "required:nursing",
+        text: "Inpatient nursing and surgical first assist",
+        profile: [fact("fact-nurse", "Inpatient nursing on a medical unit at County Hospital.")],
+        explanation:
+          "Inpatient nursing is stated. Surgical first assist is the missing part.",
+      },
+      {
+        key: "required:software",
+        text: "API design and production on-call",
+        profile: [fact("fact-api", "Designed the public billing API.")],
+        explanation: "API design is stated. Production on-call is the missing part.",
+      },
+      {
+        key: "required:teaching",
+        text: "Classroom teaching and published research",
+        profile: [
+          fact("fact-student", "Student teaching placement in a public school classroom."),
+        ],
+        explanation:
+          "Classroom teaching is stated. Published research is the missing part.",
+      },
+    ];
+    for (const item of partial) {
+      const [assessment] = verifyModelAssessments({
+        targets: [{ key: item.key, kind: "REQUIRED", text: item.text }],
+        profileItems: item.profile,
+        assessments: [
+          {
+            targetKey: item.key,
+            strength: "PARTIAL",
             supportingFactIds: [item.profile[0]!.id],
             relevantRoleIds: [],
             explanation: item.explanation,
             strategyMode: "REFRAME_ADJACENT",
-            strategy: "Use the part the profile already states.",
+            strategy: "Ask only for the missing part.",
           },
         ],
         asOf: AS_OF,
       });
       expect(assessment?.strength).toBe("PARTIAL");
       expect(assessment?.explanation).toBe(item.explanation);
-      expect(assessment?.explanation).not.toMatch(/^Supported:/);
-      expect(assessment?.explanation).not.toContain("Missing:");
+      expect(assessment?.explanation).toContain("missing part");
     }
+  });
 
-    const [unsupported] = verifyModelAssessments({
+  it("does not change a rating from word overlap or a missing date", () => {
+    const [overlapped] = verifyModelAssessments({
       targets: [
         {
-          key: "required:unrelated",
+          key: "required:nursing",
           kind: "REQUIRED",
-          text: "Quantum cryptography and orbital welding",
+          text: "Inpatient nursing and surgical first assist",
         },
       ],
-      profileItems: [fact("fact-nurse", "Inpatient nursing on a medical unit.")],
+      profileItems: [fact("fact-nurse", "Inpatient nursing on a medical unit at County Hospital.")],
       assessments: [
         {
-          targetKey: "required:unrelated",
+          targetKey: "required:nursing",
           strength: "NONE",
           supportingFactIds: [],
           relevantRoleIds: [],
-          explanation: "Nothing stated so far covers either part.",
+          explanation: "Nothing stated covers this requirement.",
           strategyMode: "ACKNOWLEDGE",
           strategy: "Address the gap honestly.",
         },
       ],
       asOf: AS_OF,
     });
-    expect(unsupported?.strength).toBe("NONE");
-    expect(unsupported?.explanation).toBe("Nothing stated so far covers either part.");
+    expect(overlapped?.strength).toBe("NONE");
+
+    const [undated] = verifyModelAssessments({
+      targets: [
+        {
+          key: "required:years",
+          kind: "REQUIRED",
+          text: "5 years of inpatient nursing",
+        },
+      ],
+      profileItems: [
+        fact("fact-nurse", "Inpatient nursing on a medical unit."),
+        experience("county", "Registered nurse at County Hospital. Inpatient nursing.", "Summer 2024", null),
+      ],
+      assessments: [
+        {
+          targetKey: "required:years",
+          strength: "STRONG",
+          supportingFactIds: ["fact-nurse"],
+          relevantRoleIds: ["county"],
+          explanation: "Inpatient nursing is stated. The role date is incomplete.",
+          strategyMode: "PROVE_WITH_STORY",
+          strategy: "Use the stated nursing work.",
+        },
+      ],
+      asOf: AS_OF,
+    });
+    expect(undated?.strength).toBe("STRONG");
+    expect(undated?.experienceCalculation).not.toBeNull();
+    expect(typeof undated?.experienceCalculation?.totalYears).toBe("number");
+
+    const assess = readFileSync(resolve("src/lib/consultation/assess.ts"), "utf8");
+    expect(assess).not.toContain("strengthForMultipartSupport");
+    expect(assess).not.toContain("missing or invalid dates");
+    expect(assess).not.toContain("do not meet the required duration");
   });
 });
 
@@ -173,90 +269,66 @@ describe("explanation matches strength without a template", () => {
     expect(assess).not.toContain("explanationAlignedToStrength");
     expect(assess).not.toContain("Supported:");
     expect(service).not.toContain("Supported:");
-    expect(service).toContain("qualityFeedback: feedback");
+    expect(assess).not.toContain("rewriteContradictingExplanations");
+    expect(service).not.toContain("rewriteContradictingExplanations");
+    expect(CONSULTATION_PLAN_WRITING_INSTRUCTIONS).toContain(WRITING_RATING);
     expect(service).toContain("runConsultationPlanWriting");
   });
+});
 
-  it("re-runs the writing step once for a contradicting explanation and keeps the rewrite", async () => {
-    const calls: string[][] = [];
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    const stored = await rewriteContradictingExplanations({
-      assessments: [
-        {
-          key: "required:scope",
-          strength: "PARTIAL",
-          explanation: "You clearly meet the experience and leadership scope.",
-        },
-        {
-          key: "required:years",
-          strength: "STRONG",
-          explanation: "You have the years this role asks for.",
-        },
-      ],
-      rewrite: async (feedback) => {
-        calls.push(feedback);
-        return [
-          {
-            key: "required:scope",
-            explanation: "You clearly meet the experience and leadership scope.",
-          },
-        ];
-      },
-    });
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toHaveLength(1);
-    expect(calls[0]?.[0]).toContain("Rewrite only explanation");
-    expect(calls[0]?.[0]).toContain("required:scope");
-    expect(calls[0]?.[0]).toContain("PARTIAL");
-    expect(stored.find((item) => item.key === "required:scope")?.explanation).toBe(
-      "You clearly meet the experience and leadership scope.",
-    );
-    expect(stored.find((item) => item.key === "required:years")?.explanation).toBe(
-      "You have the years this role asks for.",
-    );
-    expect(error).toHaveBeenCalledTimes(1);
-    expect(String(error.mock.calls[0]?.[0])).toContain(
-      "explanation_strength_contradiction",
-    );
-    error.mockRestore();
+describe("approving a requirement answer moves the score", () => {
+  it("sets a requirement row STRONG and leaves an acknowledge-the-gap track unchanged", () => {
+    const rows = [
+      "required:methods",
+      "required:nursing",
+      "required:software",
+      "required:teaching",
+    ];
+    for (const targetKey of rows) {
+      expect(
+        approvedRequirementTargetKey({
+          statementKind: "INTERVIEW_ANSWER",
+          targetKey,
+          confirmedGap: false,
+        }),
+      ).toBe(targetKey);
+      expect(
+        approvedRequirementTargetKey({
+          statementKind: "INTERVIEW_ANSWER",
+          targetKey,
+          confirmedGap: true,
+        }),
+      ).toBe("");
+    }
+    expect(
+      approvedRequirementTargetKey({
+        statementKind: "RESUME_BULLET",
+        targetKey: "required:nursing",
+        confirmedGap: false,
+      }),
+    ).toBe("");
+    expect(
+      approvedRequirementTargetKey({
+        statementKind: "INTERVIEW_ANSWER",
+        targetKey: "why-this-company",
+        confirmedGap: false,
+      }),
+    ).toBe("");
 
-    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
-    const aligned = await rewriteContradictingExplanations({
-      assessments: [
-        {
-          key: "required:scope",
-          strength: "PARTIAL",
-          explanation: "You clearly meet the experience and leadership scope.",
-        },
-      ],
-      rewrite: async () => [
-        {
-          key: "required:scope",
-          explanation:
-            "Enterprise sales experience is in your background. Leadership scope is not stated.",
-        },
-      ],
-    });
-    expect(aligned[0]?.explanation).toBe(
-      "Enterprise sales experience is in your background. Leadership scope is not stated.",
+    const service = readFileSync(resolve("src/lib/consultation/service.ts"), "utf8");
+    const approveStart = service.indexOf(
+      "export async function approveConsultationStatement",
     );
-    expect(quiet).not.toHaveBeenCalled();
-    quiet.mockRestore();
-
-    const skipped = vi.fn();
-    const unchanged = await rewriteContradictingExplanations({
-      assessments: [
-        {
-          key: "required:scope",
-          strength: "PARTIAL",
-          explanation:
-            "Enterprise sales experience is in your background. Leadership scope is not stated.",
-        },
-      ],
-      rewrite: skipped,
-    });
-    expect(skipped).not.toHaveBeenCalled();
-    expect(unchanged[0]?.explanation).toContain("not stated");
+    const approveFn = service.slice(approveStart, service.indexOf(
+      "export async function resolveConsultationStatementFlag",
+    ));
+    expect(approveFn).toContain("approvedRequirementTargetKey");
+    expect(approveFn).toContain('gapDecisionFromAnalysis(statement.turn.analysisJson) === "no_evidence"');
+    expect(approveFn).toContain("card?.targetKey ?? statement.turn.targetKey");
+    expect(approveFn).toContain('strength: "STRONG"');
+    expect(approveFn).not.toContain("runConsultation");
+    expect(approveFn).not.toContain("polishAnswer");
+    expect(approveFn).not.toContain("generateStructured");
   });
 });
 

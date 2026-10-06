@@ -18,13 +18,14 @@ import {
   isStandingRequirement,
   profileEvidenceForApplication,
   profileEvidenceItems,
-  rewriteContradictingExplanations,
   verifyModelAssessments,
   whyThisCompanyFactId,
   type EvidenceAssessment,
   type EvidenceTarget,
 } from "@/lib/consultation/assess";
 import { deriveCareerStage, type CareerStage } from "@/lib/consultation/career-stage";
+import { approvedRequirementTargetKey } from "@/lib/consultation/harper-layout";
+import { gapDecisionFromAnalysis } from "@/lib/consultation/standing";
 import {
   CHRONOLOGY_LIBRARY_TARGET,
   loadApprovedAnswersForTargets,
@@ -1762,38 +1763,7 @@ async function planAndStoreRound(input: {
       ];
       continue;
     }
-    const storedAssessments = await rewriteContradictingExplanations({
-      assessments: verified,
-      rewrite: async (feedback) => {
-        const rewrite = await runConsultationPlanWriting({
-          ...coachPayload,
-          decision,
-          usage: withHarperUsageAttempt(
-            consultationUsage(
-              input.organizationId,
-              input.campaignId,
-              "CONSULTATION_REPLY",
-              "plan_writing",
-            ),
-            consultationConfig.qualityRegenerationAttempts + 1,
-          ),
-          qualityFeedback: feedback,
-        });
-        if (!rewrite.ok) return null;
-        const rewritten = verifyModelAssessments({
-          targets: input.targets,
-          profileItems,
-          assessments: rewrite.data.assessments,
-          asOf: new Date(),
-          previousAssessments,
-        });
-        return rewritten.map((item) => ({
-          key: item.key,
-          explanation: item.explanation,
-        }));
-      },
-    });
-    await saveAssessments(input.organizationId, input.sessionId, storedAssessments);
+    await saveAssessments(input.organizationId, input.sessionId, verified);
     for (const question of voicedQuestions) {
       const written = writing.data.questions.find(
         (item) =>
@@ -1835,7 +1805,7 @@ async function planAndStoreRound(input: {
         generationError: null,
       },
     });
-    const remainingGaps = storedAssessments.filter(
+    const remainingGaps = verified.filter(
       (assessment) =>
         isStandingRequirement(assessment) && assessment.strength !== "STRONG",
     );
@@ -4816,6 +4786,18 @@ export async function approveConsultationStatement(input: {
             ...polishedFields,
           },
         }),
+    prisma.consultationAssessment.updateMany({
+      where: {
+        sessionId: statement.sessionId,
+        targetKey: approvedRequirementTargetKey({
+          statementKind: statement.kind,
+          targetKey: card?.targetKey ?? statement.turn.targetKey,
+          confirmedGap:
+            gapDecisionFromAnalysis(statement.turn.analysisJson) === "no_evidence",
+        }),
+      },
+      data: { strength: "STRONG" },
+    }),
   ]);
 }
 

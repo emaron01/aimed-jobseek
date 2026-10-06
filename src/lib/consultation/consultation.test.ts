@@ -698,7 +698,7 @@ describe("consultation evidence and questions", () => {
     expect(assessed?.verification.downgradeReasons.length).toBeGreaterThan(0);
   });
 
-  it("never lowers a rating when new evidence is added unless it contradicts the earlier evidence", () => {
+  it("stores the current rating instead of keeping an older one", () => {
     const emptyVerification = {
       originalStrength: "STRONG" as const,
       invalidSupportingFactIds: [],
@@ -733,11 +733,11 @@ describe("consultation evidence and questions", () => {
       assessmentContradictsPrior({ previous, next: lowered }),
     ).toBe(false);
     expect(preserveAssessmentStrength({ previous, next: lowered }).strength).toBe(
-      "STRONG",
+      "PARTIAL",
     );
     expect(
       preserveAssessmentStrength({ previous, next: lowered }).supportingFactIds,
-    ).toEqual(["fact_old", "fact_new"]);
+    ).toEqual(["fact_new"]);
     const contradicted = {
       ...lowered,
       explanation: "The seeker said they have no experience in security sales.",
@@ -786,10 +786,8 @@ describe("consultation evidence and questions", () => {
         },
       ],
     });
-    expect(reassessed?.strength).toBe("STRONG");
-    expect(reassessed?.supportingFactIds).toEqual(
-      expect.arrayContaining(["fact_old", "fact_new"]),
-    );
+    expect(reassessed?.strength).toBe("PARTIAL");
+    expect(reassessed?.supportingFactIds).toEqual(["fact_new"]);
   });
 
   it("accepts semantic reliability evidence for the fixture mission", () => {
