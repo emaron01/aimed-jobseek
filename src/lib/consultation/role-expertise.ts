@@ -36,6 +36,7 @@ import {
 } from "@/lib/consultation/ask-harper-answer";
 import type { CareerStage } from "@/lib/consultation/career-stage";
 import {
+  gapQuestionIsSupported,
   harperLibraryContentHash,
   loadApprovedAnswersForTargets,
   type ApprovedAnswerEvidence,
@@ -990,17 +991,78 @@ function unansweredRoleExpertiseQuestion(
   };
 }
 
-function answerForChoice(
+function answerEchoesQuestion(answerText: string, questionText: string): boolean {
+  const left = answerText.trim().toLowerCase();
+  const right = questionText.trim().toLowerCase();
+  if (!left || !right) return false;
+  if (left === right) return true;
+  return questionNearDuplicate(answerText, questionText);
+}
+
+function answerHasParts(answer: RoleExpertiseAnswerParts): boolean {
+  return [answer.challenge, answer.situation, answer.task, answer.action, answer.result].some(
+    (part) => (part ?? "").trim().length > 0,
+  );
+}
+
+/**
+ * The answers schema calls the question echo `text`. When the model puts the
+ * answer there, or returns one answer per question in order, keep that prose
+ * and store the question on `text` so the draft can be joined.
+ */
+function withProseFromTextField(
+  answer: RoleExpertiseAnswerParts,
+  questionText: string,
+): RoleExpertiseAnswerParts {
+  if (answerHasParts(answer)) {
+    return answerEchoesQuestion(answer.text, questionText)
+      ? answer
+      : { ...answer, text: questionText };
+  }
+  const prose = answer.text.trim();
+  if (!prose || prose.toLowerCase() === questionText.trim().toLowerCase()) {
+    return { ...answer, text: questionText };
+  }
+  return { ...answer, text: questionText, action: prose };
+}
+
+export function alignAnswersToChoices(
+  choices: readonly { text: string }[],
   answers: readonly RoleExpertiseAnswerParts[],
-  text: string,
-): RoleExpertiseAnswerParts | undefined {
-  const key = text.trim().toLowerCase();
-  return (
-    answers.find((answer) => answer.text.trim().toLowerCase() === key) ??
-    answers.find(
-      (answer) =>
-        questionNearDuplicate(answer.text, text) || answer.text.trim() === text.trim(),
-    )
+): Array<RoleExpertiseAnswerParts | undefined> {
+  const used = new Set<number>();
+  const aligned: Array<RoleExpertiseAnswerParts | undefined> = choices.map(
+    () => undefined,
+  );
+  choices.forEach((choice, index) => {
+    const found = answers.findIndex(
+      (answer, answerIndex) =>
+        !used.has(answerIndex) && answerEchoesQuestion(answer.text, choice.text),
+    );
+    if (found < 0) return;
+    used.add(found);
+    aligned[index] = withProseFromTextField(answers[found]!, choice.text);
+  });
+  if (answers.length !== choices.length) return aligned;
+  const unused = answers.map((_, index) => index).filter((index) => !used.has(index));
+  choices.forEach((choice, index) => {
+    if (aligned[index]) return;
+    const next = unused.shift();
+    if (next == null) return;
+    aligned[index] = withProseFromTextField(answers[next]!, choice.text);
+  });
+  return aligned;
+}
+
+/** Drafts for a best-practice answers receipt, including prose that did not echo the question. */
+export function bestPracticeDraftsForAnswers(
+  choices: readonly ValidatedRoleExpertiseQuestionChoice[],
+  answers: readonly RoleExpertiseAnswerParts[],
+  sourceTexts: readonly string[],
+): ValidatedRoleExpertiseQuestion[] {
+  const aligned = alignAnswersToChoices(choices, answers);
+  return choices.map((choice, index) =>
+    bestPracticeDraftForChoice(choice, aligned[index], sourceTexts),
   );
 }
 
@@ -1213,6 +1275,11 @@ async function generateRoleExpertiseAnswersStep(input: {
    * not pay again, and a failed check still keeps the closest real attempt.
    */
   answerMode?: "story" | "point-of-view";
+  /**
+   * Gap drafts pass the requirement text as well as the question so an approved
+   * answer is selected when it covers the requirement, not only the question wording.
+   */
+  evidenceTargets?: ReadonlyArray<{ key: string; text: string }>;
 }): Promise<
   | {
       ok: true;
@@ -1246,10 +1313,12 @@ async function generateRoleExpertiseAnswersStep(input: {
   const approvedAnswers = await loadApprovedAnswersForTargets({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
-    targets: input.choices.map((choice) => ({
-      key: choice.targetKey,
-      text: choice.text,
-    })),
+    targets:
+      input.evidenceTargets ??
+      input.choices.map((choice) => ({
+        key: choice.targetKey,
+        text: choice.text,
+      })),
   });
   const fingerprint = roleExpertiseAnswersFingerprint(
     choicePayload,
@@ -1320,10 +1389,11 @@ async function generateRoleExpertiseAnswersStep(input: {
             : (() => {
                 const issues: string[] = [];
                 const valid: ValidatedRoleExpertiseQuestion[] = [];
-                for (const choice of input.choices) {
+                const aligned = alignAnswersToChoices(input.choices, data.answers);
+                for (const [index, choice] of input.choices.entries()) {
                   const judged = bestPracticePassingDraft(
                     choice,
-                    answerForChoice(data.answers, choice.text),
+                    aligned[index],
                     sourceTexts,
                   );
                   if (judged.issue) issues.push(judged.issue);
@@ -1340,13 +1410,13 @@ async function generateRoleExpertiseAnswersStep(input: {
           if (lastAttempt) {
             if (!input.answerMode) {
               return {
-                answers: input.choices.map((choice) => {
+                answers: input.choices.map((choice, index) => {
                   const passed = checked.valid.find(
                     (question) => question.text === choice.text,
                   );
                   if (passed) return mappedAnswers([passed])[0]!;
                   const attempts = attemptSets
-                    .map((set) => answerForChoice(set, choice.text))
+                    .map((set) => alignAnswersToChoices(input.choices, set)[index])
                     .filter((answer): answer is RoleExpertiseAnswerParts =>
                       Boolean(answer),
                     );
@@ -1396,12 +1466,10 @@ async function generateRoleExpertiseAnswersStep(input: {
     });
 
     if (!input.answerMode) {
-      const questions = input.choices.map((choice) =>
-        bestPracticeDraftForChoice(
-          choice,
-          answerForChoice(gated.data.answers, choice.text),
-          sourceTexts,
-        ),
+      const questions = bestPracticeDraftsForAnswers(
+        input.choices,
+        gated.data.answers,
+        sourceTexts,
       );
       const withDraft = questions.filter((question) => question.content.trim()).length;
       return {
@@ -1806,4 +1874,119 @@ export async function hasUsableRoleExpertiseReceipt(input: {
   } catch {
     return false;
   }
+}
+
+/** One receipt per application, separate from the best-practice answers receipt. */
+export function gapDraftSubjectKey(campaignId: string): string {
+  return `${campaignId}:gap-drafts`;
+}
+
+/**
+ * After gap questions are stored, draft the ones an approved answer or profile
+ * fact can support. One answers-step call for that set. Unsupported questions
+ * are left without a draft and are not sent.
+ */
+export async function draftSupportedGapQuestions(input: {
+  organizationId: string;
+  campaignId: string;
+  sessionId: string;
+  questions: Array<{
+    text: string;
+    targetKey: string;
+    interviewTypeTag: InterviewTypeTag;
+    targetText: string;
+  }>;
+  profileItems: ReadonlyArray<{ kind?: string; text?: string }>;
+  approvedAnswers: ReadonlyArray<{ question: string; content: string }>;
+  careerStage: CareerStage;
+  jobSources: Record<string, unknown>;
+  usage?: AiCallUsageContext;
+}): Promise<{ drafted: number; called: boolean }> {
+  const pending: typeof input.questions = [];
+  for (const question of input.questions) {
+    if (
+      !gapQuestionIsSupported({
+        question: question.text,
+        targetText: question.targetText,
+        approvedAnswers: input.approvedAnswers,
+        profileItems: input.profileItems,
+      })
+    ) {
+      continue;
+    }
+    const turn = await prisma.consultationTurn.findFirst({
+      where: {
+        sessionId: input.sessionId,
+        speaker: "CONSULTANT",
+        body: question.text,
+        targetKey: question.targetKey,
+      },
+      select: {
+        id: true,
+        statements: {
+          where: { kind: "INTERVIEW_ANSWER" },
+          select: { id: true },
+        },
+      },
+    });
+    if (!turn || turn.statements.length > 0) continue;
+    pending.push(question);
+  }
+  if (pending.length === 0) return { drafted: 0, called: false };
+
+  const drafted = await generateRoleExpertiseAnswersStep({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    choices: pending.map((question) => ({
+      text: question.text,
+      targetKey: question.targetKey,
+      interviewTypeTag: question.interviewTypeTag,
+    })),
+    careerStage: input.careerStage,
+    jobSources: input.jobSources,
+    profileItems: [...input.profileItems],
+    usage: input.usage,
+    subjectKey: gapDraftSubjectKey(input.campaignId),
+    evidenceTargets: pending.flatMap((question) => [
+      { key: question.targetKey, text: question.targetText },
+      { key: `${question.targetKey}:asked`, text: question.text },
+    ]),
+  });
+  if (!drafted.ok) return { drafted: 0, called: true };
+
+  let stored = 0;
+  for (const question of drafted.questions) {
+    if (!question.content.trim()) continue;
+    const turn = await prisma.consultationTurn.findFirst({
+      where: {
+        sessionId: input.sessionId,
+        speaker: "CONSULTANT",
+        body: question.text,
+        targetKey: question.targetKey,
+      },
+      select: {
+        id: true,
+        statements: {
+          where: { kind: "INTERVIEW_ANSWER" },
+          select: { id: true },
+        },
+      },
+    });
+    if (!turn || turn.statements.length > 0) continue;
+    await prisma.consultationStatement.create({
+      data: {
+        organizationId: input.organizationId,
+        sessionId: input.sessionId,
+        turnId: turn.id,
+        kind: "INTERVIEW_ANSWER",
+        status: "DRAFT",
+        content: question.content,
+        strengtheningNote: null,
+        groundingJson: question.grounding as Prisma.InputJsonValue,
+        promptVersion: ROLE_EXPERTISE_PROMPT_VERSION,
+      },
+    });
+    stored += 1;
+  }
+  return { drafted: stored, called: true };
 }

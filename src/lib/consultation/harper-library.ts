@@ -7,7 +7,17 @@ import {
 } from "@/lib/consultation/contract";
 import { interviewerQuestionMatchesGeneral } from "@/lib/consultation/general-question-match";
 import { interviewTypeTagFromQuestionContext } from "@/lib/consultation/qa-view";
+import { looksLikeCareerWalkThrough } from "@/lib/consultation/question-detection";
 import { prisma } from "@/lib/prisma-client";
+
+/**
+ * Added only for the approved-answer selector when this application asks a
+ * career walk-through. It is not an assessment target.
+ */
+export const CHRONOLOGY_LIBRARY_TARGET = {
+  key: "chronology",
+  text: "Walk me through your recent roles and why you moved on.",
+} as const;
 
 /** Approved wording added to the role-expertise answers prompt and Harper's polish prompt. */
 export const HARPER_LIBRARY_TAILOR_INSTRUCTION =
@@ -107,6 +117,144 @@ function newerApprovedAnswer(
   return right.statementId.localeCompare(left.statementId);
 }
 
+const SUBSTANCE_STOPWORDS = new Set([
+  "with",
+  "from",
+  "that",
+  "this",
+  "your",
+  "have",
+  "been",
+  "into",
+  "over",
+  "than",
+  "them",
+  "they",
+  "their",
+  "about",
+  "using",
+  "through",
+  "would",
+  "could",
+  "should",
+  "there",
+  "after",
+  "before",
+  "during",
+  "while",
+  "also",
+  "just",
+  "only",
+  "more",
+  "most",
+  "some",
+  "such",
+  "then",
+  "once",
+  "each",
+  "other",
+  "under",
+  "what",
+  "when",
+  "where",
+  "which",
+  "tell",
+  "describe",
+]);
+
+/** Selector-only stem. Does not change requirement de-duplication. */
+function substanceStem(token: string): string {
+  let value = token;
+  if (value.length > 6 && value.endsWith("ing")) value = value.slice(0, -3);
+  else if (value.length > 6 && value.endsWith("ment")) value = value.slice(0, -4);
+  else if (value.length > 5 && value.endsWith("ed")) value = value.slice(0, -2);
+  if (value.length > 4 && value.endsWith("s")) value = value.slice(0, -1);
+  return value;
+}
+
+function substanceTokens(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .map(substanceStem)
+      .filter((token) => token.length >= 4 && !SUBSTANCE_STOPWORDS.has(token)),
+  );
+}
+
+/**
+ * The target's own words appear in the evidence, even when the evidence is a
+ * longer answer or uses different word forms. A majority of the target is
+ * required so a shared word such as "sales" does not match an unrelated answer.
+ */
+function targetSubstanceCovered(evidence: string, target: string): boolean {
+  const targetTokens = substanceTokens(target);
+  const evidenceTokens = substanceTokens(evidence);
+  if (targetTokens.size < 2) return false;
+  let hits = 0;
+  for (const token of targetTokens) {
+    if (evidenceTokens.has(token)) hits += 1;
+  }
+  return hits >= 2 && hits * 2 > targetTokens.size;
+}
+
+/** Profile fact or other single text covers a target's substance. */
+export function evidenceCoversTarget(evidence: string, target: string): boolean {
+  const left = evidence.trim();
+  const right = target.trim();
+  if (!left || !right) return false;
+  if (sameRequirementMeaning(left, right)) return true;
+  if (looksLikeCareerWalkThrough(left) && looksLikeCareerWalkThrough(right)) {
+    return true;
+  }
+  return targetSubstanceCovered(left, right);
+}
+
+/**
+ * An approved answer covers a target when the question or the answer already
+ * means the same thing, or when the question and answer together contain the
+ * target's substance under different wording.
+ */
+export function approvedAnswerCoversTarget(
+  answer: { question: string; content: string },
+  target: string,
+): boolean {
+  const text = target.trim();
+  if (!text) return false;
+  if (sameRequirementMeaning(answer.question, text)) return true;
+  if (sameRequirementMeaning(answer.content, text)) return true;
+  if (
+    (looksLikeCareerWalkThrough(answer.question) ||
+      looksLikeCareerWalkThrough(answer.content)) &&
+    looksLikeCareerWalkThrough(text)
+  ) {
+    return true;
+  }
+  return targetSubstanceCovered(`${answer.question}\n${answer.content}`, text);
+}
+
+/** A gap question can be drafted when an approved answer or a profile fact covers it. */
+export function gapQuestionIsSupported(input: {
+  question: string;
+  targetText: string;
+  approvedAnswers: ReadonlyArray<{ question: string; content: string }>;
+  profileItems: ReadonlyArray<{ kind?: string; text?: string }>;
+}): boolean {
+  const surfaces = [input.targetText, input.question]
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const facts = input.profileItems.filter(
+    (item) => item.kind === "FACT" && Boolean(item.text?.trim()),
+  );
+  return surfaces.some(
+    (surface) =>
+      input.approvedAnswers.some((answer) =>
+        approvedAnswerCoversTarget(answer, surface),
+      ) || facts.some((fact) => evidenceCoversTarget(fact.text ?? "", surface)),
+  );
+}
+
 /**
  * At most one approved answer per current target. Newest approvedAt wins when
  * two answers match the same target. This application's own statements, empty
@@ -131,8 +279,7 @@ export function selectApprovedAnswersForTargets(input: {
       .filter(
         (answer) =>
           !used.has(answer.statementId) &&
-          (sameRequirementMeaning(answer.question, text) ||
-            sameRequirementMeaning(answer.content, text)),
+          approvedAnswerCoversTarget(answer, text),
       )
       .sort(newerApprovedAnswer)[0];
     if (!winner) continue;

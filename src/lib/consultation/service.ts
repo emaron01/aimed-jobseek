@@ -24,12 +24,19 @@ import {
   type EvidenceTarget,
 } from "@/lib/consultation/assess";
 import { deriveCareerStage, type CareerStage } from "@/lib/consultation/career-stage";
-import { loadApprovedAnswersForTargets } from "@/lib/consultation/harper-library";
-import { careerWalkThroughAlreadyAsked } from "@/lib/consultation/question-detection";
+import {
+  CHRONOLOGY_LIBRARY_TARGET,
+  loadApprovedAnswersForTargets,
+} from "@/lib/consultation/harper-library";
+import {
+  careerWalkThroughAlreadyAsked,
+  looksLikeCareerWalkThrough,
+} from "@/lib/consultation/question-detection";
 import { deriveRecentRoles } from "@/lib/consultation/recent-roles";
 import {
   countAllCountedCoachingQuestions,
   countNonRoleExpertiseQuestions,
+  draftSupportedGapQuestions,
   generateRoleExpertiseWithModel,
   hasUsableRoleExpertiseReceipt,
   roleExpertiseFillRange,
@@ -1453,11 +1460,21 @@ async function planAndStoreRound(input: {
       where: { sessionId: input.sessionId },
     })
   ).map(storedAssessment);
+  const libraryTargets = chronologyRequested
+    ? [...input.targets, CHRONOLOGY_LIBRARY_TARGET]
+    : input.targets;
   const approvedAnswers = await loadApprovedAnswersForTargets({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
-    targets: input.targets,
+    targets: libraryTargets,
   });
+  const chronologyCoveredByApprovedAnswer = approvedAnswers.some(
+    (answer) =>
+      looksLikeCareerWalkThrough(answer.question) ||
+      looksLikeCareerWalkThrough(answer.content),
+  );
+  const chronologyAsked =
+    askedKeys.has("chronology") || chronologyCoveredByApprovedAnswer;
   const coachPayload = {
     targets: input.targets,
     profileItems,
@@ -1511,7 +1528,7 @@ async function planAndStoreRound(input: {
       askedKeys,
       skippedKeys,
       includeChronology: chronologyRequested,
-      chronologyAsked: askedKeys.has("chronology"),
+      chronologyAsked,
       askedQuestions,
       focusTargetKey: input.focusTargetKey ?? null,
       profileItems,
@@ -1603,6 +1620,42 @@ async function planAndStoreRound(input: {
       },
     });
   }
+  try {
+    await draftSupportedGapQuestions({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      sessionId: input.sessionId,
+      questions: voicedQuestions.map((question) => ({
+        text: question.text,
+        targetKey: question.targetKey,
+        interviewTypeTag: question.interviewTypeTag,
+        targetText:
+          input.targets.find((target) => target.key === question.targetKey)
+            ?.text ?? question.text,
+      })),
+      profileItems,
+      approvedAnswers,
+      careerStage,
+      jobSources: {
+        title: input.requirement.title,
+        employer: input.requirement.companyName ?? null,
+        seniority: input.requirement.seniority,
+      },
+      usage: consultationUsage(
+        input.organizationId,
+        input.campaignId,
+        "CONSULTATION_REPLY",
+        "role_expertise_answers",
+      ),
+    });
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "gap_draft_failed",
+        message: error instanceof Error ? error.message : "Gap drafts failed.",
+      }),
+    );
+  }
   if (input.additiveReassess) {
     const approvedAfter = await prisma.consultationStatement.count({
       where: { sessionId: input.sessionId, status: "APPROVED" },
@@ -1686,7 +1739,7 @@ async function planAndStoreRound(input: {
       askedKeys,
       skippedKeys,
       includeChronology: chronologyRequested,
-      chronologyAsked: askedKeys.has("chronology"),
+      chronologyAsked,
       askedQuestions,
       focusTargetKey: input.focusTargetKey ?? null,
       profileItems,
