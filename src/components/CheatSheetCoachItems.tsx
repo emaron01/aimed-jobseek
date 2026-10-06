@@ -4,9 +4,14 @@ import { useState } from "react";
 import {
   answerCheatSheetCoachAction,
   approveCheatSheetSampleAction,
+  regenerateCheatSheetSampleAction,
   saveCheatSheetSampleDraftAction,
 } from "@/app/actions/application-summary";
-import { ApplicationActionForm } from "@/components/ApplicationActionForm";
+import {
+  ApplicationActionForm,
+  keepHarperQuestionInPlace,
+} from "@/components/ApplicationActionForm";
+import { AppButton } from "@/components/AppButton";
 import { QuestionList, ResultBody } from "@/components/ConsultationThread";
 import type { CheatSheetCoachItem } from "@/lib/application-summary/contract";
 import { sharedGeneralForCoachItem } from "@/lib/consultation/general-question-match";
@@ -17,7 +22,95 @@ import {
 import type { ConsultationQaItem, QaStatement } from "@/lib/consultation/qa-view";
 import {
   consultationConversationCopy,
+  polishCopy,
 } from "@/lib/product-config";
+
+const sampleFieldClass =
+  "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
+
+function SampleDraftActions({
+  campaignId,
+  itemId,
+  content,
+}: {
+  campaignId: string;
+  itemId: string;
+  content: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(content);
+  return (
+    <>
+      {editing ? (
+        <textarea
+          rows={4}
+          required
+          value={value}
+          aria-label={consultationConversationCopy.editAnswer}
+          data-testid={`cheat-sheet-sample-editor-${itemId}`}
+          className={sampleFieldClass}
+          onChange={(event) => setValue(event.target.value)}
+        />
+      ) : null}
+      <div
+        className="mt-3 flex flex-nowrap items-center gap-2"
+        data-testid={`cheat-sheet-sample-actions-${itemId}`}
+      >
+        <ApplicationActionForm
+          action={approveCheatSheetSampleAction}
+          submitLabel={consultationConversationCopy.approve}
+          testId={`cheat-sheet-sample-approve-${itemId}`}
+          variant="primary"
+          compact
+          formClassName="inline-flex"
+        >
+          <input type="hidden" name="campaignId" value={campaignId} />
+          <input type="hidden" name="itemId" value={itemId} />
+        </ApplicationActionForm>
+        <ApplicationActionForm
+          action={regenerateCheatSheetSampleAction}
+          submitLabel={polishCopy.regenerate}
+          testId={`cheat-sheet-sample-regenerate-${itemId}`}
+          variant="secondary"
+          compact
+          formClassName="inline-flex"
+        >
+          <input type="hidden" name="campaignId" value={campaignId} />
+          <input type="hidden" name="itemId" value={itemId} />
+          <input type="hidden" name="content" value={value} />
+        </ApplicationActionForm>
+        {editing ? (
+          <ApplicationActionForm
+            action={saveCheatSheetSampleDraftAction}
+            submitLabel={consultationConversationCopy.saveAnswer}
+            testId={`cheat-sheet-sample-save-${itemId}`}
+            variant="secondary"
+            compact
+            formClassName="inline-flex"
+            onSuccess={() => setEditing(false)}
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+            <input type="hidden" name="itemId" value={itemId} />
+            <input type="hidden" name="content" value={value} />
+          </ApplicationActionForm>
+        ) : (
+          <AppButton
+            type="button"
+            variant="secondary"
+            className="!px-2.5 !py-1.5 !text-xs"
+            data-testid={`cheat-sheet-sample-edit-${itemId}`}
+            onClick={(event) => {
+              keepHarperQuestionInPlace(event.currentTarget);
+              setEditing(true);
+            }}
+          >
+            {consultationConversationCopy.editAnswer}
+          </AppButton>
+        )}
+      </div>
+    </>
+  );
+}
 
 export function CheatSheetCoachItems({
   campaignId,
@@ -139,44 +232,11 @@ export function CheatSheetCoachItems({
                   <div data-testid="cheat-sheet-sample-draft">
                     <ResultBody statement={sampleStatement} />
                     {allowCoachForm && item.id ? (
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <ApplicationActionForm
-                          action={approveCheatSheetSampleAction}
-                          submitLabel={consultationConversationCopy.approve}
-                          testId={`cheat-sheet-sample-approve-${item.id}`}
-                          variant="primary"
-                          compact
-                        >
-                          <input type="hidden" name="campaignId" value={campaignId} />
-                          <input type="hidden" name="itemId" value={item.id} />
-                        </ApplicationActionForm>
-                        <details data-testid={`cheat-sheet-sample-edit-${item.id}`}>
-                          <summary className="cursor-pointer text-sm font-medium text-ink">
-                            {consultationConversationCopy.editAnswer}
-                          </summary>
-                          <ApplicationActionForm
-                            action={saveCheatSheetSampleDraftAction}
-                            submitLabel={consultationConversationCopy.saveAnswer}
-                            testId={`cheat-sheet-sample-save-${item.id}`}
-                            compact
-                          >
-                            <input type="hidden" name="campaignId" value={campaignId} />
-                            <input type="hidden" name="itemId" value={item.id} />
-                            <label className="mt-2 block text-sm">
-                              <span className="sr-only">
-                                {consultationConversationCopy.editAnswer}
-                              </span>
-                              <textarea
-                                name="content"
-                                required
-                                rows={4}
-                                defaultValue={answer}
-                                className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2"
-                              />
-                            </label>
-                          </ApplicationActionForm>
-                        </details>
-                      </div>
+                      <SampleDraftActions
+                        campaignId={campaignId}
+                        itemId={item.id}
+                        content={answer}
+                      />
                     ) : null}
                   </div>
                 ) : null}
@@ -185,7 +245,7 @@ export function CheatSheetCoachItems({
                     {harperQuestion}
                   </p>
                 ) : null}
-                {allowCoachForm && item.id ? (
+                {allowCoachForm && item.id && !sampleStatement ? (
                   <ApplicationActionForm
                     action={answerCheatSheetCoachAction}
                     submitLabel={consultationConversationCopy.threadReply}

@@ -593,6 +593,13 @@ function QuestionCard({
     canEdit &&
     !item.ignored &&
     (consultationQuestionAcceptsReply(item) || Boolean(item.seekerAnswers.length));
+  const answerShowing = Boolean(
+    item.talkingPoint ||
+      item.resumeBullet ||
+      item.pendingDraftTalkingPoint ||
+      item.pendingDraftResumeBullet,
+  );
+  const showReplyBox = canAnswer && !answerShowing;
   const canSkip = canEdit && actionsEnabled && !item.ignored && !approved;
   const canIgnore = canSkip;
   const replyKey = consultationReplyTargetKey(item.questionTurnId);
@@ -800,20 +807,21 @@ function QuestionCard({
             {consultationConversationCopy.needsMoreDetailToShape}
           </p>
         ) : null}
-        {showWorking ? null : canAnswer ? (
+        {showWorking ? null : showReplyBox ? (
           <QuestionReplyForm
             campaignId={campaignId}
             item={item}
             actionsEnabled={actionsEnabled}
-            showSkip={canSkip}
-            showIgnore={canIgnore}
+            showSkip={false}
+            showIgnore={false}
             onSubmitStart={onSubmitStart}
             repliesToggle={repliesToggle}
           />
-        ) : canSkip || canIgnore || repliesToggle ? (
+        ) : null}
+        {showWorking ? null : canSkip || canIgnore || (!showReplyBox && repliesToggle) ? (
           <div
             className={actionRowClass}
-            data-testid="consultation-question-actions"
+            data-testid="consultation-secondary-actions"
           >
             {canSkip ? (
               <ApplicationActionForm
@@ -843,7 +851,7 @@ function QuestionCard({
                 <input type="hidden" name="targetKey" value={replyKey} />
               </ApplicationActionForm>
             ) : null}
-            {repliesToggle}
+            {!showReplyBox ? repliesToggle : null}
           </div>
         ) : null}
         {!item.ignored && !showWorking ? (

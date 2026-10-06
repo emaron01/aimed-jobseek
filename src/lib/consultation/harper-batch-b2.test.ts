@@ -182,7 +182,7 @@ describe("Harper Batch B2 — Where you stand inline Q&A", () => {
     expect(section).toContain("entries={standingEntries}");
   });
 
-  it("keeps Batch A inline behaviors: Share/Ignore/Ignored, Expand evidence, Show replies, Edit-after-click", () => {
+  it("keeps Batch A inline behaviors: Share/Ignore/Ignored, hidden evidence, Show replies, Edit-after-click", () => {
     const standing = readFileSync("src/components/ConsultationStanding.tsx", "utf8");
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
 
@@ -190,9 +190,8 @@ describe("Harper Batch B2 — Where you stand inline Q&A", () => {
     expect(standing).toContain("ignore-gap-");
     expect(standing).toContain("reopenIgnored");
     expect(standing).not.toContain("answerGap");
-    expect(standing).toMatch(
-      /<a[\s\S]*data-testid=\{`toggle-evidence-\$\{entry\.id\}`\}[\s\S]*expandEvidence/,
-    );
+    expect(standing).not.toContain("toggle-evidence-");
+    expect(standing).not.toContain("expandEvidence");
     expect(thread).toMatch(
       /<a[\s\S]*data-testid="consultation-toggle-replies"[\s\S]*showYourReplies/,
     );

@@ -33,6 +33,7 @@ import { isApplicationLearningsSourceId } from "@/lib/consultation/learnings";
 import {
   approveConsultationStatement,
   recordConsultationReply,
+  regenerateConsultationStatement,
 } from "@/lib/consultation/service";
 import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
 import {
@@ -1379,6 +1380,34 @@ export async function approveCheatSheetSampleAnswer(input: {
     organizationId: input.organizationId,
     statementId,
     content: prepared.sampleAnswer,
+  });
+}
+
+/**
+ * Stores the sample as a draft, then uses Harper's existing statement
+ * regenerate. The click is what asks for a new draft. Page render does not.
+ */
+export async function regenerateCheatSheetSampleAnswer(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  itemId: string;
+  content: string;
+}): Promise<void> {
+  await saveCheatSheetSampleDraft(input);
+  const prepared = await ensureCheatSheetConsultantTurn(input);
+  const statement = await prisma.consultationStatement.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      turnId: prepared.questionTurnId,
+      kind: "INTERVIEW_ANSWER",
+    },
+    select: { id: true },
+  });
+  if (!statement) throw new TenantError("That polished statement was not found.");
+  await regenerateConsultationStatement({
+    organizationId: input.organizationId,
+    statementId: statement.id,
   });
 }
 

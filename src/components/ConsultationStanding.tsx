@@ -233,8 +233,6 @@ function StandingRequirementList({
   entries,
   pendingTarget,
   setPendingTarget,
-  openIds,
-  toggle,
   collapseWhenApproved,
   approvedExpandedIds,
   onApprovedExpandedChange,
@@ -248,8 +246,6 @@ function StandingRequirementList({
   entries: StandingListEntry[];
   pendingTarget: string | null;
   setPendingTarget: (key: string | null) => void;
-  openIds: Set<string>;
-  toggle: (id: string) => void;
   collapseWhenApproved: boolean;
   approvedExpandedIds?: ReadonlySet<string>;
   onApprovedExpandedChange?: (questionTurnId: string, expanded: boolean) => void;
@@ -257,7 +253,6 @@ function StandingRequirementList({
   return (
     <ul className="space-y-4" data-testid="consultation-standing-list">
       {entries.map((entry) => {
-        const open = openIds.has(entry.id);
         const labelMatchesQuestion = entry.questions.some(
           (question) => question.question.trim() === entry.label.trim(),
         );
@@ -265,7 +260,7 @@ function StandingRequirementList({
         return (
           <li
             key={entry.id}
-            className="min-w-0 space-y-2 overflow-hidden text-sm text-ink"
+            className="min-w-0 space-y-2 overflow-hidden rounded-md border border-edge bg-canvas p-4 text-sm text-ink"
             data-testid="consultation-standing-entry"
             data-standing-target={entry.targetKey}
             data-strength={entry.strength}
@@ -285,37 +280,6 @@ function StandingRequirementList({
             ) : null}
             {entry.experience ? (
               <p className="break-words text-xs text-subtle">{entry.experience}</p>
-            ) : null}
-            {entry.facts.length > 0 ? (
-              <div>
-                <a
-                  href={`#harper-evidence-${entry.id}`}
-                  className={textLinkClass}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    toggle(entry.id);
-                  }}
-                  data-testid={`toggle-evidence-${entry.id}`}
-                >
-                  {open
-                    ? consultationConversationCopy.collapseEvidence
-                    : consultationConversationCopy.expandEvidence}
-                </a>
-                {open ? (
-                  <ul className="mt-2 space-y-1">
-                    {entry.facts.map((fact) => (
-                      <li key={fact.id} className="min-w-0 overflow-hidden">
-                        <p className="break-words font-medium text-ink">{fact.label}</p>
-                        {fact.detail ? (
-                          <p className="break-words whitespace-pre-wrap text-muted">
-                            {fact.detail}
-                          </p>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
             ) : null}
             {entry.questions.length > 0 ? (
               <div className="mt-3 space-y-3">
@@ -347,6 +311,7 @@ function StandingRequirementList({
               />
             ) : null}
             {entry.showShareForm &&
+            entry.questions.length === 0 &&
             canEdit &&
             acceptingReplies &&
             !ignoredQuestion ? (
@@ -418,7 +383,6 @@ export function ConsultationStanding({
         HARPER_SECTION_IDS.bestPractice,
       ]),
   );
-  const [openIds, setOpenIds] = useState<Set<string>>(new Set());
   const [expandedApproved, setExpandedApproved] = useState<Set<string>>(
     () => new Set(),
   );
@@ -469,23 +433,6 @@ export function ConsultationStanding({
   const showReply =
     canEdit && acceptingReplies && sessionStatus !== "SKIPPED";
   const repliesEnabled = showReply && !jobsActive;
-  const expandable = requirementEntries.filter((item) => item.facts.length > 0);
-  const allOpen =
-    expandable.length > 0 &&
-    expandable.every((item) => openIds.has(item.id));
-
-  function toggle(id: string) {
-    setOpenIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function setAll(open: boolean) {
-    setOpenIds(open ? new Set(expandable.map((item) => item.id)) : new Set());
-  }
 
   function toggleSection(id: HarperPageSectionId) {
     setOpenSections((current) => {
@@ -579,23 +526,6 @@ export function ConsultationStanding({
             </p>
           ) : null}
         </div>
-        {expandable.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            <a
-              href="#harper-toggle-all-evidence"
-              className={textLinkClass}
-              data-testid="consultation-toggle-all-evidence"
-              onClick={(event) => {
-                event.preventDefault();
-                setAll(!allOpen);
-              }}
-            >
-              {allOpen
-                ? consultationConversationCopy.collapseAllEvidence
-                : consultationConversationCopy.expandAllEvidence}
-            </a>
-          </div>
-        ) : null}
         <div id={HARPER_GENERAL_ANCHOR} data-testid="harper-standing-topics">
           <StandingRequirementList
             campaignId={campaignId}
@@ -607,8 +537,6 @@ export function ConsultationStanding({
             entries={[...requirementEntries, ...topicEntries]}
             pendingTarget={pendingTarget}
             setPendingTarget={setPendingTarget}
-            openIds={openIds}
-            toggle={toggle}
             collapseWhenApproved
             approvedExpandedIds={expandedApproved}
             onApprovedExpandedChange={(id, expanded) => {

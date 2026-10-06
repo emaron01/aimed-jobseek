@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AppPendingIndicator } from "@/components/AppButton";
+import { keepHarperQuestionInPlace } from "@/components/ApplicationActionForm";
 import { useWorkspaceJobs } from "@/components/workspace-jobs-context";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
 import { workspaceJobCopy } from "@/lib/product-config";
@@ -46,6 +47,10 @@ export function HarperLiveStatus({
 
   useEffect(() => {
     if (presentation === "clear" && consultationJobRunning(serverJobs)) {
+      const active = document.activeElement;
+      const card =
+        active instanceof Element ? active.closest("[data-harper-question]") : null;
+      keepHarperQuestionInPlace(card);
       router.refresh();
     }
   }, [presentation, serverJobs, router]);

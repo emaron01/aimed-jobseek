@@ -163,8 +163,18 @@ export type StandingInlinePartition = {
   unmapped: ConsultationQaItem[];
 };
 
-function isOpenQuestion(item: ConsultationQaItem): boolean {
-  return consultationQuestionAcceptsReply(item);
+/** A card with a visible draft or approved answer is no longer an open question. */
+function questionSortGroup(item: ConsultationQaItem): "open" | "draft" | "approved" {
+  const statements = [
+    item.talkingPoint,
+    item.resumeBullet,
+    item.pendingDraftTalkingPoint,
+    item.pendingDraftResumeBullet,
+  ].filter((statement): statement is NonNullable<typeof statement> => Boolean(statement));
+  if (statements.length === 0) return "open";
+  if (statements.some((statement) => statement.status === "DRAFT")) return "draft";
+  if (statements.some((statement) => statement.status === "APPROVED")) return "approved";
+  return "draft";
 }
 
 const WHO_TAG_ORDER = [
@@ -195,19 +205,27 @@ export function sortQuestionsByWhoTag(
 }
 
 /**
- * Open questions first, then answered. Within each group, WHO tag order
- * (screening → chronological_walk_through → focused_competency → reference_check_prep).
+ * Cards with no draft first, then drafts, then approved. Within each group,
+ * WHO tag order (screening → chronological_walk_through → focused_competency →
+ * reference_check_prep).
  */
 export function sortQuestionsOpenFirst(
   questions: ConsultationQaItem[],
 ): ConsultationQaItem[] {
   const open: ConsultationQaItem[] = [];
-  const answered: ConsultationQaItem[] = [];
+  const drafts: ConsultationQaItem[] = [];
+  const approved: ConsultationQaItem[] = [];
   for (const item of questions) {
-    if (isOpenQuestion(item)) open.push(item);
-    else answered.push(item);
+    const group = questionSortGroup(item);
+    if (group === "open") open.push(item);
+    else if (group === "draft") drafts.push(item);
+    else approved.push(item);
   }
-  return [...sortQuestionsByWhoTag(open), ...sortQuestionsByWhoTag(answered)];
+  return [
+    ...sortQuestionsByWhoTag(open),
+    ...sortQuestionsByWhoTag(drafts),
+    ...sortQuestionsByWhoTag(approved),
+  ];
 }
 
 /**
