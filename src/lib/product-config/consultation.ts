@@ -131,6 +131,7 @@ export const consultationConversationCopy = Object.freeze({
   modelUnavailable: `${consultationConfig.displayName} could not start this coaching. Retry when you are ready.`,
   retry: `Retry ${consultationConfig.displayName}`,
   start: `Start with ${consultationConfig.displayName}`,
+  prepareCoaching: "Have Harper Prepare Coaching Against the Job Requirements",
   starting: `${consultationConfig.displayName} is reading your ${vocab.product.singular} and the job…`,
   typing: `${consultationConfig.displayName} is thinking…`,
   thinking: `${consultationConfig.displayName} is thinking…`,

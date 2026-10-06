@@ -113,11 +113,19 @@ export function latestCoachingNoteForTarget(
 }
 
 export function isPrimaryHarperQuestion(turn: QaTurn): boolean {
-  return (
-    turn.speaker === "CONSULTANT" &&
-    !turn.followUp &&
-    !isClosingNoteTurn(turn) &&
-    !isCoachingNoteTurn(turn)
+  return harperHasAskedQuestion([turn]);
+}
+
+/** Harper has asked at least one question (not a closing or coaching note). */
+export function harperHasAskedQuestion(
+  turns: ReadonlyArray<Pick<QaTurn, "speaker" | "followUp" | "intent">>,
+): boolean {
+  return turns.some(
+    (turn) =>
+      turn.speaker === "CONSULTANT" &&
+      !turn.followUp &&
+      !isClosingNoteTurn(turn) &&
+      !isCoachingNoteTurn(turn),
   );
 }
 

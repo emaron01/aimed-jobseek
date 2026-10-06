@@ -21,6 +21,7 @@ import {
   emptyApplicationStepFacts,
 } from "@/lib/application/step-progress";
 import { applicationNextStepState } from "@/lib/application/next-step";
+import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
 import { loadOrderedAnsweredHarperQuestions } from "@/lib/consultation/harper-display-qa";
 import { NORMAL_JOB_MODEL, NORMAL_JOB_POSTING } from "@/lib/job-requirement/fixtures";
 import { normalizeParsedJobRequirement } from "@/lib/job-requirement/normalize";
@@ -297,6 +298,9 @@ describe("Ask Harper, sidebar order, and learned notes", () => {
     });
     await paint(root, harper);
     bannerAbove(host, host.querySelector("h2"));
+    expect(host.querySelector<HTMLButtonElement>("[data-testid=ask-harper-open]")?.disabled).toBe(
+      true,
+    );
     expect(host.querySelector("[data-testid=ask-harper-question]")).toBeNull();
 
     const notes = await InterviewStagesSection({
@@ -313,14 +317,49 @@ describe("Ask Harper, sidebar order, and learned notes", () => {
         node.textContent?.includes("Interview Notes"),
       ) ?? null,
     );
+    expect(host.querySelector<HTMLButtonElement>("[data-testid=ask-harper-open]")?.disabled).toBe(
+      true,
+    );
 
     await paint(root, summary);
     bannerAbove(host, host.querySelector("h1"));
+    expect(host.querySelector<HTMLButtonElement>("[data-testid=ask-harper-open]")?.disabled).toBe(
+      true,
+    );
     expect(replyGenerate).not.toHaveBeenCalled();
     expect(paidSpy).not.toHaveBeenCalled();
     expect(enqueue).not.toHaveBeenCalled();
 
-    await paint(root, harper);
+    const product = await prisma.product.findFirstOrThrow({ where: { organizationId } });
+    await prisma.consultationSession.create({
+      data: {
+        organizationId,
+        campaignId,
+        productId: product.id,
+        status: "IN_PROGRESS",
+        promptVersion: CONSULTATION_PROMPT_VERSION,
+        turns: {
+          create: {
+            organizationId,
+            sequence: 1,
+            speaker: "CONSULTANT",
+            body: "How do you run a weekly forecast review?",
+            targetKey: "required:0",
+            followUp: false,
+          },
+        },
+      },
+    });
+    const harperReady = await ConsultationSection({
+      campaignId,
+      organizationId,
+      canEdit: true,
+      jobs: [],
+    });
+    await paint(root, harperReady);
+    expect(host.querySelector<HTMLButtonElement>("[data-testid=ask-harper-open]")?.disabled).toBe(
+      false,
+    );
     await act(async () => {
       host.querySelector<HTMLButtonElement>("[data-testid=ask-harper-open]")?.click();
     });

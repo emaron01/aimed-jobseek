@@ -26,7 +26,10 @@ import {
 } from "@/components/CheatSheetPeopleFilter";
 import { AskHarperBox } from "@/components/AskHarperBox";
 import { PageHeader, TenantMissing } from "@/components/ui";
-import { loadAskHarperDrafts } from "@/lib/consultation/ask-harper";
+import {
+  applicationHasHarperQuestion,
+  loadAskHarperDrafts,
+} from "@/lib/consultation/ask-harper";
 import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-status";
 import { loadCheatSheetCoachQaByContact } from "@/lib/application-summary/coach-qa";
 import { statedListItems } from "@/lib/application-summary/display";
@@ -163,10 +166,16 @@ export default async function ApplicationSummaryPage({
         personNameByContactId.get(row.contactId) ?? interviewConfig.labels.interviewer,
     ),
   }));
-  const askHarperDrafts = await loadAskHarperDrafts({
-    organizationId: organization.id,
-    campaignId: id,
-  });
+  const [askHarperDrafts, hasHarperQuestion] = await Promise.all([
+    loadAskHarperDrafts({
+      organizationId: organization.id,
+      campaignId: id,
+    }),
+    applicationHasHarperQuestion({
+      organizationId: organization.id,
+      campaignId: id,
+    }),
+  ]);
   const applicationInterviewNotes = compileApplicationInterviewNotes({
     people: [...view.notesByContactId.entries()].map(([contactId, notes]) => ({
       contactId,
@@ -193,6 +202,7 @@ export default async function ApplicationSummaryPage({
         campaignId={id}
         canEdit={canGenerate}
         drafts={askHarperDrafts}
+        hasQuestion={hasHarperQuestion}
       />
       <PageHeader
         title={applicationSummaryConfig.title}

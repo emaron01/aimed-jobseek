@@ -13,6 +13,7 @@ import { HarperLiveStatus } from "@/components/HarperLiveStatus";
 import {
   buildConsultationQaView,
   consultationHasUnansweredQuestions,
+  harperHasAskedQuestion,
   latestClosingNote,
 } from "@/lib/consultation/qa-view";
 import {
@@ -433,10 +434,21 @@ export async function ConsultationSection({
         className={`space-y-4 rounded-lg border border-edge bg-surface p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
         data-testid="consultation"
       >
+        {canEdit && !session && !consultationBusy ? (
+          <ApplicationActionForm
+            action={startConsultationAction}
+            submitLabel={consultationConversationCopy.prepareCoaching}
+            testId="start-consultation"
+            variant="success"
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+          </ApplicationActionForm>
+        ) : null}
         <AskHarperBox
           campaignId={campaignId}
           canEdit={canEdit}
           drafts={askHarperDraftQuestions(qaView.questions)}
+          hasQuestion={harperHasAskedQuestion(threadTurns)}
         />
         <h2 className="text-base font-semibold text-ink">
           {consultationConfig.displayName}
@@ -509,13 +521,6 @@ export async function ConsultationSection({
         ) : null}
         {canEdit && !session && !consultationBusy ? (
           <div className="mt-3 flex flex-wrap gap-3">
-            <ApplicationActionForm
-              action={startConsultationAction}
-              submitLabel={consultationConversationCopy.start}
-              testId="start-consultation"
-            >
-              <input type="hidden" name="campaignId" value={campaignId} />
-            </ApplicationActionForm>
             <ApplicationActionForm
               action={skipConsultationAction}
               submitLabel="Skip consultation"

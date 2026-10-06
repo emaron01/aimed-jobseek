@@ -15,12 +15,14 @@ export function AskHarperBox({
   campaignId,
   canEdit,
   drafts,
+  hasQuestion,
 }: {
   campaignId: string;
   canEdit: boolean;
   drafts: ConsultationQaItem[];
+  hasQuestion: boolean;
 }) {
-  const [open, setOpen] = useState(drafts.length > 0);
+  const [open, setOpen] = useState(drafts.length > 0 && hasQuestion);
   const [pendingTarget, setPendingTarget] = useState<string | null>(null);
 
   return (
@@ -33,14 +35,18 @@ export function AskHarperBox({
           <AppButton
             type="button"
             variant="orange"
+            disabled={!hasQuestion}
             data-testid="ask-harper-open"
-            onClick={() => setOpen(true)}
+            onClick={() => {
+              if (!hasQuestion) return;
+              setOpen(true);
+            }}
           >
             {consultationConversationCopy.askHarperAction}
           </AppButton>
         ) : null}
       </div>
-      {open && canEdit ? (
+      {open && canEdit && hasQuestion ? (
         <ApplicationActionForm
           action={askHarperAction}
           submitLabel={consultationConversationCopy.askHarperAction}

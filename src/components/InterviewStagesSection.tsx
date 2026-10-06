@@ -1,6 +1,9 @@
 import { updateInterviewStageAction } from "@/app/actions/interview";
 import { AskHarperBox } from "@/components/AskHarperBox";
-import { loadAskHarperDrafts } from "@/lib/consultation/ask-harper";
+import {
+  applicationHasHarperQuestion,
+  loadAskHarperDrafts,
+} from "@/lib/consultation/ask-harper";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { InterviewStageInterviewerLink } from "@/components/InterviewStagePanel";
 import {
@@ -308,6 +311,7 @@ export function InterviewStagesList({
   stages,
   notesByContactId,
   askHarperDrafts = [],
+  hasHarperQuestion = false,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -316,6 +320,7 @@ export function InterviewStagesList({
   stages: StageView[];
   notesByContactId: Map<string, ReturnType<typeof parseCheatSheetNotes>>;
   askHarperDrafts?: Awaited<ReturnType<typeof loadAskHarperDrafts>>;
+  hasHarperQuestion?: boolean;
 }) {
   const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
   const grouped = interviewsByPerson(stages, people);
@@ -328,6 +333,7 @@ export function InterviewStagesList({
         campaignId={campaignId}
         canEdit={canEdit}
         drafts={askHarperDrafts}
+        hasQuestion={hasHarperQuestion}
       />
       <div>
         <h2 className="text-base font-semibold text-ink">
@@ -438,7 +444,10 @@ export async function InterviewStagesSection({
   const notesByContactId = new Map(
     noteRows.map((row) => [row.contactId, parseCheatSheetNotes(row.cheatSheetNotesJson)]),
   );
-  const askHarperDrafts = await loadAskHarperDrafts({ organizationId, campaignId });
+  const [askHarperDrafts, hasHarperQuestion] = await Promise.all([
+    loadAskHarperDrafts({ organizationId, campaignId }),
+    applicationHasHarperQuestion({ organizationId, campaignId }),
+  ]);
   return (
     <InterviewStagesList
       campaignId={campaignId}
@@ -448,6 +457,7 @@ export async function InterviewStagesSection({
       stages={stages}
       notesByContactId={notesByContactId}
       askHarperDrafts={askHarperDrafts}
+      hasHarperQuestion={hasHarperQuestion}
     />
   );
 }

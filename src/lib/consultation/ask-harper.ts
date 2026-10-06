@@ -9,6 +9,7 @@ import { deriveCareerStage } from "@/lib/consultation/career-stage";
 import { profileEvidenceForApplication } from "@/lib/consultation/assess";
 import {
   buildConsultationQaView,
+  harperHasAskedQuestion,
   type ConsultationQaItem,
 } from "@/lib/consultation/qa-view";
 import {
@@ -37,6 +38,25 @@ export function askHarperDraftQuestions(
       item.talkingPoint?.status !== "APPROVED" &&
       item.resumeBullet?.status !== "APPROVED",
   );
+}
+
+export async function applicationHasHarperQuestion(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<boolean> {
+  const turns = await prisma.consultationTurn.findMany({
+    where: {
+      organizationId: input.organizationId,
+      speaker: "CONSULTANT",
+      followUp: false,
+      session: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+      },
+    },
+    select: { speaker: true, followUp: true, intent: true },
+  });
+  return harperHasAskedQuestion(turns);
 }
 
 export async function loadAskHarperDrafts(input: {
