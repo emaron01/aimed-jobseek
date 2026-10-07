@@ -88,14 +88,55 @@ export function ResultActions({
   const draft = statements.filter((statement) => statement.status !== "APPROVED");
   if (draft.length === 0) {
     return (
-      <p className="mt-3" data-testid={`${testId}-approved`}>
-        <span
-          className={APPROVED_STATUS_BADGE_CLASS}
-          data-testid={`${testId}-approved-badge`}
-        >
-          {consultationStatementLabels.APPROVED}
-        </span>
-      </p>
+      <div className={cardButtonRowClass} data-testid={testId}>
+        {editing ? (
+          <ApplicationActionForm
+            action={saveEditedConsultationStatementAction}
+            submitLabel={consultationConversationCopy.saveAnswer}
+            testId={`${testId}-save`}
+            variant="secondary"
+            compact
+            formClassName={actionFormClass}
+            formId={formId}
+            onSuccess={() => {
+              if (onSaved) onSaved();
+              else setInternalEditing(false);
+            }}
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+            {statements.map((statement) => (
+              <input
+                key={`edit-${statement.id}`}
+                type="hidden"
+                name="statementId"
+                value={statement.id}
+              />
+            ))}
+            {statements.map((statement) => (
+              <input
+                key={`content-${statement.id}`}
+                type="hidden"
+                name={`content:${statement.id}`}
+                value={values[statement.id] ?? statement.content}
+              />
+            ))}
+          </ApplicationActionForm>
+        ) : (
+          <AppButton
+            type="button"
+            variant="secondary"
+            className="!px-2.5 !py-1.5 !text-xs"
+            data-testid={`${testId}-edit`}
+            onClick={(event) => {
+              keepHarperQuestionInPlace(event.currentTarget);
+              startEdit();
+            }}
+          >
+            {consultationConversationCopy.editAnswer}
+          </AppButton>
+        )}
+        {trailing}
+      </div>
     );
   }
   statements = draft;
@@ -229,7 +270,7 @@ export function ResultBody({
   onValueChange?: (statementId: string, value: string) => void;
 }) {
   const draft = statement.status === "DRAFT";
-  const showEditor = editing && draft;
+  const showEditor = editing && (draft || statement.status === "APPROVED");
   return (
     <div
       className="mt-3 min-w-0 space-y-1 overflow-hidden border-t border-edge pt-3"

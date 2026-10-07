@@ -700,9 +700,24 @@ describe("role-expertise suggested answers under the question", () => {
     expect(consultationQuestionAcceptsReply(item)).toBe(false);
 
     const thread = readFileSync("src/components/ConsultationThread.tsx", "utf8");
-    const resultActions = thread.slice(thread.indexOf("export function ResultActions"));
+    const resultActions = thread.slice(
+      thread.indexOf("export function ResultActions"),
+      thread.indexOf("function seekerReplyIsPending"),
+    );
+    const approvedRow = resultActions.slice(
+      resultActions.indexOf("draft.length === 0"),
+      resultActions.indexOf("statements = draft"),
+    );
     expect(resultActions).toContain('statement.status !== "APPROVED"');
-    expect(resultActions).toContain("consultationStatementLabels.APPROVED");
+    expect(approvedRow).toContain("consultationConversationCopy.editAnswer");
+    expect(approvedRow).toContain("saveEditedConsultationStatementAction");
+    expect(approvedRow).toContain('data-testid={`${testId}-edit`}');
+    expect(approvedRow).not.toContain("consultationStatementLabels.APPROVED");
+    expect(approvedRow).not.toContain("approveConsultationQaResultAction");
+    expect(approvedRow).not.toContain("enqueueApplicationJob");
+    expect(approvedRow).not.toContain("runPaidStructuredCall");
+    expect(thread.match(/data-testid="consultation-approved-badge"/g)).toHaveLength(1);
+    expect(thread.match(/data-testid="consultation-approved-badge-expanded"/g)).toHaveLength(1);
   });
 
   it("prefers a refined seeker-turn answer after a reply", () => {

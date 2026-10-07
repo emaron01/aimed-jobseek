@@ -273,9 +273,8 @@ describe("Harper drafts stay put and can be edited", () => {
 
   it("puts Edit in the same row as Approve and Regenerate", () => {
     const thread = src("src/components/ConsultationThread.tsx");
-    const start = thread.indexOf(
-      "className={cardButtonRowClass} data-testid={testId}",
-    );
+    const marker = "className={cardButtonRowClass} data-testid={testId}";
+    const start = thread.indexOf(marker, thread.indexOf(marker) + marker.length);
     expect(start).toBeGreaterThan(-1);
     const row = thread.slice(start, thread.indexOf("</div>", start));
     expect(row).toContain("consultationConversationCopy.approve");
@@ -340,6 +339,42 @@ describe("Harper drafts stay put and can be edited", () => {
     expect(action).not.toContain("enqueueApplicationJob");
     expect(action).not.toContain("runPaidStructuredCall");
     expect(action).not.toContain("getConsultationReplyAiProvider");
+  });
+
+  it("saves an approved edit as the same approved answer and makes no paid call", async () => {
+    findFirst.mockResolvedValue({
+      id: "st-approved",
+      status: "APPROVED",
+      kind: "INTERVIEW_ANSWER",
+      turnId: "turn-approved",
+    });
+    update.mockImplementation((args: unknown) => Promise.resolve(args));
+    updateMany.mockImplementation((args: unknown) => Promise.resolve(args));
+    transaction.mockImplementation(async (ops: Promise<unknown>[]) => Promise.all(ops));
+
+    await saveEditedConsultationStatement({
+      organizationId: "org-1",
+      statementId: "st-approved",
+      content: "Coached the team through joint customer calls.",
+    });
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: "st-approved" },
+      data: { content: "Coached the team through joint customer calls." },
+    });
+    const saved = update.mock.calls[0]?.[0] as { data: Record<string, unknown> };
+    expect(saved.data.status).toBeUndefined();
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { organizationId: "org-1", consultationTurnId: "turn-approved" },
+      data: { interviewAnswer: "Coached the team through joint customer calls." },
+    });
+    const service = src("src/lib/consultation/service.ts");
+    const save = service.slice(
+      service.indexOf("export async function saveEditedConsultationStatement"),
+      service.indexOf("export async function recordConsultationAnswerEdit"),
+    );
+    expect(save).not.toContain("enqueueApplicationJob");
+    expect(save).not.toContain("runPaidStructuredCall");
   });
 });
 
