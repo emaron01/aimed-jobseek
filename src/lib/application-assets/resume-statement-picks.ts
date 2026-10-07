@@ -5,6 +5,7 @@
  */
 
 import type { HarperDraftSettings } from "@/lib/consultation/harper-draft-settings";
+import { parseExperienceDate } from "@/lib/product-research/role-dates";
 
 export const RESUME_STATEMENT_PICKS_KEY = "resumeStatementPickIds";
 export const BROADER_EXPERIENCE_ID = "broader";
@@ -289,25 +290,31 @@ function shortestTitle(names: string[]): string {
   return names.slice().sort((a, b) => a.length - b.length)[0] ?? "Experience";
 }
 
+/** Year and month from a seeker's date. A year with no month sorts as January of that year. */
 function roleMonthIndex(value: string | null | undefined): number | null {
   const text = value?.trim() ?? "";
-  if (!text || /^present$/i.test(text)) return null;
-  const match = text.match(/^(\d{4})(?:-(\d{2}))?/);
-  if (!match) return null;
-  const month = match[2] ? Number(match[2]) : 1;
+  if (!text) return null;
+  const parsed = parseExperienceDate(text);
+  if (!parsed || parsed.present || parsed.year <= 0) return null;
+  const month = parsed.month ?? 1;
   if (month < 1 || month > 12) return null;
-  return Number(match[1]) * 12 + (month - 1);
+  return parsed.year * 12 + month - 1;
+}
+
+function hasReadableYear(value: string | null | undefined): boolean {
+  return roleMonthIndex(value) != null;
 }
 
 function isPresentEnd(endDate: string | null | undefined): boolean {
   const text = endDate?.trim() ?? "";
-  return text.length === 0 || /^present$/i.test(text);
+  if (!text) return true;
+  return parseExperienceDate(text)?.present === true;
 }
 
 /**
- * Most recent first: Present (a blank end date) before ended roles, then later
- * end dates, then later start dates. A role with no parseable date stays after
- * dated roles, in its original profile order.
+ * Most recent first. A blank end date, or Present, Current, or Now, comes first,
+ * then later end dates, then later start dates. A role is undated only when no
+ * year can be read from either date, and those roles keep their profile order.
  */
 export function orderRolesMostRecentFirst<
   T extends { startDate?: string | null; endDate?: string | null },
@@ -315,7 +322,7 @@ export function orderRolesMostRecentFirst<
   const rank = { present: 0, dated: 1, undated: 2 } as const;
   const groupOf = (role: T): keyof typeof rank => {
     if (isPresentEnd(role.endDate)) return "present";
-    if (roleMonthIndex(role.endDate) != null || roleMonthIndex(role.startDate) != null) return "dated";
+    if (hasReadableYear(role.endDate) || hasReadableYear(role.startDate)) return "dated";
     return "undated";
   };
   return roles

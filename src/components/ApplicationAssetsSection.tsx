@@ -13,7 +13,10 @@ import {
   type AssetClaim,
 } from "@/lib/application-assets/contract";
 import type { PresentationPlan } from "@/lib/application-assets/plan-contract";
-import type { StatementGroup } from "@/lib/application-assets/resume-statement-picks";
+import {
+  orderRolesMostRecentFirst,
+  type StatementGroup,
+} from "@/lib/application-assets/resume-statement-picks";
 import { ResumeStatementPicker } from "@/components/ResumeStatementPicker";
 import { formatResumeRoleMeta } from "@/lib/application-assets/dates";
 import {
@@ -249,8 +252,9 @@ function AssetPreview({
     );
   }
   if (content.type !== "RESUME") return null;
-  const featured = content.experience.filter((role) => !role.hidden && !role.condensed);
-  const condensed = content.experience.filter((role) => !role.hidden && role.condensed);
+  const experience = orderRolesMostRecentFirst(content.experience);
+  const featured = experience.filter((role) => !role.hidden && !role.condensed);
+  const condensed = experience.filter((role) => !role.hidden && role.condensed);
   return (
     <article className="space-y-4 text-sm text-ink">
       <header className="text-center">

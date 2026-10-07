@@ -12,6 +12,7 @@ import type {
   ResumeAssetContent,
 } from "./contract";
 import { formatResumeRoleMeta } from "./dates";
+import { orderRolesMostRecentFirst } from "./resume-statement-picks";
 import { hasVisibleText } from "@/lib/grounding/fact-tokens";
 
 const style = applicationAssetConfig.docx;
@@ -101,12 +102,9 @@ function resumeChildren(content: ResumeAssetContent): Paragraph[] {
       .map((claim) => bodyParagraph(claim.text)),
     heading(applicationAssetConfig.resumeHeadings.experience),
   );
-  const featured = content.experience.filter(
-    (item) => !item.hidden && !item.condensed,
-  );
-  const condensed = content.experience.filter(
-    (item) => !item.hidden && item.condensed,
-  );
+  const experience = orderRolesMostRecentFirst(content.experience);
+  const featured = experience.filter((item) => !item.hidden && !item.condensed);
+  const condensed = experience.filter((item) => !item.hidden && item.condensed);
   for (const role of featured) {
     children.push(
       bodyParagraph(

@@ -1950,3 +1950,117 @@ describe("resume bullet style, date order, and seeker edits", () => {
     expect(picker).toContain("focus({ preventScroll: true })");
   });
 });
+
+describe("role date order for every seeker date format", () => {
+  function role(
+    id: string,
+    employer: string,
+    startDate: string | null,
+    endDate: string | null,
+  ) {
+    return { id, employer, title: employer, startDate, endDate };
+  }
+
+  it("sorts the reported profile and every common date format", () => {
+    const reported = [
+      role("opentext", "OpenText", "Dec 2022", "Present"),
+      role("checkpoint", "Checkpoint Technologies", "2014", "2015"),
+      role("gryphon", "Gryphon Networks", "2010", "2014"),
+      role("ramp", "RAMP Advertising", "2006", "2010"),
+      role("merion", "Merion Publications", "2002", "2006"),
+      role("mda", "Marketing Database Associates", "1997", "2002"),
+      role("aerotek", "Aerotek", "1994", "1996"),
+      role("login", "Login VSI", "December 2021", "Dec 2022"),
+      role("micro", "Micro Focus", "Apr 2015", "Dec 2021"),
+    ];
+    const expected = [
+      "opentext",
+      "login",
+      "micro",
+      "checkpoint",
+      "gryphon",
+      "ramp",
+      "merion",
+      "mda",
+      "aerotek",
+    ];
+    expect(orderRolesMostRecentFirst(reported).map((item) => item.id)).toEqual(expected);
+    const profile: PickerProfile = {
+      experience: reported,
+      educationTexts: nursingProfile.educationTexts,
+      projectTexts: graduateProfile.projectTexts,
+    };
+    expect(
+      roleBulletBands({
+        profile,
+        settings: DEFAULT_HARPER_DRAFT_SETTINGS,
+        primaryRoleId: null,
+        directRoleIds: [],
+        asOf,
+      }).map((band) => band.roleId),
+    ).toEqual(expected);
+    const claim = (id: string, text: string) => ({
+      id,
+      text,
+      supports: [{ sourceId: "profile:name", quote: "Ada" }],
+    });
+    const resume = resumeWithExactPickedBullets(
+      {
+        type: "RESUME",
+        header: { name: claim("name", "Ada"), contactDetails: [] },
+        summary: [],
+        experience: reported.map((item) => ({
+          roleId: item.id,
+          employer: item.employer,
+          title: item.title,
+          startDate: item.startDate,
+          endDate: item.endDate,
+          location: null,
+          hidden: false,
+          condensed: false,
+          bullets: [],
+        })),
+        skills: [],
+        education: [],
+        credentials: [],
+      },
+      [],
+      "profile:name",
+    );
+    expect(resume.experience.map((item) => item.roleId)).toEqual(expected);
+
+    const formats = orderRolesMostRecentFirst([
+      role("year", "Year only", "2014", "2014"),
+      role("abbr", "Abbreviation", "Dec 2022", "Dec 2022"),
+      role("full", "Full month", "December 2021", "December 2021"),
+      role("sept", "September abbreviation", "Sept 2019", "Sept 2019"),
+      role("iso", "Numeric month", "2021-03", "2021-03"),
+      role("slash", "Slash month", "03/2021", "03/2021"),
+      role("slash-short", "Short slash month", "3/2021", "3/2021"),
+      role("present", "Present", "2010", "Present"),
+      role("current", "Current", "2011", "Current"),
+      role("now", "Now", "2012", "Now"),
+      role("undated", "No year", "undated", "n/a"),
+    ]);
+    expect(formats.map((item) => item.id)).toEqual([
+      "now",
+      "current",
+      "present",
+      "abbr",
+      "full",
+      "iso",
+      "slash",
+      "slash-short",
+      "sept",
+      "year",
+      "undated",
+    ]);
+
+    const docx = readFileSync("src/lib/application-assets/docx.ts", "utf8");
+    const writer = readFileSync("src/lib/application-assets/prompt.ts", "utf8");
+    const picker = readFileSync("src/lib/application-assets/resume-statement-picks.ts", "utf8");
+    expect(docx).toContain("orderRolesMostRecentFirst");
+    expect(writer).toContain("orderRolesMostRecentFirst");
+    expect(picker).toContain("orderRolesMostRecentFirst(profile.experience)");
+  });
+});
