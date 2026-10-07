@@ -418,9 +418,9 @@ export async function ApplicationWorkspace({
       }),
     };
   }
-  const statementGroups = showFocus(focus, ["assets"])
+  const statementPicker = showFocus(focus, ["assets"])
     ? await loadResumeStatementGroups({ organizationId, campaignId })
-    : [];
+    : { groups: [], needsPrepare: false };
   const [approvedStatementCount, approvedStoryCount] = await Promise.all([
     prisma.consultationStatement.count({
       where: {
@@ -881,7 +881,8 @@ export async function ApplicationWorkspace({
             }))
           : []
       }
-      statementGroups={statementGroups}
+      statementGroups={statementPicker.groups}
+      needsPrepare={statementPicker.needsPrepare}
       assets={requirement.campaign.applicationAssets
         .filter(
           (

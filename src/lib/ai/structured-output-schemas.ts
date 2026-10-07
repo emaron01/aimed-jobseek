@@ -44,6 +44,7 @@ import {
   linkedinInmailAssetContentSchema,
   linkedinNoteAssetContentSchema,
   resumeAssetContentSchema,
+  resumeBulletCandidatesSchema,
 } from "@/lib/application-assets/contract";
 import {
   coverLetterPresentationPlanSchema,
@@ -247,6 +248,11 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
   resumeAsset: {
     schemaName: "application_resume",
     schema: resumeAssetContentSchema,
+    usageOperations: ["APPLICATION_ASSET_GENERATION"],
+  },
+  resumeBulletCandidates: {
+    schemaName: "resume_bullet_candidates",
+    schema: resumeBulletCandidatesSchema,
     usageOperations: ["APPLICATION_ASSET_GENERATION"],
   },
   coverLetterAsset: {

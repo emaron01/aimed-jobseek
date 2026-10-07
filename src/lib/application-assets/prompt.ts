@@ -191,6 +191,7 @@ export function buildResumeAssetMessages(input: {
           })),
         hiddenRoleIds: input.hiddenRoleIds,
         condensedRoleIds: input.condensedRoleIds,
+        pickedBullets: input.requiredStatements ?? [],
         requiredStatements: input.requiredStatements ?? [],
         roleBulletPlans: input.roleBulletPlans ?? [],
         responseShape: {

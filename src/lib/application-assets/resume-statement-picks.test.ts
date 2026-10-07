@@ -17,13 +17,22 @@ import {
   resumeVersionUsable,
 } from "@/lib/application-assets/service";
 import {
-  BROADER_EXPERIENCE_TITLE,
+  assignCandidateBullets,
+  buildResumeBulletCandidateMessages,
+  selectableBulletEvidence,
+  storedCandidatesMatch,
+} from "@/lib/application-assets/resume-bullet-candidates";
+import { resumeWithExactPickedBullets } from "@/lib/application-assets/service";
+import {
   buildResumeWriterPackage,
   buildStatementGroups,
+  candidateCountForBand,
   resumeStatementPicksFromCampaign,
+  roleBulletBands,
+  type PickerBullet,
   type PickerProfile,
-  type PickerStatement,
 } from "@/lib/application-assets/resume-statement-picks";
+import { RESUME_ASSET_INSTRUCTIONS, RESUME_BULLET_CANDIDATE_INSTRUCTIONS } from "@/lib/prompt-content/application-assets";
 import { applicationAssetConfig } from "@/lib/product-config";
 import {
   DEFAULT_HARPER_DRAFT_SETTINGS,
@@ -32,25 +41,25 @@ import {
 import type { ReadyApplicationGenerationContext } from "@/lib/generation/context";
 
 const asOf = new Date("2026-10-06T00:00:00.000Z");
-const forecast = {
-  targetKey: "required:forecast",
-  text: "Own the quarterly forecast",
-  strength: "STRONG",
-};
 
-function statement(
+function bullet(
   id: string,
-  content: string,
-  targetKey: string | null = null,
-): PickerStatement {
-  return { id, kind: "INTERVIEW_ANSWER", content, targetKey };
+  roleId: string,
+  text: string,
+  jobSpecific: boolean,
+): PickerBullet {
+  return { id, roleId, text, jobSpecific };
 }
 
-function checkedIds(profile: PickerProfile, statements: PickerStatement[], settings = DEFAULT_HARPER_DRAFT_SETTINGS, directRoleIds: string[] = []) {
+function groupsFor(
+  profile: PickerProfile,
+  bullets: PickerBullet[],
+  settings = DEFAULT_HARPER_DRAFT_SETTINGS,
+  directRoleIds: string[] = [],
+) {
   return buildStatementGroups({
     profile,
-    statements,
-    assessments: [forecast, { targetKey: "required:quota", text: "Carry a quota", strength: "PARTIAL" }],
+    bullets,
     settings,
     savedPickIds: null,
     primaryRoleId: null,
@@ -83,73 +92,117 @@ const graduateProfile: PickerProfile = {
 };
 
 describe("Harper Approved Statements picker", () => {
-  it("groups sales, nursing, and new-graduate statements and pre-checks within each role's range", () => {
-    const salesStatements = [
-      statement("ot-strong", "At OpenText I owned the quarterly forecast.", "required:forecast"),
-      statement("ot-partial", "At OpenText I carried a quota.", "required:quota"),
-      ...Array.from({ length: 6 }, (_, index) =>
-        statement(`ot-0${index + 3}`, `At OpenText I ran play ${index + 3}.`),
+  it("shows every role in a band, up to twice the maximum, and pre-checks within the band", () => {
+    const recentSecond: PickerProfile = {
+      experience: [
+        { id: "opentext", employer: "OpenText", title: "Account Executive", endDate: null },
+        { id: "vmware", employer: "VMware", title: "Account Executive", endDate: "2024-06" },
+        { id: "legacy", employer: "Legacy Systems", title: "Sales Representative", endDate: "2004-06" },
+      ],
+      educationTexts: [],
+      projectTexts: [],
+    };
+    const bands = roleBulletBands({
+      profile: recentSecond,
+      settings: DEFAULT_HARPER_DRAFT_SETTINGS,
+      primaryRoleId: null,
+      directRoleIds: [],
+      asOf,
+    });
+    expect(bands.map((band) => band.roleId)).toEqual(["opentext", "vmware"]);
+    expect(bands.find((band) => band.roleId === "vmware")?.candidateCount).toBe(
+      candidateCountForBand(5, false),
+    );
+    const vmwareBullets = [
+      bullet("job", "vmware", "Closed a multi-year hospital contract.", true),
+      ...Array.from({ length: 12 }, (_, index) =>
+        bullet(`general-${index}`, "vmware", `Ran a general sales play ${index}.`, false),
       ),
-      statement("legacy-1", "At Legacy Systems I carried a bag."),
     ];
-    const sales = checkedIds(salesProfile, salesStatements);
-    const openText = sales.find((group) => group.title === "OpenText");
-    const legacy = sales.find((group) => group.title === "Legacy Systems");
-    expect(openText?.items[0]?.requirementLabel).toBe("Own the quarterly forecast");
+    const sales = groupsFor(recentSecond, [
+      ...Array.from({ length: 12 }, (_, index) =>
+        bullet(`ot-${index}`, "opentext", `Owned an OpenText forecast cycle ${index}.`, true),
+      ),
+      ...vmwareBullets,
+      bullet("old", "legacy", "Carried a bag at Legacy Systems.", true),
+    ]);
+    const openText = sales.find((group) => group.roleId === "opentext");
+    const vmware = sales.find((group) => group.roleId === "vmware");
+    expect(sales.some((group) => group.roleId === "legacy")).toBe(false);
+    expect(openText?.title).toBe("Account Executive, OpenText");
+    expect(openText?.items).toHaveLength(12);
     expect(openText?.items.filter((item) => item.checked)).toHaveLength(7);
-    expect(openText?.items.find((item) => item.id === "ot-strong")?.checked).toBe(true);
-    expect(openText?.items.find((item) => item.id === "ot-08")?.checked).toBe(false);
-    expect(openText && openText.minBullets >= 3 && openText.maxBullets <= 7).toBe(true);
-    expect(legacy?.titleOnly).toBe(true);
-    expect(legacy?.items.every((item) => !item.checked)).toBe(true);
+    expect(vmware?.maxBullets).toBe(5);
+    expect(vmware?.items).toHaveLength(10);
+    expect(vmware?.items[0]?.id).toBe("job");
+    expect(vmware?.items.filter((item) => item.checked)).toHaveLength(3);
+    expect(vmware?.items.filter((item) => item.checked).slice(1).every((item) => item.id.startsWith("general"))).toBe(true);
 
-    const nursing = checkedIds(nursingProfile, [
-      statement("su-1", "At State University I precepted new nurses."),
-      statement("su-2", "At State University I led a medication safety huddle."),
-      statement("su-3", "At State University I taught wound care."),
-      statement("su-4", "At State University I covered an extra shift."),
+    const nursing = groupsFor(
+      {
+        ...nursingProfile,
+        experience: [
+          ...nursingProfile.experience,
+          { id: "clinic", employer: "City Clinic", title: "Nurse", endDate: "2024-01" },
+        ],
+      },
+      [
+        bullet("mercy-1", "mercy", "Precepted new nurses on the night shift.", true),
+        bullet("clinic-job", "clinic", "Led a medication safety huddle.", true),
+        bullet("clinic-general", "clinic", "Covered an extra weekend shift.", false),
+        bullet("clinic-general-2", "clinic", "Taught wound care to new graduates.", false),
+      ],
+    );
+    expect(nursing.map((group) => group.roleId)).toEqual(["mercy", "clinic"]);
+    expect(nursing.find((group) => group.roleId === "clinic")?.items.map((item) => item.id)).toEqual([
+      "clinic-job",
+      "clinic-general",
+      "clinic-general-2",
     ]);
-    const school = nursing.find((group) => group.title === "State University");
-    expect(school?.items.filter((item) => item.checked)).toHaveLength(3);
-    expect(school && school.items.filter((item) => item.checked).length <= school.maxBullets).toBe(true);
 
-    const graduate = checkedIds(graduateProfile, [
-      statement("cap-1", "In my Capstone project I shipped a clinic intake form."),
-      statement("cap-2", "In my Capstone project I interviewed patients."),
-      statement("loose", "I collaborate with every team."),
-    ]);
-    const project = graduate.find((group) => group.title === "Capstone project");
-    const broader = graduate.find((group) => group.id === "broader");
-    expect(project?.items.every((item) => item.checked)).toBe(true);
-    expect(broader?.title).toBe(BROADER_EXPERIENCE_TITLE);
-    expect(broader?.title).toBe("Broader experience");
-    expect(broader?.items.map((item) => item.id)).toEqual(["loose"]);
+    const graduate = groupsFor(
+      {
+        experience: [
+          { id: "intern", employer: "County Hospital", title: "Nursing Intern", endDate: null },
+        ],
+        educationTexts: [],
+        projectTexts: [],
+      },
+      [bullet("intern-1", "intern", "Shipped a clinic intake form during a capstone rotation.", true)],
+    );
+    expect(graduate.map((group) => group.roleId)).toEqual(["intern"]);
+    expect(graduate[0]?.items[0]?.content).toBe("Shipped a clinic intake form during a capstone rotation.");
+    expect(groupsFor(graduateProfile, [])).toEqual([]);
   });
 
   it("lets Super Admin bands change the recommended set", () => {
-    const statements = Array.from({ length: 8 }, (_, index) =>
-      statement(`ot-${index}`, "At OpenText I closed an enterprise deal."),
-    );
     const tighter = parseHarperDraftSettings({
       ...DEFAULT_HARPER_DRAFT_SETTINGS,
       recentPrimaryBulletMax: 4,
     });
-    const groups = checkedIds(salesProfile, statements, tighter);
-    expect(groups.find((group) => group.title === "OpenText")?.items.filter((item) => item.checked)).toHaveLength(4);
+    const groups = groupsFor(
+      salesProfile,
+      Array.from({ length: 8 }, (_, index) =>
+        bullet(`ot-${index}`, "opentext", "Closed an enterprise deal.", true),
+      ),
+      tighter,
+    );
+    const openText = groups.find((group) => group.roleId === "opentext");
+    expect(openText?.title).toBe("Account Executive, OpenText");
+    expect(openText?.items.filter((item) => item.checked)).toHaveLength(4);
     expect(readFileSync("src/components/platform/HarperDraftSettingsForm.tsx", "utf8")).toContain(
       "recentPrimaryBulletMax",
     );
   });
 
   it("sends every pick as required content and keeps a 15-year role to title, company, and dates unless it is relevant", () => {
-    const statements = [
-      statement("ot-strong", "At OpenText I owned the quarterly forecast.", "required:forecast"),
-      statement("legacy-1", "At Legacy Systems I carried a bag."),
+    const bullets = [
+      bullet("ot-strong", "opentext", "Owned the quarterly forecast at OpenText.", true),
+      bullet("legacy-1", "legacy", "Carried a bag at Legacy Systems.", true),
     ];
     const unused = buildResumeWriterPackage({
       profile: salesProfile,
-      statements,
-      assessments: [forecast],
+      bullets,
       settings: DEFAULT_HARPER_DRAFT_SETTINGS,
       savedPickIds: null,
       primaryRoleId: null,
@@ -161,8 +214,7 @@ describe("Harper Approved Statements picker", () => {
     expect(unused.roleBulletPlans.find((plan) => plan.roleId === "legacy")?.titleOnly).toBe(true);
     const relevant = buildResumeWriterPackage({
       profile: salesProfile,
-      statements,
-      assessments: [forecast],
+      bullets,
       settings: DEFAULT_HARPER_DRAFT_SETTINGS,
       savedPickIds: null,
       primaryRoleId: null,
@@ -218,10 +270,139 @@ describe("Harper Approved Statements picker", () => {
     });
     expect(JSON.parse(messages[1]?.content ?? "{}").stories).toEqual([]);
     expect(messages[0]?.content).toContain("Prompt version: 4");
-    expect(RESUME_ASSET_PROMPT_VERSION).toBe("11");
+    expect(RESUME_ASSET_PROMPT_VERSION).toBe("12");
     expect(RESUME_WRITER_TEMPERATURE).toBe(0);
-    const writer = readFileSync("src/lib/application-assets/ai.ts", "utf8");
-    expect(writer).toContain("temperature: RESUME_WRITER_TEMPERATURE");
+    expect(RESUME_ASSET_INSTRUCTIONS).toContain(
+      "Use each picked bullet exactly as written, in the role it was picked for. Do not rewrite a picked bullet and do not add a bullet that was not picked. You may write the summary, the skills, and each role's title, company, and dates.",
+    );
+    expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).toContain(
+      "When one piece of evidence covers more than one role, write a separate bullet for each role. For each role, write up to the number of bullets given for that role. Start each bullet with a strong action verb and include the result or number when the seeker stated one.",
+    );
+  });
+
+  it("writes one-line bullets for role ids, excludes other applications, and uses picks exactly", () => {
+    const assigned = assignCandidateBullets({
+      bands: [
+        { roleId: "opentext", candidateCount: 10 },
+        { roleId: "mercy", candidateCount: 10 },
+        { roleId: "intern", candidateCount: 10 },
+      ],
+      bullets: [
+        { roleId: "opentext", text: "Closed enterprise deals\nat OpenText.", jobSpecific: true },
+        { roleId: "missing-role", text: "This role is not on the profile.", jobSpecific: true },
+        { roleId: "mercy", text: "Precepted new nurses at Mercy General.", jobSpecific: false },
+        { roleId: "intern", text: "Shipped a clinic intake form.", jobSpecific: true },
+      ],
+    });
+    expect(assigned.map((item) => item.roleId)).toEqual(["opentext", "mercy", "intern"]);
+    expect(assigned[0]?.text.includes("\n")).toBe(false);
+    expect(assigned[0]?.text).toBe("Closed enterprise deals at OpenText.");
+    const evidence = selectableBulletEvidence({
+      campaignId: "sift",
+      achievements: [
+        { id: "ach-1", text: "Closed a seven-figure renewal." },
+        { id: "why-this-company:csc", text: "I want to work at CSC." },
+      ],
+      statements: [
+        { content: "Owned the forecast.", kind: "INTERVIEW_ANSWER", campaignId: "sift", targetKey: "required:forecast" },
+        { content: "I want this company.", kind: "INTERVIEW_ANSWER", campaignId: "sift", targetKey: "why-this-company" },
+        { content: "A 90-day plan for CSC.", kind: "INTERVIEW_ANSWER", campaignId: "csc", targetKey: "required:plan" },
+        { content: "Cut the sales cycle.", kind: "RESUME_BULLET", campaignId: "sift", targetKey: null },
+      ],
+      replies: [
+        { body: "I precepted new nurses.", campaignId: "sift" },
+        { body: "I wrote this for CSC.", campaignId: "csc" },
+      ],
+    });
+    expect(evidence.map((item) => item.text)).toEqual([
+      "Closed a seven-figure renewal.",
+      "Owned the forecast.",
+      "Cut the sales cycle.",
+      "I precepted new nurses.",
+    ]);
+    const roles = roleBulletBands({
+      profile: salesProfile,
+      settings: DEFAULT_HARPER_DRAFT_SETTINGS,
+      primaryRoleId: null,
+      directRoleIds: [],
+      asOf,
+    });
+    const messages = buildResumeBulletCandidateMessages({
+      roles: roles.map((role) => ({
+        roleId: role.roleId,
+        employer: role.employer,
+        title: role.title,
+        candidateCount: role.candidateCount,
+      })),
+      evidence,
+      job: { title: "Account Executive", employer: "Sift", posting: "Own the forecast." },
+    });
+    const payload = JSON.parse(messages[1]?.content ?? "{}") as {
+      roles: Array<{ roleId: string; candidateCount: number }>;
+    };
+    expect(payload.roles.find((role) => role.roleId === "opentext")?.candidateCount).toBe(14);
+    const exact = resumeWithExactPickedBullets(
+      {
+        type: "RESUME",
+        header: {
+          name: { id: "name", text: "Ada", supports: [{ sourceId: "profile:name", quote: "Ada" }] },
+          contactDetails: [],
+        },
+        summary: [{ id: "summary", text: "Account executive.", supports: [{ sourceId: "profile:name", quote: "Ada" }] }],
+        experience: [
+          {
+            roleId: "opentext",
+            employer: "OpenText",
+            title: "Account Executive",
+            startDate: "2020-01",
+            endDate: null,
+            location: null,
+            hidden: false,
+            condensed: false,
+            bullets: [
+              { id: "invented", text: "Invented a recruiting program.", supports: [{ sourceId: "profile:name", quote: "Ada" }] },
+            ],
+          },
+        ],
+        skills: [{ id: "skill", text: "Forecasting", supports: [{ sourceId: "profile:name", quote: "Ada" }] }],
+        education: [],
+        credentials: [],
+      },
+      [{ statementId: "pick-1", roleId: "opentext", content: "Owned the quarterly forecast at OpenText." }],
+      "profile:name",
+    );
+    expect(exact.experience[0]?.bullets.map((item) => item.text)).toEqual([
+      "Owned the quarterly forecast at OpenText.",
+    ]);
+    expect(exact.summary[0]?.text).toBe("Account executive.");
+    expect(exact.skills[0]?.text).toBe("Forecasting");
+    expect(storedCandidatesMatch("abc", "abc")).toBe(true);
+    expect(storedCandidatesMatch(null, "abc")).toBe(false);
+    const picker = readFileSync("src/components/ResumeStatementPicker.tsx", "utf8");
+    expect(picker).not.toContain("interviewAnswerPick");
+    expect(picker).not.toContain("coversRequirement");
+    expect(picker).not.toContain("requirementLabel");
+    const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
+    const pickerData = readFileSync("src/lib/application-assets/resume-statement-picker-data.ts", "utf8");
+    expect(workspace).not.toContain("runPaidStructuredCall");
+    expect(pickerData).not.toContain("runPaidStructuredCall");
+    const prepare = readFileSync("src/lib/application-assets/resume-bullet-candidate-service.ts", "utf8");
+    const prepareFn = prepare.slice(prepare.indexOf("export async function prepareResumeBulletCandidates"));
+    expect(prepareFn.indexOf("storedCandidatesMatch")).toBeLessThan(prepareFn.indexOf("runPaidStructuredCall"));
+    const action = readFileSync("src/app/actions/application-assets.ts", "utf8");
+    const prepareStart = action.indexOf("export async function prepareResumeBulletCandidatesAction");
+    const prepareBody = action.slice(prepareStart, action.indexOf("export async function saveResumeStatementPicksAction"));
+    expect(prepareBody).not.toContain("enqueueApplicationJob");
+    const generateAction = action.slice(action.indexOf("export async function generateApplicationAssetAction"));
+    expect(generateAction.indexOf("prepareResumeBulletCandidates")).toBeLessThan(
+      generateAction.indexOf("applicationAssetGenerateWouldSkip"),
+    );
+    const service = readFileSync("src/lib/application-assets/service.ts", "utf8");
+    const generateStart = service.indexOf("export async function generateApplicationAsset");
+    const generateFn = service.slice(generateStart);
+    expect(generateFn.indexOf("prepareResumeBulletCandidates")).toBeLessThan(
+      generateFn.indexOf("loadResumeWriterFields"),
+    );
   });
 
   it("accepts a claim found only in a seeker's reply and drops an invented claim", () => {

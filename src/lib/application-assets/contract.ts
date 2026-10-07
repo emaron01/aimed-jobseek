@@ -4,12 +4,25 @@ import {
   normalizeEmailBody,
 } from "@/lib/email-generation/email-body";
 
-export const RESUME_ASSET_PROMPT_VERSION = "11";
+export const RESUME_ASSET_PROMPT_VERSION = "12";
+export const RESUME_BULLET_CANDIDATE_PROMPT_VERSION = "1";
 export const COVER_LETTER_ASSET_PROMPT_VERSION = "16";
 export const OUTREACH_EMAIL_PROMPT_VERSION = "5";
 export const OUTREACH_LINKEDIN_NOTE_PROMPT_VERSION = "5";
 export const OUTREACH_LINKEDIN_INMAIL_PROMPT_VERSION = "5";
 export const ASSET_CLAIM_VALIDATION_PROMPT_VERSION = "5";
+
+export const resumeBulletCandidatesSchema = z.object({
+  bullets: z.array(
+    z.object({
+      roleId: z.string(),
+      text: z.string(),
+      jobSpecific: z.boolean(),
+    }),
+  ),
+});
+
+export type ResumeBulletCandidates = z.infer<typeof resumeBulletCandidatesSchema>;
 
 export const assetSupportSchema = z.object({
   sourceId: z.string().trim().min(1),

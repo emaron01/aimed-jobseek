@@ -50,6 +50,8 @@ export const applicationAssetConfig = Object.freeze({
     interviewAnswerPick: "Interview answer",
     resumeBulletPick: "Resume bullet",
     coversRequirement: "Covers {requirement}",
+    prepareResumeBullets: "Prepare resume bullets",
+    resumeBulletsPrepared: "Resume bullets are ready.",
     saveStatementPicks: "Save statement picks",
     statementPicksSaved:
       "Statement picks saved. Regenerate the resume when you want Harper to use them.",

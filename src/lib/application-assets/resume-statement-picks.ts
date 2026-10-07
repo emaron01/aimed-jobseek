@@ -84,6 +84,25 @@ export type RoleBulletPlan = {
   yearsSinceEnd: number | null;
 };
 
+export type PickerBullet = {
+  id: string;
+  roleId: string;
+  text: string;
+  jobSpecific: boolean;
+};
+
+export type RoleBulletBand = {
+  roleId: string;
+  title: string;
+  employer: string;
+  yearsSinceEnd: number | null;
+  minBullets: number;
+  maxBullets: number;
+  candidateCount: number;
+  isPrimary: boolean;
+  directlyRelevant: boolean;
+};
+
 export function pickerProfileFromCandidate(profile: {
   experience: ReadonlyArray<{
     id: string;
@@ -335,6 +354,61 @@ function placeForStatement(
   return best?.place ?? null;
 }
 
+/** Header as on the resume: "Director of Strategic Sales, OpenText". */
+export function roleGroupHeader(title: string, employer: string): string {
+  const roleTitle = title.trim();
+  const company = employer.trim();
+  if (roleTitle && company && roleTitle.toLowerCase() !== company.toLowerCase()) {
+    return `${roleTitle}, ${company}`;
+  }
+  return roleTitle || company;
+}
+
+export function candidateCountForBand(maxBullets: number, titleOnly: boolean): number {
+  if (titleOnly) return 0;
+  return Math.max(0, maxBullets) * 2;
+}
+
+/** Personal Profile roles that take bullets. A role 15 or more years ago is included only when the plan marks it directly relevant. */
+export function roleBulletBands(input: {
+  profile: PickerProfile;
+  settings: HarperDraftSettings;
+  primaryRoleId: string | null;
+  directRoleIds: readonly string[];
+  asOf?: Date;
+}): RoleBulletBand[] {
+  const asOf = input.asOf ?? new Date();
+  const places = placesForProfile(input.profile).filter((place) => place.kind === "role");
+  const primary = primaryPlace(places, input.primaryRoleId, asOf);
+  const bands: RoleBulletBand[] = [];
+  for (const place of places) {
+    if (!place.roleId) continue;
+    const yearsSinceEnd = yearsForPlace(place, asOf);
+    const isPrimary = primary?.id === place.id;
+    const directlyRelevant = input.directRoleIds.includes(place.roleId);
+    const range = bulletRangeForRole({
+      yearsSinceEnd,
+      isPrimary,
+      directlyRelevant,
+      settings: input.settings,
+    });
+    if (range.titleOnly) continue;
+    const role = input.profile.experience.find((item) => item.id === place.roleId);
+    bands.push({
+      roleId: place.roleId,
+      title: role?.title?.trim() || place.title,
+      employer: role?.employer?.trim() || place.title,
+      yearsSinceEnd,
+      minBullets: range.min,
+      maxBullets: range.max,
+      candidateCount: candidateCountForBand(range.max, range.titleOnly),
+      isPrimary,
+      directlyRelevant,
+    });
+  }
+  return bands;
+}
+
 function recommendedIds(
   items: Array<StatementGroupItem & { rank: number }>,
   count: number,
@@ -345,102 +419,62 @@ function recommendedIds(
   return new Set(ranked.slice(0, Math.max(0, count)).map((item) => item.id));
 }
 
+export function orderRoleBullets(
+  bullets: readonly PickerBullet[],
+  candidateCount: number,
+): PickerBullet[] {
+  const specific = bullets.filter((bullet) => bullet.jobSpecific);
+  const general = bullets.filter((bullet) => !bullet.jobSpecific);
+  return [...specific, ...general].slice(0, Math.max(0, candidateCount));
+}
+
 export function buildStatementGroups(input: {
   profile: PickerProfile;
-  statements: readonly PickerStatement[];
-  assessments: readonly PickerAssessment[];
+  bullets: readonly PickerBullet[];
   settings: HarperDraftSettings;
   savedPickIds: string[] | null;
   primaryRoleId: string | null;
   directRoleIds: readonly string[];
   asOf?: Date;
 }): StatementGroup[] {
-  const asOf = input.asOf ?? new Date();
-  const places = placesForProfile(input.profile);
-  const primary = primaryPlace(places, input.primaryRoleId, asOf);
+  const bands = roleBulletBands(input);
   const saved = input.savedPickIds;
-  const buckets = new Map<string, Array<StatementGroupItem & { rank: number }>>();
-  const placeById = new Map(places.map((place) => [place.id, place]));
-
-  for (const statement of input.statements) {
-    const content = statement.content.trim();
-    if (!content) continue;
-    const place = placeForStatement(content, places);
-    const key = place?.id ?? BROADER_EXPERIENCE_ID;
-    const coverage = coverageFor(statement, input.assessments);
-    const list = buckets.get(key) ?? [];
-    list.push({
-      id: statement.id,
-      kind: statement.kind,
-      content,
-      requirementLabel: coverage.label,
-      checked: false,
-      rank: coverage.rank,
-    });
-    buckets.set(key, list);
-  }
-
-  const groups: StatementGroup[] = [];
-  const orderedIds = [
-    ...places.map((place) => place.id),
-    BROADER_EXPERIENCE_ID,
-  ];
-  for (const id of orderedIds) {
-    const raw = buckets.get(id);
-    if (!raw || raw.length === 0) continue;
-    const place = placeById.get(id) ?? null;
-    const yearsSinceEnd = place ? yearsForPlace(place, asOf) : null;
-    const isPrimary = primary?.id === id;
-    const directlyRelevant = Boolean(
-      place?.roleId && input.directRoleIds.includes(place.roleId),
+  return bands.map((band) => {
+    const shown = orderRoleBullets(
+      input.bullets.filter((bullet) => bullet.roleId === band.roleId),
+      band.candidateCount,
     );
-    const range = place
-      ? bulletRangeForRole({
-          yearsSinceEnd,
-          isPrimary,
-          directlyRelevant,
-          settings: input.settings,
-        })
-      : { min: 0, max: 0, titleOnly: false };
-    const count = range.titleOnly
-      ? 0
-      : Math.min(
-          raw.length,
-          isPrimary || directlyRelevant ? range.max : range.min,
-        );
-    const picks = recommendedIds(raw, count);
+    const recommended = Math.min(
+      shown.length,
+      band.isPrimary || band.directlyRelevant ? band.maxBullets : band.minBullets,
+    );
     const checkedIds =
       saved === null
-        ? picks
-        : new Set(raw.filter((item) => saved.includes(item.id)).map((item) => item.id));
-    groups.push({
-      id,
-      title: place?.title ?? BROADER_EXPERIENCE_TITLE,
-      roleId: place?.roleId ?? null,
-      yearsSinceEnd,
-      minBullets: range.min,
-      maxBullets: range.max,
-      titleOnly: range.titleOnly,
-      showRange: place !== null,
-      items: raw
-        .slice()
-        .sort((a, b) => b.rank - a.rank || a.id.localeCompare(b.id))
-        .map((item) => ({
-          id: item.id,
-          kind: item.kind,
-          content: item.content,
-          requirementLabel: item.requirementLabel,
-          checked: checkedIds.has(item.id),
-        })),
-    });
-  }
-  return groups;
+        ? new Set(shown.slice(0, recommended).map((bullet) => bullet.id))
+        : new Set(shown.filter((bullet) => saved.includes(bullet.id)).map((bullet) => bullet.id));
+    return {
+      id: band.roleId,
+      title: roleGroupHeader(band.title, band.employer),
+      roleId: band.roleId,
+      yearsSinceEnd: band.yearsSinceEnd,
+      minBullets: band.minBullets,
+      maxBullets: band.maxBullets,
+      titleOnly: false,
+      showRange: true,
+      items: shown.map((bullet) => ({
+        id: bullet.id,
+        kind: "RESUME_BULLET" as const,
+        content: bullet.text,
+        requirementLabel: null,
+        checked: checkedIds.has(bullet.id),
+      })),
+    };
+  });
 }
 
 export function buildResumeWriterPackage(input: {
   profile: PickerProfile;
-  statements: readonly PickerStatement[];
-  assessments: readonly PickerAssessment[];
+  bullets: readonly PickerBullet[];
   settings: HarperDraftSettings;
   savedPickIds: string[] | null;
   primaryRoleId: string | null;
@@ -460,10 +494,11 @@ export function buildResumeWriterPackage(input: {
   for (const group of groups) {
     for (const item of group.items) {
       if (!item.checked) continue;
+      const role = input.profile.experience.find((experience) => experience.id === group.roleId);
       requiredStatements.push({
         statementId: item.id,
         roleId: group.roleId,
-        roleTitle: group.title,
+        roleTitle: role?.title?.trim() || group.title,
         content: item.content,
       });
       if (group.roleId) {
@@ -489,15 +524,11 @@ export function buildResumeWriterPackage(input: {
     });
     const picks = picksByRole.get(place.roleId) ?? 0;
     const planCondensed = input.planCondensedRoleIds.includes(place.roleId);
-    let titleOnly = band.titleOnly || (planCondensed && !directlyRelevant);
-    if (picks > 0) titleOnly = false;
-    let minBullets = titleOnly ? 0 : band.min;
-    let maxBullets = titleOnly ? 0 : band.max;
-    if (!titleOnly && picks > maxBullets) maxBullets = picks;
+    const titleOnly = picks > 0 ? false : band.titleOnly || (planCondensed && !directlyRelevant);
     roleBulletPlans.push({
       roleId: place.roleId,
-      minBullets,
-      maxBullets,
+      minBullets: titleOnly ? 0 : picks,
+      maxBullets: titleOnly ? 0 : picks,
       titleOnly,
       yearsSinceEnd,
     });

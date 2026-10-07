@@ -43,6 +43,7 @@ import {
   condensedRoleIdsFromPlan,
   ensureAcceptedPresentationPlan,
 } from "./plan-service";
+import { prepareResumeBulletCandidates } from "./resume-bullet-candidate-service";
 import { loadResumeWriterFields } from "./resume-statement-picker-data";
 import type { AssetGenerationResult } from "./outreach-types";
 import { formatAssetSourceKind } from "./display";
@@ -323,6 +324,31 @@ export function logRemovedResumeClaims(
       }),
     );
   }
+}
+
+export function resumeWithExactPickedBullets(
+  content: ResumeAssetContent,
+  picks: ReadonlyArray<{ statementId: string; roleId: string | null; content: string }>,
+  sourceId: string,
+): ResumeAssetContent {
+  const byRole = new Map<string, Array<{ statementId: string; content: string }>>();
+  for (const pick of picks) {
+    if (!pick.roleId || !pick.content.trim()) continue;
+    const list = byRole.get(pick.roleId) ?? [];
+    list.push({ statementId: pick.statementId, content: pick.content });
+    byRole.set(pick.roleId, list);
+  }
+  return {
+    ...content,
+    experience: content.experience.map((role) => ({
+      ...role,
+      bullets: (byRole.get(role.roleId) ?? []).map((pick) => ({
+        id: `pick:${pick.statementId}`,
+        text: pick.content,
+        supports: [{ sourceId, quote: pick.content }],
+      })),
+    })),
+  };
 }
 
 export function resumeVersionUsable(content: ApplicationAssetContent): boolean {
@@ -1011,6 +1037,15 @@ export async function generateApplicationAsset(input: {
   const planCondensedRoleIds = condensedRoleIdsFromPlan(acceptedPlan).filter(
     (id) => !hiddenRoleIds.includes(id),
   );
+  if (input.type === "RESUME") {
+    const prepared = await prepareResumeBulletCandidates({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+    });
+    if (!prepared.ok) {
+      return { ok: false, message: prepared.message, violations: [] };
+    }
+  }
   const writer =
     input.type === "RESUME"
       ? await loadResumeWriterFields({
@@ -1085,7 +1120,7 @@ export async function generateApplicationAsset(input: {
         return { ok: true, assetId: latest.id, version: latest.version };
       }
     }
-    const content = sanitizeAssetContent(
+    const drafted = sanitizeAssetContent(
       applyProfileContactHeader(
         replaceEmDashesDeep(
           normalizeAssetSupportSourceIds(generated.data, context),
@@ -1093,6 +1128,20 @@ export async function generateApplicationAsset(input: {
         context.profile,
       ),
     );
+    const seekerSourceId =
+      context.sources.find((source) =>
+        (applicationAssetConfig.seekerSourceCategories as readonly string[]).includes(
+          source.category,
+        ),
+      )?.id ?? "profile:resume-bullet";
+    const content =
+      input.type === "RESUME" && drafted.type === "RESUME"
+        ? resumeWithExactPickedBullets(
+            drafted,
+            writer?.requiredStatements ?? [],
+            seekerSourceId,
+          )
+        : drafted;
     if (input.type === "COVER_LETTER") {
       logCoverLetterValidationAttempt({
         campaignId: context.campaign.id,
@@ -1118,11 +1167,19 @@ export async function generateApplicationAsset(input: {
             violations: [],
           };
         }
+        const savedContent =
+          dropped.content.type === "RESUME"
+            ? resumeWithExactPickedBullets(
+                dropped.content,
+                writer?.requiredStatements ?? [],
+                seekerSourceId,
+              )
+            : dropped.content;
         const saved = await saveVersion({
           context,
           type: input.type,
           personaId,
-          content: dropped.content,
+          content: savedContent,
           guidance: null,
         });
         return { ok: true, assetId: saved.id, version: saved.version };

@@ -7,6 +7,7 @@ import {
   acceptPresentationPlan,
   updateEarlierExperienceHeading,
 } from "@/lib/application-assets/plan-service";
+import { prepareResumeBulletCandidates } from "@/lib/application-assets/resume-bullet-candidate-service";
 import { saveResumeStatementPicks } from "@/lib/application-assets/resume-statement-picker-data";
 import {
   approveApplicationAsset,
@@ -44,6 +45,29 @@ function revalidate(campaign: string) {
   revalidatePath(`/campaigns/${campaign}`);
   revalidatePath(`/campaigns/${campaign}/summary`);
   revalidatePath(`/campaigns/${campaign}/assets`);
+}
+
+export async function prepareResumeBulletCandidatesAction(
+  _previous: ApplicationAssetActionResult | null,
+  formData: FormData,
+): Promise<ApplicationAssetActionResult> {
+  try {
+    await requireCurrentUser();
+    const organizationId = await requireOrganizationId();
+    const id = campaignId(formData);
+    const prepared = await prepareResumeBulletCandidates({
+      organizationId,
+      campaignId: id,
+    });
+    if (!prepared.ok) return { ok: false, message: prepared.message };
+    revalidate(id);
+    return {
+      ok: true,
+      message: applicationAssetConfig.labels.resumeBulletsPrepared,
+    };
+  } catch (error) {
+    return errorResult(error);
+  }
 }
 
 export async function saveResumeStatementPicksAction(
@@ -164,6 +188,13 @@ export async function generateApplicationAssetAction(
       .filter(Boolean);
     const regenerationInstruction =
       String(formData.get("regenerationInstruction") ?? "").trim() || null;
+    if (type === "RESUME") {
+      const prepared = await prepareResumeBulletCandidates({
+        organizationId,
+        campaignId: id,
+      });
+      if (!prepared.ok) return { ok: false, message: prepared.message };
+    }
     const { applicationAssetGenerateWouldSkip } = await import(
       "@/lib/application-assets/service"
     );

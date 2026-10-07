@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import {
+  prepareResumeBulletCandidatesAction,
   saveResumeStatementPicksAction,
   type ApplicationAssetActionResult,
 } from "@/app/actions/application-assets";
@@ -63,19 +64,7 @@ function StatementGroupFields({
                   setCount((current) => current + (event.target.checked ? 1 : -1))
                 }
               />
-              <span>
-                <span className="text-xs text-subtle">
-                  {item.kind === "RESUME_BULLET"
-                    ? labels.resumeBulletPick
-                    : labels.interviewAnswerPick}
-                  {item.requirementLabel
-                    ? ` · ${fill(labels.coversRequirement, {
-                        requirement: item.requirementLabel,
-                      })}`
-                    : ""}
-                </span>
-                <span className="mt-0.5 block">{item.content}</span>
-              </span>
+              <span className="mt-0.5 block">{item.content}</span>
             </label>
           </li>
         ))}
@@ -88,20 +77,45 @@ export function ResumeStatementPicker({
   campaignId,
   groups,
   canEdit,
+  needsPrepare,
 }: {
   campaignId: string;
   groups: StatementGroup[];
   canEdit: boolean;
+  needsPrepare: boolean;
 }) {
   const [state, action, pending] = useActionState(
     saveResumeStatementPicksAction,
     initial,
   );
+  const [prepared, prepare, preparing] = useActionState(
+    prepareResumeBulletCandidatesAction,
+    initial,
+  );
   const labels = applicationAssetConfig.labels;
-  if (groups.length === 0) return null;
+  if (groups.length === 0 && !needsPrepare) return null;
   return (
-    <form action={action} className="space-y-4" data-testid="harper-approved-statements">
+    <div className="space-y-4" data-testid="harper-approved-statements">
       <h4 className="font-semibold text-ink">{labels.harperApprovedStatements}</h4>
+      {needsPrepare && canEdit ? (
+        <form action={prepare}>
+          <input type="hidden" name="campaignId" value={campaignId} />
+          <button
+            type="submit"
+            disabled={preparing}
+            className="rounded-md bg-ink px-3 py-2 text-sm font-medium text-on-ink disabled:opacity-60"
+          >
+            {labels.prepareResumeBullets}
+          </button>
+          {prepared ? (
+            <p className={prepared.ok ? "mt-2 text-sm text-success" : "mt-2 text-sm text-danger"} role="status">
+              {prepared.message}
+            </p>
+          ) : null}
+        </form>
+      ) : null}
+      {groups.length === 0 ? null : (
+    <form action={action} className="space-y-4">
       <input type="hidden" name="campaignId" value={campaignId} />
       {groups.map((group) => (
         <StatementGroupFields key={group.id} group={group} canEdit={canEdit} />
@@ -121,5 +135,7 @@ export function ResumeStatementPicker({
         </p>
       ) : null}
     </form>
+      )}
+    </div>
   );
 }

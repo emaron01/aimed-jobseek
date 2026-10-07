@@ -1,12 +1,11 @@
 import { Prisma } from "@prisma/client";
-import { acceptedPresentationPlan } from "@/lib/application-assets/plan-service";
+import { readResumeBulletCandidates } from "@/lib/application-assets/resume-bullet-candidate-service";
 import {
   buildResumeWriterPackage,
   buildStatementGroups,
-  pickerProfileFromCandidate,
   resumeStatementPicksFromCampaign,
   workspaceSeenWithoutResumePicks,
-  type PickerStatement,
+  type PickerBullet,
   type RoleBulletPlan,
   type RequiredResumeStatement,
   type StatementGroup,
@@ -14,19 +13,18 @@ import {
 import type { PresentationPlan } from "@/lib/application-assets/plan-contract";
 import { getHarperDraftSettings } from "@/lib/consultation/harper-draft-settings";
 import { prisma } from "@/lib/prisma-client";
-import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { TenantError } from "@/lib/tenant/errors";
-
-const PICK_KINDS = ["INTERVIEW_ANSWER", "RESUME_BULLET"] as const;
 
 async function loadPickerRows(input: {
   organizationId: string;
   campaignId: string;
 }): Promise<{
   savedPickIds: string[] | null;
-  statements: PickerStatement[];
-  assessments: Array<{ targetKey: string; text: string; strength: string }>;
-  profile: ReturnType<typeof pickerProfileFromCandidate>;
+  bullets: PickerBullet[];
+  profile: NonNullable<Awaited<ReturnType<typeof readResumeBulletCandidates>>>["packet"]["profile"];
+  primaryRoleId: string | null;
+  directRoleIds: string[];
+  needsPrepare: boolean;
 } | null> {
   const campaign = await prisma.campaign.findFirst({
     where: { id: input.campaignId, organizationId: input.organizationId },
@@ -44,38 +42,8 @@ async function loadPickerRows(input: {
     },
   });
   if (!campaign) return null;
-  const parsed = parseCandidateProfileSafe(campaign.product.profileJson);
-  const profile = pickerProfileFromCandidate(
-    parsed.ok
-      ? parsed.profile
-      : { experience: [], education: [], problemsSolved: [] },
-  );
-  const rows = await prisma.consultationStatement.findMany({
-    where: {
-      organizationId: input.organizationId,
-      status: "APPROVED",
-      kind: { in: [...PICK_KINDS] },
-      approvedAt: { not: null },
-    },
-    select: {
-      id: true,
-      kind: true,
-      content: true,
-      turn: { select: { targetKey: true } },
-    },
-    orderBy: { approvedAt: "asc" },
-  });
-  const statements: PickerStatement[] = rows.flatMap((row) => {
-    if (row.kind !== "INTERVIEW_ANSWER" && row.kind !== "RESUME_BULLET") return [];
-    return [
-      {
-        id: row.id,
-        kind: row.kind,
-        content: row.content,
-        targetKey: row.turn?.targetKey ?? null,
-      },
-    ];
-  });
+  const candidates = await readResumeBulletCandidates(input);
+  if (!candidates) return null;
   const stored = resumeStatementPicksFromCampaign({
     resumeStatementPicksJson: campaign.resumeStatementPicksJson,
     workspaceSeenJson: campaign.workspaceSeenJson,
@@ -92,32 +60,34 @@ async function loadPickerRows(input: {
   }
   return {
     savedPickIds: stored.picks,
-    statements,
-    assessments: campaign.consultationSession?.assessments ?? [],
-    profile,
+    bullets: candidates.bullets,
+    profile: candidates.packet.profile,
+    primaryRoleId: candidates.packet.primaryRoleId,
+    directRoleIds: candidates.packet.directRoleIds,
+    needsPrepare: candidates.needsPrepare,
   };
 }
 
 export async function loadResumeStatementGroups(input: {
   organizationId: string;
   campaignId: string;
-}): Promise<StatementGroup[]> {
-  const [rows, settings, plan] = await Promise.all([
+}): Promise<{ groups: StatementGroup[]; needsPrepare: boolean }> {
+  const [rows, settings] = await Promise.all([
     loadPickerRows(input),
     getHarperDraftSettings(),
-    acceptedPresentationPlan({ ...input, type: "RESUME" }),
   ]);
-  if (!rows) return [];
-  const resumePlan = plan?.type === "RESUME" ? plan : null;
-  return buildStatementGroups({
-    profile: rows.profile,
-    statements: rows.statements,
-    assessments: rows.assessments,
-    settings,
-    savedPickIds: rows.savedPickIds,
-    primaryRoleId: resumePlan?.primaryRoleId ?? null,
-    directRoleIds: resumePlan?.directRoleIds ?? [],
-  });
+  if (!rows) return { groups: [], needsPrepare: false };
+  return {
+    needsPrepare: rows.needsPrepare,
+    groups: buildStatementGroups({
+      profile: rows.profile,
+      bullets: rows.bullets,
+      settings,
+      savedPickIds: rows.savedPickIds,
+      primaryRoleId: rows.primaryRoleId,
+      directRoleIds: rows.directRoleIds,
+    }),
+  };
 }
 
 export async function loadResumeWriterFields(input: {
@@ -144,15 +114,13 @@ export async function loadResumeWriterFields(input: {
       ),
     };
   }
-  const resumePlan = input.plan?.type === "RESUME" ? input.plan : null;
   return buildResumeWriterPackage({
     profile: rows.profile,
-    statements: rows.statements,
-    assessments: rows.assessments,
+    bullets: rows.bullets,
     settings,
     savedPickIds: rows.savedPickIds,
-    primaryRoleId: resumePlan?.primaryRoleId ?? null,
-    directRoleIds: resumePlan?.directRoleIds ?? [],
+    primaryRoleId: rows.primaryRoleId,
+    directRoleIds: rows.directRoleIds,
     planCondensedRoleIds: input.planCondensedRoleIds,
     hiddenRoleIds: input.hiddenRoleIds,
   });
@@ -169,18 +137,8 @@ export async function saveResumeStatementPicks(input: {
   });
   if (!campaign) throw new TenantError("Application was not found.");
   const requested = [...new Set(input.statementIds.map((id) => id.trim()).filter(Boolean))];
-  const allowed = requested.length
-    ? await prisma.consultationStatement.findMany({
-        where: {
-          organizationId: input.organizationId,
-          id: { in: requested },
-          status: "APPROVED",
-          kind: { in: [...PICK_KINDS] },
-        },
-        select: { id: true },
-      })
-    : [];
-  const allowedIds = new Set(allowed.map((row) => row.id));
+  const stored = await readResumeBulletCandidates(input);
+  const allowedIds = new Set((stored?.bullets ?? []).map((bullet) => bullet.id));
   const picks = requested.filter((id) => allowedIds.has(id));
   await prisma.campaign.update({
     where: { id: input.campaignId },

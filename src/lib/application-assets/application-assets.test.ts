@@ -366,6 +366,7 @@ describe.skipIf(!hasTestDatabase())("application assets", { timeout: 60_000 }, (
             "COVER_LETTER_ASSET",
             "PRESENTATION_PLAN",
             "ASSET_CLAIM_VALIDATION",
+            "RESUME_BULLET_CANDIDATES",
           ],
         },
       },
@@ -533,6 +534,7 @@ describe.skipIf(!hasTestDatabase())("application assets", { timeout: 60_000 }, (
             "COVER_LETTER_ASSET",
             "PRESENTATION_PLAN",
             "ASSET_CLAIM_VALIDATION",
+            "RESUME_BULLET_CANDIDATES",
           ],
         },
       },
@@ -541,6 +543,20 @@ describe.skipIf(!hasTestDatabase())("application assets", { timeout: 60_000 }, (
     const coverLetters = [...(input?.coverLetters ?? [])];
     generateStructured.mockImplementation(
       async (request: { schemaName: string; messages: Array<{ content: string }> }) => {
+        if (request.schemaName === "resume_bullet_candidates") {
+          const upcoming = resumes[0] ?? validResume();
+          return {
+            data: {
+              bullets: upcoming.experience.flatMap((role) =>
+                role.bullets.map((bullet) => ({
+                  roleId: role.roleId,
+                  text: bullet.text,
+                  jobSpecific: true,
+                })),
+              ),
+            },
+          };
+        }
         if (request.schemaName === "application_resume") {
           return { data: resumes.shift() ?? validResume() };
         }

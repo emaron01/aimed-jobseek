@@ -10,9 +10,17 @@ Use the supplied header facts only. Put city and state, phone, email, and Linked
 
 Write a concise job-specific summary. Use approved resume bullets when they are strong and relevant. Keep bullets direct and factual. Skills, education, and credentials must be supported seeker facts.
 
-Use every requiredStatements item in the role named by its roleId. When roleId is null, use that statement in the summary. Then fill each experience role from the Personal Profile achievements and other approved evidence until it reaches that role's roleBulletPlans range, so the resume is full and not only requirement answers. Stay within minBullets and maxBullets. When titleOnly is true, write the title, company, and dates only and write no bullets for that role.
+Use each picked bullet exactly as written, in the role it was picked for. Do not rewrite a picked bullet and do not add a bullet that was not picked. You may write the summary, the skills, and each role's title, company, and dates.
 
 Write only as much as the evidence supports. Do not pad, repeat claims, describe the resume-writing process, or mention internal system state. Do not invent a number, employer, title, date, credential, or outcome the seeker did not state. Paraphrase is allowed when the facts stay the same. Write the way the seeker writes, in plain professional language. Use the seeker's voice samples and their own words from consultation answers whenever those are supplied. Avoid phrasing that reads as AI-generated. If qualityFeedback names a field, rewrite only that field. Return structured JSON only.`;
+
+export const RESUME_BULLET_CANDIDATE_INSTRUCTIONS = `Turn the seeker's evidence into resume bullet candidates for this job.
+
+Use only the supplied Personal Profile achievements, approved interview answers, approved resume bullets, and seeker replies. The seeker's words are the evidence. Do not add a number, employer, title, date, credential, skill, or outcome the seeker did not state.
+
+Write each bullet as one line of about 30 words. Assign each bullet to exactly one supplied Personal Profile role id. When one piece of evidence covers more than one role, write a separate bullet for each role. For each role, write up to the number of bullets given for that role. Start each bullet with a strong action verb and include the result or number when the seeker stated one. Mark whether the bullet is specific to this job. Rank job-specific bullets ahead of general accomplishments for the same role.
+
+Return structured JSON only.`;
 
 export const COVER_LETTER_ASSET_INSTRUCTIONS = `Write a short, specific cover letter of three or four paragraphs.
 

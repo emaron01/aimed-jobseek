@@ -588,6 +588,7 @@ function AssetTypePanel({
   profileHref,
   profileEditHref,
   statementGroups,
+  needsPrepare,
 }: {
   campaignId: string;
   type: "RESUME" | "COVER_LETTER";
@@ -601,6 +602,7 @@ function AssetTypePanel({
   profileHref: string | null;
   profileEditHref: string | null;
   statementGroups: StatementGroup[];
+  needsPrepare: boolean;
 }) {
   const [result, action] = useActionState(generateApplicationAssetAction, initial);
   const orderedRows = sortAssetsNewestFirst(rows);
@@ -628,6 +630,7 @@ function AssetTypePanel({
           campaignId={campaignId}
           groups={statementGroups}
           canEdit={canEdit}
+          needsPrepare={needsPrepare}
         />
       ) : null}
       {latest?.staleReason ? (
@@ -760,6 +763,7 @@ export function ApplicationAssetsSection({
   profileEditHref = null,
   defaultOpen = false,
   statementGroups = [],
+  needsPrepare = false,
 }: {
   campaignId: string;
   assets: Array<
@@ -777,6 +781,7 @@ export function ApplicationAssetsSection({
   profileEditHref?: string | null;
   defaultOpen?: boolean;
   statementGroups?: StatementGroup[];
+  needsPrepare?: boolean;
 }) {
   const [activeType, setActiveType] = useState<"RESUME" | "COVER_LETTER">(
     "RESUME",
@@ -881,6 +886,7 @@ export function ApplicationAssetsSection({
                   type === "RESUME" ? missingResumeContacts : []
                 }
                 statementGroups={type === "RESUME" ? statementGroups : []}
+                needsPrepare={type === "RESUME" ? needsPrepare : false}
                 profileHref={profileHref}
                 profileEditHref={profileEditHref}
               />
