@@ -5,10 +5,8 @@ import {
   profileWithBulletRoleChoices,
   profileWithBulletTextEdits,
   profileWithDismissedBullet,
-  profileWithHiddenRole,
   profileWithoutSeekerBullet,
   profileWithSeekerBullet,
-  readHiddenRoleIds,
   textIsDismissed,
 } from "@/lib/application-assets/resume-bullet-candidates";
 import { readResumeBulletCandidates } from "@/lib/application-assets/resume-bullet-candidate-service";
@@ -17,7 +15,11 @@ import {
   buildResumeWriterPackage,
   buildStatementGroups,
   bulletDisplayId,
+  carryProfileHiddenRoles,
+  readResumePicksHiddenRoleIds,
+  resumePicksWithRoleLeftOff,
   resumeStatementPicksFromCampaign,
+  resumeStatementPicksJsonWith,
   roleGroupHeader,
   workspaceSeenWithoutResumePicks,
   type PickerBullet,
@@ -31,6 +33,43 @@ import type { PresentationPlan } from "@/lib/application-assets/plan-contract";
 import { getHarperDraftSettings } from "@/lib/consultation/harper-draft-settings";
 import { prisma } from "@/lib/prisma-client";
 import { TenantError } from "@/lib/tenant/errors";
+
+/** Copies profile-level hides onto applications that already have picker state, then clears the profile field. */
+async function persistCarriedHiddenRoles(input: {
+  organizationId: string;
+  productId: string;
+  profileJson: unknown;
+}): Promise<Map<string, unknown> | null> {
+  const profile =
+    input.profileJson && typeof input.profileJson === "object" && !Array.isArray(input.profileJson)
+      ? (input.profileJson as Record<string, unknown>)
+      : null;
+  if (!profile || !Object.prototype.hasOwnProperty.call(profile, "hiddenRoleIds")) return null;
+  const campaigns = await prisma.campaign.findMany({
+    where: { organizationId: input.organizationId, productId: input.productId },
+    select: { id: true, resumeStatementPicksJson: true, workspaceSeenJson: true },
+  });
+  const carried = carryProfileHiddenRoles({ profileJson: input.profileJson, campaigns });
+  if (!carried) return null;
+  await prisma.$transaction([
+    ...carried.updates.map((update) =>
+      prisma.campaign.update({
+        where: { id: update.id },
+        data: {
+          resumeStatementPicksJson: update.resumeStatementPicksJson as Prisma.InputJsonValue,
+          ...(update.workspaceSeenJson
+            ? { workspaceSeenJson: update.workspaceSeenJson as Prisma.InputJsonValue }
+            : {}),
+        },
+      }),
+    ),
+    prisma.product.updateMany({
+      where: { id: input.productId, organizationId: input.organizationId },
+      data: { profileJson: carried.profileJson as Prisma.InputJsonValue },
+    }),
+  ]);
+  return new Map(carried.updates.map((update) => [update.id, update.resumeStatementPicksJson]));
+}
 
 async function loadPickerRows(input: {
   organizationId: string;
@@ -64,8 +103,14 @@ async function loadPickerRows(input: {
   if (!campaign) return null;
   const candidates = await readResumeBulletCandidates(input);
   if (!candidates) return null;
+  const carried = await persistCarriedHiddenRoles({
+    organizationId: input.organizationId,
+    productId: candidates.packet.productId,
+    profileJson: candidates.packet.profileJson,
+  });
+  const picksJson = carried?.get(input.campaignId) ?? campaign.resumeStatementPicksJson;
   const stored = resumeStatementPicksFromCampaign({
-    resumeStatementPicksJson: campaign.resumeStatementPicksJson,
+    resumeStatementPicksJson: picksJson,
     workspaceSeenJson: campaign.workspaceSeenJson,
   });
   if (stored.carryOver) {
@@ -73,7 +118,10 @@ async function loadPickerRows(input: {
     await prisma.campaign.update({
       where: { id: input.campaignId },
       data: {
-        resumeStatementPicksJson: stored.carryOver,
+        resumeStatementPicksJson: resumeStatementPicksJsonWith({
+          current: picksJson,
+          picks: stored.carryOver,
+        }) as Prisma.InputJsonValue,
         ...(seen ? { workspaceSeenJson: seen as Prisma.InputJsonValue } : {}),
       },
     });
@@ -85,7 +133,7 @@ async function loadPickerRows(input: {
     profile: candidates.packet.profile,
     primaryRoleId: candidates.packet.primaryRoleId,
     directRoleIds: candidates.packet.directRoleIds,
-    hiddenRoleIds: readHiddenRoleIds(candidates.packet.profileJson),
+    hiddenRoleIds: readResumePicksHiddenRoleIds(picksJson),
     dismissedTexts: candidates.packet.dismissedTexts,
     needsPrepare: candidates.needsPrepare,
   };
@@ -235,30 +283,48 @@ export async function saveBulletEvidenceRole(input: {
       group.items.filter((item) => item.checked).map((item) => item.id),
     );
   const picks = [...new Set([...alreadyChecked, bullet.id])];
+  const latest = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: { resumeStatementPicksJson: true },
+  });
   await prisma.campaign.update({
     where: { id: input.campaignId },
-    data: { resumeStatementPicksJson: picks },
+    data: {
+      resumeStatementPicksJson: resumeStatementPicksJsonWith({
+        current: latest?.resumeStatementPicksJson,
+        picks,
+      }) as Prisma.InputJsonValue,
+    },
   });
 }
 
-/** The jobs this seeker left off the resume. Does not call a model. */
+/** The jobs this application left off the resume. Does not call a model. */
 export async function hiddenRoleIdsForCampaign(input: {
   organizationId: string;
   campaignId: string;
 }): Promise<string[]> {
   const campaign = await prisma.campaign.findFirst({
     where: { id: input.campaignId, organizationId: input.organizationId },
-    select: { product: { select: { profileJson: true } } },
+    select: {
+      resumeStatementPicksJson: true,
+      product: { select: { id: true, profileJson: true } },
+    },
   });
   if (!campaign) return [];
+  const carried = await persistCarriedHiddenRoles({
+    organizationId: input.organizationId,
+    productId: campaign.product.id,
+    profileJson: campaign.product.profileJson,
+  });
+  const picksJson = carried?.get(input.campaignId) ?? campaign.resumeStatementPicksJson;
   const parsed = parseCandidateProfileSafe(campaign.product.profileJson);
   const allowed = new Set(
     (parsed.ok ? parsed.profile.experience : []).map((role) => role.id),
   );
-  return readHiddenRoleIds(campaign.product.profileJson).filter((id) => allowed.has(id));
+  return readResumePicksHiddenRoleIds(picksJson).filter((id) => allowed.has(id));
 }
 
-/** Remembers that a job is left off the resume, or put back on. Does not call a model. */
+/** Remembers that this application left a job off the resume, or put it back on. Does not call a model. */
 export async function saveResumeRoleVisibility(input: {
   organizationId: string;
   campaignId: string;
@@ -267,7 +333,10 @@ export async function saveResumeRoleVisibility(input: {
 }): Promise<void> {
   const campaign = await prisma.campaign.findFirst({
     where: { id: input.campaignId, organizationId: input.organizationId },
-    select: { product: { select: { id: true, profileJson: true } } },
+    select: {
+      resumeStatementPicksJson: true,
+      product: { select: { id: true, profileJson: true } },
+    },
   });
   if (!campaign) throw new TenantError("Application was not found.");
   const roleId = input.roleId.trim();
@@ -276,11 +345,17 @@ export async function saveResumeRoleVisibility(input: {
     (parsed.ok ? parsed.profile.experience : []).map((role) => role.id),
   );
   if (!allowed.has(roleId)) throw new TenantError("That job is not on the Personal Profile.");
-  await prisma.product.update({
-    where: { id: campaign.product.id },
+  const carried = await persistCarriedHiddenRoles({
+    organizationId: input.organizationId,
+    productId: campaign.product.id,
+    profileJson: campaign.product.profileJson,
+  });
+  const current = carried?.get(input.campaignId) ?? campaign.resumeStatementPicksJson;
+  await prisma.campaign.update({
+    where: { id: input.campaignId },
     data: {
-      profileJson: profileWithHiddenRole(
-        campaign.product.profileJson,
+      resumeStatementPicksJson: resumePicksWithRoleLeftOff(
+        current,
         roleId,
         input.leftOff,
       ) as Prisma.InputJsonValue,
@@ -334,9 +409,18 @@ export async function addSeekerBullet(input: {
     (await loadResumeStatementGroups(input)).groups.flatMap((group) =>
       group.items.filter((item) => item.checked).map((item) => item.id),
     );
+  const latest = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: { resumeStatementPicksJson: true },
+  });
   await prisma.campaign.update({
     where: { id: input.campaignId },
-    data: { resumeStatementPicksJson: [...new Set([...alreadyChecked, id])] },
+    data: {
+      resumeStatementPicksJson: resumeStatementPicksJsonWith({
+        current: latest?.resumeStatementPicksJson,
+        picks: [...new Set([...alreadyChecked, id])],
+      }) as Prisma.InputJsonValue,
+    },
   });
   return id;
 }
@@ -374,24 +458,18 @@ export async function removePickerBullet(input: {
     data: { profileJson: profileJson as Prisma.InputJsonValue },
   });
   const stored = campaign.resumeStatementPicksJson;
-  if (Array.isArray(stored)) {
+  const saved = resumeStatementPicksFromCampaign({
+    resumeStatementPicksJson: stored,
+    workspaceSeenJson: null,
+  }).picks;
+  if (saved) {
     await prisma.campaign.update({
       where: { id: input.campaignId },
       data: {
-        resumeStatementPicksJson: stored.filter((id) => id !== bullet.id),
-      },
-    });
-    return;
-  }
-  if (stored && typeof stored === "object" && Array.isArray((stored as { picks?: unknown }).picks)) {
-    const record = stored as { picks: unknown[]; seen?: unknown };
-    await prisma.campaign.update({
-      where: { id: input.campaignId },
-      data: {
-        resumeStatementPicksJson: {
-          ...record,
-          picks: record.picks.filter((id) => id !== bullet.id),
-        } as Prisma.InputJsonValue,
+        resumeStatementPicksJson: resumeStatementPicksJsonWith({
+          current: stored,
+          picks: saved.filter((id) => id !== bullet.id),
+        }) as Prisma.InputJsonValue,
       },
     });
   }
@@ -438,7 +516,12 @@ export async function saveBulletText(input: {
   if (saved && !saved.includes(bullet.id)) {
     await prisma.campaign.update({
       where: { id: input.campaignId },
-      data: { resumeStatementPicksJson: [...saved, bullet.id] },
+      data: {
+        resumeStatementPicksJson: resumeStatementPicksJsonWith({
+          current: campaignPicks?.resumeStatementPicksJson,
+          picks: [...saved, bullet.id],
+        }) as Prisma.InputJsonValue,
+      },
     });
   }
 }
@@ -450,7 +533,7 @@ export async function saveResumeStatementPicks(input: {
 }): Promise<void> {
   const campaign = await prisma.campaign.findFirst({
     where: { id: input.campaignId, organizationId: input.organizationId },
-    select: { id: true },
+    select: { id: true, resumeStatementPicksJson: true },
   });
   if (!campaign) throw new TenantError("Application was not found.");
   const requested = [...new Set(input.statementIds.map((id) => id.trim()).filter(Boolean))];
@@ -460,10 +543,11 @@ export async function saveResumeStatementPicks(input: {
   await prisma.campaign.update({
     where: { id: input.campaignId },
     data: {
-      resumeStatementPicksJson: {
+      resumeStatementPicksJson: resumeStatementPicksJsonWith({
+        current: campaign.resumeStatementPicksJson,
         picks,
         seen: [...allowedIds],
-      },
+      }) as Prisma.InputJsonValue,
     },
   });
 }

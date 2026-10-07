@@ -205,34 +205,165 @@ export function readResumeStatementPickIds(value: unknown): string[] | null {
  * The column wins. Null means Harper's recommendation, unless an older seen
  * document still holds a saved array, which is carried over once.
  */
+function hiddenRoleIdsFromJson(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return [
+    ...new Set(raw.flatMap((item) => (typeof item === "string" && item.trim() ? [item.trim()] : []))),
+  ];
+}
+
+function picksRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+/** Job ids this application left off. Absent from an array of picks, which has no hide list. */
+export function readResumePicksHiddenRoleIds(resumeStatementPicksJson: unknown): string[] {
+  return hiddenRoleIdsFromJson(picksRecord(resumeStatementPicksJson)?.hiddenRoleIds);
+}
+
+/**
+ * Writes one application's hide list beside its picks and seen.
+ * An array of picks becomes `{ picks, hiddenRoleIds }` so the picks stay.
+ */
+export function resumePicksWithRoleLeftOff(
+  current: unknown,
+  roleId: string,
+  leftOff: boolean,
+): Record<string, unknown> {
+  const ids = new Set(readResumePicksHiddenRoleIds(current));
+  const id = roleId.trim();
+  if (leftOff && id) ids.add(id);
+  else ids.delete(id);
+  return picksJsonWithHiddenRoleIds(current, [...ids]);
+}
+
+function picksJsonWithHiddenRoleIds(
+  current: unknown,
+  hiddenRoleIds: readonly string[],
+): Record<string, unknown> {
+  const ids = hiddenRoleIdsFromJson(hiddenRoleIds);
+  if (Array.isArray(current)) return { picks: normalizePickIds(current), hiddenRoleIds: ids };
+  if (current && typeof current === "object") {
+    return { ...(current as Record<string, unknown>), hiddenRoleIds: ids };
+  }
+  return { hiddenRoleIds: ids };
+}
+
+/**
+ * Replaces picks, and seen when it is passed, without dropping a hide list already stored beside them.
+ * Keeps a plain array when this application has no hide list and no seen set.
+ */
+export function resumeStatementPicksJsonWith(input: {
+  current: unknown;
+  picks: readonly string[];
+  seen?: readonly string[] | null;
+}): string[] | Record<string, unknown> {
+  const hidden = readResumePicksHiddenRoleIds(input.current);
+  const record = picksRecord(input.current);
+  const currentSeen = record && Array.isArray(record.seen) ? normalizePickIds(record.seen) : null;
+  const seen = input.seen === undefined ? currentSeen : input.seen;
+  const picks = normalizePickIds(input.picks);
+  if (hidden.length === 0 && !Array.isArray(seen)) return picks;
+  const json: Record<string, unknown> = { picks };
+  if (Array.isArray(seen)) json.seen = seen;
+  if (hidden.length > 0) json.hiddenRoleIds = hidden;
+  return json;
+}
+
+/** True when this application has saved picker JSON, including picks carried in workspace seen. */
+export function campaignHasResumePickerState(input: {
+  resumeStatementPicksJson: unknown;
+  workspaceSeenJson: unknown;
+}): boolean {
+  if (input.resumeStatementPicksJson != null) return true;
+  return readResumeStatementPickIds(input.workspaceSeenJson) !== null;
+}
+
+/**
+ * Copies profile-level hidden job ids once onto every application that already has picker state.
+ * Applications with no picker state stay untouched. The profile field is removed.
+ * Returns null when the profile has no such field.
+ */
+export function carryProfileHiddenRoles(input: {
+  profileJson: unknown;
+  campaigns: ReadonlyArray<{
+    id: string;
+    resumeStatementPicksJson: unknown;
+    workspaceSeenJson: unknown;
+  }>;
+}): {
+  profileJson: Record<string, unknown>;
+  updates: Array<{
+    id: string;
+    resumeStatementPicksJson: Record<string, unknown>;
+    workspaceSeenJson?: Record<string, unknown>;
+  }>;
+} | null {
+  const profile =
+    input.profileJson && typeof input.profileJson === "object" && !Array.isArray(input.profileJson)
+      ? { ...(input.profileJson as Record<string, unknown>) }
+      : null;
+  if (!profile || !Object.prototype.hasOwnProperty.call(profile, "hiddenRoleIds")) return null;
+  const hidden = hiddenRoleIdsFromJson(profile.hiddenRoleIds);
+  delete profile.hiddenRoleIds;
+  const updates = hidden.length
+    ? input.campaigns.flatMap((campaign) => {
+        if (!campaignHasResumePickerState(campaign)) return [];
+        let current = campaign.resumeStatementPicksJson;
+        let workspaceSeenJson: Record<string, unknown> | undefined;
+        if (current == null) {
+          const fromSeen = readResumeStatementPickIds(campaign.workspaceSeenJson);
+          if (fromSeen) {
+            current = fromSeen;
+            workspaceSeenJson = workspaceSeenWithoutResumePicks(campaign.workspaceSeenJson) ?? {};
+          }
+        }
+        return [
+          {
+            id: campaign.id,
+            resumeStatementPicksJson: picksJsonWithHiddenRoleIds(current, [
+              ...readResumePicksHiddenRoleIds(current),
+              ...hidden,
+            ]),
+            ...(workspaceSeenJson ? { workspaceSeenJson } : {}),
+          },
+        ];
+      })
+    : [];
+  return { profileJson: profile, updates };
+}
+
 export function resumeStatementPicksFromCampaign(input: {
   resumeStatementPicksJson: unknown;
   workspaceSeenJson: unknown;
-}): { picks: string[] | null; seen: string[] | null; carryOver: string[] | null } {
+}): {
+  picks: string[] | null;
+  seen: string[] | null;
+  carryOver: string[] | null;
+  hiddenRoleIds: string[];
+} {
+  const hiddenRoleIds = readResumePicksHiddenRoleIds(input.resumeStatementPicksJson);
   if (Array.isArray(input.resumeStatementPicksJson)) {
     return {
       picks: normalizePickIds(input.resumeStatementPicksJson),
       seen: null,
       carryOver: null,
+      hiddenRoleIds,
     };
   }
-  if (
-    input.resumeStatementPicksJson &&
-    typeof input.resumeStatementPicksJson === "object" &&
-    !Array.isArray(input.resumeStatementPicksJson)
-  ) {
-    const record = input.resumeStatementPicksJson as Record<string, unknown>;
-    if (Array.isArray(record.picks)) {
-      return {
-        picks: normalizePickIds(record.picks),
-        seen: Array.isArray(record.seen) ? normalizePickIds(record.seen) : null,
-        carryOver: null,
-      };
-    }
+  if (picksRecord(input.resumeStatementPicksJson) && Array.isArray(picksRecord(input.resumeStatementPicksJson)?.picks)) {
+    const record = picksRecord(input.resumeStatementPicksJson)!;
+    return {
+      picks: normalizePickIds(record.picks),
+      seen: Array.isArray(record.seen) ? normalizePickIds(record.seen) : null,
+      carryOver: null,
+      hiddenRoleIds,
+    };
   }
   const fromSeen = readResumeStatementPickIds(input.workspaceSeenJson);
-  if (fromSeen === null) return { picks: null, seen: null, carryOver: null };
-  return { picks: fromSeen, seen: null, carryOver: fromSeen };
+  if (fromSeen === null) return { picks: null, seen: null, carryOver: null, hiddenRoleIds };
+  return { picks: fromSeen, seen: null, carryOver: fromSeen, hiddenRoleIds };
 }
 
 export function workspaceSeenWithoutResumePicks(

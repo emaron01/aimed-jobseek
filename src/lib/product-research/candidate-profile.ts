@@ -127,8 +127,6 @@ export const candidateProfileSchema = z.object({
   dismissedBulletTexts: z.array(z.string().trim().min(1)).optional(),
   /** Result key to the seeker's edited bullet text. A seeker's edit wins over the next draft. */
   bulletTextEdits: z.record(z.string(), z.string()).optional(),
-  /** Profile role ids the seeker left off the resume. The same hiddenRoleIds the resume already uses. */
-  hiddenRoleIds: z.array(z.string().trim().min(1)).optional(),
   /** Bullets the seeker edited or picked. They stay until the seeker removes one. */
   seekerBullets: z
     .array(

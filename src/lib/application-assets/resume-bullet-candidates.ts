@@ -745,34 +745,6 @@ export type SeekerBulletRecord = {
   roleId: string | null;
 };
 
-export function readHiddenRoleIds(profileJson: unknown): string[] {
-  if (!profileJson || typeof profileJson !== "object" || Array.isArray(profileJson)) return [];
-  const raw = (profileJson as Record<string, unknown>).hiddenRoleIds;
-  if (!Array.isArray(raw)) return [];
-  return [
-    ...new Set(
-      raw.flatMap((item) => (typeof item === "string" && item.trim() ? [item.trim()] : [])),
-    ),
-  ];
-}
-
-export function profileWithHiddenRole(
-  profileJson: unknown,
-  roleId: string,
-  leftOff: boolean,
-): Record<string, unknown> {
-  const base =
-    profileJson && typeof profileJson === "object" && !Array.isArray(profileJson)
-      ? { ...(profileJson as Record<string, unknown>) }
-      : {};
-  const ids = new Set(readHiddenRoleIds(base));
-  const id = roleId.trim();
-  if (leftOff) ids.add(id);
-  else ids.delete(id);
-  base.hiddenRoleIds = [...ids];
-  return base;
-}
-
 export function readSeekerBullets(profileJson: unknown): SeekerBulletRecord[] {
   if (!profileJson || typeof profileJson !== "object" || Array.isArray(profileJson)) return [];
   const raw = (profileJson as Record<string, unknown>).seekerBullets;

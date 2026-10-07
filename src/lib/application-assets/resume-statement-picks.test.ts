@@ -28,12 +28,10 @@ import {
   profileWithBulletRoleChoices,
   profileWithBulletTextEdits,
   profileWithDismissedBullet,
-  profileWithHiddenRole,
   profileWithoutSeekerBullet,
   profileWithSeekerBullet,
   readDismissedBulletTexts,
   questionTextForAnswer,
-  readHiddenRoleIds,
   readSeekerBullets,
   seekerBulletEvidence,
   readBulletTextEdits,
@@ -47,6 +45,9 @@ import {
   buildResumeWriterPackage,
   buildStatementGroups,
   bulletDisplayId,
+  carryProfileHiddenRoles,
+  readResumePicksHiddenRoleIds,
+  resumePicksWithRoleLeftOff,
   candidateCountForBand,
   orderRolesMostRecentFirst,
   resumeStatementPicksFromCampaign,
@@ -2001,9 +2002,7 @@ describe("role date order for every seeker date format", () => {
       educationTexts: nursingProfile.educationTexts,
       projectTexts: graduateProfile.projectTexts,
     };
-    const stored = profileWithHiddenRole({ seekerBullets: [] }, "legacy", true);
-    expect(readHiddenRoleIds(stored)).toEqual(["legacy"]);
-    expect(readHiddenRoleIds(profileWithHiddenRole(stored, "legacy", false))).toEqual([]);
+    const stored = { seekerBullets: [] };
 
     const emptyGroups = buildStatementGroups({
       profile,
@@ -2310,5 +2309,160 @@ describe("role date order for every seeker date format", () => {
     expect(removeFn).not.toContain("generateStructured");
     expect(removeFn).not.toContain("consultationStatement");
     expect(removeFn).not.toContain("achievements:");
+  });
+
+  it("hides a job on one application only and carries existing hides onto picker state", () => {
+    const profileJson = {
+      hiddenRoleIds: ["mercy"],
+      seekerBullets: [{ id: "keep", text: "Kept.", roleId: "opentext" }],
+    };
+    const carried = carryProfileHiddenRoles({
+      profileJson,
+      campaigns: [
+        {
+          id: "app-a",
+          resumeStatementPicksJson: { picks: ["stmt-1"], seen: ["stmt-1", "stmt-2"] },
+          workspaceSeenJson: null,
+        },
+        {
+          id: "app-b",
+          resumeStatementPicksJson: ["stmt-2"],
+          workspaceSeenJson: null,
+        },
+        {
+          id: "app-new",
+          resumeStatementPicksJson: null,
+          workspaceSeenJson: null,
+        },
+      ],
+    });
+    expect(carried?.profileJson).not.toHaveProperty("hiddenRoleIds");
+    expect(carried?.profileJson.seekerBullets).toEqual(profileJson.seekerBullets);
+    const appA = carried?.updates.find((item) => item.id === "app-a")?.resumeStatementPicksJson;
+    const appB = carried?.updates.find((item) => item.id === "app-b")?.resumeStatementPicksJson;
+    expect(appA).toEqual({
+      picks: ["stmt-1"],
+      seen: ["stmt-1", "stmt-2"],
+      hiddenRoleIds: ["mercy"],
+    });
+    expect(appB).toEqual({ picks: ["stmt-2"], hiddenRoleIds: ["mercy"] });
+    expect(carried?.updates.find((item) => item.id === "app-new")).toBeUndefined();
+    expect(
+      carryProfileHiddenRoles({ profileJson: carried?.profileJson, campaigns: [] }),
+    ).toBeNull();
+
+    const leftOffA = resumePicksWithRoleLeftOff(appA, "mercy", true);
+    const leftOnB = resumePicksWithRoleLeftOff(
+      { picks: ["stmt-2"], seen: ["stmt-2"] },
+      "mercy",
+      false,
+    );
+    expect(readResumePicksHiddenRoleIds(leftOffA)).toEqual(["mercy"]);
+    expect(leftOffA.picks).toEqual(["stmt-1"]);
+    expect(leftOffA.seen).toEqual(["stmt-1", "stmt-2"]);
+    expect(readResumePicksHiddenRoleIds(leftOnB)).toEqual([]);
+    expect(leftOnB.picks).toEqual(["stmt-2"]);
+    expect(leftOnB.seen).toEqual(["stmt-2"]);
+    expect(readResumePicksHiddenRoleIds(leftOffA)).not.toBe(readResumePicksHiddenRoleIds(leftOnB));
+
+    const claim = (id: string, text: string) => ({
+      id,
+      text,
+      supports: [{ sourceId: "profile:name", quote: text }],
+    });
+    const shown = (hiddenRoleIds: readonly string[]) => {
+      const exact = resumeWithExactPickedBullets(
+        {
+          type: "RESUME",
+          header: { name: claim("name", "Ada"), contactDetails: [] },
+          summary: [],
+          experience: [
+            {
+              roleId: "opentext",
+              employer: salesProfile.experience[0]!.employer ?? "",
+              title: salesProfile.experience[0]!.title ?? "",
+              startDate: null,
+              endDate: null,
+              location: null,
+              hidden: hiddenRoleIds.includes("opentext"),
+              condensed: false,
+              bullets: [claim("ot", "Closed a deal.")],
+            },
+            {
+              roleId: "mercy",
+              employer: nursingProfile.experience[0]!.employer ?? "",
+              title: nursingProfile.experience[0]!.title ?? "",
+              startDate: null,
+              endDate: null,
+              location: null,
+              hidden: hiddenRoleIds.includes("mercy"),
+              condensed: false,
+              bullets: [claim("mercy", "Precepted new nurses.")],
+            },
+          ],
+          skills: [],
+          education: [],
+          credentials: [],
+        },
+        [
+          { statementId: "ot", roleId: "opentext", content: "Closed a deal." },
+          { statementId: "mercy", roleId: "mercy", content: "Precepted new nurses." },
+        ],
+        "profile:name",
+      );
+      return exact.experience.filter((role) => !role.hidden).map((role) => role.roleId);
+    };
+    expect(shown(readResumePicksHiddenRoleIds(leftOffA))).toEqual(["opentext"]);
+    expect(shown(readResumePicksHiddenRoleIds(leftOnB))).toEqual(["opentext", "mercy"]);
+
+    const profile: PickerProfile = {
+      experience: [
+        {
+          id: "opentext",
+          employer: salesProfile.experience[0]!.employer,
+          title: salesProfile.experience[0]!.title,
+          endDate: null,
+        },
+        {
+          id: "mercy",
+          employer: nursingProfile.experience[0]!.employer,
+          title: nursingProfile.experience[0]!.title,
+          endDate: null,
+        },
+      ],
+      educationTexts: nursingProfile.educationTexts,
+      projectTexts: graduateProfile.projectTexts,
+    };
+    const bullets = [
+      { id: "ot", roleId: "opentext", text: "Closed a deal.", evidenceIds: [] as string[] },
+      { id: "mercy-bullet", roleId: "mercy", text: "Precepted new nurses.", evidenceIds: [] as string[] },
+    ];
+    const writerFor = (hiddenRoleIds: string[]) =>
+      buildResumeWriterPackage({
+        profile,
+        bullets,
+        settings: DEFAULT_HARPER_DRAFT_SETTINGS,
+        savedPickIds: ["ot", "mercy-bullet"],
+        primaryRoleId: "opentext",
+        directRoleIds: [],
+        planCondensedRoleIds: [],
+        hiddenRoleIds,
+        asOf,
+      });
+    expect(writerFor(["mercy"]).requiredStatements.map((item) => item.roleId)).not.toContain("mercy");
+    expect(writerFor([]).requiredStatements.map((item) => item.roleId)).toContain("mercy");
+    expect(graduateProfile.projectTexts).toContain("Capstone project");
+
+    const pickerData = readFileSync("src/lib/application-assets/resume-statement-picker-data.ts", "utf8");
+    const profileSchema = readFileSync("src/lib/product-research/candidate-profile.ts", "utf8");
+    const saveStart = pickerData.indexOf("export async function saveResumeRoleVisibility");
+    const save = pickerData.slice(saveStart, pickerData.indexOf("export async function addSeekerBullet"));
+    expect(save).toContain("resumeStatementPicksJson");
+    expect(save).not.toContain("profileWithHiddenRole");
+    expect(save).not.toContain("runPaidStructuredCall");
+    expect(save).not.toContain("applicationAsset");
+    expect(pickerData).not.toContain("readHiddenRoleIds");
+    expect(pickerData).not.toContain("profileWithHiddenRole");
+    expect(profileSchema).not.toContain("hiddenRoleIds");
   });
 });
