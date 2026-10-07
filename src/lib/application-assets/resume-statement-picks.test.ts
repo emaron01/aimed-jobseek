@@ -23,10 +23,15 @@ import {
   buildResumeBulletCandidateMessages,
   employerNameRetryMessage,
   employerRetryDecision,
+  evidenceHasStatedResult,
+  mergeEmployerNameRetry,
+  mergeFollowUpBullets,
   profileWithBulletRoleChoices,
   questionTextForAnswer,
   selectableBulletEvidence,
   storedCandidatesMatch,
+  uncitedStatedResults,
+  uncoveredResultFollowUpMessage,
 } from "@/lib/application-assets/resume-bullet-candidates";
 import { resumeWithExactPickedBullets } from "@/lib/application-assets/service";
 import {
@@ -282,12 +287,12 @@ describe("Harper Approved Statements picker", () => {
     expect(RESUME_ASSET_INSTRUCTIONS).toContain(
       "Use each picked bullet exactly as written, in the role it was picked for. Do not rewrite a picked bullet and do not add a bullet that was not picked. You may write the summary, the skills, and each role's title, company, and dates.",
     );
-    expect(RESUME_BULLET_CANDIDATE_PROMPT_VERSION).toBe("4");
+    expect(RESUME_BULLET_CANDIDATE_PROMPT_VERSION).toBe("5");
     expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).toContain(
       "Assign a bullet to a role only when the evidence names that role's employer or is an achievement listed under that role in the Personal Profile. Evidence that names no employer goes to General background, not to a role.",
     );
     expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).toContain(
-      "For each role, write the number of bullets given whenever the evidence supports it. Lead with the seeker's strongest accomplishments (results with numbers, named customers, scope, awards), whether or not the job description mentions them, then add bullets that speak to this job's requirements. Every distinct result the seeker stated for a role appears in at least one bullet. Rank by strength of evidence and relevance to this job together.",
+      "For each role, write the number of bullets given whenever the evidence supports it. Lead with the seeker's strongest accomplishments (results with numbers, named customers, scope, awards), whether or not the job description mentions them, then add bullets that speak to this job's requirements. When an approved answer and a Personal Profile achievement state the same result, write the bullet from the approved answer. Every distinct result the seeker stated for a role appears in at least one bullet. Rank by strength of evidence and relevance to this job together.",
     );
     expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).toContain(
       "Start each bullet with a strong action verb and include the result or number when the seeker stated one. Do not write the employer's name in a bullet; the job heading already shows it. Customer and partner names the seeker stated are fine.",
@@ -331,7 +336,8 @@ describe("Harper Approved Statements picker", () => {
       statements: [
         { id: "stmt-forecast", content: "Owned the forecast.", kind: "INTERVIEW_ANSWER", campaignId: "sift", targetKey: "required:forecast" },
         { id: "stmt-why", content: "I want this company.", kind: "INTERVIEW_ANSWER", campaignId: "sift", targetKey: "why-this-company" },
-        { id: "stmt-csc", content: "A 90-day plan for CSC.", kind: "INTERVIEW_ANSWER", campaignId: "csc", targetKey: "required:plan" },
+        { id: "stmt-csc", content: "A 90-day plan for CSC.", kind: "INTERVIEW_ANSWER", campaignId: "csc", targetKey: "required:plan", sourceEmployer: "CSC" },
+        { id: "stmt-library", content: "Closed a multi-threaded $1.3MM Bank of America deal.", kind: "INTERVIEW_ANSWER", campaignId: "csc", targetKey: "required:deal", question: "Tell me about a deal you closed at OpenText.", sourceEmployer: "CSC" },
         { id: "stmt-cycle", content: "Cut the sales cycle.", kind: "RESUME_BULLET", campaignId: "sift", targetKey: null },
       ],
       replies: [
@@ -340,11 +346,14 @@ describe("Harper Approved Statements picker", () => {
       ],
     });
     expect(evidence.map((item) => item.text)).toEqual([
-      "Closed a seven-figure renewal.",
       "Owned the forecast.",
+      "Closed a multi-threaded $1.3MM Bank of America deal.",
       "Cut the sales cycle.",
+      "Closed a seven-figure renewal.",
       "I precepted new nurses.",
     ]);
+    expect(evidence[1]?.question).toContain("OpenText");
+    expect(evidence.findIndex((item) => item.kind === "ACHIEVEMENT")).toBeGreaterThan(0);
     const roles = roleBulletBands({
       profile: salesProfile,
       settings: DEFAULT_HARPER_DRAFT_SETTINGS,
@@ -468,12 +477,14 @@ describe("Harper Approved Statements picker", () => {
     console.info = info;
     expect(assigned.map((item) => `${item.roleId}:${item.text}`)).toEqual([
       "opentext:Held forecast deviation to 5-10% in FY26.",
+      "opentext:Held forecast deviation to 5-10%.",
       "mercy:Precepted new nurses on the night shift.",
       "intern:Shipped a clinic intake form during a capstone rotation.",
       "general:Joined a team that will teach me.",
     ]);
     expect(assigned.some((item) => item.roleId === "vmware" || item.roleId === "clinic")).toBe(false);
-    expect(logged.some((line) => line.includes("resume_bullet_candidate_dropped") && line.includes("at OpenText"))).toBe(true);
+    expect(assigned.some((item) => item.text.includes("OpenText"))).toBe(false);
+    expect(logged.some((line) => line.includes("resume_bullet_candidate_dropped") && line.includes("at OpenText"))).toBe(false);
     expect(logged.some((line) => line.includes("resume_bullet_candidate_moved") && line.includes("general"))).toBe(true);
     const background = groupsFor(salesProfile, [
       bullet("bg", "general", "Joined a team that will teach me.", false),
@@ -693,13 +704,15 @@ describe("Harper Approved Statements picker", () => {
     ).toBe("general");
     expect(assigned.some((item) => item.text === "grew the magazine group.")).toBe(true);
     expect(assigned.some((item) => item.text.includes("Merion"))).toBe(false);
+    expect(assigned.some((item) => item.text === "Led account managers on a national team.")).toBe(true);
+    expect(assigned.some((item) => item.text.includes("Gryphon"))).toBe(false);
     expect(
       logged.some(
         (line) =>
           line.includes("resume_bullet_candidate_dropped") &&
           line.includes("Led Gryphon Networks account managers"),
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(attributedEvidenceRole(evidence[1]!, roles)).toBe("opentext");
     expect(attributedEvidenceRole(evidence[2]!, roles)).toBe("general");
     expect(
@@ -744,7 +757,7 @@ describe("Harper Approved Statements picker", () => {
       evidence: withQuestion,
       job: { title: "Account Executive", employer: "Sift", posting: "Own the forecast." },
     });
-    expect(messages[0]?.content.startsWith("Prompt version: 4")).toBe(true);
+    expect(messages[0]?.content.startsWith("Prompt version: 5")).toBe(true);
     expect(JSON.parse(messages[1]?.content ?? "{}").evidence[0].question).toContain("OpenText");
     expect(employerNameRetryMessage()).toContain("does not include the employer's name");
     expect(
@@ -766,9 +779,16 @@ describe("Harper Approved Statements picker", () => {
     expect(prepare.indexOf("runPaidStructuredCall")).toBeLessThan(prepare.indexOf("callProvider: async"));
     expect(provider).toContain("employerRetryDecision");
     expect(provider).toContain("employerNameRetryMessage()");
-    expect(provider.indexOf("alreadyRetried: false")).toBeLessThan(
-      provider.indexOf("employerNameRetryMessage()"),
+    expect(provider).toContain("mergeEmployerNameRetry");
+    expect(provider.indexOf("employerRetryDecision")).toBeLessThan(
+      provider.indexOf("mergeEmployerNameRetry"),
     );
+    expect(provider.indexOf("mergeEmployerNameRetry")).toBeLessThan(
+      provider.indexOf("uncoveredResultFollowUpMessage"),
+    );
+    expect(provider).toContain("resume_bullet_candidates_follow_up");
+    expect(provider.match(/uncoveredResultFollowUpMessage/g)).toHaveLength(1);
+    expect(provider).toContain("if (uncovered.length === 0 || !system) return kept");
 
     const strong = [
       { id: "jd", text: "Partnered with marketing on demand generation.", jobSpecific: true },
@@ -814,6 +834,290 @@ describe("Harper Approved Statements picker", () => {
     const assets = readFileSync("src/components/ApplicationAssetsSection.tsx", "utf8");
     expect(assets).toContain("preparingBullets={generating}");
     expect(assets).toContain("router.refresh");
+  });
+
+  it("uses the whole library, keeps every stated result, and matches a shorter employer name", () => {
+    const employers = [
+      salesProfile.experience[0]!.employer!,
+      nursingProfile.experience[0]!.employer!,
+    ];
+    expect(employers).toEqual(["OpenText", "Mercy General"]);
+    const evidence = selectableBulletEvidence({
+      campaignId: "sift",
+      profileEmployers: employers,
+      achievements: [
+        {
+          id: "ach-ot",
+          text: "Closed a multi-threaded $1.3MM Bank of America deal.",
+          roleId: "opentext",
+        },
+      ],
+      statements: [
+        {
+          id: "library-deal",
+          content: "Closed a multi-threaded $1.3MM Bank of America deal.",
+          kind: "INTERVIEW_ANSWER",
+          campaignId: "csc",
+          targetKey: "required:deal",
+          question: "Tell me about a deal you closed at OpenText.",
+          sourceEmployer: "CSC",
+        },
+        {
+          id: "library-why",
+          content: "I want to join CSC because of its domain-security work.",
+          kind: "INTERVIEW_ANSWER",
+          campaignId: "csc",
+          targetKey: "why-this-company",
+          question: "Why do you want to work at CSC?",
+          sourceEmployer: "CSC",
+          whyThisCompany: "I want to join CSC because of its domain-security work.",
+        },
+        {
+          id: "library-plan",
+          content: "A 90-day plan for CSC.",
+          kind: "RESUME_BULLET",
+          campaignId: "csc",
+          targetKey: "required:plan",
+          question: "What is your 90-day plan for CSC?",
+          sourceEmployer: "CSC",
+        },
+        {
+          id: "library-nursing",
+          content: "Precepted 8 new nurses on the night shift.",
+          kind: "INTERVIEW_ANSWER",
+          campaignId: "city-hospital",
+          targetKey: "required:precept",
+          question: "How do you precept new nurses?",
+          sourceEmployer: "City Hospital",
+        },
+        {
+          id: "library-capstone",
+          content: "Shipped 1 clinic intake form during a capstone.",
+          kind: "RESUME_BULLET",
+          campaignId: "northwind",
+          targetKey: null,
+          question: "What did you build in school?",
+          sourceEmployer: "Northwind",
+        },
+      ],
+      replies: [
+        { id: "reply-csc", body: "I wrote this for CSC.", campaignId: "csc" },
+      ],
+    });
+    expect(evidence.map((item) => item.id)).toEqual([
+      "library-deal",
+      "library-nursing",
+      "library-capstone",
+      "ach-ot",
+    ]);
+    expect(evidence[0]?.kind).toBe("INTERVIEW_ANSWER");
+    expect(evidence[0]?.question).toBe("Tell me about a deal you closed at OpenText.");
+    expect(evidence.findIndex((item) => item.kind === "ACHIEVEMENT")).toBe(3);
+    expect(JSON.stringify(evidence)).not.toContain("90-day plan");
+    expect(JSON.stringify(evidence)).not.toContain("domain-security");
+    expect(graduateProfile.projectTexts).toContain("Capstone project");
+
+    const messages = buildResumeBulletCandidateMessages({
+      roles: [
+        { roleId: "opentext", employer: "OpenText", title: "Account Executive", candidateCount: 14 },
+        { roleId: "mercy", employer: "Mercy General", title: "Registered Nurse", candidateCount: 10 },
+      ],
+      evidence,
+      job: { title: "Account Executive", employer: "Sift", posting: "Own the forecast." },
+    });
+    expect(messages[0]?.content).toContain(
+      "When an approved answer and a Personal Profile achievement state the same result, write the bullet from the approved answer.",
+    );
+    const sent = JSON.parse(messages[1]?.content ?? "{}") as { evidence: Array<{ id: string }> };
+    expect(sent.evidence[0]?.id).toBe("library-deal");
+    expect(sent.evidence.map((item) => item.id).indexOf("ach-ot")).toBeGreaterThan(0);
+
+    expect(evidenceHasStatedResult("I like teamwork.")).toBe(false);
+    expect(evidenceHasStatedResult("Precepted 8 new nurses on the night shift.", employers)).toBe(true);
+    const uncovered = uncitedStatedResults({
+      evidence,
+      employers,
+      bullets: [{ evidenceIds: ["library-deal"] }],
+    });
+    expect(uncovered.map((item) => item.id)).toEqual([
+      "library-nursing",
+      "library-capstone",
+      "ach-ot",
+    ]);
+    const followUp = uncoveredResultFollowUpMessage({
+      roles: [{ roleId: "mercy", employer: "Mercy General", title: "Registered Nurse", candidateCount: 10 }],
+      evidence: uncovered.filter((item) => item.id === "library-nursing"),
+      job: { title: "Registered Nurse", employer: "Mercy General", posting: "Precept new nurses." },
+    });
+    expect(followUp.startsWith("Write bullets only for these items, which the earlier list did not cover.")).toBe(true);
+    expect(followUp).toContain("library-nursing");
+    expect(followUp).not.toContain("library-deal");
+    const merged = mergeFollowUpBullets({
+      kept: {
+        bullets: [
+          {
+            roleId: "opentext",
+            text: "Closed a multi-threaded $1.3MM Bank of America deal.",
+            jobSpecific: false,
+            evidenceIds: ["library-deal"],
+          },
+        ],
+      },
+      followUp: {
+        bullets: [
+          {
+            roleId: "mercy",
+            text: "Precepted 8 new nurses on the night shift.",
+            jobSpecific: true,
+            evidenceIds: ["library-nursing"],
+          },
+          {
+            roleId: "opentext",
+            text: "Closed the deal again.",
+            jobSpecific: false,
+            evidenceIds: ["library-deal"],
+          },
+        ],
+      },
+      uncoveredIds: new Set(["library-nursing"]),
+    });
+    expect(merged.bullets.map((item) => item.evidenceIds[0])).toEqual(["library-deal", "library-nursing"]);
+    const afterMerge = uncitedStatedResults({
+      evidence,
+      employers,
+      bullets: merged.bullets,
+    });
+    expect(afterMerge.map((item) => item.id)).not.toContain("library-nursing");
+
+    const retried = mergeEmployerNameRetry({
+      employers: ["OpenText"],
+      first: {
+        bullets: [
+          {
+            roleId: "opentext",
+            text: "Closed a $1.3MM Bank of America deal.",
+            jobSpecific: false,
+            evidenceIds: ["boa"],
+          },
+          {
+            roleId: "opentext",
+            text: "Built OpenText's forecast practice.",
+            jobSpecific: false,
+            evidenceIds: ["forecast"],
+          },
+        ],
+      },
+      retry: {
+        bullets: [
+          {
+            roleId: "opentext",
+            text: "Closed a different deal.",
+            jobSpecific: false,
+            evidenceIds: ["boa"],
+          },
+          {
+            roleId: "opentext",
+            text: "Built the forecast practice.",
+            jobSpecific: false,
+            evidenceIds: ["forecast"],
+          },
+        ],
+      },
+    });
+    expect(retried.bullets.map((item) => item.text)).toEqual([
+      "Closed a $1.3MM Bank of America deal.",
+      "Built the forecast practice.",
+    ]);
+
+    const stripped = assignCandidateBullets({
+      bands: [{ roleId: "mercy", employer: "Mercy General", candidateCount: 4 }],
+      roles: [{ roleId: "mercy", employer: "Mercy General" }],
+      evidence: [
+        {
+          id: "library-nursing",
+          kind: "INTERVIEW_ANSWER",
+          text: "Precepted new nurses at Mercy General.",
+          roleId: null,
+          question: "How do you precept new nurses at Mercy General?",
+        },
+      ],
+      bullets: [
+        {
+          roleId: "mercy",
+          text: "Precepted new nurses at Mercy General during the night shift.",
+          jobSpecific: true,
+          evidenceIds: ["library-nursing"],
+        },
+      ],
+    });
+    expect(stripped[0]?.roleId).toBe("mercy");
+    expect(stripped[0]?.text).toBe("Precepted new nurses during the night shift.");
+    expect(stripped[0]?.text.includes("Mercy")).toBe(false);
+
+    const microFocus = [{ roleId: "micro-focus", employer: "Micro Focus (acquired by OpenText)" }];
+    expect(
+      attributedEvidenceRole(
+        {
+          id: "mf",
+          kind: "INTERVIEW_ANSWER",
+          text: "Closed the Micro Focus renewal.",
+          roleId: null,
+          question: "Tell me about a renewal.",
+        },
+        microFocus,
+      ),
+    ).toBe("micro-focus");
+    expect(
+      attributedEvidenceRole(
+        {
+          id: "mf-ambiguous",
+          kind: "INTERVIEW_ANSWER",
+          text: "Closed the Micro Focus renewal.",
+          roleId: null,
+          question: null,
+        },
+        [
+          { roleId: "micro-focus", employer: "Micro Focus (acquired by OpenText)" },
+          { roleId: "micro-focus-short", employer: "Micro Focus" },
+        ],
+      ),
+    ).toBe("general");
+    expect(
+      attributedEvidenceRole(
+        {
+          id: "capstone",
+          kind: "RESUME_BULLET",
+          text: "Shipped a clinic intake form during a capstone.",
+          roleId: null,
+          question: "What did you build in school?",
+        },
+        microFocus,
+      ),
+    ).toBe("general");
+    const placed = assignCandidateBullets({
+      bands: [{ roleId: "micro-focus", employer: "Micro Focus (acquired by OpenText)", candidateCount: 4 }],
+      roles: microFocus,
+      evidence: [
+        {
+          id: "mf",
+          kind: "INTERVIEW_ANSWER",
+          text: "Closed the Micro Focus renewal.",
+          roleId: null,
+          question: "Tell me about a renewal.",
+        },
+      ],
+      bullets: [
+        {
+          roleId: "general",
+          text: "Closed the Micro Focus renewal.",
+          jobSpecific: false,
+          evidenceIds: ["mf"],
+        },
+      ],
+    });
+    expect(placed[0]?.roleId).toBe("micro-focus");
+    expect(placed[0]?.text).toBe("Closed the renewal.");
+    expect(placed[0]?.text.includes("Micro Focus")).toBe(false);
   });
 
   it("accepts a claim found only in a seeker's reply and drops an invented claim", () => {

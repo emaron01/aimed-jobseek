@@ -47,25 +47,88 @@ export function oneLineBullet(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+export type BulletLibraryStatement = {
+  id: string;
+  content: string;
+  kind: string;
+  campaignId: string;
+  targetKey: string | null;
+  question?: string | null;
+  /** Job-posting employer of the application this answer belongs to. */
+  sourceEmployer?: string | null;
+  whyThisCompany?: string | null;
+};
+
+/**
+ * Why-this-company answers stay out. An answer from another application that
+ * names that application's target employer is about that employer, not a
+ * career result. Naming one of the seeker's own employers does not.
+ */
+export function libraryStatementExcluded(input: {
+  statement: BulletLibraryStatement;
+  campaignId: string;
+  profileEmployers: readonly string[];
+}): boolean {
+  const statement = input.statement;
+  if ((statement.targetKey ?? "").trim() === WHY_THIS_COMPANY_TARGET_KEY) return true;
+  const why = statement.whyThisCompany?.trim() ?? "";
+  const question = statement.question?.trim() ?? "";
+  const content = statement.content.trim();
+  if (why && (content === why || question === why)) return true;
+  if (statement.campaignId === input.campaignId) return false;
+  const target = statement.sourceEmployer?.trim() ?? "";
+  if (target.length < 2) return false;
+  const namesTarget =
+    textNamesEmployer(content, target) || textNamesEmployer(question, target);
+  if (!namesTarget) return false;
+  const ownEmployer = input.profileEmployers.some((employer) => {
+    const name = employer.trim();
+    if (name.length < 2) return false;
+    return (
+      name.toLowerCase() === target.toLowerCase() ||
+      textNamesEmployer(name, target) ||
+      textNamesEmployer(target, name)
+    );
+  });
+  return !ownEmployer;
+}
+
 export function selectableBulletEvidence(input: {
   campaignId: string;
   achievements: ReadonlyArray<{ id: string; text: string; roleId: string }>;
-  statements: ReadonlyArray<{
-    id: string;
-    content: string;
-    kind: string;
-    campaignId: string;
-    targetKey: string | null;
-    question?: string | null;
-  }>;
+  statements: ReadonlyArray<BulletLibraryStatement>;
   replies: ReadonlyArray<{
     id: string;
     body: string;
     campaignId: string;
     question?: string | null;
   }>;
+  profileEmployers?: readonly string[];
 }): BulletEvidence[] {
   const evidence: BulletEvidence[] = [];
+  const profileEmployers = input.profileEmployers ?? [];
+  for (const statement of input.statements) {
+    if (statement.kind !== "INTERVIEW_ANSWER" && statement.kind !== "RESUME_BULLET") continue;
+    if (
+      libraryStatementExcluded({
+        statement,
+        campaignId: input.campaignId,
+        profileEmployers,
+      })
+    ) {
+      continue;
+    }
+    const text = oneLineBullet(statement.content);
+    const id = statement.id.trim();
+    if (!text || !id) continue;
+    evidence.push({
+      id,
+      kind: statement.kind,
+      text,
+      roleId: null,
+      question: statement.question?.trim() || null,
+    });
+  }
   for (const item of input.achievements) {
     if (item.id.startsWith("why-this-company:")) continue;
     const text = oneLineBullet(item.text);
@@ -77,21 +140,6 @@ export function selectableBulletEvidence(input: {
       text,
       roleId,
       question: null,
-    });
-  }
-  for (const statement of input.statements) {
-    if (statement.campaignId !== input.campaignId) continue;
-    if (statement.kind !== "INTERVIEW_ANSWER" && statement.kind !== "RESUME_BULLET") continue;
-    if ((statement.targetKey ?? "").trim() === WHY_THIS_COMPANY_TARGET_KEY) continue;
-    const text = oneLineBullet(statement.content);
-    const id = statement.id.trim();
-    if (!text || !id) continue;
-    evidence.push({
-      id,
-      kind: statement.kind,
-      text,
-      roleId: null,
-      question: statement.question?.trim() || null,
     });
   }
   for (const reply of input.replies) {
@@ -143,6 +191,47 @@ export function textNamesEmployer(text: string, employer: string): boolean {
   if (company.length < 2) return false;
   const escaped = company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(?:^|[^\\p{L}\\p{N}])${escaped}(?=$|[^\\p{L}\\p{N}])`, "iu").test(text);
+}
+
+export type ProfileEmployerRole = { roleId: string; employer: string };
+
+/** Full employer, plus the name before a trailing parenthesis ("Micro Focus (acquired by OpenText)" → "Micro Focus"). */
+export function employerMatchNames(employer: string): string[] {
+  const full = employer.trim();
+  if (full.length < 2) return [];
+  const names = [full];
+  const beforeParen = full.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  if (beforeParen.length >= 2 && beforeParen.toLowerCase() !== full.toLowerCase()) {
+    names.push(beforeParen);
+  }
+  return names;
+}
+
+/**
+ * Roles whose employer the text names.
+ * A stated name that is contained in exactly one profile employer selects that role.
+ * A stated name contained in more than one employer decides nothing.
+ */
+export function rolesNamedByText(
+  text: string,
+  roles: readonly ProfileEmployerRole[],
+): string[] {
+  const byName = new Map<string, string[]>();
+  for (const role of roles) {
+    for (const name of employerMatchNames(role.employer)) {
+      if (!textNamesEmployer(text, name)) continue;
+      const key = name.toLowerCase();
+      const list = byName.get(key) ?? [];
+      list.push(role.roleId);
+      byName.set(key, list);
+    }
+  }
+  const decided = new Set<string>();
+  for (const roleIds of byName.values()) {
+    const unique = [...new Set(roleIds)];
+    if (unique.length === 1) decided.add(unique[0]!);
+  }
+  return [...decided];
 }
 
 function escapeEmployer(employer: string): string {
@@ -216,18 +305,15 @@ function removeEveryEmployerMention(text: string, employer: string): string {
 
 /**
  * Remove a profile employer's name from a bullet.
- * A simple possessive or prefix is removed. Any other mention is removed only
- * when the bullet is built from a Personal Profile achievement; otherwise the
- * bullet is dropped.
+ * A possessive, a prefix, or a mid-sentence mention is removed for every bullet.
+ * The bullet is dropped only when a name remains or the text is empty.
  */
 export function cleanBulletEmployerNames(input: {
   text: string;
   employers: readonly string[];
-  achievementBacked: boolean;
 }): { ok: true; text: string } | { ok: false } {
   let text = oneLineBullet(input.text);
-  const employers = [...input.employers]
-    .map((employer) => employer.trim())
+  const employers = [...new Set(input.employers.flatMap((employer) => employerMatchNames(employer)))]
     .filter((employer) => employer.length >= 2)
     .sort((a, b) => b.length - a.length);
   for (const employer of employers) {
@@ -237,12 +323,17 @@ export function cleanBulletEmployerNames(input: {
       text = simple;
       continue;
     }
-    if (!input.achievementBacked) return { ok: false };
     text = removeEveryEmployerMention(text, employer);
     if (textNamesEmployer(text, employer)) return { ok: false };
   }
   if (!text) return { ok: false };
   return { ok: true, text };
+}
+
+export function bulletNamesProfileEmployer(text: string, employers: readonly string[]): boolean {
+  return employers
+    .flatMap((employer) => employerMatchNames(employer))
+    .some((name) => textNamesEmployer(text, name));
 }
 
 export function employerRetryDecision(input: {
@@ -252,16 +343,102 @@ export function employerRetryDecision(input: {
 }): "retry" | "keep" {
   if (input.alreadyRetried) return "keep";
   const namesEmployer = input.bullets.some((bullet) =>
-    input.employers.some((employer) => textNamesEmployer(bullet.text, employer)),
+    bulletNamesProfileEmployer(bullet.text, input.employers),
   );
   return namesEmployer ? "retry" : "keep";
+}
+
+/** Keep bullets that did not name an employer. Replace only the ones that did. */
+export function mergeEmployerNameRetry(input: {
+  first: ResumeBulletCandidates;
+  retry: ResumeBulletCandidates;
+  employers: readonly string[];
+}): ResumeBulletCandidates {
+  const passing: ResumeBulletCandidates["bullets"] = [];
+  const failed: ResumeBulletCandidates["bullets"] = [];
+  const failedIds = new Set<string>();
+  for (const bullet of input.first.bullets) {
+    if (!bulletNamesProfileEmployer(bullet.text, input.employers)) {
+      passing.push(bullet);
+      continue;
+    }
+    failed.push(bullet);
+    for (const id of bullet.evidenceIds) {
+      const evidenceId = id.trim();
+      if (evidenceId) failedIds.add(evidenceId);
+    }
+  }
+  const replacements = input.retry.bullets.filter((bullet) =>
+    bullet.evidenceIds.some((id) => failedIds.has(id.trim())),
+  );
+  const replacedIds = new Set(
+    replacements.flatMap((bullet) => bullet.evidenceIds.map((id) => id.trim()).filter(Boolean)),
+  );
+  const unreplaced = failed.filter(
+    (bullet) => !bullet.evidenceIds.some((id) => replacedIds.has(id.trim())),
+  );
+  return { bullets: [...passing, ...replacements, ...unreplaced] };
 }
 
 export function employerNameRetryMessage(): string {
   return "Rewrite every bullet that names an employer so the bullet does not include the employer's name. The job heading already shows it. Customer and partner names the seeker stated are fine. Return the full bullet list.";
 }
 
-export type ProfileEmployerRole = { roleId: string; employer: string };
+export const UNCOVERED_RESULT_FOLLOW_UP_SENTENCE =
+  "Write bullets only for these items, which the earlier list did not cover.";
+
+/** A number, a named customer, scope, or an award. A profile employer name alone is not a result. */
+export function evidenceHasStatedResult(text: string, employers: readonly string[] = []): boolean {
+  if (/\d/.test(text)) return true;
+  if (/\b(awards?|awarded|prize|honou?rs?|honou?red|top performers?)\b/i.test(text)) return true;
+  if (/\b(nationwide|multi-threaded|multithreaded|direct reports?|headcount|quota)\b/i.test(text)) {
+    return true;
+  }
+  const named =
+    text.match(/\b[A-Z][a-z]+(?:\s+(?:of|and)\s+[A-Z][a-z]+|\s+[A-Z][a-z]+)+\b/g) ?? [];
+  const employerNames = new Set(
+    employers.flatMap((employer) => employerMatchNames(employer)).map((name) => name.toLowerCase()),
+  );
+  return named.some((name) => !employerNames.has(name.toLowerCase()));
+}
+
+/** Evidence with a stated result that no returned bullet cites. */
+export function uncitedStatedResults(input: {
+  evidence: readonly BulletEvidence[];
+  bullets: readonly { evidenceIds: readonly string[] }[];
+  employers?: readonly string[];
+}): BulletEvidence[] {
+  const cited = new Set(
+    input.bullets.flatMap((bullet) => bullet.evidenceIds.map((id) => id.trim()).filter(Boolean)),
+  );
+  return input.evidence.filter(
+    (item) =>
+      !cited.has(item.id) && evidenceHasStatedResult(item.text, input.employers ?? []),
+  );
+}
+
+export function uncoveredResultFollowUpMessage(input: {
+  roles: readonly BulletCandidateRole[];
+  evidence: readonly BulletEvidence[];
+  job: { title: string; employer: string; posting: string };
+}): string {
+  return `${UNCOVERED_RESULT_FOLLOW_UP_SENTENCE}\n${JSON.stringify({
+    roles: input.roles,
+    evidence: input.evidence,
+    job: input.job,
+  })}`;
+}
+
+export function mergeFollowUpBullets(input: {
+  kept: ResumeBulletCandidates;
+  followUp: ResumeBulletCandidates;
+  uncoveredIds: ReadonlySet<string>;
+}): ResumeBulletCandidates {
+  const added = input.followUp.bullets.filter((bullet) =>
+    bullet.evidenceIds.some((id) => input.uncoveredIds.has(id.trim())),
+  );
+  return { bullets: [...input.kept.bullets, ...added] };
+}
 
 /** Question and answer together. An achievement always stays on its own role. */
 export function attributedEvidenceRole(
@@ -269,12 +446,8 @@ export function attributedEvidenceRole(
   roles: readonly ProfileEmployerRole[],
 ): string {
   if (evidence.kind === "ACHIEVEMENT" && evidence.roleId) return evidence.roleId;
-  const named = (text: string) =>
-    roles
-      .filter((role) => role.employer.trim() && textNamesEmployer(text, role.employer))
-      .map((role) => role.roleId);
-  const inQuestion = named(evidence.question ?? "");
-  const inAnswer = named(evidence.text);
+  const inQuestion = rolesNamedByText(evidence.question ?? "", roles);
+  const inAnswer = rolesNamedByText(evidence.text, roles);
   const union = [...new Set([...inQuestion, ...inAnswer])];
   if (union.length === 1) return union[0]!;
   if (union.length > 1 && inAnswer.length === 1) return inAnswer[0]!;
@@ -374,13 +547,9 @@ export function assignCandidateBullets(input: {
     const cited = evidenceIds
       .map((id) => evidenceById.get(id))
       .filter((item): item is BulletEvidence => item !== undefined);
-    const achievementBacked = cited.some(
-      (evidence) => evidence.kind === "ACHIEVEMENT" && Boolean(evidence.roleId),
-    );
     const cleaned = cleanBulletEmployerNames({
       text: raw,
       employers,
-      achievementBacked,
     });
     if (!cleaned.ok) {
       logBulletCandidate({

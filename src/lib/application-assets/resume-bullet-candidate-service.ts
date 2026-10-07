@@ -16,11 +16,15 @@ import {
   bulletCandidateRoles,
   employerNameRetryMessage,
   employerRetryDecision,
+  mergeEmployerNameRetry,
+  mergeFollowUpBullets,
   questionTextForAnswer,
   readBulletRoleChoices,
   resumeBulletCandidateFingerprint,
   selectableBulletEvidence,
   storedCandidatesMatch,
+  uncitedStatedResults,
+  uncoveredResultFollowUpMessage,
   type BulletCandidateRole,
   type BulletEvidence,
   type BulletQuestionTurn,
@@ -64,19 +68,6 @@ async function loadBulletCandidatePacket(input: {
       },
       consultationSession: {
         select: {
-          statements: {
-            where: {
-              status: "APPROVED",
-              kind: { in: ["INTERVIEW_ANSWER", "RESUME_BULLET"] },
-            },
-            select: {
-              id: true,
-              content: true,
-              kind: true,
-              turnId: true,
-              turn: { select: { targetKey: true } },
-            },
-          },
           turns: {
             orderBy: { sequence: "asc" },
             select: {
@@ -105,9 +96,51 @@ async function loadBulletCandidatePacket(input: {
         role.achievements.map((item) => ({ id: item.id, text: item.text, roleId: role.id })),
       )
     : [];
-  const [settings, plan] = await Promise.all([
+  const profileEmployers = profile.experience
+    .map((role) => role.employer?.trim() ?? "")
+    .filter((employer) => employer.length >= 2);
+  const [settings, plan, libraryRows] = await Promise.all([
     getHarperDraftSettings(),
     acceptedPresentationPlan({ ...input, type: "RESUME" }),
+    prisma.consultationStatement.findMany({
+      where: {
+        organizationId: input.organizationId,
+        status: "APPROVED",
+        approvedAt: { not: null },
+        kind: { in: ["INTERVIEW_ANSWER", "RESUME_BULLET"] },
+        session: { productId: campaign.product.id },
+      },
+      orderBy: [{ approvedAt: "desc" }, { id: "asc" }],
+      select: {
+        id: true,
+        content: true,
+        kind: true,
+        turnId: true,
+        turn: { select: { targetKey: true } },
+        session: {
+          select: {
+            campaignId: true,
+            campaign: {
+              select: {
+                whyThisCompany: true,
+                jobRequirement: { select: { companyName: true } },
+              },
+            },
+            turns: {
+              orderBy: { sequence: "asc" },
+              select: {
+                id: true,
+                speaker: true,
+                body: true,
+                sequence: true,
+                targetKey: true,
+                analysisJson: true,
+              },
+            },
+          },
+        },
+      },
+    }),
   ]);
   const resumePlan = plan?.type === "RESUME" ? plan : null;
   const primaryRoleId = resumePlan?.primaryRoleId ?? null;
@@ -133,14 +166,27 @@ async function loadBulletCandidatePacket(input: {
     evidence: selectableBulletEvidence({
       campaignId: input.campaignId,
       achievements,
-      statements: (campaign.consultationSession?.statements ?? []).map((statement) => ({
-        id: statement.id,
-        content: statement.content,
-        kind: statement.kind,
-        campaignId: input.campaignId,
-        targetKey: statement.turn?.targetKey ?? null,
-        question: questionTextForAnswer({ turns, turnId: statement.turnId }),
-      })),
+      profileEmployers,
+      statements: libraryRows.map((statement) => {
+        const sessionTurns: BulletQuestionTurn[] = statement.session.turns.map((turn) => ({
+          id: turn.id,
+          speaker: turn.speaker,
+          body: turn.body,
+          sequence: turn.sequence,
+          targetKey: turn.targetKey,
+          analysisJson: turn.analysisJson,
+        }));
+        return {
+          id: statement.id,
+          content: statement.content,
+          kind: statement.kind,
+          campaignId: statement.session.campaignId,
+          targetKey: statement.turn.targetKey,
+          question: questionTextForAnswer({ turns: sessionTurns, turnId: statement.turnId }),
+          sourceEmployer: statement.session.campaign.jobRequirement?.companyName ?? null,
+          whyThisCompany: statement.session.campaign.whyThisCompany,
+        };
+      }),
       replies: (campaign.consultationSession?.turns ?? [])
         .filter((turn) => turn.speaker === "SEEKER" && !turn.skipped)
         .map((turn) => ({
@@ -273,7 +319,7 @@ export async function prepareResumeBulletCandidates(input: {
         const employers = packet.profileRoles.map((role) => role.employer);
         const generate = async (
           nextMessages: Array<{ role: "system" | "user"; content: string }>,
-          alreadyRetried: boolean,
+          step: string,
         ) => {
           const response = await getConsultationReplyAiProvider({
             temperature: RESUME_WRITER_TEMPERATURE,
@@ -284,11 +330,7 @@ export async function prepareResumeBulletCandidates(input: {
               campaignId: input.campaignId,
               category: "ASSET_GENERATION",
               operation: "APPLICATION_ASSET_GENERATION",
-              metadata: {
-                step: alreadyRetried
-                  ? "resume_bullet_candidates_retry"
-                  : "resume_bullet_candidates",
-              },
+              metadata: { step },
             }),
             messages: nextMessages,
             parseOutput: (raw) => ({
@@ -298,20 +340,47 @@ export async function prepareResumeBulletCandidates(input: {
           });
           return response.data;
         };
-        const first = await generate(messages, false);
+        const first = await generate(messages, "resume_bullet_candidates");
+        let kept = first;
         if (
           employerRetryDecision({
             bullets: first.bullets,
             employers,
             alreadyRetried: false,
-          }) === "keep"
+          }) === "retry"
         ) {
-          return first;
+          const retry = await generate(
+            [...messages, { role: "user", content: employerNameRetryMessage() }],
+            "resume_bullet_candidates_retry",
+          );
+          kept = mergeEmployerNameRetry({ first, retry, employers });
         }
-        return generate(
-          [...messages, { role: "user", content: employerNameRetryMessage() }],
-          true,
+        const uncovered = uncitedStatedResults({
+          evidence: packet.evidence,
+          bullets: kept.bullets,
+          employers,
+        });
+        const system = messages[0];
+        if (uncovered.length === 0 || !system) return kept;
+        const followUp = await generate(
+          [
+            system,
+            {
+              role: "user",
+              content: uncoveredResultFollowUpMessage({
+                roles: packet.roles,
+                evidence: uncovered,
+                job: packet.job,
+              }),
+            },
+          ],
+          "resume_bullet_candidates_follow_up",
         );
+        return mergeFollowUpBullets({
+          kept,
+          followUp,
+          uncoveredIds: new Set(uncovered.map((item) => item.id)),
+        });
       },
     });
     return { ok: true, skipped: false };
