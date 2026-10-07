@@ -2458,6 +2458,8 @@ model Campaign {
   companyResearchNotes String?
   /// Latest viewed result key per application step. Missing keys mean unseen.
   workspaceSeenJson   Json?
+  /// Seeker's resume statement picks. Null until they save. An array, including an empty one, is their choice.
+  resumeStatementPicksJson Json?
 
   @@index([organizationId])
   @@index([organizationId, createdAt])

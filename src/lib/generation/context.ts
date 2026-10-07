@@ -21,7 +21,8 @@ export type GenerationSource = {
     | "COMPANY_RESEARCH"
     | "ASSESSMENT"
     | "PERSONA"
-    | "APPLICATION";
+    | "APPLICATION"
+    | "SEEKER_REPLY";
   url: string | null;
 };
 
@@ -290,6 +291,14 @@ export async function loadApplicationGenerationContext(
       id: `statement:${statement.id}`,
       text: statement.content,
       category: "APPROVED_STATEMENT",
+      url: null,
+    });
+  }
+  for (const turn of campaign.consultationSession?.turns ?? []) {
+    addSource(sources, {
+      id: `reply:${turn.id}`,
+      text: turn.body,
+      category: "SEEKER_REPLY",
       url: null,
     });
   }

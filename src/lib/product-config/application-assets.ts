@@ -53,6 +53,8 @@ export const applicationAssetConfig = Object.freeze({
     saveStatementPicks: "Save statement picks",
     statementPicksSaved:
       "Statement picks saved. Regenerate the resume when you want Harper to use them.",
+    resumeRegenerateUnchanged:
+      "Harper couldn't write a new version this time. Your current resume is unchanged. Please regenerate.",
   },
   harperBulletBands: {
     heading: "Resume bullet bands",
@@ -74,6 +76,7 @@ export const applicationAssetConfig = Object.freeze({
     "PROFILE_FACT",
     "APPROVED_STATEMENT",
     "APPROVED_STORY",
+    "SEEKER_REPLY",
   ],
   resumeHeadings: {
     summary: "Professional summary",

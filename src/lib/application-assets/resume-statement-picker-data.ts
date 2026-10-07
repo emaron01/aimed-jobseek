@@ -1,16 +1,11 @@
 import { Prisma } from "@prisma/client";
-import {
-  migrateWorkspaceSeen,
-  parseWorkspaceSeenJson,
-  serializeWorkspaceSeen,
-} from "@/lib/application/step-progress";
 import { acceptedPresentationPlan } from "@/lib/application-assets/plan-service";
 import {
   buildResumeWriterPackage,
   buildStatementGroups,
   pickerProfileFromCandidate,
-  readResumeStatementPickIds,
-  workspaceSeenJsonWithPicks,
+  resumeStatementPicksFromCampaign,
+  workspaceSeenWithoutResumePicks,
   type PickerStatement,
   type RoleBulletPlan,
   type RequiredResumeStatement,
@@ -37,6 +32,7 @@ async function loadPickerRows(input: {
     where: { id: input.campaignId, organizationId: input.organizationId },
     select: {
       workspaceSeenJson: true,
+      resumeStatementPicksJson: true,
       product: { select: { profileJson: true } },
       consultationSession: {
         select: {
@@ -80,8 +76,22 @@ async function loadPickerRows(input: {
       },
     ];
   });
+  const stored = resumeStatementPicksFromCampaign({
+    resumeStatementPicksJson: campaign.resumeStatementPicksJson,
+    workspaceSeenJson: campaign.workspaceSeenJson,
+  });
+  if (stored.carryOver) {
+    const seen = workspaceSeenWithoutResumePicks(campaign.workspaceSeenJson);
+    await prisma.campaign.update({
+      where: { id: input.campaignId },
+      data: {
+        resumeStatementPicksJson: stored.carryOver,
+        ...(seen ? { workspaceSeenJson: seen as Prisma.InputJsonValue } : {}),
+      },
+    });
+  }
   return {
-    savedPickIds: readResumeStatementPickIds(campaign.workspaceSeenJson),
+    savedPickIds: stored.picks,
     statements,
     assessments: campaign.consultationSession?.assessments ?? [],
     profile,
@@ -155,7 +165,7 @@ export async function saveResumeStatementPicks(input: {
 }): Promise<void> {
   const campaign = await prisma.campaign.findFirst({
     where: { id: input.campaignId, organizationId: input.organizationId },
-    select: { workspaceSeenJson: true },
+    select: { id: true },
   });
   if (!campaign) throw new TenantError("Application was not found.");
   const requested = [...new Set(input.statementIds.map((id) => id.trim()).filter(Boolean))];
@@ -172,17 +182,8 @@ export async function saveResumeStatementPicks(input: {
     : [];
   const allowedIds = new Set(allowed.map((row) => row.id));
   const picks = requested.filter((id) => allowedIds.has(id));
-  const seen = serializeWorkspaceSeen(
-    migrateWorkspaceSeen(parseWorkspaceSeenJson(campaign.workspaceSeenJson)),
-  );
   await prisma.campaign.update({
     where: { id: input.campaignId },
-    data: {
-      workspaceSeenJson: workspaceSeenJsonWithPicks(
-        campaign.workspaceSeenJson,
-        seen,
-        picks,
-      ) as Prisma.InputJsonValue,
-    },
+    data: { resumeStatementPicksJson: picks },
   });
 }

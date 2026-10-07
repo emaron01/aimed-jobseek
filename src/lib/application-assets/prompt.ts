@@ -37,6 +37,7 @@ function seekerSources(context: ApplicationGenerationContext) {
       "PROFILE_FACT",
       "APPROVED_STATEMENT",
       "APPROVED_STORY",
+      "SEEKER_REPLY",
     ].includes(source.category),
   );
 }
@@ -160,6 +161,7 @@ export function buildResumeAssetMessages(input: {
             "PROFILE_FACT",
             "APPROVED_STATEMENT",
             "APPROVED_STORY",
+            "SEEKER_REPLY",
             "JOB_REQUIREMENT",
             "COMPANY_RESEARCH",
           ].includes(source.category),

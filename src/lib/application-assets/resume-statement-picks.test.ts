@@ -9,17 +9,22 @@ import { buildPresentationPlanMessages } from "@/lib/application-assets/plan-pro
 import { buildResumeAssetMessages } from "@/lib/application-assets/prompt";
 import { RESUME_PRESENTATION_PLAN_INSTRUCTIONS } from "@/lib/prompt-content/presentation-plan";
 import {
+  claimMatchesSeekerEvidence,
+  dropUngroundedResumeClaims,
+  logRemovedResumeClaims,
   resumeCitationOutcome,
   resumeClaimCitationErrors,
+  resumeVersionUsable,
 } from "@/lib/application-assets/service";
 import {
   BROADER_EXPERIENCE_TITLE,
   buildResumeWriterPackage,
   buildStatementGroups,
-  workspaceSeenJsonWithPicks,
+  resumeStatementPicksFromCampaign,
   type PickerProfile,
   type PickerStatement,
 } from "@/lib/application-assets/resume-statement-picks";
+import { applicationAssetConfig } from "@/lib/product-config";
 import {
   DEFAULT_HARPER_DRAFT_SETTINGS,
   parseHarperDraftSettings,
@@ -219,6 +224,88 @@ describe("Harper Approved Statements picker", () => {
     expect(writer).toContain("temperature: RESUME_WRITER_TEMPERATURE");
   });
 
+  it("accepts a claim found only in a seeker's reply and drops an invented claim", () => {
+    const reply = "I precepted new nurses at State University.";
+    const sources = [
+      { id: "reply:1", category: "SEEKER_REPLY", text: reply },
+      { id: "profile:name", category: "PROFILE_FACT", text: "Ada Lovelace closed enterprise deals at OpenText." },
+      { id: "job:1", category: "JOB_REQUIREMENT", text: "Own the forecast", url: null },
+    ];
+    const grounded = {
+      id: "grounded",
+      text: reply,
+      supports: [{ sourceId: "reply:1", quote: reply }],
+    };
+    expect(claimMatchesSeekerEvidence(grounded, sources)).toBe(true);
+    const context = {
+      sources,
+      assessments: [],
+    } as unknown as ReadyApplicationGenerationContext;
+    const claim = (id: string, text: string, sourceId: string) => ({
+      id,
+      text,
+      supports: [{ sourceId, quote: text }],
+    });
+    const content = {
+      type: "RESUME" as const,
+      header: {
+        name: claim("name", "Ada Lovelace", "profile:name"),
+        contactDetails: [],
+      },
+      summary: [claim("summary", "Ada Lovelace closed enterprise deals at OpenText.", "profile:name")],
+      experience: [
+        {
+          roleId: "opentext",
+          employer: "OpenText",
+          title: "Account Executive",
+          startDate: "2020-01",
+          endDate: null,
+          location: null,
+          hidden: false,
+          condensed: false,
+          bullets: [
+            claim("kept", reply, "reply:1"),
+            claim("invented", "Recruited two representatives who became top performers.", "job:1"),
+          ],
+        },
+      ],
+      skills: [],
+      education: [],
+      credentials: [],
+    };
+    expect(resumeClaimCitationErrors(content, context).some((line) => line.includes("kept"))).toBe(false);
+    expect(resumeClaimCitationErrors(content, context).some((line) => line.includes("invented"))).toBe(true);
+    const logged: string[] = [];
+    const info = console.info;
+    console.info = (message?: unknown) => {
+      logged.push(String(message));
+    };
+    const dropped = dropUngroundedResumeClaims(content, context);
+    logRemovedResumeClaims(dropped.removed);
+    console.info = info;
+    expect(dropped.removed.map((item) => item.id)).toEqual(["invented"]);
+    expect(dropped.content.experience[0]?.bullets.map((item) => item.id)).toEqual(["kept"]);
+    expect(resumeVersionUsable(dropped.content)).toBe(true);
+    expect(logged.some((line) => line.includes("resume_claim_removed") && line.includes("invented"))).toBe(true);
+
+    const emptyBody = {
+      ...content,
+      summary: [claim("summary", "Invented a revenue number of $9MM.", "job:1")],
+      experience: [{ ...content.experience[0], bullets: [claim("invented", "Recruited two representatives who became top performers.", "job:1")] }],
+    };
+    const cleared = dropUngroundedResumeClaims(emptyBody, context);
+    expect(resumeVersionUsable(cleared.content)).toBe(false);
+    expect(applicationAssetConfig.labels.resumeRegenerateUnchanged).toBe(
+      "Harper couldn't write a new version this time. Your current resume is unchanged. Please regenerate.",
+    );
+    const service = readFileSync("src/lib/application-assets/service.ts", "utf8");
+    const loop = service.slice(service.indexOf("for (let attempt = 0; attempt < 2"));
+    expect(loop).toContain("resumeClaimCitationErrors");
+    expect(loop).toContain("dropUngroundedResumeClaims");
+    expect(loop).toContain("resumeRegenerateUnchanged");
+    expect(loop.indexOf("dropUngroundedResumeClaims")).toBeLessThan(loop.lastIndexOf("saveVersion"));
+  });
+
   it("retries an uncited resume claim once and does not save when the retry still fails", () => {
     const claim = (id: string, sourceId: string) => ({
       id,
@@ -246,22 +333,39 @@ describe("Harper Approved Statements picker", () => {
     expect(resumeCitationOutcome({ attempt: 0, violations })).toBe("retry");
     expect(resumeCitationOutcome({ attempt: 1, violations })).toBe("reject");
     expect(resumeCitationOutcome({ attempt: 1, violations: [] })).toBe("save");
-    const service = readFileSync("src/lib/application-assets/service.ts", "utf8");
-    const loop = service.slice(service.indexOf("for (let attempt = 0; attempt < 2"));
-    expect(loop.indexOf("validateAssetContent")).toBeGreaterThan(-1);
-    expect(loop.indexOf("validateAssetContent")).toBeLessThan(loop.indexOf("saveVersion"));
-    expect(loop).toContain('outcome === "reject"');
     const action = readFileSync("src/app/actions/application-assets.ts", "utf8");
     const saveStart = action.indexOf("export async function saveResumeStatementPicksAction");
     const save = action.slice(saveStart, action.indexOf("function errorResult", saveStart));
     expect(save).not.toContain("enqueueApplicationJob");
   });
 
-  it("keeps saved picks when the workspace seen state is rewritten", () => {
-    const previous = { v: 2, assets: "resume", resumeStatementPickIds: ["stmt-1"] };
-    const next = workspaceSeenJsonWithPicks(previous, { v: 2, assets: "resume-2" }) as {
-      resumeStatementPickIds: string[];
-    };
-    expect(next.resumeStatementPickIds).toEqual(["stmt-1"]);
+  it("keeps picks when workspace seen changes and carries over picks already stored there", () => {
+    const seen = { v: 2, assets: "resume", resumeStatementPickIds: ["stmt-1"] };
+    const carried = resumeStatementPicksFromCampaign({
+      resumeStatementPicksJson: null,
+      workspaceSeenJson: seen,
+    });
+    expect(carried.picks).toEqual(["stmt-1"]);
+    expect(carried.carryOver).toEqual(["stmt-1"]);
+    const afterSeenRewrite = resumeStatementPicksFromCampaign({
+      resumeStatementPicksJson: ["stmt-1"],
+      workspaceSeenJson: { v: 2, assets: "resume-2" },
+    });
+    expect(afterSeenRewrite.picks).toEqual(["stmt-1"]);
+    expect(afterSeenRewrite.carryOver).toBeNull();
+    const cleared = resumeStatementPicksFromCampaign({
+      resumeStatementPicksJson: [],
+      workspaceSeenJson: seen,
+    });
+    expect(cleared.picks).toEqual([]);
+    expect(cleared.carryOver).toBeNull();
+    const tracker = readFileSync("src/lib/application/tracker.ts", "utf8");
+    expect(tracker).not.toContain("workspaceSeenJsonWithPicks");
+    const migration = readFileSync(
+      "prisma/migrations/20261006204500_campaign_resume_statement_picks/migration.sql",
+      "utf8",
+    );
+    expect(migration).toContain('ADD COLUMN "resumeStatementPicksJson" JSONB');
+    expect(migration).toContain("resumeStatementPickIds");
   });
 });

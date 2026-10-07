@@ -33,6 +33,7 @@ import {
   RESUME_ASSET_PROMPT_VERSION,
   applicationAssetContentSchema,
   assetClaims,
+  resumeAssetContentSchema,
   type ApplicationAssetContent,
   type AssetClaim,
   type CoverLetterAssetContent,
@@ -188,6 +189,22 @@ function isSeekerSource(
   ).includes(category);
 }
 
+/** A claim the seeker stated: its words appear in a profile fact, a reply, an approved statement, or an approved story. */
+export function claimMatchesSeekerEvidence(
+  claim: { text: string },
+  sources: ReadonlyArray<{ text: string; category: string }>,
+): boolean {
+  const text = claim.text.trim().replace(/\s+/g, " ").toLowerCase();
+  if (!text) return false;
+  return sources.some((source) => {
+    if (!isSeekerSource(source.category as ReadyApplicationGenerationContext["sources"][number]["category"])) {
+      return false;
+    }
+    const corpus = source.text.trim().replace(/\s+/g, " ").toLowerCase();
+    return corpus.includes(text);
+  });
+}
+
 function supportErrors(
   content: ApplicationAssetContent,
   context: ReadyApplicationGenerationContext,
@@ -201,6 +218,12 @@ function supportErrors(
       errors.push(`Claim id ${claim.id} was duplicated.`);
     }
     ids.add(claim.id);
+    if (
+      content.type === "RESUME" &&
+      claimMatchesSeekerEvidence(claim, context.sources)
+    ) {
+      continue;
+    }
     const isCoverLetterClose =
       content.type === "COVER_LETTER" && index === claims.length - 1;
     const acknowledgeIds = new Set(
@@ -251,7 +274,7 @@ export function resumeClaimCitationErrors(
   return supportErrors(content, context);
 }
 
-/** First failure is retried once with the violation text. A second failure is not saved. */
+/** First failure is retried once. A second failure drops the claims that match nothing the seeker stated. */
 export function resumeCitationOutcome(input: {
   attempt: number;
   violations: string[];
@@ -259,6 +282,59 @@ export function resumeCitationOutcome(input: {
   if (input.violations.length === 0) return "save";
   if (input.attempt < 1) return "retry";
   return "reject";
+}
+
+export function dropUngroundedResumeClaims(
+  content: ApplicationAssetContent,
+  context: ReadyApplicationGenerationContext,
+): { content: ResumeAssetContent; removed: AssetClaim[] } {
+  if (content.type !== "RESUME") {
+    return { content: content as unknown as ResumeAssetContent, removed: [] };
+  }
+  const headerIds = new Set([
+    content.header.name.id,
+    ...content.header.contactDetails.map((item) => item.id),
+  ]);
+  const removed = assetClaims(content).filter(
+    (claim) =>
+      !headerIds.has(claim.id) &&
+      !claimMatchesSeekerEvidence(claim, context.sources),
+  );
+  const dropped = stripClaimsById(
+    content,
+    new Set(removed.map((claim) => claim.id)),
+  );
+  return {
+    content: dropped.type === "RESUME" ? dropped : content,
+    removed,
+  };
+}
+
+export function logRemovedResumeClaims(
+  removed: ReadonlyArray<{ id: string; text: string }>,
+): void {
+  for (const claim of removed) {
+    console.info(
+      JSON.stringify({
+        event: "resume_claim_removed",
+        claimId: claim.id,
+        claimText: claim.text,
+      }),
+    );
+  }
+}
+
+export function resumeVersionUsable(content: ApplicationAssetContent): boolean {
+  if (content.type !== "RESUME") return false;
+  if (!resumeAssetContentSchema.safeParse(content).success) return false;
+  const body = [
+    ...content.summary,
+    ...content.experience.flatMap((role) => role.bullets),
+    ...content.skills,
+    ...content.education,
+    ...content.credentials,
+  ];
+  return body.some((claim) => claim.text.trim().length > 0);
 }
 
 function resumeStructureErrors(
@@ -1025,18 +1101,30 @@ export async function generateApplicationAsset(input: {
       });
     }
     if (input.type === "RESUME") {
-      const violations = await validateAssetContent({
-        content,
-        context,
-        hiddenRoleIds,
-        condensedRoleIds,
-      });
+      const violations = resumeClaimCitationErrors(content, context);
       const outcome = resumeCitationOutcome({ attempt, violations });
-      if (outcome === "retry" || outcome === "reject") {
-        lastViolations = violations;
-        lastMessage = applicationAssetConfig.labels.verificationFailed;
+      if (outcome === "retry") {
         qualityFeedback = violations;
         continue;
+      }
+      if (outcome === "reject") {
+        const dropped = dropUngroundedResumeClaims(content, context);
+        logRemovedResumeClaims(dropped.removed);
+        if (!resumeVersionUsable(dropped.content)) {
+          return {
+            ok: false,
+            message: applicationAssetConfig.labels.resumeRegenerateUnchanged,
+            violations: [],
+          };
+        }
+        const saved = await saveVersion({
+          context,
+          type: input.type,
+          personaId,
+          content: dropped.content,
+          guidance: null,
+        });
+        return { ok: true, assetId: saved.id, version: saved.version };
       }
     }
     const saved = await saveVersion({

@@ -4,7 +4,6 @@
  * Saving picks does not call a model. The seeker regenerates the resume.
  */
 
-import type { Prisma } from "@prisma/client";
 import type { HarperDraftSettings } from "@/lib/consultation/harper-draft-settings";
 
 export const RESUME_STATEMENT_PICKS_KEY = "resumeStatementPickIds";
@@ -134,13 +133,7 @@ export function yearsSinceRoleEnd(
   return Number(((now - end) / 12).toFixed(1));
 }
 
-export function readResumeStatementPickIds(value: unknown): string[] | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
-  if (!Object.prototype.hasOwnProperty.call(record, RESUME_STATEMENT_PICKS_KEY)) {
-    return null;
-  }
-  const raw = record[RESUME_STATEMENT_PICKS_KEY];
+function normalizePickIds(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return [
     ...new Set(
@@ -151,15 +144,45 @@ export function readResumeStatementPickIds(value: unknown): string[] | null {
   ];
 }
 
-export function workspaceSeenJsonWithPicks(
-  previous: unknown,
-  seen: Record<string, string | number>,
-  picks?: string[] | null,
-): Prisma.InputJsonValue {
-  const preserved =
-    picks === undefined ? readResumeStatementPickIds(previous) : picks;
-  if (preserved === null) return { ...seen };
-  return { ...seen, [RESUME_STATEMENT_PICKS_KEY]: preserved };
+/** Picks previously stored inside workspaceSeenJson. Null when that key was never saved. */
+export function readResumeStatementPickIds(value: unknown): string[] | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (!Object.prototype.hasOwnProperty.call(record, RESUME_STATEMENT_PICKS_KEY)) {
+    return null;
+  }
+  return normalizePickIds(record[RESUME_STATEMENT_PICKS_KEY]);
+}
+
+/**
+ * The column wins. Null means Harper's recommendation, unless an older seen
+ * document still holds a saved array, which is carried over once.
+ */
+export function resumeStatementPicksFromCampaign(input: {
+  resumeStatementPicksJson: unknown;
+  workspaceSeenJson: unknown;
+}): { picks: string[] | null; carryOver: string[] | null } {
+  if (Array.isArray(input.resumeStatementPicksJson)) {
+    return {
+      picks: normalizePickIds(input.resumeStatementPicksJson),
+      carryOver: null,
+    };
+  }
+  const fromSeen = readResumeStatementPickIds(input.workspaceSeenJson);
+  if (fromSeen === null) return { picks: null, carryOver: null };
+  return { picks: fromSeen, carryOver: fromSeen };
+}
+
+export function workspaceSeenWithoutResumePicks(
+  value: unknown,
+): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = { ...(value as Record<string, unknown>) };
+  if (!Object.prototype.hasOwnProperty.call(record, RESUME_STATEMENT_PICKS_KEY)) {
+    return null;
+  }
+  delete record[RESUME_STATEMENT_PICKS_KEY];
+  return record;
 }
 
 export function bulletRangeForRole(input: {

@@ -14,7 +14,6 @@ import {
 import { isHiringTeamPersonaBuilt, hiringTeamInvolvement } from "@/lib/hiring-team/build";
 import { JOB_REQUIREMENT_PROCESSING_VERSION } from "@/lib/job-requirement/types";
 import { askedQuestionsFromTurns } from "@/lib/consultation/questions";
-import { workspaceSeenJsonWithPicks } from "@/lib/application-assets/resume-statement-picks";
 import { prisma } from "@/lib/prisma-client";
 import {
   applicationStepFromPathname,
@@ -218,12 +217,7 @@ export async function getApplicationTracker(input: {
   if (shouldPersist) {
     await prisma.campaign.update({
       where: { id: campaign.id },
-      data: {
-        workspaceSeenJson: workspaceSeenJsonWithPicks(
-          campaign.workspaceSeenJson,
-          serializeWorkspaceSeen(seenState),
-        ),
-      },
+      data: { workspaceSeenJson: serializeWorkspaceSeen(seenState) },
     });
   }
   const currentStep = input.pathname
@@ -296,13 +290,10 @@ export async function markApplicationStepViewed(input: {
       await prisma.campaign.update({
         where: { id: input.campaignId },
         data: {
-          workspaceSeenJson: workspaceSeenJsonWithPicks(
-            campaign.workspaceSeenJson,
-            serializeWorkspaceSeen({
-              ...seenState,
-              version: 2,
-            }),
-          ),
+          workspaceSeenJson: serializeWorkspaceSeen({
+            ...seenState,
+            version: 2,
+          }),
         },
       });
     }
@@ -311,13 +302,10 @@ export async function markApplicationStepViewed(input: {
   await prisma.campaign.update({
     where: { id: input.campaignId },
     data: {
-      workspaceSeenJson: workspaceSeenJsonWithPicks(
-        campaign.workspaceSeenJson,
-        serializeWorkspaceSeen({
-          version: 2,
-          keys: { ...seenState.keys, [input.stepKey]: step.resultKey },
-        }),
-      ),
+      workspaceSeenJson: serializeWorkspaceSeen({
+        version: 2,
+        keys: { ...seenState.keys, [input.stepKey]: step.resultKey },
+      }),
     },
   });
 }
