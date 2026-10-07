@@ -325,6 +325,7 @@ describe("Harper Approved Statements picker", () => {
         "Content: Write up to the number of bullets given for each role, best first: the seeker's biggest stated results (numbers, named customers, scope, awards), then bullets that speak to this job. Every distinct result with a number appears in a bullet. Never write two bullets for the same result. Write bullets only for accomplishments; skip work arrangements, commute, pay, availability, and why the seeker wants the job.",
         "Style: One line, under 30 words. Start with a strong verb and the result. Do not name the employer; the job heading shows it. Customer and partner names are fine. Name at most two teams or departments. Leave story details, such as system counts and step-by-step methods, for interviews. No filler endings.",
         "Return structured JSON only.",
+        "Output shape: { bullets: [{ roleId (or null), text, evidenceIds, needsJobCheck }] }. Each role's requested count is its band maximum (not twice it). Keep the existing split of evidence that names more than one employer.",
       ].join("\n"),
     );
   });
