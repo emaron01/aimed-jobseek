@@ -238,7 +238,7 @@ describe("Ask Harper question shape", () => {
     }
     expect(replyGenerate).not.toHaveBeenCalled();
     expect(consultationConversationCopy.askHarperNotAQuestion).toBe(
-      "That isn't an interview question. Ask a real one.",
+      "Harper answers interview questions. Try asking one an interviewer might ask you.",
     );
   });
 
@@ -745,7 +745,7 @@ describe("Ask Harper answers every real question", () => {
     const empty = await askHarperAction(null, formData({ campaignId, question: "hello" }));
     expect(empty).toEqual({
       ok: false,
-      message: "That isn't an interview question. Ask a real one.",
+      message: "Harper answers interview questions. Try asking one an interviewer might ask you.",
     });
     expect(replyGenerate).toHaveBeenCalledTimes(callsAfterFail);
     expect(enqueue).not.toHaveBeenCalled();
