@@ -55,6 +55,8 @@ export type StatementGroupItem = {
   content: string;
   requirementLabel: string | null;
   checked: boolean;
+  /** Harper's recommendation. Shown even when the seeker's checkbox differs. */
+  recommended: boolean;
   evidenceIds: string[];
 };
 
@@ -108,6 +110,8 @@ export type RoleBulletBand = {
   candidateCount: number;
   isPrimary: boolean;
   directlyRelevant: boolean;
+  /** Offered in the picker, and title, company, and dates only on the resume until the seeker picks a bullet. */
+  titleOnly: boolean;
 };
 
 export function pickerProfileFromCandidate(profile: {
@@ -187,16 +191,31 @@ export function readResumeStatementPickIds(value: unknown): string[] | null {
 export function resumeStatementPicksFromCampaign(input: {
   resumeStatementPicksJson: unknown;
   workspaceSeenJson: unknown;
-}): { picks: string[] | null; carryOver: string[] | null } {
+}): { picks: string[] | null; seen: string[] | null; carryOver: string[] | null } {
   if (Array.isArray(input.resumeStatementPicksJson)) {
     return {
       picks: normalizePickIds(input.resumeStatementPicksJson),
+      seen: null,
       carryOver: null,
     };
   }
+  if (
+    input.resumeStatementPicksJson &&
+    typeof input.resumeStatementPicksJson === "object" &&
+    !Array.isArray(input.resumeStatementPicksJson)
+  ) {
+    const record = input.resumeStatementPicksJson as Record<string, unknown>;
+    if (Array.isArray(record.picks)) {
+      return {
+        picks: normalizePickIds(record.picks),
+        seen: Array.isArray(record.seen) ? normalizePickIds(record.seen) : null,
+        carryOver: null,
+      };
+    }
+  }
   const fromSeen = readResumeStatementPickIds(input.workspaceSeenJson);
-  if (fromSeen === null) return { picks: null, carryOver: null };
-  return { picks: fromSeen, carryOver: fromSeen };
+  if (fromSeen === null) return { picks: null, seen: null, carryOver: null };
+  return { picks: fromSeen, seen: null, carryOver: fromSeen };
 }
 
 export function workspaceSeenWithoutResumePicks(
@@ -376,7 +395,7 @@ export function candidateCountForBand(maxBullets: number, titleOnly: boolean): n
   return Math.max(0, maxBullets) * 2;
 }
 
-/** Personal Profile roles that take bullets. A role 15 or more years ago is included only when the plan marks it directly relevant. */
+/** Personal Profile roles that take bullets. A role 15 or more years ago is still offered, unchecked, unless it is directly relevant. */
 export function roleBulletBands(input: {
   profile: PickerProfile;
   settings: HarperDraftSettings;
@@ -399,31 +418,24 @@ export function roleBulletBands(input: {
       directlyRelevant,
       settings: input.settings,
     });
-    if (range.titleOnly) continue;
     const role = input.profile.experience.find((item) => item.id === place.roleId);
+    const offeredMax = range.titleOnly
+      ? input.settings.oldestRelevantBulletMax
+      : range.max;
     bands.push({
       roleId: place.roleId,
       title: role?.title?.trim() || place.title,
       employer: role?.employer?.trim() || place.title,
       yearsSinceEnd,
-      minBullets: range.min,
-      maxBullets: range.max,
-      candidateCount: candidateCountForBand(range.max, range.titleOnly),
+      minBullets: range.titleOnly ? 0 : range.min,
+      maxBullets: range.titleOnly ? 0 : range.max,
+      candidateCount: candidateCountForBand(offeredMax, false),
       isPrimary,
       directlyRelevant,
+      titleOnly: range.titleOnly,
     });
   }
   return bands;
-}
-
-function recommendedIds(
-  items: Array<StatementGroupItem & { rank: number }>,
-  count: number,
-): Set<string> {
-  const ranked = items
-    .slice()
-    .sort((a, b) => b.rank - a.rank || a.id.localeCompare(b.id));
-  return new Set(ranked.slice(0, Math.max(0, count)).map((item) => item.id));
 }
 
 /** Strength of evidence and relevance together. A numbered result outranks a job-only line. */
@@ -447,30 +459,46 @@ export function orderRoleBullets(
     .map((item) => item.bullet);
 }
 
+function bulletChecked(input: {
+  id: string;
+  recommended: boolean;
+  saved: string[] | null;
+  seen: string[] | null;
+}): boolean {
+  if (input.saved === null) return input.recommended;
+  if (input.saved.includes(input.id)) return true;
+  if (!input.recommended) return false;
+  if (input.seen === null) return true;
+  return !input.seen.includes(input.id);
+}
+
 export function buildStatementGroups(input: {
   profile: PickerProfile;
   bullets: readonly PickerBullet[];
   settings: HarperDraftSettings;
   savedPickIds: string[] | null;
+  /** Bullet ids offered at the seeker's last save. Null when that set was not stored. */
+  seenBulletIds?: string[] | null;
   primaryRoleId: string | null;
   directRoleIds: readonly string[];
   asOf?: Date;
 }): StatementGroup[] {
   const bands = roleBulletBands(input);
   const saved = input.savedPickIds;
+  const seen = input.seenBulletIds ?? null;
   const groups: StatementGroup[] = bands.map((band) => {
     const shown = orderRoleBullets(
       input.bullets.filter((bullet) => bullet.roleId === band.roleId),
       band.candidateCount,
     );
-    const recommended = Math.min(
-      shown.length,
-      band.isPrimary || band.directlyRelevant ? band.maxBullets : band.minBullets,
-    );
-    const checkedIds =
-      saved === null
-        ? new Set(shown.slice(0, recommended).map((bullet) => bullet.id))
-        : new Set(shown.filter((bullet) => saved.includes(bullet.id)).map((bullet) => bullet.id));
+    const recommendedCount =
+      band.titleOnly && !band.directlyRelevant
+        ? 0
+        : Math.min(
+            shown.length,
+            band.isPrimary || band.directlyRelevant ? band.maxBullets : band.minBullets,
+          );
+    const recommendedIds = new Set(shown.slice(0, recommendedCount).map((bullet) => bullet.id));
     return {
       id: band.roleId,
       title: roleGroupHeader(band.title, band.employer),
@@ -478,16 +506,20 @@ export function buildStatementGroups(input: {
       yearsSinceEnd: band.yearsSinceEnd,
       minBullets: band.minBullets,
       maxBullets: band.maxBullets,
-      titleOnly: false,
+      titleOnly: band.titleOnly,
       showRange: true,
-      items: shown.map((bullet) => ({
-        id: bullet.id,
-        kind: "RESUME_BULLET" as const,
-        content: bullet.text,
-        requirementLabel: null,
-        checked: checkedIds.has(bullet.id),
-        evidenceIds: bullet.evidenceIds,
-      })),
+      items: shown.map((bullet) => {
+        const recommended = recommendedIds.has(bullet.id);
+        return {
+          id: bullet.id,
+          kind: "RESUME_BULLET" as const,
+          content: bullet.text,
+          requirementLabel: null,
+          recommended,
+          checked: bulletChecked({ id: bullet.id, recommended, saved, seen }),
+          evidenceIds: bullet.evidenceIds,
+        };
+      }),
     };
   });
   const groupedIds = new Set(groups.map((group) => group.id));
@@ -511,7 +543,8 @@ export function buildStatementGroups(input: {
         kind: "RESUME_BULLET" as const,
         content: bullet.text,
         requirementLabel: null,
-        checked: saved === null || saved.includes(bullet.id),
+        recommended: false,
+        checked: bulletChecked({ id: bullet.id, recommended: false, saved, seen }),
         evidenceIds: bullet.evidenceIds,
       })),
     });
@@ -532,7 +565,8 @@ export function buildStatementGroups(input: {
       kind: "RESUME_BULLET" as const,
       content: bullet.text,
       requirementLabel: null,
-      checked: saved !== null && saved.includes(bullet.id),
+      recommended: false,
+      checked: bulletChecked({ id: bullet.id, recommended: false, saved, seen }),
       evidenceIds: bullet.evidenceIds,
     })),
   });
@@ -544,6 +578,7 @@ export function buildResumeWriterPackage(input: {
   bullets: readonly PickerBullet[];
   settings: HarperDraftSettings;
   savedPickIds: string[] | null;
+  seenBulletIds?: string[] | null;
   primaryRoleId: string | null;
   directRoleIds: readonly string[];
   planCondensedRoleIds: readonly string[];

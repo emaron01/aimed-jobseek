@@ -21,6 +21,7 @@ import {
   assignCandidateBullets,
   attributedEvidenceRole,
   buildResumeBulletCandidateMessages,
+  bulletResultKey,
   employerNameRetryMessage,
   employerRetryDecision,
   evidenceHasStatedResult,
@@ -120,7 +121,9 @@ describe("Harper Approved Statements picker", () => {
       directRoleIds: [],
       asOf,
     });
-    expect(bands.map((band) => band.roleId)).toEqual(["opentext", "vmware"]);
+    expect(bands.map((band) => band.roleId)).toEqual(["opentext", "vmware", "legacy"]);
+    expect(bands.find((band) => band.roleId === "legacy")?.titleOnly).toBe(true);
+    expect(bands.find((band) => band.roleId === "legacy")?.maxBullets).toBe(0);
     expect(bands.find((band) => band.roleId === "vmware")?.candidateCount).toBe(
       candidateCountForBand(5, false),
     );
@@ -139,7 +142,11 @@ describe("Harper Approved Statements picker", () => {
     ]);
     const openText = sales.find((group) => group.roleId === "opentext");
     const vmware = sales.find((group) => group.roleId === "vmware");
-    expect(sales.some((group) => group.roleId === "legacy")).toBe(false);
+    const legacy = sales.find((group) => group.roleId === "legacy");
+    expect(legacy?.titleOnly).toBe(true);
+    expect(legacy?.items.map((item) => item.content)).toEqual(["Carried a bag at Legacy Systems."]);
+    expect(legacy?.items[0]?.checked).toBe(false);
+    expect(legacy?.items[0]?.recommended).toBe(false);
     expect(openText?.title).toBe("Account Executive, OpenText");
     expect(openText?.items).toHaveLength(12);
     expect(openText?.items.filter((item) => item.checked)).toHaveLength(7);
@@ -477,7 +484,6 @@ describe("Harper Approved Statements picker", () => {
     console.info = info;
     expect(assigned.map((item) => `${item.roleId}:${item.text}`)).toEqual([
       "opentext:Held forecast deviation to 5-10% in FY26.",
-      "opentext:Held forecast deviation to 5-10%.",
       "mercy:Precepted new nurses on the night shift.",
       "intern:Shipped a clinic intake form during a capstone rotation.",
       "general:Joined a team that will teach me.",
@@ -573,15 +579,17 @@ describe("Harper Approved Statements picker", () => {
       { roleId: "mercy", text: "Precepted new nurses on the night shift.", jobSpecific: true, evidenceIds: ["mercy-ach"] },
       { roleId: "intern", text: "Shipped a clinic intake form.", jobSpecific: true, evidenceIds: ["intern-ach"] },
     ];
+    const otKey = bulletResultKey("Held forecast deviation to 5-10% in FY26.", ["ot-answer"]);
+    const mercyKey = bulletResultKey("Precepted new nurses on the night shift.", ["mercy-ach"]);
     const profile = profileWithBulletRoleChoices(
       { experience: salesProfile.experience },
-      ["ot-answer"],
+      [otKey],
       "vmware",
     );
-    const again = profileWithBulletRoleChoices(profile, ["mercy-ach"], "general");
+    const again = profileWithBulletRoleChoices(profile, [mercyKey], "general");
     const choices = again.bulletRoleChoices as Record<string, string>;
-    expect(choices["ot-answer"]).toBe("vmware");
-    expect(choices["mercy-ach"]).toBe("general");
+    expect(choices[otKey]).toBe("vmware");
+    expect(choices[mercyKey]).toBe("general");
     const nextRun = assignCandidateBullets({ bands, evidence, bullets, choices, roles: bands });
     const otherApplication = assignCandidateBullets({ bands, evidence, bullets, choices, roles: bands });
     expect(nextRun.map((item) => `${item.roleId}:${item.evidenceIds[0]}`)).toEqual(
@@ -598,6 +606,147 @@ describe("Harper Approved Statements picker", () => {
     expect(correction).not.toContain("runPaidStructuredCall");
     expect(correction).not.toContain("enqueueApplicationJob");
     expect(correction).toContain("saveBulletEvidenceRole");
+    expect(correction).toContain("bulletId");
+    expect(correction).not.toContain("evidenceIds");
+  });
+
+  it("shows Harper's recommendation, corrects one bullet, and keeps a distinct result", () => {
+    const recommended = buildStatementGroups({
+      profile: salesProfile,
+      bullets: [
+        bullet("kept", "opentext", "Closed a $1.3MM Bank of America deal.", false),
+        bullet("fresh", "opentext", "Improved forecast deviation from 20% to 5-10%.", false),
+        bullet("declined", "opentext", "Ran a VMware campaign that created $3MM in pipeline.", false),
+      ],
+      settings: DEFAULT_HARPER_DRAFT_SETTINGS,
+      savedPickIds: ["kept"],
+      seenBulletIds: ["kept", "declined"],
+      primaryRoleId: "opentext",
+      directRoleIds: [],
+      asOf,
+    });
+    const openText = recommended.find((group) => group.roleId === "opentext");
+    expect(openText?.items.map((item) => item.recommended)).toEqual([true, true, true]);
+    expect(openText?.items.find((item) => item.id === "kept")?.checked).toBe(true);
+    expect(openText?.items.find((item) => item.id === "fresh")?.checked).toBe(true);
+    expect(openText?.items.find((item) => item.id === "declined")?.checked).toBe(false);
+    expect(applicationAssetConfig.labels.harperRecommends).toBe("Harper recommends");
+    const picker = readFileSync("src/components/ResumeStatementPicker.tsx", "utf8");
+    expect(picker).toContain('data-testid="harper-recommends"');
+    expect(picker).toContain("bulletId: item.id");
+
+    const shared = "answer-both";
+    const goal = "Led the team to 90%-110% of goal.";
+    const sprint = "Closed a Sprint sale.";
+    const goalKey = bulletResultKey(goal, [shared]);
+    const sprintKey = bulletResultKey(sprint, [shared]);
+    expect(goalKey).not.toBe(sprintKey);
+    const roles = [
+      { roleId: "opentext", employer: salesProfile.experience[0]!.employer ?? "" },
+      { roleId: "gryphon", employer: "Gryphon Networks" },
+      { roleId: "mercy", employer: nursingProfile.experience[0]!.employer ?? "" },
+      { roleId: "micro", employer: "Micro Focus" },
+    ];
+    const moved = assignCandidateBullets({
+      bands: roles.map((role) => ({ ...role, candidateCount: 6 })),
+      roles,
+      evidence: [
+        {
+          id: shared,
+          kind: "INTERVIEW_ANSWER",
+          text: "At OT the team hit 90%-110% of goal, and at Gryphon Networks closed a Sprint sale.",
+          roleId: null,
+          question: "Tell me about a quota and a sale.",
+        },
+      ],
+      choices: { [sprintKey]: "gryphon" },
+      bullets: [
+        { roleId: "gryphon", text: goal, jobSpecific: false, evidenceIds: [shared] },
+        { roleId: "gryphon", text: sprint, jobSpecific: false, evidenceIds: [shared] },
+      ],
+    });
+    expect(moved.find((item) => item.text === goal)?.roleId).toBe("general");
+    expect(moved.find((item) => item.text === sprint)?.roleId).toBe("gryphon");
+    expect(
+      attributedEvidenceRole(
+        {
+          id: "ot-short",
+          kind: "INTERVIEW_ANSWER",
+          text: "Held forecast deviation to 5-10% at OT.",
+          roleId: null,
+          question: "How close was the forecast?",
+        },
+        [
+          { roleId: "opentext", employer: "OpenText" },
+          { roleId: "mercy", employer: "Mercy General" },
+        ],
+      ),
+    ).toBe("opentext");
+    expect(
+      attributedEvidenceRole(
+        {
+          id: "ot-ambiguous",
+          kind: "INTERVIEW_ANSWER",
+          text: "Held the forecast at OT.",
+          roleId: null,
+          question: null,
+        },
+        [
+          { roleId: "opentext", employer: "OpenText" },
+          { roleId: "other", employer: "Oak Terrace" },
+        ],
+      ),
+    ).toBe("general");
+
+    const duplicates = assignCandidateBullets({
+      bands: [
+        { roleId: "opentext", employer: "OpenText", candidateCount: 6 },
+        { roleId: "micro", employer: "Micro Focus", candidateCount: 6 },
+      ],
+      roles: [
+        { roleId: "opentext", employer: "OpenText" },
+        { roleId: "micro", employer: "Micro Focus" },
+      ],
+      evidence: [
+        { id: "vm", kind: "INTERVIEW_ANSWER", text: "Ran a VMware campaign that created $3MM in pipeline.", roleId: null, question: "What pipeline did you create?" },
+        { id: "boa", kind: "INTERVIEW_ANSWER", text: "Closed a $1.3MM Bank of America deal.", roleId: null, question: "Tell me about a deal at OpenText." },
+        { id: "att", kind: "INTERVIEW_ANSWER", text: "Grew a $100K SIEM sale to $1MM in utilization and a $6MM network operations sale.", roleId: null, question: "Tell me about AT&T at Micro Focus." },
+        { id: "capstone", kind: "RESUME_BULLET", text: "Shipped a clinic intake form during a capstone.", roleId: null, question: "What did you build in school?" },
+      ],
+      bullets: [
+        { roleId: "opentext", text: "Ran a VMware campaign that created $3MM in pipeline.", jobSpecific: false, evidenceIds: ["vm"] },
+        { roleId: "opentext", text: "Created $3MM in pipeline with a VMware campaign.", jobSpecific: true, evidenceIds: ["vm"] },
+        { roleId: "opentext", text: "Closed a $1.3MM Bank of America deal.", jobSpecific: false, evidenceIds: ["boa"] },
+        { roleId: "general", text: "Closed a $1.3MM Bank of America deal.", jobSpecific: false, evidenceIds: ["boa"] },
+        { roleId: "micro", text: "Grew a $100K SIEM sale to $1MM in utilization and a $6MM network operations sale.", jobSpecific: false, evidenceIds: ["att"] },
+        { roleId: "general", text: "Shipped a clinic intake form during a capstone.", jobSpecific: false, evidenceIds: ["capstone"] },
+      ],
+    });
+    expect(duplicates.filter((item) => item.text.toLowerCase().includes("vmware"))).toHaveLength(1);
+    expect(duplicates.filter((item) => item.text.includes("Bank of America")).map((item) => item.roleId)).toEqual(["opentext"]);
+    expect(duplicates.some((item) => item.text.includes("$100K") && item.text.includes("$6MM"))).toBe(true);
+    expect(duplicates.some((item) => item.roleId === "general" && item.text.includes("capstone"))).toBe(true);
+    expect(graduateProfile.projectTexts).toContain("Capstone project");
+
+    const att = "Grew a $100K SIEM sale to $1MM in utilization and a $6MM network operations sale at Micro Focus.";
+    const kept = mergeEmployerNameRetry({
+      employers: ["Micro Focus"],
+      first: {
+        bullets: [
+          { roleId: "micro", text: att, jobSpecific: false, evidenceIds: ["att"] },
+          { roleId: "micro", text: "Led the team to 90%-110% of goal at Micro Focus.", jobSpecific: false, evidenceIds: ["att"] },
+        ],
+      },
+      retry: {
+        bullets: [
+          { roleId: "micro", text: "Grew a SIEM sale.", jobSpecific: false, evidenceIds: ["att"] },
+        ],
+      },
+    });
+    expect(kept.bullets.map((item) => item.text)).toEqual([
+      att,
+      "Led the team to 90%-110% of goal at Micro Focus.",
+    ]);
   });
 
   it("keeps achievement bullets with their role, drops embedded employer names, and leads with the strongest results", () => {

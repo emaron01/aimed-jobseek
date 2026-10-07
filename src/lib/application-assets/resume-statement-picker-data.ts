@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import {
+  bulletResultKey,
   profileWithBulletRoleChoices,
 } from "@/lib/application-assets/resume-bullet-candidates";
 import { readResumeBulletCandidates } from "@/lib/application-assets/resume-bullet-candidate-service";
@@ -26,6 +27,7 @@ async function loadPickerRows(input: {
   campaignId: string;
 }): Promise<{
   savedPickIds: string[] | null;
+  seenBulletIds: string[] | null;
   bullets: PickerBullet[];
   profile: NonNullable<Awaited<ReturnType<typeof readResumeBulletCandidates>>>["packet"]["profile"];
   primaryRoleId: string | null;
@@ -66,6 +68,7 @@ async function loadPickerRows(input: {
   }
   return {
     savedPickIds: stored.picks,
+    seenBulletIds: stored.seen,
     bullets: candidates.bullets,
     profile: candidates.packet.profile,
     primaryRoleId: candidates.packet.primaryRoleId,
@@ -96,6 +99,7 @@ export async function loadResumeStatementGroups(input: {
       bullets: rows.bullets,
       settings,
       savedPickIds: rows.savedPickIds,
+      seenBulletIds: rows.seenBulletIds,
       primaryRoleId: rows.primaryRoleId,
       directRoleIds: rows.directRoleIds,
     }),
@@ -133,6 +137,7 @@ export async function loadResumeWriterFields(input: {
     bullets: rows.bullets,
     settings,
     savedPickIds: rows.savedPickIds,
+    seenBulletIds: rows.seenBulletIds,
     primaryRoleId: rows.primaryRoleId,
     directRoleIds: rows.directRoleIds,
     planCondensedRoleIds: input.planCondensedRoleIds,
@@ -140,11 +145,11 @@ export async function loadResumeWriterFields(input: {
   });
 }
 
-/** Saves the seeker's job correction on the Personal Profile. Does not call a model. */
+/** Saves the seeker's job correction for one bullet. Does not call a model. */
 export async function saveBulletEvidenceRole(input: {
   organizationId: string;
   campaignId: string;
-  evidenceIds: string[];
+  bulletId: string;
   roleId: string;
 }): Promise<void> {
   const campaign = await prisma.campaign.findFirst({
@@ -160,14 +165,15 @@ export async function saveBulletEvidenceRole(input: {
   if (roleId !== GENERAL_BACKGROUND_ID && !allowed.has(roleId)) {
     throw new TenantError("That job is not on the Personal Profile.");
   }
-  const evidenceIds = [...new Set(input.evidenceIds.map((id) => id.trim()).filter(Boolean))];
-  if (evidenceIds.length === 0) throw new TenantError("That bullet has no evidence to correct.");
+  const stored = await readResumeBulletCandidates(input);
+  const bullet = stored?.bullets.find((item) => item.id === input.bulletId.trim());
+  if (!bullet) throw new TenantError("That bullet has no evidence to correct.");
   await prisma.product.update({
     where: { id: campaign.product.id },
     data: {
       profileJson: profileWithBulletRoleChoices(
         campaign.product.profileJson,
-        evidenceIds,
+        [bulletResultKey(bullet.text, bullet.evidenceIds)],
         roleId,
       ) as Prisma.InputJsonValue,
     },
@@ -190,6 +196,11 @@ export async function saveResumeStatementPicks(input: {
   const picks = requested.filter((id) => allowedIds.has(id));
   await prisma.campaign.update({
     where: { id: input.campaignId },
-    data: { resumeStatementPicksJson: picks },
+    data: {
+      resumeStatementPicksJson: {
+        picks,
+        seen: [...allowedIds],
+      },
+    },
   });
 }

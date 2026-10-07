@@ -207,23 +207,50 @@ export function employerMatchNames(employer: string): string[] {
   return names;
 }
 
+/** Initials of a profile employer, such as "OT" for OpenText. */
+export function employerInitials(employer: string): string[] {
+  const base = employer.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  const words = base
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .split(/[^A-Za-z0-9]+/)
+    .map((word) => word.trim())
+    .filter((word) => word.length > 0 && !/^(of|and|the|a|an|by|for)$/i.test(word));
+  if (words.length < 2) return [];
+  const initials = words.map((word) => word[0]!.toUpperCase()).join("");
+  if (initials.length < 2 || initials.length > 4) return [];
+  return [initials];
+}
+
+/** Uppercase initials only. "OT" matches; a lowercase word does not. */
+export function textNamesInitials(text: string, initials: string): boolean {
+  if (!/^[A-Z]{2,4}$/.test(initials)) return false;
+  const escaped = initials.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|[^\\p{L}\\p{N}])${escaped}(?=$|[^\\p{L}\\p{N}])`, "u").test(text);
+}
+
 /**
  * Roles whose employer the text names.
- * A stated name that is contained in exactly one profile employer selects that role.
- * A stated name contained in more than one employer decides nothing.
+ * A stated name or initials that match exactly one profile employer selects that role.
+ * A name that matches more than one employer decides nothing.
  */
 export function rolesNamedByText(
   text: string,
   roles: readonly ProfileEmployerRole[],
 ): string[] {
   const byName = new Map<string, string[]>();
+  const add = (key: string, roleId: string) => {
+    const list = byName.get(key) ?? [];
+    list.push(roleId);
+    byName.set(key, list);
+  };
   for (const role of roles) {
     for (const name of employerMatchNames(role.employer)) {
       if (!textNamesEmployer(text, name)) continue;
-      const key = name.toLowerCase();
-      const list = byName.get(key) ?? [];
-      list.push(role.roleId);
-      byName.set(key, list);
+      add(name.toLowerCase(), role.roleId);
+    }
+    for (const initials of employerInitials(role.employer)) {
+      if (!textNamesInitials(text, initials)) continue;
+      add(initials.toLowerCase(), role.roleId);
     }
   }
   const decided = new Set<string>();
@@ -232,6 +259,78 @@ export function rolesNamedByText(
     if (unique.length === 1) decided.add(unique[0]!);
   }
   return [...decided];
+}
+
+function normalizedAmounts(text: string): string[] {
+  const withoutYears = text.replace(/\bFY\s*'?\d{2,4}\b/gi, " ");
+  const amounts: string[] = [];
+  const pattern =
+    /(?:\$\s*)?(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?:\s*(mm|million|thousand|k|m))?(?:\s*%)?/gi;
+  for (const match of withoutYears.matchAll(pattern)) {
+    const raw = Number(match[1]!.replace(/,/g, ""));
+    if (!Number.isFinite(raw)) continue;
+    const unit = (match[2] ?? "").toLowerCase();
+    const percent = match[0].includes("%");
+    if (percent && !unit) {
+      amounts.push(`${raw}%`);
+      continue;
+    }
+    let value = raw;
+    if (unit === "mm" || unit === "million" || unit === "m") value = raw * 1_000_000;
+    else if (unit === "k" || unit === "thousand") value = raw * 1_000;
+    amounts.push(String(value));
+  }
+  return [...new Set(amounts)].sort();
+}
+
+function namedResultTokens(text: string, employers: readonly string[]): string[] {
+  const employerNames = new Set(
+    employers.flatMap((employer) => employerMatchNames(employer)).map((name) => name.toLowerCase()),
+  );
+  const found =
+    text.match(
+      /\b[A-Z][A-Za-z0-9&.'-]*(?:\s+(?:of|and|&)\s+[A-Z][A-Za-z0-9&.'-]*|\s+[A-Z][A-Za-z0-9&.'-]*)*/g,
+    ) ?? [];
+  return [
+    ...new Set(
+      found
+        .map((name) => name.trim().toLowerCase())
+        .filter((name) => name.length > 1 && !employerNames.has(name)),
+    ),
+  ].sort();
+}
+
+function sameTokenSet(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((token, index) => token === right[index]);
+}
+
+/** Same numbers and named customers. A different number set is a different result. */
+export function sameBulletResult(
+  left: string,
+  right: string,
+  employers: readonly string[] = [],
+): boolean {
+  const leftAmounts = normalizedAmounts(left);
+  const rightAmounts = normalizedAmounts(right);
+  const leftNames = namedResultTokens(left, employers);
+  const rightNames = namedResultTokens(right, employers);
+  if (leftAmounts.length === 0 && rightAmounts.length === 0) {
+    return leftNames.length > 0 && sameTokenSet(leftNames, rightNames);
+  }
+  if (!sameTokenSet(leftAmounts, rightAmounts)) return false;
+  if (leftNames.length === 0 || rightNames.length === 0) return true;
+  return leftNames.some((name) => rightNames.includes(name));
+}
+
+/**
+ * Match across runs: the same evidence ids plus the same result (numbers and named customers).
+ * Wording can change. A different result from the same evidence does not match.
+ */
+export function bulletResultKey(text: string, evidenceIds: readonly string[]): string {
+  const evidence = [...new Set(evidenceIds.map((id) => id.trim()).filter(Boolean))].sort();
+  const signature = [...normalizedAmounts(text), ...namedResultTokens(text, [])].join("|");
+  return `result:${createHash("sha256").update(`${evidence.join("\n")}\n${signature}`).digest("hex").slice(0, 20)}`;
 }
 
 function escapeEmployer(employer: string): string {
@@ -326,14 +425,46 @@ export function cleanBulletEmployerNames(input: {
     text = removeEveryEmployerMention(text, employer);
     if (textNamesEmployer(text, employer)) return { ok: false };
   }
+  const initialCounts = new Map<string, number>();
+  for (const employer of input.employers) {
+    for (const initials of employerInitials(employer)) {
+      initialCounts.set(initials, (initialCounts.get(initials) ?? 0) + 1);
+    }
+  }
+  for (const [initials, count] of initialCounts) {
+    if (count !== 1 || !textNamesInitials(text, initials)) continue;
+    text = tidyBulletText(
+      text.replace(
+        new RegExp(
+          `(?:\\b(?:at|for|with)\\s+)?${initials}(?:['’]s)?(?=$|[^\\p{L}\\p{N}])`,
+          "gu",
+        ),
+        "",
+      ),
+    );
+  }
   if (!text) return { ok: false };
   return { ok: true, text };
 }
 
 export function bulletNamesProfileEmployer(text: string, employers: readonly string[]): boolean {
-  return employers
-    .flatMap((employer) => employerMatchNames(employer))
-    .some((name) => textNamesEmployer(text, name));
+  if (
+    employers
+      .flatMap((employer) => employerMatchNames(employer))
+      .some((name) => textNamesEmployer(text, name))
+  ) {
+    return true;
+  }
+  const initialCounts = new Map<string, number>();
+  for (const employer of employers) {
+    for (const initials of employerInitials(employer)) {
+      initialCounts.set(initials, (initialCounts.get(initials) ?? 0) + 1);
+    }
+  }
+  for (const [initials, count] of initialCounts) {
+    if (count === 1 && textNamesInitials(text, initials)) return true;
+  }
+  return false;
 }
 
 export function employerRetryDecision(input: {
@@ -348,7 +479,24 @@ export function employerRetryDecision(input: {
   return namesEmployer ? "retry" : "keep";
 }
 
-/** Keep bullets that did not name an employer. Replace only the ones that did. */
+function sharesEvidence(
+  left: { evidenceIds: readonly string[] },
+  right: { evidenceIds: readonly string[] },
+): boolean {
+  const ids = new Set(left.evidenceIds.map((id) => id.trim()).filter(Boolean));
+  return right.evidenceIds.some((id) => ids.has(id.trim()));
+}
+
+function amountCount(text: string): number {
+  return normalizedAmounts(text).length;
+}
+
+function comparableBulletText(text: string, employers: readonly string[]): string {
+  const cleaned = cleanBulletEmployerNames({ text, employers });
+  return cleaned.ok ? cleaned.text : text;
+}
+
+/** Keep every distinct result. A retry replaces only the same result, and only when it keeps the numbers. */
 export function mergeEmployerNameRetry(input: {
   first: ResumeBulletCandidates;
   retry: ResumeBulletCandidates;
@@ -356,28 +504,34 @@ export function mergeEmployerNameRetry(input: {
 }): ResumeBulletCandidates {
   const passing: ResumeBulletCandidates["bullets"] = [];
   const failed: ResumeBulletCandidates["bullets"] = [];
-  const failedIds = new Set<string>();
   for (const bullet of input.first.bullets) {
-    if (!bulletNamesProfileEmployer(bullet.text, input.employers)) {
-      passing.push(bullet);
-      continue;
-    }
-    failed.push(bullet);
-    for (const id of bullet.evidenceIds) {
-      const evidenceId = id.trim();
-      if (evidenceId) failedIds.add(evidenceId);
-    }
+    if (!bulletNamesProfileEmployer(bullet.text, input.employers)) passing.push(bullet);
+    else failed.push(bullet);
   }
-  const replacements = input.retry.bullets.filter((bullet) =>
-    bullet.evidenceIds.some((id) => failedIds.has(id.trim())),
-  );
-  const replacedIds = new Set(
-    replacements.flatMap((bullet) => bullet.evidenceIds.map((id) => id.trim()).filter(Boolean)),
-  );
-  const unreplaced = failed.filter(
-    (bullet) => !bullet.evidenceIds.some((id) => replacedIds.has(id.trim())),
-  );
-  return { bullets: [...passing, ...replacements, ...unreplaced] };
+  const used = new Set<number>();
+  const merged = failed.map((bullet) => {
+    const index = input.retry.bullets.findIndex(
+      (candidate, candidateIndex) =>
+        !used.has(candidateIndex) &&
+        sharesEvidence(candidate, bullet) &&
+        sameBulletResult(
+          comparableBulletText(candidate.text, input.employers),
+          comparableBulletText(bullet.text, input.employers),
+          input.employers,
+        ),
+    );
+    if (index < 0) return bullet;
+    const replacement = input.retry.bullets[index]!;
+    if (
+      amountCount(comparableBulletText(replacement.text, input.employers)) <
+      amountCount(comparableBulletText(bullet.text, input.employers))
+    ) {
+      return bullet;
+    }
+    used.add(index);
+    return replacement;
+  });
+  return { bullets: [...passing, ...merged] };
 }
 
 export function employerNameRetryMessage(): string {
@@ -483,7 +637,7 @@ export function readBulletRoleChoices(profileJson: unknown): Record<string, stri
 
 export function profileWithBulletRoleChoices(
   profileJson: unknown,
-  evidenceIds: readonly string[],
+  resultKeys: readonly string[],
   roleId: string,
 ): Record<string, unknown> {
   const base =
@@ -491,24 +645,21 @@ export function profileWithBulletRoleChoices(
       ? { ...(profileJson as Record<string, unknown>) }
       : {};
   const choices = readBulletRoleChoices(base);
-  for (const id of evidenceIds) {
-    const evidenceId = id.trim();
-    if (evidenceId) choices[evidenceId] = roleId;
+  for (const key of resultKeys) {
+    const resultKey = key.trim();
+    if (resultKey) choices[resultKey] = roleId;
   }
   base.bulletRoleChoices = choices;
   return base;
 }
 
 function seekerChoice(
+  text: string,
   evidenceIds: readonly string[],
   choices: Readonly<Record<string, string>> | undefined,
 ): string | null {
   if (!choices) return null;
-  for (const id of evidenceIds) {
-    const choice = choices[id];
-    if (choice) return choice;
-  }
-  return null;
+  return choices[bulletResultKey(text, evidenceIds)] ?? null;
 }
 
 export function assignCandidateBullets(input: {
@@ -561,7 +712,7 @@ export function assignCandidateBullets(input: {
       continue;
     }
     const text = cleaned.text;
-    const choice = seekerChoice(evidenceIds, input.choices);
+    const choice = seekerChoice(text, evidenceIds, input.choices);
     const make = (roleId: string, seekerChosen: boolean): PickerBullet => ({
       id: `bullet:${createHash("sha256").update(`${roleId}\n${text}`).digest("hex").slice(0, 16)}`,
       roleId,
@@ -611,9 +762,21 @@ export function assignCandidateBullets(input: {
       place(attributed[0]!, make(attributed[0]!, false), false);
       continue;
     }
+    const fromBullet = rolesNamedByText(text, roleList);
+    if (fromBullet.length === 1 && roles.has(fromBullet[0]!)) {
+      place(fromBullet[0]!, make(fromBullet[0]!, false), false);
+      logBulletCandidate({
+        event: "resume_bullet_candidate_moved",
+        roleId: fromBullet[0]!,
+        text,
+        evidenceIds,
+      });
+      continue;
+    }
+    place(GENERAL_BACKGROUND_ID, make(GENERAL_BACKGROUND_ID, false), true);
     logBulletCandidate({
-      event: "resume_bullet_candidate_dropped",
-      roleId,
+      event: "resume_bullet_candidate_moved",
+      roleId: GENERAL_BACKGROUND_ID,
       text,
       evidenceIds,
     });
@@ -627,12 +790,54 @@ export function assignCandidateBullets(input: {
   const extraRoles = [...chosen.keys()].filter(
     (roleId) => roleId !== GENERAL_BACKGROUND_ID && !bands.has(roleId),
   );
-  return [
-    ...ordered,
-    ...extraRoles.flatMap((roleId) => chosen.get(roleId) ?? []),
-    ...(chosen.get(GENERAL_BACKGROUND_ID) ?? []),
-    ...(grouped.get(GENERAL_BACKGROUND_ID) ?? []),
-  ];
+  return collapseSameResults(
+    [
+      ...ordered,
+      ...extraRoles.flatMap((roleId) => chosen.get(roleId) ?? []),
+      ...(chosen.get(GENERAL_BACKGROUND_ID) ?? []),
+      ...(grouped.get(GENERAL_BACKGROUND_ID) ?? []),
+    ],
+    employers,
+  );
+}
+
+function preferBullet(current: PickerBullet, next: PickerBullet): PickerBullet {
+  const currentGeneral = current.roleId === GENERAL_BACKGROUND_ID;
+  const nextGeneral = next.roleId === GENERAL_BACKGROUND_ID;
+  if (currentGeneral !== nextGeneral) return currentGeneral ? next : current;
+  if (Boolean(current.seekerChosen) !== Boolean(next.seekerChosen)) {
+    return current.seekerChosen ? current : next;
+  }
+  return next.text.length > current.text.length ? next : current;
+}
+
+function evidenceOverlaps(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  const ids = new Set(left.map((id) => id.trim()).filter(Boolean));
+  return right.some((id) => ids.has(id.trim()));
+}
+
+/** One copy of the same result from the same evidence. A role wins over General background. Distinct number sets both stay. */
+export function collapseSameResults(
+  bullets: readonly PickerBullet[],
+  employers: readonly string[],
+): PickerBullet[] {
+  const kept: PickerBullet[] = [];
+  for (const bullet of bullets) {
+    const index = kept.findIndex(
+      (existing) =>
+        evidenceOverlaps(existing.evidenceIds, bullet.evidenceIds) &&
+        sameBulletResult(existing.text, bullet.text, employers),
+    );
+    if (index < 0) {
+      kept.push(bullet);
+      continue;
+    }
+    kept[index] = preferBullet(kept[index]!, bullet);
+  }
+  return kept;
 }
 
 export function bulletCandidateRoles(input: {

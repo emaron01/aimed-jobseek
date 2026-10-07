@@ -61,6 +61,14 @@ function StatementGroupFields({
               />
               <span className="mt-0.5 block">
                 {item.content}
+                {item.recommended ? (
+                  <span
+                    className="ml-2 inline-block rounded border border-edge px-1 align-middle text-xs text-subtle"
+                    data-testid="harper-recommends"
+                  >
+                    {labels.harperRecommends}
+                  </span>
+                ) : null}
                 {canEdit && item.evidenceIds.length > 0 ? (
                   <select
                     aria-label="Job"
@@ -72,7 +80,7 @@ function StatementGroupFields({
                       startMove(() => {
                         void saveBulletEvidenceRoleAction({
                           campaignId,
-                          evidenceIds: item.evidenceIds,
+                          bulletId: item.id,
                           roleId,
                         });
                       });

@@ -44,6 +44,7 @@ export const applicationAssetConfig = Object.freeze({
     harperApprovedStatements: "Harper Approved Statements",
     broaderExperience: "Broader experience",
     recommendedBulletRange: "Recommended bullets: {min} to {max}.",
+    harperRecommends: "Harper recommends",
     preparingResumeBullets: `${consultationConfig.displayName} is preparing your resume bullets…`,
     titleCompanyDatesOnly: "Title, company, and dates only",
     picksOutsideRange:

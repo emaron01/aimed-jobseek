@@ -75,7 +75,7 @@ export async function prepareResumeBulletCandidatesAction(
 
 export async function saveBulletEvidenceRoleAction(input: {
   campaignId: string;
-  evidenceIds: string[];
+  bulletId: string;
   roleId: string;
 }): Promise<ApplicationAssetActionResult> {
   try {
@@ -84,7 +84,7 @@ export async function saveBulletEvidenceRoleAction(input: {
     await saveBulletEvidenceRole({
       organizationId,
       campaignId: input.campaignId,
-      evidenceIds: input.evidenceIds,
+      bulletId: input.bulletId,
       roleId: input.roleId,
     });
     revalidate(input.campaignId);
