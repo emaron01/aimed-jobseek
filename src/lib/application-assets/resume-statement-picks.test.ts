@@ -306,6 +306,57 @@ describe("Harper Approved Statements picker", () => {
     expect(loop.indexOf("dropUngroundedResumeClaims")).toBeLessThan(loop.lastIndexOf("saveVersion"));
   });
 
+  it("keeps a paraphrased bullet that cites an approved statement and drops a bullet that cites a missing source", () => {
+    const statement = "Closed a multi-year agreement with a hospital system.";
+    const paraphrased = "Negotiated a multi-year hospital contract and expanded the account.";
+    const sources = [
+      { id: "statement:1", category: "APPROVED_STATEMENT", text: statement },
+      { id: "profile:name", category: "PROFILE_FACT", text: "Ada Lovelace" },
+    ];
+    const context = {
+      sources,
+      assessments: [],
+    } as unknown as ReadyApplicationGenerationContext;
+    const claim = (id: string, text: string, sourceId: string) => ({
+      id,
+      text,
+      supports: [{ sourceId, quote: text }],
+    });
+    const content = {
+      type: "RESUME" as const,
+      header: {
+        name: claim("name", "Ada Lovelace", "profile:name"),
+        contactDetails: [],
+      },
+      summary: [claim("summary", "Sells into hospital systems.", "statement:1")],
+      experience: [
+        {
+          roleId: "opentext",
+          employer: "OpenText",
+          title: "Account Executive",
+          startDate: "2020-01",
+          endDate: null,
+          location: null,
+          hidden: false,
+          condensed: false,
+          bullets: [
+            claim("kept", paraphrased, "statement:1"),
+            claim("missing", "Built a forecasting practice from scratch.", "statement:missing"),
+          ],
+        },
+      ],
+      skills: [],
+      education: [],
+      credentials: [],
+    };
+    expect(statement.includes(paraphrased)).toBe(false);
+    expect(claimMatchesSeekerEvidence(content.experience[0].bullets[0], sources)).toBe(true);
+    expect(claimMatchesSeekerEvidence(content.experience[0].bullets[1], sources)).toBe(false);
+    const dropped = dropUngroundedResumeClaims(content, context);
+    expect(dropped.removed.map((item) => item.id)).toEqual(["missing"]);
+    expect(dropped.content.experience[0]?.bullets.map((item) => item.id)).toEqual(["kept"]);
+  });
+
   it("retries an uncited resume claim once and does not save when the retry still fails", () => {
     const claim = (id: string, sourceId: string) => ({
       id,

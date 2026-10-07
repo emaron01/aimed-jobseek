@@ -189,20 +189,21 @@ function isSeekerSource(
   ).includes(category);
 }
 
-/** A claim the seeker stated: its words appear in a profile fact, a reply, an approved statement, or an approved story. */
+/** A claim is grounded when it cites a profile fact, a seeker reply, an approved statement, or an approved story. */
 export function claimMatchesSeekerEvidence(
-  claim: { text: string },
-  sources: ReadonlyArray<{ text: string; category: string }>,
+  claim: { supports?: ReadonlyArray<{ sourceId: string }> },
+  sources: ReadonlyArray<{ id: string; category: string }>,
 ): boolean {
-  const text = claim.text.trim().replace(/\s+/g, " ").toLowerCase();
-  if (!text) return false;
-  return sources.some((source) => {
-    if (!isSeekerSource(source.category as ReadyApplicationGenerationContext["sources"][number]["category"])) {
-      return false;
-    }
-    const corpus = source.text.trim().replace(/\s+/g, " ").toLowerCase();
-    return corpus.includes(text);
-  });
+  const seekerIds = new Set(
+    sources
+      .filter((source) =>
+        isSeekerSource(
+          source.category as ReadyApplicationGenerationContext["sources"][number]["category"],
+        ),
+      )
+      .map((source) => source.id),
+  );
+  return (claim.supports ?? []).some((support) => seekerIds.has(support.sourceId));
 }
 
 function supportErrors(
