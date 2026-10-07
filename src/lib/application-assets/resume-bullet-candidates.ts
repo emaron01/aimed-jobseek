@@ -5,6 +5,7 @@ import {
   type ResumeBulletCandidates,
 } from "@/lib/application-assets/contract";
 import {
+  bulletDisplayId,
   GENERAL_BACKGROUND_ID,
   roleBulletBands,
   type PickerBullet,
@@ -688,10 +689,6 @@ function citedEvidenceForBullet(
   return cited;
 }
 
-function bulletDisplayId(roleId: string, text: string): string {
-  return `bullet:${createHash("sha256").update(`${roleId}\n${text}`).digest("hex").slice(0, 16)}`;
-}
-
 /**
  * The job a saved pick or edit already used. New candidates keep the model's role.
  * This does not move a bullet the seeker has not saved.
@@ -733,6 +730,34 @@ export type SeekerBulletRecord = {
   text: string;
   roleId: string | null;
 };
+
+export function readHiddenRoleIds(profileJson: unknown): string[] {
+  if (!profileJson || typeof profileJson !== "object" || Array.isArray(profileJson)) return [];
+  const raw = (profileJson as Record<string, unknown>).hiddenRoleIds;
+  if (!Array.isArray(raw)) return [];
+  return [
+    ...new Set(
+      raw.flatMap((item) => (typeof item === "string" && item.trim() ? [item.trim()] : [])),
+    ),
+  ];
+}
+
+export function profileWithHiddenRole(
+  profileJson: unknown,
+  roleId: string,
+  leftOff: boolean,
+): Record<string, unknown> {
+  const base =
+    profileJson && typeof profileJson === "object" && !Array.isArray(profileJson)
+      ? { ...(profileJson as Record<string, unknown>) }
+      : {};
+  const ids = new Set(readHiddenRoleIds(base));
+  const id = roleId.trim();
+  if (leftOff) ids.add(id);
+  else ids.delete(id);
+  base.hiddenRoleIds = [...ids];
+  return base;
+}
 
 export function readSeekerBullets(profileJson: unknown): SeekerBulletRecord[] {
   if (!profileJson || typeof profileJson !== "object" || Array.isArray(profileJson)) return [];

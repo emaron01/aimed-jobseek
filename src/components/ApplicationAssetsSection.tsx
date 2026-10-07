@@ -58,14 +58,6 @@ type AssetRow = {
   createdAt: string;
 };
 
-type ProfileRole = {
-  id: string;
-  employer: string | null;
-  title: string | null;
-  startDate: string | null;
-  endDate: string | null;
-};
-
 type PlanRow = {
   type: "RESUME" | "COVER_LETTER";
   status: "DRAFT" | "ACCEPTED";
@@ -583,7 +575,6 @@ function AssetTypePanel({
   campaignId,
   type,
   rows,
-  profileRoles,
   plan,
   planError,
   canEdit,
@@ -598,7 +589,6 @@ function AssetTypePanel({
   campaignId: string;
   type: "RESUME" | "COVER_LETTER";
   rows: AssetRow[];
-  profileRoles: ProfileRole[];
   plan: PlanRow | null;
   planError: string | null;
   canEdit: boolean;
@@ -625,10 +615,6 @@ function AssetTypePanel({
   }, [type, generating, result, router]);
   const orderedRows = sortAssetsNewestFirst(rows);
   const latest = orderedRows[0] ?? null;
-  const latestResume =
-    type === "RESUME" && latest?.content.type === "RESUME"
-      ? latest.content
-      : null;
   const earlierExperienceHeading =
     plan?.plan.type === "RESUME" ? plan.plan.earlierExperienceHeading : null;
   const documentId =
@@ -702,36 +688,6 @@ function AssetTypePanel({
         <form action={action} className="space-y-3">
           <input type="hidden" name="campaignId" value={campaignId} />
           <input type="hidden" name="type" value={type} />
-          {type === "RESUME" ? (
-            <details>
-              <summary className="cursor-pointer text-sm font-medium">
-                {applicationAssetConfig.labels.hideRolesLegend}
-              </summary>
-              <fieldset className="mt-2">
-                <legend className="sr-only">
-                  {applicationAssetConfig.labels.hideRolesLegend}
-                </legend>
-                <div className="mt-2 space-y-1">
-                  {profileRoles.map((role) => (
-                    <label key={role.id} className="block text-sm">
-                      <input
-                        type="checkbox"
-                        name="hiddenRoleId"
-                        value={role.id}
-                        defaultChecked={Boolean(
-                          latestResume?.experience.find(
-                            (item) => item.roleId === role.id,
-                          )?.hidden,
-                        )}
-                        className="mr-2"
-                      />
-                      {[role.title, role.employer].filter(Boolean).join(" at ")}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            </details>
-          ) : null}
           {orderedRows.length ? (
             <label className="block text-sm">
               <span className="font-medium text-ink">
@@ -772,7 +728,6 @@ function AssetTypePanel({
 export function ApplicationAssetsSection({
   campaignId,
   assets,
-  profileRoles,
   plans,
   invalidPlanTypes = [],
   canEdit,
@@ -791,7 +746,6 @@ export function ApplicationAssetsSection({
       content: unknown;
     }
   >;
-  profileRoles: ProfileRole[];
   plans: PlanRow[];
   invalidPlanTypes?: Array<"RESUME" | "COVER_LETTER">;
   canEdit: boolean;
@@ -892,7 +846,6 @@ export function ApplicationAssetsSection({
                 campaignId={campaignId}
                 type={type}
                 rows={valid.filter((asset) => asset.type === type)}
-                profileRoles={profileRoles}
                 plan={plans.find((item) => item.type === type) ?? null}
                 planError={
                   invalidPlanTypes.includes(type)

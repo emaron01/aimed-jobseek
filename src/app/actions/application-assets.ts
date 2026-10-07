@@ -9,8 +9,11 @@ import {
 } from "@/lib/application-assets/plan-service";
 import { prepareResumeBulletCandidates } from "@/lib/application-assets/resume-bullet-candidate-service";
 import {
+  addSeekerBullet,
+  hiddenRoleIdsForCampaign,
   saveBulletEvidenceRole,
   saveBulletText,
+  saveResumeRoleVisibility,
   saveResumeStatementPicks,
 } from "@/lib/application-assets/resume-statement-picker-data";
 import {
@@ -29,6 +32,7 @@ export type ApplicationAssetActionResult = {
   assetId?: string;
   version?: number;
   violations?: string[];
+  bulletId?: string;
 };
 
 function campaignId(formData: FormData): string {
@@ -113,6 +117,48 @@ export async function saveBulletTextAction(input: {
     });
     revalidate(input.campaignId);
     return { ok: true, message: applicationAssetConfig.labels.bulletEditSaved };
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
+export async function saveResumeRoleVisibilityAction(input: {
+  campaignId: string;
+  roleId: string;
+  leftOff: boolean;
+}): Promise<ApplicationAssetActionResult> {
+  try {
+    await requireCurrentUser();
+    const organizationId = await requireOrganizationId();
+    await saveResumeRoleVisibility({
+      organizationId,
+      campaignId: input.campaignId,
+      roleId: input.roleId,
+      leftOff: input.leftOff,
+    });
+    revalidate(input.campaignId);
+    return { ok: true, message: applicationAssetConfig.labels.leaveOffResume };
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
+export async function addSeekerBulletAction(input: {
+  campaignId: string;
+  roleId: string;
+  text: string;
+}): Promise<ApplicationAssetActionResult> {
+  try {
+    await requireCurrentUser();
+    const organizationId = await requireOrganizationId();
+    const bulletId = await addSeekerBullet({
+      organizationId,
+      campaignId: input.campaignId,
+      roleId: input.roleId,
+      text: input.text,
+    });
+    revalidate(input.campaignId);
+    return { ok: true, message: applicationAssetConfig.labels.bulletEditSaved, bulletId };
   } catch (error) {
     return errorResult(error);
   }
@@ -230,10 +276,10 @@ export async function generateApplicationAssetAction(
     ]);
     const id = campaignId(formData);
     const type = assetType(formData);
-    const hiddenRoleIds = formData
-      .getAll("hiddenRoleId")
-      .map((value) => String(value).trim())
-      .filter(Boolean);
+    const hiddenRoleIds = await hiddenRoleIdsForCampaign({
+      organizationId,
+      campaignId: id,
+    });
     const regenerationInstruction =
       String(formData.get("regenerationInstruction") ?? "").trim() || null;
     const { applicationAssetGenerateWouldSkip } = await import(

@@ -870,17 +870,6 @@ export async function ApplicationWorkspace({
       }
       profileHref={profileHref}
       profileEditHref={profileEditHref}
-      profileRoles={
-        profile.ok
-          ? profile.profile.experience.map((role) => ({
-              id: role.id,
-              employer: role.employer,
-              title: role.title,
-              startDate: role.startDate,
-              endDate: role.endDate,
-            }))
-          : []
-      }
       statementGroups={statementPicker.groups}
       statementRoleOptions={statementPicker.roleOptions}
       needsPrepare={statementPicker.needsPrepare}

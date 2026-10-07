@@ -388,7 +388,6 @@ describe("live inline action status", () => {
         createElement(ApplicationAssetsSection, {
           campaignId: "camp",
           assets: [],
-          profileRoles: [],
           plans: [],
           canEdit: true,
           defaultOpen: true,
@@ -405,7 +404,6 @@ describe("live inline action status", () => {
         createElement(ApplicationAssetsSection, {
           campaignId: "camp",
           assets: [],
-          profileRoles: [],
           plans: [],
           canEdit: true,
           defaultOpen: true,
@@ -420,7 +418,6 @@ describe("live inline action status", () => {
         createElement(ApplicationAssetsSection, {
           campaignId: "camp",
           assets: [],
-          profileRoles: [],
           plans: [],
           canEdit: true,
           defaultOpen: true,
@@ -437,7 +434,6 @@ describe("live inline action status", () => {
         createElement(ApplicationAssetsSection, {
           campaignId: "camp",
           assets: [],
-          profileRoles: [],
           plans: [],
           canEdit: true,
           defaultOpen: true,

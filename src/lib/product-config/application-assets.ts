@@ -55,6 +55,8 @@ export const applicationAssetConfig = Object.freeze({
     prepareResumeBullets: "Prepare resume bullets",
     refreshBullets: "Refresh bullets",
     checkTheJob: "Check the job",
+    leaveOffResume: "Leave off resume",
+    addBullet: "Add a bullet",
     resumeBulletsPrepared: "Resume bullets are ready.",
     editBullet: "Edit",
     saveBullet: "Save",

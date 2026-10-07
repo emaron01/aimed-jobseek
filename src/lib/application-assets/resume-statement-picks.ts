@@ -4,6 +4,7 @@
  * Saving picks does not call a model. The seeker regenerates the resume.
  */
 
+import { createHash } from "node:crypto";
 import type { HarperDraftSettings } from "@/lib/consultation/harper-draft-settings";
 import { parseExperienceDate } from "@/lib/product-research/role-dates";
 
@@ -21,6 +22,8 @@ export type PickerProfile = {
     title: string | null;
     startDate?: string | null;
     endDate: string | null;
+    /** Personal Profile achievement text, word for word. */
+    achievements?: string[];
   }>;
   educationTexts: string[];
   projectTexts: string[];
@@ -59,6 +62,10 @@ export type StatementGroupItem = {
   seekerOwned: boolean;
 };
 
+export function bulletDisplayId(roleId: string, text: string): string {
+  return `bullet:${createHash("sha256").update(`${roleId}\n${text}`).digest("hex").slice(0, 16)}`;
+}
+
 export type StatementGroup = {
   id: string;
   title: string;
@@ -68,6 +75,8 @@ export type StatementGroup = {
   maxBullets: number;
   titleOnly: boolean;
   showRange: boolean;
+  /** The seeker left this job off the resume. */
+  leftOff: boolean;
   items: StatementGroupItem[];
 };
 
@@ -150,6 +159,9 @@ export function pickerProfileFromCandidate(profile: {
       title: role.title ?? null,
       startDate: role.startDate ?? null,
       endDate: role.endDate ?? null,
+      achievements: (role.achievements ?? [])
+        .map((item) => item.text?.trim() ?? "")
+        .filter((text) => text.length > 0),
     })),
     educationTexts,
     projectTexts: [...new Set(projectTexts)],
@@ -499,18 +511,36 @@ export function buildStatementGroups(input: {
   seenBulletIds?: string[] | null;
   primaryRoleId: string | null;
   directRoleIds: readonly string[];
+  hiddenRoleIds?: readonly string[];
   asOf?: Date;
 }): StatementGroup[] {
   const bands = roleBulletBands(input);
   const saved = input.savedPickIds;
   const seen = input.seenBulletIds ?? null;
+  const hidden = new Set(input.hiddenRoleIds ?? []);
   const groups: StatementGroup[] = bands.map((band) => {
     const shown = input.bullets.filter((bullet) => bullet.roleId === band.roleId);
+    const leftOff = hidden.has(band.roleId);
+    const achievements =
+      shown.length === 0 && !leftOff
+        ? (input.profile.experience.find((role) => role.id === band.roleId)?.achievements ?? [])
+            .map((text) => text.trim())
+            .filter((text) => text.length > 0)
+            .map((text) => ({
+              id: bulletDisplayId(band.roleId, text),
+              roleId: band.roleId,
+              text,
+              evidenceIds: [] as string[],
+              seekerOwned: false,
+              needsJobCheck: false,
+            }))
+        : [];
+    const offered = achievements.length > 0 ? achievements : shown;
     const recommendedIds = new Set(
-      shown
-        .filter((bullet) => !bullet.needsJobCheck)
-        .slice(0, band.maxBullets)
-        .map((bullet) => bullet.id),
+      (achievements.length > 0
+        ? offered.slice(0, band.minBullets)
+        : offered.filter((bullet) => !bullet.needsJobCheck).slice(0, band.maxBullets)
+      ).map((bullet) => bullet.id),
     );
     return {
       id: band.roleId,
@@ -521,7 +551,8 @@ export function buildStatementGroups(input: {
       maxBullets: band.maxBullets,
       titleOnly: band.titleOnly,
       showRange: true,
-      items: shown.map((bullet) => {
+      leftOff,
+      items: offered.map((bullet) => {
         const needsJobCheck = bullet.needsJobCheck === true;
         const seekerOwned = bullet.seekerOwned === true;
         const recommended = recommendedIds.has(bullet.id);
@@ -562,6 +593,7 @@ export function buildStatementGroups(input: {
       maxBullets: extras.length,
       titleOnly: false,
       showRange: false,
+      leftOff: hidden.has(role.id),
       items: extras.map((bullet) => ({
         id: bullet.id,
         kind: "RESUME_BULLET" as const,
@@ -593,6 +625,7 @@ export function buildStatementGroups(input: {
     maxBullets: 0,
     titleOnly: false,
     showRange: false,
+    leftOff: false,
     items: general.map((bullet) => ({
       id: bullet.id,
       kind: "RESUME_BULLET" as const,
@@ -637,7 +670,7 @@ export function buildResumeWriterPackage(input: {
   const requiredStatements: RequiredResumeStatement[] = [];
   const picksByRole = new Map<string, number>();
   for (const group of groups) {
-    if (!group.roleId) continue;
+    if (!group.roleId || group.leftOff) continue;
     for (const item of group.items) {
       if (!item.checked) continue;
       const role = input.profile.experience.find((experience) => experience.id === group.roleId);

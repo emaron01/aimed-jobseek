@@ -3,9 +3,11 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  addSeekerBulletAction,
   prepareResumeBulletCandidatesAction,
   saveBulletEvidenceRoleAction,
   saveBulletTextAction,
+  saveResumeRoleVisibilityAction,
   saveResumeStatementPicksAction,
   type ApplicationAssetActionResult,
 } from "@/app/actions/application-assets";
@@ -198,11 +200,35 @@ function StatementGroupFields({
         min: group.minBullets,
         max: group.maxBullets,
       });
+  const router = useRouter();
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, startSave] = useTransition();
+  const [note, setNote] = useState<string | null>(null);
   return (
     <fieldset className="space-y-2" data-testid={`statement-group-${group.id}`}>
       <legend className="text-sm font-semibold text-ink">{group.title}</legend>
       {group.showRange ? (
         <p className="text-xs text-subtle">{rangeLabel}</p>
+      ) : null}
+      {canEdit && group.roleId ? (
+        <label className="flex items-center gap-2 text-sm text-ink">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={group.leftOff}
+            data-testid="leave-off-resume"
+            onChange={(event) => {
+              const leftOff = event.target.checked;
+              void saveResumeRoleVisibilityAction({
+                campaignId,
+                roleId: group.roleId ?? "",
+                leftOff,
+              }).then(() => router.refresh());
+            }}
+          />
+          {labels.leaveOffResume}
+        </label>
       ) : null}
       <ul className="space-y-2">
         {group.items.map((item) => (
@@ -218,6 +244,58 @@ function StatementGroupFields({
           />
         ))}
       </ul>
+      {canEdit && group.roleId ? (
+        adding ? (
+          <div className="space-y-1">
+            <textarea
+              className="block w-full rounded border border-edge px-2 py-1 text-sm text-ink"
+              aria-label={labels.addBullet}
+              value={draft}
+              rows={2}
+              onChange={(event) => setDraft(event.target.value)}
+            />
+            <button
+              type="button"
+              className="rounded border border-edge px-2 py-0.5 text-xs text-ink disabled:opacity-60"
+              disabled={saving || !draft.trim()}
+              onClick={() => {
+                startSave(async () => {
+                  const result = await addSeekerBulletAction({
+                    campaignId,
+                    roleId: group.roleId ?? "",
+                    text: draft,
+                  });
+                  if (!result.ok || !result.bulletId) {
+                    setNote(result.message);
+                    return;
+                  }
+                  setNote(null);
+                  setDraft("");
+                  setAdding(false);
+                  focusBulletId = result.bulletId;
+                  router.refresh();
+                });
+              }}
+            >
+              {labels.saveBullet}
+            </button>
+            {note ? (
+              <p className="text-xs text-danger" role="status">
+                {note}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="rounded border border-edge px-2 py-0.5 text-xs text-ink"
+            data-testid="add-a-bullet"
+            onClick={() => setAdding(true)}
+          >
+            {labels.addBullet}
+          </button>
+        )
+      ) : null}
     </fieldset>
   );
 }

@@ -29,7 +29,7 @@ describe("resume and cover letter page", () => {
     expect(section).toContain("applicationAssetConfig.labels.adjustManually");
     expect(section).toContain("applicationAssetConfig.labels.cancel");
     expect(section).toContain("applicationAssetConfig.labels.saveNewVersion");
-    expect(section).toContain("applicationAssetConfig.labels.hideRolesLegend");
+    expect(section).not.toContain("name=\"hiddenRoleId\"");
     expect(section).toContain("applicationAssetConfig.labels.approve");
     expect(section).toContain("applicationAssetConfig.labels.downloadDocx");
     expect(section).toContain("regenerationInstruction");
@@ -47,12 +47,9 @@ describe("resume and cover letter page", () => {
     expect(section).not.toContain("asset.guidance");
     expect(service).toContain("ensureAcceptedPresentationPlan");
     expect(service).toContain("guidance: null");
-    const hideRolesDetails = section.slice(
-      section.indexOf('name="hiddenRoleId"') - 400,
-      section.indexOf('name="hiddenRoleId"'),
-    );
-    expect(hideRolesDetails).toContain("hideRolesLegend");
-    expect(hideRolesDetails).not.toContain("adjustManually");
+    const picker = source("src/components/ResumeStatementPicker.tsx");
+    expect(picker).toContain("leaveOffResume");
+    expect(applicationAssetConfig.labels.leaveOffResume).toBe("Leave off resume");
   });
 
   it("shows each document ready notice once", () => {

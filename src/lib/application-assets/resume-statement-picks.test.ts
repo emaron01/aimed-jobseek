@@ -26,7 +26,12 @@ import {
   bulletResultKey,
   profileWithBulletRoleChoices,
   profileWithBulletTextEdits,
+  profileWithHiddenRole,
+  profileWithSeekerBullet,
   questionTextForAnswer,
+  readHiddenRoleIds,
+  readSeekerBullets,
+  seekerBulletEvidence,
   readBulletTextEdits,
   selectableBulletEvidence,
   replaceUnpickedCandidates,
@@ -37,6 +42,7 @@ import { resumeWithExactPickedBullets } from "@/lib/application-assets/service";
 import {
   buildResumeWriterPackage,
   buildStatementGroups,
+  bulletDisplayId,
   candidateCountForBand,
   orderRolesMostRecentFirst,
   resumeStatementPicksFromCampaign,
@@ -1951,5 +1957,237 @@ describe("role date order for every seeker date format", () => {
     expect(docx).toContain("orderRolesMostRecentFirst");
     expect(writer).toContain("orderRolesMostRecentFirst");
     expect(picker).toContain("orderRolesMostRecentFirst(profile.experience)");
+  });
+
+  it("leaves a job off the resume, keeps an added seeker bullet, and shows profile achievements when a job is empty", () => {
+    const openTextAchievement = "Closed a $1.3MM Bank of America deal.";
+    const mercyAchievement = "Precepted 8 new nurses on the night shift.";
+    const capstoneAchievement = "Shipped a clinic intake form during a capstone.";
+    const profile: PickerProfile = {
+      experience: [
+        {
+          id: "opentext",
+          employer: "OpenText",
+          title: "Account Executive",
+          endDate: null,
+          achievements: [openTextAchievement],
+        },
+        {
+          id: "mercy",
+          employer: "Mercy General",
+          title: "Registered Nurse",
+          endDate: null,
+          achievements: [mercyAchievement],
+        },
+        {
+          id: "intern",
+          employer: "County Hospital",
+          title: "Nursing Intern",
+          endDate: null,
+          achievements: [capstoneAchievement],
+        },
+        {
+          id: "legacy",
+          employer: salesProfile.experience[1]!.employer,
+          title: salesProfile.experience[1]!.title,
+          endDate: "2004-06",
+          achievements: ["Kept an old territory."],
+        },
+      ],
+      educationTexts: nursingProfile.educationTexts,
+      projectTexts: graduateProfile.projectTexts,
+    };
+    const stored = profileWithHiddenRole({ seekerBullets: [] }, "legacy", true);
+    expect(readHiddenRoleIds(stored)).toEqual(["legacy"]);
+    expect(readHiddenRoleIds(profileWithHiddenRole(stored, "legacy", false))).toEqual([]);
+
+    const emptyGroups = buildStatementGroups({
+      profile,
+      bullets: [],
+      settings: DEFAULT_HARPER_DRAFT_SETTINGS,
+      savedPickIds: null,
+      primaryRoleId: "opentext",
+      directRoleIds: [],
+      hiddenRoleIds: ["legacy"],
+      asOf,
+    });
+    const openText = emptyGroups.find((group) => group.roleId === "opentext");
+    const mercy = emptyGroups.find((group) => group.roleId === "mercy");
+    const intern = emptyGroups.find((group) => group.roleId === "intern");
+    const legacy = emptyGroups.find((group) => group.roleId === "legacy");
+    expect(openText?.items.map((item) => item.content)).toEqual([openTextAchievement]);
+    expect(mercy?.items.map((item) => item.content)).toEqual([mercyAchievement]);
+    expect(intern?.items.map((item) => item.content)).toEqual([capstoneAchievement]);
+    expect(openText?.items[0]?.recommended).toBe(true);
+    expect(mercy?.items[0]?.recommended).toBe(true);
+    expect(intern?.items[0]?.recommended).toBe(true);
+    expect(legacy?.leftOff).toBe(true);
+    expect(legacy?.items).toEqual([]);
+    expect(graduateProfile.projectTexts).toContain("Capstone project");
+
+    const withCandidate = buildStatementGroups({
+      profile,
+      bullets: [
+        {
+          id: "candidate-mercy",
+          roleId: "mercy",
+          text: "A drafted mercy bullet.",
+          evidenceIds: ["mercy-answer"],
+        },
+      ],
+      settings: DEFAULT_HARPER_DRAFT_SETTINGS,
+      savedPickIds: null,
+      primaryRoleId: "opentext",
+      directRoleIds: [],
+      asOf,
+    });
+    expect(
+      withCandidate.find((group) => group.roleId === "mercy")?.items.map((item) => item.content),
+    ).toEqual(["A drafted mercy bullet."]);
+
+    const addedText = "Coached the night shift to close the handoff gap.";
+    const addedId = bulletDisplayId("mercy", addedText);
+    const withAdded = profileWithSeekerBullet(stored, {
+      id: addedId,
+      text: addedText,
+      roleId: "mercy",
+    });
+    expect(readSeekerBullets(withAdded)).toEqual([
+      { id: addedId, text: addedText, roleId: "mercy" },
+    ]);
+    expect(seekerBulletEvidence(readSeekerBullets(withAdded))[0]?.kind).toBe("SEEKER_REPLY");
+    const replaced = replaceUnpickedCandidates({
+      employers: ["OpenText", "Mercy General"],
+      kept: [{ text: addedText, evidenceIds: [`seeker-bullet:${addedId}`], resultKey: "added" }],
+      previous: [
+        { text: "Ran a VMware campaign that created $3MM in pipeline.", evidenceIds: ["vm"] },
+        { text: addedText, evidenceIds: [`seeker-bullet:${addedId}`] },
+      ],
+      next: [
+        { text: "Built a $4MM pipeline with a partner campaign.", evidenceIds: ["vm"] },
+      ],
+    });
+    expect(replaced.map((item) => item.text)).toEqual([
+      addedText,
+      "Built a $4MM pipeline with a partner campaign.",
+    ]);
+    const keptGroups = buildStatementGroups({
+      profile,
+      bullets: [
+        {
+          id: addedId,
+          roleId: "mercy",
+          text: addedText,
+          evidenceIds: [`seeker-bullet:${addedId}`],
+          seekerOwned: true,
+        },
+      ],
+      settings: DEFAULT_HARPER_DRAFT_SETTINGS,
+      savedPickIds: [addedId],
+      primaryRoleId: "opentext",
+      directRoleIds: [],
+      asOf,
+    });
+    const keptMercy = keptGroups.find((group) => group.roleId === "mercy")?.items[0];
+    expect(keptMercy?.content).toBe(addedText);
+    expect(keptMercy?.checked).toBe(true);
+    expect(keptMercy?.seekerOwned).toBe(true);
+
+    const claim = (id: string, text: string) => ({
+      id,
+      text,
+      supports: [{ sourceId: "profile:name", quote: text }],
+    });
+    const generated = resumeWithExactPickedBullets(
+      {
+        type: "RESUME",
+        header: { name: claim("name", "Ada"), contactDetails: [] },
+        summary: [],
+        experience: [
+          {
+            roleId: "opentext",
+            employer: "OpenText",
+            title: "Account Executive",
+            startDate: null,
+            endDate: null,
+            location: null,
+            hidden: false,
+            condensed: false,
+            bullets: [claim("old", "Old OpenText bullet.")],
+          },
+          {
+            roleId: "legacy",
+            employer: "Legacy Systems",
+            title: "Sales Representative",
+            startDate: "2000-01",
+            endDate: "2004-06",
+            location: null,
+            hidden: true,
+            condensed: true,
+            bullets: [claim("old-legacy", "Kept an old territory.")],
+          },
+        ],
+        skills: [],
+        education: [],
+        credentials: [],
+      },
+      [
+        { statementId: addedId, roleId: "mercy", content: addedText },
+        { statementId: "legacy-pick", roleId: "legacy", content: "Kept an old territory." },
+        { statementId: "ot", roleId: "opentext", content: openTextAchievement },
+      ],
+      "profile:name",
+    );
+    const onResume = generated.experience.filter((role) => !role.hidden && !role.condensed);
+    const earlier = generated.experience.filter((role) => !role.hidden && role.condensed);
+    expect(onResume.map((role) => role.roleId)).toEqual(["opentext"]);
+    expect(earlier.map((role) => role.roleId)).toEqual([]);
+    expect(generated.experience.find((role) => role.roleId === "legacy")?.bullets).toEqual([]);
+    const writer = buildResumeWriterPackage({
+      profile,
+      bullets: [
+        {
+          id: addedId,
+          roleId: "mercy",
+          text: addedText,
+          evidenceIds: [],
+          seekerOwned: true,
+        },
+        {
+          id: "legacy-pick",
+          roleId: "legacy",
+          text: "Kept an old territory.",
+          evidenceIds: [],
+          seekerOwned: true,
+        },
+      ],
+      settings: DEFAULT_HARPER_DRAFT_SETTINGS,
+      savedPickIds: [addedId, "legacy-pick"],
+      primaryRoleId: "opentext",
+      directRoleIds: [],
+      planCondensedRoleIds: [],
+      hiddenRoleIds: ["legacy"],
+      asOf,
+    });
+    expect(writer.requiredStatements.map((item) => item.roleId)).not.toContain("legacy");
+    expect(writer.requiredStatements.some((item) => item.content === addedText)).toBe(true);
+
+    const pickerSource = readFileSync("src/components/ResumeStatementPicker.tsx", "utf8");
+    const addSource = readFileSync(
+      "src/lib/application-assets/resume-statement-picker-data.ts",
+      "utf8",
+    );
+    const actionSource = readFileSync("src/app/actions/application-assets.ts", "utf8");
+    expect(pickerSource).toContain("leaveOffResume");
+    expect(pickerSource).toContain("addBullet");
+    expect(applicationAssetConfig.labels.leaveOffResume).toBe("Leave off resume");
+    expect(applicationAssetConfig.labels.addBullet).toBe("Add a bullet");
+    expect(addSource).toContain("export async function addSeekerBullet");
+    expect(addSource.slice(addSource.indexOf("export async function addSeekerBullet"))).not.toContain(
+      "runPaidStructuredCall",
+    );
+    expect(addSource).not.toContain("generateStructured");
+    expect(actionSource).toContain("hiddenRoleIdsForCampaign");
+    expect(actionSource).not.toContain('getAll("hiddenRoleId")');
   });
 });

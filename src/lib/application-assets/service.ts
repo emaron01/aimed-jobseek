@@ -355,7 +355,9 @@ export function resumeWithExactPickedBullets(
     experience: orderRolesMostRecentFirst(
       content.experience.map((role) => ({
         ...role,
-        bullets: (byRole.get(role.roleId) ?? []).map((pick) => ({
+        bullets: role.hidden
+          ? []
+          : (byRole.get(role.roleId) ?? []).map((pick) => ({
           id: `pick:${pick.statementId}`,
           text: pick.content,
           supports: [{ sourceId: cite(pick.content), quote: pick.content }],

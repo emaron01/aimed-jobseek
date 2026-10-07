@@ -1,15 +1,19 @@
 import { Prisma } from "@prisma/client";
 import {
   bulletResultKey,
+  oneLineBullet,
   profileWithBulletRoleChoices,
   profileWithBulletTextEdits,
+  profileWithHiddenRole,
   profileWithSeekerBullet,
+  readHiddenRoleIds,
 } from "@/lib/application-assets/resume-bullet-candidates";
 import { readResumeBulletCandidates } from "@/lib/application-assets/resume-bullet-candidate-service";
 import {
   GENERAL_BACKGROUND_ID,
   buildResumeWriterPackage,
   buildStatementGroups,
+  bulletDisplayId,
   resumeStatementPicksFromCampaign,
   roleGroupHeader,
   workspaceSeenWithoutResumePicks,
@@ -34,6 +38,7 @@ async function loadPickerRows(input: {
   profile: NonNullable<Awaited<ReturnType<typeof readResumeBulletCandidates>>>["packet"]["profile"];
   primaryRoleId: string | null;
   directRoleIds: string[];
+  hiddenRoleIds: string[];
   needsPrepare: boolean;
 } | null> {
   const campaign = await prisma.campaign.findFirst({
@@ -75,6 +80,7 @@ async function loadPickerRows(input: {
     profile: candidates.packet.profile,
     primaryRoleId: candidates.packet.primaryRoleId,
     directRoleIds: candidates.packet.directRoleIds,
+    hiddenRoleIds: readHiddenRoleIds(candidates.packet.profileJson),
     needsPrepare: candidates.needsPrepare,
   };
 }
@@ -104,6 +110,7 @@ export async function loadResumeStatementGroups(input: {
       seenBulletIds: rows.seenBulletIds,
       primaryRoleId: rows.primaryRoleId,
       directRoleIds: rows.directRoleIds,
+      hiddenRoleIds: rows.hiddenRoleIds,
     }),
   };
 }
@@ -143,7 +150,7 @@ export async function loadResumeWriterFields(input: {
     primaryRoleId: rows.primaryRoleId,
     directRoleIds: rows.directRoleIds,
     planCondensedRoleIds: input.planCondensedRoleIds,
-    hiddenRoleIds: input.hiddenRoleIds,
+    hiddenRoleIds: rows.hiddenRoleIds,
   });
 }
 
@@ -207,6 +214,106 @@ export async function saveBulletEvidenceRole(input: {
     where: { id: input.campaignId },
     data: { resumeStatementPicksJson: picks },
   });
+}
+
+/** The jobs this seeker left off the resume. Does not call a model. */
+export async function hiddenRoleIdsForCampaign(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<string[]> {
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: { product: { select: { profileJson: true } } },
+  });
+  if (!campaign) return [];
+  const parsed = parseCandidateProfileSafe(campaign.product.profileJson);
+  const allowed = new Set(
+    (parsed.ok ? parsed.profile.experience : []).map((role) => role.id),
+  );
+  return readHiddenRoleIds(campaign.product.profileJson).filter((id) => allowed.has(id));
+}
+
+/** Remembers that a job is left off the resume, or put back on. Does not call a model. */
+export async function saveResumeRoleVisibility(input: {
+  organizationId: string;
+  campaignId: string;
+  roleId: string;
+  leftOff: boolean;
+}): Promise<void> {
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: { product: { select: { id: true, profileJson: true } } },
+  });
+  if (!campaign) throw new TenantError("Application was not found.");
+  const roleId = input.roleId.trim();
+  const parsed = parseCandidateProfileSafe(campaign.product.profileJson);
+  const allowed = new Set(
+    (parsed.ok ? parsed.profile.experience : []).map((role) => role.id),
+  );
+  if (!allowed.has(roleId)) throw new TenantError("That job is not on the Personal Profile.");
+  await prisma.product.update({
+    where: { id: campaign.product.id },
+    data: {
+      profileJson: profileWithHiddenRole(
+        campaign.product.profileJson,
+        roleId,
+        input.leftOff,
+      ) as Prisma.InputJsonValue,
+    },
+  });
+}
+
+/** Saves one line the seeker wrote as a seeker bullet for this job. Does not call a model. */
+export async function addSeekerBullet(input: {
+  organizationId: string;
+  campaignId: string;
+  roleId: string;
+  text: string;
+}): Promise<string> {
+  const text = oneLineBullet(input.text);
+  if (!text) throw new TenantError("Write the bullet before saving.");
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: {
+      resumeStatementPicksJson: true,
+      product: { select: { id: true, profileJson: true } },
+    },
+  });
+  if (!campaign) throw new TenantError("Application was not found.");
+  const roleId = input.roleId.trim();
+  const parsed = parseCandidateProfileSafe(campaign.product.profileJson);
+  const allowed = new Set(
+    (parsed.ok ? parsed.profile.experience : []).map((role) => role.id),
+  );
+  if (roleId !== GENERAL_BACKGROUND_ID && !allowed.has(roleId)) {
+    throw new TenantError("That job is not on the Personal Profile.");
+  }
+  const storedRole = roleId === GENERAL_BACKGROUND_ID ? null : roleId;
+  const id = bulletDisplayId(storedRole ?? GENERAL_BACKGROUND_ID, text);
+  await prisma.product.update({
+    where: { id: campaign.product.id },
+    data: {
+      profileJson: profileWithSeekerBullet(campaign.product.profileJson, {
+        id,
+        text,
+        roleId: storedRole,
+      }) as Prisma.InputJsonValue,
+    },
+  });
+  const saved = resumeStatementPicksFromCampaign({
+    resumeStatementPicksJson: campaign.resumeStatementPicksJson,
+    workspaceSeenJson: null,
+  }).picks;
+  const alreadyChecked =
+    saved ??
+    (await loadResumeStatementGroups(input)).groups.flatMap((group) =>
+      group.items.filter((item) => item.checked).map((item) => item.id),
+    );
+  await prisma.campaign.update({
+    where: { id: input.campaignId },
+    data: { resumeStatementPicksJson: [...new Set([...alreadyChecked, id])] },
+  });
+  return id;
 }
 
 /** Saves the seeker's wording for one bullet. Does not call a model. */

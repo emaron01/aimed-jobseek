@@ -1602,7 +1602,7 @@ describe("application asset seeker-facing labels", () => {
     expect(section).toContain("viewEditCoverLetter");
     expect(section).toContain("applicationAssetConfig.labels.adjustManually");
     expect(section).toContain("applicationAssetConfig.labels.cancel");
-    expect(section).toContain("applicationAssetConfig.labels.hideRolesLegend");
+    expect(section).not.toContain("name=\"hiddenRoleId\"");
     expect(section).not.toContain("xl:grid-cols-2");
     expect(section).not.toContain("formatClaimEditorLabel");
     expect(section).not.toContain("${item.sourceId}");
