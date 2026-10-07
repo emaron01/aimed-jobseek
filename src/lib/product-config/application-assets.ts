@@ -43,7 +43,7 @@ export const applicationAssetConfig = Object.freeze({
       "One part of this version could not be verified and was removed. Retry that part if you want it rewritten.",
     harperApprovedStatements: "Harper Approved Statements",
     broaderExperience: "Broader experience",
-    recommendedBulletRange: "Recommended bullets: {min} to {max}",
+    recommendedBulletRange: "Recommended bullets: {min} to {max}. {count} selected.",
     titleCompanyDatesOnly: "Title, company, and dates only",
     picksOutsideRange:
       "This role has {count} picks. The recommended range is {min} to {max}. You can still save.",

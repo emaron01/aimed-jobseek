@@ -62,6 +62,7 @@ async function loadBulletCandidatePacket(input: {
               kind: { in: ["INTERVIEW_ANSWER", "RESUME_BULLET"] },
             },
             select: {
+              id: true,
               content: true,
               kind: true,
               turn: { select: { targetKey: true } },
@@ -69,7 +70,7 @@ async function loadBulletCandidatePacket(input: {
           },
           turns: {
             where: { speaker: "SEEKER", skipped: false },
-            select: { body: true },
+            select: { id: true, body: true },
           },
         },
       },
@@ -84,7 +85,7 @@ async function loadBulletCandidatePacket(input: {
   );
   const achievements = parsed.ok
     ? parsed.profile.experience.flatMap((role) =>
-        role.achievements.map((item) => ({ id: item.id, text: item.text })),
+        role.achievements.map((item) => ({ id: item.id, text: item.text, roleId: role.id })),
       )
     : [];
   const [settings, plan] = await Promise.all([
@@ -106,12 +107,14 @@ async function loadBulletCandidatePacket(input: {
       campaignId: input.campaignId,
       achievements,
       statements: (campaign.consultationSession?.statements ?? []).map((statement) => ({
+        id: statement.id,
         content: statement.content,
         kind: statement.kind,
         campaignId: input.campaignId,
         targetKey: statement.turn?.targetKey ?? null,
       })),
       replies: (campaign.consultationSession?.turns ?? []).map((turn) => ({
+        id: turn.id,
         body: turn.body,
         campaignId: input.campaignId,
       })),
@@ -143,6 +146,7 @@ function bulletsFromStored(
   return assignCandidateBullets({
     bullets: parsed.data.bullets,
     bands: packet.roles,
+    evidence: packet.evidence,
   });
 }
 

@@ -552,6 +552,7 @@ describe.skipIf(!hasTestDatabase())("application assets", { timeout: 60_000 }, (
                   roleId: role.roleId,
                   text: bullet.text,
                   jobSpecific: true,
+                  evidenceIds: [role.roleId === "role_2" ? "ach_3" : "ach_1"],
                 })),
               ),
             },

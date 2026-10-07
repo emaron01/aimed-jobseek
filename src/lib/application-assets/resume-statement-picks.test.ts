@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { RESUME_WRITER_TEMPERATURE } from "@/lib/application-assets/ai";
 import {
   RESUME_ASSET_PROMPT_VERSION,
+  RESUME_BULLET_CANDIDATE_PROMPT_VERSION,
   type ApplicationAssetContent,
 } from "@/lib/application-assets/contract";
 import { buildPresentationPlanMessages } from "@/lib/application-assets/plan-prompt";
@@ -275,6 +276,10 @@ describe("Harper Approved Statements picker", () => {
     expect(RESUME_ASSET_INSTRUCTIONS).toContain(
       "Use each picked bullet exactly as written, in the role it was picked for. Do not rewrite a picked bullet and do not add a bullet that was not picked. You may write the summary, the skills, and each role's title, company, and dates.",
     );
+    expect(RESUME_BULLET_CANDIDATE_PROMPT_VERSION).toBe("2");
+    expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).toContain(
+      "Assign a bullet to a role only when the evidence names that role's employer or is an achievement listed under that role in the Personal Profile. Evidence that names no employer is not assigned to any role.",
+    );
     expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).toContain(
       "When one piece of evidence covers more than one role, write a separate bullet for each role. For each role, write up to the number of bullets given for that role. Start each bullet with a strong action verb and include the result or number when the seeker stated one.",
     );
@@ -283,15 +288,20 @@ describe("Harper Approved Statements picker", () => {
   it("writes one-line bullets for role ids, excludes other applications, and uses picks exactly", () => {
     const assigned = assignCandidateBullets({
       bands: [
-        { roleId: "opentext", candidateCount: 10 },
-        { roleId: "mercy", candidateCount: 10 },
-        { roleId: "intern", candidateCount: 10 },
+        { roleId: "opentext", employer: "OpenText", candidateCount: 10 },
+        { roleId: "mercy", employer: "Mercy General", candidateCount: 10 },
+        { roleId: "intern", employer: "County Hospital", candidateCount: 10 },
+      ],
+      evidence: [
+        { id: "ev-ot", kind: "INTERVIEW_ANSWER", text: "Closed enterprise deals at OpenText.", roleId: null },
+        { id: "ev-mercy", kind: "INTERVIEW_ANSWER", text: "Precepted new nurses at Mercy General.", roleId: null },
+        { id: "ev-intern", kind: "ACHIEVEMENT", text: "Shipped a clinic intake form.", roleId: "intern" },
       ],
       bullets: [
-        { roleId: "opentext", text: "Closed enterprise deals\nat OpenText.", jobSpecific: true },
-        { roleId: "missing-role", text: "This role is not on the profile.", jobSpecific: true },
-        { roleId: "mercy", text: "Precepted new nurses at Mercy General.", jobSpecific: false },
-        { roleId: "intern", text: "Shipped a clinic intake form.", jobSpecific: true },
+        { roleId: "opentext", text: "Closed enterprise deals\nat OpenText.", jobSpecific: true, evidenceIds: ["ev-ot"] },
+        { roleId: "missing-role", text: "This role is not on the profile.", jobSpecific: true, evidenceIds: ["ev-ot"] },
+        { roleId: "mercy", text: "Precepted new nurses at Mercy General.", jobSpecific: false, evidenceIds: ["ev-mercy"] },
+        { roleId: "intern", text: "Shipped a clinic intake form.", jobSpecific: true, evidenceIds: ["ev-intern"] },
       ],
     });
     expect(assigned.map((item) => item.roleId)).toEqual(["opentext", "mercy", "intern"]);
@@ -300,18 +310,18 @@ describe("Harper Approved Statements picker", () => {
     const evidence = selectableBulletEvidence({
       campaignId: "sift",
       achievements: [
-        { id: "ach-1", text: "Closed a seven-figure renewal." },
-        { id: "why-this-company:csc", text: "I want to work at CSC." },
+        { id: "ach-1", text: "Closed a seven-figure renewal.", roleId: "opentext" },
+        { id: "why-this-company:csc", text: "I want to work at CSC.", roleId: "opentext" },
       ],
       statements: [
-        { content: "Owned the forecast.", kind: "INTERVIEW_ANSWER", campaignId: "sift", targetKey: "required:forecast" },
-        { content: "I want this company.", kind: "INTERVIEW_ANSWER", campaignId: "sift", targetKey: "why-this-company" },
-        { content: "A 90-day plan for CSC.", kind: "INTERVIEW_ANSWER", campaignId: "csc", targetKey: "required:plan" },
-        { content: "Cut the sales cycle.", kind: "RESUME_BULLET", campaignId: "sift", targetKey: null },
+        { id: "stmt-forecast", content: "Owned the forecast.", kind: "INTERVIEW_ANSWER", campaignId: "sift", targetKey: "required:forecast" },
+        { id: "stmt-why", content: "I want this company.", kind: "INTERVIEW_ANSWER", campaignId: "sift", targetKey: "why-this-company" },
+        { id: "stmt-csc", content: "A 90-day plan for CSC.", kind: "INTERVIEW_ANSWER", campaignId: "csc", targetKey: "required:plan" },
+        { id: "stmt-cycle", content: "Cut the sales cycle.", kind: "RESUME_BULLET", campaignId: "sift", targetKey: null },
       ],
       replies: [
-        { body: "I precepted new nurses.", campaignId: "sift" },
-        { body: "I wrote this for CSC.", campaignId: "csc" },
+        { id: "reply-nurses", body: "I precepted new nurses.", campaignId: "sift" },
+        { id: "reply-csc", body: "I wrote this for CSC.", campaignId: "csc" },
       ],
     });
     expect(evidence.map((item) => item.text)).toEqual([
@@ -403,6 +413,101 @@ describe("Harper Approved Statements picker", () => {
     expect(generateFn.indexOf("prepareResumeBulletCandidates")).toBeLessThan(
       generateFn.indexOf("loadResumeWriterFields"),
     );
+  });
+
+  it("keeps a bullet only with its own employer or its own profile achievement", () => {
+    const evidence = [
+      { id: "ot-answer", kind: "INTERVIEW_ANSWER" as const, text: "Held forecast deviation to 5-10% at OpenText in FY26.", roleId: null },
+      { id: "vmware-answer", kind: "INTERVIEW_ANSWER" as const, text: "Closed a multi-year hospital contract at VMware.", roleId: null },
+      { id: "mercy-ach", kind: "ACHIEVEMENT" as const, text: "Precepted new nurses on the night shift.", roleId: "mercy" },
+      { id: "clinic-ach", kind: "ACHIEVEMENT" as const, text: "Led a medication safety huddle.", roleId: "clinic" },
+      { id: "intern-ach", kind: "ACHIEVEMENT" as const, text: "Shipped a clinic intake form during a capstone rotation.", roleId: "intern" },
+      { id: "no-employer", kind: "SEEKER_REPLY" as const, text: "I want a team that will teach me.", roleId: null },
+    ];
+    const bands = [
+      { roleId: "opentext", employer: salesProfile.experience[0]!.employer ?? "", candidateCount: 10 },
+      { roleId: "vmware", employer: "VMware", candidateCount: 10 },
+      { roleId: "mercy", employer: nursingProfile.experience[0]!.employer ?? "", candidateCount: 10 },
+      { roleId: "clinic", employer: "City Clinic", candidateCount: 10 },
+      { roleId: "intern", employer: "County Hospital", candidateCount: 10 },
+    ];
+    const logged: string[] = [];
+    const info = console.info;
+    console.info = (message?: unknown) => {
+      if (typeof message === "string") logged.push(message);
+    };
+    const assigned = assignCandidateBullets({
+      bands,
+      evidence,
+      bullets: [
+        { roleId: "vmware", text: "Held forecast deviation to 5-10% in FY26.", jobSpecific: true, evidenceIds: ["ot-answer"] },
+        { roleId: "opentext", text: "Held forecast deviation to 5-10% at OpenText.", jobSpecific: true, evidenceIds: ["ot-answer"] },
+        { roleId: "clinic", text: "Precepted new nurses on the night shift.", jobSpecific: false, evidenceIds: ["mercy-ach"] },
+        { roleId: "mercy", text: "Precepted new nurses on the night shift.", jobSpecific: true, evidenceIds: ["mercy-ach"] },
+        { roleId: "intern", text: "Shipped a clinic intake form during a capstone rotation.", jobSpecific: true, evidenceIds: ["intern-ach"] },
+        { roleId: "opentext", text: "Joined a team that will teach me.", jobSpecific: false, evidenceIds: ["no-employer"] },
+        { roleId: "mercy", text: "Joined a team that will teach me.", jobSpecific: false, evidenceIds: ["no-employer"] },
+        { roleId: "intern", text: "Joined a team that will teach me.", jobSpecific: false, evidenceIds: ["no-employer"] },
+      ],
+    });
+    console.info = info;
+    expect(assigned.map((item) => `${item.roleId}:${item.text}`)).toEqual([
+      "opentext:Held forecast deviation to 5-10% at OpenText.",
+      "mercy:Precepted new nurses on the night shift.",
+      "intern:Shipped a clinic intake form during a capstone rotation.",
+    ]);
+    expect(assigned.some((item) => item.roleId === "vmware" || item.roleId === "clinic")).toBe(false);
+    expect(logged.some((line) => line.includes("resume_bullet_candidate_dropped") && line.includes("vmware"))).toBe(true);
+    expect(logged.some((line) => line.includes("no-employer") || line.includes("Joined a team"))).toBe(true);
+
+    const sales = groupsFor(
+      {
+        ...salesProfile,
+        experience: [
+          ...salesProfile.experience,
+          { id: "vmware", employer: "VMware", title: "Account Executive", endDate: "2024-06" },
+        ],
+      },
+      Array.from({ length: 8 }, (_, index) =>
+        bullet(`ot-${index}`, "opentext", "Closed an enterprise deal.", true),
+      ),
+    );
+    expect(sales.find((group) => group.roleId === "opentext")?.items.filter((item) => item.checked)).toHaveLength(7);
+    const nursing = groupsFor(
+      {
+        ...nursingProfile,
+        experience: [
+          ...nursingProfile.experience,
+          { id: "clinic", employer: "City Clinic", title: "Nurse", endDate: "2024-01" },
+        ],
+      },
+      [
+        bullet("mercy-1", "mercy", "Precepted new nurses on the night shift.", true),
+        bullet("clinic-job", "clinic", "Led a medication safety huddle.", true),
+        bullet("clinic-general", "clinic", "Covered an extra weekend shift.", false),
+        bullet("clinic-general-2", "clinic", "Taught wound care to new graduates.", false),
+      ],
+    );
+    expect(nursing.find((group) => group.roleId === "mercy")?.items.filter((item) => item.checked)).toHaveLength(1);
+    expect(nursing.find((group) => group.roleId === "clinic")?.items.filter((item) => item.checked)).toHaveLength(3);
+    const graduate = groupsFor(
+      {
+        experience: [
+          { id: "intern", employer: "County Hospital", title: "Nursing Intern", endDate: null },
+        ],
+        educationTexts: [],
+        projectTexts: [],
+      },
+      [bullet("intern-1", "intern", "Shipped a clinic intake form during a capstone rotation.", true)],
+    );
+    expect(graduate[0]?.items.filter((item) => item.checked)).toHaveLength(1);
+    expect(applicationAssetConfig.labels.recommendedBulletRange).toContain("{count}");
+    const picker = readFileSync("src/components/ResumeStatementPicker.tsx", "utf8");
+    const checkedCount = picker.indexOf("group.items.filter((item) => item.checked)");
+    const rangeNote = picker.indexOf("recommendedBulletRange");
+    expect(checkedCount).toBeGreaterThan(-1);
+    expect(rangeNote).toBeGreaterThan(checkedCount);
+    expect(picker.slice(rangeNote, rangeNote + 200)).toContain("count");
   });
 
   it("accepts a claim found only in a seeker's reply and drops an invented claim", () => {

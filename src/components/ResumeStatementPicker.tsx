@@ -33,6 +33,7 @@ function StatementGroupFields({
     : fill(labels.recommendedBulletRange, {
         min: group.minBullets,
         max: group.maxBullets,
+        count,
       });
   return (
     <fieldset className="space-y-2" data-testid={`statement-group-${group.id}`}>
