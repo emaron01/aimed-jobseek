@@ -19,7 +19,8 @@ import {
   type ResumeAssetContent,
 } from "@/lib/application-assets/contract";
 import {
-  PRESENTATION_PLAN_PROMPT_VERSION,
+  COVER_LETTER_PRESENTATION_PLAN_PROMPT_VERSION,
+  RESUME_PRESENTATION_PLAN_PROMPT_VERSION,
   presentationPlanSchema,
   type PresentationPlan,
 } from "@/lib/application-assets/plan-contract";
@@ -54,7 +55,10 @@ export function presentationPlanFingerprint(
   input: Parameters<typeof buildPresentationPlanMessages>[0],
 ): string {
   return fingerprintPaidCallInputs({
-    promptVersion: PRESENTATION_PLAN_PROMPT_VERSION,
+    promptVersion:
+      input.type === "RESUME"
+        ? RESUME_PRESENTATION_PLAN_PROMPT_VERSION
+        : COVER_LETTER_PRESENTATION_PLAN_PROMPT_VERSION,
     schemaName:
       input.type === "RESUME"
         ? "resume_presentation_plan"
@@ -243,6 +247,8 @@ export type AssetGenerationFingerprintInput = {
   salutation: string;
   regenerationInstruction: string | null;
   qualityFeedback?: string[];
+  requiredStatements?: Parameters<typeof buildResumeAssetMessages>[0]["requiredStatements"];
+  roleBulletPlans?: Parameters<typeof buildResumeAssetMessages>[0]["roleBulletPlans"];
 };
 
 export function assetGenerationFingerprint(
@@ -255,6 +261,8 @@ export function assetGenerationFingerprint(
       condensedRoleIds: input.condensedRoleIds,
       regenerationInstruction: input.regenerationInstruction,
       qualityFeedback: input.qualityFeedback ?? [],
+      requiredStatements: input.requiredStatements ?? [],
+      roleBulletPlans: input.roleBulletPlans ?? [],
     });
   }
   return coverLetterAssetFingerprint({

@@ -18,8 +18,9 @@ export default async function PlatformHarperPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Harper drafts</h1>
         <p className="mt-1 text-sm text-muted">
-          Best-practice question count, the overall question limit, and spoken-answer
-          length targets. Stored in platform settings. Changing them does not call a model.
+          Best-practice question count, the overall question limit, spoken-answer
+          length targets, and resume bullet bands. Stored in platform settings.
+          Changing them does not call a model.
         </p>
       </div>
       <HarperDraftSettingsForm settings={settings} hasConsoleRow={hasConsoleRow} />

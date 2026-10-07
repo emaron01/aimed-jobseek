@@ -228,6 +228,8 @@ describe.skipIf(!hasTestDatabase())(
         recommendations: [
           { text: "Lead with Acme", reason: "Most relevant", roleId: "r1" },
         ],
+        primaryRoleId: null,
+        directRoleIds: [] as string[],
       };
       let calls = 0;
       const first = await runGatedPresentationPlan({

@@ -1,5 +1,8 @@
 import type { AiMessage } from "@/lib/ai/types";
-import { PRESENTATION_PLAN_PROMPT_VERSION } from "@/lib/application-assets/plan-contract";
+import {
+  COVER_LETTER_PRESENTATION_PLAN_PROMPT_VERSION,
+  RESUME_PRESENTATION_PLAN_PROMPT_VERSION,
+} from "@/lib/application-assets/plan-contract";
 import {
   COVER_LETTER_PRESENTATION_PLAN_INSTRUCTIONS,
   RESUME_PRESENTATION_PLAN_INSTRUCTIONS,
@@ -29,10 +32,14 @@ export function buildPresentationPlanMessages(input: {
     input.type === "RESUME"
       ? RESUME_PRESENTATION_PLAN_INSTRUCTIONS
       : COVER_LETTER_PRESENTATION_PLAN_INSTRUCTIONS;
+  const promptVersion =
+    input.type === "RESUME"
+      ? RESUME_PRESENTATION_PLAN_PROMPT_VERSION
+      : COVER_LETTER_PRESENTATION_PLAN_PROMPT_VERSION;
   return [
     {
       role: "system",
-      content: `Prompt version: ${PRESENTATION_PLAN_PROMPT_VERSION}\n\n${instructions}`,
+      content: `Prompt version: ${promptVersion}\n\n${instructions}`,
     },
     {
       role: "user",
@@ -40,7 +47,7 @@ export function buildPresentationPlanMessages(input: {
         consultantName: consultationConfig.displayName,
         application: input.application,
         roles: input.roles,
-        stories: input.stories,
+        stories: input.type === "RESUME" ? [] : input.stories,
         assessments: input.assessments,
         earlierExperienceYears:
           applicationAssetConfig.presentation.earlierExperienceYears,

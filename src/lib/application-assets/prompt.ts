@@ -26,6 +26,10 @@ import {
   type AssetClaim,
 } from "./contract";
 import type { OutreachGenerationInput } from "./outreach-types";
+import type {
+  RequiredResumeStatement,
+  RoleBulletPlan,
+} from "./resume-statement-picks";
 
 function seekerSources(context: ApplicationGenerationContext) {
   return context.sources.filter((source) =>
@@ -132,6 +136,8 @@ export function buildResumeAssetMessages(input: {
   condensedRoleIds: string[];
   regenerationInstruction: string | null;
   qualityFeedback: string[];
+  requiredStatements?: RequiredResumeStatement[];
+  roleBulletPlans?: RoleBulletPlan[];
 }): AiMessage[] {
   const contact = input.context.profile.identity;
   return [
@@ -183,6 +189,8 @@ export function buildResumeAssetMessages(input: {
           })),
         hiddenRoleIds: input.hiddenRoleIds,
         condensedRoleIds: input.condensedRoleIds,
+        requiredStatements: input.requiredStatements ?? [],
+        roleBulletPlans: input.roleBulletPlans ?? [],
         responseShape: {
           type: "RESUME",
           header: {

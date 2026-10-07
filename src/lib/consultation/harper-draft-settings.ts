@@ -17,6 +17,18 @@ export type HarperDraftSettings = {
   walkThroughWordsPerRole: number;
   walkThroughWordsTotal: number;
   resumeBulletWords: number;
+  recentRoleYears: number;
+  midRoleYears: number;
+  olderRoleYears: number;
+  recentBulletMin: number;
+  recentBulletMax: number;
+  recentPrimaryBulletMax: number;
+  midBulletMin: number;
+  midBulletMax: number;
+  olderBulletMin: number;
+  olderBulletMax: number;
+  oldestRelevantBulletMin: number;
+  oldestRelevantBulletMax: number;
 };
 
 export const DEFAULT_HARPER_DRAFT_SETTINGS: HarperDraftSettings = {
@@ -28,6 +40,18 @@ export const DEFAULT_HARPER_DRAFT_SETTINGS: HarperDraftSettings = {
   walkThroughWordsPerRole: 40,
   walkThroughWordsTotal: 200,
   resumeBulletWords: 30,
+  recentRoleYears: 5,
+  midRoleYears: 10,
+  olderRoleYears: 15,
+  recentBulletMin: 3,
+  recentBulletMax: 5,
+  recentPrimaryBulletMax: 7,
+  midBulletMin: 1,
+  midBulletMax: 3,
+  olderBulletMin: 0,
+  olderBulletMax: 2,
+  oldestRelevantBulletMin: 1,
+  oldestRelevantBulletMax: 2,
 };
 
 function wholeNumber(
@@ -86,6 +110,91 @@ export function parseHarperDraftSettings(value: unknown): HarperDraftSettings {
       1,
       200,
     ),
+    ...bulletBands(row, defaults),
+  };
+}
+
+function bulletPair(
+  minRaw: unknown,
+  maxRaw: unknown,
+  fallbackMin: number,
+  fallbackMax: number,
+): { min: number; max: number } {
+  const min = wholeNumber(minRaw, fallbackMin, 0, 20);
+  const max = wholeNumber(maxRaw, fallbackMax, 0, 20);
+  if (min > max) return { min: fallbackMin, max: fallbackMax };
+  return { min, max };
+}
+
+function bulletBands(
+  row: Record<string, unknown>,
+  defaults: HarperDraftSettings,
+): Pick<
+  HarperDraftSettings,
+  | "recentRoleYears"
+  | "midRoleYears"
+  | "olderRoleYears"
+  | "recentBulletMin"
+  | "recentBulletMax"
+  | "recentPrimaryBulletMax"
+  | "midBulletMin"
+  | "midBulletMax"
+  | "olderBulletMin"
+  | "olderBulletMax"
+  | "oldestRelevantBulletMin"
+  | "oldestRelevantBulletMax"
+> {
+  let recentRoleYears = wholeNumber(row.recentRoleYears, defaults.recentRoleYears, 1, 40);
+  let midRoleYears = wholeNumber(row.midRoleYears, defaults.midRoleYears, 1, 60);
+  let olderRoleYears = wholeNumber(row.olderRoleYears, defaults.olderRoleYears, 1, 80);
+  if (!(recentRoleYears < midRoleYears && midRoleYears < olderRoleYears)) {
+    recentRoleYears = defaults.recentRoleYears;
+    midRoleYears = defaults.midRoleYears;
+    olderRoleYears = defaults.olderRoleYears;
+  }
+  const recent = bulletPair(
+    row.recentBulletMin,
+    row.recentBulletMax,
+    defaults.recentBulletMin,
+    defaults.recentBulletMax,
+  );
+  const mid = bulletPair(
+    row.midBulletMin,
+    row.midBulletMax,
+    defaults.midBulletMin,
+    defaults.midBulletMax,
+  );
+  const older = bulletPair(
+    row.olderBulletMin,
+    row.olderBulletMax,
+    defaults.olderBulletMin,
+    defaults.olderBulletMax,
+  );
+  const oldestRelevant = bulletPair(
+    row.oldestRelevantBulletMin,
+    row.oldestRelevantBulletMax,
+    defaults.oldestRelevantBulletMin,
+    defaults.oldestRelevantBulletMax,
+  );
+  const recentPrimaryBulletMax = wholeNumber(
+    row.recentPrimaryBulletMax,
+    defaults.recentPrimaryBulletMax,
+    0,
+    20,
+  );
+  return {
+    recentRoleYears,
+    midRoleYears,
+    olderRoleYears,
+    recentBulletMin: recent.min,
+    recentBulletMax: recent.max,
+    recentPrimaryBulletMax,
+    midBulletMin: mid.min,
+    midBulletMax: mid.max,
+    olderBulletMin: older.min,
+    olderBulletMax: older.max,
+    oldestRelevantBulletMin: oldestRelevant.min,
+    oldestRelevantBulletMax: oldestRelevant.max,
   };
 }
 

@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { applicationAssetConfig } from "@/lib/product-config/application-assets";
 
-export const PRESENTATION_PLAN_PROMPT_VERSION = "3";
+export const RESUME_PRESENTATION_PLAN_PROMPT_VERSION = "4";
+export const COVER_LETTER_PRESENTATION_PLAN_PROMPT_VERSION = "3";
+/** Resume plan prompt version. Cover letters keep their own constant. */
+export const PRESENTATION_PLAN_PROMPT_VERSION = RESUME_PRESENTATION_PLAN_PROMPT_VERSION;
 
 const recommendationSchema = z.object({
   text: z.string().trim().min(1),
@@ -44,6 +47,11 @@ export function normalizeResumePresentationPlan(raw: unknown): unknown {
         : applicationAssetConfig.presentation.earlierExperienceHeading,
     condensedRoleIds: stringList(row.condensedRoleIds),
     recommendations: normalizeRecommendations(row.recommendations),
+    primaryRoleId:
+      typeof row.primaryRoleId === "string" && row.primaryRoleId.trim()
+        ? row.primaryRoleId.trim()
+        : null,
+    directRoleIds: stringList(row.directRoleIds),
   };
 }
 
@@ -67,6 +75,8 @@ export const resumePresentationPlanSchema = z.object({
   earlierExperienceHeading: z.string().trim().min(1),
   condensedRoleIds: z.array(z.string().trim().min(1)),
   recommendations: z.array(recommendationSchema).min(1),
+  primaryRoleId: z.string().trim().min(1).nullable().default(null),
+  directRoleIds: z.array(z.string().trim().min(1)).default([]),
 });
 
 export const coverLetterPresentationPlanSchema = z.object({

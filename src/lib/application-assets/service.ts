@@ -42,6 +42,7 @@ import {
   condensedRoleIdsFromPlan,
   ensureAcceptedPresentationPlan,
 } from "./plan-service";
+import { loadResumeWriterFields } from "./resume-statement-picker-data";
 import type { AssetGenerationResult } from "./outreach-types";
 import { formatAssetSourceKind } from "./display";
 import { applyProfileContactHeader } from "./header";
@@ -240,6 +241,24 @@ function supportErrors(
     }
   }
   return errors;
+}
+
+/** A resume claim that cites no Personal Profile fact, approved statement, or approved story. */
+export function resumeClaimCitationErrors(
+  content: ApplicationAssetContent,
+  context: ReadyApplicationGenerationContext,
+): string[] {
+  return supportErrors(content, context);
+}
+
+/** First failure is retried once with the violation text. A second failure is not saved. */
+export function resumeCitationOutcome(input: {
+  attempt: number;
+  violations: string[];
+}): "save" | "retry" | "reject" {
+  if (input.violations.length === 0) return "save";
+  if (input.attempt < 1) return "retry";
+  return "reject";
 }
 
 function resumeStructureErrors(
@@ -775,9 +794,20 @@ export async function applicationAssetGenerateWouldSkip(input: {
   });
   // Without an accepted plan, generate would write one — do not skip enqueue.
   if (!acceptedPlan) return false;
-  const condensedRoleIds = condensedRoleIdsFromPlan(acceptedPlan).filter(
+  const planCondensedRoleIds = condensedRoleIdsFromPlan(acceptedPlan).filter(
     (id) => !hiddenRoleIds.includes(id),
   );
+  const writer =
+    input.type === "RESUME"
+      ? await loadResumeWriterFields({
+          organizationId: input.organizationId,
+          campaignId: input.campaignId,
+          plan: acceptedPlan,
+          planCondensedRoleIds,
+          hiddenRoleIds,
+        })
+      : null;
+  const condensedRoleIds = writer?.condensedRoleIds ?? planCondensedRoleIds;
   const fingerprint = assetGenerationFingerprint({
     context,
     type: input.type,
@@ -786,6 +816,8 @@ export async function applicationAssetGenerateWouldSkip(input: {
     salutation: coverLetterSalutation(context),
     regenerationInstruction: input.regenerationInstruction ?? null,
     qualityFeedback: [],
+    requiredStatements: writer?.requiredStatements ?? [],
+    roleBulletPlans: writer?.roleBulletPlans ?? [],
   });
   return applicationAssetGenerationUnchanged({
     organizationId: input.organizationId,
@@ -899,9 +931,20 @@ export async function generateApplicationAsset(input: {
     ...new Set((input.hiddenRoleIds ?? []).map((id) => id.trim()).filter(Boolean)),
   ];
   const allowedRoleIds = new Set(context.profile.experience.map((role) => role.id));
-  const condensedRoleIds = condensedRoleIdsFromPlan(acceptedPlan).filter(
+  const planCondensedRoleIds = condensedRoleIdsFromPlan(acceptedPlan).filter(
     (id) => !hiddenRoleIds.includes(id),
   );
+  const writer =
+    input.type === "RESUME"
+      ? await loadResumeWriterFields({
+          organizationId: input.organizationId,
+          campaignId: input.campaignId,
+          plan: acceptedPlan,
+          planCondensedRoleIds,
+          hiddenRoleIds,
+        })
+      : null;
+  const condensedRoleIds = writer?.condensedRoleIds ?? planCondensedRoleIds;
   if (hiddenRoleIds.some((id) => !allowedRoleIds.has(id))) {
     return {
       ok: false,
@@ -918,6 +961,8 @@ export async function generateApplicationAsset(input: {
   }
   const salutation = coverLetterSalutation(context);
   let lastMessage = "The model did not return a usable asset.";
+  let lastViolations: string[] = [];
+  let qualityFeedback: string[] = [];
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const generated =
       input.type === "RESUME"
@@ -926,7 +971,9 @@ export async function generateApplicationAsset(input: {
             hiddenRoleIds,
             condensedRoleIds,
             regenerationInstruction: input.regenerationInstruction ?? null,
-            qualityFeedback: [],
+            qualityFeedback,
+            requiredStatements: writer?.requiredStatements ?? [],
+            roleBulletPlans: writer?.roleBulletPlans ?? [],
           })
         : await generateCoverLetterWithModel({
             context,
@@ -947,7 +994,7 @@ export async function generateApplicationAsset(input: {
       continue;
     }
     // Worker second line: unchanged inputs keep the current version (no new draft).
-    if (generated.skipped) {
+    if (generated.skipped && attempt === 0) {
       const latest = await prisma.applicationAsset.findFirst({
         where: {
           organizationId: input.organizationId,
@@ -977,6 +1024,21 @@ export async function generateApplicationAsset(input: {
         passed: true,
       });
     }
+    if (input.type === "RESUME") {
+      const violations = await validateAssetContent({
+        content,
+        context,
+        hiddenRoleIds,
+        condensedRoleIds,
+      });
+      const outcome = resumeCitationOutcome({ attempt, violations });
+      if (outcome === "retry" || outcome === "reject") {
+        lastViolations = violations;
+        lastMessage = applicationAssetConfig.labels.verificationFailed;
+        qualityFeedback = violations;
+        continue;
+      }
+    }
     const saved = await saveVersion({
       context,
       type: input.type,
@@ -986,7 +1048,11 @@ export async function generateApplicationAsset(input: {
     });
     return { ok: true, assetId: saved.id, version: saved.version };
   }
-  return { ok: false, message: lastMessage, violations: [lastMessage] };
+  return {
+    ok: false,
+    message: lastMessage,
+    violations: lastViolations.length > 0 ? lastViolations : [lastMessage],
+  };
 }
 
 export async function approveApplicationAsset(input: {

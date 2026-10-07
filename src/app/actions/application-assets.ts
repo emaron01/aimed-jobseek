@@ -7,6 +7,7 @@ import {
   acceptPresentationPlan,
   updateEarlierExperienceHeading,
 } from "@/lib/application-assets/plan-service";
+import { saveResumeStatementPicks } from "@/lib/application-assets/resume-statement-picker-data";
 import {
   approveApplicationAsset,
   resolveApplicationAssetFlag,
@@ -42,6 +43,34 @@ function assetType(formData: FormData): "RESUME" | "COVER_LETTER" {
 function revalidate(campaign: string) {
   revalidatePath(`/campaigns/${campaign}`);
   revalidatePath(`/campaigns/${campaign}/summary`);
+  revalidatePath(`/campaigns/${campaign}/assets`);
+}
+
+export async function saveResumeStatementPicksAction(
+  _previous: ApplicationAssetActionResult | null,
+  formData: FormData,
+): Promise<ApplicationAssetActionResult> {
+  try {
+    await requireCurrentUser();
+    const organizationId = await requireOrganizationId();
+    const id = campaignId(formData);
+    const statementIds = formData
+      .getAll("statementId")
+      .map((value) => String(value).trim())
+      .filter(Boolean);
+    await saveResumeStatementPicks({
+      organizationId,
+      campaignId: id,
+      statementIds,
+    });
+    revalidate(id);
+    return {
+      ok: true,
+      message: applicationAssetConfig.labels.statementPicksSaved,
+    };
+  } catch (error) {
+    return errorResult(error);
+  }
 }
 
 function errorResult(error: unknown): ApplicationAssetActionResult {

@@ -2,22 +2,19 @@ import type { ApplicationPresentationPlanType } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { writePresentationPlanWithModel } from "@/lib/application-assets/plan-ai";
 import {
-  PRESENTATION_PLAN_PROMPT_VERSION,
+  COVER_LETTER_PRESENTATION_PLAN_PROMPT_VERSION,
+  RESUME_PRESENTATION_PLAN_PROMPT_VERSION,
   presentationPlanSchema,
   type PresentationPlan,
 } from "@/lib/application-assets/plan-contract";
+import { yearsSinceRoleEnd } from "@/lib/application-assets/resume-statement-picks";
 import { prisma } from "@/lib/prisma-client";
 import { applicationAssetConfig, vocab } from "@/lib/product-config";
 import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import { TenantError } from "@/lib/tenant/errors";
 
 function yearsSinceEnd(endDate: string | null, asOf: Date): number | null {
-  if (!endDate) return 0;
-  const match = endDate.trim().match(/^(\d{4})-(\d{2})$/);
-  if (!match) return null;
-  const end = Number(match[1]) * 12 + Number(match[2]) - 1;
-  const now = asOf.getUTCFullYear() * 12 + asOf.getUTCMonth();
-  return Number(((now - end) / 12).toFixed(1));
+  return yearsSinceRoleEnd(endDate, asOf);
 }
 
 function parsePlan(value: unknown): PresentationPlan {
@@ -139,13 +136,19 @@ export async function writePresentationPlan(input: {
       status: "DRAFT",
       planJson: written.data as unknown as Prisma.InputJsonValue,
       adjustmentNote: input.adjustmentNote ?? null,
-      promptVersion: PRESENTATION_PLAN_PROMPT_VERSION,
+      promptVersion:
+        input.type === "RESUME"
+          ? RESUME_PRESENTATION_PLAN_PROMPT_VERSION
+          : COVER_LETTER_PRESENTATION_PLAN_PROMPT_VERSION,
     },
     update: {
       status: "DRAFT",
       planJson: written.data as unknown as Prisma.InputJsonValue,
       adjustmentNote: input.adjustmentNote ?? null,
-      promptVersion: PRESENTATION_PLAN_PROMPT_VERSION,
+      promptVersion:
+        input.type === "RESUME"
+          ? RESUME_PRESENTATION_PLAN_PROMPT_VERSION
+          : COVER_LETTER_PRESENTATION_PLAN_PROMPT_VERSION,
       acceptedAt: null,
     },
   });

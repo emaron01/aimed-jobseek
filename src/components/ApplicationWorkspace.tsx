@@ -18,6 +18,7 @@ import {
   ApplicationWorkspaceLive,
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
+import { loadResumeStatementGroups } from "@/lib/application-assets/resume-statement-picker-data";
 import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-status";
 import { supersedeObsoleteWorkspaceFailures } from "@/lib/application-jobs/obsolete-failures";
 import {
@@ -417,6 +418,9 @@ export async function ApplicationWorkspace({
       }),
     };
   }
+  const statementGroups = showFocus(focus, ["assets"])
+    ? await loadResumeStatementGroups({ organizationId, campaignId })
+    : [];
   const [approvedStatementCount, approvedStoryCount] = await Promise.all([
     prisma.consultationStatement.count({
       where: {
@@ -877,6 +881,7 @@ export async function ApplicationWorkspace({
             }))
           : []
       }
+      statementGroups={statementGroups}
       assets={requirement.campaign.applicationAssets
         .filter(
           (

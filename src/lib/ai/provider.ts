@@ -77,6 +77,13 @@ const consultationReplyCache: { key: string; provider: AiProvider | null } = {
   key: "",
   provider: null,
 };
+const consultationReplyTemperatureCache: {
+  key: string;
+  provider: AiProvider | null;
+} = {
+  key: "",
+  provider: null,
+};
 const assetCache: { key: string; provider: AiProvider | null } = {
   key: "",
   provider: null,
@@ -208,15 +215,31 @@ export function getConsultationAiProvider(): AiProvider {
 }
 
 /** Per-answer consultation AI only — never uses Consultation AI configuration. */
-export function getConsultationReplyAiProvider(): AiProvider {
+export function getConsultationReplyAiProvider(options?: {
+  temperature?: number;
+}): AiProvider {
   const config = getConsultationReplyAiConfig();
-  const key = cacheKey(config);
-  if (consultationReplyCache.key === key && consultationReplyCache.provider) {
-    return consultationReplyCache.provider;
+  if (options?.temperature === undefined) {
+    const key = cacheKey(config);
+    if (consultationReplyCache.key === key && consultationReplyCache.provider) {
+      return consultationReplyCache.provider;
+    }
+    const provider = createAiProvider(config);
+    consultationReplyCache.key = key;
+    consultationReplyCache.provider = provider;
+    return provider;
   }
-  const provider = createAiProvider(config);
-  consultationReplyCache.key = key;
-  consultationReplyCache.provider = provider;
+  const temperature = options.temperature;
+  const key = `${cacheKey(config)}|temperature:${temperature}`;
+  if (
+    consultationReplyTemperatureCache.key === key &&
+    consultationReplyTemperatureCache.provider
+  ) {
+    return consultationReplyTemperatureCache.provider;
+  }
+  const provider = createAiProvider({ ...config, temperature });
+  consultationReplyTemperatureCache.key = key;
+  consultationReplyTemperatureCache.provider = provider;
   return provider;
 }
 

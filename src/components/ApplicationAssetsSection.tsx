@@ -13,6 +13,8 @@ import {
   type AssetClaim,
 } from "@/lib/application-assets/contract";
 import type { PresentationPlan } from "@/lib/application-assets/plan-contract";
+import type { StatementGroup } from "@/lib/application-assets/resume-statement-picks";
+import { ResumeStatementPicker } from "@/components/ResumeStatementPicker";
 import { formatResumeRoleMeta } from "@/lib/application-assets/dates";
 import {
   formatAssetStatusLabel,
@@ -585,6 +587,7 @@ function AssetTypePanel({
   missingContacts,
   profileHref,
   profileEditHref,
+  statementGroups,
 }: {
   campaignId: string;
   type: "RESUME" | "COVER_LETTER";
@@ -597,6 +600,7 @@ function AssetTypePanel({
   missingContacts: string[];
   profileHref: string | null;
   profileEditHref: string | null;
+  statementGroups: StatementGroup[];
 }) {
   const [result, action] = useActionState(generateApplicationAssetAction, initial);
   const orderedRows = sortAssetsNewestFirst(rows);
@@ -619,6 +623,13 @@ function AssetTypePanel({
           ? applicationAssetConfig.labels.resume
           : applicationAssetConfig.labels.coverLetter}
       </h3>
+      {type === "RESUME" ? (
+        <ResumeStatementPicker
+          campaignId={campaignId}
+          groups={statementGroups}
+          canEdit={canEdit}
+        />
+      ) : null}
       {latest?.staleReason ? (
         <p
           className={`text-sm text-warning ${WORKSPACE_MESSAGE_WRAP_CLASS}`}
@@ -748,6 +759,7 @@ export function ApplicationAssetsSection({
   profileHref = null,
   profileEditHref = null,
   defaultOpen = false,
+  statementGroups = [],
 }: {
   campaignId: string;
   assets: Array<
@@ -764,6 +776,7 @@ export function ApplicationAssetsSection({
   profileHref?: string | null;
   profileEditHref?: string | null;
   defaultOpen?: boolean;
+  statementGroups?: StatementGroup[];
 }) {
   const [activeType, setActiveType] = useState<"RESUME" | "COVER_LETTER">(
     "RESUME",
@@ -867,6 +880,7 @@ export function ApplicationAssetsSection({
                 missingContacts={
                   type === "RESUME" ? missingResumeContacts : []
                 }
+                statementGroups={type === "RESUME" ? statementGroups : []}
                 profileHref={profileHref}
                 profileEditHref={profileEditHref}
               />

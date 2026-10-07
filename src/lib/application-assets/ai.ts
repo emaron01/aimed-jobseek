@@ -38,6 +38,10 @@ import {
   type CoverLetterAssetContent,
   type ResumeAssetContent,
 } from "./contract";
+import type {
+  RequiredResumeStatement,
+  RoleBulletPlan,
+} from "./resume-statement-picks";
 import type { OutreachGenerationInput } from "./outreach-types";
 import {
   buildAssetClaimValidationMessages,
@@ -92,19 +96,25 @@ function failure(operation: string, error: unknown, message: string) {
   return { ok: false as const, message: `${message}${detail}` };
 }
 
+export const RESUME_WRITER_TEMPERATURE = 0;
+
 export async function generateResumeWithModel(input: {
   context: ReadyApplicationGenerationContext;
   hiddenRoleIds: string[];
   condensedRoleIds: string[];
   regenerationInstruction: string | null;
   qualityFeedback: string[];
+  requiredStatements?: RequiredResumeStatement[];
+  roleBulletPlans?: RoleBulletPlan[];
 }): Promise<Result<ResumeAssetContent>> {
   if (!isConsultationReplyAiConfigured()) {
     return { ok: false, message: WRITING_UNCONFIGURED };
   }
   const resumeInput = input;
   const callProvider = async () => {
-    const response = await getConsultationReplyAiProvider().generateStructured({
+    const response = await getConsultationReplyAiProvider({
+      temperature: RESUME_WRITER_TEMPERATURE,
+    }).generateStructured({
       ...structuredOutputRequest("resumeAsset"),
       ...aiCallTracking(
         assetUsage(input.context, "APPLICATION_ASSET_GENERATION"),

@@ -6,6 +6,7 @@ import {
   type PlatformSettingsActionResult,
 } from "@/app/actions/platform-settings";
 import type { HarperDraftSettings } from "@/lib/consultation/harper-draft-settings";
+import { applicationAssetConfig } from "@/lib/product-config";
 
 const initial: PlatformSettingsActionResult | null = null;
 
@@ -18,6 +19,22 @@ const FIELDS: Array<{ key: keyof HarperDraftSettings; label: string }> = [
   { key: "walkThroughWordsPerRole", label: "Career walk-through words per recent role" },
   { key: "walkThroughWordsTotal", label: "Career walk-through words in total" },
   { key: "resumeBulletWords", label: "Resume bullet words" },
+];
+
+const bands = applicationAssetConfig.harperBulletBands;
+const BULLET_FIELDS: Array<{ key: keyof HarperDraftSettings; label: string }> = [
+  { key: "recentRoleYears", label: bands.recentRoleYears },
+  { key: "midRoleYears", label: bands.midRoleYears },
+  { key: "olderRoleYears", label: bands.olderRoleYears },
+  { key: "recentBulletMin", label: bands.recentBulletMin },
+  { key: "recentBulletMax", label: bands.recentBulletMax },
+  { key: "recentPrimaryBulletMax", label: bands.recentPrimaryBulletMax },
+  { key: "midBulletMin", label: bands.midBulletMin },
+  { key: "midBulletMax", label: bands.midBulletMax },
+  { key: "olderBulletMin", label: bands.olderBulletMin },
+  { key: "olderBulletMax", label: bands.olderBulletMax },
+  { key: "oldestRelevantBulletMin", label: bands.oldestRelevantBulletMin },
+  { key: "oldestRelevantBulletMax", label: bands.oldestRelevantBulletMax },
 ];
 
 export function HarperDraftSettingsForm({
@@ -53,6 +70,25 @@ export function HarperDraftSettingsForm({
             />
           </label>
         ))}
+      </div>
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold text-ink">{bands.heading}</h2>
+        <p className="text-xs text-subtle">{bands.help}</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {BULLET_FIELDS.map((field) => (
+            <label key={field.key} className="block text-sm text-ink">
+              <span className="mb-1 block font-medium">{field.label}</span>
+              <input
+                name={field.key}
+                type="number"
+                min={0}
+                required
+                defaultValue={settings[field.key]}
+                className="w-full rounded-md border border-edge bg-canvas px-3 py-2 text-sm text-ink"
+              />
+            </label>
+          ))}
+        </div>
       </div>
       {state ? (
         <p className={state.ok ? "text-sm text-success" : "text-sm text-danger"} role="status">

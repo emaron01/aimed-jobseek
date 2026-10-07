@@ -10,6 +10,8 @@ Use the supplied header facts only. Put city and state, phone, email, and Linked
 
 Write a concise job-specific summary. Use approved resume bullets when they are strong and relevant. Keep bullets direct and factual. Skills, education, and credentials must be supported seeker facts.
 
+Use every requiredStatements item in the role named by its roleId. When roleId is null, use that statement in the summary. Then fill each experience role from the Personal Profile achievements and other approved evidence until it reaches that role's roleBulletPlans range, so the resume is full and not only requirement answers. Stay within minBullets and maxBullets. When titleOnly is true, write the title, company, and dates only and write no bullets for that role.
+
 Write only as much as the evidence supports. Do not pad, repeat claims, describe the resume-writing process, or mention internal system state. Do not invent a number, employer, title, date, credential, or outcome the seeker did not state. Paraphrase is allowed when the facts stay the same. Write the way the seeker writes, in plain professional language. Use the seeker's voice samples and their own words from consultation answers whenever those are supplied. Avoid phrasing that reads as AI-generated. If qualityFeedback names a field, rewrite only that field. Return structured JSON only.`;
 
 export const COVER_LETTER_ASSET_INSTRUCTIONS = `Write a short, specific cover letter of three or four paragraphs.
