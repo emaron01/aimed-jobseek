@@ -87,8 +87,44 @@ describe("approved requirement rows catch-up", () => {
     expect(
       catchUpSetsStrong({
         strength: "PARTIAL",
+        assessmentTargetKey: "role-expertise:partner-marketing",
+        statementKind: "INTERVIEW_ANSWER",
+        statementStatus: "APPROVED",
+        cardTargetKey: "role-expertise:partner-marketing",
+        turnTargetKey: "role-expertise:partner-marketing",
+        gapDecision: "evidence",
+      }),
+    ).toBe(false);
+  });
+
+  it("turns the why-this-company row STRONG, and still skips an acknowledge-the-gap or resume bullet", () => {
+    expect(
+      catchUpSetsStrong({
+        strength: "PARTIAL",
         assessmentTargetKey: "why-this-company",
         statementKind: "INTERVIEW_ANSWER",
+        statementStatus: "APPROVED",
+        cardTargetKey: "why-this-company",
+        turnTargetKey: "question:why",
+        gapDecision: "evidence",
+      }),
+    ).toBe(true);
+    expect(
+      catchUpSetsStrong({
+        strength: "NONE",
+        assessmentTargetKey: "why-this-company",
+        statementKind: "INTERVIEW_ANSWER",
+        statementStatus: "APPROVED",
+        cardTargetKey: "why-this-company",
+        turnTargetKey: "why-this-company",
+        gapDecision: "no_evidence",
+      }),
+    ).toBe(false);
+    expect(
+      catchUpSetsStrong({
+        strength: "PARTIAL",
+        assessmentTargetKey: "why-this-company",
+        statementKind: "RESUME_BULLET",
         statementStatus: "APPROVED",
         cardTargetKey: "why-this-company",
         turnTargetKey: "why-this-company",
@@ -130,6 +166,7 @@ describe("approved requirement rows catch-up", () => {
     expect(sql).toContain(
       `^(required|outcome|competency|preferred|mission):`,
     );
+    expect(sql).toContain(`btrim(assessment."targetKey") = 'why-this-company'`);
     expect(sql).toContain(`replyToTurnId`);
     expect(sql).toContain(`'question:' || linked.id`);
     expect(sql).toContain(`NULLIF(btrim(turn."targetKey"), '')`);

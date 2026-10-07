@@ -2,14 +2,18 @@
 -- that fills a requirement row sets that row to STRONG" shipped.
 -- Same rule as approveConsultationStatement: the question card's target key,
 -- or the statement turn's key when the answer is not on a card. Interview
--- answers only. Acknowledge-the-gap (gapDecision no_evidence), resume bullets,
--- and non-requirement cards are left as stored. Only strength changes.
+-- answers only. Requirement rows and why-this-company qualify.
+-- Acknowledge-the-gap (gapDecision no_evidence), resume bullets, and other
+-- cards are left as stored. Only strength changes.
 -- Idempotent: a second run matches no PARTIAL or NONE rows.
 
 UPDATE "ConsultationAssessment" AS assessment
 SET strength = 'STRONG'::"EvidenceStrength"
 WHERE assessment.strength IN ('PARTIAL'::"EvidenceStrength", 'NONE'::"EvidenceStrength")
-  AND btrim(assessment."targetKey") ~ '^(required|outcome|competency|preferred|mission):'
+  AND (
+    btrim(assessment."targetKey") ~ '^(required|outcome|competency|preferred|mission):'
+    OR btrim(assessment."targetKey") = 'why-this-company'
+  )
   AND EXISTS (
     SELECT 1
     FROM "ConsultationStatement" AS statement

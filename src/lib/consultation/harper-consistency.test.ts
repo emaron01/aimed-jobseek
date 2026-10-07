@@ -313,6 +313,13 @@ describe("approving a requirement answer moves the score", () => {
         targetKey: "why-this-company",
         confirmedGap: false,
       }),
+    ).toBe("why-this-company");
+    expect(
+      approvedRequirementTargetKey({
+        statementKind: "INTERVIEW_ANSWER",
+        targetKey: "why-this-company",
+        confirmedGap: true,
+      }),
     ).toBe("");
 
     const service = readFileSync(resolve("src/lib/consultation/service.ts"), "utf8");

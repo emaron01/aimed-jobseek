@@ -99,8 +99,9 @@ export function isRequirementLikeTargetKey(targetKey: string): boolean {
 
 /**
  * Target key whose standing row becomes STRONG when this interview answer is
- * approved. An acknowledge-the-gap track and any non-requirement card return
- * an empty key so the current strength is left as stored.
+ * approved. Requirement rows and why-this-company qualify. An acknowledge-the-gap
+ * track, a resume bullet, and any other card return an empty key so the current
+ * strength is left as stored.
  */
 export function approvedRequirementTargetKey(input: {
   statementKind: string;
@@ -109,7 +110,8 @@ export function approvedRequirementTargetKey(input: {
 }): string {
   if (input.statementKind !== "INTERVIEW_ANSWER" || input.confirmedGap) return "";
   const key = input.targetKey?.trim() ?? "";
-  return isRequirementLikeTargetKey(key) ? key : "";
+  if (key === WHY_THIS_COMPANY_TARGET_KEY || isRequirementLikeTargetKey(key)) return key;
+  return "";
 }
 
 /** True when the item must appear somewhere on Harper (answers, statements, or open Q). */
