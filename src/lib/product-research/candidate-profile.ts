@@ -123,6 +123,8 @@ export const candidateProfileSchema = z.object({
   gaps: z.array(profileGapSchema).default([]),
   /** Evidence id to a profile role id, or "general" for General background. */
   bulletRoleChoices: z.record(z.string(), z.string()).optional(),
+  /** Bullet text the seeker removed. A later refresh does not suggest that result. */
+  dismissedBulletTexts: z.array(z.string().trim().min(1)).optional(),
   /** Result key to the seeker's edited bullet text. A seeker's edit wins over the next draft. */
   bulletTextEdits: z.record(z.string(), z.string()).optional(),
   /** Profile role ids the seeker left off the resume. The same hiddenRoleIds the resume already uses. */

@@ -4,9 +4,12 @@ import {
   oneLineBullet,
   profileWithBulletRoleChoices,
   profileWithBulletTextEdits,
+  profileWithDismissedBullet,
   profileWithHiddenRole,
+  profileWithoutSeekerBullet,
   profileWithSeekerBullet,
   readHiddenRoleIds,
+  textIsDismissed,
 } from "@/lib/application-assets/resume-bullet-candidates";
 import { readResumeBulletCandidates } from "@/lib/application-assets/resume-bullet-candidate-service";
 import {
@@ -18,6 +21,7 @@ import {
   roleGroupHeader,
   workspaceSeenWithoutResumePicks,
   type PickerBullet,
+  type PickerProfile,
   type RoleBulletPlan,
   type RequiredResumeStatement,
   type StatementGroup,
@@ -39,6 +43,7 @@ async function loadPickerRows(input: {
   primaryRoleId: string | null;
   directRoleIds: string[];
   hiddenRoleIds: string[];
+  dismissedTexts: string[];
   needsPrepare: boolean;
 } | null> {
   const campaign = await prisma.campaign.findFirst({
@@ -81,11 +86,31 @@ async function loadPickerRows(input: {
     primaryRoleId: candidates.packet.primaryRoleId,
     directRoleIds: candidates.packet.directRoleIds,
     hiddenRoleIds: readHiddenRoleIds(candidates.packet.profileJson),
+    dismissedTexts: candidates.packet.dismissedTexts,
     needsPrepare: candidates.needsPrepare,
   };
 }
 
 export type BulletRoleOption = { roleId: string; label: string };
+
+/** Profile achievements the seeker has not removed. The profile itself is unchanged. */
+export function profileWithoutDismissedResults(
+  profile: PickerProfile,
+  dismissed: readonly string[],
+): PickerProfile {
+  const employers = profile.experience
+    .map((role) => role.employer?.trim() ?? "")
+    .filter((employer) => employer.length > 0);
+  return {
+    ...profile,
+    experience: profile.experience.map((role) => ({
+      ...role,
+      achievements: (role.achievements ?? []).filter(
+        (text) => !textIsDismissed(text, dismissed, employers),
+      ),
+    })),
+  };
+}
 
 export async function loadResumeStatementGroups(input: {
   organizationId: string;
@@ -103,7 +128,7 @@ export async function loadResumeStatementGroups(input: {
       label: roleGroupHeader(role.title?.trim() || "", role.employer?.trim() || ""),
     })),
     groups: buildStatementGroups({
-      profile: rows.profile,
+      profile: profileWithoutDismissedResults(rows.profile, rows.dismissedTexts),
       bullets: rows.bullets,
       settings,
       savedPickIds: rows.savedPickIds,
@@ -142,7 +167,7 @@ export async function loadResumeWriterFields(input: {
     };
   }
   return buildResumeWriterPackage({
-    profile: rows.profile,
+    profile: profileWithoutDismissedResults(rows.profile, rows.dismissedTexts),
     bullets: rows.bullets,
     settings,
     savedPickIds: rows.savedPickIds,
@@ -314,6 +339,62 @@ export async function addSeekerBullet(input: {
     data: { resumeStatementPicksJson: [...new Set([...alreadyChecked, id])] },
   });
   return id;
+}
+
+/** Removes one picker bullet. Does not call a model or change the source answer or achievement. */
+export async function removePickerBullet(input: {
+  organizationId: string;
+  campaignId: string;
+  bulletId: string;
+}): Promise<void> {
+  const bulletId = input.bulletId.trim();
+  const groups = await loadResumeStatementGroups(input);
+  const bullet = groups.groups.flatMap((group) => group.items).find((item) => item.id === bulletId);
+  if (!bullet) throw new TenantError("That bullet was not found.");
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: {
+      resumeStatementPicksJson: true,
+      product: { select: { id: true, profileJson: true } },
+    },
+  });
+  if (!campaign) throw new TenantError("Application was not found.");
+  const parsed = parseCandidateProfileSafe(campaign.product.profileJson);
+  const employers = parsed.ok
+    ? parsed.profile.experience.map((role) => role.employer?.trim() ?? "").filter(Boolean)
+    : [];
+  let profileJson = profileWithDismissedBullet(
+    campaign.product.profileJson,
+    bullet.content,
+    employers,
+  );
+  if (bullet.seekerOwned) profileJson = profileWithoutSeekerBullet(profileJson, bullet.id);
+  await prisma.product.update({
+    where: { id: campaign.product.id },
+    data: { profileJson: profileJson as Prisma.InputJsonValue },
+  });
+  const stored = campaign.resumeStatementPicksJson;
+  if (Array.isArray(stored)) {
+    await prisma.campaign.update({
+      where: { id: input.campaignId },
+      data: {
+        resumeStatementPicksJson: stored.filter((id) => id !== bullet.id),
+      },
+    });
+    return;
+  }
+  if (stored && typeof stored === "object" && Array.isArray((stored as { picks?: unknown }).picks)) {
+    const record = stored as { picks: unknown[]; seen?: unknown };
+    await prisma.campaign.update({
+      where: { id: input.campaignId },
+      data: {
+        resumeStatementPicksJson: {
+          ...record,
+          picks: record.picks.filter((id) => id !== bullet.id),
+        } as Prisma.InputJsonValue,
+      },
+    });
+  }
 }
 
 /** Saves the seeker's wording for one bullet. Does not call a model. */

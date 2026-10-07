@@ -20,6 +20,8 @@ import {
   questionTextForAnswer,
   readBulletRoleChoices,
   readBulletTextEdits,
+  readDismissedBulletTexts,
+  textIsDismissed,
   profileWithSeekerBullet,
   readSeekerBullets,
   replaceUnpickedCandidates,
@@ -62,6 +64,7 @@ export type BulletCandidatePacket = {
   choices: Record<string, string>;
   textEdits: Record<string, string>;
   seekerBullets: SeekerBulletRecord[];
+  dismissedTexts: string[];
   pickedIds: string[];
   profileRoles: Array<{ roleId: string; employer: string }>;
 };
@@ -238,6 +241,7 @@ async function loadBulletCandidatePacket(input: {
     choices: readBulletRoleChoices(campaign.product.profileJson),
     textEdits,
     seekerBullets,
+    dismissedTexts: readDismissedBulletTexts(campaign.product.profileJson),
     pickedIds: picked.picks ?? [],
     profileRoles,
   };
@@ -265,9 +269,16 @@ function bulletsFromStored(
         roles: packet.profileRoles,
         pickedIds: new Set(packet.pickedIds),
         textEdits: packet.textEdits,
+        dismissedTexts: packet.dismissedTexts,
       })
     : [];
-  return mergeStoredSeekerBullets(assigned, packet.seekerBullets);
+  const employers = packet.profileRoles.map((role) => role.employer);
+  return mergeStoredSeekerBullets(
+    assigned,
+    packet.seekerBullets.filter(
+      (bullet) => !textIsDismissed(bullet.text, packet.dismissedTexts, employers),
+    ),
+  );
 }
 
 function mergeStoredSeekerBullets(
@@ -466,6 +477,7 @@ export async function prepareResumeBulletCandidates(input: {
             next: response.data.bullets,
             kept,
             employers,
+            dismissedTexts: packet.dismissedTexts,
           }),
         };
       },

@@ -11,6 +11,7 @@ import { prepareResumeBulletCandidates } from "@/lib/application-assets/resume-b
 import {
   addSeekerBullet,
   hiddenRoleIdsForCampaign,
+  removePickerBullet,
   saveBulletEvidenceRole,
   saveBulletText,
   saveResumeRoleVisibility,
@@ -159,6 +160,25 @@ export async function addSeekerBulletAction(input: {
     });
     revalidate(input.campaignId);
     return { ok: true, message: applicationAssetConfig.labels.bulletEditSaved, bulletId };
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
+export async function removePickerBulletAction(input: {
+  campaignId: string;
+  bulletId: string;
+}): Promise<ApplicationAssetActionResult> {
+  try {
+    await requireCurrentUser();
+    const organizationId = await requireOrganizationId();
+    await removePickerBullet({
+      organizationId,
+      campaignId: input.campaignId,
+      bulletId: input.bulletId,
+    });
+    revalidate(input.campaignId);
+    return { ok: true, message: applicationAssetConfig.labels.removeBullet };
   } catch (error) {
     return errorResult(error);
   }

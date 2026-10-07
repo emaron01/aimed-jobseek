@@ -6,6 +6,7 @@ import {
   addSeekerBulletAction,
   prepareResumeBulletCandidatesAction,
   saveBulletEvidenceRoleAction,
+  removePickerBulletAction,
   saveBulletTextAction,
   saveResumeRoleVisibilityAction,
   saveResumeStatementPicksAction,
@@ -161,6 +162,30 @@ function BulletLine({
             }}
           >
             {labels.saveBullet}
+          </button>
+        ) : null}
+        {canEdit ? (
+          <button
+            type="button"
+            className="rounded border border-edge px-2 py-0.5 text-xs text-ink disabled:opacity-60"
+            disabled={saving}
+            data-testid="remove-bullet"
+            onClick={() => {
+              startSave(async () => {
+                const result = await removePickerBulletAction({
+                  campaignId,
+                  bulletId: item.id,
+                });
+                if (!result.ok) {
+                  setNote(result.message);
+                  rowRef.current?.focus({ preventScroll: true });
+                  return;
+                }
+                router.refresh();
+              });
+            }}
+          >
+            {labels.removeBullet}
           </button>
         ) : null}
       </span>

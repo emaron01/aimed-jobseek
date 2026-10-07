@@ -16,6 +16,7 @@ import {
   resumeCitationOutcome,
   resumeClaimCitationErrors,
   resumeVersionUsable,
+  resumeWithExactPickedBullets,
 } from "@/lib/application-assets/service";
 import {
   applyBulletTextEdits,
@@ -26,8 +27,11 @@ import {
   bulletResultKey,
   profileWithBulletRoleChoices,
   profileWithBulletTextEdits,
+  profileWithDismissedBullet,
   profileWithHiddenRole,
+  profileWithoutSeekerBullet,
   profileWithSeekerBullet,
+  readDismissedBulletTexts,
   questionTextForAnswer,
   readHiddenRoleIds,
   readSeekerBullets,
@@ -38,7 +42,7 @@ import {
   splitEvidenceByEmployer,
   storedCandidatesMatch,
 } from "@/lib/application-assets/resume-bullet-candidates";
-import { resumeWithExactPickedBullets } from "@/lib/application-assets/service";
+import { profileWithoutDismissedResults } from "@/lib/application-assets/resume-statement-picker-data";
 import {
   buildResumeWriterPackage,
   buildStatementGroups,
@@ -2189,5 +2193,122 @@ describe("role date order for every seeker date format", () => {
     expect(addSource).not.toContain("generateStructured");
     expect(actionSource).toContain("hiddenRoleIdsForCampaign");
     expect(actionSource).not.toContain('getAll("hiddenRoleId")');
+  });
+
+  it("removes a bullet from the list and does not suggest that result again", () => {
+    const openText = "Closed a $1.3MM Bank of America deal.";
+    const reworded = "Closed the Bank of America deal for $1.3MM.";
+    const mercyText = "Precepted 8 new nurses on the night shift.";
+    const capstone = "Shipped a clinic intake form during a capstone.";
+    const profile: PickerProfile = {
+      experience: [
+        {
+          id: "opentext",
+          employer: salesProfile.experience[0]!.employer,
+          title: salesProfile.experience[0]!.title,
+          endDate: null,
+          achievements: [openText],
+        },
+        {
+          id: "mercy",
+          employer: nursingProfile.experience[0]!.employer,
+          title: nursingProfile.experience[0]!.title,
+          endDate: null,
+          achievements: [mercyText],
+        },
+        {
+          id: "intern",
+          employer: "County Hospital",
+          title: "Nursing Intern",
+          endDate: null,
+          achievements: [capstone],
+        },
+      ],
+      educationTexts: nursingProfile.educationTexts,
+      projectTexts: graduateProfile.projectTexts,
+    };
+    const sourceProfile = {
+      achievements: profile.experience.map((role) => role.achievements),
+      bulletRoleChoices: { deal: "opentext" },
+    };
+    const dismissed = profileWithDismissedBullet(sourceProfile, openText, ["OpenText", "Mercy General"]);
+    expect(readDismissedBulletTexts(dismissed)).toEqual([openText]);
+    expect(dismissed.achievements).toEqual(sourceProfile.achievements);
+    expect(dismissed.bulletRoleChoices).toEqual({ deal: "opentext" });
+
+    const offered = profileWithoutDismissedResults(profile, [openText]);
+    expect(offered.experience.find((role) => role.id === "opentext")?.achievements).toEqual([]);
+    expect(profile.experience.find((role) => role.id === "opentext")?.achievements).toEqual([openText]);
+    const groups = buildStatementGroups({
+      profile: offered,
+      bullets: [],
+      settings: DEFAULT_HARPER_DRAFT_SETTINGS,
+      savedPickIds: null,
+      primaryRoleId: "opentext",
+      directRoleIds: [],
+      asOf,
+    });
+    expect(groups.find((group) => group.roleId === "opentext")?.items).toEqual([]);
+    expect(groups.find((group) => group.roleId === "mercy")?.items.map((item) => item.content)).toEqual([
+      mercyText,
+    ]);
+    expect(groups.find((group) => group.roleId === "intern")?.items.map((item) => item.content)).toEqual([
+      capstone,
+    ]);
+    expect(graduateProfile.projectTexts).toContain("Capstone project");
+
+    const assigned = assignCandidateBullets({
+      bands: [{ roleId: "opentext", employer: "OpenText", candidateCount: 4 }],
+      evidence: [
+        {
+          id: "boa",
+          kind: "INTERVIEW_ANSWER",
+          text: `${openText} at OpenText.`,
+          roleId: null,
+          question: "Tell me about a deal at OpenText.",
+        },
+        {
+          id: "forecast",
+          kind: "INTERVIEW_ANSWER",
+          text: "Held forecast deviation to 5-10% at OpenText.",
+          roleId: null,
+          question: "How did you run the forecast?",
+        },
+      ],
+      dismissedTexts: [openText],
+      bullets: [
+        { roleId: "opentext", text: reworded, evidenceIds: ["boa"] },
+        { roleId: "opentext", text: "Held forecast deviation to 5-10%.", evidenceIds: ["forecast"] },
+      ],
+    });
+    expect(assigned.map((item) => item.text)).toEqual(["Held forecast deviation to 5-10%."]);
+
+    const seekerId = bulletDisplayId("mercy", mercyText);
+    const kept = profileWithSeekerBullet(dismissed, { id: seekerId, text: mercyText, roleId: "mercy" });
+    const removed = profileWithoutSeekerBullet(kept, seekerId);
+    expect(readSeekerBullets(removed)).toEqual([]);
+    expect(readDismissedBulletTexts(removed)).toEqual([openText]);
+
+    const refreshed = replaceUnpickedCandidates({
+      employers: ["OpenText", "Mercy General"],
+      dismissedTexts: [openText],
+      kept: [],
+      previous: [{ text: openText, evidenceIds: ["boa"] }],
+      next: [
+        { text: reworded, evidenceIds: ["boa"] },
+        { text: "Held forecast deviation to 5-10%.", evidenceIds: ["forecast"] },
+      ],
+    });
+    expect(refreshed.map((item) => item.text)).toEqual(["Held forecast deviation to 5-10%."]);
+
+    const pickerSource = readFileSync("src/components/ResumeStatementPicker.tsx", "utf8");
+    const removeSource = readFileSync("src/lib/application-assets/resume-statement-picker-data.ts", "utf8");
+    const removeFn = removeSource.slice(removeSource.indexOf("export async function removePickerBullet"));
+    expect(applicationAssetConfig.labels.removeBullet).toBe("Remove");
+    expect(pickerSource).toContain("removeBullet");
+    expect(removeFn).not.toContain("runPaidStructuredCall");
+    expect(removeFn).not.toContain("generateStructured");
+    expect(removeFn).not.toContain("consultationStatement");
+    expect(removeFn).not.toContain("achievements:");
   });
 });

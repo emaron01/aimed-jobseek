@@ -406,6 +406,20 @@ export function sameBulletResult(
   return leftNames.some((name) => rightNames.includes(name));
 }
 
+/** The same sentence, or the same result (amounts and named customers). */
+export function textIsDismissed(
+  text: string,
+  dismissed: readonly string[],
+  employers: readonly string[] = [],
+): boolean {
+  const line = oneLineBullet(text).toLowerCase();
+  if (!line) return false;
+  return dismissed.some((item) => {
+    const stored = oneLineBullet(item).toLowerCase();
+    return stored === line || sameBulletResult(item, text, employers);
+  });
+}
+
 /**
  * Match across runs: the same evidence ids plus the same result (numbers and named customers).
  * Wording can change. A different result from the same evidence does not match.
@@ -800,6 +814,47 @@ export function profileWithSeekerBullet(
   return base;
 }
 
+export function profileWithoutSeekerBullet(
+  profileJson: unknown,
+  bulletId: string,
+): Record<string, unknown> {
+  const base =
+    profileJson && typeof profileJson === "object" && !Array.isArray(profileJson)
+      ? { ...(profileJson as Record<string, unknown>) }
+      : {};
+  const id = bulletId.trim();
+  base.seekerBullets = readSeekerBullets(base).filter((item) => item.id !== id);
+  return base;
+}
+
+export function readDismissedBulletTexts(profileJson: unknown): string[] {
+  if (!profileJson || typeof profileJson !== "object" || Array.isArray(profileJson)) return [];
+  const raw = (profileJson as Record<string, unknown>).dismissedBulletTexts;
+  if (!Array.isArray(raw)) return [];
+  return [
+    ...new Set(
+      raw.flatMap((item) => (typeof item === "string" && item.trim() ? [oneLineBullet(item)] : [])),
+    ),
+  ];
+}
+
+export function profileWithDismissedBullet(
+  profileJson: unknown,
+  text: string,
+  employers: readonly string[] = [],
+): Record<string, unknown> {
+  const base =
+    profileJson && typeof profileJson === "object" && !Array.isArray(profileJson)
+      ? { ...(profileJson as Record<string, unknown>) }
+      : {};
+  const line = oneLineBullet(text);
+  const existing = readDismissedBulletTexts(base);
+  if (line && !textIsDismissed(line, existing, employers)) {
+    base.dismissedBulletTexts = [...existing, line];
+  }
+  return base;
+}
+
 function draftResultKey(text: string, evidenceIds: readonly string[], employers: readonly string[]): string {
   const line = oneLineBullet(text);
   const cleaned = cleanBulletEmployerNames({ text: line, employers });
@@ -815,8 +870,13 @@ export function replaceUnpickedCandidates<T extends { text: string; evidenceIds:
   next: readonly T[];
   kept: readonly { text: string; evidenceIds?: readonly string[]; resultKey?: string }[];
   employers: readonly string[];
+  /** Results the seeker removed. A refresh does not keep or add them. */
+  dismissedTexts?: readonly string[];
 }): T[] {
+  const dismissed = input.dismissedTexts ?? [];
+  const stillOffered = (text: string) => !textIsDismissed(text, dismissed, input.employers);
   const keptPrevious = input.previous.filter((raw) => {
+    if (!stillOffered(raw.text)) return false;
     const key = draftResultKey(raw.text, raw.evidenceIds, input.employers);
     return input.kept.some((bullet) => {
       if (bullet.resultKey === key) return true;
@@ -831,6 +891,7 @@ export function replaceUnpickedCandidates<T extends { text: string; evidenceIds:
   });
   const fresh = input.next.filter(
     (bullet) =>
+      stillOffered(bullet.text) &&
       !keptPrevious.some((existing) =>
         sameBulletResult(existing.text, bullet.text, input.employers),
       ) &&
@@ -878,6 +939,8 @@ export function assignCandidateBullets(input: {
   /** Display ids the seeker already picked. Those bullets keep the job they had. */
   pickedIds?: ReadonlySet<string>;
   textEdits?: Readonly<Record<string, string>>;
+  /** Results the seeker removed. They are not suggested again. */
+  dismissedTexts?: readonly string[];
 }): PickerBullet[] {
   const roles = new Map(
     (input.roles ?? input.bands).map((role) => [role.roleId, role.employer]),
@@ -904,6 +967,7 @@ export function assignCandidateBullets(input: {
     const cleaned = cleanBulletEmployerNames({ text: raw, employers });
     if (!cleaned.ok) continue;
     const text = cleaned.text;
+    if (textIsDismissed(text, input.dismissedTexts ?? [], employers)) continue;
     const resultKey = bulletResultKey(text, evidenceIds);
     const choice = input.choices?.[resultKey] ?? null;
     const savedRole = roleSavedEarlier({
