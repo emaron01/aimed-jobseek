@@ -193,6 +193,13 @@ export function textNamesEmployer(text: string, employer: string): boolean {
   return new RegExp(`(?:^|[^\\p{L}\\p{N}])${escaped}(?=$|[^\\p{L}\\p{N}])`, "iu").test(text);
 }
 
+/** "Microfocus" names "Micro Focus" when that spaceless form matches one profile employer. */
+function textNamesCompactEmployer(text: string, employer: string): boolean {
+  const compact = employer.replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+  if (compact.length < 6) return false;
+  return text.split(/[^A-Za-z0-9]+/).some((token) => token.toLowerCase() === compact);
+}
+
 export type ProfileEmployerRole = { roleId: string; employer: string };
 
 /** Full employer, plus the name before a trailing parenthesis ("Micro Focus (acquired by OpenText)" → "Micro Focus"). */
@@ -245,8 +252,8 @@ export function rolesNamedByText(
   };
   for (const role of roles) {
     for (const name of employerMatchNames(role.employer)) {
-      if (!textNamesEmployer(text, name)) continue;
-      add(name.toLowerCase(), role.roleId);
+      if (textNamesEmployer(text, name)) add(name.toLowerCase(), role.roleId);
+      else if (textNamesCompactEmployer(text, name)) add(`compact:${name.toLowerCase()}`, role.roleId);
     }
     for (const initials of employerInitials(role.employer)) {
       if (!textNamesInitials(text, initials)) continue;
@@ -259,6 +266,80 @@ export function rolesNamedByText(
     if (unique.length === 1) decided.add(unique[0]!);
   }
   return [...decided];
+}
+
+/**
+ * One evidence item that names more than one Personal Profile employer becomes one
+ * segment per employer, before the candidate call. Sentences are split on . ! ?
+ * followed by whitespace; a decimal point between digits stays in the sentence.
+ * A sentence that names no employer stays with the segment before it. Leading
+ * unnamed sentences join the first employer segment. A sentence that names more
+ * than one employer stays whole. Each segment keeps the original evidence id
+ * and question. An item that names one employer, or none, is left as one segment.
+ * A sentence names an employer when rolesNamedByText matches the full name, the
+ * name before a trailing parenthesis, unique initials, or one word equal to that
+ * employer with spaces removed (Microfocus names Micro Focus).
+ */
+export function splitEvidenceByEmployer(
+  evidence: readonly BulletEvidence[],
+  roles: readonly ProfileEmployerRole[],
+): BulletEvidence[] {
+  return evidence.flatMap((item) => splitEvidenceItem(item, roles));
+}
+
+function evidenceSentences(text: string): string[] {
+  const parts: string[] = [];
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char !== "." && char !== "!" && char !== "?") continue;
+    const previous = text[index - 1] ?? "";
+    const next = text[index + 1] ?? "";
+    if (char === "." && /\d/.test(previous) && /\d/.test(next)) continue;
+    if (next !== "" && !/\s/.test(next)) continue;
+    let end = index + 1;
+    while (end < text.length && /\s/.test(text[end] ?? "")) end += 1;
+    const sentence = text.slice(start, index + 1).trim();
+    if (sentence) parts.push(sentence);
+    start = end;
+    index = end - 1;
+  }
+  const tail = text.slice(start).trim();
+  if (tail) parts.push(tail);
+  return parts.length > 0 ? parts : [text.trim()].filter(Boolean);
+}
+
+function splitEvidenceItem(
+  item: BulletEvidence,
+  roles: readonly ProfileEmployerRole[],
+): BulletEvidence[] {
+  if (rolesNamedByText(item.text, roles).length < 2) return [item];
+  const sentences = evidenceSentences(item.text);
+  if (sentences.length < 2) return [item];
+  const segments: string[][] = [];
+  let current: string[] = [];
+  let currentRole: string | null = null;
+  let leading: string[] = [];
+  for (const sentence of sentences) {
+    const named = rolesNamedByText(sentence, roles);
+    if (named.length === 0) {
+      if (current.length === 0 && segments.length === 0) leading.push(sentence);
+      else current.push(sentence);
+      continue;
+    }
+    const role = named.length === 1 ? named[0]! : null;
+    if (current.length > 0 && role !== null && role === currentRole) {
+      current.push(sentence);
+      continue;
+    }
+    if (current.length > 0) segments.push(current);
+    current = [...(segments.length === 0 ? leading : []), sentence];
+    leading = [];
+    currentRole = role;
+  }
+  if (current.length > 0) segments.push(current);
+  if (segments.length < 2) return [item];
+  return segments.map((parts) => ({ ...item, text: parts.join(" ") }));
 }
 
 function normalizedAmounts(text: string, unitOrCurrencyOnly = false): string[] {
@@ -665,6 +746,78 @@ export function profileWithBulletRoleChoices(
   return base;
 }
 
+export function readBulletTextEdits(profileJson: unknown): Record<string, string> {
+  if (!profileJson || typeof profileJson !== "object" || Array.isArray(profileJson)) return {};
+  const raw = (profileJson as Record<string, unknown>).bulletTextEdits;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const edits: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (key.trim() && typeof value === "string" && value.trim()) edits[key.trim()] = value.trim();
+  }
+  return edits;
+}
+
+/** Stores the seeker's bullet text beside bulletRoleChoices. The key is the same result key. */
+export function profileWithBulletTextEdits(
+  profileJson: unknown,
+  resultKey: string,
+  text: string,
+): Record<string, unknown> {
+  const base =
+    profileJson && typeof profileJson === "object" && !Array.isArray(profileJson)
+      ? { ...(profileJson as Record<string, unknown>) }
+      : {};
+  const edits = readBulletTextEdits(base);
+  const key = resultKey.trim();
+  const value = text.trim();
+  if (key && value) edits[key] = value;
+  base.bulletTextEdits = edits;
+  return base;
+}
+
+/** Seeker edits go into the next candidate run as the seeker's own words. */
+export function bulletEditEvidence(edits: Readonly<Record<string, string>>): BulletEvidence[] {
+  return Object.entries(edits)
+    .filter(([, text]) => text.trim().length > 0)
+    .map(([key, text]) => ({
+      id: `bullet-edit:${key}`,
+      kind: "SEEKER_REPLY" as const,
+      text: text.trim(),
+      roleId: null,
+      question: null,
+    }));
+}
+
+/**
+ * Replaces a draft with the seeker's text for that result. The bullet id stays the
+ * draft id, so a saved pick still matches. A later draft of the same result is replaced too.
+ */
+export function applyBulletTextEdits(
+  bullets: readonly PickerBullet[],
+  edits: Readonly<Record<string, string>>,
+): PickerBullet[] {
+  const applied = bullets.map((bullet) => {
+    const resultKey = bullet.resultKey ?? bulletResultKey(bullet.text, bullet.evidenceIds);
+    const edited = edits[resultKey]?.trim();
+    if (!edited) return { ...bullet, resultKey };
+    return { ...bullet, resultKey, text: edited };
+  });
+  return applied.filter((bullet, index) => {
+    const editOnly =
+      bullet.evidenceIds.length > 0 &&
+      bullet.evidenceIds.every((id) => id.startsWith("bullet-edit:"));
+    const editId = bullet.evidenceIds.find((id) => id.startsWith("bullet-edit:"));
+    if (!editOnly || !editId) return true;
+    const key = editId.slice("bullet-edit:".length);
+    return !applied.some(
+      (other, otherIndex) =>
+        otherIndex !== index &&
+        other.resultKey === key &&
+        !other.evidenceIds.every((id) => id.startsWith("bullet-edit:")),
+    );
+  });
+}
+
 function seekerChoice(
   text: string,
   evidenceIds: readonly string[],
@@ -672,6 +825,37 @@ function seekerChoice(
 ): string | null {
   if (!choices) return null;
   return choices[bulletResultKey(text, evidenceIds)] ?? null;
+}
+
+/** Segments that share an evidence id stay distinct. The bullet is tied to the segment with the same result. */
+function citedEvidenceForBullet(
+  evidenceIds: readonly string[],
+  evidenceById: ReadonlyMap<string, readonly BulletEvidence[]>,
+  text: string,
+  employers: readonly string[],
+): BulletEvidence[] | null {
+  if (evidenceIds.length === 0) return null;
+  const cited: BulletEvidence[] = [];
+  for (const id of evidenceIds) {
+    const segments = evidenceById.get(id);
+    if (!segments || segments.length === 0) return null;
+    if (segments.length === 1) {
+      cited.push(segments[0]!);
+      continue;
+    }
+    const matched = segments.find((segment) => sameBulletResult(segment.text, text, employers));
+    const bulletAmounts = normalizedAmounts(text);
+    const sameAmounts = segments.filter((segment) => {
+      const amounts = normalizedAmounts(segment.text);
+      return (
+        amounts.length > 0 &&
+        amounts.length === bulletAmounts.length &&
+        amounts.every((amount, index) => amount === bulletAmounts[index])
+      );
+    });
+    cited.push(matched ?? (sameAmounts.length === 1 ? sameAmounts[0]! : segments[0]!));
+  }
+  return cited;
 }
 
 export function assignCandidateBullets(input: {
@@ -693,7 +877,12 @@ export function assignCandidateBullets(input: {
     roleId,
     employer,
   }));
-  const evidenceById = new Map(input.evidence.map((item) => [item.id, item]));
+  const evidenceById = new Map<string, BulletEvidence[]>();
+  for (const item of input.evidence) {
+    const list = evidenceById.get(item.id) ?? [];
+    list.push(item);
+    evidenceById.set(item.id, list);
+  }
   const grouped = new Map<string, PickerBullet[]>();
   const chosen = new Map<string, PickerBullet[]>();
   const place = (roleId: string, bullet: PickerBullet, preferred: boolean) => {
@@ -707,9 +896,6 @@ export function assignCandidateBullets(input: {
     const raw = oneLineBullet(bullet.text);
     if (!raw) continue;
     const evidenceIds = [...new Set(bullet.evidenceIds.map((id) => id.trim()).filter(Boolean))];
-    const cited = evidenceIds
-      .map((id) => evidenceById.get(id))
-      .filter((item): item is BulletEvidence => item !== undefined);
     const cleaned = cleanBulletEmployerNames({
       text: raw,
       employers,
@@ -724,6 +910,7 @@ export function assignCandidateBullets(input: {
       continue;
     }
     const text = cleaned.text;
+    const cited = citedEvidenceForBullet(evidenceIds, evidenceById, text, employers);
     const choice = seekerChoice(text, evidenceIds, input.choices);
     const make = (roleId: string, seekerChosen: boolean): PickerBullet => ({
       id: `bullet:${createHash("sha256").update(`${roleId}\n${text}`).digest("hex").slice(0, 16)}`,
@@ -748,7 +935,7 @@ export function assignCandidateBullets(input: {
       continue;
     }
     const roleId = bullet.roleId.trim();
-    if (cited.length !== evidenceIds.length || evidenceIds.length === 0) {
+    if (!cited) {
       logBulletCandidate({
         event: "resume_bullet_candidate_dropped",
         roleId,

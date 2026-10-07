@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   prepareResumeBulletCandidatesAction,
   saveBulletEvidenceRoleAction,
+  saveBulletTextAction,
   saveResumeStatementPicksAction,
   type ApplicationAssetActionResult,
 } from "@/app/actions/application-assets";
@@ -20,6 +21,145 @@ const initial: ApplicationAssetActionResult | null = null;
 
 function fill(template: string, values: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ""));
+}
+
+let focusBulletId: string | null = null;
+
+function BulletLine({
+  campaignId,
+  item,
+  groupRoleId,
+  canEdit,
+  roleOptions,
+  moving,
+  startMove,
+}: {
+  campaignId: string;
+  item: StatementGroup["items"][number];
+  groupRoleId: string | null;
+  canEdit: boolean;
+  roleOptions: Array<{ roleId: string; label: string }>;
+  moving: boolean;
+  startMove: (callback: () => void) => void;
+}) {
+  const router = useRouter();
+  const labels = applicationAssetConfig.labels;
+  const rowRef = useRef<HTMLLIElement>(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(item.content);
+  const [saving, startSave] = useTransition();
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (focusBulletId !== item.id) return;
+    focusBulletId = null;
+    rowRef.current?.focus({ preventScroll: true });
+  }, [item.id, item.content]);
+  return (
+    <li id={`bullet-row-${item.id}`} ref={rowRef} tabIndex={-1} className="text-sm text-ink">
+      <label className="flex items-start gap-2">
+        <input
+          type="checkbox"
+          name="statementId"
+          value={item.id}
+          defaultChecked={item.checked}
+          disabled={!canEdit}
+          className="mt-1"
+        />
+        <span className="mt-0.5 block">
+          {editing ? draft : item.content}
+          {item.recommended ? (
+            <span
+              className="ml-2 inline-block rounded border border-edge px-1 align-middle text-xs text-subtle"
+              data-testid="harper-recommends"
+            >
+              {labels.harperRecommends}
+            </span>
+          ) : null}
+        </span>
+      </label>
+      <span className="mt-1 flex flex-wrap items-center gap-2" data-testid={`bullet-actions-${item.id}`}>
+        {canEdit && item.evidenceIds.length > 0 ? (
+          <select
+            aria-label="Job"
+            className="max-w-full rounded border border-edge bg-warning-tint px-1 py-0.5 text-xs text-subtle"
+            value={groupRoleId ?? GENERAL_BACKGROUND_ID}
+            disabled={moving}
+            onChange={(event) => {
+              const roleId = event.target.value;
+              startMove(() => {
+                void saveBulletEvidenceRoleAction({
+                  campaignId,
+                  bulletId: item.id,
+                  roleId,
+                });
+              });
+            }}
+          >
+            {roleOptions.map((role) => (
+              <option key={role.roleId} value={role.roleId}>
+                {role.label}
+              </option>
+            ))}
+            <option value={GENERAL_BACKGROUND_ID}>{GENERAL_BACKGROUND_TITLE}</option>
+          </select>
+        ) : null}
+        {canEdit ? (
+          <button
+            type="button"
+            className="rounded border border-edge px-2 py-0.5 text-xs text-ink"
+            onClick={() => {
+              setDraft(editing ? draft : item.content);
+              setEditing(true);
+              rowRef.current?.focus({ preventScroll: true });
+            }}
+          >
+            {labels.editBullet}
+          </button>
+        ) : null}
+        {canEdit ? (
+          <button
+            type="button"
+            className="rounded border border-edge px-2 py-0.5 text-xs text-ink disabled:opacity-60"
+            disabled={!editing || saving}
+            onClick={() => {
+              startSave(async () => {
+                const result = await saveBulletTextAction({
+                  campaignId,
+                  bulletId: item.id,
+                  text: draft,
+                });
+                if (!result.ok) {
+                  setNote(result.message);
+                  rowRef.current?.focus({ preventScroll: true });
+                  return;
+                }
+                setNote(null);
+                setEditing(false);
+                focusBulletId = item.id;
+                rowRef.current?.focus({ preventScroll: true });
+                router.refresh();
+              });
+            }}
+          >
+            {labels.saveBullet}
+          </button>
+        ) : null}
+      </span>
+      {editing ? (
+        <textarea
+          className="mt-1 block w-full rounded border border-edge px-2 py-1 text-sm text-ink"
+          value={draft}
+          aria-label={labels.editBullet}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+      ) : null}
+      {note ? (
+        <p className="mt-1 text-xs text-danger" role="status">
+          {note}
+        </p>
+      ) : null}
+    </li>
+  );
 }
 
 function StatementGroupFields({
@@ -49,54 +189,16 @@ function StatementGroupFields({
       ) : null}
       <ul className="space-y-2">
         {group.items.map((item) => (
-          <li key={item.id}>
-            <label className="flex items-start gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                name="statementId"
-                value={item.id}
-                defaultChecked={item.checked}
-                disabled={!canEdit}
-                className="mt-1"
-              />
-              <span className="mt-0.5 block">
-                {item.content}
-                {item.recommended ? (
-                  <span
-                    className="ml-2 inline-block rounded border border-edge px-1 align-middle text-xs text-subtle"
-                    data-testid="harper-recommends"
-                  >
-                    {labels.harperRecommends}
-                  </span>
-                ) : null}
-                {canEdit && item.evidenceIds.length > 0 ? (
-                  <select
-                    aria-label="Job"
-                    className="mt-1 block max-w-full rounded border border-edge bg-warning-tint px-1 py-0.5 text-xs text-subtle"
-                    value={group.roleId ?? GENERAL_BACKGROUND_ID}
-                    disabled={moving}
-                    onChange={(event) => {
-                      const roleId = event.target.value;
-                      startMove(() => {
-                        void saveBulletEvidenceRoleAction({
-                          campaignId,
-                          bulletId: item.id,
-                          roleId,
-                        });
-                      });
-                    }}
-                  >
-                    {roleOptions.map((role) => (
-                      <option key={role.roleId} value={role.roleId}>
-                        {role.label}
-                      </option>
-                    ))}
-                    <option value={GENERAL_BACKGROUND_ID}>{GENERAL_BACKGROUND_TITLE}</option>
-                  </select>
-                ) : null}
-              </span>
-            </label>
-          </li>
+          <BulletLine
+            key={item.id}
+            campaignId={campaignId}
+            item={item}
+            groupRoleId={group.roleId}
+            canEdit={canEdit}
+            roleOptions={roleOptions}
+            moving={moving}
+            startMove={startMove}
+          />
         ))}
       </ul>
     </fieldset>

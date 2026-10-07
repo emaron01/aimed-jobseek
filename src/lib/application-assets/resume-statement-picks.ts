@@ -19,6 +19,7 @@ export type PickerProfile = {
     id: string;
     employer: string | null;
     title: string | null;
+    startDate?: string | null;
     endDate: string | null;
   }>;
   educationTexts: string[];
@@ -98,6 +99,8 @@ export type PickerBullet = {
   evidenceIds: string[];
   /** True when the seeker moved this bullet onto the role. */
   seekerChosen?: boolean;
+  /** Result key of the draft text. An edit replaces the text and keeps this key. */
+  resultKey?: string;
 };
 
 export type RoleBulletBand = {
@@ -119,6 +122,7 @@ export function pickerProfileFromCandidate(profile: {
     id: string;
     employer?: string | null;
     title?: string | null;
+    startDate?: string | null;
     endDate?: string | null;
     summary?: string | null;
     achievements?: ReadonlyArray<{ text?: string | null }>;
@@ -144,6 +148,7 @@ export function pickerProfileFromCandidate(profile: {
       id: role.id,
       employer: role.employer ?? null,
       title: role.title ?? null,
+      startDate: role.startDate ?? null,
       endDate: role.endDate ?? null,
     })),
     educationTexts,
@@ -284,9 +289,62 @@ function shortestTitle(names: string[]): string {
   return names.slice().sort((a, b) => a.length - b.length)[0] ?? "Experience";
 }
 
+function roleMonthIndex(value: string | null | undefined): number | null {
+  const text = value?.trim() ?? "";
+  if (!text || /^present$/i.test(text)) return null;
+  const match = text.match(/^(\d{4})(?:-(\d{2}))?/);
+  if (!match) return null;
+  const month = match[2] ? Number(match[2]) : 1;
+  if (month < 1 || month > 12) return null;
+  return Number(match[1]) * 12 + (month - 1);
+}
+
+function isPresentEnd(endDate: string | null | undefined): boolean {
+  const text = endDate?.trim() ?? "";
+  return text.length === 0 || /^present$/i.test(text);
+}
+
+/**
+ * Most recent first: Present (a blank end date) before ended roles, then later
+ * end dates, then later start dates. A role with no parseable date stays after
+ * dated roles, in its original profile order.
+ */
+export function orderRolesMostRecentFirst<
+  T extends { startDate?: string | null; endDate?: string | null },
+>(roles: readonly T[]): T[] {
+  const rank = { present: 0, dated: 1, undated: 2 } as const;
+  const groupOf = (role: T): keyof typeof rank => {
+    if (isPresentEnd(role.endDate)) return "present";
+    if (roleMonthIndex(role.endDate) != null || roleMonthIndex(role.startDate) != null) return "dated";
+    return "undated";
+  };
+  return roles
+    .map((role, index) => ({ role, index }))
+    .sort((left, right) => {
+      const leftGroup = groupOf(left.role);
+      const rightGroup = groupOf(right.role);
+      if (leftGroup !== rightGroup) return rank[leftGroup] - rank[rightGroup];
+      if (leftGroup === "undated") return left.index - right.index;
+      if (leftGroup === "dated") {
+        const endDelta =
+          (roleMonthIndex(right.role.endDate) ?? -1) - (roleMonthIndex(left.role.endDate) ?? -1);
+        if (endDelta !== 0) return endDelta;
+      }
+      const leftStart = roleMonthIndex(left.role.startDate);
+      const rightStart = roleMonthIndex(right.role.startDate);
+      if (leftStart == null && rightStart != null) return 1;
+      if (leftStart != null && rightStart == null) return -1;
+      if (leftStart != null && rightStart != null && leftStart !== rightStart) {
+        return rightStart - leftStart;
+      }
+      return left.index - right.index;
+    })
+    .map((item) => item.role);
+}
+
 function placesForProfile(profile: PickerProfile): PickerPlace[] {
   const places: PickerPlace[] = [];
-  for (const role of profile.experience) {
+  for (const role of orderRolesMostRecentFirst(profile.experience)) {
     const employer = role.employer?.trim() ?? "";
     places.push({
       id: role.id,

@@ -4,8 +4,8 @@ import {
   normalizeEmailBody,
 } from "@/lib/email-generation/email-body";
 
-export const RESUME_ASSET_PROMPT_VERSION = "12";
-export const RESUME_BULLET_CANDIDATE_PROMPT_VERSION = "5";
+export const RESUME_ASSET_PROMPT_VERSION = "13";
+export const RESUME_BULLET_CANDIDATE_PROMPT_VERSION = "6";
 export const COVER_LETTER_ASSET_PROMPT_VERSION = "16";
 export const OUTREACH_EMAIL_PROMPT_VERSION = "5";
 export const OUTREACH_LINKEDIN_NOTE_PROMPT_VERSION = "5";

@@ -28,6 +28,7 @@ import {
   applicationAssetGenerationUnchanged,
   assetGenerationFingerprint,
 } from "./paid-inputs";
+import { orderRolesMostRecentFirst } from "@/lib/application-assets/resume-statement-picks";
 import {
   COVER_LETTER_ASSET_PROMPT_VERSION,
   RESUME_ASSET_PROMPT_VERSION,
@@ -333,6 +334,7 @@ export function resumeWithExactPickedBullets(
   content: ResumeAssetContent,
   picks: ReadonlyArray<{ statementId: string; roleId: string | null; content: string }>,
   sourceId: string,
+  sources?: ReadonlyArray<{ id: string; category: string; text: string }>,
 ): ResumeAssetContent {
   const byRole = new Map<string, Array<{ statementId: string; content: string }>>();
   for (const pick of picks) {
@@ -341,16 +343,28 @@ export function resumeWithExactPickedBullets(
     list.push({ statementId: pick.statementId, content: pick.content });
     byRole.set(pick.roleId, list);
   }
+  const cite = (text: string) => {
+    const match = sources?.find(
+      (source) =>
+        source.text.trim() === text.trim() &&
+        (applicationAssetConfig.seekerSourceCategories as readonly string[]).includes(
+          source.category,
+        ),
+    );
+    return match?.id ?? sourceId;
+  };
   return {
     ...content,
-    experience: content.experience.map((role) => ({
-      ...role,
-      bullets: (byRole.get(role.roleId) ?? []).map((pick) => ({
-        id: `pick:${pick.statementId}`,
-        text: pick.content,
-        supports: [{ sourceId, quote: pick.content }],
+    experience: orderRolesMostRecentFirst(
+      content.experience.map((role) => ({
+        ...role,
+        bullets: (byRole.get(role.roleId) ?? []).map((pick) => ({
+          id: `pick:${pick.statementId}`,
+          text: pick.content,
+          supports: [{ sourceId: cite(pick.content), quote: pick.content }],
+        })),
       })),
-    })),
+    ),
   };
 }
 
@@ -1089,7 +1103,7 @@ export async function generateApplicationAsset(input: {
       campaignId: input.campaignId,
     }));
   let lastMessage = "The model did not return a usable asset.";
-  let lastViolations: string[] = [];
+  const lastViolations: string[] = [];
   let qualityFeedback: string[] = [];
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const generated =
@@ -1158,6 +1172,7 @@ export async function generateApplicationAsset(input: {
             drafted,
             writer?.requiredStatements ?? [],
             seekerSourceId,
+            context.sources,
           )
         : drafted;
     if (input.type === "COVER_LETTER") {
@@ -1191,6 +1206,7 @@ export async function generateApplicationAsset(input: {
                 dropped.content,
                 writer?.requiredStatements ?? [],
                 seekerSourceId,
+                context.sources,
               )
             : dropped.content;
         const saved = await saveVersion({

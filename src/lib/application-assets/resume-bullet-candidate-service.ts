@@ -11,17 +11,21 @@ import {
 } from "@/lib/application-assets/contract";
 import { acceptedPresentationPlan } from "@/lib/application-assets/plan-service";
 import {
+  applyBulletTextEdits,
   assignCandidateBullets,
   buildResumeBulletCandidateMessages,
   bulletCandidateRoles,
+  bulletEditEvidence,
   employerNameRetryMessage,
   employerRetryDecision,
   mergeEmployerNameRetry,
   mergeFollowUpBullets,
   questionTextForAnswer,
   readBulletRoleChoices,
+  readBulletTextEdits,
   resumeBulletCandidateFingerprint,
   selectableBulletEvidence,
+  splitEvidenceByEmployer,
   storedCandidatesMatch,
   uncitedStatedResults,
   uncoveredResultFollowUpMessage,
@@ -52,6 +56,7 @@ export type BulletCandidatePacket = {
   primaryRoleId: string | null;
   directRoleIds: string[];
   choices: Record<string, string>;
+  textEdits: Record<string, string>;
   profileRoles: Array<{ roleId: string; employer: string }>;
 };
 
@@ -155,6 +160,11 @@ async function loadBulletCandidatePacket(input: {
       analysisJson: turn.analysisJson,
     }),
   );
+  const profileRoles = (parsed.ok ? parsed.profile.experience : []).map((role) => ({
+    roleId: role.id,
+    employer: role.employer?.trim() ?? "",
+  }));
+  const textEdits = readBulletTextEdits(campaign.product.profileJson);
   return {
     profile,
     roles: bulletCandidateRoles({
@@ -163,39 +173,45 @@ async function loadBulletCandidatePacket(input: {
       primaryRoleId,
       directRoleIds,
     }),
-    evidence: selectableBulletEvidence({
-      campaignId: input.campaignId,
-      achievements,
-      profileEmployers,
-      statements: libraryRows.map((statement) => {
-        const sessionTurns: BulletQuestionTurn[] = statement.session.turns.map((turn) => ({
-          id: turn.id,
-          speaker: turn.speaker,
-          body: turn.body,
-          sequence: turn.sequence,
-          targetKey: turn.targetKey,
-          analysisJson: turn.analysisJson,
-        }));
-        return {
-          id: statement.id,
-          content: statement.content,
-          kind: statement.kind,
-          campaignId: statement.session.campaignId,
-          targetKey: statement.turn.targetKey,
-          question: questionTextForAnswer({ turns: sessionTurns, turnId: statement.turnId }),
-          sourceEmployer: statement.session.campaign.jobRequirement?.companyName ?? null,
-          whyThisCompany: statement.session.campaign.whyThisCompany,
-        };
-      }),
-      replies: (campaign.consultationSession?.turns ?? [])
-        .filter((turn) => turn.speaker === "SEEKER" && !turn.skipped)
-        .map((turn) => ({
-          id: turn.id,
-          body: turn.body,
+    evidence: [
+      ...splitEvidenceByEmployer(
+        selectableBulletEvidence({
           campaignId: input.campaignId,
-          question: questionTextForAnswer({ turns, turnId: turn.id }),
-        })),
-    }),
+          achievements,
+          profileEmployers,
+          statements: libraryRows.map((statement) => {
+            const sessionTurns: BulletQuestionTurn[] = statement.session.turns.map((turn) => ({
+              id: turn.id,
+              speaker: turn.speaker,
+              body: turn.body,
+              sequence: turn.sequence,
+              targetKey: turn.targetKey,
+              analysisJson: turn.analysisJson,
+            }));
+            return {
+              id: statement.id,
+              content: statement.content,
+              kind: statement.kind,
+              campaignId: statement.session.campaignId,
+              targetKey: statement.turn.targetKey,
+              question: questionTextForAnswer({ turns: sessionTurns, turnId: statement.turnId }),
+              sourceEmployer: statement.session.campaign.jobRequirement?.companyName ?? null,
+              whyThisCompany: statement.session.campaign.whyThisCompany,
+            };
+          }),
+          replies: (campaign.consultationSession?.turns ?? [])
+            .filter((turn) => turn.speaker === "SEEKER" && !turn.skipped)
+            .map((turn) => ({
+              id: turn.id,
+              body: turn.body,
+              campaignId: input.campaignId,
+              question: questionTextForAnswer({ turns, turnId: turn.id }),
+            })),
+        }),
+        profileRoles,
+      ),
+      ...bulletEditEvidence(textEdits),
+    ],
     job: {
       title: campaign.jobRequirement?.title ?? "",
       employer: campaign.jobRequirement?.companyName ?? "",
@@ -204,10 +220,8 @@ async function loadBulletCandidatePacket(input: {
     primaryRoleId,
     directRoleIds,
     choices: readBulletRoleChoices(campaign.product.profileJson),
-    profileRoles: profile.experience.map((role) => ({
-      roleId: role.id,
-      employer: role.employer?.trim() ?? "",
-    })),
+    textEdits,
+    profileRoles,
   };
 }
 
@@ -225,13 +239,16 @@ function bulletsFromStored(
 ): PickerBullet[] {
   const parsed = resumeBulletCandidatesSchema.safeParse(json);
   if (!parsed.success) return [];
-  return assignCandidateBullets({
-    bullets: parsed.data.bullets,
-    bands: packet.roles,
-    evidence: packet.evidence,
-    choices: packet.choices,
-    roles: packet.profileRoles,
-  });
+  return applyBulletTextEdits(
+    assignCandidateBullets({
+      bullets: parsed.data.bullets,
+      bands: packet.roles,
+      evidence: packet.evidence,
+      choices: packet.choices,
+      roles: packet.profileRoles,
+    }),
+    packet.textEdits,
+  );
 }
 
 /** Stored General background lines. Reads the receipt and does not call the model. */

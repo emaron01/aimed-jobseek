@@ -10,6 +10,7 @@ import {
 import { prepareResumeBulletCandidates } from "@/lib/application-assets/resume-bullet-candidate-service";
 import {
   saveBulletEvidenceRole,
+  saveBulletText,
   saveResumeStatementPicks,
 } from "@/lib/application-assets/resume-statement-picker-data";
 import {
@@ -89,6 +90,27 @@ export async function saveBulletEvidenceRoleAction(input: {
     });
     revalidate(input.campaignId);
     return { ok: true, message: applicationAssetConfig.labels.statementPicksSaved };
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
+export async function saveBulletTextAction(input: {
+  campaignId: string;
+  bulletId: string;
+  text: string;
+}): Promise<ApplicationAssetActionResult> {
+  try {
+    await requireCurrentUser();
+    const organizationId = await requireOrganizationId();
+    await saveBulletText({
+      organizationId,
+      campaignId: input.campaignId,
+      bulletId: input.bulletId,
+      text: input.text,
+    });
+    revalidate(input.campaignId);
+    return { ok: true, message: applicationAssetConfig.labels.bulletEditSaved };
   } catch (error) {
     return errorResult(error);
   }

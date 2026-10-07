@@ -302,6 +302,16 @@ export async function loadApplicationGenerationContext(
       url: null,
     });
   }
+  for (const [key, text] of Object.entries(
+    parsedProfile.ok ? (parsedProfile.profile.bulletTextEdits ?? {}) : {},
+  )) {
+    addSource(sources, {
+      id: `bullet-edit:${key}`,
+      text,
+      category: "SEEKER_REPLY",
+      url: null,
+    });
+  }
   for (const story of stories) {
     const approved = [
       story.verbatimAnswer,

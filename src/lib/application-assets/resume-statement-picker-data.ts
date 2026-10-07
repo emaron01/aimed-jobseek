@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import {
   bulletResultKey,
   profileWithBulletRoleChoices,
+  profileWithBulletTextEdits,
 } from "@/lib/application-assets/resume-bullet-candidates";
 import { readResumeBulletCandidates } from "@/lib/application-assets/resume-bullet-candidate-service";
 import {
@@ -168,13 +169,44 @@ export async function saveBulletEvidenceRole(input: {
   const stored = await readResumeBulletCandidates(input);
   const bullet = stored?.bullets.find((item) => item.id === input.bulletId.trim());
   if (!bullet) throw new TenantError("That bullet has no evidence to correct.");
+  const resultKey = bullet.resultKey ?? bulletResultKey(bullet.text, bullet.evidenceIds);
   await prisma.product.update({
     where: { id: campaign.product.id },
     data: {
       profileJson: profileWithBulletRoleChoices(
         campaign.product.profileJson,
-        [bulletResultKey(bullet.text, bullet.evidenceIds)],
+        [resultKey],
         roleId,
+      ) as Prisma.InputJsonValue,
+    },
+  });
+}
+
+/** Saves the seeker's wording for one bullet. Does not call a model. */
+export async function saveBulletText(input: {
+  organizationId: string;
+  campaignId: string;
+  bulletId: string;
+  text: string;
+}): Promise<void> {
+  const text = input.text.trim();
+  if (!text) throw new TenantError("Write the bullet before saving.");
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: { product: { select: { id: true, profileJson: true } } },
+  });
+  if (!campaign) throw new TenantError("Application was not found.");
+  const stored = await readResumeBulletCandidates(input);
+  const bullet = stored?.bullets.find((item) => item.id === input.bulletId.trim());
+  if (!bullet) throw new TenantError("That bullet was not found.");
+  const resultKey = bullet.resultKey ?? bulletResultKey(bullet.text, bullet.evidenceIds);
+  await prisma.product.update({
+    where: { id: campaign.product.id },
+    data: {
+      profileJson: profileWithBulletTextEdits(
+        campaign.product.profileJson,
+        resultKey,
+        text,
       ) as Prisma.InputJsonValue,
     },
   });
