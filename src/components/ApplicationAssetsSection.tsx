@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   approveApplicationAssetAction,
   generateApplicationAssetAction,
@@ -28,7 +28,7 @@ import {
   consultationConfig,
   vocab,
 } from "@/lib/product-config";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { InlineActionStatus, trackedActionJobIds } from "@/components/InlineActionStatus";
 import {
   AppActionLink,
@@ -606,7 +606,19 @@ function AssetTypePanel({
   statementRoleOptions: Array<{ roleId: string; label: string }>;
   needsPrepare: boolean;
 }) {
-  const [result, action] = useActionState(generateApplicationAssetAction, initial);
+  const [result, action, generating] = useActionState(generateApplicationAssetAction, initial);
+  const router = useRouter();
+  const generateWasPending = useRef(false);
+  useEffect(() => {
+    if (type !== "RESUME") return;
+    if (generating) {
+      generateWasPending.current = true;
+      return;
+    }
+    if (!generateWasPending.current) return;
+    generateWasPending.current = false;
+    if (result?.ok) router.refresh();
+  }, [type, generating, result, router]);
   const orderedRows = sortAssetsNewestFirst(rows);
   const latest = orderedRows[0] ?? null;
   const latestResume =
@@ -634,6 +646,7 @@ function AssetTypePanel({
           roleOptions={statementRoleOptions}
           canEdit={canEdit}
           needsPrepare={needsPrepare}
+          preparingBullets={generating}
         />
       ) : null}
       {latest?.staleReason ? (

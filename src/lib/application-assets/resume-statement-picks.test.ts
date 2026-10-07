@@ -19,8 +19,12 @@ import {
 } from "@/lib/application-assets/service";
 import {
   assignCandidateBullets,
+  attributedEvidenceRole,
   buildResumeBulletCandidateMessages,
+  employerNameRetryMessage,
+  employerRetryDecision,
   profileWithBulletRoleChoices,
+  questionTextForAnswer,
   selectableBulletEvidence,
   storedCandidatesMatch,
 } from "@/lib/application-assets/resume-bullet-candidates";
@@ -136,9 +140,10 @@ describe("Harper Approved Statements picker", () => {
     expect(openText?.items.filter((item) => item.checked)).toHaveLength(7);
     expect(vmware?.maxBullets).toBe(5);
     expect(vmware?.items).toHaveLength(10);
-    expect(vmware?.items[0]?.id).toBe("job");
+    expect(vmware?.items[0]?.id).toBe("general-0");
+    expect(vmware?.items.some((item) => item.id === "job")).toBe(false);
     expect(vmware?.items.filter((item) => item.checked)).toHaveLength(3);
-    expect(vmware?.items.filter((item) => item.checked).slice(1).every((item) => item.id.startsWith("general"))).toBe(true);
+    expect(vmware?.items.filter((item) => item.checked).every((item) => item.id.startsWith("general"))).toBe(true);
 
     const nursing = groupsFor(
       {
@@ -277,12 +282,21 @@ describe("Harper Approved Statements picker", () => {
     expect(RESUME_ASSET_INSTRUCTIONS).toContain(
       "Use each picked bullet exactly as written, in the role it was picked for. Do not rewrite a picked bullet and do not add a bullet that was not picked. You may write the summary, the skills, and each role's title, company, and dates.",
     );
-    expect(RESUME_BULLET_CANDIDATE_PROMPT_VERSION).toBe("3");
+    expect(RESUME_BULLET_CANDIDATE_PROMPT_VERSION).toBe("4");
     expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).toContain(
       "Assign a bullet to a role only when the evidence names that role's employer or is an achievement listed under that role in the Personal Profile. Evidence that names no employer goes to General background, not to a role.",
     );
     expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).toContain(
-      "When one piece of evidence covers more than one role, write a separate bullet for each role. For each role, write up to the number of bullets given for that role. Start each bullet with a strong action verb and include the result or number when the seeker stated one.",
+      "For each role, write the number of bullets given whenever the evidence supports it. Lead with the seeker's strongest accomplishments (results with numbers, named customers, scope, awards), whether or not the job description mentions them, then add bullets that speak to this job's requirements. Every distinct result the seeker stated for a role appears in at least one bullet. Rank by strength of evidence and relevance to this job together.",
+    );
+    expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).toContain(
+      "Start each bullet with a strong action verb and include the result or number when the seeker stated one. Do not write the employer's name in a bullet; the job heading already shows it. Customer and partner names the seeker stated are fine.",
+    );
+    expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).not.toContain(
+      "For each role, write up to the number of bullets given for that role.",
+    );
+    expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).not.toContain(
+      "Rank job-specific bullets ahead of general accomplishments for the same role.",
     );
   });
 
@@ -299,15 +313,15 @@ describe("Harper Approved Statements picker", () => {
         { id: "ev-intern", kind: "ACHIEVEMENT", text: "Shipped a clinic intake form.", roleId: "intern" },
       ],
       bullets: [
-        { roleId: "opentext", text: "Closed enterprise deals\nat OpenText.", jobSpecific: true, evidenceIds: ["ev-ot"] },
-        { roleId: "missing-role", text: "This role is not on the profile.", jobSpecific: true, evidenceIds: ["ev-ot"] },
-        { roleId: "mercy", text: "Precepted new nurses at Mercy General.", jobSpecific: false, evidenceIds: ["ev-mercy"] },
+        { roleId: "opentext", text: "Closed enterprise\ndeals.", jobSpecific: true, evidenceIds: ["ev-ot"] },
+        { roleId: "missing-role", text: "This role is not on the profile.", jobSpecific: true, evidenceIds: ["missing-evidence"] },
+        { roleId: "mercy", text: "Precepted new nurses.", jobSpecific: false, evidenceIds: ["ev-mercy"] },
         { roleId: "intern", text: "Shipped a clinic intake form.", jobSpecific: true, evidenceIds: ["ev-intern"] },
       ],
     });
     expect(assigned.map((item) => item.roleId)).toEqual(["opentext", "mercy", "intern"]);
     expect(assigned[0]?.text.includes("\n")).toBe(false);
-    expect(assigned[0]?.text).toBe("Closed enterprise deals at OpenText.");
+    expect(assigned[0]?.text).toBe("Closed enterprise deals.");
     const evidence = selectableBulletEvidence({
       campaignId: "sift",
       achievements: [
@@ -453,13 +467,13 @@ describe("Harper Approved Statements picker", () => {
     });
     console.info = info;
     expect(assigned.map((item) => `${item.roleId}:${item.text}`)).toEqual([
-      "opentext:Held forecast deviation to 5-10% at OpenText.",
+      "opentext:Held forecast deviation to 5-10% in FY26.",
       "mercy:Precepted new nurses on the night shift.",
       "intern:Shipped a clinic intake form during a capstone rotation.",
       "general:Joined a team that will teach me.",
     ]);
     expect(assigned.some((item) => item.roleId === "vmware" || item.roleId === "clinic")).toBe(false);
-    expect(logged.some((line) => line.includes("resume_bullet_candidate_dropped") && line.includes("vmware"))).toBe(true);
+    expect(logged.some((line) => line.includes("resume_bullet_candidate_dropped") && line.includes("at OpenText"))).toBe(true);
     expect(logged.some((line) => line.includes("resume_bullet_candidate_moved") && line.includes("general"))).toBe(true);
     const background = groupsFor(salesProfile, [
       bullet("bg", "general", "Joined a team that will teach me.", false),
@@ -519,13 +533,16 @@ describe("Harper Approved Statements picker", () => {
       [bullet("intern-1", "intern", "Shipped a clinic intake form during a capstone rotation.", true)],
     );
     expect(graduate[0]?.items.filter((item) => item.checked)).toHaveLength(1);
-    expect(applicationAssetConfig.labels.recommendedBulletRange).toContain("{count}");
+    expect(applicationAssetConfig.labels.recommendedBulletRange).toBe(
+      "Recommended bullets: {min} to {max}.",
+    );
     const picker = readFileSync("src/components/ResumeStatementPicker.tsx", "utf8");
-    const checkedCount = picker.indexOf("group.items.filter((item) => item.checked)");
-    const rangeNote = picker.indexOf("recommendedBulletRange");
-    expect(checkedCount).toBeGreaterThan(-1);
-    expect(rangeNote).toBeGreaterThan(checkedCount);
-    expect(picker.slice(rangeNote, rangeNote + 200)).toContain("count");
+    expect(picker).not.toContain("picksOutsideRange");
+    expect(picker).not.toContain("{count}");
+    expect(picker).toContain("bg-warning-tint");
+    expect(picker).toContain("preparingResumeBullets");
+    expect(picker).toContain("AppPendingIndicator");
+    expect(picker).toContain("router.refresh");
   });
 
   it("saves a job correction without a paid call and applies it on every application", () => {
@@ -541,7 +558,7 @@ describe("Harper Approved Statements picker", () => {
       { roleId: "intern", employer: "County Hospital", candidateCount: 10 },
     ];
     const bullets = [
-      { roleId: "opentext", text: "Held forecast deviation to 5-10% at OpenText.", jobSpecific: true, evidenceIds: ["ot-answer"] },
+      { roleId: "opentext", text: "Held forecast deviation to 5-10% in FY26.", jobSpecific: true, evidenceIds: ["ot-answer"] },
       { roleId: "mercy", text: "Precepted new nurses on the night shift.", jobSpecific: true, evidenceIds: ["mercy-ach"] },
       { roleId: "intern", text: "Shipped a clinic intake form.", jobSpecific: true, evidenceIds: ["intern-ach"] },
     ];
@@ -570,6 +587,233 @@ describe("Harper Approved Statements picker", () => {
     expect(correction).not.toContain("runPaidStructuredCall");
     expect(correction).not.toContain("enqueueApplicationJob");
     expect(correction).toContain("saveBulletEvidenceRole");
+  });
+
+  it("keeps achievement bullets with their role, drops embedded employer names, and leads with the strongest results", () => {
+    const rampText =
+      "Hired, trained, and managed account managers, contributing to a minimum year-over-year ARR increase of $9.7 million.";
+    const roles = [
+      { roleId: "ramp", employer: "RAMP Advertising" },
+      { roleId: "gryphon", employer: "Gryphon Networks" },
+      { roleId: "opentext", employer: "OpenText" },
+      { roleId: "loginvsi", employer: "Login VSI" },
+      { roleId: "merion", employer: "Merion Publications" },
+    ];
+    const bands = roles.map((role) => ({ ...role, candidateCount: 4 }));
+    const evidence = [
+      { id: "ramp-ach", kind: "ACHIEVEMENT" as const, text: rampText, roleId: "ramp", question: null },
+      {
+        id: "ot-question",
+        kind: "INTERVIEW_ANSWER" as const,
+        text: "Closed a multi-threaded $1.3MM deal with Bank of America and AT&T.",
+        roleId: null,
+        question: "Tell me about a deal you closed at OpenText.",
+      },
+      {
+        id: "either-company",
+        kind: "SEEKER_REPLY" as const,
+        text: "Closed a multi-threaded deal with a national bank.",
+        roleId: null,
+        question: "Was this at OpenText or Login VSI?",
+      },
+      {
+        id: "possessive",
+        kind: "INTERVIEW_ANSWER" as const,
+        text: "Built the enterprise forecasting practice.",
+        roleId: null,
+        question: "What did you build at OpenText?",
+      },
+    ];
+    const logged: string[] = [];
+    const info = console.info;
+    console.info = (message?: unknown) => {
+      if (typeof message === "string") logged.push(message);
+    };
+    const assigned = assignCandidateBullets({
+      bands,
+      roles,
+      evidence,
+      bullets: [
+        {
+          roleId: "gryphon",
+          text: "Hired, trained, and managed Gryphon Networks account managers, contributing to a minimum year-over-year ARR increase of $9.7 million.",
+          jobSpecific: true,
+          evidenceIds: ["ramp-ach"],
+        },
+        {
+          roleId: "gryphon",
+          text: "Built OpenText's enterprise forecasting practice for Bank of America and AT&T.",
+          jobSpecific: false,
+          evidenceIds: ["possessive"],
+        },
+        {
+          roleId: "ramp",
+          text: "Closed a multi-threaded $1.3MM deal with Bank of America and AT&T.",
+          jobSpecific: false,
+          evidenceIds: ["ot-question"],
+        },
+        {
+          roleId: "opentext",
+          text: "Closed a multi-threaded deal with a national bank.",
+          jobSpecific: true,
+          evidenceIds: ["either-company"],
+        },
+        {
+          roleId: "opentext",
+          text: "Merion Publications grew the magazine group.",
+          jobSpecific: false,
+          evidenceIds: ["either-company"],
+        },
+        {
+          roleId: "opentext",
+          text: "Led Gryphon Networks account managers on a national team.",
+          jobSpecific: true,
+          evidenceIds: ["ot-question"],
+        },
+      ],
+    });
+    console.info = info;
+    const ramp = assigned.find((item) => item.evidenceIds.includes("ramp-ach"));
+    expect(ramp?.roleId).toBe("ramp");
+    expect(ramp?.text).toBe(rampText);
+    expect(ramp?.text.toLowerCase().includes("gryphon")).toBe(false);
+    const possessive = assigned.find((item) => item.evidenceIds.includes("possessive"));
+    expect(possessive?.roleId).toBe("opentext");
+    expect(possessive?.text).toBe(
+      "Built enterprise forecasting practice for Bank of America and AT&T.",
+    );
+    expect(possessive?.text.includes("OpenText")).toBe(false);
+    const fromQuestion = assigned.find((item) => item.evidenceIds.includes("ot-question"));
+    expect(fromQuestion?.roleId).toBe("opentext");
+    expect(fromQuestion?.text).toContain("Bank of America");
+    expect(fromQuestion?.text).toContain("AT&T");
+    expect(
+      assigned.find((item) => item.text === "Closed a multi-threaded deal with a national bank.")
+        ?.roleId,
+    ).toBe("general");
+    expect(assigned.some((item) => item.text === "grew the magazine group.")).toBe(true);
+    expect(assigned.some((item) => item.text.includes("Merion"))).toBe(false);
+    expect(
+      logged.some(
+        (line) =>
+          line.includes("resume_bullet_candidate_dropped") &&
+          line.includes("Led Gryphon Networks account managers"),
+      ),
+    ).toBe(true);
+    expect(attributedEvidenceRole(evidence[1]!, roles)).toBe("opentext");
+    expect(attributedEvidenceRole(evidence[2]!, roles)).toBe("general");
+    expect(
+      questionTextForAnswer({
+        turns: [
+          {
+            id: "q-ot",
+            speaker: "CONSULTANT",
+            body: "Tell me about a deal you closed at OpenText.",
+            sequence: 1,
+            targetKey: "required:deal",
+          },
+          {
+            id: "a-ot",
+            speaker: "SEEKER",
+            body: "Closed a multi-threaded deal.",
+            sequence: 2,
+            targetKey: "required:deal",
+            analysisJson: { replyToTurnId: "q-ot" },
+          },
+        ],
+        turnId: "a-ot",
+      }),
+    ).toBe("Tell me about a deal you closed at OpenText.");
+    const withQuestion = selectableBulletEvidence({
+      campaignId: "sift",
+      achievements: [],
+      statements: [
+        {
+          id: "stmt-ot",
+          content: "Closed a multi-threaded deal.",
+          kind: "INTERVIEW_ANSWER",
+          campaignId: "sift",
+          targetKey: "required:deal",
+          question: "Tell me about a deal you closed at OpenText.",
+        },
+      ],
+      replies: [],
+    });
+    const messages = buildResumeBulletCandidateMessages({
+      roles: [{ roleId: "opentext", employer: "OpenText", title: "Account Executive", candidateCount: 4 }],
+      evidence: withQuestion,
+      job: { title: "Account Executive", employer: "Sift", posting: "Own the forecast." },
+    });
+    expect(messages[0]?.content.startsWith("Prompt version: 4")).toBe(true);
+    expect(JSON.parse(messages[1]?.content ?? "{}").evidence[0].question).toContain("OpenText");
+    expect(employerNameRetryMessage()).toContain("does not include the employer's name");
+    expect(
+      employerRetryDecision({
+        bullets: [{ text: "Built OpenText's forecasting practice." }],
+        employers: ["OpenText"],
+        alreadyRetried: false,
+      }),
+    ).toBe("retry");
+    expect(
+      employerRetryDecision({
+        bullets: [{ text: "Built OpenText's forecasting practice." }],
+        employers: ["OpenText"],
+        alreadyRetried: true,
+      }),
+    ).toBe("keep");
+    const prepare = readFileSync("src/lib/application-assets/resume-bullet-candidate-service.ts", "utf8");
+    const provider = prepare.slice(prepare.indexOf("callProvider: async"));
+    expect(prepare.indexOf("runPaidStructuredCall")).toBeLessThan(prepare.indexOf("callProvider: async"));
+    expect(provider).toContain("employerRetryDecision");
+    expect(provider).toContain("employerNameRetryMessage()");
+    expect(provider.indexOf("alreadyRetried: false")).toBeLessThan(
+      provider.indexOf("employerNameRetryMessage()"),
+    );
+
+    const strong = [
+      { id: "jd", text: "Partnered with marketing on demand generation.", jobSpecific: true },
+      { id: "boa", text: "Closed a multi-threaded $1.3MM Bank of America deal.", jobSpecific: false },
+      { id: "forecast", text: "Improved forecast deviation from 20% to 5-10%.", jobSpecific: false },
+      { id: "revenue", text: "Delivered $6.8MM in FY26 revenue, including $3.5MM in new enterprise.", jobSpecific: false },
+      { id: "vmware", text: "Ran a VMware campaign that created $3MM in pipeline.", jobSpecific: false },
+      { id: "jd2", text: "Supported the posted sales process.", jobSpecific: true },
+    ];
+    const ranked = assignCandidateBullets({
+      bands: [{ roleId: "opentext", employer: "OpenText", candidateCount: 4 }],
+      roles: [{ roleId: "opentext", employer: "OpenText" }],
+      evidence: strong.map((item) => ({
+        id: item.id,
+        kind: "ACHIEVEMENT" as const,
+        text: item.text,
+        roleId: "opentext",
+        question: null,
+      })),
+      bullets: strong.map((item) => ({
+        roleId: "opentext",
+        text: item.text,
+        jobSpecific: item.jobSpecific,
+        evidenceIds: [item.id],
+      })),
+    });
+    expect(ranked.map((item) => item.text)).toEqual([
+      "Closed a multi-threaded $1.3MM Bank of America deal.",
+      "Improved forecast deviation from 20% to 5-10%.",
+      "Delivered $6.8MM in FY26 revenue, including $3.5MM in new enterprise.",
+      "Ran a VMware campaign that created $3MM in pipeline.",
+    ]);
+    const recommended = groupsFor(salesProfile, ranked.map((item, index) => ({
+      ...item,
+      id: strong.filter((row) => item.text === row.text)[0]?.id ?? `ranked-${index}`,
+    })));
+    const openText = recommended.find((group) => group.roleId === "opentext");
+    expect(openText?.items.slice(0, 4).every((item) => item.checked)).toBe(true);
+    expect(openText?.items[0]?.content).toContain("Bank of America");
+    expect(applicationAssetConfig.labels.preparingResumeBullets).toBe(
+      "Harper is preparing your resume bullets…",
+    );
+    const assets = readFileSync("src/components/ApplicationAssetsSection.tsx", "utf8");
+    expect(assets).toContain("preparingBullets={generating}");
+    expect(assets).toContain("router.refresh");
   });
 
   it("accepts a claim found only in a seeker's reply and drops an invented claim", () => {

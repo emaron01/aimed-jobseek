@@ -232,6 +232,7 @@ export async function generateApplicationAssetAction(
         regenerationInstruction,
       })
     ) {
+      if (type === "RESUME") revalidate(id);
       return {
         ok: true,
         message:

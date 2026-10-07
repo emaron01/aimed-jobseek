@@ -14,12 +14,16 @@ import {
   assignCandidateBullets,
   buildResumeBulletCandidateMessages,
   bulletCandidateRoles,
+  employerNameRetryMessage,
+  employerRetryDecision,
+  questionTextForAnswer,
   readBulletRoleChoices,
   resumeBulletCandidateFingerprint,
   selectableBulletEvidence,
   storedCandidatesMatch,
   type BulletCandidateRole,
   type BulletEvidence,
+  type BulletQuestionTurn,
 } from "@/lib/application-assets/resume-bullet-candidates";
 import {
   GENERAL_BACKGROUND_ID,
@@ -69,12 +73,21 @@ async function loadBulletCandidatePacket(input: {
               id: true,
               content: true,
               kind: true,
+              turnId: true,
               turn: { select: { targetKey: true } },
             },
           },
           turns: {
-            where: { speaker: "SEEKER", skipped: false },
-            select: { id: true, body: true },
+            orderBy: { sequence: "asc" },
+            select: {
+              id: true,
+              speaker: true,
+              body: true,
+              sequence: true,
+              targetKey: true,
+              analysisJson: true,
+              skipped: true,
+            },
           },
         },
       },
@@ -99,6 +112,16 @@ async function loadBulletCandidatePacket(input: {
   const resumePlan = plan?.type === "RESUME" ? plan : null;
   const primaryRoleId = resumePlan?.primaryRoleId ?? null;
   const directRoleIds = resumePlan?.directRoleIds ?? [];
+  const turns: BulletQuestionTurn[] = (campaign.consultationSession?.turns ?? []).map(
+    (turn) => ({
+      id: turn.id,
+      speaker: turn.speaker,
+      body: turn.body,
+      sequence: turn.sequence,
+      targetKey: turn.targetKey,
+      analysisJson: turn.analysisJson,
+    }),
+  );
   return {
     profile,
     roles: bulletCandidateRoles({
@@ -116,12 +139,16 @@ async function loadBulletCandidatePacket(input: {
         kind: statement.kind,
         campaignId: input.campaignId,
         targetKey: statement.turn?.targetKey ?? null,
+        question: questionTextForAnswer({ turns, turnId: statement.turnId }),
       })),
-      replies: (campaign.consultationSession?.turns ?? []).map((turn) => ({
-        id: turn.id,
-        body: turn.body,
-        campaignId: input.campaignId,
-      })),
+      replies: (campaign.consultationSession?.turns ?? [])
+        .filter((turn) => turn.speaker === "SEEKER" && !turn.skipped)
+        .map((turn) => ({
+          id: turn.id,
+          body: turn.body,
+          campaignId: input.campaignId,
+          question: questionTextForAnswer({ turns, turnId: turn.id }),
+        })),
     }),
     job: {
       title: campaign.jobRequirement?.title ?? "",
@@ -243,24 +270,48 @@ export async function prepareResumeBulletCandidates(input: {
       parseStored: (json) => resumeBulletCandidatesSchema.parse(json),
       isResultUsable: (stored) => Array.isArray(stored.bullets),
       callProvider: async () => {
-        const response = await getConsultationReplyAiProvider({
-          temperature: RESUME_WRITER_TEMPERATURE,
-        }).generateStructured({
-          ...structuredOutputRequest("resumeBulletCandidates"),
-          ...aiCallTracking({
-            organizationId: input.organizationId,
-            campaignId: input.campaignId,
-            category: "ASSET_GENERATION",
-            operation: "APPLICATION_ASSET_GENERATION",
-            metadata: { step: "resume_bullet_candidates" },
-          }),
-          messages,
-          parseOutput: (raw) => ({
-            data: resumeBulletCandidatesSchema.parse(raw),
-            coercedFields: [],
-          }),
-        });
-        return response.data;
+        const employers = packet.profileRoles.map((role) => role.employer);
+        const generate = async (
+          nextMessages: Array<{ role: "system" | "user"; content: string }>,
+          alreadyRetried: boolean,
+        ) => {
+          const response = await getConsultationReplyAiProvider({
+            temperature: RESUME_WRITER_TEMPERATURE,
+          }).generateStructured({
+            ...structuredOutputRequest("resumeBulletCandidates"),
+            ...aiCallTracking({
+              organizationId: input.organizationId,
+              campaignId: input.campaignId,
+              category: "ASSET_GENERATION",
+              operation: "APPLICATION_ASSET_GENERATION",
+              metadata: {
+                step: alreadyRetried
+                  ? "resume_bullet_candidates_retry"
+                  : "resume_bullet_candidates",
+              },
+            }),
+            messages: nextMessages,
+            parseOutput: (raw) => ({
+              data: resumeBulletCandidatesSchema.parse(raw),
+              coercedFields: [],
+            }),
+          });
+          return response.data;
+        };
+        const first = await generate(messages, false);
+        if (
+          employerRetryDecision({
+            bullets: first.bullets,
+            employers,
+            alreadyRetried: false,
+          }) === "keep"
+        ) {
+          return first;
+        }
+        return generate(
+          [...messages, { role: "user", content: employerNameRetryMessage() }],
+          true,
+        );
       },
     });
     return { ok: true, skipped: false };

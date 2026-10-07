@@ -426,13 +426,25 @@ function recommendedIds(
   return new Set(ranked.slice(0, Math.max(0, count)).map((item) => item.id));
 }
 
+/** Strength of evidence and relevance together. A numbered result outranks a job-only line. */
+export function bulletEvidenceRank(bullet: PickerBullet): number {
+  const hasNumber = /\d/.test(bullet.text);
+  return (hasNumber ? 2 : 0) + (bullet.jobSpecific ? 1 : 0);
+}
+
 export function orderRoleBullets(
   bullets: readonly PickerBullet[],
   candidateCount: number,
 ): PickerBullet[] {
-  const specific = bullets.filter((bullet) => bullet.jobSpecific);
-  const general = bullets.filter((bullet) => !bullet.jobSpecific);
-  return [...specific, ...general].slice(0, Math.max(0, candidateCount));
+  return bullets
+    .map((bullet, index) => ({ bullet, index }))
+    .sort(
+      (a, b) =>
+        bulletEvidenceRank(b.bullet) - bulletEvidenceRank(a.bullet) ||
+        a.index - b.index,
+    )
+    .slice(0, Math.max(0, candidateCount))
+    .map((item) => item.bullet);
 }
 
 export function buildStatementGroups(input: {
