@@ -749,6 +749,122 @@ describe("Harper Approved Statements picker", () => {
     ]);
   });
 
+  it("collapses one result per group and follows up when a cited answer's amounts are missing", () => {
+    const gsiLong = "Drove GSI and end-customer motions that produced $6.8MM in FY26 revenue.";
+    const gsiShort = "Generated $6.8MM in FY26 revenue with GSI.";
+    const fullContract =
+      "Led a risk-driven enterprise sale of a $1.3MM contract with a $300K upsell for Bank of America.";
+    const strategyOnly = "Led executive-level deal strategy for a $1.3MM Bank of America contract.";
+    const precept = "Precepted new nurses on the night shift.";
+    const preceptRanked = "Precepted new nurses on the night shift for the unit.";
+    const capstone = "Shipped a clinic intake form during a capstone.";
+    const openTextQuestion = "Tell me about a result at OpenText.";
+    const assigned = assignCandidateBullets({
+      bands: [
+        { roleId: "opentext", employer: salesProfile.experience[0]!.employer ?? "", candidateCount: 8 },
+        { roleId: "mercy", employer: nursingProfile.experience[0]!.employer ?? "", candidateCount: 4 },
+        { roleId: "intern", employer: "County Hospital", candidateCount: 4 },
+      ],
+      evidence: [
+        { id: "gsi-a", kind: "INTERVIEW_ANSWER", text: `${gsiLong} at OpenText.`, roleId: null, question: openTextQuestion },
+        { id: "gsi-b", kind: "INTERVIEW_ANSWER", text: `${gsiShort} at OpenText.`, roleId: null, question: openTextQuestion },
+        { id: "deal-a", kind: "INTERVIEW_ANSWER", text: `${fullContract} at OpenText.`, roleId: null, question: openTextQuestion },
+        { id: "deal-b", kind: "INTERVIEW_ANSWER", text: `${strategyOnly} at OpenText.`, roleId: null, question: openTextQuestion },
+        { id: "mercy-a", kind: "ACHIEVEMENT", text: precept, roleId: "mercy", question: null },
+        { id: "mercy-b", kind: "INTERVIEW_ANSWER", text: `${precept} at Mercy General.`, roleId: null, question: "How do you precept new nurses?" },
+        { id: "capstone", kind: "RESUME_BULLET", text: capstone, roleId: null, question: "What did you build in school?" },
+      ],
+      bullets: [
+        { roleId: "opentext", text: gsiLong, jobSpecific: false, evidenceIds: ["gsi-a"] },
+        { roleId: "opentext", text: gsiShort, jobSpecific: true, evidenceIds: ["gsi-b"] },
+        { roleId: "opentext", text: fullContract, jobSpecific: true, evidenceIds: ["deal-a"] },
+        { roleId: "opentext", text: strategyOnly, jobSpecific: false, evidenceIds: ["deal-b"] },
+        { roleId: "mercy", text: precept, jobSpecific: false, evidenceIds: ["mercy-a"] },
+        { roleId: "mercy", text: preceptRanked, jobSpecific: true, evidenceIds: ["mercy-b"] },
+        { roleId: "general", text: capstone, jobSpecific: false, evidenceIds: ["capstone"] },
+      ],
+    });
+    expect(assigned.filter((item) => item.text.includes("$6.8MM")).map((item) => item.text)).toEqual([gsiShort]);
+    expect(assigned.filter((item) => item.text.includes("$1.3MM")).map((item) => item.text).sort()).toEqual(
+      [fullContract, strategyOnly].sort(),
+    );
+    expect(assigned.filter((item) => item.roleId === "mercy").map((item) => item.text)).toEqual([preceptRanked]);
+    expect(assigned.some((item) => item.roleId === "general" && item.text === capstone)).toBe(true);
+    expect(graduateProfile.projectTexts).toContain("Capstone project");
+    const groups = buildStatementGroups({
+      profile: {
+        experience: [
+          ...salesProfile.experience,
+          ...nursingProfile.experience,
+          { id: "intern", employer: "County Hospital", title: "Nursing Intern", endDate: null },
+        ],
+        educationTexts: nursingProfile.educationTexts,
+        projectTexts: graduateProfile.projectTexts,
+      },
+      bullets: assigned,
+      settings: DEFAULT_HARPER_DRAFT_SETTINGS,
+      savedPickIds: null,
+      primaryRoleId: "opentext",
+      directRoleIds: [],
+      asOf,
+    });
+    const openText = groups.find((group) => group.roleId === "opentext");
+    expect(openText?.items.filter((item) => item.content.includes("$6.8MM") && item.recommended)).toHaveLength(1);
+    expect(openText?.items.filter((item) => item.content.includes("Bank of America"))).toHaveLength(2);
+
+    const attEvidence = {
+      id: "att",
+      kind: "INTERVIEW_ANSWER" as const,
+      text: "Grew a $100K SIEM sale to $1MM in utilization and a $6MM network operations management sale at Micro Focus.",
+      roleId: null,
+      question: "Tell me about AT&T.",
+    };
+    const citingBullet = {
+      text: "Sold solutions to strategic accounts including AT&T, NTT, Accenture, and IBM.",
+      evidenceIds: ["att"],
+    };
+    const dryRun = uncitedStatedResults({
+      employers: [salesProfile.experience[0]!.employer ?? "", nursingProfile.experience[0]!.employer ?? "", "Micro Focus"],
+      evidence: [
+        attEvidence,
+        {
+          id: "mercy-shift",
+          kind: "INTERVIEW_ANSWER",
+          text: "Precepted 8 new nurses on the night shift at Mercy General.",
+          roleId: null,
+          question: "How do you precept new nurses?",
+        },
+        {
+          id: "capstone-form",
+          kind: "RESUME_BULLET",
+          text: "Shipped 1 clinic intake form during a capstone.",
+          roleId: null,
+          question: "What did you build in school?",
+        },
+      ],
+      bullets: [
+        citingBullet,
+        {
+          text: "Shipped 1 clinic intake form during a capstone.",
+          evidenceIds: ["capstone-form"],
+        },
+      ],
+    });
+    expect(dryRun.map((item) => item.id)).toEqual(["att", "mercy-shift"]);
+    const amountsPresent = uncitedStatedResults({
+      employers: ["Micro Focus"],
+      evidence: [attEvidence],
+      bullets: [
+        citingBullet,
+        {
+          text: "Grew a $100K SIEM sale to $1MM in utilization and a $6MM network operations management sale.",
+          evidenceIds: ["later"],
+        },
+      ],
+    });
+    expect(amountsPresent).toEqual([]);
+  });
+
   it("keeps achievement bullets with their role, drops embedded employer names, and leads with the strongest results", () => {
     const rampText =
       "Hired, trained, and managed account managers, contributing to a minimum year-over-year ARR increase of $9.7 million.";
@@ -1086,13 +1202,14 @@ describe("Harper Approved Statements picker", () => {
     const uncovered = uncitedStatedResults({
       evidence,
       employers,
-      bullets: [{ evidenceIds: ["library-deal"] }],
+      bullets: [
+        {
+          text: "Closed a multi-threaded $1.3MM Bank of America deal.",
+          evidenceIds: ["library-deal"],
+        },
+      ],
     });
-    expect(uncovered.map((item) => item.id)).toEqual([
-      "library-nursing",
-      "library-capstone",
-      "ach-ot",
-    ]);
+    expect(uncovered.map((item) => item.id)).toEqual(["library-nursing", "library-capstone"]);
     const followUp = uncoveredResultFollowUpMessage({
       roles: [{ roleId: "mercy", employer: "Mercy General", title: "Registered Nurse", candidateCount: 10 }],
       evidence: uncovered.filter((item) => item.id === "library-nursing"),

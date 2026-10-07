@@ -261,7 +261,7 @@ export function rolesNamedByText(
   return [...decided];
 }
 
-function normalizedAmounts(text: string): string[] {
+function normalizedAmounts(text: string, unitOrCurrencyOnly = false): string[] {
   const withoutYears = text.replace(/\bFY\s*'?\d{2,4}\b/gi, " ");
   const amounts: string[] = [];
   const pattern =
@@ -271,6 +271,8 @@ function normalizedAmounts(text: string): string[] {
     if (!Number.isFinite(raw)) continue;
     const unit = (match[2] ?? "").toLowerCase();
     const percent = match[0].includes("%");
+    const currency = match[0].includes("$");
+    if (unitOrCurrencyOnly && !unit && !percent && !currency) continue;
     if (percent && !unit) {
       amounts.push(`${raw}%`);
       continue;
@@ -556,19 +558,29 @@ export function evidenceHasStatedResult(text: string, employers: readonly string
   return named.some((name) => !employerNames.has(name.toLowerCase()));
 }
 
-/** Evidence with a stated result that no returned bullet cites. */
+/**
+ * Evidence still missing a stated result.
+ * A number with a unit or currency is covered only when that amount appears in a bullet.
+ * Citing the evidence is not enough. Evidence with no such amount stays covered once a bullet cites it.
+ */
 export function uncitedStatedResults(input: {
   evidence: readonly BulletEvidence[];
-  bullets: readonly { evidenceIds: readonly string[] }[];
+  bullets: readonly { evidenceIds: readonly string[]; text?: string }[];
   employers?: readonly string[];
 }): BulletEvidence[] {
+  const employers = input.employers ?? [];
+  const coveredAmounts = new Set(
+    input.bullets.flatMap((bullet) => normalizedAmounts(bullet.text ?? "", true)),
+  );
   const cited = new Set(
     input.bullets.flatMap((bullet) => bullet.evidenceIds.map((id) => id.trim()).filter(Boolean)),
   );
-  return input.evidence.filter(
-    (item) =>
-      !cited.has(item.id) && evidenceHasStatedResult(item.text, input.employers ?? []),
-  );
+  return input.evidence.filter((item) => {
+    if (!evidenceHasStatedResult(item.text, employers)) return false;
+    const amounts = normalizedAmounts(item.text, true);
+    if (amounts.length > 0) return amounts.some((amount) => !coveredAmounts.has(amount));
+    return !cited.has(item.id);
+  });
 }
 
 export function uncoveredResultFollowUpMessage(input: {
@@ -801,6 +813,19 @@ export function assignCandidateBullets(input: {
   );
 }
 
+/** Same order as bulletEvidenceRank: a numbered line, then a job-specific line. */
+function harperBulletRank(bullet: PickerBullet): number {
+  return (/\d/.test(bullet.text) ? 2 : 0) + (bullet.jobSpecific ? 1 : 0);
+}
+
+function preferSameGroupBullet(current: PickerBullet, next: PickerBullet): PickerBullet {
+  const amountDelta = normalizedAmounts(next.text).length - normalizedAmounts(current.text).length;
+  if (amountDelta !== 0) return amountDelta > 0 ? next : current;
+  const rankDelta = harperBulletRank(next) - harperBulletRank(current);
+  if (rankDelta !== 0) return rankDelta > 0 ? next : current;
+  return preferBullet(current, next);
+}
+
 function preferBullet(current: PickerBullet, next: PickerBullet): PickerBullet {
   const currentGeneral = current.roleId === GENERAL_BACKGROUND_ID;
   const nextGeneral = next.roleId === GENERAL_BACKGROUND_ID;
@@ -819,23 +844,31 @@ function evidenceOverlaps(
   return right.some((id) => ids.has(id.trim()));
 }
 
-/** One copy of the same result from the same evidence. A role wins over General background. Distinct number sets both stay. */
+/**
+ * One copy of the same result in a group, even when the evidence differs.
+ * Across groups, the same result still collapses only when the evidence overlaps, and a role wins over General background.
+ * A different amount set stays. The kept bullet has more amounts, then the higher Harper rank.
+ */
 export function collapseSameResults(
   bullets: readonly PickerBullet[],
   employers: readonly string[],
 ): PickerBullet[] {
   const kept: PickerBullet[] = [];
   for (const bullet of bullets) {
-    const index = kept.findIndex(
-      (existing) =>
-        evidenceOverlaps(existing.evidenceIds, bullet.evidenceIds) &&
-        sameBulletResult(existing.text, bullet.text, employers),
-    );
+    const index = kept.findIndex((existing) => {
+      if (!sameBulletResult(existing.text, bullet.text, employers)) return false;
+      if (existing.roleId === bullet.roleId) return true;
+      return evidenceOverlaps(existing.evidenceIds, bullet.evidenceIds);
+    });
     if (index < 0) {
       kept.push(bullet);
       continue;
     }
-    kept[index] = preferBullet(kept[index]!, bullet);
+    const current = kept[index]!;
+    kept[index] =
+      current.roleId === bullet.roleId
+        ? preferSameGroupBullet(current, bullet)
+        : preferBullet(current, bullet);
   }
   return kept;
 }
