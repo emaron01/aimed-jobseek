@@ -242,6 +242,53 @@ describe("Ask Harper question shape", () => {
     );
   });
 
+  it("accepts interviewer questions in any phrasing and declines a non-interview request", async () => {
+    const accepted = [
+      "Explain how pipeline is impacted by MEDDPICC?",
+      "Explain how pipeline is impacted by MEDDPICC",
+      "How do you build pipeline with MEDDPICC",
+      "Why does MEDDPICC change a forecast",
+      "Compare MEDDPICC with MEDDIC",
+      "Walk me through a deal review",
+      "How do you prioritize patients during a busy shift?",
+      "Explain how you would triage a full waiting room",
+      "Why does sepsis screening come first",
+      "Compare primary and secondary survey",
+      "Walk me through a shift handoff",
+      "Explain how you would design a REST API.",
+      "How would you scale a checkout service",
+      "Why choose a queue over a direct call",
+      "Compare SQL and NoSQL for this catalog",
+      "Walk me through debugging a failed deploy",
+      "Explain how you would approach your first week",
+      "How would you learn a new codebase as a new graduate",
+      "Why this role as a first job",
+      "Compare two internships you completed",
+      "Walk me through a group project from school",
+    ];
+    for (const question of accepted) {
+      expect(isRealAskHarperQuestion(question), question).toBe(true);
+    }
+    replyGenerate.mockClear();
+    for (const question of [
+      "Write my resume for this job",
+      "Please rewrite the cover letter",
+      "What's the weather today",
+    ]) {
+      expect(isRealAskHarperQuestion(question), question).toBe(false);
+      const result = await askHarper({
+        organizationId: "unused",
+        campaignId: "unused",
+        question,
+      });
+      expect(result).toEqual({
+        ok: false,
+        message: consultationConversationCopy.askHarperNotAQuestion,
+      });
+    }
+    expect(replyGenerate).not.toHaveBeenCalled();
+  });
+
   it("uses the approved answers paragraph and does not re-run stored suggested answers from that bump", () => {
     expect(ROLE_EXPERTISE_ANSWERS_SYSTEM_INSTRUCTIONS).toContain(
       APPROVED_ANSWERS_PARAGRAPH,

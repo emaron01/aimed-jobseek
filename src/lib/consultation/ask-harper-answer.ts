@@ -24,8 +24,13 @@ type PointOfViewParts = {
 const STORY_QUESTION =
   /\b(?:how did you|what did you|tell me about|walk me through|give (?:me )?(?:an|one) example|describe (?:a|an|the) (?:time|situation|example)|time when|situation where)\b/i;
 
-const INTERROGATIVE =
-  /^(?:what|whats|what's|how|why|who|when|where|which|whose|do|does|did|can|could|would|should|is|are|was|were)\b/i;
+/** An instruction to produce the seeker's resume or cover letter. */
+const SEEKER_DOCUMENT_TASK =
+  /^(?:please\s+)?(?:can you\s+|could you\s+|would you\s+|harper[, ]+)?(?:write|rewrite|draft|generate|create|update|edit|fix|polish|make)\b[\s\S]{0,80}\b(?:my|the|this)\s+(?:resume|cover letter|cv)\b/i;
+
+/** A request an interviewer does not ask the candidate. */
+const UNRELATED_REQUEST =
+  /^(?:please\s+)?(?:tell me a joke|what(?:'s| is) the weather(?:\s+\w+){0,3}|what time is it)[.!?]*$/i;
 
 export type AskHarperAnswerKind = "story" | "point-of-view";
 
@@ -33,15 +38,21 @@ export function askHarperAnswerKind(questionText: string): AskHarperAnswerKind {
   return STORY_QUESTION.test(questionText.trim()) ? "story" : "point-of-view";
 }
 
-/** Empty or meaningless text is not an interview question and must not call the model. */
+function isClearlyNotAnInterviewRequest(value: string): boolean {
+  return SEEKER_DOCUMENT_TASK.test(value) || UNRELATED_REQUEST.test(value);
+}
+
+/**
+ * Accepts a question an interviewer could ask, in any phrasing, with or without
+ * a question mark. Empty or meaningless text, and a request that is clearly not
+ * an interview question, is declined and must not call the model.
+ */
 export function isRealAskHarperQuestion(questionText: string): boolean {
   const value = questionText.trim();
   if (!/[a-z]/i.test(value)) return false;
   const words = value.split(/\s+/).filter(Boolean);
   if (words.length < 3) return false;
-  if (value.includes("?")) return true;
-  if (INTERROGATIVE.test(value)) return true;
-  return askHarperAnswerKind(value) === "story";
+  return !isClearlyNotAnInterviewRequest(value);
 }
 
 function partText(value: string | null | undefined): string {
