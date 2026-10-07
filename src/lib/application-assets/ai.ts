@@ -106,6 +106,7 @@ export async function generateResumeWithModel(input: {
   qualityFeedback: string[];
   requiredStatements?: RequiredResumeStatement[];
   roleBulletPlans?: RoleBulletPlan[];
+  backgroundEvidence?: string[];
 }): Promise<Result<ResumeAssetContent>> {
   if (!isConsultationReplyAiConfigured()) {
     return { ok: false, message: WRITING_UNCONFIGURED };
@@ -145,6 +146,7 @@ export async function generateCoverLetterWithModel(input: {
   salutation: string;
   regenerationInstruction: string | null;
   qualityFeedback: string[];
+  backgroundEvidence?: string[];
 }): Promise<Result<CoverLetterAssetContent>> {
   if (!isConsultationReplyAiConfigured()) {
     return { ok: false, message: WRITING_UNCONFIGURED };

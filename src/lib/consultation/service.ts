@@ -3,6 +3,7 @@ import {
   employerResearchModelInput,
   loadApplicationEmployerResearch,
 } from "@/lib/application/employer-research-reader";
+import { readGeneralBackgroundTexts } from "@/lib/application-assets/resume-bullet-candidate-service";
 import type { JobScorecard, ScorecardItem } from "@/lib/job-requirement/types";
 import {
   runConsultationPlanDecision,
@@ -832,6 +833,13 @@ export async function polishAnswerWithQuality(input: {
     walkThrough: looksLikeCareerWalkThrough(input.target?.text ?? ""),
     recentRoleCount: input.profileItems.filter((item) => item.itemType === "EXPERIENCE").length,
   });
+  const backgroundEvidence =
+    input.usage?.organizationId && input.usage.campaignId
+      ? await readGeneralBackgroundTexts({
+          organizationId: input.usage.organizationId,
+          campaignId: input.usage.campaignId,
+        }).catch(() => [])
+      : [];
   let shapeRewriteUsed = false;
   for (
     let attempt = 0;
@@ -851,6 +859,7 @@ export async function polishAnswerWithQuality(input: {
       target: input.target ?? null,
       targetStrength: input.targetStrength ?? null,
       supportingEvidence: input.supportingEvidence ?? [],
+      backgroundEvidence,
       approvedAnswers,
       voiceSamples,
       careerStage,

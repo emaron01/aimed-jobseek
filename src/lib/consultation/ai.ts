@@ -495,6 +495,7 @@ export async function polishAnswerWithModel(input: {
   target?: { key: string; kind: string; text: string } | null;
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
   supportingEvidence?: string[];
+  backgroundEvidence?: string[];
   approvedAnswers?: ReadonlyArray<{
     id: string;
     question: string;

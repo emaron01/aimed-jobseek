@@ -139,6 +139,7 @@ export function buildResumeAssetMessages(input: {
   qualityFeedback: string[];
   requiredStatements?: RequiredResumeStatement[];
   roleBulletPlans?: RoleBulletPlan[];
+  backgroundEvidence?: string[];
 }): AiMessage[] {
   const contact = input.context.profile.identity;
   return [
@@ -194,6 +195,7 @@ export function buildResumeAssetMessages(input: {
         pickedBullets: input.requiredStatements ?? [],
         requiredStatements: input.requiredStatements ?? [],
         roleBulletPlans: input.roleBulletPlans ?? [],
+        backgroundEvidence: input.backgroundEvidence ?? [],
         responseShape: {
           type: "RESUME",
           header: {
@@ -233,6 +235,7 @@ export function buildCoverLetterAssetMessages(input: {
   salutation: string;
   regenerationInstruction: string | null;
   qualityFeedback: string[];
+  backgroundEvidence?: string[];
 }): AiMessage[] {
   return [
     {
@@ -269,6 +272,7 @@ export function buildCoverLetterAssetMessages(input: {
         seekerVoiceInstruction: applicationAssetConfig.seekerVoiceInstruction,
         salutation: input.salutation,
         signerName: input.context.profile.identity.name?.text ?? "",
+        backgroundEvidence: input.backgroundEvidence ?? [],
         responseShape: {
           type: "COVER_LETTER",
           salutation: "exact supplied salutation",

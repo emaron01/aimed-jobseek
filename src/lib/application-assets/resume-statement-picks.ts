@@ -55,6 +55,7 @@ export type StatementGroupItem = {
   content: string;
   requirementLabel: string | null;
   checked: boolean;
+  evidenceIds: string[];
 };
 
 export type StatementGroup = {
@@ -84,11 +85,17 @@ export type RoleBulletPlan = {
   yearsSinceEnd: number | null;
 };
 
+export const GENERAL_BACKGROUND_ID = "general";
+export const GENERAL_BACKGROUND_TITLE = "General background";
+
 export type PickerBullet = {
   id: string;
   roleId: string;
   text: string;
   jobSpecific: boolean;
+  evidenceIds: string[];
+  /** True when the seeker moved this bullet onto the role. */
+  seekerChosen?: boolean;
 };
 
 export type RoleBulletBand = {
@@ -439,7 +446,7 @@ export function buildStatementGroups(input: {
 }): StatementGroup[] {
   const bands = roleBulletBands(input);
   const saved = input.savedPickIds;
-  return bands.map((band) => {
+  const groups: StatementGroup[] = bands.map((band) => {
     const shown = orderRoleBullets(
       input.bullets.filter((bullet) => bullet.roleId === band.roleId),
       band.candidateCount,
@@ -467,9 +474,57 @@ export function buildStatementGroups(input: {
         content: bullet.text,
         requirementLabel: null,
         checked: checkedIds.has(bullet.id),
+        evidenceIds: bullet.evidenceIds,
       })),
     };
   });
+  const groupedIds = new Set(groups.map((group) => group.id));
+  for (const role of input.profile.experience) {
+    if (groupedIds.has(role.id)) continue;
+    const extras = input.bullets.filter(
+      (bullet) => bullet.roleId === role.id && bullet.seekerChosen,
+    );
+    if (extras.length === 0) continue;
+    groups.push({
+      id: role.id,
+      title: roleGroupHeader(role.title?.trim() || "", role.employer?.trim() || ""),
+      roleId: role.id,
+      yearsSinceEnd: null,
+      minBullets: 0,
+      maxBullets: extras.length,
+      titleOnly: false,
+      showRange: false,
+      items: extras.map((bullet) => ({
+        id: bullet.id,
+        kind: "RESUME_BULLET" as const,
+        content: bullet.text,
+        requirementLabel: null,
+        checked: saved === null || saved.includes(bullet.id),
+        evidenceIds: bullet.evidenceIds,
+      })),
+    });
+  }
+  const general = input.bullets.filter((bullet) => bullet.roleId === GENERAL_BACKGROUND_ID);
+  if (general.length === 0) return groups;
+  groups.push({
+    id: GENERAL_BACKGROUND_ID,
+    title: GENERAL_BACKGROUND_TITLE,
+    roleId: null,
+    yearsSinceEnd: null,
+    minBullets: 0,
+    maxBullets: 0,
+    titleOnly: false,
+    showRange: false,
+    items: general.map((bullet) => ({
+      id: bullet.id,
+      kind: "RESUME_BULLET" as const,
+      content: bullet.text,
+      requirementLabel: null,
+      checked: saved !== null && saved.includes(bullet.id),
+      evidenceIds: bullet.evidenceIds,
+    })),
+  });
+  return groups;
 }
 
 export function buildResumeWriterPackage(input: {
@@ -486,12 +541,14 @@ export function buildResumeWriterPackage(input: {
   requiredStatements: RequiredResumeStatement[];
   roleBulletPlans: RoleBulletPlan[];
   condensedRoleIds: string[];
+  backgroundEvidence: string[];
 } {
   const asOf = input.asOf ?? new Date();
   const groups = buildStatementGroups(input);
   const requiredStatements: RequiredResumeStatement[] = [];
   const picksByRole = new Map<string, number>();
   for (const group of groups) {
+    if (!group.roleId) continue;
     for (const item of group.items) {
       if (!item.checked) continue;
       const role = input.profile.experience.find((experience) => experience.id === group.roleId);
@@ -536,5 +593,8 @@ export function buildResumeWriterPackage(input: {
   const condensedRoleIds = roleBulletPlans
     .filter((plan) => plan.titleOnly && !hidden.has(plan.roleId))
     .map((plan) => plan.roleId);
-  return { requiredStatements, roleBulletPlans, condensedRoleIds };
+  const backgroundEvidence = groups
+    .filter((group) => group.id === GENERAL_BACKGROUND_ID)
+    .flatMap((group) => group.items.map((item) => item.content));
+  return { requiredStatements, roleBulletPlans, condensedRoleIds, backgroundEvidence };
 }

@@ -20,6 +20,7 @@ import {
 import {
   assignCandidateBullets,
   buildResumeBulletCandidateMessages,
+  profileWithBulletRoleChoices,
   selectableBulletEvidence,
   storedCandidatesMatch,
 } from "@/lib/application-assets/resume-bullet-candidates";
@@ -49,7 +50,7 @@ function bullet(
   text: string,
   jobSpecific: boolean,
 ): PickerBullet {
-  return { id, roleId, text, jobSpecific };
+  return { id, roleId, text, jobSpecific, evidenceIds: [] };
 }
 
 function groupsFor(
@@ -276,9 +277,9 @@ describe("Harper Approved Statements picker", () => {
     expect(RESUME_ASSET_INSTRUCTIONS).toContain(
       "Use each picked bullet exactly as written, in the role it was picked for. Do not rewrite a picked bullet and do not add a bullet that was not picked. You may write the summary, the skills, and each role's title, company, and dates.",
     );
-    expect(RESUME_BULLET_CANDIDATE_PROMPT_VERSION).toBe("2");
+    expect(RESUME_BULLET_CANDIDATE_PROMPT_VERSION).toBe("3");
     expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).toContain(
-      "Assign a bullet to a role only when the evidence names that role's employer or is an achievement listed under that role in the Personal Profile. Evidence that names no employer is not assigned to any role.",
+      "Assign a bullet to a role only when the evidence names that role's employer or is an achievement listed under that role in the Personal Profile. Evidence that names no employer goes to General background, not to a role.",
     );
     expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).toContain(
       "When one piece of evidence covers more than one role, write a separate bullet for each role. For each role, write up to the number of bullets given for that role. Start each bullet with a strong action verb and include the result or number when the seeker stated one.",
@@ -455,10 +456,27 @@ describe("Harper Approved Statements picker", () => {
       "opentext:Held forecast deviation to 5-10% at OpenText.",
       "mercy:Precepted new nurses on the night shift.",
       "intern:Shipped a clinic intake form during a capstone rotation.",
+      "general:Joined a team that will teach me.",
     ]);
     expect(assigned.some((item) => item.roleId === "vmware" || item.roleId === "clinic")).toBe(false);
     expect(logged.some((line) => line.includes("resume_bullet_candidate_dropped") && line.includes("vmware"))).toBe(true);
-    expect(logged.some((line) => line.includes("no-employer") || line.includes("Joined a team"))).toBe(true);
+    expect(logged.some((line) => line.includes("resume_bullet_candidate_moved") && line.includes("general"))).toBe(true);
+    const background = groupsFor(salesProfile, [
+      bullet("bg", "general", "Joined a team that will teach me.", false),
+    ]);
+    expect(background.find((group) => group.title === "General background")?.roleId).toBeNull();
+    const writer = buildResumeWriterPackage({
+      profile: salesProfile,
+      bullets: [bullet("bg", "general", "Joined a team that will teach me.", false)],
+      settings: DEFAULT_HARPER_DRAFT_SETTINGS,
+      savedPickIds: null,
+      primaryRoleId: null,
+      directRoleIds: [],
+      planCondensedRoleIds: [],
+      asOf,
+    });
+    expect(writer.requiredStatements.some((item) => item.content.includes("teach me"))).toBe(false);
+    expect(writer.backgroundEvidence).toEqual(["Joined a team that will teach me."]);
 
     const sales = groupsFor(
       {
@@ -508,6 +526,50 @@ describe("Harper Approved Statements picker", () => {
     expect(checkedCount).toBeGreaterThan(-1);
     expect(rangeNote).toBeGreaterThan(checkedCount);
     expect(picker.slice(rangeNote, rangeNote + 200)).toContain("count");
+  });
+
+  it("saves a job correction without a paid call and applies it on every application", () => {
+    const evidence = [
+      { id: "ot-answer", kind: "INTERVIEW_ANSWER" as const, text: "Held forecast deviation to 5-10% at OpenText in FY26.", roleId: null },
+      { id: "mercy-ach", kind: "ACHIEVEMENT" as const, text: "Precepted new nurses on the night shift.", roleId: "mercy" },
+      { id: "intern-ach", kind: "ACHIEVEMENT" as const, text: "Shipped a clinic intake form.", roleId: "intern" },
+    ];
+    const bands = [
+      { roleId: "opentext", employer: "OpenText", candidateCount: 10 },
+      { roleId: "vmware", employer: "VMware", candidateCount: 10 },
+      { roleId: "mercy", employer: "Mercy General", candidateCount: 10 },
+      { roleId: "intern", employer: "County Hospital", candidateCount: 10 },
+    ];
+    const bullets = [
+      { roleId: "opentext", text: "Held forecast deviation to 5-10% at OpenText.", jobSpecific: true, evidenceIds: ["ot-answer"] },
+      { roleId: "mercy", text: "Precepted new nurses on the night shift.", jobSpecific: true, evidenceIds: ["mercy-ach"] },
+      { roleId: "intern", text: "Shipped a clinic intake form.", jobSpecific: true, evidenceIds: ["intern-ach"] },
+    ];
+    const profile = profileWithBulletRoleChoices(
+      { experience: salesProfile.experience },
+      ["ot-answer"],
+      "vmware",
+    );
+    const again = profileWithBulletRoleChoices(profile, ["mercy-ach"], "general");
+    const choices = again.bulletRoleChoices as Record<string, string>;
+    expect(choices["ot-answer"]).toBe("vmware");
+    expect(choices["mercy-ach"]).toBe("general");
+    const nextRun = assignCandidateBullets({ bands, evidence, bullets, choices, roles: bands });
+    const otherApplication = assignCandidateBullets({ bands, evidence, bullets, choices, roles: bands });
+    expect(nextRun.map((item) => `${item.roleId}:${item.evidenceIds[0]}`)).toEqual(
+      otherApplication.map((item) => `${item.roleId}:${item.evidenceIds[0]}`),
+    );
+    expect(nextRun.find((item) => item.evidenceIds.includes("ot-answer"))?.roleId).toBe("vmware");
+    expect(nextRun.find((item) => item.evidenceIds.includes("mercy-ach"))?.roleId).toBe("general");
+    expect(nextRun.find((item) => item.evidenceIds.includes("intern-ach"))?.roleId).toBe("intern");
+    const action = readFileSync("src/app/actions/application-assets.ts", "utf8");
+    const correction = action.slice(
+      action.indexOf("export async function saveBulletEvidenceRoleAction"),
+      action.indexOf("export async function saveResumeStatementPicksAction"),
+    );
+    expect(correction).not.toContain("runPaidStructuredCall");
+    expect(correction).not.toContain("enqueueApplicationJob");
+    expect(correction).toContain("saveBulletEvidenceRole");
   });
 
   it("accepts a claim found only in a seeker's reply and drops an invented claim", () => {

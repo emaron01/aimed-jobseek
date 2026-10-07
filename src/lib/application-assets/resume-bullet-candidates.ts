@@ -5,6 +5,7 @@ import {
   type ResumeBulletCandidates,
 } from "@/lib/application-assets/contract";
 import {
+  GENERAL_BACKGROUND_ID,
   orderRoleBullets,
   roleBulletBands,
   type PickerBullet,
@@ -97,14 +98,15 @@ export function evidenceSupportsAssignedRole(input: {
   return textNamesEmployer(input.evidence.text, input.employer);
 }
 
-function logDroppedBulletCandidate(input: {
+function logBulletCandidate(input: {
+  event: "resume_bullet_candidate_dropped" | "resume_bullet_candidate_moved";
   roleId: string;
   text: string;
   evidenceIds: readonly string[];
 }): void {
   console.info(
     JSON.stringify({
-      event: "resume_bullet_candidate_dropped",
+      event: input.event,
       roleId: input.roleId,
       evidenceIds: input.evidenceIds,
       text: input.text,
@@ -112,43 +114,163 @@ function logDroppedBulletCandidate(input: {
   );
 }
 
+export function readBulletRoleChoices(profileJson: unknown): Record<string, string> {
+  if (!profileJson || typeof profileJson !== "object" || Array.isArray(profileJson)) return {};
+  const raw = (profileJson as Record<string, unknown>).bulletRoleChoices;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const choices: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (key.trim() && typeof value === "string" && value.trim()) choices[key.trim()] = value.trim();
+  }
+  return choices;
+}
+
+export function profileWithBulletRoleChoices(
+  profileJson: unknown,
+  evidenceIds: readonly string[],
+  roleId: string,
+): Record<string, unknown> {
+  const base =
+    profileJson && typeof profileJson === "object" && !Array.isArray(profileJson)
+      ? { ...(profileJson as Record<string, unknown>) }
+      : {};
+  const choices = readBulletRoleChoices(base);
+  for (const id of evidenceIds) {
+    const evidenceId = id.trim();
+    if (evidenceId) choices[evidenceId] = roleId;
+  }
+  base.bulletRoleChoices = choices;
+  return base;
+}
+
+function seekerChoice(
+  evidenceIds: readonly string[],
+  choices: Readonly<Record<string, string>> | undefined,
+): string | null {
+  if (!choices) return null;
+  for (const id of evidenceIds) {
+    const choice = choices[id];
+    if (choice) return choice;
+  }
+  return null;
+}
+
+function textNamesAnyEmployer(text: string, employers: readonly string[]): boolean {
+  return employers.some((employer) => textNamesEmployer(text, employer));
+}
+
 export function assignCandidateBullets(input: {
   bullets: ResumeBulletCandidates["bullets"];
   bands: ReadonlyArray<{ roleId: string; employer: string; candidateCount: number }>;
   evidence: readonly BulletEvidence[];
+  /** Evidence id to a role id or "general". The seeker's choice wins. */
+  choices?: Readonly<Record<string, string>>;
+  /** Every Personal Profile role, used when a choice names a role outside the bullet bands. */
+  roles?: ReadonlyArray<{ roleId: string; employer: string }>;
 }): PickerBullet[] {
   const bands = new Map(input.bands.map((band) => [band.roleId, band]));
+  const roles = new Map(
+    (input.roles ?? input.bands).map((role) => [role.roleId, role.employer]),
+  );
+  for (const band of input.bands) roles.set(band.roleId, band.employer);
+  const employers = [...roles.values()];
   const evidenceById = new Map(input.evidence.map((item) => [item.id, item]));
   const grouped = new Map<string, PickerBullet[]>();
+  const chosen = new Map<string, PickerBullet[]>();
+  const place = (roleId: string, bullet: PickerBullet, preferred: boolean) => {
+    const bucket = preferred ? chosen : grouped;
+    const list = bucket.get(roleId) ?? [];
+    if (list.some((item) => item.id === bullet.id)) return;
+    list.push(bullet);
+    bucket.set(roleId, list);
+  };
   for (const bullet of input.bullets) {
-    const roleId = bullet.roleId.trim();
-    const band = bands.get(roleId);
-    if (!band) continue;
     const text = oneLineBullet(bullet.text);
     if (!text) continue;
     const evidenceIds = [...new Set(bullet.evidenceIds.map((id) => id.trim()).filter(Boolean))];
-    const supportsRole =
-      evidenceIds.length > 0 &&
-      evidenceIds.every((id) => {
-        const evidence = evidenceById.get(id);
-        return (
-          evidence !== undefined &&
-          evidenceSupportsAssignedRole({ evidence, roleId, employer: band.employer })
-        );
+    const cited = evidenceIds
+      .map((id) => evidenceById.get(id))
+      .filter((item): item is BulletEvidence => item !== undefined);
+    const choice = seekerChoice(evidenceIds, input.choices);
+    const make = (roleId: string, seekerChosen: boolean): PickerBullet => ({
+      id: `bullet:${createHash("sha256").update(`${roleId}\n${text}`).digest("hex").slice(0, 16)}`,
+      roleId,
+      text,
+      jobSpecific: bullet.jobSpecific,
+      evidenceIds,
+      seekerChosen,
+    });
+    if (choice === GENERAL_BACKGROUND_ID) {
+      place(GENERAL_BACKGROUND_ID, make(GENERAL_BACKGROUND_ID, true), true);
+      logBulletCandidate({
+        event: "resume_bullet_candidate_moved",
+        roleId: GENERAL_BACKGROUND_ID,
+        text,
+        evidenceIds,
       });
-    if (!supportsRole) {
-      logDroppedBulletCandidate({ roleId, text, evidenceIds });
       continue;
     }
-    const id = `bullet:${createHash("sha256").update(`${roleId}\n${text}`).digest("hex").slice(0, 16)}`;
-    const list = grouped.get(roleId) ?? [];
-    if (list.some((item) => item.id === id)) continue;
-    list.push({ id, roleId, text, jobSpecific: bullet.jobSpecific });
-    grouped.set(roleId, list);
+    if (choice && roles.has(choice)) {
+      place(choice, make(choice, true), true);
+      continue;
+    }
+    const roleId = bullet.roleId.trim();
+    const band = bands.get(roleId);
+    const supportsRole =
+      band !== undefined &&
+      cited.length === evidenceIds.length &&
+      evidenceIds.length > 0 &&
+      cited.every((evidence) =>
+        evidenceSupportsAssignedRole({ evidence, roleId, employer: band.employer }),
+      );
+    if (supportsRole) {
+      place(roleId, make(roleId, false), false);
+      continue;
+    }
+    const achievementRoles = [
+      ...new Set(
+        cited
+          .filter((evidence) => evidence.kind === "ACHIEVEMENT" && evidence.roleId)
+          .map((evidence) => evidence.roleId as string),
+      ),
+    ];
+    const namesEmployer = cited.some((evidence) => textNamesAnyEmployer(evidence.text, employers));
+    if (!namesEmployer && achievementRoles.length === 1 && roles.has(achievementRoles[0]!)) {
+      place(achievementRoles[0]!, make(achievementRoles[0]!, false), false);
+      continue;
+    }
+    if (!namesEmployer && cited.length > 0 && cited.length === evidenceIds.length) {
+      place(GENERAL_BACKGROUND_ID, make(GENERAL_BACKGROUND_ID, false), true);
+      logBulletCandidate({
+        event: "resume_bullet_candidate_moved",
+        roleId: GENERAL_BACKGROUND_ID,
+        text,
+        evidenceIds,
+      });
+      continue;
+    }
+    logBulletCandidate({
+      event: "resume_bullet_candidate_dropped",
+      roleId,
+      text,
+      evidenceIds,
+    });
   }
-  return input.bands.flatMap((band) =>
-    orderRoleBullets(grouped.get(band.roleId) ?? [], band.candidateCount),
+  const ordered = input.bands.flatMap((band) => {
+    const automatic = orderRoleBullets(grouped.get(band.roleId) ?? [], band.candidateCount);
+    const preferred = chosen.get(band.roleId) ?? [];
+    const seen = new Set(preferred.map((item) => item.id));
+    return [...preferred, ...automatic.filter((item) => !seen.has(item.id))];
+  });
+  const extraRoles = [...chosen.keys()].filter(
+    (roleId) => roleId !== GENERAL_BACKGROUND_ID && !bands.has(roleId),
   );
+  return [
+    ...ordered,
+    ...extraRoles.flatMap((roleId) => chosen.get(roleId) ?? []),
+    ...(chosen.get(GENERAL_BACKGROUND_ID) ?? []),
+    ...(grouped.get(GENERAL_BACKGROUND_ID) ?? []),
+  ];
 }
 
 export function bulletCandidateRoles(input: {

@@ -249,6 +249,7 @@ export type AssetGenerationFingerprintInput = {
   qualityFeedback?: string[];
   requiredStatements?: Parameters<typeof buildResumeAssetMessages>[0]["requiredStatements"];
   roleBulletPlans?: Parameters<typeof buildResumeAssetMessages>[0]["roleBulletPlans"];
+  backgroundEvidence?: string[];
 };
 
 export function assetGenerationFingerprint(
@@ -263,6 +264,7 @@ export function assetGenerationFingerprint(
       qualityFeedback: input.qualityFeedback ?? [],
       requiredStatements: input.requiredStatements ?? [],
       roleBulletPlans: input.roleBulletPlans ?? [],
+      backgroundEvidence: input.backgroundEvidence ?? [],
     });
   }
   return coverLetterAssetFingerprint({
@@ -270,5 +272,6 @@ export function assetGenerationFingerprint(
     salutation: input.salutation,
     regenerationInstruction: input.regenerationInstruction,
     qualityFeedback: input.qualityFeedback ?? [],
+    backgroundEvidence: input.backgroundEvidence ?? [],
   });
 }

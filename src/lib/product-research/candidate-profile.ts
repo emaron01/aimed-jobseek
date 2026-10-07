@@ -121,6 +121,8 @@ export const candidateProfileSchema = z.object({
       }
     }),
   gaps: z.array(profileGapSchema).default([]),
+  /** Evidence id to a profile role id, or "general" for General background. */
+  bulletRoleChoices: z.record(z.string(), z.string()).optional(),
 });
 
 export type CandidateProfile = z.infer<typeof candidateProfileSchema>;

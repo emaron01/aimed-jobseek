@@ -588,6 +588,7 @@ function AssetTypePanel({
   profileHref,
   profileEditHref,
   statementGroups,
+  statementRoleOptions,
   needsPrepare,
 }: {
   campaignId: string;
@@ -602,6 +603,7 @@ function AssetTypePanel({
   profileHref: string | null;
   profileEditHref: string | null;
   statementGroups: StatementGroup[];
+  statementRoleOptions: Array<{ roleId: string; label: string }>;
   needsPrepare: boolean;
 }) {
   const [result, action] = useActionState(generateApplicationAssetAction, initial);
@@ -629,6 +631,7 @@ function AssetTypePanel({
         <ResumeStatementPicker
           campaignId={campaignId}
           groups={statementGroups}
+          roleOptions={statementRoleOptions}
           canEdit={canEdit}
           needsPrepare={needsPrepare}
         />
@@ -763,6 +766,7 @@ export function ApplicationAssetsSection({
   profileEditHref = null,
   defaultOpen = false,
   statementGroups = [],
+  statementRoleOptions = [],
   needsPrepare = false,
 }: {
   campaignId: string;
@@ -781,6 +785,7 @@ export function ApplicationAssetsSection({
   profileEditHref?: string | null;
   defaultOpen?: boolean;
   statementGroups?: StatementGroup[];
+  statementRoleOptions?: Array<{ roleId: string; label: string }>;
   needsPrepare?: boolean;
 }) {
   const [activeType, setActiveType] = useState<"RESUME" | "COVER_LETTER">(
@@ -886,6 +891,7 @@ export function ApplicationAssetsSection({
                   type === "RESUME" ? missingResumeContacts : []
                 }
                 statementGroups={type === "RESUME" ? statementGroups : []}
+                statementRoleOptions={type === "RESUME" ? statementRoleOptions : []}
                 needsPrepare={type === "RESUME" ? needsPrepare : false}
                 profileHref={profileHref}
                 profileEditHref={profileEditHref}

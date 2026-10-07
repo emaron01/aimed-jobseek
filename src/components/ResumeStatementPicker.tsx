@@ -1,12 +1,17 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import {
   prepareResumeBulletCandidatesAction,
+  saveBulletEvidenceRoleAction,
   saveResumeStatementPicksAction,
   type ApplicationAssetActionResult,
 } from "@/app/actions/application-assets";
-import type { StatementGroup } from "@/lib/application-assets/resume-statement-picks";
+import {
+  GENERAL_BACKGROUND_ID,
+  GENERAL_BACKGROUND_TITLE,
+  type StatementGroup,
+} from "@/lib/application-assets/resume-statement-picks";
 import { applicationAssetConfig } from "@/lib/product-config";
 
 const initial: ApplicationAssetActionResult | null = null;
@@ -16,12 +21,17 @@ function fill(template: string, values: Record<string, string | number>): string
 }
 
 function StatementGroupFields({
+  campaignId,
   group,
   canEdit,
+  roleOptions,
 }: {
+  campaignId: string;
   group: StatementGroup;
   canEdit: boolean;
+  roleOptions: Array<{ roleId: string; label: string }>;
 }) {
+  const [moving, startMove] = useTransition();
   const labels = applicationAssetConfig.labels;
   const [count, setCount] = useState(
     group.items.filter((item) => item.checked).length,
@@ -65,7 +75,34 @@ function StatementGroupFields({
                   setCount((current) => current + (event.target.checked ? 1 : -1))
                 }
               />
-              <span className="mt-0.5 block">{item.content}</span>
+              <span className="mt-0.5 block">
+                {item.content}
+                {canEdit && item.evidenceIds.length > 0 ? (
+                  <select
+                    aria-label="Job"
+                    className="mt-1 block max-w-full rounded border border-edge bg-surface px-1 py-0.5 text-xs text-subtle"
+                    value={group.roleId ?? GENERAL_BACKGROUND_ID}
+                    disabled={moving}
+                    onChange={(event) => {
+                      const roleId = event.target.value;
+                      startMove(() => {
+                        void saveBulletEvidenceRoleAction({
+                          campaignId,
+                          evidenceIds: item.evidenceIds,
+                          roleId,
+                        });
+                      });
+                    }}
+                  >
+                    {roleOptions.map((role) => (
+                      <option key={role.roleId} value={role.roleId}>
+                        {role.label}
+                      </option>
+                    ))}
+                    <option value={GENERAL_BACKGROUND_ID}>{GENERAL_BACKGROUND_TITLE}</option>
+                  </select>
+                ) : null}
+              </span>
             </label>
           </li>
         ))}
@@ -79,11 +116,13 @@ export function ResumeStatementPicker({
   groups,
   canEdit,
   needsPrepare,
+  roleOptions = [],
 }: {
   campaignId: string;
   groups: StatementGroup[];
   canEdit: boolean;
   needsPrepare: boolean;
+  roleOptions?: Array<{ roleId: string; label: string }>;
 }) {
   const [state, action, pending] = useActionState(
     saveResumeStatementPicksAction,
@@ -119,7 +158,13 @@ export function ResumeStatementPicker({
     <form action={action} className="space-y-4">
       <input type="hidden" name="campaignId" value={campaignId} />
       {groups.map((group) => (
-        <StatementGroupFields key={group.id} group={group} canEdit={canEdit} />
+        <StatementGroupFields
+          key={group.id}
+          campaignId={campaignId}
+          group={group}
+          canEdit={canEdit}
+          roleOptions={roleOptions}
+        />
       ))}
       {canEdit ? (
         <button

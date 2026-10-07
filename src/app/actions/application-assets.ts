@@ -8,7 +8,10 @@ import {
   updateEarlierExperienceHeading,
 } from "@/lib/application-assets/plan-service";
 import { prepareResumeBulletCandidates } from "@/lib/application-assets/resume-bullet-candidate-service";
-import { saveResumeStatementPicks } from "@/lib/application-assets/resume-statement-picker-data";
+import {
+  saveBulletEvidenceRole,
+  saveResumeStatementPicks,
+} from "@/lib/application-assets/resume-statement-picker-data";
 import {
   approveApplicationAsset,
   resolveApplicationAssetFlag,
@@ -65,6 +68,27 @@ export async function prepareResumeBulletCandidatesAction(
       ok: true,
       message: applicationAssetConfig.labels.resumeBulletsPrepared,
     };
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
+export async function saveBulletEvidenceRoleAction(input: {
+  campaignId: string;
+  evidenceIds: string[];
+  roleId: string;
+}): Promise<ApplicationAssetActionResult> {
+  try {
+    await requireCurrentUser();
+    const organizationId = await requireOrganizationId();
+    await saveBulletEvidenceRole({
+      organizationId,
+      campaignId: input.campaignId,
+      evidenceIds: input.evidenceIds,
+      roleId: input.roleId,
+    });
+    revalidate(input.campaignId);
+    return { ok: true, message: applicationAssetConfig.labels.statementPicksSaved };
   } catch (error) {
     return errorResult(error);
   }

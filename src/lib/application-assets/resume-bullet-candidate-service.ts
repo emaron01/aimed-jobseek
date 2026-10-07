@@ -14,6 +14,7 @@ import {
   assignCandidateBullets,
   buildResumeBulletCandidateMessages,
   bulletCandidateRoles,
+  readBulletRoleChoices,
   resumeBulletCandidateFingerprint,
   selectableBulletEvidence,
   storedCandidatesMatch,
@@ -21,6 +22,7 @@ import {
   type BulletEvidence,
 } from "@/lib/application-assets/resume-bullet-candidates";
 import {
+  GENERAL_BACKGROUND_ID,
   pickerProfileFromCandidate,
   type PickerBullet,
   type PickerProfile,
@@ -41,6 +43,8 @@ export type BulletCandidatePacket = {
   job: { title: string; employer: string; posting: string };
   primaryRoleId: string | null;
   directRoleIds: string[];
+  choices: Record<string, string>;
+  profileRoles: Array<{ roleId: string; employer: string }>;
 };
 
 async function loadBulletCandidatePacket(input: {
@@ -50,7 +54,7 @@ async function loadBulletCandidatePacket(input: {
   const campaign = await prisma.campaign.findFirst({
     where: { id: input.campaignId, organizationId: input.organizationId },
     select: {
-      product: { select: { profileJson: true } },
+      product: { select: { id: true, profileJson: true } },
       jobRequirement: {
         select: { title: true, companyName: true, rawText: true },
       },
@@ -126,6 +130,11 @@ async function loadBulletCandidatePacket(input: {
     },
     primaryRoleId,
     directRoleIds,
+    choices: readBulletRoleChoices(campaign.product.profileJson),
+    profileRoles: profile.experience.map((role) => ({
+      roleId: role.id,
+      employer: role.employer?.trim() ?? "",
+    })),
   };
 }
 
@@ -147,7 +156,21 @@ function bulletsFromStored(
     bullets: parsed.data.bullets,
     bands: packet.roles,
     evidence: packet.evidence,
+    choices: packet.choices,
+    roles: packet.profileRoles,
   });
+}
+
+/** Stored General background lines. Reads the receipt and does not call the model. */
+export async function readGeneralBackgroundTexts(input: {
+  organizationId: string;
+  campaignId: string;
+}): Promise<string[]> {
+  const stored = await readResumeBulletCandidates(input);
+  if (!stored) return [];
+  return stored.bullets
+    .filter((bullet) => bullet.roleId === GENERAL_BACKGROUND_ID)
+    .map((bullet) => bullet.text);
 }
 
 /** Page view reads the stored candidates. It does not call the model. */

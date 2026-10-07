@@ -263,6 +263,7 @@ export function buildConsultationPolishMessages(input: {
   target?: { key: string; kind: string; text: string } | null;
   targetStrength?: "STRONG" | "PARTIAL" | "NONE" | null;
   supportingEvidence?: string[];
+  backgroundEvidence?: string[];
   approvedAnswers?: ReadonlyArray<{
     id: string;
     question: string;
@@ -331,6 +332,7 @@ export function buildConsultationPolishMessages(input: {
         target: input.target ?? null,
         targetStrength: input.targetStrength ?? null,
         supportingEvidence: input.supportingEvidence ?? [],
+        backgroundEvidence: input.backgroundEvidence ?? [],
         approvedAnswers: input.approvedAnswers ?? [],
         seekerRepliesTakePrecedenceOverPriorApprovedAnswer:
           (input.approvedAnswers?.length ?? 0) > 0,

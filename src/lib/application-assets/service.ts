@@ -43,7 +43,10 @@ import {
   condensedRoleIdsFromPlan,
   ensureAcceptedPresentationPlan,
 } from "./plan-service";
-import { prepareResumeBulletCandidates } from "./resume-bullet-candidate-service";
+import {
+  prepareResumeBulletCandidates,
+  readGeneralBackgroundTexts,
+} from "./resume-bullet-candidate-service";
 import { loadResumeWriterFields } from "./resume-statement-picker-data";
 import type { AssetGenerationResult } from "./outreach-types";
 import { formatAssetSourceKind } from "./display";
@@ -911,6 +914,12 @@ export async function applicationAssetGenerateWouldSkip(input: {
         })
       : null;
   const condensedRoleIds = writer?.condensedRoleIds ?? planCondensedRoleIds;
+  const backgroundEvidence =
+    writer?.backgroundEvidence ??
+    (await readGeneralBackgroundTexts({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+    }));
   const fingerprint = assetGenerationFingerprint({
     context,
     type: input.type,
@@ -921,6 +930,7 @@ export async function applicationAssetGenerateWouldSkip(input: {
     qualityFeedback: [],
     requiredStatements: writer?.requiredStatements ?? [],
     roleBulletPlans: writer?.roleBulletPlans ?? [],
+    backgroundEvidence,
   });
   return applicationAssetGenerationUnchanged({
     organizationId: input.organizationId,
@@ -1072,6 +1082,12 @@ export async function generateApplicationAsset(input: {
     };
   }
   const salutation = coverLetterSalutation(context);
+  const backgroundEvidence =
+    writer?.backgroundEvidence ??
+    (await readGeneralBackgroundTexts({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+    }));
   let lastMessage = "The model did not return a usable asset.";
   let lastViolations: string[] = [];
   let qualityFeedback: string[] = [];
@@ -1086,12 +1102,14 @@ export async function generateApplicationAsset(input: {
             qualityFeedback,
             requiredStatements: writer?.requiredStatements ?? [],
             roleBulletPlans: writer?.roleBulletPlans ?? [],
+            backgroundEvidence,
           })
         : await generateCoverLetterWithModel({
             context,
             salutation,
             regenerationInstruction: input.regenerationInstruction ?? null,
             qualityFeedback: [],
+            backgroundEvidence,
           });
     if (!generated.ok) {
       lastMessage = generated.message;

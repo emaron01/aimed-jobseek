@@ -1,15 +1,21 @@
 import { Prisma } from "@prisma/client";
+import {
+  profileWithBulletRoleChoices,
+} from "@/lib/application-assets/resume-bullet-candidates";
 import { readResumeBulletCandidates } from "@/lib/application-assets/resume-bullet-candidate-service";
 import {
+  GENERAL_BACKGROUND_ID,
   buildResumeWriterPackage,
   buildStatementGroups,
   resumeStatementPicksFromCampaign,
+  roleGroupHeader,
   workspaceSeenWithoutResumePicks,
   type PickerBullet,
   type RoleBulletPlan,
   type RequiredResumeStatement,
   type StatementGroup,
 } from "@/lib/application-assets/resume-statement-picks";
+import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
 import type { PresentationPlan } from "@/lib/application-assets/plan-contract";
 import { getHarperDraftSettings } from "@/lib/consultation/harper-draft-settings";
 import { prisma } from "@/lib/prisma-client";
@@ -68,17 +74,23 @@ async function loadPickerRows(input: {
   };
 }
 
+export type BulletRoleOption = { roleId: string; label: string };
+
 export async function loadResumeStatementGroups(input: {
   organizationId: string;
   campaignId: string;
-}): Promise<{ groups: StatementGroup[]; needsPrepare: boolean }> {
+}): Promise<{ groups: StatementGroup[]; needsPrepare: boolean; roleOptions: BulletRoleOption[] }> {
   const [rows, settings] = await Promise.all([
     loadPickerRows(input),
     getHarperDraftSettings(),
   ]);
-  if (!rows) return { groups: [], needsPrepare: false };
+  if (!rows) return { groups: [], needsPrepare: false, roleOptions: [] };
   return {
     needsPrepare: rows.needsPrepare,
+    roleOptions: rows.profile.experience.map((role) => ({
+      roleId: role.id,
+      label: roleGroupHeader(role.title?.trim() || "", role.employer?.trim() || ""),
+    })),
     groups: buildStatementGroups({
       profile: rows.profile,
       bullets: rows.bullets,
@@ -100,6 +112,7 @@ export async function loadResumeWriterFields(input: {
   requiredStatements: RequiredResumeStatement[];
   roleBulletPlans: RoleBulletPlan[];
   condensedRoleIds: string[];
+  backgroundEvidence: string[];
 }> {
   const [rows, settings] = await Promise.all([
     loadPickerRows(input),
@@ -112,6 +125,7 @@ export async function loadResumeWriterFields(input: {
       condensedRoleIds: input.planCondensedRoleIds.filter(
         (id) => !input.hiddenRoleIds.includes(id),
       ),
+      backgroundEvidence: [],
     };
   }
   return buildResumeWriterPackage({
@@ -123,6 +137,40 @@ export async function loadResumeWriterFields(input: {
     directRoleIds: rows.directRoleIds,
     planCondensedRoleIds: input.planCondensedRoleIds,
     hiddenRoleIds: input.hiddenRoleIds,
+  });
+}
+
+/** Saves the seeker's job correction on the Personal Profile. Does not call a model. */
+export async function saveBulletEvidenceRole(input: {
+  organizationId: string;
+  campaignId: string;
+  evidenceIds: string[];
+  roleId: string;
+}): Promise<void> {
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: { product: { select: { id: true, profileJson: true } } },
+  });
+  if (!campaign) throw new TenantError("Application was not found.");
+  const roleId = input.roleId.trim();
+  const parsed = parseCandidateProfileSafe(campaign.product.profileJson);
+  const allowed = new Set(
+    (parsed.ok ? parsed.profile.experience : []).map((role) => role.id),
+  );
+  if (roleId !== GENERAL_BACKGROUND_ID && !allowed.has(roleId)) {
+    throw new TenantError("That job is not on the Personal Profile.");
+  }
+  const evidenceIds = [...new Set(input.evidenceIds.map((id) => id.trim()).filter(Boolean))];
+  if (evidenceIds.length === 0) throw new TenantError("That bullet has no evidence to correct.");
+  await prisma.product.update({
+    where: { id: campaign.product.id },
+    data: {
+      profileJson: profileWithBulletRoleChoices(
+        campaign.product.profileJson,
+        evidenceIds,
+        roleId,
+      ) as Prisma.InputJsonValue,
+    },
   });
 }
 
