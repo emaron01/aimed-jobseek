@@ -650,7 +650,6 @@ function AssetTypePanel({
           roleOptions={statementRoleOptions}
           canEdit={canEdit}
           needsPrepare={needsPrepare}
-          preparingBullets={generating}
         />
       ) : null}
       {latest?.staleReason ? (

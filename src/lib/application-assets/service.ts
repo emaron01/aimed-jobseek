@@ -44,10 +44,7 @@ import {
   condensedRoleIdsFromPlan,
   ensureAcceptedPresentationPlan,
 } from "./plan-service";
-import {
-  prepareResumeBulletCandidates,
-  readGeneralBackgroundTexts,
-} from "./resume-bullet-candidate-service";
+import { readGeneralBackgroundTexts } from "./resume-bullet-candidate-service";
 import { loadResumeWriterFields } from "./resume-statement-picker-data";
 import type { AssetGenerationResult } from "./outreach-types";
 import { formatAssetSourceKind } from "./display";
@@ -1061,15 +1058,6 @@ export async function generateApplicationAsset(input: {
   const planCondensedRoleIds = condensedRoleIdsFromPlan(acceptedPlan).filter(
     (id) => !hiddenRoleIds.includes(id),
   );
-  if (input.type === "RESUME") {
-    const prepared = await prepareResumeBulletCandidates({
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-    });
-    if (!prepared.ok) {
-      return { ok: false, message: prepared.message, violations: [] };
-    }
-  }
   const writer =
     input.type === "RESUME"
       ? await loadResumeWriterFields({

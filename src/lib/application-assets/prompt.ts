@@ -220,7 +220,7 @@ export function buildResumeAssetMessages(input: {
               location: "exact supplied location|null",
               hidden: "boolean from hiddenRoleIds only",
               condensed: "boolean from condensedRoleIds only",
-              bullets: ["claim"],
+              bullets: [],
             },
           ],
           skills: ["claim"],

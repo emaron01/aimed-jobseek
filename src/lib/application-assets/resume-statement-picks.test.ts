@@ -161,11 +161,16 @@ describe("Harper Approved Statements picker", () => {
     expect(openText?.items).toHaveLength(12);
     expect(openText?.items.filter((item) => item.checked)).toHaveLength(7);
     expect(vmware?.maxBullets).toBe(5);
-    expect(vmware?.items).toHaveLength(10);
-    expect(vmware?.items[0]?.id).toBe("general-0");
-    expect(vmware?.items.some((item) => item.id === "job")).toBe(false);
-    expect(vmware?.items.filter((item) => item.checked)).toHaveLength(3);
-    expect(vmware?.items.filter((item) => item.checked).every((item) => item.id.startsWith("general"))).toBe(true);
+    expect(vmware?.items).toHaveLength(13);
+    expect(vmware?.items[0]?.id).toBe("job");
+    expect(vmware?.items.filter((item) => item.checked)).toHaveLength(5);
+    expect(vmware?.items.filter((item) => item.checked).map((item) => item.id)).toEqual([
+      "job",
+      "general-0",
+      "general-1",
+      "general-2",
+      "general-3",
+    ]);
 
     const nursing = groupsFor(
       {
@@ -299,26 +304,28 @@ describe("Harper Approved Statements picker", () => {
     });
     expect(JSON.parse(messages[1]?.content ?? "{}").stories).toEqual([]);
     expect(messages[0]?.content).toContain("Prompt version: 4");
-    expect(RESUME_ASSET_PROMPT_VERSION).toBe("13");
+    expect(RESUME_ASSET_PROMPT_VERSION).toBe("14");
     expect(RESUME_WRITER_TEMPERATURE).toBe(0);
     expect(RESUME_ASSET_INSTRUCTIONS).toContain(
-      "Use each picked bullet exactly as written, in the role it was picked for. Do not rewrite a picked bullet and do not add a bullet that was not picked. You may write the summary, the skills, and each role's title, company, and dates.",
+      "Write the summary in two or three sentences that name the seeker's strongest stated results, with their numbers, before describing skills or methods.",
     );
-    expect(RESUME_BULLET_CANDIDATE_PROMPT_VERSION).toBe("6");
-    expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).toContain(
-      "Assign a bullet to a role only when the evidence names that role's employer or is an achievement listed under that role in the Personal Profile. Evidence that names no employer goes to General background, not to a role.",
+    expect(RESUME_ASSET_INSTRUCTIONS).toContain(
+      "You may write the summary, the skills, and each role's title, company, and dates.",
     );
-    expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).toContain(
-      "For each role, write the number of bullets given whenever the evidence supports it. Lead with the seeker's strongest accomplishments (results with numbers, named customers, scope, awards), whether or not the job description mentions them, then add bullets that speak to this job's requirements. When an approved answer and a Personal Profile achievement state the same result, write the bullet from the approved answer. Every distinct result the seeker stated for a role appears in at least one bullet. Rank by strength of evidence and relevance to this job together.",
-    );
-    expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).toContain(
-      "Start each bullet with a strong action verb and include the result or number when the seeker stated one. Do not write the employer's name in a bullet; the job heading already shows it. Each bullet describes results from one employer only. Lead with the result. Do not list departments or teams; name at most two when they matter. Do not end a bullet with a general phrase about how the work was done. Customer and partner names the seeker stated are fine.",
-    );
-    expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).not.toContain(
-      "For each role, write up to the number of bullets given for that role.",
-    );
-    expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).not.toContain(
-      "Rank job-specific bullets ahead of general accomplishments for the same role.",
+    expect(RESUME_ASSET_INSTRUCTIONS).not.toContain("Use each picked bullet exactly as written");
+    expect(RESUME_ASSET_INSTRUCTIONS).not.toContain("Use approved resume bullets when they are strong");
+    expect(RESUME_ASSET_INSTRUCTIONS).toContain("SEEKER_REPLY");
+    expect(RESUME_BULLET_CANDIDATE_PROMPT_VERSION).toBe("7");
+    expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS).toBe(
+      [
+        "Write resume bullet candidates from the seeker's own evidence for this job.",
+        "Facts: Use only the supplied evidence. The seeker's words are the facts. Never add or change a number, employer, customer, title, date, credential, skill, or outcome.",
+        "Placement: Put each bullet under the role where it happened: the role whose employer the evidence or its question names, or the role an achievement is listed under. If you cannot tell, give your best guess and set needsJobCheck to true. If the evidence is not about any one role, set roleId to null. Each bullet covers one employer.",
+        "Ownership: Describe the seeker's real part. Say the seeker led, managed, or coached others only when the evidence says so for that role. When a team result came from the seeker's coaching, say so, for example \"Coached the team to close...\".",
+        "Content: Write up to the number of bullets given for each role, best first: the seeker's biggest stated results (numbers, named customers, scope, awards), then bullets that speak to this job. Every distinct result with a number appears in a bullet. Never write two bullets for the same result. Write bullets only for accomplishments; skip work arrangements, commute, pay, availability, and why the seeker wants the job.",
+        "Style: One line, under 30 words. Start with a strong verb and the result. Do not name the employer; the job heading shows it. Customer and partner names are fine. Name at most two teams or departments. Leave story details, such as system counts and step-by-step methods, for interviews. No filler endings.",
+        "Return structured JSON only.",
+      ].join("\n"),
     );
   });
 
@@ -391,7 +398,7 @@ describe("Harper Approved Statements picker", () => {
     const payload = JSON.parse(messages[1]?.content ?? "{}") as {
       roles: Array<{ roleId: string; candidateCount: number }>;
     };
-    expect(payload.roles.find((role) => role.roleId === "opentext")?.candidateCount).toBe(14);
+    expect(payload.roles.find((role) => role.roleId === "opentext")?.candidateCount).toBe(7);
     const exact = resumeWithExactPickedBullets(
       {
         type: "RESUME",
@@ -445,15 +452,11 @@ describe("Harper Approved Statements picker", () => {
     const prepareBody = action.slice(prepareStart, action.indexOf("export async function saveResumeStatementPicksAction"));
     expect(prepareBody).not.toContain("enqueueApplicationJob");
     const generateAction = action.slice(action.indexOf("export async function generateApplicationAssetAction"));
-    expect(generateAction.indexOf("prepareResumeBulletCandidates")).toBeLessThan(
-      generateAction.indexOf("applicationAssetGenerateWouldSkip"),
-    );
+    expect(generateAction).not.toContain("prepareResumeBulletCandidates");
     const service = readFileSync("src/lib/application-assets/service.ts", "utf8");
     const generateStart = service.indexOf("export async function generateApplicationAsset");
     const generateFn = service.slice(generateStart);
-    expect(generateFn.indexOf("prepareResumeBulletCandidates")).toBeLessThan(
-      generateFn.indexOf("loadResumeWriterFields"),
-    );
+    expect(generateFn).not.toContain("prepareResumeBulletCandidates");
   });
 
   it("keeps a bullet only with its own employer or its own profile achievement", () => {
@@ -493,15 +496,17 @@ describe("Harper Approved Statements picker", () => {
     });
     console.info = info;
     expect(assigned.map((item) => `${item.roleId}:${item.text}`)).toEqual([
-      "opentext:Held forecast deviation to 5-10% in FY26.",
+      "vmware:Held forecast deviation to 5-10% in FY26.",
+      "opentext:Held forecast deviation to 5-10%.",
+      "clinic:Precepted new nurses on the night shift.",
       "mercy:Precepted new nurses on the night shift.",
       "intern:Shipped a clinic intake form during a capstone rotation.",
-      "general:Joined a team that will teach me.",
+      "opentext:Joined a team that will teach me.",
+      "mercy:Joined a team that will teach me.",
+      "intern:Joined a team that will teach me.",
     ]);
-    expect(assigned.some((item) => item.roleId === "vmware" || item.roleId === "clinic")).toBe(false);
     expect(assigned.some((item) => item.text.includes("OpenText"))).toBe(false);
     expect(logged.some((line) => line.includes("resume_bullet_candidate_dropped") && line.includes("at OpenText"))).toBe(false);
-    expect(logged.some((line) => line.includes("resume_bullet_candidate_moved") && line.includes("general"))).toBe(true);
     const background = groupsFor(salesProfile, [
       bullet("bg", "general", "Joined a team that will teach me.", false),
     ]);
@@ -675,7 +680,7 @@ describe("Harper Approved Statements picker", () => {
         { roleId: "gryphon", text: sprint, jobSpecific: false, evidenceIds: [shared] },
       ],
     });
-    expect(moved.find((item) => item.text === goal)?.roleId).toBe("general");
+    expect(moved.find((item) => item.text === goal)?.roleId).toBe("gryphon");
     expect(moved.find((item) => item.text === sprint)?.roleId).toBe("gryphon");
     expect(
       attributedEvidenceRole(
@@ -733,7 +738,10 @@ describe("Harper Approved Statements picker", () => {
       ],
     });
     expect(duplicates.filter((item) => item.text.toLowerCase().includes("vmware"))).toHaveLength(1);
-    expect(duplicates.filter((item) => item.text.includes("Bank of America")).map((item) => item.roleId)).toEqual(["opentext"]);
+    expect(duplicates.filter((item) => item.text.includes("Bank of America")).map((item) => item.roleId)).toEqual([
+      "opentext",
+      "general",
+    ]);
     expect(duplicates.some((item) => item.text.includes("$100K") && item.text.includes("$6MM"))).toBe(true);
     expect(duplicates.some((item) => item.roleId === "general" && item.text.includes("capstone"))).toBe(true);
     expect(graduateProfile.projectTexts).toContain("Capstone project");
@@ -794,11 +802,11 @@ describe("Harper Approved Statements picker", () => {
         { roleId: "general", text: capstone, jobSpecific: false, evidenceIds: ["capstone"] },
       ],
     });
-    expect(assigned.filter((item) => item.text.includes("$6.8MM")).map((item) => item.text)).toEqual([gsiShort]);
+    expect(assigned.filter((item) => item.text.includes("$6.8MM")).map((item) => item.text)).toEqual([gsiLong]);
     expect(assigned.filter((item) => item.text.includes("$1.3MM")).map((item) => item.text).sort()).toEqual(
       [fullContract, strategyOnly].sort(),
     );
-    expect(assigned.filter((item) => item.roleId === "mercy").map((item) => item.text)).toEqual([preceptRanked]);
+    expect(assigned.filter((item) => item.roleId === "mercy").map((item) => item.text)).toEqual([precept]);
     expect(assigned.some((item) => item.roleId === "general" && item.text === capstone)).toBe(true);
     expect(graduateProfile.projectTexts).toContain("Capstone project");
     const groups = buildStatementGroups({
@@ -960,23 +968,23 @@ describe("Harper Approved Statements picker", () => {
     });
     console.info = info;
     const ramp = assigned.find((item) => item.evidenceIds.includes("ramp-ach"));
-    expect(ramp?.roleId).toBe("ramp");
+    expect(ramp?.roleId).toBe("gryphon");
     expect(ramp?.text).toBe(rampText);
     expect(ramp?.text.toLowerCase().includes("gryphon")).toBe(false);
     const possessive = assigned.find((item) => item.evidenceIds.includes("possessive"));
-    expect(possessive?.roleId).toBe("opentext");
+    expect(possessive?.roleId).toBe("gryphon");
     expect(possessive?.text).toBe(
       "Built enterprise forecasting practice for Bank of America and AT&T.",
     );
     expect(possessive?.text.includes("OpenText")).toBe(false);
     const fromQuestion = assigned.find((item) => item.evidenceIds.includes("ot-question"));
-    expect(fromQuestion?.roleId).toBe("opentext");
+    expect(fromQuestion?.roleId).toBe("ramp");
     expect(fromQuestion?.text).toContain("Bank of America");
     expect(fromQuestion?.text).toContain("AT&T");
     expect(
       assigned.find((item) => item.text === "Closed a multi-threaded deal with a national bank.")
         ?.roleId,
-    ).toBe("general");
+    ).toBe("opentext");
     expect(assigned.some((item) => item.text === "grew the magazine group.")).toBe(true);
     expect(assigned.some((item) => item.text.includes("Merion"))).toBe(false);
     expect(assigned.some((item) => item.text === "Led account managers on a national team.")).toBe(true);
@@ -1032,7 +1040,7 @@ describe("Harper Approved Statements picker", () => {
       evidence: withQuestion,
       job: { title: "Account Executive", employer: "Sift", posting: "Own the forecast." },
     });
-    expect(messages[0]?.content.startsWith("Prompt version: 6")).toBe(true);
+    expect(messages[0]?.content.startsWith("Prompt version: 7")).toBe(true);
     expect(JSON.parse(messages[1]?.content ?? "{}").evidence[0].question).toContain("OpenText");
     expect(employerNameRetryMessage()).toContain("does not include the employer's name");
     expect(
@@ -1052,18 +1060,12 @@ describe("Harper Approved Statements picker", () => {
     const prepare = readFileSync("src/lib/application-assets/resume-bullet-candidate-service.ts", "utf8");
     const provider = prepare.slice(prepare.indexOf("callProvider: async"));
     expect(prepare.indexOf("runPaidStructuredCall")).toBeLessThan(prepare.indexOf("callProvider: async"));
-    expect(provider).toContain("employerRetryDecision");
-    expect(provider).toContain("employerNameRetryMessage()");
-    expect(provider).toContain("mergeEmployerNameRetry");
-    expect(provider.indexOf("employerRetryDecision")).toBeLessThan(
-      provider.indexOf("mergeEmployerNameRetry"),
-    );
-    expect(provider.indexOf("mergeEmployerNameRetry")).toBeLessThan(
-      provider.indexOf("uncoveredResultFollowUpMessage"),
-    );
-    expect(provider).toContain("resume_bullet_candidates_follow_up");
-    expect(provider.match(/uncoveredResultFollowUpMessage/g)).toHaveLength(1);
-    expect(provider).toContain("if (uncovered.length === 0 || !system) return kept");
+    expect(provider).not.toContain("employerRetryDecision");
+    expect(provider).not.toContain("employerNameRetryMessage()");
+    expect(provider).not.toContain("mergeEmployerNameRetry");
+    expect(provider).not.toContain("uncoveredResultFollowUpMessage");
+    expect(provider).not.toContain("resume_bullet_candidates_follow_up");
+    expect(prepare).toContain("evidenceNotCovered");
 
     const strong = [
       { id: "jd", text: "Partnered with marketing on demand generation.", jobSpecific: true },
@@ -1090,25 +1092,22 @@ describe("Harper Approved Statements picker", () => {
         evidenceIds: [item.id],
       })),
     });
-    expect(ranked.map((item) => item.text)).toEqual([
-      "Closed a multi-threaded $1.3MM Bank of America deal.",
-      "Improved forecast deviation from 20% to 5-10%.",
-      "Delivered $6.8MM in FY26 revenue, including $3.5MM in new enterprise.",
-      "Ran a VMware campaign that created $3MM in pipeline.",
-    ]);
+    expect(ranked.map((item) => item.text)).toEqual(strong.map((item) => item.text));
     const recommended = groupsFor(salesProfile, ranked.map((item, index) => ({
       ...item,
       id: strong.filter((row) => item.text === row.text)[0]?.id ?? `ranked-${index}`,
     })));
     const openText = recommended.find((group) => group.roleId === "opentext");
     expect(openText?.items.slice(0, 4).every((item) => item.checked)).toBe(true);
-    expect(openText?.items[0]?.content).toContain("Bank of America");
-    expect(applicationAssetConfig.labels.preparingResumeBullets).toBe(
-      "Harper is preparing your resume bullets…",
-    );
+    expect(openText?.items[0]?.content).toContain("Partnered with marketing");
+    expect(applicationAssetConfig.labels.refreshBullets).toBe("Refresh bullets");
+    expect(applicationAssetConfig.labels.checkTheJob).toBe("Check the job");
     const assets = readFileSync("src/components/ApplicationAssetsSection.tsx", "utf8");
-    expect(assets).toContain("preparingBullets={generating}");
-    expect(assets).toContain("router.refresh");
+    expect(assets).not.toContain("preparingBullets={generating}");
+    const picker = readFileSync("src/components/ResumeStatementPicker.tsx", "utf8");
+    expect(picker).toContain("refreshBullets");
+    expect(picker).toContain("check-the-job");
+    expect(picker).toContain("router.refresh");
   });
 
   it("uses the whole library, keeps every stated result, and matches a shorter employer name", () => {
@@ -1200,9 +1199,7 @@ describe("Harper Approved Statements picker", () => {
       evidence,
       job: { title: "Account Executive", employer: "Sift", posting: "Own the forecast." },
     });
-    expect(messages[0]?.content).toContain(
-      "When an approved answer and a Personal Profile achievement state the same result, write the bullet from the approved answer.",
-    );
+    expect(messages[0]?.content).toContain("set needsJobCheck to true");
     const sent = JSON.parse(messages[1]?.content ?? "{}") as { evidence: Array<{ id: string }> };
     expect(sent.evidence[0]?.id).toBe("library-deal");
     expect(sent.evidence.map((item) => item.id).indexOf("ach-ot")).toBeGreaterThan(0);
@@ -1391,7 +1388,7 @@ describe("Harper Approved Statements picker", () => {
         },
       ],
     });
-    expect(placed[0]?.roleId).toBe("micro-focus");
+    expect(placed[0]?.roleId).toBe("general");
     expect(placed[0]?.text).toBe("Closed the renewal.");
     expect(placed[0]?.text.includes("Micro Focus")).toBe(false);
   });
@@ -1594,10 +1591,55 @@ describe("Harper Approved Statements picker", () => {
 });
 
 describe("resume bullet style, date order, and seeker edits", () => {
-  const style =
-    "Each bullet describes results from one employer only. Lead with the result. Do not list departments or teams; name at most two when they matter. Do not end a bullet with a general phrase about how the work was done.";
+  const style = "Do not name the employer; the job heading shows it. Customer and partner names are fine.";
   const summarySentence =
     "Write the summary in two or three sentences that name the seeker's strongest stated results, with their numbers, before describing skills or methods.";
+
+  it("shows Check the job and does not pre-check until the seeker confirms the job", () => {
+    const evidence = [
+      {
+        id: "ev-deal",
+        kind: "INTERVIEW_ANSWER" as const,
+        text: "Closed a $2MM deal.",
+        roleId: null,
+        question: null,
+      },
+    ];
+    const bands = [{ roleId: "opentext", employer: "OpenText", candidateCount: 7 }];
+    const assigned = assignCandidateBullets({
+      bands,
+      evidence,
+      bullets: [
+        {
+          roleId: "opentext",
+          text: "Closed a $2MM deal.",
+          evidenceIds: ["ev-deal"],
+          needsJobCheck: true,
+        },
+      ],
+    });
+    const open = groupsFor(salesProfile, assigned).find((group) => group.roleId === "opentext");
+    expect(open?.items[0]?.needsJobCheck).toBe(true);
+    expect(open?.items[0]?.checked).toBe(false);
+    const confirmed = assignCandidateBullets({
+      bands,
+      evidence,
+      choices: { [assigned[0]!.resultKey ?? ""]: "opentext" },
+      bullets: [
+        {
+          roleId: "opentext",
+          text: "Closed a $2MM deal.",
+          evidenceIds: ["ev-deal"],
+          needsJobCheck: true,
+        },
+      ],
+    });
+    const confirmedItem = groupsFor(salesProfile, confirmed).find((group) => group.roleId === "opentext")
+      ?.items[0];
+    expect(confirmedItem?.needsJobCheck).toBe(false);
+    expect(confirmedItem?.checked).toBe(true);
+    expect(applicationAssetConfig.labels.checkTheJob).toBe("Check the job");
+  });
 
   it("splits one answer that names two employers and keeps each result on its own bullet", () => {
     const roles = [
@@ -1677,7 +1719,7 @@ describe("resume bullet style, date order, and seeker edits", () => {
     });
     const att = placed.find((item) => item.text.includes("6.8"));
     const sprint = placed.find((item) => item.text.includes("12 million"));
-    expect(att?.roleId).toBe("micro");
+    expect(att?.roleId).toBe("gryphon");
     expect(sprint?.roleId).toBe("gryphon");
     expect(att?.text.includes("12 million")).toBe(false);
     expect(sprint?.text.includes("6.8")).toBe(false);
@@ -1690,7 +1732,7 @@ describe("resume bullet style, date order, and seeker edits", () => {
 
   it("keeps the approved bullet and summary sentences, and orders roles most recent first", () => {
     expect(RESUME_BULLET_CANDIDATE_INSTRUCTIONS.indexOf(style)).toBeGreaterThan(
-      RESUME_BULLET_CANDIDATE_INSTRUCTIONS.indexOf("Do not write the employer's name in a bullet"),
+      RESUME_BULLET_CANDIDATE_INSTRUCTIONS.indexOf("Facts:"),
     );
     expect(RESUME_ASSET_INSTRUCTIONS.indexOf(summarySentence)).toBeGreaterThan(
       RESUME_ASSET_INSTRUCTIONS.indexOf("Write a concise job-specific summary."),

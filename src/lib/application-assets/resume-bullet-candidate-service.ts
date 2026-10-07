@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import {
   getConsultationReplyAiProvider,
   isConsultationReplyAiConfigured,
@@ -11,31 +12,31 @@ import {
 } from "@/lib/application-assets/contract";
 import { acceptedPresentationPlan } from "@/lib/application-assets/plan-service";
 import {
-  applyBulletTextEdits,
   assignCandidateBullets,
   buildResumeBulletCandidateMessages,
   bulletCandidateRoles,
   bulletEditEvidence,
-  employerNameRetryMessage,
-  employerRetryDecision,
-  mergeEmployerNameRetry,
-  mergeFollowUpBullets,
+  evidenceNotCovered,
   questionTextForAnswer,
   readBulletRoleChoices,
   readBulletTextEdits,
+  profileWithSeekerBullet,
+  readSeekerBullets,
   resumeBulletCandidateFingerprint,
+  sameBulletResult,
+  seekerBulletEvidence,
   selectableBulletEvidence,
   splitEvidenceByEmployer,
   storedCandidatesMatch,
-  uncitedStatedResults,
-  uncoveredResultFollowUpMessage,
   type BulletCandidateRole,
   type BulletEvidence,
   type BulletQuestionTurn,
+  type SeekerBulletRecord,
 } from "@/lib/application-assets/resume-bullet-candidates";
 import {
   GENERAL_BACKGROUND_ID,
   pickerProfileFromCandidate,
+  resumeStatementPicksFromCampaign,
   type PickerBullet,
   type PickerProfile,
 } from "@/lib/application-assets/resume-statement-picks";
@@ -49,6 +50,8 @@ export const RESUME_BULLET_CANDIDATES_OPERATION = "RESUME_BULLET_CANDIDATES" as 
 const UNCONFIGURED = "Resume bullet preparation is not configured.";
 
 export type BulletCandidatePacket = {
+  productId: string;
+  profileJson: unknown;
   profile: PickerProfile;
   roles: BulletCandidateRole[];
   evidence: BulletEvidence[];
@@ -57,6 +60,8 @@ export type BulletCandidatePacket = {
   directRoleIds: string[];
   choices: Record<string, string>;
   textEdits: Record<string, string>;
+  seekerBullets: SeekerBulletRecord[];
+  pickedIds: string[];
   profileRoles: Array<{ roleId: string; employer: string }>;
 };
 
@@ -67,6 +72,8 @@ async function loadBulletCandidatePacket(input: {
   const campaign = await prisma.campaign.findFirst({
     where: { id: input.campaignId, organizationId: input.organizationId },
     select: {
+      resumeStatementPicksJson: true,
+      workspaceSeenJson: true,
       product: { select: { id: true, profileJson: true } },
       jobRequirement: {
         select: { title: true, companyName: true, rawText: true },
@@ -165,7 +172,14 @@ async function loadBulletCandidatePacket(input: {
     employer: role.employer?.trim() ?? "",
   }));
   const textEdits = readBulletTextEdits(campaign.product.profileJson);
+  const seekerBullets = readSeekerBullets(campaign.product.profileJson);
+  const picked = resumeStatementPicksFromCampaign({
+    resumeStatementPicksJson: campaign.resumeStatementPicksJson,
+    workspaceSeenJson: campaign.workspaceSeenJson,
+  });
   return {
+    productId: campaign.product.id,
+    profileJson: campaign.product.profileJson,
     profile,
     roles: bulletCandidateRoles({
       profile,
@@ -211,6 +225,7 @@ async function loadBulletCandidatePacket(input: {
         profileRoles,
       ),
       ...bulletEditEvidence(textEdits),
+      ...seekerBulletEvidence(seekerBullets),
     ],
     job: {
       title: campaign.jobRequirement?.title ?? "",
@@ -221,6 +236,8 @@ async function loadBulletCandidatePacket(input: {
     directRoleIds,
     choices: readBulletRoleChoices(campaign.product.profileJson),
     textEdits,
+    seekerBullets,
+    pickedIds: picked.picks ?? [],
     profileRoles,
   };
 }
@@ -238,17 +255,61 @@ function bulletsFromStored(
   json: unknown,
 ): PickerBullet[] {
   const parsed = resumeBulletCandidatesSchema.safeParse(json);
-  if (!parsed.success) return [];
-  return applyBulletTextEdits(
-    assignCandidateBullets({
-      bullets: parsed.data.bullets,
-      bands: packet.roles,
-      evidence: packet.evidence,
-      choices: packet.choices,
-      roles: packet.profileRoles,
-    }),
-    packet.textEdits,
-  );
+  const assigned = parsed.success
+    ? assignCandidateBullets({
+        bullets: parsed.data.bullets,
+        bands: packet.roles,
+        evidence: packet.evidence,
+        choices: packet.choices,
+        roles: packet.profileRoles,
+        pickedIds: new Set(packet.pickedIds),
+        textEdits: packet.textEdits,
+      })
+    : [];
+  return mergeStoredSeekerBullets(assigned, packet.seekerBullets);
+}
+
+function mergeStoredSeekerBullets(
+  candidates: readonly PickerBullet[],
+  seekers: readonly SeekerBulletRecord[],
+): PickerBullet[] {
+  if (seekers.length === 0) return [...candidates];
+  const used = new Set<string>();
+  const merged = candidates.flatMap((candidate) => {
+    const seeker = seekers.find(
+      (item) =>
+        !used.has(item.id) &&
+        (item.id === candidate.id ||
+          sameBulletResult(item.text, candidate.text)),
+    );
+    if (!seeker) return [candidate];
+    used.add(seeker.id);
+    return [
+      {
+        ...candidate,
+        id: seeker.id,
+        roleId: seeker.roleId ?? GENERAL_BACKGROUND_ID,
+        text: seeker.text,
+        seekerOwned: true,
+        needsJobCheck: false,
+        seekerChosen: true,
+      },
+    ];
+  });
+  return [
+    ...merged,
+    ...seekers
+      .filter((seeker) => !used.has(seeker.id))
+      .map((seeker) => ({
+        id: seeker.id,
+        roleId: seeker.roleId ?? GENERAL_BACKGROUND_ID,
+        text: seeker.text,
+        evidenceIds: [`seeker-bullet:${seeker.id}`],
+        seekerOwned: true,
+        needsJobCheck: false,
+        seekerChosen: true,
+      })),
+  ];
 }
 
 /** Stored General background lines. Reads the receipt and does not call the model. */
@@ -292,6 +353,34 @@ export async function readResumeBulletCandidates(input: {
   };
 }
 
+async function keepPickedBullets(packet: BulletCandidatePacket, json: unknown): Promise<void> {
+  const shown = bulletsFromStored(packet, json);
+  const keep = shown.filter(
+    (bullet) => bullet.seekerOwned || packet.pickedIds.includes(bullet.id),
+  );
+  if (keep.length === 0) return;
+  let profileJson = packet.profileJson;
+  let changed = false;
+  for (const bullet of keep) {
+    const existing = readSeekerBullets(profileJson);
+    const roleId = bullet.roleId === GENERAL_BACKGROUND_ID ? null : bullet.roleId;
+    if (existing.some((item) => item.id === bullet.id && item.text === bullet.text && item.roleId === roleId)) {
+      continue;
+    }
+    profileJson = profileWithSeekerBullet(profileJson, {
+      id: bullet.id,
+      text: bullet.text,
+      roleId,
+    });
+    changed = true;
+  }
+  if (!changed) return;
+  await prisma.product.update({
+    where: { id: packet.productId },
+    data: { profileJson: profileJson as Prisma.InputJsonValue },
+  });
+}
+
 /** Seeker action. A matching fingerprint returns the stored bullets and does not call the model. */
 export async function prepareResumeBulletCandidates(input: {
   organizationId: string;
@@ -310,6 +399,7 @@ export async function prepareResumeBulletCandidates(input: {
     },
     select: { inputHash: true, resultJson: true },
   });
+  if (receipt) await keepPickedBullets(packet, receipt.resultJson);
   if (
     storedCandidatesMatch(receipt?.inputHash ?? null, fingerprint) &&
     resumeBulletCandidatesSchema.safeParse(receipt?.resultJson).success
@@ -319,9 +409,25 @@ export async function prepareResumeBulletCandidates(input: {
   if (!isConsultationReplyAiConfigured()) {
     return { ok: false, message: UNCONFIGURED };
   }
+  const previous = resumeBulletCandidatesSchema.safeParse(receipt?.resultJson);
+  const previousBullets = previous.success ? previous.data.bullets : [];
+  const shown = previous.success ? bulletsFromStored(packet, receipt?.resultJson) : [];
+  const covered = [
+    ...packet.seekerBullets.map((bullet) => ({ text: bullet.text, evidenceIds: [] as string[] })),
+    ...shown
+      .filter((bullet) => bullet.seekerOwned || packet.pickedIds.includes(bullet.id))
+      .map((bullet) => ({ text: bullet.text, evidenceIds: bullet.evidenceIds })),
+  ];
+  const employers = packet.profileRoles.map((role) => role.employer);
+  const evidence = evidenceNotCovered({
+    evidence: packet.evidence,
+    bullets: covered,
+    employers,
+  });
+  if (previous.success && evidence.length === 0) return { ok: true, skipped: true };
   const messages = buildResumeBulletCandidateMessages({
     roles: packet.roles,
-    evidence: packet.evidence,
+    evidence,
     job: packet.job,
   });
   try {
@@ -333,71 +439,31 @@ export async function prepareResumeBulletCandidates(input: {
       parseStored: (json) => resumeBulletCandidatesSchema.parse(json),
       isResultUsable: (stored) => Array.isArray(stored.bullets),
       callProvider: async () => {
-        const employers = packet.profileRoles.map((role) => role.employer);
-        const generate = async (
-          nextMessages: Array<{ role: "system" | "user"; content: string }>,
-          step: string,
-        ) => {
-          const response = await getConsultationReplyAiProvider({
-            temperature: RESUME_WRITER_TEMPERATURE,
-          }).generateStructured({
-            ...structuredOutputRequest("resumeBulletCandidates"),
-            ...aiCallTracking({
-              organizationId: input.organizationId,
-              campaignId: input.campaignId,
-              category: "ASSET_GENERATION",
-              operation: "APPLICATION_ASSET_GENERATION",
-              metadata: { step },
-            }),
-            messages: nextMessages,
-            parseOutput: (raw) => ({
-              data: resumeBulletCandidatesSchema.parse(raw),
-              coercedFields: [],
-            }),
-          });
-          return response.data;
-        };
-        const first = await generate(messages, "resume_bullet_candidates");
-        let kept = first;
-        if (
-          employerRetryDecision({
-            bullets: first.bullets,
-            employers,
-            alreadyRetried: false,
-          }) === "retry"
-        ) {
-          const retry = await generate(
-            [...messages, { role: "user", content: employerNameRetryMessage() }],
-            "resume_bullet_candidates_retry",
-          );
-          kept = mergeEmployerNameRetry({ first, retry, employers });
-        }
-        const uncovered = uncitedStatedResults({
-          evidence: packet.evidence,
-          bullets: kept.bullets,
-          employers,
+        const response = await getConsultationReplyAiProvider({
+          temperature: RESUME_WRITER_TEMPERATURE,
+        }).generateStructured({
+          ...structuredOutputRequest("resumeBulletCandidates"),
+          ...aiCallTracking({
+            organizationId: input.organizationId,
+            campaignId: input.campaignId,
+            category: "ASSET_GENERATION",
+            operation: "APPLICATION_ASSET_GENERATION",
+            metadata: { step: "resume_bullet_candidates" },
+          }),
+          messages,
+          parseOutput: (raw) => ({
+            data: resumeBulletCandidatesSchema.parse(raw),
+            coercedFields: [],
+          }),
         });
-        const system = messages[0];
-        if (uncovered.length === 0 || !system) return kept;
-        const followUp = await generate(
-          [
-            system,
-            {
-              role: "user",
-              content: uncoveredResultFollowUpMessage({
-                roles: packet.roles,
-                evidence: uncovered,
-                job: packet.job,
-              }),
-            },
-          ],
-          "resume_bullet_candidates_follow_up",
+        const added = response.data.bullets.filter(
+          (bullet) =>
+            !previousBullets.some((existing) =>
+              sameBulletResult(existing.text, bullet.text, employers),
+            ) &&
+            !covered.some((existing) => sameBulletResult(existing.text, bullet.text, employers)),
         );
-        return mergeFollowUpBullets({
-          kept,
-          followUp,
-          uncoveredIds: new Set(uncovered.map((item) => item.id)),
-        });
+        return { bullets: [...previousBullets, ...added] };
       },
     });
     return { ok: true, skipped: false };

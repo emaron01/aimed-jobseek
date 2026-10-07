@@ -64,6 +64,15 @@ function BulletLine({
           defaultChecked={item.checked}
           disabled={!canEdit}
           className="mt-1"
+          onChange={(event) => {
+            if (!item.needsJobCheck || !event.target.checked) return;
+            void saveBulletEvidenceRoleAction({
+              campaignId,
+              bulletId: item.id,
+              roleId: groupRoleId ?? GENERAL_BACKGROUND_ID,
+              pick: true,
+            }).then(() => router.refresh());
+          }}
         />
         <span className="mt-0.5 block">
           {editing ? draft : item.content}
@@ -73,6 +82,14 @@ function BulletLine({
               data-testid="harper-recommends"
             >
               {labels.harperRecommends}
+            </span>
+          ) : null}
+          {item.needsJobCheck ? (
+            <span
+              className="ml-2 inline-block rounded border border-edge px-1 align-middle text-xs text-subtle"
+              data-testid="check-the-job"
+            >
+              {labels.checkTheJob}
             </span>
           ) : null}
         </span>
@@ -91,7 +108,7 @@ function BulletLine({
                   campaignId,
                   bulletId: item.id,
                   roleId,
-                });
+                }).then(() => router.refresh());
               });
             }}
           >
@@ -251,7 +268,7 @@ export function ResumeStatementPicker({
           <AppPendingIndicator label={labels.preparingResumeBullets} />
         </p>
       ) : null}
-      {needsPrepare && canEdit ? (
+      {canEdit && (needsPrepare || groups.length > 0) ? (
         <form action={prepare}>
           <input type="hidden" name="campaignId" value={campaignId} />
           <button
@@ -259,7 +276,7 @@ export function ResumeStatementPicker({
             disabled={preparing}
             className="rounded-md bg-ink px-3 py-2 text-sm font-medium text-on-ink disabled:opacity-60"
           >
-            {labels.prepareResumeBullets}
+            {labels.refreshBullets}
           </button>
           {prepared ? (
             <p className={prepared.ok ? "mt-2 text-sm text-success" : "mt-2 text-sm text-danger"} role="status">

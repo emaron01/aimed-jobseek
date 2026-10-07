@@ -60,6 +60,10 @@ export type StatementGroupItem = {
   /** Harper's recommendation. Shown even when the seeker's checkbox differs. */
   recommended: boolean;
   evidenceIds: string[];
+  /** The model was not sure of the job. Hidden once the seeker confirms it. */
+  needsJobCheck: boolean;
+  /** The seeker edited or picked this bullet. A candidate run does not change it. */
+  seekerOwned: boolean;
 };
 
 export type StatementGroup = {
@@ -96,12 +100,14 @@ export type PickerBullet = {
   id: string;
   roleId: string;
   text: string;
-  jobSpecific: boolean;
+  jobSpecific?: boolean;
   evidenceIds: string[];
   /** True when the seeker moved this bullet onto the role. */
   seekerChosen?: boolean;
   /** Result key of the draft text. An edit replaces the text and keeps this key. */
   resultKey?: string;
+  needsJobCheck?: boolean;
+  seekerOwned?: boolean;
 };
 
 export type RoleBulletBand = {
@@ -457,7 +463,7 @@ export function roleGroupHeader(title: string, employer: string): string {
 
 export function candidateCountForBand(maxBullets: number, titleOnly: boolean): number {
   if (titleOnly) return 0;
-  return Math.max(0, maxBullets) * 2;
+  return Math.max(0, maxBullets);
 }
 
 /** Personal Profile roles that take bullets. A role 15 or more years ago is still offered, unchecked, unless it is directly relevant. */
@@ -484,17 +490,15 @@ export function roleBulletBands(input: {
       settings: input.settings,
     });
     const role = input.profile.experience.find((item) => item.id === place.roleId);
-    const offeredMax = range.titleOnly
-      ? input.settings.oldestRelevantBulletMax
-      : range.max;
+    const maxBullets = range.titleOnly ? 0 : range.max;
     bands.push({
       roleId: place.roleId,
       title: role?.title?.trim() || place.title,
       employer: role?.employer?.trim() || place.title,
       yearsSinceEnd,
       minBullets: range.titleOnly ? 0 : range.min,
-      maxBullets: range.titleOnly ? 0 : range.max,
-      candidateCount: candidateCountForBand(offeredMax, false),
+      maxBullets,
+      candidateCount: maxBullets,
       isPrimary,
       directlyRelevant,
       titleOnly: range.titleOnly,
@@ -529,7 +533,14 @@ function bulletChecked(input: {
   recommended: boolean;
   saved: string[] | null;
   seen: string[] | null;
+  seekerOwned: boolean;
+  needsJobCheck: boolean;
 }): boolean {
+  if (input.needsJobCheck) return false;
+  if (input.seekerOwned) {
+    if (input.saved === null) return true;
+    return input.saved.includes(input.id);
+  }
   if (input.saved === null) return input.recommended;
   if (input.saved.includes(input.id)) return true;
   if (!input.recommended) return false;
@@ -552,18 +563,13 @@ export function buildStatementGroups(input: {
   const saved = input.savedPickIds;
   const seen = input.seenBulletIds ?? null;
   const groups: StatementGroup[] = bands.map((band) => {
-    const shown = orderRoleBullets(
-      input.bullets.filter((bullet) => bullet.roleId === band.roleId),
-      band.candidateCount,
+    const shown = input.bullets.filter((bullet) => bullet.roleId === band.roleId);
+    const recommendedIds = new Set(
+      shown
+        .filter((bullet) => !bullet.needsJobCheck)
+        .slice(0, band.maxBullets)
+        .map((bullet) => bullet.id),
     );
-    const recommendedCount =
-      band.titleOnly && !band.directlyRelevant
-        ? 0
-        : Math.min(
-            shown.length,
-            band.isPrimary || band.directlyRelevant ? band.maxBullets : band.minBullets,
-          );
-    const recommendedIds = new Set(shown.slice(0, recommendedCount).map((bullet) => bullet.id));
     return {
       id: band.roleId,
       title: roleGroupHeader(band.title, band.employer),
@@ -574,6 +580,8 @@ export function buildStatementGroups(input: {
       titleOnly: band.titleOnly,
       showRange: true,
       items: shown.map((bullet) => {
+        const needsJobCheck = bullet.needsJobCheck === true;
+        const seekerOwned = bullet.seekerOwned === true;
         const recommended = recommendedIds.has(bullet.id);
         return {
           id: bullet.id,
@@ -581,8 +589,17 @@ export function buildStatementGroups(input: {
           content: bullet.text,
           requirementLabel: null,
           recommended,
-          checked: bulletChecked({ id: bullet.id, recommended, saved, seen }),
+          checked: bulletChecked({
+            id: bullet.id,
+            recommended,
+            saved,
+            seen,
+            seekerOwned,
+            needsJobCheck,
+          }),
           evidenceIds: bullet.evidenceIds,
+          needsJobCheck,
+          seekerOwned,
         };
       }),
     };
@@ -591,7 +608,7 @@ export function buildStatementGroups(input: {
   for (const role of input.profile.experience) {
     if (groupedIds.has(role.id)) continue;
     const extras = input.bullets.filter(
-      (bullet) => bullet.roleId === role.id && bullet.seekerChosen,
+      (bullet) => bullet.roleId === role.id && (bullet.seekerChosen || bullet.seekerOwned),
     );
     if (extras.length === 0) continue;
     groups.push({
@@ -609,8 +626,17 @@ export function buildStatementGroups(input: {
         content: bullet.text,
         requirementLabel: null,
         recommended: false,
-        checked: bulletChecked({ id: bullet.id, recommended: false, saved, seen }),
+        checked: bulletChecked({
+          id: bullet.id,
+          recommended: false,
+          saved,
+          seen,
+          seekerOwned: bullet.seekerOwned === true,
+          needsJobCheck: bullet.needsJobCheck === true,
+        }),
         evidenceIds: bullet.evidenceIds,
+        needsJobCheck: bullet.needsJobCheck === true,
+        seekerOwned: bullet.seekerOwned === true,
       })),
     });
   }
@@ -631,8 +657,17 @@ export function buildStatementGroups(input: {
       content: bullet.text,
       requirementLabel: null,
       recommended: false,
-      checked: bulletChecked({ id: bullet.id, recommended: false, saved, seen }),
+      checked: bulletChecked({
+        id: bullet.id,
+        recommended: false,
+        saved,
+        seen,
+        seekerOwned: bullet.seekerOwned === true,
+        needsJobCheck: bullet.needsJobCheck === true,
+      }),
       evidenceIds: bullet.evidenceIds,
+      needsJobCheck: bullet.needsJobCheck === true,
+      seekerOwned: bullet.seekerOwned === true,
     })),
   });
   return groups;

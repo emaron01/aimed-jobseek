@@ -78,6 +78,7 @@ export async function saveBulletEvidenceRoleAction(input: {
   campaignId: string;
   bulletId: string;
   roleId: string;
+  pick?: boolean;
 }): Promise<ApplicationAssetActionResult> {
   try {
     await requireCurrentUser();
@@ -87,6 +88,7 @@ export async function saveBulletEvidenceRoleAction(input: {
       campaignId: input.campaignId,
       bulletId: input.bulletId,
       roleId: input.roleId,
+      pick: input.pick,
     });
     revalidate(input.campaignId);
     return { ok: true, message: applicationAssetConfig.labels.statementPicksSaved };
@@ -234,13 +236,6 @@ export async function generateApplicationAssetAction(
       .filter(Boolean);
     const regenerationInstruction =
       String(formData.get("regenerationInstruction") ?? "").trim() || null;
-    if (type === "RESUME") {
-      const prepared = await prepareResumeBulletCandidates({
-        organizationId,
-        campaignId: id,
-      });
-      if (!prepared.ok) return { ok: false, message: prepared.message };
-    }
     const { applicationAssetGenerateWouldSkip } = await import(
       "@/lib/application-assets/service"
     );

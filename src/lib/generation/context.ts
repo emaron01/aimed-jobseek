@@ -312,6 +312,14 @@ export async function loadApplicationGenerationContext(
       url: null,
     });
   }
+  for (const bullet of parsedProfile.ok ? (parsedProfile.profile.seekerBullets ?? []) : []) {
+    addSource(sources, {
+      id: `seeker-bullet:${bullet.id}`,
+      text: bullet.text,
+      category: "SEEKER_REPLY",
+      url: null,
+    });
+  }
   for (const story of stories) {
     const approved = [
       story.verbatimAnswer,

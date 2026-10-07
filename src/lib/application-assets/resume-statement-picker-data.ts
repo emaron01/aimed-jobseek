@@ -3,6 +3,7 @@ import {
   bulletResultKey,
   profileWithBulletRoleChoices,
   profileWithBulletTextEdits,
+  profileWithSeekerBullet,
 } from "@/lib/application-assets/resume-bullet-candidates";
 import { readResumeBulletCandidates } from "@/lib/application-assets/resume-bullet-candidate-service";
 import {
@@ -152,6 +153,8 @@ export async function saveBulletEvidenceRole(input: {
   campaignId: string;
   bulletId: string;
   roleId: string;
+  /** Checking the bullet confirms the job and keeps it picked. */
+  pick?: boolean;
 }): Promise<void> {
   const campaign = await prisma.campaign.findFirst({
     where: { id: input.campaignId, organizationId: input.organizationId },
@@ -170,15 +173,39 @@ export async function saveBulletEvidenceRole(input: {
   const bullet = stored?.bullets.find((item) => item.id === input.bulletId.trim());
   if (!bullet) throw new TenantError("That bullet has no evidence to correct.");
   const resultKey = bullet.resultKey ?? bulletResultKey(bullet.text, bullet.evidenceIds);
+  const storedRole = roleId === GENERAL_BACKGROUND_ID ? null : roleId;
+  let profileJson = profileWithBulletRoleChoices(
+    campaign.product.profileJson,
+    [resultKey],
+    roleId,
+  );
+  profileJson = profileWithSeekerBullet(profileJson, {
+    id: bullet.id,
+    text: bullet.text,
+    roleId: storedRole,
+  });
   await prisma.product.update({
     where: { id: campaign.product.id },
-    data: {
-      profileJson: profileWithBulletRoleChoices(
-        campaign.product.profileJson,
-        [resultKey],
-        roleId,
-      ) as Prisma.InputJsonValue,
-    },
+    data: { profileJson: profileJson as Prisma.InputJsonValue },
+  });
+  if (!input.pick) return;
+  const campaignPicks = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: { resumeStatementPicksJson: true },
+  });
+  const saved = resumeStatementPicksFromCampaign({
+    resumeStatementPicksJson: campaignPicks?.resumeStatementPicksJson,
+    workspaceSeenJson: null,
+  }).picks;
+  const alreadyChecked =
+    saved ??
+    (await loadResumeStatementGroups(input)).groups.flatMap((group) =>
+      group.items.filter((item) => item.checked).map((item) => item.id),
+    );
+  const picks = [...new Set([...alreadyChecked, bullet.id])];
+  await prisma.campaign.update({
+    where: { id: input.campaignId },
+    data: { resumeStatementPicksJson: picks },
   });
 }
 
@@ -200,16 +227,32 @@ export async function saveBulletText(input: {
   const bullet = stored?.bullets.find((item) => item.id === input.bulletId.trim());
   if (!bullet) throw new TenantError("That bullet was not found.");
   const resultKey = bullet.resultKey ?? bulletResultKey(bullet.text, bullet.evidenceIds);
+  const profileJson = profileWithSeekerBullet(
+    profileWithBulletTextEdits(campaign.product.profileJson, resultKey, text),
+    {
+      id: bullet.id,
+      text,
+      roleId: bullet.roleId === GENERAL_BACKGROUND_ID ? null : bullet.roleId,
+    },
+  );
   await prisma.product.update({
     where: { id: campaign.product.id },
-    data: {
-      profileJson: profileWithBulletTextEdits(
-        campaign.product.profileJson,
-        resultKey,
-        text,
-      ) as Prisma.InputJsonValue,
-    },
+    data: { profileJson: profileJson as Prisma.InputJsonValue },
   });
+  const campaignPicks = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+    select: { resumeStatementPicksJson: true },
+  });
+  const saved = resumeStatementPicksFromCampaign({
+    resumeStatementPicksJson: campaignPicks?.resumeStatementPicksJson,
+    workspaceSeenJson: null,
+  }).picks;
+  if (saved && !saved.includes(bullet.id)) {
+    await prisma.campaign.update({
+      where: { id: input.campaignId },
+      data: { resumeStatementPicksJson: [...saved, bullet.id] },
+    });
+  }
 }
 
 export async function saveResumeStatementPicks(input: {

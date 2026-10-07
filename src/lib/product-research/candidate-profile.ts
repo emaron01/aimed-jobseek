@@ -125,6 +125,16 @@ export const candidateProfileSchema = z.object({
   bulletRoleChoices: z.record(z.string(), z.string()).optional(),
   /** Result key to the seeker's edited bullet text. A seeker's edit wins over the next draft. */
   bulletTextEdits: z.record(z.string(), z.string()).optional(),
+  /** Bullets the seeker edited or picked. They stay until the seeker removes one. */
+  seekerBullets: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1),
+        text: z.string().trim().min(1),
+        roleId: z.string().trim().min(1).nullable(),
+      }),
+    )
+    .optional(),
 });
 
 export type CandidateProfile = z.infer<typeof candidateProfileSchema>;

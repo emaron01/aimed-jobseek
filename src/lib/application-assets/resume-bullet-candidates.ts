@@ -6,7 +6,6 @@ import {
 } from "@/lib/application-assets/contract";
 import {
   GENERAL_BACKGROUND_ID,
-  orderRoleBullets,
   roleBulletBands,
   type PickerBullet,
   type PickerProfile,
@@ -579,14 +578,22 @@ function comparableBulletText(text: string, employers: readonly string[]): strin
   return cleaned.ok ? cleaned.text : text;
 }
 
+type LegacyCandidateBullet = {
+  roleId: string | null;
+  text: string;
+  evidenceIds: string[];
+  needsJobCheck?: boolean;
+  jobSpecific?: boolean;
+};
+
 /** Keep every distinct result. A retry replaces only the same result, and only when it keeps the numbers. */
 export function mergeEmployerNameRetry(input: {
-  first: ResumeBulletCandidates;
-  retry: ResumeBulletCandidates;
+  first: { bullets: LegacyCandidateBullet[] };
+  retry: { bullets: LegacyCandidateBullet[] };
   employers: readonly string[];
-}): ResumeBulletCandidates {
-  const passing: ResumeBulletCandidates["bullets"] = [];
-  const failed: ResumeBulletCandidates["bullets"] = [];
+}): { bullets: LegacyCandidateBullet[] } {
+  const passing: LegacyCandidateBullet[] = [];
+  const failed: LegacyCandidateBullet[] = [];
   for (const bullet of input.first.bullets) {
     if (!bulletNamesProfileEmployer(bullet.text, input.employers)) passing.push(bullet);
     else failed.push(bullet);
@@ -677,10 +684,10 @@ export function uncoveredResultFollowUpMessage(input: {
 }
 
 export function mergeFollowUpBullets(input: {
-  kept: ResumeBulletCandidates;
-  followUp: ResumeBulletCandidates;
+  kept: { bullets: LegacyCandidateBullet[] };
+  followUp: { bullets: LegacyCandidateBullet[] };
   uncoveredIds: ReadonlySet<string>;
-}): ResumeBulletCandidates {
+}): { bullets: LegacyCandidateBullet[] } {
   const added = input.followUp.bullets.filter((bullet) =>
     bullet.evidenceIds.some((id) => input.uncoveredIds.has(id.trim())),
   );
@@ -699,22 +706,6 @@ export function attributedEvidenceRole(
   if (union.length === 1) return union[0]!;
   if (union.length > 1 && inAnswer.length === 1) return inAnswer[0]!;
   return GENERAL_BACKGROUND_ID;
-}
-
-function logBulletCandidate(input: {
-  event: "resume_bullet_candidate_dropped" | "resume_bullet_candidate_moved";
-  roleId: string;
-  text: string;
-  evidenceIds: readonly string[];
-}): void {
-  console.info(
-    JSON.stringify({
-      event: input.event,
-      roleId: input.roleId,
-      evidenceIds: input.evidenceIds,
-      text: input.text,
-    }),
-  );
 }
 
 export function readBulletRoleChoices(profileJson: unknown): Record<string, string> {
@@ -775,6 +766,19 @@ export function profileWithBulletTextEdits(
   return base;
 }
 
+/** Seeker bullets stay evidence for later candidate runs and for citation. */
+export function seekerBulletEvidence(bullets: readonly SeekerBulletRecord[]): BulletEvidence[] {
+  return bullets
+    .filter((bullet) => bullet.text.trim())
+    .map((bullet) => ({
+      id: `seeker-bullet:${bullet.id}`,
+      kind: "SEEKER_REPLY" as const,
+      text: bullet.text.trim(),
+      roleId: bullet.roleId,
+      question: null,
+    }));
+}
+
 /** Seeker edits go into the next candidate run as the seeker's own words. */
 export function bulletEditEvidence(edits: Readonly<Record<string, string>>): BulletEvidence[] {
   return Object.entries(edits)
@@ -818,15 +822,6 @@ export function applyBulletTextEdits(
   });
 }
 
-function seekerChoice(
-  text: string,
-  evidenceIds: readonly string[],
-  choices: Readonly<Record<string, string>> | undefined,
-): string | null {
-  if (!choices) return null;
-  return choices[bulletResultKey(text, evidenceIds)] ?? null;
-}
-
 /** Segments that share an evidence id stay distinct. The bullet is tied to the segment with the same result. */
 function citedEvidenceForBullet(
   evidenceIds: readonly string[],
@@ -858,16 +853,133 @@ function citedEvidenceForBullet(
   return cited;
 }
 
+function bulletDisplayId(roleId: string, text: string): string {
+  return `bullet:${createHash("sha256").update(`${roleId}\n${text}`).digest("hex").slice(0, 16)}`;
+}
+
+/**
+ * The job a saved pick or edit already used. New candidates keep the model's role.
+ * This does not move a bullet the seeker has not saved.
+ */
+function roleSavedEarlier(input: {
+  text: string;
+  evidenceIds: readonly string[];
+  evidenceById: ReadonlyMap<string, readonly BulletEvidence[]>;
+  roleList: readonly ProfileEmployerRole[];
+  roles: ReadonlyMap<string, string>;
+  choice: string | null;
+  employers: readonly string[];
+}): string {
+  if (input.choice === GENERAL_BACKGROUND_ID) return GENERAL_BACKGROUND_ID;
+  if (input.choice && input.roles.has(input.choice)) return input.choice;
+  const cited = citedEvidenceForBullet(
+    input.evidenceIds,
+    input.evidenceById,
+    input.text,
+    input.employers,
+  );
+  if (!cited) return GENERAL_BACKGROUND_ID;
+  const attributed = [
+    ...new Set(cited.map((evidence) => attributedEvidenceRole(evidence, input.roleList))),
+  ];
+  if (
+    attributed.length === 1 &&
+    (attributed[0] === GENERAL_BACKGROUND_ID || input.roles.has(attributed[0]!))
+  ) {
+    return attributed[0]!;
+  }
+  const fromBullet = rolesNamedByText(input.text, input.roleList);
+  if (fromBullet.length === 1 && input.roles.has(fromBullet[0]!)) return fromBullet[0]!;
+  return GENERAL_BACKGROUND_ID;
+}
+
+export type SeekerBulletRecord = {
+  id: string;
+  text: string;
+  roleId: string | null;
+};
+
+export function readSeekerBullets(profileJson: unknown): SeekerBulletRecord[] {
+  if (!profileJson || typeof profileJson !== "object" || Array.isArray(profileJson)) return [];
+  const raw = (profileJson as Record<string, unknown>).seekerBullets;
+  if (!Array.isArray(raw)) return [];
+  const bullets: SeekerBulletRecord[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const record = item as Record<string, unknown>;
+    const id = typeof record.id === "string" ? record.id.trim() : "";
+    const text = typeof record.text === "string" ? record.text.trim() : "";
+    const roleId =
+      record.roleId === null
+        ? null
+        : typeof record.roleId === "string" && record.roleId.trim()
+          ? record.roleId.trim()
+          : null;
+    if (!id || !text) continue;
+    if (bullets.some((bullet) => bullet.id === id)) continue;
+    bullets.push({ id, text, roleId });
+  }
+  return bullets;
+}
+
+export function profileWithSeekerBullet(
+  profileJson: unknown,
+  bullet: SeekerBulletRecord,
+): Record<string, unknown> {
+  const base =
+    profileJson && typeof profileJson === "object" && !Array.isArray(profileJson)
+      ? { ...(profileJson as Record<string, unknown>) }
+      : {};
+  const bullets = readSeekerBullets(base).filter((item) => item.id !== bullet.id);
+  bullets.push({
+    id: bullet.id.trim(),
+    text: bullet.text.trim(),
+    roleId: bullet.roleId,
+  });
+  base.seekerBullets = bullets;
+  return base;
+}
+
+/** Evidence whose stated result is not already in a seeker bullet or a pick. */
+export function evidenceNotCovered(input: {
+  evidence: readonly BulletEvidence[];
+  bullets: readonly { text: string; evidenceIds?: readonly string[] }[];
+  employers: readonly string[];
+}): BulletEvidence[] {
+  return input.evidence.filter((item) => {
+    const amounts = normalizedAmounts(item.text, true);
+    if (amounts.length > 0) {
+      const covered = new Set(
+        input.bullets.flatMap((bullet) => normalizedAmounts(bullet.text, true)),
+      );
+      return amounts.some((amount) => !covered.has(amount));
+    }
+    return !input.bullets.some(
+      (bullet) =>
+        bullet.evidenceIds?.includes(item.id) ||
+        sameBulletResult(bullet.text, item.text, input.employers),
+    );
+  });
+}
+
 export function assignCandidateBullets(input: {
-  bullets: ResumeBulletCandidates["bullets"];
+  bullets: ReadonlyArray<{
+    roleId: string | null;
+    text: string;
+    evidenceIds: readonly string[];
+    needsJobCheck?: boolean;
+    jobSpecific?: boolean;
+  }>;
   bands: ReadonlyArray<{ roleId: string; employer: string; candidateCount: number }>;
   evidence: readonly BulletEvidence[];
-  /** Evidence id to a role id or "general". The seeker's choice wins. */
+  /** Result key to a role id or "general". The seeker's choice wins. */
   choices?: Readonly<Record<string, string>>;
   /** Every Personal Profile role, used when a choice names a role outside the bullet bands. */
   roles?: ReadonlyArray<{ roleId: string; employer: string }>;
+  /** Display ids the seeker already picked. Those bullets keep the job they had. */
+  pickedIds?: ReadonlySet<string>;
+  textEdits?: Readonly<Record<string, string>>;
 }): PickerBullet[] {
-  const bands = new Map(input.bands.map((band) => [band.roleId, band]));
   const roles = new Map(
     (input.roles ?? input.bands).map((role) => [role.roleId, role.employer]),
   );
@@ -877,126 +989,70 @@ export function assignCandidateBullets(input: {
     roleId,
     employer,
   }));
+  const known = new Set(input.evidence.map((item) => item.id.trim()).filter(Boolean));
   const evidenceById = new Map<string, BulletEvidence[]>();
   for (const item of input.evidence) {
     const list = evidenceById.get(item.id) ?? [];
     list.push(item);
     evidenceById.set(item.id, list);
   }
-  const grouped = new Map<string, PickerBullet[]>();
-  const chosen = new Map<string, PickerBullet[]>();
-  const place = (roleId: string, bullet: PickerBullet, preferred: boolean) => {
-    const bucket = preferred ? chosen : grouped;
-    const list = bucket.get(roleId) ?? [];
-    if (list.some((item) => item.id === bullet.id)) return;
-    list.push(bullet);
-    bucket.set(roleId, list);
-  };
+  const drafted: PickerBullet[] = [];
   for (const bullet of input.bullets) {
+    const evidenceIds = [...new Set(bullet.evidenceIds.map((id) => id.trim()).filter(Boolean))];
+    if (evidenceIds.length === 0 || evidenceIds.some((id) => !known.has(id))) continue;
     const raw = oneLineBullet(bullet.text);
     if (!raw) continue;
-    const evidenceIds = [...new Set(bullet.evidenceIds.map((id) => id.trim()).filter(Boolean))];
-    const cleaned = cleanBulletEmployerNames({
-      text: raw,
+    const cleaned = cleanBulletEmployerNames({ text: raw, employers });
+    if (!cleaned.ok) continue;
+    const text = cleaned.text;
+    const resultKey = bulletResultKey(text, evidenceIds);
+    const choice = input.choices?.[resultKey] ?? null;
+    const savedRole = roleSavedEarlier({
+      text,
+      evidenceIds,
+      evidenceById,
+      roleList,
+      roles,
+      choice,
       employers,
     });
-    if (!cleaned.ok) {
-      logBulletCandidate({
-        event: "resume_bullet_candidate_dropped",
-        roleId: bullet.roleId.trim(),
-        text: raw,
-        evidenceIds,
-      });
-      continue;
-    }
-    const text = cleaned.text;
-    const cited = citedEvidenceForBullet(evidenceIds, evidenceById, text, employers);
-    const choice = seekerChoice(text, evidenceIds, input.choices);
-    const make = (roleId: string, seekerChosen: boolean): PickerBullet => ({
-      id: `bullet:${createHash("sha256").update(`${roleId}\n${text}`).digest("hex").slice(0, 16)}`,
-      roleId,
-      text,
-      jobSpecific: bullet.jobSpecific,
+    const savedId = bulletDisplayId(savedRole, text);
+    const edited = input.textEdits?.[resultKey]?.trim() || "";
+    const kept = Boolean(edited) || (input.pickedIds?.has(savedId) ?? false);
+    const modelRole = bullet.roleId?.trim() || null;
+    const placedRole = kept
+      ? savedRole
+      : choice === GENERAL_BACKGROUND_ID
+        ? GENERAL_BACKGROUND_ID
+        : choice && roles.has(choice)
+          ? choice
+          : modelRole && modelRole !== GENERAL_BACKGROUND_ID && roles.has(modelRole)
+            ? modelRole
+            : null;
+    drafted.push({
+      id: kept ? savedId : bulletDisplayId(placedRole ?? GENERAL_BACKGROUND_ID, text),
+      roleId: placedRole ?? "",
+      text: edited || text,
       evidenceIds,
-      seekerChosen,
-    });
-    if (choice === GENERAL_BACKGROUND_ID) {
-      place(GENERAL_BACKGROUND_ID, make(GENERAL_BACKGROUND_ID, true), true);
-      logBulletCandidate({
-        event: "resume_bullet_candidate_moved",
-        roleId: GENERAL_BACKGROUND_ID,
-        text,
-        evidenceIds,
-      });
-      continue;
-    }
-    if (choice && roles.has(choice)) {
-      place(choice, make(choice, true), true);
-      continue;
-    }
-    const roleId = bullet.roleId.trim();
-    if (!cited) {
-      logBulletCandidate({
-        event: "resume_bullet_candidate_dropped",
-        roleId,
-        text,
-        evidenceIds,
-      });
-      continue;
-    }
-    const attributed = [
-      ...new Set(cited.map((evidence) => attributedEvidenceRole(evidence, roleList))),
-    ];
-    if (attributed.length === 1 && attributed[0] === GENERAL_BACKGROUND_ID) {
-      place(GENERAL_BACKGROUND_ID, make(GENERAL_BACKGROUND_ID, false), true);
-      logBulletCandidate({
-        event: "resume_bullet_candidate_moved",
-        roleId: GENERAL_BACKGROUND_ID,
-        text,
-        evidenceIds,
-      });
-      continue;
-    }
-    if (attributed.length === 1 && roles.has(attributed[0]!)) {
-      place(attributed[0]!, make(attributed[0]!, false), false);
-      continue;
-    }
-    const fromBullet = rolesNamedByText(text, roleList);
-    if (fromBullet.length === 1 && roles.has(fromBullet[0]!)) {
-      place(fromBullet[0]!, make(fromBullet[0]!, false), false);
-      logBulletCandidate({
-        event: "resume_bullet_candidate_moved",
-        roleId: fromBullet[0]!,
-        text,
-        evidenceIds,
-      });
-      continue;
-    }
-    place(GENERAL_BACKGROUND_ID, make(GENERAL_BACKGROUND_ID, false), true);
-    logBulletCandidate({
-      event: "resume_bullet_candidate_moved",
-      roleId: GENERAL_BACKGROUND_ID,
-      text,
-      evidenceIds,
+      seekerChosen: Boolean(choice),
+      seekerOwned: kept,
+      resultKey,
+      needsJobCheck: kept ? false : bullet.needsJobCheck === true && !choice,
     });
   }
-  const ordered = input.bands.flatMap((band) => {
-    const automatic = orderRoleBullets(grouped.get(band.roleId) ?? [], band.candidateCount);
-    const preferred = chosen.get(band.roleId) ?? [];
-    const seen = new Set(preferred.map((item) => item.id));
-    return [...preferred, ...automatic.filter((item) => !seen.has(item.id))];
-  });
-  const extraRoles = [...chosen.keys()].filter(
-    (roleId) => roleId !== GENERAL_BACKGROUND_ID && !bands.has(roleId),
-  );
-  return collapseSameResults(
-    [
-      ...ordered,
-      ...extraRoles.flatMap((roleId) => chosen.get(roleId) ?? []),
-      ...(chosen.get(GENERAL_BACKGROUND_ID) ?? []),
-      ...(grouped.get(GENERAL_BACKGROUND_ID) ?? []),
-    ],
-    employers,
+  const collapsed: PickerBullet[] = [];
+  for (const bullet of drafted) {
+    const same = collapsed.findIndex(
+      (existing) =>
+        existing.roleId === bullet.roleId &&
+        sameBulletResult(existing.text, bullet.text, employers),
+    );
+    if (same < 0) collapsed.push(bullet);
+  }
+  return collapsed.map((bullet) =>
+    bullet.roleId
+      ? bullet
+      : { ...bullet, roleId: GENERAL_BACKGROUND_ID, id: bulletDisplayId(GENERAL_BACKGROUND_ID, bullet.text) },
   );
 }
 
