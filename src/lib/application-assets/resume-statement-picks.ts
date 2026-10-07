@@ -13,7 +13,6 @@ export const BROADER_EXPERIENCE_TITLE = "Broader experience";
 
 const SCHOOL_WORD = /\b(university|college|school|institute|academy)\b/i;
 const PROJECT_WORD = /\bprojects?\b/i;
-const REQUIREMENT_TARGET = /^(required|outcome|competency|preferred|mission):/;
 
 export type PickerProfile = {
   experience: Array<{
@@ -32,12 +31,6 @@ export type PickerStatement = {
   kind: "INTERVIEW_ANSWER" | "RESUME_BULLET";
   content: string;
   targetKey: string | null;
-};
-
-export type PickerAssessment = {
-  targetKey: string;
-  text: string;
-  strength: string;
 };
 
 type PlaceKind = "role" | "school" | "project";
@@ -421,36 +414,6 @@ function primaryPlace(
   );
 }
 
-function coverageFor(
-  statement: PickerStatement,
-  assessments: readonly PickerAssessment[],
-): { rank: number; label: string | null } {
-  const key = statement.targetKey?.trim() ?? "";
-  if (!REQUIREMENT_TARGET.test(key)) return { rank: 0, label: null };
-  const assessment = assessments.find((item) => item.targetKey === key);
-  if (!assessment) return { rank: 0, label: null };
-  const strength = assessment.strength.trim().toUpperCase();
-  const rank = strength === "STRONG" ? 3 : strength === "PARTIAL" ? 2 : 1;
-  return { rank, label: assessment.text.trim() || null };
-}
-
-function placeForStatement(
-  content: string,
-  places: readonly PickerPlace[],
-): PickerPlace | null {
-  const lower = content.toLowerCase();
-  let best: { place: PickerPlace; score: number } | null = null;
-  const kindScore = { role: 3, school: 2, project: 1 };
-  for (const place of places) {
-    for (const name of place.matchNames) {
-      if (name.length < 2 || !lower.includes(name.toLowerCase())) continue;
-      const score = name.length * 10 + kindScore[place.kind];
-      if (!best || score > best.score) best = { place, score };
-    }
-  }
-  return best?.place ?? null;
-}
-
 /** Header as on the resume: "Director of Strategic Sales, OpenText". */
 export function roleGroupHeader(title: string, employer: string): string {
   const roleTitle = title.trim();
@@ -505,27 +468,6 @@ export function roleBulletBands(input: {
     });
   }
   return bands;
-}
-
-/** Strength of evidence and relevance together. A numbered result outranks a job-only line. */
-export function bulletEvidenceRank(bullet: PickerBullet): number {
-  const hasNumber = /\d/.test(bullet.text);
-  return (hasNumber ? 2 : 0) + (bullet.jobSpecific ? 1 : 0);
-}
-
-export function orderRoleBullets(
-  bullets: readonly PickerBullet[],
-  candidateCount: number,
-): PickerBullet[] {
-  return bullets
-    .map((bullet, index) => ({ bullet, index }))
-    .sort(
-      (a, b) =>
-        bulletEvidenceRank(b.bullet) - bulletEvidenceRank(a.bullet) ||
-        a.index - b.index,
-    )
-    .slice(0, Math.max(0, candidateCount))
-    .map((item) => item.bullet);
 }
 
 function bulletChecked(input: {

@@ -22,6 +22,7 @@ import {
   readBulletTextEdits,
   profileWithSeekerBullet,
   readSeekerBullets,
+  replaceUnpickedCandidates,
   resumeBulletCandidateFingerprint,
   sameBulletResult,
   seekerBulletEvidence,
@@ -456,14 +457,17 @@ export async function prepareResumeBulletCandidates(input: {
             coercedFields: [],
           }),
         });
-        const added = response.data.bullets.filter(
-          (bullet) =>
-            !previousBullets.some((existing) =>
-              sameBulletResult(existing.text, bullet.text, employers),
-            ) &&
-            !covered.some((existing) => sameBulletResult(existing.text, bullet.text, employers)),
+        const kept = shown.filter(
+          (bullet) => bullet.seekerOwned || packet.pickedIds.includes(bullet.id),
         );
-        return { bullets: [...previousBullets, ...added] };
+        return {
+          bullets: replaceUnpickedCandidates({
+            previous: previousBullets,
+            next: response.data.bullets,
+            kept,
+            employers,
+          }),
+        };
       },
     });
     return { ok: true, skipped: false };

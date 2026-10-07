@@ -24,20 +24,14 @@ import {
   buildResumeBulletCandidateMessages,
   bulletEditEvidence,
   bulletResultKey,
-  employerNameRetryMessage,
-  employerRetryDecision,
-  evidenceHasStatedResult,
-  mergeEmployerNameRetry,
-  mergeFollowUpBullets,
   profileWithBulletRoleChoices,
   profileWithBulletTextEdits,
   questionTextForAnswer,
   readBulletTextEdits,
   selectableBulletEvidence,
+  replaceUnpickedCandidates,
   splitEvidenceByEmployer,
   storedCandidatesMatch,
-  uncitedStatedResults,
-  uncoveredResultFollowUpMessage,
 } from "@/lib/application-assets/resume-bullet-candidates";
 import { resumeWithExactPickedBullets } from "@/lib/application-assets/service";
 import {
@@ -746,26 +740,6 @@ describe("Harper Approved Statements picker", () => {
     expect(duplicates.some((item) => item.text.includes("$100K") && item.text.includes("$6MM"))).toBe(true);
     expect(duplicates.some((item) => item.roleId === "general" && item.text.includes("capstone"))).toBe(true);
     expect(graduateProfile.projectTexts).toContain("Capstone project");
-
-    const att = "Grew a $100K SIEM sale to $1MM in utilization and a $6MM network operations sale at Micro Focus.";
-    const kept = mergeEmployerNameRetry({
-      employers: ["Micro Focus"],
-      first: {
-        bullets: [
-          { roleId: "micro", text: att, jobSpecific: false, evidenceIds: ["att"] },
-          { roleId: "micro", text: "Led the team to 90%-110% of goal at Micro Focus.", jobSpecific: false, evidenceIds: ["att"] },
-        ],
-      },
-      retry: {
-        bullets: [
-          { roleId: "micro", text: "Grew a SIEM sale.", jobSpecific: false, evidenceIds: ["att"] },
-        ],
-      },
-    });
-    expect(kept.bullets.map((item) => item.text)).toEqual([
-      att,
-      "Led the team to 90%-110% of goal at Micro Focus.",
-    ]);
   });
 
   it("collapses one result per group and follows up when a cited answer's amounts are missing", () => {
@@ -830,58 +804,6 @@ describe("Harper Approved Statements picker", () => {
     const openText = groups.find((group) => group.roleId === "opentext");
     expect(openText?.items.filter((item) => item.content.includes("$6.8MM") && item.recommended)).toHaveLength(1);
     expect(openText?.items.filter((item) => item.content.includes("Bank of America"))).toHaveLength(2);
-
-    const attEvidence = {
-      id: "att",
-      kind: "INTERVIEW_ANSWER" as const,
-      text: "Grew a $100K SIEM sale to $1MM in utilization and a $6MM network operations management sale at Micro Focus.",
-      roleId: null,
-      question: "Tell me about AT&T.",
-    };
-    const citingBullet = {
-      text: "Sold solutions to strategic accounts including AT&T, NTT, Accenture, and IBM.",
-      evidenceIds: ["att"],
-    };
-    const dryRun = uncitedStatedResults({
-      employers: [salesProfile.experience[0]!.employer ?? "", nursingProfile.experience[0]!.employer ?? "", "Micro Focus"],
-      evidence: [
-        attEvidence,
-        {
-          id: "mercy-shift",
-          kind: "INTERVIEW_ANSWER",
-          text: "Precepted 8 new nurses on the night shift at Mercy General.",
-          roleId: null,
-          question: "How do you precept new nurses?",
-        },
-        {
-          id: "capstone-form",
-          kind: "RESUME_BULLET",
-          text: "Shipped 1 clinic intake form during a capstone.",
-          roleId: null,
-          question: "What did you build in school?",
-        },
-      ],
-      bullets: [
-        citingBullet,
-        {
-          text: "Shipped 1 clinic intake form during a capstone.",
-          evidenceIds: ["capstone-form"],
-        },
-      ],
-    });
-    expect(dryRun.map((item) => item.id)).toEqual(["att", "mercy-shift"]);
-    const amountsPresent = uncitedStatedResults({
-      employers: ["Micro Focus"],
-      evidence: [attEvidence],
-      bullets: [
-        citingBullet,
-        {
-          text: "Grew a $100K SIEM sale to $1MM in utilization and a $6MM network operations management sale.",
-          evidenceIds: ["later"],
-        },
-      ],
-    });
-    expect(amountsPresent).toEqual([]);
   });
 
   it("keeps achievement bullets with their role, drops embedded employer names, and leads with the strongest results", () => {
@@ -1043,21 +965,6 @@ describe("Harper Approved Statements picker", () => {
     });
     expect(messages[0]?.content.startsWith("Prompt version: 7")).toBe(true);
     expect(JSON.parse(messages[1]?.content ?? "{}").evidence[0].question).toContain("OpenText");
-    expect(employerNameRetryMessage()).toContain("does not include the employer's name");
-    expect(
-      employerRetryDecision({
-        bullets: [{ text: "Built OpenText's forecasting practice." }],
-        employers: ["OpenText"],
-        alreadyRetried: false,
-      }),
-    ).toBe("retry");
-    expect(
-      employerRetryDecision({
-        bullets: [{ text: "Built OpenText's forecasting practice." }],
-        employers: ["OpenText"],
-        alreadyRetried: true,
-      }),
-    ).toBe("keep");
     const prepare = readFileSync("src/lib/application-assets/resume-bullet-candidate-service.ts", "utf8");
     const provider = prepare.slice(prepare.indexOf("callProvider: async"));
     expect(prepare.indexOf("runPaidStructuredCall")).toBeLessThan(prepare.indexOf("callProvider: async"));
@@ -1067,6 +974,8 @@ describe("Harper Approved Statements picker", () => {
     expect(provider).not.toContain("uncoveredResultFollowUpMessage");
     expect(provider).not.toContain("resume_bullet_candidates_follow_up");
     expect(prepare).toContain("evidenceNotCovered");
+    expect(provider).toContain("replaceUnpickedCandidates");
+    expect(provider).not.toContain("[...previousBullets, ...added]");
 
     const strong = [
       { id: "jd", text: "Partnered with marketing on demand generation.", jobSpecific: true },
@@ -1205,102 +1114,39 @@ describe("Harper Approved Statements picker", () => {
     expect(sent.evidence[0]?.id).toBe("library-deal");
     expect(sent.evidence.map((item) => item.id).indexOf("ach-ot")).toBeGreaterThan(0);
 
-    expect(evidenceHasStatedResult("I like teamwork.")).toBe(false);
-    expect(evidenceHasStatedResult("Precepted 8 new nurses on the night shift.", employers)).toBe(true);
-    const uncovered = uncitedStatedResults({
-      evidence,
+    const pickedText = "Held forecast deviation to 5-10%.";
+    const draftText = "Closed a $2MM deal.";
+    const editedText = "Coached the team to close a $2MM deal.";
+    const replaced = replaceUnpickedCandidates({
       employers,
-      bullets: [
+      kept: [
         {
-          text: "Closed a multi-threaded $1.3MM Bank of America deal.",
-          evidenceIds: ["library-deal"],
+          text: pickedText,
+          evidenceIds: ["ot"],
+          resultKey: bulletResultKey(pickedText, ["ot"]),
+        },
+        {
+          text: editedText,
+          evidenceIds: ["deal"],
+          resultKey: bulletResultKey(draftText, ["deal"]),
         },
       ],
+      previous: [
+        { text: pickedText, evidenceIds: ["ot"] },
+        { text: draftText, evidenceIds: ["deal"] },
+        { text: "Ran a VMware campaign that created $3MM in pipeline.", evidenceIds: ["vm"] },
+      ],
+      next: [
+        { text: pickedText, evidenceIds: ["ot"] },
+        { text: "Built a $4MM pipeline with a partner campaign.", evidenceIds: ["vm"] },
+        { text: "Opened a $1MM logo.", evidenceIds: ["logo"] },
+      ],
     });
-    expect(uncovered.map((item) => item.id)).toEqual(["library-nursing", "library-capstone"]);
-    const followUp = uncoveredResultFollowUpMessage({
-      roles: [{ roleId: "mercy", employer: "Mercy General", title: "Registered Nurse", candidateCount: 10 }],
-      evidence: uncovered.filter((item) => item.id === "library-nursing"),
-      job: { title: "Registered Nurse", employer: "Mercy General", posting: "Precept new nurses." },
-    });
-    expect(followUp.startsWith("Write bullets only for these items, which the earlier list did not cover.")).toBe(true);
-    expect(followUp).toContain("library-nursing");
-    expect(followUp).not.toContain("library-deal");
-    const merged = mergeFollowUpBullets({
-      kept: {
-        bullets: [
-          {
-            roleId: "opentext",
-            text: "Closed a multi-threaded $1.3MM Bank of America deal.",
-            jobSpecific: false,
-            evidenceIds: ["library-deal"],
-          },
-        ],
-      },
-      followUp: {
-        bullets: [
-          {
-            roleId: "mercy",
-            text: "Precepted 8 new nurses on the night shift.",
-            jobSpecific: true,
-            evidenceIds: ["library-nursing"],
-          },
-          {
-            roleId: "opentext",
-            text: "Closed the deal again.",
-            jobSpecific: false,
-            evidenceIds: ["library-deal"],
-          },
-        ],
-      },
-      uncoveredIds: new Set(["library-nursing"]),
-    });
-    expect(merged.bullets.map((item) => item.evidenceIds[0])).toEqual(["library-deal", "library-nursing"]);
-    const afterMerge = uncitedStatedResults({
-      evidence,
-      employers,
-      bullets: merged.bullets,
-    });
-    expect(afterMerge.map((item) => item.id)).not.toContain("library-nursing");
-
-    const retried = mergeEmployerNameRetry({
-      employers: ["OpenText"],
-      first: {
-        bullets: [
-          {
-            roleId: "opentext",
-            text: "Closed a $1.3MM Bank of America deal.",
-            jobSpecific: false,
-            evidenceIds: ["boa"],
-          },
-          {
-            roleId: "opentext",
-            text: "Built OpenText's forecast practice.",
-            jobSpecific: false,
-            evidenceIds: ["forecast"],
-          },
-        ],
-      },
-      retry: {
-        bullets: [
-          {
-            roleId: "opentext",
-            text: "Closed a different deal.",
-            jobSpecific: false,
-            evidenceIds: ["boa"],
-          },
-          {
-            roleId: "opentext",
-            text: "Built the forecast practice.",
-            jobSpecific: false,
-            evidenceIds: ["forecast"],
-          },
-        ],
-      },
-    });
-    expect(retried.bullets.map((item) => item.text)).toEqual([
-      "Closed a $1.3MM Bank of America deal.",
-      "Built the forecast practice.",
+    expect(replaced.map((item) => item.text)).toEqual([
+      pickedText,
+      draftText,
+      "Built a $4MM pipeline with a partner campaign.",
+      "Opened a $1MM logo.",
     ]);
 
     const stripped = assignCandidateBullets({

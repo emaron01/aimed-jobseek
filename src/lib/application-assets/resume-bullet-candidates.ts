@@ -529,171 +529,6 @@ export function cleanBulletEmployerNames(input: {
   return { ok: true, text };
 }
 
-export function bulletNamesProfileEmployer(text: string, employers: readonly string[]): boolean {
-  if (
-    employers
-      .flatMap((employer) => employerMatchNames(employer))
-      .some((name) => textNamesEmployer(text, name))
-  ) {
-    return true;
-  }
-  const initialCounts = new Map<string, number>();
-  for (const employer of employers) {
-    for (const initials of employerInitials(employer)) {
-      initialCounts.set(initials, (initialCounts.get(initials) ?? 0) + 1);
-    }
-  }
-  for (const [initials, count] of initialCounts) {
-    if (count === 1 && textNamesInitials(text, initials)) return true;
-  }
-  return false;
-}
-
-export function employerRetryDecision(input: {
-  bullets: ReadonlyArray<{ text: string }>;
-  employers: readonly string[];
-  alreadyRetried: boolean;
-}): "retry" | "keep" {
-  if (input.alreadyRetried) return "keep";
-  const namesEmployer = input.bullets.some((bullet) =>
-    bulletNamesProfileEmployer(bullet.text, input.employers),
-  );
-  return namesEmployer ? "retry" : "keep";
-}
-
-function sharesEvidence(
-  left: { evidenceIds: readonly string[] },
-  right: { evidenceIds: readonly string[] },
-): boolean {
-  const ids = new Set(left.evidenceIds.map((id) => id.trim()).filter(Boolean));
-  return right.evidenceIds.some((id) => ids.has(id.trim()));
-}
-
-function amountCount(text: string): number {
-  return normalizedAmounts(text).length;
-}
-
-function comparableBulletText(text: string, employers: readonly string[]): string {
-  const cleaned = cleanBulletEmployerNames({ text, employers });
-  return cleaned.ok ? cleaned.text : text;
-}
-
-type LegacyCandidateBullet = {
-  roleId: string | null;
-  text: string;
-  evidenceIds: string[];
-  needsJobCheck?: boolean;
-  jobSpecific?: boolean;
-};
-
-/** Keep every distinct result. A retry replaces only the same result, and only when it keeps the numbers. */
-export function mergeEmployerNameRetry(input: {
-  first: { bullets: LegacyCandidateBullet[] };
-  retry: { bullets: LegacyCandidateBullet[] };
-  employers: readonly string[];
-}): { bullets: LegacyCandidateBullet[] } {
-  const passing: LegacyCandidateBullet[] = [];
-  const failed: LegacyCandidateBullet[] = [];
-  for (const bullet of input.first.bullets) {
-    if (!bulletNamesProfileEmployer(bullet.text, input.employers)) passing.push(bullet);
-    else failed.push(bullet);
-  }
-  const used = new Set<number>();
-  const merged = failed.map((bullet) => {
-    const index = input.retry.bullets.findIndex(
-      (candidate, candidateIndex) =>
-        !used.has(candidateIndex) &&
-        sharesEvidence(candidate, bullet) &&
-        sameBulletResult(
-          comparableBulletText(candidate.text, input.employers),
-          comparableBulletText(bullet.text, input.employers),
-          input.employers,
-        ),
-    );
-    if (index < 0) return bullet;
-    const replacement = input.retry.bullets[index]!;
-    if (
-      amountCount(comparableBulletText(replacement.text, input.employers)) <
-      amountCount(comparableBulletText(bullet.text, input.employers))
-    ) {
-      return bullet;
-    }
-    used.add(index);
-    return replacement;
-  });
-  return { bullets: [...passing, ...merged] };
-}
-
-export function employerNameRetryMessage(): string {
-  return "Rewrite every bullet that names an employer so the bullet does not include the employer's name. The job heading already shows it. Customer and partner names the seeker stated are fine. Return the full bullet list.";
-}
-
-export const UNCOVERED_RESULT_FOLLOW_UP_SENTENCE =
-  "Write bullets only for these items, which the earlier list did not cover.";
-
-/** A number, a named customer, scope, or an award. A profile employer name alone is not a result. */
-export function evidenceHasStatedResult(text: string, employers: readonly string[] = []): boolean {
-  if (/\d/.test(text)) return true;
-  if (/\b(awards?|awarded|prize|honou?rs?|honou?red|top performers?)\b/i.test(text)) return true;
-  if (/\b(nationwide|multi-threaded|multithreaded|direct reports?|headcount|quota)\b/i.test(text)) {
-    return true;
-  }
-  const named =
-    text.match(/\b[A-Z][a-z]+(?:\s+(?:of|and)\s+[A-Z][a-z]+|\s+[A-Z][a-z]+)+\b/g) ?? [];
-  const employerNames = new Set(
-    employers.flatMap((employer) => employerMatchNames(employer)).map((name) => name.toLowerCase()),
-  );
-  return named.some((name) => !employerNames.has(name.toLowerCase()));
-}
-
-/**
- * Evidence still missing a stated result.
- * A number with a unit or currency is covered only when that amount appears in a bullet.
- * Citing the evidence is not enough. Evidence with no such amount stays covered once a bullet cites it.
- */
-export function uncitedStatedResults(input: {
-  evidence: readonly BulletEvidence[];
-  bullets: readonly { evidenceIds: readonly string[]; text?: string }[];
-  employers?: readonly string[];
-}): BulletEvidence[] {
-  const employers = input.employers ?? [];
-  const coveredAmounts = new Set(
-    input.bullets.flatMap((bullet) => normalizedAmounts(bullet.text ?? "", true)),
-  );
-  const cited = new Set(
-    input.bullets.flatMap((bullet) => bullet.evidenceIds.map((id) => id.trim()).filter(Boolean)),
-  );
-  return input.evidence.filter((item) => {
-    if (!evidenceHasStatedResult(item.text, employers)) return false;
-    const amounts = normalizedAmounts(item.text, true);
-    if (amounts.length > 0) return amounts.some((amount) => !coveredAmounts.has(amount));
-    return !cited.has(item.id);
-  });
-}
-
-export function uncoveredResultFollowUpMessage(input: {
-  roles: readonly BulletCandidateRole[];
-  evidence: readonly BulletEvidence[];
-  job: { title: string; employer: string; posting: string };
-}): string {
-  return `${UNCOVERED_RESULT_FOLLOW_UP_SENTENCE}\n${JSON.stringify({
-    roles: input.roles,
-    evidence: input.evidence,
-    job: input.job,
-  })}`;
-}
-
-export function mergeFollowUpBullets(input: {
-  kept: { bullets: LegacyCandidateBullet[] };
-  followUp: { bullets: LegacyCandidateBullet[] };
-  uncoveredIds: ReadonlySet<string>;
-}): { bullets: LegacyCandidateBullet[] } {
-  const added = input.followUp.bullets.filter((bullet) =>
-    bullet.evidenceIds.some((id) => input.uncoveredIds.has(id.trim())),
-  );
-  return { bullets: [...input.kept.bullets, ...added] };
-}
-
 /** Question and answer together. An achievement always stays on its own role. */
 export function attributedEvidenceRole(
   evidence: BulletEvidence,
@@ -940,6 +775,45 @@ export function profileWithSeekerBullet(
   return base;
 }
 
+function draftResultKey(text: string, evidenceIds: readonly string[], employers: readonly string[]): string {
+  const line = oneLineBullet(text);
+  const cleaned = cleanBulletEmployerNames({ text: line, employers });
+  return bulletResultKey(cleaned.ok ? cleaned.text : line, evidenceIds);
+}
+
+/**
+ * A refresh keeps seeker, edited, and picked bullets exactly as stored.
+ * Every other previous candidate is replaced by the new run.
+ */
+export function replaceUnpickedCandidates<T extends { text: string; evidenceIds: readonly string[] }>(input: {
+  previous: readonly T[];
+  next: readonly T[];
+  kept: readonly { text: string; evidenceIds?: readonly string[]; resultKey?: string }[];
+  employers: readonly string[];
+}): T[] {
+  const keptPrevious = input.previous.filter((raw) => {
+    const key = draftResultKey(raw.text, raw.evidenceIds, input.employers);
+    return input.kept.some((bullet) => {
+      if (bullet.resultKey === key) return true;
+      const same =
+        sameBulletResult(bullet.text, raw.text, input.employers) ||
+        sameBulletResult(bullet.text, oneLineBullet(raw.text), input.employers);
+      if (!same) return false;
+      const ids = bullet.evidenceIds?.filter((id) => !id.startsWith("seeker-bullet:")) ?? [];
+      if (ids.length === 0) return true;
+      return raw.evidenceIds.some((id) => ids.includes(id));
+    });
+  });
+  const fresh = input.next.filter(
+    (bullet) =>
+      !keptPrevious.some((existing) =>
+        sameBulletResult(existing.text, bullet.text, input.employers),
+      ) &&
+      !input.kept.some((existing) => sameBulletResult(existing.text, bullet.text, input.employers)),
+  );
+  return [...keptPrevious, ...fresh];
+}
+
 /** Evidence whose stated result is not already in a seeker bullet or a pick. */
 export function evidenceNotCovered(input: {
   evidence: readonly BulletEvidence[];
@@ -1054,66 +928,6 @@ export function assignCandidateBullets(input: {
       ? bullet
       : { ...bullet, roleId: GENERAL_BACKGROUND_ID, id: bulletDisplayId(GENERAL_BACKGROUND_ID, bullet.text) },
   );
-}
-
-/** Same order as bulletEvidenceRank: a numbered line, then a job-specific line. */
-function harperBulletRank(bullet: PickerBullet): number {
-  return (/\d/.test(bullet.text) ? 2 : 0) + (bullet.jobSpecific ? 1 : 0);
-}
-
-function preferSameGroupBullet(current: PickerBullet, next: PickerBullet): PickerBullet {
-  const amountDelta = normalizedAmounts(next.text).length - normalizedAmounts(current.text).length;
-  if (amountDelta !== 0) return amountDelta > 0 ? next : current;
-  const rankDelta = harperBulletRank(next) - harperBulletRank(current);
-  if (rankDelta !== 0) return rankDelta > 0 ? next : current;
-  return preferBullet(current, next);
-}
-
-function preferBullet(current: PickerBullet, next: PickerBullet): PickerBullet {
-  const currentGeneral = current.roleId === GENERAL_BACKGROUND_ID;
-  const nextGeneral = next.roleId === GENERAL_BACKGROUND_ID;
-  if (currentGeneral !== nextGeneral) return currentGeneral ? next : current;
-  if (Boolean(current.seekerChosen) !== Boolean(next.seekerChosen)) {
-    return current.seekerChosen ? current : next;
-  }
-  return next.text.length > current.text.length ? next : current;
-}
-
-function evidenceOverlaps(
-  left: readonly string[],
-  right: readonly string[],
-): boolean {
-  const ids = new Set(left.map((id) => id.trim()).filter(Boolean));
-  return right.some((id) => ids.has(id.trim()));
-}
-
-/**
- * One copy of the same result in a group, even when the evidence differs.
- * Across groups, the same result still collapses only when the evidence overlaps, and a role wins over General background.
- * A different amount set stays. The kept bullet has more amounts, then the higher Harper rank.
- */
-export function collapseSameResults(
-  bullets: readonly PickerBullet[],
-  employers: readonly string[],
-): PickerBullet[] {
-  const kept: PickerBullet[] = [];
-  for (const bullet of bullets) {
-    const index = kept.findIndex((existing) => {
-      if (!sameBulletResult(existing.text, bullet.text, employers)) return false;
-      if (existing.roleId === bullet.roleId) return true;
-      return evidenceOverlaps(existing.evidenceIds, bullet.evidenceIds);
-    });
-    if (index < 0) {
-      kept.push(bullet);
-      continue;
-    }
-    const current = kept[index]!;
-    kept[index] =
-      current.roleId === bullet.roleId
-        ? preferSameGroupBullet(current, bullet)
-        : preferBullet(current, bullet);
-  }
-  return kept;
 }
 
 export function bulletCandidateRoles(input: {
