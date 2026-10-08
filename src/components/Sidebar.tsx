@@ -50,7 +50,7 @@ export function Sidebar({ items }: { items: SidebarNavItem[] }) {
           const active = isSidebarItemActive(item, pathname);
 
           return (
-            <div key={item.href}>
+            <div key={`${item.href}-${item.label}`}>
               {item.separatorBefore ? (
                 <div
                   className="my-2 border-t border-on-nav/15"
@@ -59,7 +59,7 @@ export function Sidebar({ items }: { items: SidebarNavItem[] }) {
               ) : null}
               <Link
                 href={item.href}
-                data-testid={`sidebar-${item.href}`}
+                data-testid={`sidebar-${item.label}`}
                 className={cn(
                   "block rounded-md bg-surface px-3 py-2 text-sm font-medium text-ink transition-colors",
                   active ? "bg-surface text-ink" : "hover:bg-surface",

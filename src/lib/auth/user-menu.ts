@@ -203,7 +203,7 @@ export function buildSidebarNavItems(input: {
 
   const items: SidebarNavItem[] = [
     { href: "/", label: "Home" },
-    { href: "/campaigns", label: vocab.campaign.Plural },
+    { href: "/", label: vocab.campaign.Plural },
     { href: "/contacts", label: vocab.contact.Plural },
     ...(anyListFeatureEnabled()
       ? [{ href: "/lists", label: vocab.list.Plural }]

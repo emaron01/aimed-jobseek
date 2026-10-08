@@ -71,7 +71,9 @@ describe("account lifecycle B3 source seams", () => {
       paymentLocked: false,
     });
     const hrefs = items.map((i) => i.href);
-    expect(hrefs).toContain("/campaigns");
+    expect(items.some((i) => i.label === "Applications" && i.href === "/")).toBe(
+      true,
+    );
     expect(hrefs).toContain("/settings");
     expect(hrefs).not.toEqual(["/settings/billing"]);
   });
