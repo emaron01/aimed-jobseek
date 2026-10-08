@@ -3,6 +3,7 @@ import type {
   CheatSheetPersonSection,
 } from "@/lib/application-summary/contract";
 import {
+  CHEAT_SHEET_TARGET_PREFIX,
   CHRONOLOGY_TARGET_KEY,
   type AnswerFramework,
   type InterviewTypeTag,
@@ -18,6 +19,7 @@ import {
   resolveInterviewTypeTag,
 } from "@/lib/consultation/questions";
 import { questionTextNearDuplicate } from "@/lib/consultation/general-question-match";
+import { replyToTurnIdFromAnalysis } from "@/lib/consultation/qa-view";
 import { careerWalkThroughAlreadyAsked } from "@/lib/consultation/question-detection";
 
 const WHO_TAG_ORDER: InterviewTypeTag[] = [
@@ -373,34 +375,115 @@ function referencedGeneralId(item: CheatSheetCoachItem): string | null {
 }
 
 /**
- * Append only questions the stored list does not already have.
+ * Question ids the seeker edited (a saved sample), answered, or approved.
+ * A skipped reply does not keep the question.
+ */
+export function seekerKeptLikelyQuestionIds(input: {
+  questionIds: readonly string[];
+  turns: ReadonlyArray<{
+    id: string;
+    speaker: string;
+    targetKey: string | null;
+    skipped?: boolean;
+    analysisJson?: unknown;
+  }>;
+  statements: ReadonlyArray<{
+    turnId: string;
+    kind: string;
+  }>;
+}): Set<string> {
+  const wanted = new Set(input.questionIds.map((id) => id.trim()).filter(Boolean));
+  const questionIdFromTarget = (targetKey: string | null | undefined): string | null => {
+    if (!targetKey?.startsWith(CHEAT_SHEET_TARGET_PREFIX)) return null;
+    const id = targetKey.slice(CHEAT_SHEET_TARGET_PREFIX.length).trim();
+    return wanted.has(id) ? id : null;
+  };
+  const consultantTurnToQuestion = new Map<string, string>();
+  for (const turn of input.turns) {
+    if (turn.speaker !== "CONSULTANT") continue;
+    const questionId = questionIdFromTarget(turn.targetKey);
+    if (questionId) consultantTurnToQuestion.set(turn.id, questionId);
+  }
+  const kept = new Set<string>();
+  for (const statement of input.statements) {
+    if (statement.kind !== "INTERVIEW_ANSWER") continue;
+    const questionId = consultantTurnToQuestion.get(statement.turnId);
+    if (questionId) kept.add(questionId);
+  }
+  for (const turn of input.turns) {
+    if (turn.speaker !== "SEEKER" || turn.skipped) continue;
+    const direct = questionIdFromTarget(turn.targetKey);
+    if (direct) {
+      kept.add(direct);
+      continue;
+    }
+    const pinned = replyToTurnIdFromAnalysis(turn.analysisJson);
+    const questionId = pinned ? consultantTurnToQuestion.get(pinned) : undefined;
+    if (questionId) kept.add(questionId);
+  }
+  return kept;
+}
+
+/**
+ * The writer's new list replaces the stored one.
+ * A question the seeker edited, answered, or approved stays, including when
+ * the writer omitted it or wrote a new version of it.
  * The writer's 4–12 range applies to `incoming` before this merge.
- * The stored list keeps every existing question, in its existing order,
- * and can grow past 12 with no fixed ceiling.
  */
 export function mergePersonLikelyQuestions(input: {
   existing: CheatSheetCoachItem[];
   incoming: CheatSheetCoachItem[];
+  seekerKeptIds?: ReadonlySet<string>;
 }): CheatSheetCoachItem[] {
-  const kept = [...input.existing];
-  const generalIds = new Set(
-    kept
-      .map((item) => referencedGeneralId(item))
-      .filter((id): id is string => Boolean(id)),
-  );
-  for (const item of input.incoming) {
+  const seekerKeptIds = input.seekerKeptIds ?? new Set<string>();
+  const protectedItems = input.existing.filter((item) => {
+    const id = item.id?.trim();
+    return Boolean(id && seekerKeptIds.has(id));
+  });
+  const usedProtected = new Set<string>();
+  const result: CheatSheetCoachItem[] = [];
+
+  const matchesProtected = (item: CheatSheetCoachItem): CheatSheetCoachItem | null => {
     const generalId = referencedGeneralId(item);
-    if (generalId && generalIds.has(generalId)) continue;
+    if (generalId) {
+      const byGeneral = protectedItems.find((existing) => {
+        const id = existing.id?.trim() ?? "";
+        return !usedProtected.has(id) && referencedGeneralId(existing) === generalId;
+      });
+      if (byGeneral) return byGeneral;
+    }
     const prompt = item.prompt.trim();
-    if (
-      kept.some((existing) =>
-        questionTextNearDuplicate(existing.prompt, prompt),
-      )
-    ) {
+    return (
+      protectedItems.find((existing) => {
+        const id = existing.id?.trim() ?? "";
+        return !usedProtected.has(id) && questionTextNearDuplicate(existing.prompt, prompt);
+      }) ?? null
+    );
+  };
+
+  const alreadyListed = (item: CheatSheetCoachItem): boolean => {
+    const generalId = referencedGeneralId(item);
+    if (generalId && result.some((existing) => referencedGeneralId(existing) === generalId)) {
+      return true;
+    }
+    const prompt = item.prompt.trim();
+    return result.some((existing) => questionTextNearDuplicate(existing.prompt, prompt));
+  };
+
+  for (const item of input.incoming) {
+    const kept = matchesProtected(item);
+    if (kept) {
+      usedProtected.add(kept.id?.trim() ?? "");
+      if (!alreadyListed(kept)) result.push(kept);
       continue;
     }
-    kept.push(item);
-    if (generalId) generalIds.add(generalId);
+    if (alreadyListed(item)) continue;
+    result.push(item);
   }
-  return kept;
+  for (const item of protectedItems) {
+    const id = item.id?.trim() ?? "";
+    if (usedProtected.has(id) || alreadyListed(item)) continue;
+    result.push(item);
+  }
+  return result;
 }

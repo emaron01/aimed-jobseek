@@ -107,6 +107,7 @@ import {
 import {
   mergePersonLikelyQuestions,
   personLikelyQuestionCountDecision,
+  seekerKeptLikelyQuestionIds,
 } from "@/lib/application-summary/likely-questions";
 import { contactIdFromCheatSheetTarget } from "@/lib/consultation/harper-layout";
 
@@ -214,12 +215,14 @@ describe("stable likely-question identity", () => {
     const merged = mergePersonLikelyQuestions({
       existing: [answered, second],
       incoming: writerOrder,
+      seekerKeptIds: new Set(["contact:c1:likely:1"]),
     });
     const stored = assignLikely(merged);
     const forecast = stored.find((row) => row.prompt === FORECAST);
-    const keptSecond = stored.find((row) => row.prompt === second.prompt);
+    const replacedSecond = stored.find((row) => row.prompt === second.prompt);
     expect(forecast?.id).toBe("contact:c1:likely:1");
-    expect(keptSecond?.id).toBe("contact:c1:likely:2");
+    expect(replacedSecond?.id).not.toBe("contact:c1:likely:2");
+    expect(replacedSecond?.sampleAnswer).toBe("Replacement that must not land.");
     expect(forecast?.sampleAnswer).toBe(answered.sampleAnswer);
     expect(answers.get(`cheatSheet:${forecast?.id}`)).toEqual({
       reply: "I name slip risk out loud.",
@@ -260,29 +263,34 @@ describe("stable likely-question identity", () => {
   });
 });
 
-describe("additive person-section regeneration", () => {
-  it("appends a new question and a new General reference, and drops duplicates", () => {
-    const existing = [
-      item({
-        id: "contact:c1:likely:1",
-        prompt: FORECAST,
-        sampleAnswer: "Approved Monday commit.",
-      }),
-      item({
-        id: "contact:c1:likely:2",
-        prompt: GENERAL_TEXT,
-        generalQuestionId: "turn-general",
-        sampleAnswer: null,
-      }),
-    ];
+describe("person-section update replaces unedited questions", () => {
+  it("drops unedited prior questions and keeps edited, answered, and approved ones", () => {
+    const edited = item({
+      id: "contact:c1:likely:edited",
+      prompt: "How do you staff a new territory?",
+      sampleAnswer: "I hire the manager before the quota.",
+    });
+    const answered = item({
+      id: "contact:c1:likely:answered",
+      prompt: "What do you inspect in a late-stage deal?",
+      sampleAnswer: null,
+      harperQuestion: "Which deal should I use?",
+    });
+    const approved = item({
+      id: "contact:c1:likely:approved",
+      prompt: FORECAST,
+      sampleAnswer: "Approved Monday commit.",
+    });
+    const unedited = item({
+      id: "contact:c1:likely:old",
+      prompt: GENERAL_TEXT,
+      generalQuestionId: "turn-general",
+      sampleAnswer: "A generated sample the seeker never touched.",
+    });
     const incoming = [
       item({
         prompt: "How do you run a weekly forecast?",
         sampleAnswer: "Must not replace the approved answer.",
-      }),
-      item({
-        prompt: "A reworded general question that still points at the same id.",
-        generalQuestionId: "turn-general",
       }),
       item({ prompt: COACHING, sampleAnswer: "I start with the slipped commit." }),
       item({
@@ -294,20 +302,72 @@ describe("additive person-section regeneration", () => {
         generalQuestionId: "turn-new",
       }),
     ];
-    const merged = mergePersonLikelyQuestions({ existing, incoming });
+    const merged = mergePersonLikelyQuestions({
+      existing: [edited, answered, approved, unedited],
+      incoming,
+      seekerKeptIds: new Set([edited.id!, answered.id!, approved.id!]),
+    });
     expect(merged.map((row) => row.prompt)).toEqual([
       FORECAST,
-      GENERAL_TEXT,
       COACHING,
       "Tell me how you would open a first meeting with this hiring manager.",
+      edited.prompt,
+      answered.prompt,
     ]);
+    expect(merged.map((row) => row.prompt)).not.toContain(GENERAL_TEXT);
+    expect(merged[0]?.id).toBe(approved.id);
     expect(merged[0]?.sampleAnswer).toBe("Approved Monday commit.");
-    expect(merged[0]?.id).toBe("contact:c1:likely:1");
-    expect(merged[1]?.generalQuestionId).toBe("turn-general");
-    expect(merged[3]?.generalQuestionId).toBe("turn-new");
+    expect(merged[3]?.id).toBe(edited.id);
+    expect(merged[4]?.id).toBe(answered.id);
+    expect(merged[2]?.generalQuestionId).toBe("turn-new");
   });
 
-  it("applies 4-12 to the writer's new list and lets the stored total grow past 12", () => {
+  it("treats a saved sample, a reply, and an approval as kept, and a skip as not kept", () => {
+    const questionIds = ["edited", "answered", "approved", "skipped", "untouched"];
+    const kept = seekerKeptLikelyQuestionIds({
+      questionIds,
+      turns: [
+        {
+          id: "turn-edited",
+          speaker: "CONSULTANT",
+          targetKey: "cheatSheet:edited",
+        },
+        {
+          id: "turn-answered",
+          speaker: "CONSULTANT",
+          targetKey: "cheatSheet:answered",
+        },
+        {
+          id: "reply-answered",
+          speaker: "SEEKER",
+          targetKey: "cheatSheet:answered",
+        },
+        {
+          id: "turn-approved",
+          speaker: "CONSULTANT",
+          targetKey: "cheatSheet:approved",
+        },
+        {
+          id: "turn-skipped",
+          speaker: "CONSULTANT",
+          targetKey: "cheatSheet:skipped",
+        },
+        {
+          id: "reply-skipped",
+          speaker: "SEEKER",
+          targetKey: "cheatSheet:skipped",
+          skipped: true,
+        },
+      ],
+      statements: [
+        { turnId: "turn-edited", kind: "INTERVIEW_ANSWER" },
+        { turnId: "turn-approved", kind: "INTERVIEW_ANSWER" },
+      ],
+    });
+    expect([...kept].sort()).toEqual(["answered", "approved", "edited"]);
+  });
+
+  it("applies 4-12 to the writer's new list and drops unedited questions instead of accumulating", () => {
     expect(personLikelyQuestionCountDecision(4, 0)).toBe("save");
     expect(personLikelyQuestionCountDecision(12, 0)).toBe("save");
     expect(personLikelyQuestionCountDecision(13, 0)).toBe("retry");
@@ -347,12 +407,21 @@ describe("additive person-section regeneration", () => {
     );
     const incoming = incomingPrompts.map((prompt) => item({ prompt }));
     const merged = mergePersonLikelyQuestions({ existing, incoming });
-    expect(merged).toHaveLength(22);
-    expect(merged.slice(0, 10).map((row) => row.id)).toEqual(
-      existing.map((row) => row.id),
-    );
-    const parsed = storedSection(merged);
-    expect(parsed.likelyQuestions).toHaveLength(22);
+    expect(merged).toHaveLength(12);
+    expect(merged.map((row) => row.prompt)).toEqual(incomingPrompts);
+    const kept = mergePersonLikelyQuestions({
+      existing,
+      incoming,
+      seekerKeptIds: new Set([existing[0]!.id!, existing[1]!.id!]),
+    });
+    expect(kept).toHaveLength(14);
+    expect(kept.slice(0, 12).map((row) => row.prompt)).toEqual(incomingPrompts);
+    expect(kept.slice(12).map((row) => row.id)).toEqual([
+      existing[0]!.id,
+      existing[1]!.id,
+    ]);
+    const parsed = storedSection(kept);
+    expect(parsed.likelyQuestions).toHaveLength(14);
     const twelve = incoming.slice(0, 12).map((row) => ({
       ...row,
       interviewTypeTag: "focused_competency" as const,

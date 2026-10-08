@@ -27,6 +27,10 @@ import { cheatSheetPersonSectionInputHash } from "@/lib/application-summary/peop
 import { buildApplicationSummaryGuidanceMessages } from "@/lib/application-summary/prompt";
 import { consultationReplyTargetKey, type ConsultationQaItem, type QaStatement } from "@/lib/consultation/qa-view";
 import { APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content";
+import {
+  ENTERPRISE_SALES_DIRECTOR_POSTING,
+  NURSE_MANAGER_POSTING,
+} from "@/lib/job-requirement/fixtures";
 
 const generateStructured = vi.hoisted(() => vi.fn());
 
@@ -54,7 +58,7 @@ const NEW_QUESTION = "Tell me how you coach a sales manager through a missed qua
 const GENERAL_NOTE =
   "These are Harper's top picks. They represent the types of questions this interviewer may ask. Make sure you study General Study Questions.";
 const LIKELY_INSTRUCTION =
-  "You are given Harper's General questions for this application. Choose the questions this interviewer is most likely to ask, relevant to their role and responsibilities, referencing Harper's General questions by id when they fit. Then add the questions this interviewer would likely ask from their own function's perspective that Harper's list does not cover. Return between 4 and 12 questions in total, ranked from most to least likely, chosen as the most likely rather than a random sample. Do not include questions outside their area.";
+  "You are given Harper's General questions for this application. Choose the 4 to 12 questions this interviewer is most likely to ask, most likely first, based on who they are: their title and function, and their relationship to the job being interviewed for, inferred from their title and the job's title (for example the hiring manager or a more senior leader, a peer, someone this role would lead, a cross-functional partner, or a recruiter). A recruiter or talent-acquisition interviewer covers the standard screen (why this company, why you are leaving or looking, motivation, compensation expectations, timing, and logistics) along with high-level qualifying questions about the job's core requirements, such as scope, team size, and approach. Use one of Harper's General questions (by id) only when this interviewer would genuinely ask it; otherwise write the question from this interviewer's perspective. Do not include questions outside their area.";
 
 function statement(
   partial: Partial<QaStatement> & Pick<QaStatement, "id" | "kind" | "status" | "content">,
@@ -361,7 +365,7 @@ describe("likely questions from Harper's General questions", () => {
     expect(sent.people).toHaveLength(1);
     expect(JSON.parse(messages[1]!.content).careerStage).toBe("late_career");
     expect(messages[0]!.content).toContain(LIKELY_INSTRUCTION);
-    expect(messages[0]!.content).toContain("Prompt version: 17");
+    expect(messages[0]!.content).toContain("Prompt version: 18");
   });
 
   it("accepts 4 to 12 likely questions, rejects fewer or more, and drops an unknown reference", () => {
@@ -593,7 +597,7 @@ describe("likely questions from Harper's General questions", () => {
 
   it("keeps the approved instruction text, bumps the prompt version, and does not regenerate on a page view", () => {
     expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain(LIKELY_INSTRUCTION);
-    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("17");
+    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("18");
     const person = {
       sectionKey: "contact:1",
       roleId: "role-1",
@@ -639,5 +643,96 @@ describe("likely questions from Harper's General questions", () => {
     expect(view).not.toContain("generateStructured");
     expect(service).toContain("personLikelyQuestionCountDecision");
     expect(service).toContain("for (let attempt = 0; attempt < 2; attempt += 1)");
+  });
+
+  it("sends the exact person instruction for a recruiter and for sales, nursing, and new-graduate guides", () => {
+    const screen =
+      "A recruiter or talent-acquisition interviewer covers the standard screen (why this company, why you are leaving or looking, motivation, compensation expectations, timing, and logistics) along with high-level qualifying questions about the job's core requirements, such as scope, team size, and approach.";
+    expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain(LIKELY_INSTRUCTION);
+    expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).not.toContain(
+      "relevant to their role and responsibilities",
+    );
+    expect(
+      APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS.split(
+        "You are given Harper's General questions",
+      ),
+    ).toHaveLength(2);
+
+    const cases = [
+      {
+        careerStage: "late_career" as const,
+        posting: ENTERPRISE_SALES_DIRECTOR_POSTING,
+        roleName: "Recruiter",
+        titles: ["Talent Acquisition Partner"],
+        sectionKind: "RECRUITER",
+        interviewerTitle: "Talent Acquisition Partner",
+      },
+      {
+        careerStage: "mid_career" as const,
+        posting: NURSE_MANAGER_POSTING,
+        roleName: "Hiring Manager",
+        titles: ["Clinical Nurse Manager"],
+        sectionKind: "HIRING_MANAGER",
+        interviewerTitle: "Clinical Nurse Manager",
+      },
+      {
+        careerStage: "college_graduate" as const,
+        posting: ENTERPRISE_SALES_DIRECTOR_POSTING,
+        roleName: "Recruiter",
+        titles: ["Campus Recruiter"],
+        sectionKind: "RECRUITER",
+        interviewerTitle: "Campus Recruiter",
+      },
+      {
+        careerStage: "new_to_workforce" as const,
+        posting: NURSE_MANAGER_POSTING,
+        roleName: "Hiring Manager",
+        titles: ["Clinical Nurse Manager"],
+        sectionKind: "HIRING_MANAGER",
+        interviewerTitle: "Clinical Nurse Manager",
+      },
+    ];
+
+    for (const item of cases) {
+      const messages = buildApplicationSummaryGuidanceMessages({
+        sources: [{ id: "job:posting", text: item.posting, category: "JOB" }],
+        people: [
+          {
+            sectionKey: "contact:1",
+            roleId: "role-1",
+            contactId: "1",
+            heading: "Alex",
+            roleName: item.roleName,
+            titles: item.titles,
+            sectionKind: item.sectionKind,
+          },
+        ],
+        mode: "person",
+        careerStage: item.careerStage,
+        interviewer: {
+          hiringTeamRole: item.roleName,
+          title: item.interviewerTitle,
+          persona: "Runs this conversation.",
+          responsibilities: "Decides whether to continue.",
+          caresAbout: ["Fit"],
+        },
+      });
+      const system = messages[0]?.content ?? "";
+      expect(system).toContain(LIKELY_INSTRUCTION);
+      expect(system).toContain(screen);
+      expect(system).toContain(
+        "Every sampleAnswer is returned as answerFramework plus its parts",
+      );
+      const sources = JSON.parse(messages[1]?.content ?? "{}") as {
+        allowedSources?: Array<{ text?: string }>;
+        careerStage?: string;
+      };
+      const people = JSON.parse(messages[2]?.content ?? "{}") as {
+        interviewer?: { title?: string };
+      };
+      expect(sources.allowedSources?.[0]?.text).toBe(item.posting);
+      expect(sources.careerStage).toBe(item.careerStage);
+      expect(people.interviewer?.title).toBe(item.interviewerTitle);
+    }
   });
 });

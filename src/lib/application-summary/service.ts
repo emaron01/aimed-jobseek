@@ -26,6 +26,7 @@ import {
   mergePersonLikelyQuestions,
   personLikelyQuestionCountDecision,
   resolvePersonLikelyQuestions,
+  seekerKeptLikelyQuestionIds,
   validatePersonSectionLikelyQuestions,
 } from "@/lib/application-summary/likely-questions";
 import { loadOrderedAnsweredHarperQuestions } from "@/lib/consultation/harper-display-qa";
@@ -35,7 +36,10 @@ import {
   recordConsultationReply,
   regenerateConsultationStatement,
 } from "@/lib/consultation/service";
-import { CONSULTATION_PROMPT_VERSION } from "@/lib/consultation/contract";
+import {
+  CHEAT_SHEET_TARGET_PREFIX,
+  CONSULTATION_PROMPT_VERSION,
+} from "@/lib/consultation/contract";
 import {
   individualProfileRecordSchema,
   interviewerWorkExperience,
@@ -828,6 +832,52 @@ function personPayload(person: {
   };
 }
 
+async function loadSeekerKeptLikelyQuestionIds(input: {
+  organizationId: string;
+  campaignId: string;
+  questionIds: string[];
+}): Promise<Set<string>> {
+  if (input.questionIds.length === 0) return new Set();
+  const targetKeys = input.questionIds.map(
+    (id) => `${CHEAT_SHEET_TARGET_PREFIX}${id}`,
+  );
+  const turns = await prisma.consultationTurn.findMany({
+    where: {
+      organizationId: input.organizationId,
+      session: {
+        campaignId: input.campaignId,
+        organizationId: input.organizationId,
+      },
+      targetKey: { in: targetKeys },
+    },
+    select: {
+      id: true,
+      speaker: true,
+      targetKey: true,
+      analysisJson: true,
+      skipped: true,
+    },
+  });
+  const consultantTurnIds = turns
+    .filter((turn) => turn.speaker === "CONSULTANT")
+    .map((turn) => turn.id);
+  const statements =
+    consultantTurnIds.length === 0
+      ? []
+      : await prisma.consultationStatement.findMany({
+          where: {
+            turnId: { in: consultantTurnIds },
+            kind: "INTERVIEW_ANSWER",
+          },
+          select: { turnId: true, kind: true },
+        });
+  return seekerKeptLikelyQuestionIds({
+    questionIds: input.questionIds,
+    turns,
+    statements,
+  });
+}
+
 async function markSummaryFailed(campaignId: string, message: string) {
   await prisma.applicationSummary.update({
     where: { campaignId },
@@ -919,6 +969,13 @@ export async function generateApplicationSummary(input: {
     ) {
       return;
     }
+    const seekerKeptIds = await loadSeekerKeptLikelyQuestionIds({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      questionIds: (existingPerson?.likelyQuestions ?? [])
+        .map((item) => item.id?.trim() ?? "")
+        .filter(Boolean),
+    });
     const consultantTurns = await prisma.consultationTurn.findMany({
       where: {
         session: { campaignId: input.campaignId, organizationId: input.organizationId },
@@ -945,6 +1002,7 @@ export async function generateApplicationSummary(input: {
       const mergedLikelyQuestions = mergePersonLikelyQuestions({
         existing: existingPerson?.likelyQuestions ?? [],
         incoming: likelyQuestions,
+        seekerKeptIds,
       });
       const section = {
         ...assignCoachItemIds({

@@ -4,7 +4,7 @@ import {
   interviewTypeTagSchema,
 } from "@/lib/consultation/contract";
 
-export const APPLICATION_SUMMARY_PROMPT_VERSION = "17";
+export const APPLICATION_SUMMARY_PROMPT_VERSION = "18";
 
 export const CHEAT_SHEET_SECTION_KINDS = [
   "RECRUITER",
@@ -186,7 +186,7 @@ export const cheatSheetPersonSectionSchema = z.preprocess(
   cheatSheetPersonSectionGenerateSchema
     .omit({ likelyQuestions: true })
     .extend({
-      // The writer is capped at 12 per call. Additive refresh appends, so the stored list can grow past 12.
+      // The writer is capped at 12 per call. An update replaces that list, and seeker-kept questions can make the stored list longer than 12.
       likelyQuestions: z.array(cheatSheetCoachItemSchema).min(1),
       bestMaterial: z.array(guidanceItemSchema).optional().default([]),
       storyIds: z.array(z.string()).optional().default([]),
