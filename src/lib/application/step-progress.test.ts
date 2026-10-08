@@ -184,7 +184,7 @@ describe("application step colors", () => {
         { ...idle, hiringTeamRoleCount: 2, hiringTeamBuiltCount: 1 },
         [],
       ),
-    ).toBe("in_progress");
+    ).toBe("done");
     expect(
       resolveApplicationStepState(
         "hiring-team",

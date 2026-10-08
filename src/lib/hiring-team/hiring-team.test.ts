@@ -68,7 +68,6 @@ import { applicationPersonaOptions } from "@/lib/hiring-team/scope";
 import {
   addApplicationHiringTeamRole,
   addTemplateToApplication,
-  approveApplicationHiringTeamRole,
   rebuildApplicationHiringTeamRole,
   removeApplicationHiringTeamRole,
   savePersonaAsTemplate,
@@ -967,15 +966,6 @@ describe.skipIf(!hasTestDatabase())("hiring team per application", { timeout: 60
     await syncApplicationHiringTeam({ organizationId, campaignId: appA.id });
     const edited = await prisma.persona.findFirst({ where: { id: manager!.id } });
     expect(edited?.name).toBe("Edited hiring manager");
-
-    // Approve requires a built narrative; identification-only roles stay unapproved.
-    await expect(
-      approveApplicationHiringTeamRole({
-        organizationId,
-        campaignId: appA.id,
-        personaId: manager!.id,
-      }),
-    ).rejects.toThrow(/Generate this .+ before approving/);
 
     expect(rolesA).toHaveLength(1);
     const addedForRebuild = await addApplicationHiringTeamRole({

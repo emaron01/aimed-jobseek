@@ -33,23 +33,13 @@ import {
 } from "@/lib/application/workspace-links";
 import { listApplicationContacts } from "@/lib/application/contacts";
 import { isHiringTeamPersonaBuilt } from "@/lib/hiring-team/build";
-import {
-  APPROVED_PERSONA_DETAILS_CLASS,
-  hiringTeamPersonaIsApproved,
-  NEEDS_REVIEW_PERSONA_DETAILS_CLASS,
-} from "@/lib/hiring-team/review-group";
-import { profileJsonAwaitingSeekerInput } from "@/lib/hiring-team/synthesize-outcome";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { getActiveEmailSignatureBody } from "@/lib/signature/signature";
 import { AppPendingIndicator } from "@/components/AppButton";
 import { getApplicationResearchStatus } from "@/lib/application/research-status";
 import {
   addTemplateRoleAction,
-  approveApplicationRoleAction,
-  buildAllDirectRolesAction,
-  buildApplicationRoleAction,
   moveApplicationRoleInvolvementAction,
-  rebuildApplicationRoleAction,
   removeApplicationRoleAction,
   saveRoleAsTemplateAction,
   updateApplicationRoleAction,
@@ -81,7 +71,6 @@ import { isOutreachAssetType } from "@/lib/product-config";
 import { HiringTeamDisclosureGroup } from "@/components/HiringTeamDisclosureGroup";
 import { AddPersonaSection } from "@/components/AddPersonaSection";
 import { HiringTeamAssumptionNotice } from "@/components/HiringTeamAssumptionNotice";
-import { HiringTeamReviewGroup } from "@/components/HiringTeamReviewGroup";
 import { HiringTeamPersonPicker } from "@/components/HiringTeamPersonPicker";
 import { HiringTeamRoleActions } from "@/components/HiringTeamRoleActions";
 import {
@@ -1110,37 +1099,25 @@ function toContactRow(row: {
   };
 }
 
-function hiringTeamStatusChip(input: {
-  setupStatus: string;
-  approvalStatus: string;
-  staleAt: Date | null;
-  profileJson: unknown;
-  building: boolean;
-}): { kind: "none" | "text" | "building"; text?: string } {
-  if (input.building) {
+function hiringTeamStatusChip(building: boolean): {
+  kind: "none" | "building";
+  text?: string;
+} {
+  if (building) {
     return { kind: "building", text: hiringTeamConfig.status.building };
   }
-  if (input.staleAt) {
-    return { kind: "text", text: hiringTeamConfig.status.stale };
-  }
-  if (
-    hiringTeamPersonaIsApproved({
-      approvalStatus: input.approvalStatus,
-      staleAt: input.staleAt,
-      profileJson: input.profileJson,
-      building: input.building,
-    })
-  ) {
-    return { kind: "text", text: hiringTeamConfig.status.approved };
-  }
-  if (
-    profileJsonAwaitingSeekerInput(input.profileJson) ||
-    input.setupStatus === "FAILED"
-  ) {
-    return { kind: "text", text: hiringTeamConfig.status.awaitingDetails };
-  }
-  // Identified / Ready: no chip
   return { kind: "none" };
+}
+
+function roleResponsibilityText(
+  responsibilities: string | null,
+  overview: string | null,
+  definition: string | null,
+): string {
+  const text = (responsibilities ?? overview ?? definition ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text || hiringTeamConfig.noResponsibilities;
 }
 
 function KindMark({ kind }: { kind: string }) {
@@ -1187,30 +1164,6 @@ async function HiringTeamSection({
   const indirectRoles = organizedRoles.filter(
     ({ narrative }) => narrative?.involvement === "INDIRECT",
   );
-  function roleIsBuilding(role: (typeof roles)[number]) {
-    return (
-      role.setupStatus === "SYNTHESIZING" ||
-      jobs.some(
-        (job) =>
-          job.type === "HIRING_TEAM_BUILD" &&
-          job.targetId === role.id &&
-          (job.status === "PENDING" || job.status === "IN_PROGRESS"),
-      )
-    );
-  }
-  function roleIsApproved(item: (typeof organizedRoles)[number]) {
-    return hiringTeamPersonaIsApproved({
-      approvalStatus: item.role.approvalStatus,
-      staleAt: item.role.staleAt,
-      profileJson: item.role.profileJson,
-      building: roleIsBuilding(item.role),
-    });
-  }
-  const approvedDirect = directRoles.filter(roleIsApproved);
-  const reviewDirect = directRoles.filter((item) => !roleIsApproved(item));
-  const approvedIndirect = indirectRoles.filter(roleIsApproved);
-  const reviewIndirect = indirectRoles.filter((item) => !roleIsApproved(item));
-
   const roleCard = ({
     role,
     narrative,
@@ -1223,20 +1176,9 @@ async function HiringTeamSection({
           job.targetId === role.id &&
           (job.status === "PENDING" || job.status === "IN_PROGRESS"),
       );
-    const chip = hiringTeamStatusChip({
-      setupStatus: role.setupStatus,
-      approvalStatus: role.approvalStatus,
-      staleAt: role.staleAt,
-      profileJson: role.profileJson,
-      building,
-    });
+    const chip = hiringTeamStatusChip(building);
     const roleBuilt = isHiringTeamPersonaBuilt(role);
-    const approvedPersona = hiringTeamPersonaIsApproved({
-      approvalStatus: role.approvalStatus,
-      staleAt: role.staleAt,
-      profileJson: role.profileJson,
-      building,
-    });
+    const mappedPeople = people.filter((person) => person.chosenPersonaId === role.id);
     return (
     <div
       key={role.id}
@@ -1254,14 +1196,16 @@ async function HiringTeamSection({
               <span data-testid={`hiring-team-status-${role.id}`}>
                 <AppPendingIndicator label={chip.text ?? hiringTeamConfig.status.building} />
               </span>
-            ) : chip.kind === "text" && chip.text ? (
+            ) : (
               <span
                 className="text-xs text-subtle"
-                data-testid={`hiring-team-status-${role.id}`}
+                data-testid={`hiring-team-researched-${role.id}`}
               >
-                {chip.text}
+                {roleBuilt
+                  ? hiringTeamConfig.status.researched
+                  : hiringTeamConfig.status.notResearched}
               </span>
-            ) : null}
+            )}
           </div>
           {canEdit ? (
             <HiringTeamRoleActions
@@ -1334,9 +1278,26 @@ async function HiringTeamSection({
         <p className="text-sm text-ink">
           {textList(role.targetTitles).join(", ") || "No likely titles."}
         </p>
-        {people
-          .filter((person) => person.chosenPersonaId === role.id)
-          .map((person) => (
+        <div data-testid={`hiring-team-responsibilities-${role.id}`}>
+          <h5 className="text-sm font-medium text-ink">
+            {hiringTeamConfig.responsibilitiesLabel}
+          </h5>
+          <p className="line-clamp-3 text-sm text-ink">
+            {roleResponsibilityText(
+              role.responsibilities,
+              narrative?.overview ?? null,
+              role.definition,
+            )}
+          </p>
+        </div>
+        <div data-testid={`hiring-team-people-${role.id}`}>
+          <h5 className="text-sm font-medium text-ink">
+            {hiringTeamConfig.mappedPeopleLabel}
+          </h5>
+          {mappedPeople.length === 0 ? (
+            <p className="text-sm text-muted">{hiringTeamConfig.noMappedPeople}</p>
+          ) : (
+            mappedPeople.map((person) => (
             <div
               key={person.contactId}
               className="flex flex-wrap items-center justify-between gap-2"
@@ -1356,31 +1317,18 @@ async function HiringTeamSection({
                 </AppActionLink>
               ) : null}
             </div>
-          ))}
+            ))
+          )}
+        </div>
         {role.whyThisPersonaMatters ? (
           <p className="text-sm text-ink">{role.whyThisPersonaMatters}</p>
         ) : null}
         {canEdit ? (
-          <>
-            <ApplicationActionForm
-              action={
-                role.setupStatus === "FAILED" || role.staleAt
-                  ? rebuildApplicationRoleAction
-                  : buildApplicationRoleAction
-              }
-              submitLabel={hiringTeamConfig.actions.build}
-              pendingLabel={hiringTeamConfig.queuedBuild}
-              testId={`build-role-${role.id}`}
-            >
-              <input type="hidden" name="campaignId" value={campaignId} />
-              <input type="hidden" name="personaId" value={role.id} />
-            </ApplicationActionForm>
-            <HiringTeamCheatSheetToggle
-              campaignId={campaignId}
-              personaId={role.id}
-              added={role.cheatSheetActivatedAt != null}
-            />
-          </>
+          <HiringTeamCheatSheetToggle
+            campaignId={campaignId}
+            personaId={role.id}
+            added={role.cheatSheetActivatedAt != null}
+          />
         ) : null}
         {canEdit ? (
           <ApplicationActionForm
@@ -1404,13 +1352,8 @@ async function HiringTeamSection({
         ) : null}
       </div>
       <details
-        className={
-          approvedPersona
-            ? APPROVED_PERSONA_DETAILS_CLASS
-            : NEEDS_REVIEW_PERSONA_DETAILS_CLASS
-        }
+        className="mt-4 space-y-0 rounded-md border border-edge p-3"
         data-testid={`hiring-team-details-${role.id}`}
-        data-persona-review={approvedPersona ? "approved" : "needs-review"}
       >
       <summary className="cursor-pointer text-sm font-medium text-ink">
         {hiringTeamDetailsTitle(role.name)}
@@ -1456,16 +1399,6 @@ async function HiringTeamSection({
         {canEdit ? (
           <div className="space-y-3 print:hidden">
             <div className="flex flex-wrap gap-3">
-              {roleBuilt ? (
-              <ApplicationActionForm
-                action={approveApplicationRoleAction}
-                submitLabel="Approve"
-                testId={`approve-role-${role.id}`}
-              >
-                <input type="hidden" name="campaignId" value={campaignId} />
-                <input type="hidden" name="personaId" value={role.id} />
-              </ApplicationActionForm>
-              ) : null}
               <ApplicationActionForm
                 action={removeApplicationRoleAction}
                 submitLabel="Remove role"
@@ -1512,64 +1445,31 @@ async function HiringTeamSection({
         <p className="text-sm text-muted">No {vocab.persona.plural} yet.</p>
       ) : (
         <div className="space-y-5">
-          {directRoles.length > 0 ? <HiringTeamRecommendedLine /> : null}
-          <HiringTeamReviewGroup
-            title={hiringTeamConfig.status.approved}
-            testId="hiring-team-group-approved"
-          >
-            {approvedDirect.length > 0 ? (
+          {directRoles.length > 0 ? (
+            <>
+              <HiringTeamRecommendedLine />
               <HiringTeamDisclosureGroup
                 groupKey="direct"
                 title={hiringTeamConfig.sections.direct}
               >
-                {approvedDirect.map(roleCard)}
+                {directRoles.map(roleCard)}
               </HiringTeamDisclosureGroup>
-            ) : null}
-            {approvedIndirect.length > 0 ? (
-              <HiringTeamDisclosureGroup
-                groupKey="indirect"
-                title={hiringTeamConfig.sections.indirect}
-              >
-                {approvedIndirect.map(roleCard)}
-              </HiringTeamDisclosureGroup>
-            ) : null}
-          </HiringTeamReviewGroup>
-          <HiringTeamReviewGroup
-            title={hiringTeamConfig.needsReviewGroup}
-            testId="hiring-team-group-needs-review"
+            </>
+          ) : null}
+          <HiringTeamDisclosureGroup
+            groupKey="indirect"
+            title={hiringTeamConfig.sections.indirect}
           >
-            {reviewDirect.length > 0 ? (
-              <HiringTeamDisclosureGroup
-                groupKey="direct"
-                title={hiringTeamConfig.sections.direct}
-              >
-                {reviewDirect.map(roleCard)}
-              </HiringTeamDisclosureGroup>
-            ) : null}
-            <HiringTeamDisclosureGroup
-              groupKey="indirect"
-              title={hiringTeamConfig.sections.indirect}
-            >
-              {reviewIndirect.length > 0 ? (
-                reviewIndirect.map(roleCard)
-              ) : indirectRoles.length === 0 ? (
-                <p className="text-sm text-subtle">
-                  No indirect {vocab.persona.plural.toLowerCase()}.
-                </p>
-              ) : null}
-            </HiringTeamDisclosureGroup>
-          </HiringTeamReviewGroup>
+            {indirectRoles.length > 0 ? (
+              indirectRoles.map(roleCard)
+            ) : (
+              <p className="text-sm text-subtle">
+                No indirect {vocab.persona.plural.toLowerCase()}.
+              </p>
+            )}
+          </HiringTeamDisclosureGroup>
         </div>
       )}
-      {canEdit ? (
-        <ApplicationActionForm
-          action={buildAllDirectRolesAction}
-          submitLabel={hiringTeamConfig.actions.buildAllDirect}
-          testId="build-all-direct-roles"
-        >
-          <input type="hidden" name="campaignId" value={campaignId} />
-        </ApplicationActionForm>
-      ) : null}
       {canEdit && templates.length > 0 ? (
         <ApplicationActionForm action={addTemplateRoleAction} submitLabel="Add saved template" testId="add-template-role">
           <input type="hidden" name="campaignId" value={campaignId} />

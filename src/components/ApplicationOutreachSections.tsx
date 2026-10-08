@@ -3,7 +3,6 @@
 import { useActionState, useRef, useState, type ReactNode, type RefObject } from "react";
 import {
   addApplicationContactAction,
-  buildOutreachPersonaThenGenerateAction,
   generateOutreachAssetAction,
   markApplicationAppliedAction,
   setApplicationProgressAction,
@@ -27,7 +26,6 @@ import {
 import { outreachEmailHandoff } from "@/lib/application-assets/handoff";
 import { openEmailClientHref } from "@/lib/email-generation/email-body";
 import {
-  applicationSummaryConfig,
   outreachConfig,
   polishCopy,
   vocab,
@@ -107,7 +105,6 @@ const GENERATOR_KINDS: OutreachGeneratorKind[] = [
 
 function Status({ result }: { result: ApplicationOutreachActionResult | null }) {
   if (!result) return null;
-  if (result.needsPersonaBuild) return null;
   return (
     <InlineActionStatus result={result}>
       {result.violations?.length ? (
@@ -541,10 +538,6 @@ export function ApplicationOutreachSection({
     generateOutreachAssetAction,
     initial,
   );
-  const [buildGenerateState, buildGenerateAction] = useActionState(
-    buildOutreachPersonaThenGenerateAction,
-    initial,
-  );
   const [sentState, sentAction] = useActionState(
     markOutreachSentAction,
     initial,
@@ -554,16 +547,6 @@ export function ApplicationOutreachSection({
   const [generatorKind, setGeneratorKind] =
     useState<OutreachGeneratorKind>("EMAIL");
   const [showAddContact, setShowAddContact] = useState(false);
-  const [showUnbuiltPrompt, setShowUnbuiltPrompt] = useState(false);
-  const [unbuiltDismissed, setUnbuiltDismissed] = useState(false);
-  const [pendingGenerate, setPendingGenerate] = useState<{
-    kind: OutreachGeneratorKind;
-    purpose: string;
-    followUpToAssetId: string | null;
-    interviewStageId: string | null;
-    regenerationInstruction: string;
-    skipThankYouQuestions: boolean;
-  } | null>(null);
   const selected =
     contacts.find((contact) => contact.contactId === selectedId) ??
     contacts[0] ??
@@ -580,21 +563,9 @@ export function ApplicationOutreachSection({
   const thankYouSelected = generatorKind === "INTERVIEW_THANK_YOU";
   const fieldClass =
     "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
-  const selectedRole = selected?.personaId
-    ? (roles.find((role) => role.id === selected.personaId) ?? null)
-    : null;
-  const selectedPersonaBuilt = selectedRole?.personaBuilt !== false;
-  const showUnbuiltPersonaPrompt =
-    !selectedPersonaBuilt &&
-    !unbuiltDismissed &&
-    (showUnbuiltPrompt || Boolean(generateState?.needsPersonaBuild));
-
   function openContact(contactId: string, assetId?: string) {
     setSelectedId(contactId);
     setExplicitAssetId(assetId ?? null);
-    setShowUnbuiltPrompt(false);
-    setUnbuiltDismissed(false);
-    setPendingGenerate(null);
   }
 
   function openAddContact() {
@@ -972,137 +943,11 @@ export function ApplicationOutreachSection({
             <Status result={sentState} />
 
             {canEdit ? (
-              showUnbuiltPersonaPrompt ? (
-                <div
-                  className="space-y-3 rounded-md border border-edge p-4"
-                  data-testid="outreach-unbuilt-persona"
-                >
-                  <p className="text-sm text-ink">
-                    {applicationSummaryConfig.sections.unbuiltPersona}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <form action={buildGenerateAction} className="contents">
-                      <input
-                        type="hidden"
-                        name="campaignId"
-                        value={campaignId}
-                      />
-                      <input
-                        type="hidden"
-                        name="contactId"
-                        value={selected.contactId}
-                      />
-                      <input
-                        type="hidden"
-                        name="personaId"
-                        value={selected.personaId ?? ""}
-                      />
-                      <input
-                        type="hidden"
-                        name="kind"
-                        value={pendingGenerate?.kind ?? generatorKind}
-                      />
-                      <input
-                        type="hidden"
-                        name="purpose"
-                        value={
-                          pendingGenerate?.purpose ??
-                          (thankYouSelected
-                            ? "THANK_YOU"
-                            : lastSent
-                              ? "FOLLOW_UP"
-                              : "PROACTIVE")
-                        }
-                      />
-                      {(pendingGenerate?.followUpToAssetId ??
-                        (lastSent && !thankYouSelected ? lastSent.id : null)) ? (
-                        <input
-                          type="hidden"
-                          name="followUpToAssetId"
-                          value={
-                            pendingGenerate?.followUpToAssetId ??
-                            lastSent?.id ??
-                            ""
-                          }
-                        />
-                      ) : null}
-                      {(pendingGenerate?.interviewStageId ?? "").trim() ? (
-                        <input
-                          type="hidden"
-                          name="interviewStageId"
-                          value={pendingGenerate?.interviewStageId ?? ""}
-                        />
-                      ) : null}
-                      {(pendingGenerate?.skipThankYouQuestions ??
-                        false) ? (
-                        <input
-                          type="hidden"
-                          name="skipThankYouQuestions"
-                          value="1"
-                        />
-                      ) : null}
-                      {(pendingGenerate?.regenerationInstruction ?? "").trim() ? (
-                        <input
-                          type="hidden"
-                          name="regenerationInstruction"
-                          value={pendingGenerate?.regenerationInstruction ?? ""}
-                        />
-                      ) : null}
-                      <SubmitButton>
-                        {applicationSummaryConfig.actions.buildPersonaNow}
-                      </SubmitButton>
-                    </form>
-                    <AppButton
-                      type="button"
-                      variant="secondary"
-                      data-testid="outreach-unbuilt-persona-no"
-                      onClick={() => {
-                        setShowUnbuiltPrompt(false);
-                        setUnbuiltDismissed(true);
-                        setPendingGenerate(null);
-                      }}
-                    >
-                      {applicationSummaryConfig.actions.buildPersonaNo}
-                    </AppButton>
-                  </div>
-                  <Status result={buildGenerateState} />
-                </div>
-              ) : (
                 <form
                   key={`generate-${selected.contactId}`}
                   action={generateAction}
-                  onSubmit={(event) => {
+                  onSubmit={() => {
                     setExplicitAssetId(null);
-                    if (!selectedPersonaBuilt) {
-                      event.preventDefault();
-                      const form = event.currentTarget;
-                      const data = new FormData(form);
-                      const kindRaw = String(data.get("kind") ?? "EMAIL");
-                      const kind: OutreachGeneratorKind =
-                        kindRaw === "LINKEDIN_CONNECTION_NOTE" ||
-                        kindRaw === "LINKEDIN_INMAIL" ||
-                        kindRaw === "INTERVIEW_THANK_YOU"
-                          ? kindRaw
-                          : "EMAIL";
-                      setPendingGenerate({
-                        kind,
-                        purpose: String(data.get("purpose") ?? "PROACTIVE"),
-                        followUpToAssetId:
-                          String(data.get("followUpToAssetId") ?? "").trim() ||
-                          null,
-                        interviewStageId:
-                          String(data.get("interviewStageId") ?? "").trim() ||
-                          null,
-                        regenerationInstruction: String(
-                          data.get("regenerationInstruction") ?? "",
-                        ),
-                        skipThankYouQuestions:
-                          String(data.get("skipThankYouQuestions") ?? "") ===
-                          "1",
-                      });
-                      setUnbuiltDismissed(false);
-                      setShowUnbuiltPrompt(true);
-                    }
                   }}
                   className="grid gap-3 md:grid-cols-2"
                   data-testid="add-next-outreach"
@@ -1134,14 +979,6 @@ export function ApplicationOutreachSection({
                       type="hidden"
                       name="followUpToAssetId"
                       value={lastSent.id}
-                    />
-                  ) : null}
-                  {thankYouSelected &&
-                  pendingGenerate?.skipThankYouQuestions ? (
-                    <input
-                      type="hidden"
-                      name="skipThankYouQuestions"
-                      value="1"
                     />
                   ) : null}
                   <div className="md:col-span-2">
@@ -1224,7 +1061,6 @@ export function ApplicationOutreachSection({
                   </label>
                   <SubmitButton>{outreachConfig.labels.generate}</SubmitButton>
                 </form>
-              )
             ) : null}
             <Status result={generateState} />
           </div>

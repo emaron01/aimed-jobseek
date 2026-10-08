@@ -124,13 +124,6 @@ export function emptyApplicationStepFacts(): ApplicationStepFactInput {
   };
 }
 
-export function hiringTeamAllBuilt(facts: ApplicationStepFactInput): boolean {
-  return (
-    facts.hiringTeamRoleCount > 0 &&
-    facts.hiringTeamBuiltCount === facts.hiringTeamRoleCount
-  );
-}
-
 export function stepResultKey(
   key: ApplicationStepKey,
   facts: ApplicationStepFactInput,
@@ -147,7 +140,7 @@ export function stepResultKey(
         : "consultation:open";
     case "hiring-team":
       return facts.hiringTeamRoleCount > 0
-        ? `hiring-team:built:${facts.hiringTeamBuiltCount}:${facts.hiringTeamRoleCount}`
+        ? `hiring-team:identified:${facts.hiringTeamRoleCount}`
         : null;
     case "assets":
       if (facts.latestAssetKind === "cover" && facts.latestCoverLetterVersion) {
@@ -228,7 +221,7 @@ export function stepIsDone(
     case "consultation":
       return facts.consultationComplete;
     case "hiring-team":
-      return hiringTeamAllBuilt(facts);
+      return facts.hiringTeamRoleCount > 0;
     case "assets":
       return facts.latestResumeApproved && !facts.hasUnapprovedAssetDraft;
     case "outreach":
@@ -300,9 +293,6 @@ export function stepIsInProgress(
   }
   if (key === "consultation") {
     return facts.consultationStarted && !facts.consultationComplete;
-  }
-  if (key === "hiring-team") {
-    return facts.hiringTeamRoleCount > 0 && !hiringTeamAllBuilt(facts);
   }
   if (key === "assets") {
     return (
@@ -668,13 +658,6 @@ function stepTurnCountLabel(
       facts.interviewersWithoutGuideCount,
       applicationStepCopy.oneInterviewerHasNoPrepGuide,
       applicationStepCopy.interviewersHaveNoPrepGuide,
-    );
-  }
-  if (key === "hiring-team") {
-    return countedLabel(
-      Math.max(0, facts.hiringTeamRoleCount - facts.hiringTeamBuiltCount),
-      applicationStepCopy.onePersonaIsNotBuilt,
-      applicationStepCopy.personasAreNotBuilt,
     );
   }
   return null;

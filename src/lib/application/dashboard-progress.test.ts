@@ -238,7 +238,9 @@ describe("dashboard step wording", () => {
     );
     expect(card(html, "assets")).toContain(applicationStepCopy.assetsDone);
     expect(card(html, "hiring-team")).toContain("Personas and Interviewers");
-    expect(card(html, "hiring-team")).toContain(applicationStepCopy.newHiringPersonas);
+    expect(card(html, "hiring-team")).toContain(applicationStepCopy.done);
+    expect(card(html, "hiring-team")).not.toContain(applicationStepCopy.yourTurn);
+    expect(card(html, "hiring-team")).not.toContain(applicationStepCopy.onePersonaIsNotBuilt);
     expect(card(html, "outreach")).toContain("Send Outreach");
     expect(card(html, "outreach")).toContain(applicationStepCopy.notStarted);
     const interviews = card(html, "interviews");
@@ -359,7 +361,16 @@ describe("dashboard guidance", () => {
     expect(html).toContain(
       'href="/campaigns/camp_1/consultation#harper-q%3Aturn_9"',
     );
-    expect(html).toContain("2 personas are not built");
+    const hiring = steps.find((item) => item.key === "hiring-team");
+    expect(hiring?.workDone).toBe(true);
+    expect(hiring?.turnCountLabel).toBeNull();
+    expect(hiring?.actionHref).toBe("/campaigns/camp_1/hiring-team");
+    const hiringCard =
+      html.match(/data-testid="overview-step-hiring-team"[\s\S]*?<\/a>/)?.[0] ?? "";
+    expect(hiringCard).toContain(applicationStepCopy.done);
+    expect(hiringCard).not.toContain(applicationStepCopy.yourTurn);
+    expect(hiringCard).not.toContain(applicationStepCopy.onePersonaIsNotBuilt);
+    expect(hiringCard).not.toContain("personas are not built");
     const guides = steps.find((item) => item.key === "summary");
     expect(guides?.state).toBe("not_started");
     expect(guides?.turnCountLabel).toBe("2 interviewers have no prep guide");

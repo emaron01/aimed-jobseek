@@ -340,9 +340,12 @@ describe("cheat sheet batch 3", () => {
     const button = unbuilt.querySelector("button");
     expect(button?.textContent).toBe("Generate persona research");
     const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
-    expect(workspace).toContain("submitLabel={hiringTeamConfig.actions.build}");
-    expect(workspace).toContain("pendingLabel={hiringTeamConfig.queuedBuild}");
-    expect(workspace).toContain("hiringTeamConfig.actions.buildAllDirect");
+    const section = workspace.slice(
+      workspace.indexOf("async function HiringTeamSection"),
+      workspace.indexOf("function AnnotatedBlock"),
+    );
+    expect(section).not.toContain("submitLabel={hiringTeamConfig.actions.build}");
+    expect(section).not.toContain("hiringTeamConfig.actions.buildAllDirect");
     const harper = readFileSync("src/components/HarperPersonView.tsx", "utf8");
     expect(harper).toContain("CheatSheetPersonBody");
     expect(applicationSummaryConfig.actions.generateSection).toBe("Generate");

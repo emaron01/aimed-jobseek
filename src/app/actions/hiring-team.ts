@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import {
   addApplicationHiringTeamRole,
   addTemplateToApplication,
-  approveApplicationHiringTeamRole,
   hiringTeamSynthesizeUnchanged,
   queueHiringTeamBuild,
   queueHiringTeamBuildDirect,
@@ -255,26 +254,6 @@ export async function removePersonaFromCheatSheetAction(
     return { ok: true, message: hiringTeamConfig.actions.removeFromCheatSheet };
   } catch (error) {
     return fail(error, `The ${vocab.persona.singular} could not be removed from Interview Preparation Guides.`);
-  }
-}
-
-export async function approveApplicationRoleAction(
-  _prev: HiringTeamActionResult | null,
-  formData: FormData,
-): Promise<HiringTeamActionResult> {
-  try {
-    const organizationId = await requireOrganizationId();
-    await requireCurrentUser();
-    const campaignId = String(formData.get("campaignId") ?? "").trim();
-    const personaId = String(formData.get("personaId") ?? "").trim();
-    if (!campaignId || !personaId) {
-      return { ok: false, message: `${vocab.persona.Singular} was not found.` };
-    }
-    await approveApplicationHiringTeamRole({ organizationId, campaignId, personaId });
-    revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: `${vocab.persona.Singular} approved.` };
-  } catch (error) {
-    return fail(error, `The ${vocab.persona.singular} could not be approved.`);
   }
 }
 

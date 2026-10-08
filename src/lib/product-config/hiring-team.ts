@@ -19,6 +19,8 @@ export const hiringTeamConfig = {
     failed: "Add more details to build this persona",
     stale: "Details changed: Regenerate to update",
     approved: "Approved",
+    researched: "Researched",
+    notResearched: "Not researched yet",
     awaitingDetails: "Add more details to build this persona",
   },
   actions: {
@@ -37,6 +39,10 @@ export const hiringTeamConfig = {
   addPersonTitle: "Add a Person",
   detailsLabel: "Details",
   needsReviewGroup: "Needs review",
+  responsibilitiesLabel: "Responsibilities",
+  noResponsibilities: "No responsibilities are stored for this role yet.",
+  mappedPeopleLabel: "People in this role",
+  noMappedPeople: "No one is mapped to this role.",
   recommendedMark: "Recommended",
   recommendedLine:
     "Harper recommends studying these roles. They're the ones most likely to interview you for this job.",

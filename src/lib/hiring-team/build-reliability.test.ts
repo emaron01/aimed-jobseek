@@ -201,11 +201,13 @@ describe("hiring team build reliability", () => {
     const callers = [
       "src/app/actions/hiring-team.ts",
       "src/app/actions/application-summary.ts",
-      "src/app/actions/application-outreach.ts",
     ];
     for (const file of callers) {
       expect(readFileSync(file, "utf8")).toContain("queueHiringTeamBuild");
     }
+    const outreach = readFileSync("src/app/actions/application-outreach.ts", "utf8");
+    expect(outreach).toContain("prepareInterviewPrepGuideGeneration");
+    expect(outreach).not.toContain("queueHiringTeamBuild");
     const researchFinish = readFileSync(
       "src/lib/application/research-finish.ts",
       "utf8",
@@ -305,16 +307,4 @@ describe("hiring team build reliability", () => {
     expect(build).toContain('manuallyEditedFields: ["seeker"]');
   });
 
-  it("approve requires a built narrative", () => {
-    const build = readFileSync("src/lib/hiring-team/build.ts", "utf8");
-    expect(build).toContain(
-      "Generate this ${vocab.persona.singular} before approving it.",
-    );
-    const workspace = readFileSync(
-      "src/components/ApplicationWorkspace.tsx",
-      "utf8",
-    );
-    expect(workspace).toContain("roleBuilt ? (");
-    expect(workspace).toContain("approveApplicationRoleAction");
-  });
 });

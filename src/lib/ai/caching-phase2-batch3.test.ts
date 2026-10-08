@@ -88,9 +88,7 @@ describe("Caching Phase 2 batch 3 wiring", () => {
     );
     const generateFn = outreachActions.slice(
       outreachActions.indexOf("export async function generateOutreachAssetAction"),
-      outreachActions.indexOf(
-        "export async function buildOutreachPersonaThenGenerateAction",
-      ),
+      outreachActions.indexOf("export async function markOutreachSentAction"),
     );
     expect(generateFn).toContain("outreachGenerateWouldSkip");
     expect(generateFn).toContain("outreachUnchangedSkipMessage");

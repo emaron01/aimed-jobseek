@@ -13,11 +13,7 @@ import {
   resolveOutreachGeneratorKind,
 } from "@/lib/application-assets/display";
 import { resolveInterviewThankYouNotes } from "@/lib/application-assets/display";
-import {
-  applicationSummaryConfig,
-  hiringTeamConfig,
-  outreachConfig,
-} from "@/lib/product-config";
+import { outreachConfig } from "@/lib/product-config";
 
 const emptyAsset = {
   id: "asset_1",
@@ -223,39 +219,28 @@ describe("application outreach workspace", () => {
     expect(outreach).toContain("guidance: input.regenerationInstruction");
   });
 
-  it("prompts to build an unbuilt persona instead of auto-building", () => {
+  it("builds an unbuilt role on the generate click, then writes the message", () => {
     const section = readFileSync(
       "src/components/ApplicationOutreachSections.tsx",
       "utf8",
     );
     const action = readFileSync("src/app/actions/application-outreach.ts", "utf8");
-    const process = readFileSync("src/lib/application-jobs/process.ts", "utf8");
-    const researchFinish = readFileSync(
-      "src/lib/application/research-finish.ts",
-      "utf8",
-    );
-    expect(section).toContain("outreach-unbuilt-persona");
-    expect(section).toContain("outreach-unbuilt-persona-no");
-    expect(section).toContain("applicationSummaryConfig.sections.unbuiltPersona");
-    expect(section).toContain("buildOutreachPersonaThenGenerateAction");
-    expect(section).toContain("applicationSummaryConfig.actions.buildPersonaNow");
-    expect(section).toContain("applicationSummaryConfig.actions.buildPersonaNo");
-    expect(applicationSummaryConfig.sections.unbuiltPersona).toBe(
-      "You have not fully built this persona. Do you want to build it now?",
-    );
-    expect(action).toContain("needsPersonaBuild: true");
-    expect(action).toContain("buildOutreachPersonaThenGenerateAction");
-    expect(action).toContain("deferredOutreach");
-    expect(action).not.toContain("hiringTeamConfig.needsBuildFirst");
+    expect(section).not.toContain("outreach-unbuilt-persona");
+    expect(section).not.toContain("buildOutreachPersonaThenGenerateAction");
+    expect(section).toContain("generateOutreachAssetAction");
     const generateFn = action.slice(
       action.indexOf("export async function generateOutreachAssetAction"),
-      action.indexOf("export async function buildOutreachPersonaThenGenerateAction"),
+      action.indexOf("export async function markOutreachSentAction"),
     );
+    expect(generateFn).toContain("isHiringTeamPersonaBuilt");
+    expect(generateFn).toContain("prepareInterviewPrepGuideGeneration");
+    expect(generateFn).toContain("enqueueApplicationJob");
+    expect(generateFn).not.toContain("needsPersonaBuild");
     expect(generateFn).not.toContain("queueHiringTeamBuild");
-    expect(generateFn).toContain("needsPersonaBuild: true");
-    expect(process).toContain("deferredOutreach");
-    expect(process).toContain('type: "OUTREACH"');
-    expect(researchFinish).toContain('type: "HIRING_TEAM_IDENTIFY"');
+    const buildCall = generateFn.indexOf("prepareInterviewPrepGuideGeneration");
+    const writeCall = generateFn.indexOf("enqueueApplicationJob");
+    expect(buildCall).toBeGreaterThan(-1);
+    expect(writeCall).toBeGreaterThan(buildCall);
   });
 
   it("reuses the gated contact-list and selected-sequence layout", () => {
@@ -273,7 +258,7 @@ describe("application outreach workspace", () => {
 });
 
 describe("hiring team persona actions", () => {
-  it("shows Edit and Build as visible buttons", () => {
+  it("shows Edit and hides per-role Generate", () => {
     const actions = readFileSync(
       "src/components/HiringTeamRoleActions.tsx",
       "utf8",
@@ -282,13 +267,20 @@ describe("hiring team persona actions", () => {
       "src/components/ApplicationWorkspace.tsx",
       "utf8",
     );
+    const section = workspace.slice(
+      workspace.indexOf("async function HiringTeamSection"),
+      workspace.indexOf("function AnnotatedBlock"),
+    );
     expect(actions).toContain("HiringTeamRoleActions");
     expect(actions).toContain("hiringTeamConfig.actions.edit");
-    expect(actions).toContain("hiringTeamConfig.actions.knowWhoInterviewing");
-    expect(actions).toContain('variant="secondary"');
-    expect(workspace).toContain("HiringTeamRoleActions");
-    expect(workspace).toContain("build-role-");
-    expect(actions).toContain(hiringTeamConfig.actions.edit);
+    expect(section).toContain("HiringTeamRoleActions");
+    expect(section).toContain('name="name"');
+    expect(section).toContain('name="likelyTitles"');
+    expect(section).toContain('name="notes"');
+    expect(section).not.toContain("build-role-");
+    expect(section).not.toContain("approve-role-");
+    expect(section).not.toContain("runPaidStructuredCall");
+    expect(section).not.toContain("enqueueApplicationJob");
   });
 });
 

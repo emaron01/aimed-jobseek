@@ -25,11 +25,6 @@ import {
 } from "@/lib/consultation/approved-collapse";
 import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
 import {
-  APPROVED_PERSONA_DETAILS_CLASS,
-  hiringTeamPersonaIsApproved,
-  NEEDS_REVIEW_PERSONA_DETAILS_CLASS,
-} from "@/lib/hiring-team/review-group";
-import {
   consultationConversationCopy,
   consultationStatementLabels,
   hiringTeamConfig,
@@ -257,76 +252,23 @@ describe("UI batch 1 cheat sheet collapse", () => {
 });
 
 describe("UI batch 1 persona review groups", () => {
-  const built = {
-    narrative: { overview: { text: "Owns hiring.", kind: "FACT" } },
-  };
-
-  it("groups Approved versus Needs review and colors the detail boxes", () => {
-    expect(hiringTeamConfig.status.approved).toBe("Approved");
-    expect(hiringTeamConfig.needsReviewGroup).toBe("Needs review");
-    expect(
-      hiringTeamPersonaIsApproved({
-        approvalStatus: "APPROVED",
-        staleAt: null,
-        profileJson: built,
-        building: false,
-      }),
-    ).toBe(true);
-    expect(
-      hiringTeamPersonaIsApproved({
-        approvalStatus: "NEEDS_REVIEW",
-        staleAt: null,
-        profileJson: built,
-        building: false,
-      }),
-    ).toBe(false);
-    expect(
-      hiringTeamPersonaIsApproved({
-        approvalStatus: "APPROVED",
-        staleAt: new Date(),
-        profileJson: built,
-        building: false,
-      }),
-    ).toBe(false);
-    expect(
-      hiringTeamPersonaIsApproved({
-        approvalStatus: "APPROVED",
-        staleAt: null,
-        profileJson: built,
-        building: true,
-      }),
-    ).toBe(false);
-    expect(
-      hiringTeamPersonaIsApproved({
-        approvalStatus: "NOT_STARTED",
-        staleAt: null,
-        profileJson: {},
-        building: false,
-      }),
-    ).toBe(false);
-    expect(APPROVED_PERSONA_DETAILS_CLASS).toContain("border-success");
-    expect(APPROVED_PERSONA_DETAILS_CLASS).toContain("bg-success-tint");
-    expect(APPROVED_PERSONA_DETAILS_CLASS).toContain("text-success");
-    expect(NEEDS_REVIEW_PERSONA_DETAILS_CLASS).toContain("border-primary");
-    expect(NEEDS_REVIEW_PERSONA_DETAILS_CLASS).toContain("bg-primary/10");
-    expect(NEEDS_REVIEW_PERSONA_DETAILS_CLASS).toContain("text-primary");
+  it("lists each role without an Approve group", () => {
+    expect(hiringTeamConfig.status.researched).toBe("Researched");
+    expect(hiringTeamConfig.status.notResearched).toBe("Not researched yet");
     const workspace = src("src/components/ApplicationWorkspace.tsx");
-    const group = src("src/components/HiringTeamReviewGroup.tsx");
-    expect(workspace).toContain("hiring-team-group-approved");
-    expect(workspace).toContain("hiring-team-group-needs-review");
-    expect(workspace).toContain("hiringTeamConfig.status.approved");
-    expect(workspace).toContain("hiringTeamConfig.needsReviewGroup");
-    expect(workspace.indexOf('groupKey="direct"')).toBeLessThan(
-      workspace.indexOf('groupKey="indirect"'),
+    const section = workspace.slice(
+      workspace.indexOf("async function HiringTeamSection"),
+      workspace.indexOf("function AnnotatedBlock"),
     );
-    expect(workspace).toContain("APPROVED_PERSONA_DETAILS_CLASS");
-    expect(workspace).toContain("NEEDS_REVIEW_PERSONA_DETAILS_CLASS");
-    expect(workspace).not.toMatch(/<details[^>]*\sopen/);
-    expect(group).toContain("useState(true)");
-    expect(group).toContain("aria-expanded={open}");
-    expect(group).toContain('{open ? "▼" : "▶"}');
-    expect(group).toContain("CHEAT_SHEET_HEADING_CLASS");
-    expect(CHEAT_SHEET_HEADING_CLASS).toContain("!bg-primary/10");
+    expect(section).not.toContain("approve-role-");
+    expect(section).not.toContain("hiring-team-group-approved");
+    expect(section).not.toContain("hiring-team-group-needs-review");
+    expect(section.indexOf('groupKey="direct"')).toBeLessThan(
+      section.indexOf('groupKey="indirect"'),
+    );
+    expect(section).toContain("hiringTeamConfig.status.researched");
+    expect(section).toContain("hiringTeamConfig.responsibilitiesLabel");
+    expect(section).not.toMatch(/<details[^>]*\sopen/);
   });
 });
 

@@ -266,7 +266,7 @@ describe("signature panel and outreach message window", () => {
     expect(saveAction).not.toContain("runPaidStructuredCall");
     const generateAction = action.slice(
       action.indexOf("export async function generateOutreachAssetAction"),
-      action.indexOf("export async function buildOutreachPersonaThenGenerateAction"),
+      action.indexOf("export async function markOutreachSentAction"),
     );
     expect(generateAction).toContain("enqueueApplicationJob");
     expect(view.host.querySelector("[data-testid='outreach-regenerate-email_proactive']")).toBeTruthy();

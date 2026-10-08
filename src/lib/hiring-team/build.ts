@@ -719,27 +719,6 @@ export async function moveApplicationHiringTeamRoleInvolvement(input: {
   });
 }
 
-export async function approveApplicationHiringTeamRole(input: {
-  organizationId: string;
-  campaignId: string;
-  personaId: string;
-}): Promise<void> {
-  const persona = await requireRole(input);
-  if (!isHiringTeamPersonaBuilt(persona)) {
-    throw new TenantError(
-      `Generate this ${vocab.persona.singular} before approving it.`,
-    );
-  }
-  await prisma.persona.update({
-    where: { id: persona.id },
-    data: {
-      approvalStatus: "APPROVED",
-      setupStatus: "APPROVED",
-      approvedAt: new Date(),
-    },
-  });
-}
-
 export type RebuildHiringTeamRoleResult = {
   identifySkipped: boolean;
   synthesizeSkipped: boolean;
