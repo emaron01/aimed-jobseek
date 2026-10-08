@@ -473,6 +473,7 @@ describe.skipIf(!hasTestDatabase())("cheat sheet Harper reply persistence", { ti
     });
     expect(statement?.status).toBe("DRAFT");
     expect(statement?.content).toBe(edited);
+    expect(statement?.groundingJson).toMatchObject({ seekerEdited: true });
     const story = await prisma.profileStory.findFirst({
       where: { organizationId, consultationTurnId: turn!.id },
     });
@@ -486,5 +487,44 @@ describe.skipIf(!hasTestDatabase())("cheat sheet Harper reply persistence", { ti
     );
     expect(fn).not.toContain("enqueueApplicationJob");
     expect(fn).not.toContain("polishAnswerWithQuality");
+    const service = readFileSync("src/lib/application-summary/service.ts", "utf8");
+    const save = service.slice(
+      service.indexOf("export async function saveCheatSheetSampleDraft"),
+      service.indexOf("export async function resolveApplicationSummaryFlag"),
+    );
+    expect(save).toContain("saveEditedConsultationStatement");
+  });
+
+  it("keeps a guide sample Harper-owned when the saved text did not change", async () => {
+    const item = collectCoachItems(coachGuidance()).find(
+      (row) => row.sampleAnswer && !row.harperQuestion,
+    );
+    expect(item?.sampleAnswer).toBeTruthy();
+    const { saveCheatSheetSampleDraft } = await import(
+      "@/lib/application-summary/service"
+    );
+    await saveCheatSheetSampleDraft({
+      organizationId,
+      campaignId,
+      userId,
+      itemId: item!.id!,
+      content: item!.sampleAnswer!,
+    });
+    const session = await prisma.consultationSession.findFirst({ where: { campaignId } });
+    const turn = await prisma.consultationTurn.findFirst({
+      where: { sessionId: session!.id, targetKey: `cheatSheet:${item!.id}` },
+    });
+    const statement = await prisma.consultationStatement.findFirst({
+      where: { turnId: turn!.id, kind: "INTERVIEW_ANSWER" },
+    });
+    expect(statement?.content).toBe(item!.sampleAnswer);
+    const grounding = statement?.groundingJson;
+    const seekerEdited =
+      Boolean(grounding) &&
+      typeof grounding === "object" &&
+      !Array.isArray(grounding) &&
+      (grounding as { seekerEdited?: unknown }).seekerEdited === true;
+    expect(seekerEdited).toBe(false);
+    expect(polishAnswerWithQuality).not.toHaveBeenCalled();
   });
 });

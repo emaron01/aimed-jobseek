@@ -35,6 +35,7 @@ import {
   approveConsultationStatement,
   recordConsultationReply,
   regenerateConsultationStatement,
+  saveEditedConsultationStatement,
 } from "@/lib/consultation/service";
 import {
   CHEAT_SHEET_TARGET_PREFIX,
@@ -1479,7 +1480,11 @@ export async function regenerateCheatSheetSampleAnswer(input: {
   });
 }
 
-/** Saves edited sample text as a draft statement. No model call and no job. */
+/**
+ * Saves edited sample text as a draft statement. No model call and no job.
+ * A new statement starts as Harper's sample, then Harper's save records the
+ * seeker's text and sets seekerEdited only when that text changed.
+ */
 export async function saveCheatSheetSampleDraft(input: {
   organizationId: string;
   campaignId: string;
@@ -1490,10 +1495,25 @@ export async function saveCheatSheetSampleDraft(input: {
   const content = input.content.trim();
   if (!content) throw new TenantError("Write an answer, or skip the question.");
   const prepared = await ensureCheatSheetConsultantTurn(input);
-  await storeCheatSheetSampleStatement({
+  const existing = await prisma.consultationStatement.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      turnId: prepared.questionTurnId,
+      kind: "INTERVIEW_ANSWER",
+    },
+    select: { id: true },
+  });
+  const statementId =
+    existing?.id ??
+    (await storeCheatSheetSampleStatement({
+      organizationId: input.organizationId,
+      sessionId: prepared.sessionId,
+      questionTurnId: prepared.questionTurnId,
+      content: prepared.sampleAnswer.trim() || content,
+    }));
+  await saveEditedConsultationStatement({
     organizationId: input.organizationId,
-    sessionId: prepared.sessionId,
-    questionTurnId: prepared.questionTurnId,
+    statementId,
     content,
   });
 }

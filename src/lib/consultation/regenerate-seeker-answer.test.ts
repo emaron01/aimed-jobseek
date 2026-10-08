@@ -10,7 +10,10 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+import { CheatSheetCoachItems } from "@/components/CheatSheetCoachItems";
 import { ResultActions, ResultBody } from "@/components/ConsultationThread";
+import { HarperDraftProvider } from "@/components/HarperDraftStore";
+import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
 import {
   draftRegenerationAnswer,
   withSeekerEditedGrounding,
@@ -184,6 +187,107 @@ describe("Regenerate button label", () => {
     expect(label()).toBe(polishCopy.polishMyAnswer);
     render(true, NEW_GRADUATE_ANSWER);
     expect(label()).toBe(polishCopy.polishMyAnswer);
+    act(() => {
+      root.unmount();
+    });
+    host.remove();
+  });
+
+  it("uses that label on Interview Preparation Guides sample drafts", () => {
+    const owned = statement({
+      id: "st-owned",
+      content: NURSING_ANSWER,
+      groundingJson: { seekerEdited: true, keyPoints: ["Riverside staffed the floor."] },
+    });
+    const harper = statement({
+      id: "st-harper",
+      content: NEW_GRADUATE_ANSWER,
+      groundingJson: { keyPoints: ["Harper drafted the internship."] },
+    });
+    function guideQa(id: string, question: string, draft: QaStatement): ConsultationQaItem {
+      return {
+        questionTurnId: `turn-${id}`,
+        targetKey: `cheatSheet:${id}`,
+        question,
+        followUp: null,
+        seekerAnswers: [],
+        statements: [draft],
+        resumeBullet: null,
+        talkingPoint: draft,
+        pendingDraftTalkingPoint: null,
+        pendingDraftResumeBullet: null,
+        ignored: false,
+        needsMoreDetail: false,
+      };
+    }
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root: Root = createRoot(host);
+    act(() => {
+      root.render(
+        createElement(
+          HarperDraftProvider,
+          null,
+          createElement(CheatSheetCoachItems, {
+            campaignId: "camp",
+            canEdit: true,
+            items: [
+              {
+                id: "contact:c-1:likely:1",
+                prompt: "Tell me about an enterprise sales motion.",
+                sampleAnswer: SALES_ANSWER,
+                harperQuestion: null,
+                supports: [],
+              },
+              {
+                id: "contact:c-1:likely:2",
+                prompt: "Tell me about staffing a hospital floor.",
+                sampleAnswer: NURSING_ANSWER,
+                harperQuestion: null,
+                supports: [],
+              },
+              {
+                id: "contact:c-1:likely:3",
+                prompt: "Tell me about your internship.",
+                sampleAnswer: NEW_GRADUATE_ANSWER,
+                harperQuestion: null,
+                supports: [],
+              },
+            ],
+            qaItems: [
+              guideQa("contact:c-1:likely:2", "Tell me about staffing a hospital floor.", owned),
+              guideQa("contact:c-1:likely:3", "Tell me about your internship.", harper),
+            ],
+          }),
+        ),
+      );
+    });
+    function buttonText(testId: string): string {
+      const form = host.querySelector(`[data-testid='${testId}']`);
+      return form?.querySelector("button")?.textContent ?? "";
+    }
+    expect(buttonText("cheat-sheet-sample-regenerate-contact:c-1:likely:1")).toBe(
+      polishCopy.regenerate,
+    );
+    expect(buttonText("consultation-result-turn-contact:c-1:likely:2-regenerate")).toBe(
+      polishCopy.polishMyAnswer,
+    );
+    expect(buttonText("consultation-result-turn-contact:c-1:likely:3-regenerate")).toBe(
+      polishCopy.regenerate,
+    );
+    const service = readFileSync("src/lib/application-summary/service.ts", "utf8");
+    const save = service.slice(
+      service.indexOf("export async function saveCheatSheetSampleDraft"),
+      service.indexOf("export async function resolveApplicationSummaryFlag"),
+    );
+    expect(save).toContain("saveEditedConsultationStatement");
+    expect(save).not.toContain("seekerEdited:");
+    const regenerate = service.slice(
+      service.indexOf("export async function regenerateCheatSheetSampleAnswer"),
+      service.indexOf("export async function saveCheatSheetSampleDraft"),
+    );
+    expect(regenerate).toContain("saveCheatSheetSampleDraft");
+    expect(regenerate).toContain("regenerateConsultationStatement");
     act(() => {
       root.unmount();
     });
