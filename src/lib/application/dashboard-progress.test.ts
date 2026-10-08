@@ -446,4 +446,82 @@ describe("dashboard guidance", () => {
       expect(source).not.toContain("generateStructured");
     }
   });
+
+  it("puts a small action on the text row, green for your turn and white when done", () => {
+    const steps = [
+      step({
+        key: "consultation",
+        title: "Harper Questionnaire",
+        state: "in_progress",
+        actionLabel: "Answer Harper's questions",
+        actionHref: "/campaigns/camp_1/consultation",
+      }),
+      step({
+        key: "job",
+        title: "Job requirements",
+        workDone: true,
+        state: "done",
+        actionLabel: "Open Job requirements",
+        actionHref: "/campaigns/camp_1/job",
+      }),
+      step({
+        key: "company",
+        title: "Company Research",
+        hasActiveJob: true,
+        state: "in_progress",
+        actionLabel: "Review company research",
+        actionHref: "/campaigns/camp_1/company",
+      }),
+    ];
+    const html = renderToStaticMarkup(
+      createElement(ApplicationStepCards, { steps }),
+    );
+    const opening = (source: string, testId: string) =>
+      source.match(new RegExp(`<[^>]*data-testid="${testId}"[^>]*>`))?.[0] ?? "";
+    const card = opening(html, "overview-step-consultation");
+    expect(card).toContain("flex-wrap");
+    expect(card).toContain("items-center");
+    expect(card).not.toContain("flex-col");
+    const yourTurn = opening(html, "overview-step-action-consultation");
+    expect(yourTurn).toContain("px-2.5");
+    expect(yourTurn).toContain("py-1");
+    expect(yourTurn).toContain("text-xs");
+    expect(yourTurn).toContain("bg-success text-on-ink");
+    const done = opening(html, "overview-step-action-job");
+    expect(done).toContain("text-xs");
+    expect(done).toContain("bg-surface text-ink");
+    expect(done).not.toContain("bg-success");
+    const working = opening(html, "overview-step-action-company");
+    expect(working).toContain("bg-surface text-ink");
+    expect(working).not.toContain("bg-success");
+
+    const overview = renderToStaticMarkup(
+      createElement(ApplicationOverview, { view: overviewView(steps) }),
+    );
+    const line = opening(overview, "your-next-step");
+    expect(line).toContain("flex-wrap");
+    expect(line).toContain("items-center");
+    const next = opening(overview, "your-next-step-action");
+    expect(next).toContain("text-xs");
+    expect(next).toContain("px-2.5");
+    expect(next).toContain("bg-surface text-ink");
+    expect(next).not.toContain("bg-success");
+
+    const yourTurnLine = renderToStaticMarkup(
+      createElement(ApplicationOverview, {
+        view: overviewView([
+          step({
+            key: "consultation",
+            title: "Harper Questionnaire",
+            state: "in_progress",
+            actionLabel: "Answer Harper's questions",
+            actionHref: "/campaigns/camp_1/consultation",
+          }),
+        ]),
+      }),
+    );
+    const yourTurnNext = opening(yourTurnLine, "your-next-step-action");
+    expect(yourTurnNext).toContain("text-xs");
+    expect(yourTurnNext).toContain("bg-success text-on-ink");
+  });
 });

@@ -22,6 +22,32 @@ function turnKind(step: ApplicationStepView, spinning: boolean): TurnKind {
   return "your_turn";
 }
 
+function stepActionVariant(kind: TurnKind): "success" | "secondary" {
+  return kind === "your_turn" ? "success" : "secondary";
+}
+
+export function DashboardStepAction({
+  step,
+  testId,
+}: {
+  step: ApplicationStepView;
+  testId: string;
+}) {
+  const jobs = useWorkspaceJobs();
+  const kind = turnKind(step, dashboardStepShowsSpinner(step, jobs));
+  return (
+    <AppActionLink
+      href={step.actionHref}
+      variant={stepActionVariant(kind)}
+      size="sm"
+      className="shrink-0"
+      data-testid={testId}
+    >
+      {step.actionLabel}
+    </AppActionLink>
+  );
+}
+
 export function ApplicationStepCards({
   steps,
 }: {
@@ -40,43 +66,42 @@ export function ApplicationStepCards({
         return (
           <li key={step.key}>
             <div
-              className="flex h-full flex-col gap-2 rounded-md border border-edge px-3 py-2 text-sm text-ink"
+              className="flex h-full flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md border border-edge px-3 py-2 text-sm text-ink"
               data-testid={`overview-step-${step.key}`}
             >
-              <span className="font-medium">
-                {step.number}. {step.title}
-              </span>
-              {kind === "working" ? (
-                <AppPendingIndicator label={applicationStepCopy.harperIsWorking} />
-              ) : null}
-              {kind === "your_turn" ? (
-                <StatusPill tone="progress">{applicationStepCopy.yourTurn}</StatusPill>
-              ) : null}
-              {kind === "your_turn" && step.turnCountLabel ? (
-                <p data-testid={`overview-step-count-${step.key}`}>{step.turnCountLabel}</p>
-              ) : null}
-              {kind === "done" ? (
-                <StatusPill
-                  tone={applicationStepStatusTone({
-                    key: step.key,
-                    workDone: step.workDone,
-                    state: step.state,
-                  })}
-                >
-                  {applicationStepCopy.done}
-                </StatusPill>
-              ) : null}
-              {kind === "not_started" ? (
-                <StatusPill tone="attention">{applicationStepCopy.notStarted}</StatusPill>
-              ) : null}
-              {showStatus ? <p>{status}</p> : null}
-              <AppActionLink
-                href={step.actionHref}
-                className="mt-auto self-start"
-                data-testid={`overview-step-action-${step.key}`}
-              >
-                {step.actionLabel}
-              </AppActionLink>
+              <div className="flex flex-1 flex-col gap-1">
+                <span className="font-medium">
+                  {step.number}. {step.title}
+                </span>
+                {kind === "working" ? (
+                  <AppPendingIndicator label={applicationStepCopy.harperIsWorking} />
+                ) : null}
+                {kind === "your_turn" ? (
+                  <StatusPill tone="progress">{applicationStepCopy.yourTurn}</StatusPill>
+                ) : null}
+                {kind === "your_turn" && step.turnCountLabel ? (
+                  <p data-testid={`overview-step-count-${step.key}`}>{step.turnCountLabel}</p>
+                ) : null}
+                {kind === "done" ? (
+                  <StatusPill
+                    tone={applicationStepStatusTone({
+                      key: step.key,
+                      workDone: step.workDone,
+                      state: step.state,
+                    })}
+                  >
+                    {applicationStepCopy.done}
+                  </StatusPill>
+                ) : null}
+                {kind === "not_started" ? (
+                  <StatusPill tone="attention">{applicationStepCopy.notStarted}</StatusPill>
+                ) : null}
+                {showStatus ? <p>{status}</p> : null}
+              </div>
+              <DashboardStepAction
+                step={step}
+                testId={`overview-step-action-${step.key}`}
+              />
             </div>
           </li>
         );

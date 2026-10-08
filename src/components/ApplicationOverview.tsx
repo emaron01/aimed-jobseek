@@ -1,5 +1,4 @@
-import { AppActionLink } from "@/components/AppButton";
-import { ApplicationStepCards } from "@/components/ApplicationStepCards";
+import { ApplicationStepCards, DashboardStepAction } from "@/components/ApplicationStepCards";
 import { AppCard, SectionHeader, StatusPill } from "@/components/design";
 import { applicationProgressCurrent } from "@/lib/application/step-progress";
 import { applicationStepCopy, consultationConversationCopy } from "@/lib/product-config";
@@ -75,15 +74,13 @@ function YourNextStep({
   if (!step) return null;
   return (
     <div
-      className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-edge bg-surface px-3 py-2"
+      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md border border-edge bg-surface px-3 py-2"
       data-testid="your-next-step"
     >
-      <p className="text-sm text-ink">
+      <p className="min-w-0 flex-1 text-sm text-ink">
         {applicationStepCopy.yourNextStep}: {step.title}: {step.actionLabel}
       </p>
-      <AppActionLink href={step.actionHref} data-testid="your-next-step-action">
-        {step.actionLabel}
-      </AppActionLink>
+      <DashboardStepAction step={step} testId="your-next-step-action" />
     </div>
   );
 }

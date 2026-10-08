@@ -35,8 +35,20 @@ const VARIANT_CLASS: Record<AppButtonVariant, string> = {
     "border border-edge-strong bg-surface px-2 py-0.5 text-[11px] text-ink underline decoration-edge-strong underline-offset-2 shadow-sm hover:bg-canvas active:bg-canvas focus-visible:outline-focus disabled:border-edge disabled:text-subtle disabled:no-underline",
 };
 
+const BUTTON_SIZE_CLASS = {
+  md: "px-3.5 py-2 text-sm",
+  sm: "px-2.5 py-1 text-xs",
+} as const;
+
+export type AppButtonSize = keyof typeof BUTTON_SIZE_CLASS;
+
 const BASE_CLASS =
   "inline-flex cursor-pointer items-center justify-center rounded-md px-3.5 py-2 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60";
+
+function buttonSizeClass(size: AppButtonSize): string {
+  if (size === "md") return BASE_CLASS;
+  return BASE_CLASS.replace("px-3.5 py-2 text-sm", BUTTON_SIZE_CLASS.sm);
+}
 
 export const PRIMARY_BUTTON_CLASS = `${BASE_CLASS} ${VARIANT_CLASS.primary}`;
 export const SECONDARY_BUTTON_CLASS = `${BASE_CLASS} ${VARIANT_CLASS.secondary}`;
@@ -143,6 +155,7 @@ export function AppActionLink({
   href,
   children,
   variant = "secondary",
+  size = "md",
   className = "",
   pending = false,
   pendingLabel,
@@ -157,6 +170,7 @@ export function AppActionLink({
   href: string;
   children: ReactNode;
   variant?: AppButtonVariant;
+  size?: AppButtonSize;
   className?: string;
   pending?: boolean;
   pendingLabel?: string;
@@ -169,7 +183,7 @@ export function AppActionLink({
   "data-testid"?: string;
 }) {
   const isDisabled = disabled || pending;
-  const classes = `${BASE_CLASS} ${VARIANT_CLASS[variant]} ${className}`.trim();
+  const classes = `${buttonSizeClass(size)} ${VARIANT_CLASS[variant]} ${className}`.trim();
   if (isDisabled) {
     return (
       <span
