@@ -510,7 +510,7 @@ export default async function CampaignDetailPage({
               />
             ) : null}
             <AppActionLink
-              href="/campaigns"
+              href="/"
               variant="secondary"
             >
               Back to {vocab.campaign.plural}
@@ -557,7 +557,7 @@ export default async function CampaignDetailPage({
       />
       ) : (
       <div className="flex flex-wrap items-center gap-2">
-        <AppActionLink href="/campaigns" variant="secondary">
+        <AppActionLink href="/" variant="secondary">
           {polishCopy.backToApplications}
         </AppActionLink>
         {canEditTemplate && campaignArchived ? (

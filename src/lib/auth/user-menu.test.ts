@@ -181,7 +181,7 @@ describe("buildSidebarNavItems", () => {
       items.some((i) => i.href === "/contacts" && i.label === vocab.contact.Plural),
     ).toBe(true);
     expect(
-      items.some((i) => i.href === "/campaigns" && i.label === vocab.campaign.Plural),
+      items.some((i) => i.href === "/" && i.label === vocab.campaign.Plural),
     ).toBe(true);
     expect(
       items.some((i) => i.href === "/products" && i.label === vocab.product.nav),
@@ -192,7 +192,7 @@ describe("buildSidebarNavItems", () => {
     expect(items.some((i) => i.href === "/personas")).toBe(false);
     expect(items.map((i) => i.href)).toEqual([
       "/",
-      "/campaigns",
+      "/",
       "/contacts",
       "/products",
       "/settings/voice",

@@ -45,20 +45,24 @@ function sidebarItemMatchLength(item: SidebarNavItem, pathname: string): number 
   return best;
 }
 
-function currentSidebarHref(
+function sidebarItemKey(item: SidebarNavItem): string {
+  return `${item.href}\0${item.label}`;
+}
+
+function currentSidebarKey(
   items: SidebarNavItem[],
   pathname: string,
 ): string | null {
-  let href: string | null = null;
+  let key: string | null = null;
   let length = 0;
   for (const item of items) {
     const match = sidebarItemMatchLength(item, pathname);
     if (match > length) {
       length = match;
-      href = item.href;
+      key = sidebarItemKey(item);
     }
   }
-  return href;
+  return key;
 }
 
 function ApplicationSidebarSlot() {
@@ -78,7 +82,7 @@ function ApplicationSidebarSlot() {
 
 export function Sidebar({ items }: { items: SidebarNavItem[] }) {
   const pathname = usePathname() || "";
-  const currentHref = currentSidebarHref(items, pathname);
+  const currentKey = currentSidebarKey(items, pathname);
 
   return (
     <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-on-nav/15 bg-nav text-on-nav print:hidden">
@@ -95,10 +99,10 @@ export function Sidebar({ items }: { items: SidebarNavItem[] }) {
       </Suspense>
       <nav className="flex flex-1 flex-col gap-0.5 p-3" data-testid="app-sidebar">
         {items.map((item) => {
-          const current = item.href === currentHref;
+          const current = sidebarItemKey(item) === currentKey;
 
           return (
-            <div key={item.href}>
+            <div key={`${item.href}-${item.label}`}>
               {item.separatorBefore ? (
                 <div
                   className="my-2 border-t border-on-nav/15"
