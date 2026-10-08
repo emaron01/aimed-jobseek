@@ -1,4 +1,7 @@
 import { updateInterviewStageAction } from "@/app/actions/interview";
+import { InterviewPrepGuideForm } from "@/components/InterviewPrepGuideButton";
+import { applicationSummaryGuidanceSchema } from "@/lib/application-summary/contract";
+import { personSectionNeedsGeneration } from "@/lib/application-summary/people";
 import { AskHarperBox } from "@/components/AskHarperBox";
 import {
   applicationHasHarperQuestion,
@@ -312,6 +315,7 @@ export function InterviewStagesList({
   notesByContactId,
   askHarperDrafts = [],
   hasHarperQuestion = false,
+  guideReadyByContactId = new Map<string, boolean>(),
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -321,6 +325,7 @@ export function InterviewStagesList({
   notesByContactId: Map<string, ReturnType<typeof parseCheatSheetNotes>>;
   askHarperDrafts?: Awaited<ReturnType<typeof loadAskHarperDrafts>>;
   hasHarperQuestion?: boolean;
+  guideReadyByContactId?: Map<string, boolean>;
 }) {
   const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
   const grouped = interviewsByPerson(stages, people);
@@ -363,6 +368,13 @@ export function InterviewStagesList({
               <InterviewStageInterviewerLink campaignId={campaignId} person={group.person} />
             }
           >
+            {canEdit ? (
+              <InterviewPrepGuideForm
+                campaignId={campaignId}
+                contactId={group.person.contactId}
+                hasGuide={guideReadyByContactId.get(group.person.contactId) ?? false}
+              />
+            ) : null}
             {group.interviews.map((stage) => (
               <PersonInterview
                 key={stage.id}
@@ -444,10 +456,27 @@ export async function InterviewStagesSection({
   const notesByContactId = new Map(
     noteRows.map((row) => [row.contactId, parseCheatSheetNotes(row.cheatSheetNotesJson)]),
   );
-  const [askHarperDrafts, hasHarperQuestion] = await Promise.all([
+  const [askHarperDrafts, hasHarperQuestion, summary] = await Promise.all([
     loadAskHarperDrafts({ organizationId, campaignId }),
     applicationHasHarperQuestion({ organizationId, campaignId }),
+    prisma.applicationSummary.findFirst({
+      where: { organizationId, campaignId },
+      select: { guidanceJson: true },
+    }),
   ]);
+  const guidance = summary?.guidanceJson
+    ? applicationSummaryGuidanceSchema.safeParse(summary.guidanceJson)
+    : null;
+  const guideReadyByContactId = new Map<string, boolean>();
+  if (guidance?.success) {
+    for (const section of guidance.data.people) {
+      if (!section.contactId) continue;
+      guideReadyByContactId.set(
+        section.contactId,
+        !personSectionNeedsGeneration(section),
+      );
+    }
+  }
   return (
     <InterviewStagesList
       campaignId={campaignId}
@@ -458,6 +487,7 @@ export async function InterviewStagesSection({
       notesByContactId={notesByContactId}
       askHarperDrafts={askHarperDrafts}
       hasHarperQuestion={hasHarperQuestion}
+      guideReadyByContactId={guideReadyByContactId}
     />
   );
 }

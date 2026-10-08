@@ -30,6 +30,10 @@ type FilterState = {
 
 const CheatSheetFilterContext = createContext<FilterState | null>(null);
 
+export function useCheatSheetSelectedKey(): string | null {
+  return useCheatSheetFilter().selectedKey;
+}
+
 function useCheatSheetFilter(): FilterState {
   const value = useContext(CheatSheetFilterContext);
   if (!value) {

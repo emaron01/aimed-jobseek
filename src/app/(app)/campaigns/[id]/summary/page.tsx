@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { generateApplicationPageMetadata } from "@/lib/application/page-metadata";
 import { generateApplicationSummaryAction } from "@/app/actions/application-summary";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
+import { CheatSheetGenerationError } from "@/components/CheatSheetGenerationError";
+import { CheatSheetInterviewPrepGuideButton } from "@/components/InterviewPrepGuideButton";
 import { CheatSheetCompanyResearch } from "@/components/ApplicationCompanyBriefing";
 import {
   WorkspaceProgress,
@@ -33,6 +35,8 @@ import {
 import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-status";
 import { loadCheatSheetCoachQaByContact } from "@/lib/application-summary/coach-qa";
 import { statedListItems } from "@/lib/application-summary/display";
+import { latestApplicationSummaryFailure } from "@/lib/application-summary/failure-message";
+import { personSectionNeedsGeneration } from "@/lib/application-summary/people";
 import {
   compileApplicationInterviewNotes,
   compileNotesFromInterviewsWithPerson,
@@ -135,12 +139,17 @@ export default async function ApplicationSummaryPage({
   const canGenerate = view.campaign.ownerUserId === user.id;
   const requirementScorecard = scorecard(view.requirement.scorecardJson);
   const summaryStatus = view.summary?.status ?? null;
-  const actionLabel =
-    summaryStatus === "FAILED"
-      ? applicationSummaryConfig.actions.retry
-      : summaryStatus === "READY"
-        ? applicationSummaryConfig.actions.regenerate
-        : applicationSummaryConfig.actions.generate;
+  const summaryFailure = latestApplicationSummaryFailure({
+    jobs: live.jobs,
+    summaryStatus,
+    generationError: view.summary?.generationError ?? null,
+    fallback: `${applicationSummaryConfig.title} could not be generated. Retry.`,
+  });
+  const actionLabel = summaryFailure
+    ? applicationSummaryConfig.actions.retry
+    : summaryStatus === "READY"
+      ? applicationSummaryConfig.actions.regenerate
+      : applicationSummaryConfig.actions.generate;
   const guidance = view.guidance;
   const filterOptions = view.people.map((person) => ({
     sectionKey: person.sectionKey,
@@ -215,25 +224,30 @@ export default async function ApplicationSummaryPage({
       />
 
       <div className="print:hidden">
-        <WorkspaceProgress jobs={live.jobs} type="APPLICATION_SUMMARY" stayAndWatch />
+        <WorkspaceProgress
+          jobs={live.jobs}
+          type="APPLICATION_SUMMARY"
+          stayAndWatch
+          hideFailure
+        />
         {filterOptions.length > 0 ? (
           <div className="mb-4">
             <CheatSheetPeopleFilter />
           </div>
         ) : null}
-        {summaryStatus === "FAILED" ? (
-          <p role="alert" className="mt-2 rounded-md border border-danger bg-danger-tint p-3 text-sm text-danger">
-            {view.summary?.generationError ?? `${applicationSummaryConfig.title} could not be generated. Retry.`}
-          </p>
-        ) : null}
+        <CheatSheetGenerationError message={summaryFailure?.message ?? null} />
         {canGenerate ? (
           <div className="mt-3">
             <ApplicationActionForm
               action={generateApplicationSummaryAction}
               submitLabel={actionLabel}
               testId="application-summary-generation"
+              suppressJobFailure
             >
               <input type="hidden" name="campaignId" value={id} />
+              {summaryFailure?.sectionKey ? (
+                <input type="hidden" name="sectionKey" value={summaryFailure.sectionKey} />
+              ) : null}
             </ApplicationActionForm>
           </div>
         ) : null}
@@ -243,9 +257,7 @@ export default async function ApplicationSummaryPage({
       <CheatSheetSection id="overview" title={applicationSummaryConfig.sections.overview}>
         {!guidance?.overview ? (
           <p className="text-sm text-muted">
-            {summaryStatus === "FAILED"
-              ? `${applicationSummaryConfig.title} could not be generated. Use Retry above.`
-              : `Generate the ${applicationSummaryConfig.title} to create the company background, job requirements, and where you shine.`}
+            {`Generate the ${applicationSummaryConfig.title} to create the company background, job requirements, and where you shine.`}
           </p>
         ) : (
           <>
@@ -346,6 +358,15 @@ export default async function ApplicationSummaryPage({
               </>
             }
           >
+            {person.contactId ? (
+              <CheatSheetInterviewPrepGuideButton
+                campaignId={id}
+                contactId={person.contactId}
+                sectionKey={person.sectionKey}
+                hasGuide={Boolean(section) && !personSectionNeedsGeneration(section)}
+                canEdit={canGenerate}
+              />
+            ) : null}
             <CheatSheetPersonBody
               campaignId={id}
               canEdit={canGenerate}
@@ -360,6 +381,7 @@ export default async function ApplicationSummaryPage({
               interviewNotesPersonName={person.contactId ? person.heading : null}
               generalQuestions={generalQuestions}
               personQuestions={personQuestions}
+              prepGuideOwnsContact
             />
           </CheatSheetSection>
           </CheatSheetPersonSection>

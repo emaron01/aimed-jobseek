@@ -19,6 +19,8 @@ export const applicationSummaryConfig = Object.freeze({
     filterClear: "Clear",
     filterNoMatches: "No matching people",
     generateSection: "Generate",
+    createInterviewPrepGuide: "Create Interview Prep Guide",
+    updateInterviewPrepGuide: "Update Interview Prep Guide",
     buildPersonaNow: "Yes",
     buildPersonaNo: "No",
   },

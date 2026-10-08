@@ -62,6 +62,7 @@ import {
   type CheatSheetInterviewerContext,
 } from "@/lib/application-summary/people";
 import { listPersonPreps } from "@/lib/interview/person-prep";
+import { prepareInterviewPrepGuideGeneration } from "@/lib/interview/prep-guide";
 import {
   applicationSummaryConfig,
   consultationConfig,
@@ -861,6 +862,36 @@ export async function generateApplicationSummary(input: {
     const person = data.people.find((item) => item.sectionKey === requested[0]!.sectionKey);
     if (!person) {
       throw new TenantError("That Interview cheat sheet section is not on this application.");
+    }
+    if (person.contactId && !person.personaBuilt) {
+      try {
+        await prepareInterviewPrepGuideGeneration({
+          organizationId: input.organizationId,
+          campaignId: input.campaignId,
+          personaId: person.roleId,
+          personaBuilt: false,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : `${applicationSummaryConfig.title} could not be generated. Retry.`;
+        if (!existing) {
+          await prisma.applicationSummary.upsert({
+            where: { campaignId: input.campaignId },
+            create: {
+              organizationId: input.organizationId,
+              campaignId: input.campaignId,
+              status: "FAILED",
+              generationError: message,
+              promptVersion: APPLICATION_SUMMARY_PROMPT_VERSION,
+            },
+            update: { status: "FAILED", generationError: message },
+          });
+        }
+        throw error;
+      }
+      return generateApplicationSummary(input);
     }
     await prisma.applicationSummary.upsert({
       where: { campaignId: input.campaignId },

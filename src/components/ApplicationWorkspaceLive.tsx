@@ -199,11 +199,14 @@ export function WorkspaceProgress({
   type,
   stayAndWatch,
   profileHref,
+  hideFailure = false,
 }: {
   jobs: WorkspaceJobStatusView[];
   type: WorkspaceJobStatusView["type"];
   stayAndWatch?: boolean;
   profileHref?: string | null;
+  /** Spinner only. The page shows one plain failure message. */
+  hideFailure?: boolean;
 }) {
   const latest = jobs.find((job) => job.type === type);
   const live =
@@ -224,7 +227,11 @@ export function WorkspaceProgress({
     );
   }
   if (failed) {
-    if (type === "HIRING_TEAM_IDENTIFY" || type === "HIRING_TEAM_BUILD") {
+    if (
+      hideFailure ||
+      type === "HIRING_TEAM_IDENTIFY" ||
+      type === "HIRING_TEAM_BUILD"
+    ) {
       return null;
     }
     return (

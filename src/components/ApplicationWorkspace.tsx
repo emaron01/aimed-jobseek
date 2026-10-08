@@ -18,6 +18,8 @@ import {
   ApplicationWorkspaceLive,
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
+import { CheatSheetGenerationError } from "@/components/CheatSheetGenerationError";
+import { latestApplicationSummaryFailure } from "@/lib/application-summary/failure-message";
 import { loadResumeStatementGroups } from "@/lib/application-assets/resume-statement-picker-data";
 import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-status";
 import { supersedeObsoleteWorkspaceFailures } from "@/lib/application-jobs/obsolete-failures";
@@ -953,7 +955,15 @@ export async function ApplicationWorkspace({
     ) : null}
     {showFocus(focus, ["interviews"]) ? (
     <div id="interviews">
-    <WorkspaceProgress jobs={live.jobs} type="APPLICATION_SUMMARY" />
+    <WorkspaceProgress jobs={live.jobs} type="APPLICATION_SUMMARY" hideFailure />
+    <CheatSheetGenerationError
+      message={
+        latestApplicationSummaryFailure({
+          jobs: live.jobs,
+          fallback: `${applicationSummaryConfig.title} could not be generated. Retry.`,
+        })?.message ?? null
+      }
+    />
     <InterviewStagesSection
       campaignId={requirement.campaignId}
       organizationId={organizationId}

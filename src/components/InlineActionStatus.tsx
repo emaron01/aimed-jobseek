@@ -25,11 +25,14 @@ export function InlineActionStatus({
   result,
   className = "",
   testId = "inline-action-status",
+  suppressJobFailure = false,
   children,
 }: {
   result: InlineActionResult | null;
   className?: string;
   testId?: string;
+  /** The page already shows one failure message. Do not repeat a finished job error. */
+  suppressJobFailure?: boolean;
   children?: ReactNode;
 }) {
   const { jobs, missingJobIds, watchJobIds } = useWorkspaceJobResolution();
@@ -78,6 +81,7 @@ export function InlineActionStatus({
   }
 
   const failed = tracked.find((item) => item.absent || item.job?.status === "FAILED");
+  if (failed && suppressJobFailure) return null;
   if (failed) {
     return (
       <p

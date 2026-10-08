@@ -12,6 +12,7 @@ import {
   saveCheatSheetSampleDraft,
 } from "@/lib/application-summary/service";
 import { queueHiringTeamBuild } from "@/lib/hiring-team/build";
+import { queueInterviewPrepGuide } from "@/lib/interview/prep-guide";
 import {
   applicationSummaryConfig,
   consultationConversationCopy,
@@ -65,6 +66,53 @@ export async function buildCheatSheetPersonaAction(
     return {
       ok: false,
       message: `${vocab.persona.Singular} could not be built.`,
+    };
+  }
+}
+
+export async function createInterviewPrepGuideAction(
+  _previous: ApplicationSummaryActionResult | null,
+  formData: FormData,
+): Promise<ApplicationSummaryActionResult> {
+  const campaignId = String(formData.get("campaignId") ?? "").trim();
+  const contactId = String(formData.get("contactId") ?? "").trim();
+  if (!campaignId) return { ok: false, message: "Application was not found." };
+  if (!contactId) return { ok: false, message: "Choose a person first." };
+  try {
+    const organizationId = await requireOrganizationId();
+    const user = await requireCurrentUser();
+    const queued = await queueInterviewPrepGuide({
+      organizationId,
+      campaignId,
+      userId: user.id,
+      contactId,
+    });
+    revalidatePath(`/campaigns/${campaignId}/summary`);
+    revalidatePath(`/campaigns/${campaignId}/interviews`);
+    if (queued.unchanged) {
+      return {
+        ok: true,
+        message: applicationSummaryConfig.actions.unchanged,
+      };
+    }
+    return {
+      ok: true,
+      message: workspaceProgressText("APPLICATION_SUMMARY"),
+      ...(queued.jobId ? { jobId: queued.jobId } : {}),
+    };
+  } catch (error) {
+    if (error instanceof TenantError) {
+      return { ok: false, message: error.message };
+    }
+    console.error(
+      JSON.stringify({
+        event: "interview_prep_guide_action_failed",
+        message: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+    return {
+      ok: false,
+      message: `${applicationSummaryConfig.title} could not be generated. Retry.`,
     };
   }
 }

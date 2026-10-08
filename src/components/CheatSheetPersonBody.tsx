@@ -115,6 +115,7 @@ export function CheatSheetPersonBody({
   additionalPrepQuestions = [],
   generalQuestions = [],
   personQuestions = [],
+  prepGuideOwnsContact = false,
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -144,7 +145,14 @@ export function CheatSheetPersonBody({
   generalQuestions?: ConsultationQaItem[];
   /** This person's person-prep questions, excluding coach items already listed. */
   personQuestions?: ConsultationQaItem[];
+  /**
+   * Cheat Sheet contacts use Create/Update Interview Prep Guide.
+   * That button owns persona build and section generation.
+   */
+  prepGuideOwnsContact?: boolean;
 }) {
+  const contactGuideOwned =
+    prepGuideOwnsContact && sectionKey.startsWith("contact:");
   const useInterviewNotesSection = interviewNotes != null;
   const notesBlock = useInterviewNotesSection ? (
     <NotesFromInterviewsSection
@@ -177,7 +185,7 @@ export function CheatSheetPersonBody({
       </CheatSheetSubsection>
     ) : null;
 
-  if (!personaBuilt) {
+  if (!personaBuilt && !contactGuideOwned) {
     return (
       <div className="space-y-3" data-testid={`unbuilt-persona-${sectionKey}`}>
         <CoachingDisclaimer />
@@ -193,6 +201,16 @@ export function CheatSheetPersonBody({
             <input type="hidden" name="personaId" value={personaId} />
           </ApplicationActionForm>
         ) : null}
+        {notesBlock}
+        {additionalPrepBlock}
+      </div>
+    );
+  }
+
+  if (contactGuideOwned && (!personaBuilt || !section)) {
+    return (
+      <div className="space-y-3">
+        <CoachingDisclaimer />
         {notesBlock}
         {additionalPrepBlock}
       </div>

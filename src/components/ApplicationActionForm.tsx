@@ -74,6 +74,7 @@ export function ApplicationActionForm({
   hideSubmit = false,
   disableFieldsWhilePending = false,
   preserveScroll = true,
+  suppressJobFailure = false,
   onSuccess,
   compact = false,
   formClassName = "space-y-3",
@@ -94,6 +95,8 @@ export function ApplicationActionForm({
   disableFieldsWhilePending?: boolean;
   /** Keep viewport position after a successful router.refresh (Harper Q&A). */
   preserveScroll?: boolean;
+  /** When a tracked job fails, leave the message to the page so it appears once. */
+  suppressJobFailure?: boolean;
   /** Runs after a successful action, before the page refresh. */
   onSuccess?: () => void;
   /** Smaller seeker action buttons (Harper question row). */
@@ -136,7 +139,11 @@ export function ApplicationActionForm({
   const fields = (
     <>
       {children}
-      <InlineActionStatus result={state} testId={`${testId}-status`} />
+      <InlineActionStatus
+        result={state}
+        testId={`${testId}-status`}
+        suppressJobFailure={suppressJobFailure}
+      />
       <AppButton
         type="submit"
         variant={variant}
