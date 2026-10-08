@@ -14,6 +14,17 @@ import {
 import { isHiringTeamPersonaBuilt, hiringTeamInvolvement } from "@/lib/hiring-team/build";
 import { JOB_REQUIREMENT_PROCESSING_VERSION } from "@/lib/job-requirement/types";
 import { askedQuestionsFromTurns } from "@/lib/consultation/questions";
+import {
+  isStandingShareAnswer,
+  questionHasApprovedResult,
+} from "@/lib/consultation/harper-three-sections";
+import {
+  buildConsultationQaView,
+  isIgnoredSeekerTurn,
+  replyToTurnIdFromAnalysis,
+  type ConsultationQaItem,
+  type QaStatement,
+} from "@/lib/consultation/qa-view";
 import { personSectionNeedsGeneration } from "@/lib/application-summary/people";
 import { prisma } from "@/lib/prisma-client";
 import {
@@ -343,6 +354,7 @@ export function consultationFacts(
       intent: string | null;
       analysisJson: unknown;
     }>;
+    statements?: QaStatement[];
   } | null,
 ): {
   started: boolean;
@@ -367,13 +379,88 @@ export function consultationFacts(
   const open = asked.filter(
     (question) => !question.answered && !question.ignored,
   );
+  const needing = harperQuestionsNeedingAnswer({
+    turns: session.turns,
+    statements: session.statements ?? [],
+  });
   return {
     started: true,
     unanswered: open.length > 0,
     complete: open.length === 0,
-    unansweredCount: open.length,
-    firstUnansweredTurnId: open[0]?.turnId ?? null,
+    unansweredCount: needing.count,
+    firstUnansweredTurnId: needing.firstTurnId,
   };
+}
+
+/**
+ * Questions the Harper page still wants an answer for: unanswered, skipped,
+ * or a draft that is not approved. Approved results and permanent ignores are out.
+ * The step's done rule stays on `unanswered` / `complete` above.
+ */
+export function harperQuestionsNeedingAnswer(input: {
+  turns: Array<{
+    id: string;
+    speaker: "CONSULTANT" | "SEEKER";
+    body: string;
+    targetKey: string | null;
+    followUp: boolean;
+    skipped: boolean;
+    sequence: number;
+    intent: string | null;
+    analysisJson: unknown;
+  }>;
+  statements: QaStatement[];
+}): { count: number; firstTurnId: string | null } {
+  const view = buildConsultationQaView({
+    turns: input.turns,
+    statements: input.statements,
+  });
+  const needing = view.questions.filter((item) =>
+    harperQuestionNeedsSeekerAnswer(item, input.turns),
+  );
+  return {
+    count: needing.length,
+    firstTurnId: needing[0]?.questionTurnId ?? null,
+  };
+}
+
+function harperQuestionNeedsSeekerAnswer(
+  item: ConsultationQaItem,
+  turns: ReadonlyArray<{
+    id: string;
+    speaker: "CONSULTANT" | "SEEKER";
+    skipped: boolean;
+    analysisJson: unknown;
+  }>,
+): boolean {
+  if (item.ignored || isStandingShareAnswer(item)) return false;
+  if (item.followUp) return true;
+  if (item.pendingDraftTalkingPoint || item.pendingDraftResumeBullet) return true;
+  if (questionHasApprovedResult(item)) return false;
+  if (
+    item.talkingPoint?.status === "DRAFT" ||
+    item.resumeBullet?.status === "DRAFT"
+  ) {
+    return true;
+  }
+  if (seekerSkippedQuestion(item, turns)) return true;
+  return !item.seekerAnswers.some((answer) => answer.body.trim().length > 0);
+}
+
+function seekerSkippedQuestion(
+  item: ConsultationQaItem,
+  turns: ReadonlyArray<{
+    id: string;
+    speaker: "CONSULTANT" | "SEEKER";
+    skipped: boolean;
+    analysisJson: unknown;
+  }>,
+): boolean {
+  return turns.some((turn) => {
+    if (turn.speaker !== "SEEKER" || !turn.skipped) return false;
+    if (isIgnoredSeekerTurn(turn)) return false;
+    return replyToTurnIdFromAnalysis(turn.analysisJson) === item.questionTurnId;
+  });
 }
 
 /** Newest interview first, then the first interviewer on that interview who has no ready guide. */

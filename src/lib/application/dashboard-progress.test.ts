@@ -233,7 +233,9 @@ describe("dashboard step wording", () => {
     expect(card(html, "company")).toContain("Company Research");
     expect(card(html, "company")).toContain(applicationStepCopy.companyDone);
     expect(card(html, "consultation")).toContain("Harper Questionnaire");
-    expect(card(html, "consultation")).toContain(applicationStepCopy.consultationInProgress);
+    expect(card(html, "consultation")).not.toContain(
+      applicationStepCopy.consultationInProgress,
+    );
     expect(card(html, "assets")).toContain(applicationStepCopy.assetsDone);
     expect(card(html, "hiring-team")).toContain("Personas and Interviewers");
     expect(card(html, "hiring-team")).toContain(applicationStepCopy.newHiringPersonas);

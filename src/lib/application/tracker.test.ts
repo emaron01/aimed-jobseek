@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   consultationFacts,
+  harperQuestionsNeedingAnswer,
   interviewersMissingPrepGuides,
 } from "@/lib/application/tracker";
 import {
@@ -180,6 +181,123 @@ describe("consultationFacts Harper green", () => {
         [],
       ),
     ).toBe("done");
+  });
+});
+
+function statement(input: {
+  id: string;
+  turnId: string;
+  status: "DRAFT" | "APPROVED";
+}) {
+  return {
+    id: input.id,
+    turnId: input.turnId,
+    kind: "INTERVIEW_ANSWER" as const,
+    status: input.status,
+    content: "Shaped answer",
+    strengtheningNote: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+}
+
+describe("harperQuestionsNeedingAnswer", () => {
+  it("counts unanswered, skipped, and unapproved drafts, and skips approved and ignored", () => {
+    const result = harperQuestionsNeedingAnswer({
+      turns: [
+        turn({
+          id: "open",
+          speaker: "CONSULTANT",
+          body: "What was the forecasting result?",
+          targetKey: "forecasting",
+          sequence: 1,
+        }),
+        turn({
+          id: "skipped-q",
+          speaker: "CONSULTANT",
+          body: "Walk me through a deal you lost?",
+          targetKey: "deal",
+          sequence: 2,
+        }),
+        {
+          ...turn({
+            id: "skip-1",
+            speaker: "SEEKER",
+            body: "",
+            targetKey: "deal",
+            sequence: 3,
+            analysisJson: { status: "READY", replyToTurnId: "skipped-q" },
+          }),
+          skipped: true,
+        },
+        turn({
+          id: "draft-q",
+          speaker: "CONSULTANT",
+          body: "How do you run a forecast?",
+          targetKey: "role-expertise:forecast",
+          sequence: 4,
+        }),
+        turn({
+          id: "draft-a",
+          speaker: "SEEKER",
+          body: "I rebuild the model with the team.",
+          targetKey: "role-expertise:forecast",
+          sequence: 5,
+          analysisJson: { replyToTurnId: "draft-q" },
+        }),
+        turn({
+          id: "approved-q",
+          speaker: "CONSULTANT",
+          body: "Why this company?",
+          targetKey: "why-this-company",
+          sequence: 6,
+        }),
+        turn({
+          id: "ignored-q",
+          speaker: "CONSULTANT",
+          body: "Tell me about a gap?",
+          targetKey: "gap",
+          sequence: 7,
+        }),
+        {
+          ...turn({
+            id: "ignore-1",
+            speaker: "SEEKER",
+            body: "",
+            targetKey: "gap",
+            sequence: 8,
+            analysisJson: {
+              status: "READY",
+              replyToTurnId: "ignored-q",
+              ignored: true,
+            },
+          }),
+          skipped: true,
+        },
+      ],
+      statements: [
+        statement({ id: "draft-1", turnId: "draft-a", status: "DRAFT" }),
+        statement({ id: "approved-1", turnId: "approved-q", status: "APPROVED" }),
+      ],
+    });
+    expect(result.count).toBe(3);
+    expect(result.firstTurnId).toBe("open");
+    const facts = consultationFacts({
+      turns: [
+        turn({
+          id: "approved-q",
+          speaker: "CONSULTANT",
+          body: "Why this company?",
+          targetKey: "why-this-company",
+          sequence: 1,
+        }),
+      ],
+      statements: [
+        statement({ id: "approved-1", turnId: "approved-q", status: "APPROVED" }),
+      ],
+    });
+    expect(facts.unansweredCount).toBe(0);
+    expect(facts.unanswered).toBe(true);
+    expect(facts.complete).toBe(false);
   });
 });
 

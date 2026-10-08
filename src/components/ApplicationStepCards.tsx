@@ -62,7 +62,11 @@ export function ApplicationStepCards({
         const showStatus =
           (kind === "your_turn" || kind === "done") &&
           status !== applicationStepCopy.yourTurn &&
-          status !== applicationStepCopy.done;
+          status !== applicationStepCopy.done &&
+          !(
+            step.key === "consultation" &&
+            status === applicationStepCopy.consultationInProgress
+          );
         return (
           <li key={step.key}>
             <div
