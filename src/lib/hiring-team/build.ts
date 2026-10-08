@@ -547,7 +547,6 @@ export async function queueHiringTeamBuild(input: {
   campaignId: string;
   personaId: string;
   initiatedByUserId?: string | null;
-  deferredOutreach?: ApplicationJobPayload["deferredOutreach"];
   deferCheatSheetSection?: boolean;
 }) {
   const { isPersonaAiConfigured } = await import("@/lib/ai");
@@ -563,7 +562,6 @@ export async function queueHiringTeamBuild(input: {
   });
   const payload: ApplicationJobPayload = {};
   if (input.initiatedByUserId) payload.userId = input.initiatedByUserId;
-  if (input.deferredOutreach) payload.deferredOutreach = input.deferredOutreach;
   if (input.deferCheatSheetSection) payload.deferCheatSheetSection = true;
   return enqueueApplicationJob({
     organizationId: input.organizationId,

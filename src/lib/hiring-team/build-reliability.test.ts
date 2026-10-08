@@ -198,13 +198,13 @@ describe("hiring team build reliability", () => {
   });
 
   it("no HIRING_TEAM_BUILD starts without a seeker action caller", () => {
-    const callers = [
-      "src/app/actions/hiring-team.ts",
-      "src/app/actions/application-summary.ts",
-    ];
+    const callers = ["src/app/actions/application-summary.ts"];
     for (const file of callers) {
       expect(readFileSync(file, "utf8")).toContain("queueHiringTeamBuild");
     }
+    expect(readFileSync("src/app/actions/hiring-team.ts", "utf8")).not.toContain(
+      "queueHiringTeamBuild",
+    );
     const outreach = readFileSync("src/app/actions/application-outreach.ts", "utf8");
     expect(outreach).toContain("prepareInterviewPrepGuideGeneration");
     expect(outreach).not.toContain("queueHiringTeamBuild");
@@ -295,10 +295,9 @@ describe("hiring team build reliability", () => {
     const service = readFileSync("src/lib/application-jobs/service.ts", "utf8");
     expect(service).toContain("isRetryableProviderMessage");
     expect(service).toContain("HIRING_TEAM_BUILD");
-    const actions = readFileSync("src/app/actions/hiring-team.ts", "utf8");
-    expect(actions).toContain("No Changes To ${skip.roleName} Persona");
-    expect(actions).toContain("skip.awaitingDetails");
-    expect(actions).toContain("hiringTeamConfig.status.awaitingDetails");
+    expect(readFileSync("src/app/actions/hiring-team.ts", "utf8")).not.toContain(
+      "queueHiringTeamBuild",
+    );
   });
 
   it("edit clears awaitingSeekerInput so a new fingerprint can build", () => {

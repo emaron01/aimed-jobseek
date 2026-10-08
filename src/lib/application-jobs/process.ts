@@ -1,7 +1,6 @@
 import {
   completeApplicationJob,
   consultationPlanningOperationsFromPayload,
-  enqueueApplicationJob,
   failApplicationJob,
   readJobPayload,
 } from "@/lib/application-jobs/service";
@@ -25,7 +24,6 @@ import {
   personPrepFocus,
   recordPersonPrepOpening,
 } from "@/lib/interview/person-prep";
-import { outreachJobTargetId } from "@/lib/product-config";
 import { prisma } from "@/lib/prisma-client";
 import { runWithTenantContext } from "@/lib/tenant/request-context";
 import { drainConsultationUnprocessedInput } from "@/lib/consultation/drain";
@@ -88,65 +86,18 @@ export async function processApplicationJob(
             break;
           case "HIRING_TEAM_BUILD":
             if (!job.targetId) throw new Error("Hiring Team build is missing a role.");
-            {
-              const rebuildResult = await rebuildApplicationHiringTeamRole({
+            await rebuildApplicationHiringTeamRole({
+              organizationId: job.organizationId,
+              campaignId: job.campaignId,
+              personaId: job.targetId,
+            });
+            if (payload.deferCheatSheetSection && job.targetId) {
+              await enqueuePersonaCheatSheetSection({
                 organizationId: job.organizationId,
                 campaignId: job.campaignId,
                 personaId: job.targetId,
+                userId: job.initiatedByUserId ?? payload.userId ?? null,
               });
-              if (payload.deferCheatSheetSection && job.targetId) {
-                await enqueuePersonaCheatSheetSection({
-                  organizationId: job.organizationId,
-                  campaignId: job.campaignId,
-                  personaId: job.targetId,
-                  userId: job.initiatedByUserId ?? payload.userId ?? null,
-                });
-              }
-              if (!rebuildResult.synthesizeSkipped) {
-                const deferred = payload.deferredOutreach;
-                if (deferred?.assetType && deferred.personaId) {
-                  const deferredPurpose =
-                    deferred.purpose === "FOLLOW_UP" ||
-                    deferred.purpose === "THANK_YOU" ||
-                    deferred.purpose === "CHECK_IN"
-                      ? deferred.purpose
-                      : "PROACTIVE";
-                  const deferredType = deferred.assetType as
-                    | "EMAIL"
-                    | "LINKEDIN_CONNECTION_NOTE"
-                    | "LINKEDIN_INMAIL";
-                  await enqueueApplicationJob({
-                    organizationId: job.organizationId,
-                    campaignId: job.campaignId,
-                    type: "OUTREACH",
-                    targetId: outreachJobTargetId({
-                      type: deferredType,
-                      personaId: deferred.personaId,
-                      contactId: deferred.contactId ?? null,
-                      purpose: deferredPurpose,
-                      interviewStageId: deferred.interviewStageId ?? null,
-                    }),
-                    initiatedByUserId: job.initiatedByUserId,
-                    payload: {
-                      userId:
-                        deferred.userId ??
-                        job.initiatedByUserId ??
-                        payload.userId,
-                      assetType: deferred.assetType,
-                      personaId: deferred.personaId,
-                      contactId: deferred.contactId ?? null,
-                      purpose: deferred.purpose,
-                      followUpToAssetId: deferred.followUpToAssetId ?? null,
-                      interviewStageId: deferred.interviewStageId ?? null,
-                      emailLength: deferred.emailLength ?? null,
-                      regenerationInstruction:
-                        deferred.regenerationInstruction ?? null,
-                      skipThankYouQuestions: deferred.skipThankYouQuestions,
-                      thankYouAnswers: deferred.thankYouAnswers,
-                    },
-                  });
-                }
-              }
             }
             break;
           case "CONTACT_PROFILE":

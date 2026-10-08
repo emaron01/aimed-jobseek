@@ -175,9 +175,6 @@ export function mergeApplicationJobPayload(
 ): ApplicationJobPayload {
   const merged: ApplicationJobPayload = { ...existing };
   if (incoming.userId !== undefined) merged.userId = incoming.userId;
-  if (incoming.deferredOutreach) {
-    merged.deferredOutreach = incoming.deferredOutreach;
-  }
   if (incoming.sectionKey !== undefined) merged.sectionKey = incoming.sectionKey;
   if (incoming.contactId !== undefined) merged.contactId = incoming.contactId;
   if (incoming.personaId !== undefined) merged.personaId = incoming.personaId;

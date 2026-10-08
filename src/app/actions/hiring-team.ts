@@ -4,9 +4,6 @@ import { revalidatePath } from "next/cache";
 import {
   addApplicationHiringTeamRole,
   addTemplateToApplication,
-  hiringTeamSynthesizeUnchanged,
-  queueHiringTeamBuild,
-  queueHiringTeamBuildDirect,
   removeApplicationHiringTeamRole,
   savePersonaAsTemplate,
   updateApplicationHiringTeamRole,
@@ -257,41 +254,6 @@ export async function removePersonaFromCheatSheetAction(
   }
 }
 
-export async function rebuildApplicationRoleAction(
-  _prev: HiringTeamActionResult | null,
-  formData: FormData,
-): Promise<HiringTeamActionResult> {
-  try {
-    const organizationId = await requireOrganizationId();
-    await requireCurrentUser();
-    const campaignId = String(formData.get("campaignId") ?? "").trim();
-    const personaId = String(formData.get("personaId") ?? "").trim();
-    if (!campaignId || !personaId) {
-      return { ok: false, message: `${vocab.persona.Singular} was not found.` };
-    }
-    const skip = await hiringTeamSynthesizeUnchanged({
-      organizationId,
-      campaignId,
-      personaId,
-    });
-    if (skip.unchanged) {
-      revalidatePath(`/campaigns/${campaignId}`);
-      if (skip.awaitingDetails) {
-        return {
-          ok: true,
-          message: hiringTeamConfig.status.awaitingDetails,
-        };
-      }
-      return { ok: true, message: `No Changes To ${skip.roleName} Persona` };
-    }
-    const job = await queueHiringTeamBuild({ organizationId, campaignId, personaId });
-    revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: hiringTeamConfig.queuedBuild, jobId: job.id };
-  } catch (error) {
-    return fail(error, `The ${vocab.persona.singular} could not be rebuilt.`);
-  }
-}
-
 export async function addTemplateRoleAction(
   _prev: HiringTeamActionResult | null,
   formData: FormData,
@@ -329,64 +291,6 @@ export async function removeApplicationRoleAction(
     return { ok: true, message: `${vocab.persona.Singular} removed.` };
   } catch (error) {
     return fail(error, `The ${vocab.persona.singular} could not be removed.`);
-  }
-}
-
-export async function buildApplicationRoleAction(
-  _prev: HiringTeamActionResult | null,
-  formData: FormData,
-): Promise<HiringTeamActionResult> {
-  try {
-    const organizationId = await requireOrganizationId();
-    await requireCurrentUser();
-    const campaignId = String(formData.get("campaignId") ?? "").trim();
-    const personaId = String(formData.get("personaId") ?? "").trim();
-    if (!campaignId || !personaId) {
-      return { ok: false, message: `${vocab.persona.Singular} was not found.` };
-    }
-    const skip = await hiringTeamSynthesizeUnchanged({
-      organizationId,
-      campaignId,
-      personaId,
-    });
-    if (skip.unchanged) {
-      revalidatePath(`/campaigns/${campaignId}`);
-      if (skip.awaitingDetails) {
-        return {
-          ok: true,
-          message: hiringTeamConfig.status.awaitingDetails,
-        };
-      }
-      return { ok: true, message: `No Changes To ${skip.roleName} Persona` };
-    }
-    const job = await queueHiringTeamBuild({ organizationId, campaignId, personaId });
-    revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: hiringTeamConfig.queuedBuild, jobId: job.id };
-  } catch (error) {
-    return fail(error, `The ${vocab.persona.singular} could not be started.`);
-  }
-}
-
-export async function buildAllDirectRolesAction(
-  _prev: HiringTeamActionResult | null,
-  formData: FormData,
-): Promise<HiringTeamActionResult> {
-  try {
-    const organizationId = await requireOrganizationId();
-    await requireCurrentUser();
-    const campaignId = String(formData.get("campaignId") ?? "").trim();
-    if (!campaignId) {
-      return { ok: false, message: `${vocab.campaign.Singular} was not found.` };
-    }
-    const queued = await queueHiringTeamBuildDirect({ organizationId, campaignId });
-    revalidatePath(`/campaigns/${campaignId}`);
-    return {
-      ok: true,
-      message: hiringTeamConfig.queuedBuildAllDirect,
-      ...(queued.jobIds.length > 0 ? { jobIds: queued.jobIds } : {}),
-    };
-  } catch (error) {
-    return fail(error, "Direct role builds could not be started.");
   }
 }
 

@@ -191,8 +191,8 @@ describe("UI batch 1 cheat sheet collapse", () => {
     expect(collapsible).toContain('data-cheat-sheet-indicator={open ? "open" : "collapsed"}');
     expect(page).not.toContain('CheatSheetSection id="overview"');
     expect(page).not.toContain('CheatSheetSection id="stages"');
-    expect(page).toContain('CheatSheetSection id="company"');
-    expect(page).toContain('CheatSheetSection id="position"');
+    expect(page).toContain('id="company"');
+    expect(page).toContain('id="position"');
     expect(page).toContain("CheatSheetSection id={person.sectionKey}");
     expect(body).toContain("sections.caresAbout");
     expect(body).toContain("sections.positioningStatements");

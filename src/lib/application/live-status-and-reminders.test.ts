@@ -61,11 +61,7 @@ vi.mock("@/app/actions/application-summary", () => ({
   saveCheatSheetSampleDraftAction: vi.fn(),
 }));
 
-vi.mock("@/app/actions/hiring-team", () => ({
-  buildApplicationRoleAction: (...args: unknown[]) => personaAction(...args),
-  rebuildApplicationRoleAction: vi.fn(),
-  buildAllDirectRolesAction: vi.fn(),
-}));
+vi.mock("@/app/actions/hiring-team", () => ({}));
 
 vi.mock("@/app/actions/application-outreach", () => ({
   generateOutreachAssetAction: (...args: unknown[]) => outreachAction(...args),
@@ -82,6 +78,13 @@ vi.mock("@/app/actions/application-assets", () => ({
   generateApplicationAssetAction: (...args: unknown[]) => assetAction(...args),
   approveApplicationAssetAction: vi.fn(),
   saveEditedApplicationAssetAction: vi.fn(),
+  addSeekerBulletAction: vi.fn(),
+  prepareResumeBulletCandidatesAction: vi.fn(),
+  saveBulletEvidenceRoleAction: vi.fn(),
+  removePickerBulletAction: vi.fn(),
+  saveBulletTextAction: vi.fn(),
+  saveResumeRoleVisibilityAction: vi.fn(),
+  saveResumeStatementPicksAction: vi.fn(),
 }));
 
 function job(

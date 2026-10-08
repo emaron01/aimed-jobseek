@@ -138,10 +138,10 @@ describe("paid-call gate Phase 1 fingerprints and wiring", () => {
       expect(src).not.toContain("paid-call-gate");
     }
     const actions = readFileSync("src/app/actions/hiring-team.ts", "utf8");
-    expect(actions).toContain("No Changes To ${skip.roleName} Persona");
-    expect(actions).toContain("hiringTeamSynthesizeUnchanged");
+    expect(actions).not.toContain("queueHiringTeamBuild");
     const processSrc = readFileSync("src/lib/application-jobs/process.ts", "utf8");
-    expect(processSrc).toContain("synthesizeSkipped");
+    expect(processSrc).toContain("rebuildApplicationHiringTeamRole");
+    expect(processSrc).not.toContain("deferredOutreach");
     const noAi = readFileSync("src/lib/application/no-ai-on-view.test.ts", "utf8");
     expect(noAi).toContain("enqueueApplicationJob");
   });

@@ -46,19 +46,6 @@ export type ApplicationJobPayload = {
   sectionKey?: string;
   /** Add to Cheat Sheet: write the role section after this build finishes. */
   deferCheatSheetSection?: boolean;
-  deferredOutreach?: {
-    userId?: string;
-    assetType: string;
-    personaId: string;
-    contactId?: string | null;
-    purpose?: string;
-    followUpToAssetId?: string | null;
-    interviewStageId?: string | null;
-    emailLength?: string | null;
-    regenerationInstruction?: string | null;
-    skipThankYouQuestions?: boolean;
-    thankYouAnswers?: Array<{ id: string; answer: string }>;
-  };
 };
 
 export function isTimeoutMessage(message: string): boolean {

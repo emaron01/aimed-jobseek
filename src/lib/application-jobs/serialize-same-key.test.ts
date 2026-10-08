@@ -571,54 +571,6 @@ describe.skipIf(!hasTestDatabase())("application job serialize same-key (databas
     await clearJobs();
   });
 
-  it("deferredOutreach survives PENDING reuse", async () => {
-    await clearJobs();
-    await prisma.applicationJob.create({
-      data: {
-        organizationId,
-        campaignId,
-        type: "HIRING_TEAM_BUILD",
-        targetId: "persona-1",
-        status: "IN_PROGRESS",
-        startedAt: new Date(),
-        workerHeartbeatAt: new Date(),
-      },
-    });
-    const first = await enqueueApplicationJob({
-      organizationId,
-      campaignId,
-      type: "HIRING_TEAM_BUILD",
-      targetId: "persona-1",
-      payload: {
-        deferredOutreach: {
-          assetType: "EMAIL",
-          personaId: "persona-1",
-          purpose: "PROACTIVE",
-        },
-      },
-    });
-    await enqueueApplicationJob({
-      organizationId,
-      campaignId,
-      type: "HIRING_TEAM_BUILD",
-      targetId: "persona-1",
-      payload: {
-        deferredOutreach: {
-          assetType: "EMAIL",
-          personaId: "persona-1",
-          purpose: "FOLLOW_UP",
-          followUpToAssetId: "asset-9",
-        },
-      },
-    });
-    const row = await prisma.applicationJob.findFirstOrThrow({
-      where: { id: first.id },
-    });
-    const payload = readJobPayload(row.payload);
-    expect(payload.deferredOutreach?.purpose).toBe("FOLLOW_UP");
-    expect(payload.deferredOutreach?.followUpToAssetId).toBe("asset-9");
-  });
-
   it("retry with existing PENDING returns it and creates no second PENDING", async () => {
     await clearJobs();
     const pending = await enqueueApplicationJob({
