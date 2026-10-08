@@ -26,6 +26,7 @@ import {
   consultationStatementLabels,
   polishCopy,
 } from "@/lib/product-config";
+import { groundingSeekerEdited } from "@/lib/consultation/answer-binding";
 import { stripInternalIdsFromDisplayText } from "@/lib/consultation/evidence-display";
 import {
   harperContactAnchorId,
@@ -157,6 +158,11 @@ export function ResultActions({
     );
   }
   statements = draft;
+  const regenerateLabel = statements.some((statement) =>
+    groundingSeekerEdited(statement.groundingJson),
+  )
+    ? polishCopy.polishMyAnswer
+    : polishCopy.regenerate;
   const editorHere = editing && draftValues == null;
   return (
     <>
@@ -217,7 +223,7 @@ export function ResultActions({
         </ApplicationActionForm>
         <ApplicationActionForm
           action={regenerateConsultationQaResultAction}
-          submitLabel={polishCopy.regenerate}
+          submitLabel={regenerateLabel}
           testId={`${testId}-regenerate`}
           variant="secondary"
           compact

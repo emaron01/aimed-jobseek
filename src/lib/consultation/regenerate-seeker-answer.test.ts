@@ -2,8 +2,15 @@
 import { readFileSync } from "node:fs";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { describe, expect, it } from "vitest";
-import { ResultBody } from "@/components/ConsultationThread";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: () => undefined, push: () => undefined }),
+  usePathname: () => "/campaigns/camp/consultation",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+import { ResultActions, ResultBody } from "@/components/ConsultationThread";
 import {
   draftRegenerationAnswer,
   withSeekerEditedGrounding,
@@ -136,5 +143,50 @@ describe("key points edit with the answer", () => {
     expect(actions).toContain("keyPoints:");
     expect(actions).toContain("polishCopy.statementUnchanged");
     expect(actions).toContain("polishCopy.statementRegenerated");
+  });
+});
+
+describe("Regenerate button label", () => {
+  it("says Polish my answer on a seeker-owned draft and Regenerate on a Harper draft", () => {
+    expect(polishCopy.polishMyAnswer).toBe("Polish my answer");
+    expect(polishCopy.regenerate).toBe("Regenerate");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root: Root = createRoot(host);
+    function render(owned: boolean, content: string) {
+      act(() => {
+        root.render(
+          createElement(ResultActions, {
+            campaignId: "camp",
+            testId: "consultation-result-q1",
+            statements: [
+              statement({
+                id: "st-1",
+                content,
+                groundingJson: owned
+                  ? { seekerEdited: true, keyPoints: ["OpenText pipeline was $2.9MM."] }
+                  : { keyPoints: ["Harper drafted this."] },
+              }),
+            ],
+          }),
+        );
+      });
+    }
+    function label(): string {
+      const form = host.querySelector(
+        "[data-testid='consultation-result-q1-regenerate']",
+      );
+      return form?.querySelector("button")?.textContent ?? "";
+    }
+    render(false, SALES_ANSWER);
+    expect(label()).toBe(polishCopy.regenerate);
+    render(true, NURSING_ANSWER);
+    expect(label()).toBe(polishCopy.polishMyAnswer);
+    render(true, NEW_GRADUATE_ANSWER);
+    expect(label()).toBe(polishCopy.polishMyAnswer);
+    act(() => {
+      root.unmount();
+    });
+    host.remove();
   });
 });
