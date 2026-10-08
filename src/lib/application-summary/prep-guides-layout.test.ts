@@ -66,15 +66,15 @@ describe("Interview Preparation Guides layout", () => {
     const overview = map.indexOf("-overview");
     const notes = map.indexOf("-guide-notes");
     const personBody = map.indexOf("<CheatSheetPersonBody");
-    const company = map.indexOf("-company");
     expect(overview).toBeGreaterThan(-1);
     expect(notes).toBeGreaterThan(overview);
     expect(personBody).toBeGreaterThan(notes);
-    expect(company).toBeGreaterThan(personBody);
     expect(map).toContain("<AtAGlanceBody");
     expect(map).toContain("<CheatSheetInterviewNotes notes={applicationInterviewNotes}");
-    expect(map).toContain("<CompanyProfileBody");
+    expect(map).not.toContain("CompanyProfileBody");
     expect(map).not.toContain("compileNotesFromInterviewsWithPerson");
+    const companyCard = page.indexOf('testId="prep-guide-company"');
+    expect(page.indexOf("<CompanyProfileBody", companyCard)).toBeGreaterThan(companyCard);
 
     const cares = body.indexOf("sections.caresAbout");
     const positioning = body.indexOf("sections.positioningStatements");
@@ -118,5 +118,42 @@ describe("Interview Preparation Guides layout", () => {
     });
     expect(compiled.map((note) => note.text)).toEqual(["newer note", "older note"]);
     expect(compiled[0]?.personName).toBe("Ada Lovelace");
+  });
+
+  it("prints one person's guide expanded, with no page break between subsections", () => {
+    const page = readFileSync("src/app/(app)/campaigns/[id]/summary/page.tsx", "utf8");
+    const css = readFileSync("src/app/globals.css", "utf8");
+    const style = page.slice(page.indexOf("@media print"), page.indexOf("</style>"));
+    expect(style).toContain(
+      'body[data-print-section] .application-summary-section[data-print-active="true"]',
+    );
+    expect(style).toContain("break-inside: auto !important");
+    expect(style).toContain("break-before: auto !important");
+    expect(style).toContain("break-after: auto !important");
+    expect(style).toContain("page-break-before: auto !important");
+    expect(style).toContain("page-break-after: auto !important");
+    expect(style).toContain("page-break-inside: auto !important");
+    expect(style).not.toContain("page-break-before: always");
+    expect(style).not.toContain("break-before: page");
+    expect(style).toContain("[data-print-section-chrome]");
+    expect(page).toContain("data-print-section-chrome");
+    expect(css).toContain(".application-summary .cheat-sheet-collapsible-body.hidden");
+    expect(css).toContain("display: block !important");
+
+    const mapStart = page.indexOf("{view.people.map");
+    const map = page.slice(mapStart, page.indexOf("</PrepGuidePrimaryCard>", mapStart));
+    const sectionStart = map.indexOf("<CheatSheetSection");
+    const overview = map.indexOf('sections.overview');
+    const notes = map.indexOf("sections.interviewNotes");
+    const personBody = map.indexOf("<CheatSheetPersonBody");
+    const sectionEnd = map.indexOf("</CheatSheetSection>");
+    expect(sectionStart).toBeGreaterThan(-1);
+    expect(overview).toBeGreaterThan(sectionStart);
+    expect(notes).toBeGreaterThan(overview);
+    expect(personBody).toBeGreaterThan(notes);
+    expect(sectionEnd).toBeGreaterThan(personBody);
+    expect(map.slice(sectionStart, sectionEnd)).not.toContain("CompanyProfileBody");
+    expect(map.slice(sectionStart, sectionEnd)).not.toContain("page-break");
+    expect(map.slice(sectionStart, sectionEnd)).not.toContain("break-before");
   });
 });

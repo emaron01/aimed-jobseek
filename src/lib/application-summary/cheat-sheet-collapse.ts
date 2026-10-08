@@ -14,7 +14,6 @@ const SUBSECTION_SUFFIXES = [
   "-questions-to-ask",
   "-additional-prep",
   "-overview",
-  "-company",
 ] as const;
 
 export function initialCheatSheetOpenIds(): Set<string> {

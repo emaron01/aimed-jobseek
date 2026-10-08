@@ -217,7 +217,9 @@ function PrepGuidePrimaryCard({
       className="space-y-4 rounded-md border-2 border-edge-strong bg-surface p-4"
       data-testid={testId}
     >
-      <h2 className="text-sm font-semibold text-ink">{title}</h2>
+      <h2 className="text-sm font-semibold text-ink" data-print-section-chrome>
+        {title}
+      </h2>
       {children}
     </section>
   );
@@ -334,10 +336,26 @@ export default async function ApplicationSummaryPage({
       <CheatSheetPrintBanner />
       <style>{`
         @media print {
+          body[data-print-section] [data-print-section-chrome] { display: none !important; }
+          body[data-print-section] [data-testid="prep-guide-personas"]:not(:has([data-print-active="true"])) {
+            display: none !important;
+          }
           body[data-print-section] .application-summary-section { display: none !important; }
-          body[data-print-section] .application-summary-section[data-print-active="true"] { display: block !important; }
+          body[data-print-section] .application-summary-section[data-print-active="true"] {
+            display: block !important;
+          }
+          body[data-print-section] .application-summary-section[data-print-active="true"],
+          body[data-print-section] .application-summary-section[data-print-active="true"] * {
+            break-before: auto !important;
+            break-after: auto !important;
+            break-inside: auto !important;
+            page-break-before: auto !important;
+            page-break-after: auto !important;
+            page-break-inside: auto !important;
+          }
         }
       `}</style>
+      <div data-print-section-chrome>
       <AskHarperBox
         campaignId={id}
         canEdit={canGenerate}
@@ -353,6 +371,7 @@ export default async function ApplicationSummaryPage({
           </div>
         }
       />
+      </div>
 
       <div className="print:hidden">
         <WorkspaceProgress
@@ -482,16 +501,6 @@ export default async function ApplicationSummaryPage({
               personQuestions={personQuestions}
               prepGuideOwnsContact
             />
-            <CheatSheetSubsection
-              id={`${person.sectionKey}-company`}
-              title={applicationSummaryConfig.sections.company}
-            >
-              <CompanyProfileBody
-                research={view.research}
-                companyName={view.requirement.companyName}
-                postingText={view.requirement.rawText}
-              />
-            </CheatSheetSubsection>
           </CheatSheetSection>
           </CheatSheetPersonSection>
         );
