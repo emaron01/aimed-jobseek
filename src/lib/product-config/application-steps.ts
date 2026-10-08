@@ -53,14 +53,14 @@ export const applicationStepList: readonly ApplicationStepDefinition[] =
       key: "company",
       number: 3,
       hrefSegment: "company",
-      title: applicationWorkspaceCopy.companyTitle,
+      title: "Company Research",
       emptyGuidance: "Research this employer so the rest of the application has a company to work from.",
     },
     {
       key: "consultation",
       number: 4,
       hrefSegment: "consultation",
-      title: consultationConfig.displayName,
+      title: "Harper Questionnaire",
       emptyGuidance: consultationConversationCopy.start,
     },
     {
@@ -121,7 +121,14 @@ export const applicationStepCopy = Object.freeze({
   newHarperQuestion: "New: Harper question",
   newResumeVersion: "New: resume version",
   newCoverLetterVersion: "New: cover letter version",
-  newHiringPersonas: "New: hiring personas",
+  newHiringPersonas: "New: Please review and/or update",
+  appliedDone: "Applied",
+  jobDone: "Successfully uploaded and reviewed by Harper",
+  companyDone: "Reviewed and approved by you",
+  consultationInProgress: "Please review and respond",
+  assetsDone: "Completed and approved by you",
+  interviewsDone: "Keep your interview notes updated",
+  summaryStatus: "Review and study for each interview",
   newOutreachContact: "New: contact added",
   newOutreachMessage: "New: message for",
   newInterviewStage: "New: interview stage",
@@ -158,6 +165,61 @@ export function applicationStepHref(
   const step = applicationStepByKey(key);
   if (!step.hrefSegment) return `/campaigns/${id}#applied`;
   return `/campaigns/${id}/${step.hrefSegment}`;
+}
+
+export type ApplicationStepStatusTone = "done" | "progress" | "active" | "attention";
+
+type ApplicationStepStatusInput = {
+  key: ApplicationStepKey;
+  workDone: boolean;
+  hasNew: boolean;
+  newLabel: string | null;
+  state: "not_started" | "needs_attention" | "in_progress" | "active" | "done";
+};
+
+/** Dashboard cards, sidebar status text, and any pill that names a step status. */
+export function applicationStepStatusLabel(step: ApplicationStepStatusInput): string {
+  if (step.workDone) {
+    switch (step.key) {
+      case "applied":
+        return applicationStepCopy.appliedDone;
+      case "job":
+        return applicationStepCopy.jobDone;
+      case "company":
+        return applicationStepCopy.companyDone;
+      case "assets":
+        return applicationStepCopy.assetsDone;
+      case "interviews":
+        return applicationStepCopy.interviewsDone;
+      case "summary":
+        return applicationStepCopy.summaryStatus;
+      default:
+        return applicationStepCopy.done;
+    }
+  }
+  if (step.hasNew && step.newLabel) return step.newLabel;
+  if (step.state === "active") return applicationStepCopy.active;
+  if (step.state === "in_progress") {
+    if (step.key === "consultation") return applicationStepCopy.consultationInProgress;
+    return applicationStepCopy.inProgress;
+  }
+  if (step.state === "needs_attention") return applicationStepCopy.needsAttention;
+  return applicationStepCopy.notStarted;
+}
+
+/** Interview Notes stays on the in-progress color after its work is done. */
+export function applicationStepStatusTone(input: {
+  key: ApplicationStepKey;
+  workDone: boolean;
+  state: ApplicationStepStatusInput["state"];
+}): ApplicationStepStatusTone {
+  if (input.key === "interviews" && (input.workDone || input.state === "done")) {
+    return "progress";
+  }
+  if (input.workDone) return "done";
+  if (input.state === "active") return "active";
+  if (input.state === "in_progress") return "progress";
+  return "attention";
 }
 
 export function applicationStepFromPathname(

@@ -8,7 +8,11 @@ import {
   dashboardStepShowsSpinner,
   type ApplicationStepView,
 } from "@/lib/application/step-progress";
-import { applicationStepCopy } from "@/lib/product-config";
+import {
+  applicationStepCopy,
+  applicationStepStatusLabel,
+  applicationStepStatusTone,
+} from "@/lib/product-config";
 
 export function ApplicationStepCards({
   steps,
@@ -34,27 +38,13 @@ export function ApplicationStepCards({
                 <AppPendingIndicator label={applicationStepCopy.inProgress} />
               ) : (
                 <StatusPill
-                  tone={
-                    step.workDone
-                      ? "done"
-                      : step.state === "active"
-                        ? "active"
-                        : step.state === "in_progress"
-                          ? "progress"
-                          : "attention"
-                  }
+                  tone={applicationStepStatusTone({
+                    key: step.key,
+                    workDone: step.workDone,
+                    state: step.state,
+                  })}
                 >
-                  {step.workDone
-                    ? applicationStepCopy.done
-                    : step.hasNew && step.newLabel
-                      ? step.newLabel
-                      : step.state === "active"
-                        ? applicationStepCopy.active
-                        : step.state === "in_progress"
-                          ? applicationStepCopy.inProgress
-                          : step.state === "needs_attention"
-                            ? applicationStepCopy.needsAttention
-                            : applicationStepCopy.notStarted}
+                  {applicationStepStatusLabel(step)}
                 </StatusPill>
               )}
             </Link>

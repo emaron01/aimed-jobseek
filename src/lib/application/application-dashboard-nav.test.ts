@@ -178,8 +178,8 @@ const DASHBOARD = `/campaigns/${CAMPAIGN_ID}`;
 
 const STEP_PAGES = [
   ["job", "Job requirements", `${DASHBOARD}/job`],
-  ["company", "Company", `${DASHBOARD}/company`],
-  ["consultation", "Harper", `${DASHBOARD}/consultation`],
+  ["company", "Company Research", `${DASHBOARD}/company`],
+  ["consultation", "Harper Questionnaire", `${DASHBOARD}/consultation`],
   ["assets", "Resume and cover letter", `${DASHBOARD}/assets`],
   ["hiring-team", "Personas and Interviewers", `${DASHBOARD}/hiring-team`],
   ["outreach", "Send Outreach", `${DASHBOARD}/outreach`],

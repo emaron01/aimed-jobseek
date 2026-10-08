@@ -3,12 +3,15 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ApplicationStepCards } from "@/components/ApplicationStepCards";
+import { ApplicationStepMarker } from "@/components/ApplicationSidebarTracker";
 import { TopBar } from "@/components/TopBar";
 import { harperLivePresentation } from "@/components/HarperLiveStatus";
 import { mergeWorkspaceJobSnapshots } from "@/components/workspace-jobs-context";
 import {
   applicationProgressLine,
+  buildApplicationStepViews,
   dashboardStepShowsSpinner,
+  emptyApplicationStepFacts,
   newApplicationProgressLabels,
   type ApplicationStepView,
 } from "@/lib/application/step-progress";
@@ -179,5 +182,120 @@ describe("application progress line", () => {
     expect(html).toContain("bg-danger-tint");
     expect(html).toContain("Next Up: Harper");
     expect(html).toContain("items-center");
+  });
+});
+
+describe("dashboard step wording", () => {
+  function card(html: string, key: string): string {
+    const match = html.match(
+      new RegExp(`data-testid="overview-step-${key}"[\\s\\S]*?</a>`),
+    );
+    expect(match?.[0], key).toBeTruthy();
+    return match?.[0] ?? "";
+  }
+
+  it("shows the new names and status wording on the dashboard and in the top-bar pills", () => {
+    const steps = buildApplicationStepViews({
+      campaignId: "camp_1",
+      currentStep: "overview",
+      facts: {
+        ...emptyApplicationStepFacts(),
+        appliedAt: "2026-09-25",
+        hasJobTitle: true,
+        researchDone: true,
+        consultationStarted: true,
+        consultationComplete: false,
+        hasResumeVersion: true,
+        latestResumeApproved: true,
+        hasApprovedResume: true,
+        hiringTeamRoleCount: 1,
+        hiringTeamBuiltCount: 0,
+        interviewStageCount: 1,
+        cheatSheetReady: true,
+      },
+      jobs: [],
+      seen: { consultation: "consultation:open" },
+    });
+    const html = renderToStaticMarkup(
+      createElement(ApplicationStepCards, { steps }),
+    );
+
+    expect(card(html, "applied")).toContain("Application Status");
+    expect(card(html, "applied")).toContain(applicationStepCopy.appliedDone);
+    expect(card(html, "applied")).toContain("bg-success-tint");
+    expect(card(html, "job")).toContain(applicationStepCopy.jobDone);
+    expect(card(html, "company")).toContain("Company Research");
+    expect(card(html, "company")).toContain(applicationStepCopy.companyDone);
+    expect(card(html, "consultation")).toContain("Harper Questionnaire");
+    expect(card(html, "consultation")).toContain(applicationStepCopy.consultationInProgress);
+    expect(card(html, "assets")).toContain(applicationStepCopy.assetsDone);
+    expect(card(html, "hiring-team")).toContain("Personas and Interviewers");
+    expect(card(html, "hiring-team")).toContain(applicationStepCopy.newHiringPersonas);
+    expect(card(html, "outreach")).toContain("Send Outreach");
+    expect(card(html, "outreach")).toContain(applicationStepCopy.notStarted);
+    const interviews = card(html, "interviews");
+    expect(interviews).toContain("Interview Notes");
+    expect(interviews).toContain(applicationStepCopy.interviewsDone);
+    expect(interviews).toContain("bg-warning-tint");
+    expect(interviews).not.toContain("bg-success-tint");
+    expect(card(html, "summary")).toContain("Interview Preparation Guides");
+    expect(card(html, "summary")).toContain(applicationStepCopy.summaryStatus);
+
+    const companyNext = buildApplicationStepViews({
+      campaignId: "camp_1",
+      currentStep: "overview",
+      facts: { ...emptyApplicationStepFacts(), hasJobTitle: true },
+      jobs: [],
+      seen: {},
+    });
+    const companyPills = renderToStaticMarkup(
+      createElement(TopBar, {
+        menuModel: null,
+        workspaceTitle: "Acme Workspace",
+        progress: applicationProgressLine(companyNext),
+      }),
+    );
+    expect(companyPills).toContain("Currently Completing: Company Research");
+    expect(companyPills).toContain("Next Up: Harper Questionnaire");
+
+    const guidesNext = buildApplicationStepViews({
+      campaignId: "camp_1",
+      currentStep: "overview",
+      facts: {
+        ...emptyApplicationStepFacts(),
+        hasJobTitle: true,
+        researchDone: true,
+        consultationStarted: true,
+        consultationComplete: true,
+        hasResumeVersion: true,
+        latestResumeApproved: true,
+        hasApprovedResume: true,
+        appliedAt: "2026-09-25",
+        hiringTeamRoleCount: 1,
+        hiringTeamBuiltCount: 1,
+        interviewStageCount: 1,
+      },
+      jobs: [],
+      seen: {},
+    });
+    const guidePills = renderToStaticMarkup(
+      createElement(TopBar, {
+        menuModel: null,
+        progress: applicationProgressLine(guidesNext),
+      }),
+    );
+    expect(guidePills).toContain("Next Up: Interview Preparation Guides");
+
+    const marker = renderToStaticMarkup(
+      createElement(ApplicationStepMarker, {
+        state: "done",
+        current: false,
+        statusLabel: applicationStepCopy.interviewsDone,
+        statusTone: "progress",
+      }),
+    );
+    expect(marker).toContain("bg-warning-tint");
+    expect(marker).toContain(applicationStepCopy.interviewsDone);
+    expect(marker).not.toContain("bg-success");
   });
 });

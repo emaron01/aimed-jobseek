@@ -25,6 +25,8 @@ import {
   applicationStepCopy,
   applicationStepFromPathname,
   applicationStepHref,
+  applicationStepStatusLabel,
+  applicationStepStatusTone,
   polishCopy,
   vocab,
 } from "@/lib/product-config";
@@ -69,42 +71,29 @@ function stateTone(state: ApplicationStepState): string {
   }
 }
 
-function stateLabel(state: ApplicationStepState): string {
-  switch (state) {
-    case "done":
-      return applicationStepCopy.done;
-    case "active":
-      return applicationStepCopy.active;
-    case "in_progress":
-      return applicationStepCopy.inProgress;
-    case "needs_attention":
-      return applicationStepCopy.needsAttention;
-    case "not_started":
-      return applicationStepCopy.notStarted;
-    default: {
-      const exhaustive: never = state;
-      throw new Error(`Unknown step state: ${String(exhaustive)}`);
-    }
-  }
-}
-
 export function ApplicationStepMarker({
   state,
   current,
   hasActiveJob = false,
+  statusLabel,
+  statusTone,
 }: {
   state: ApplicationStepState;
   current: boolean;
   hasActiveJob?: boolean;
+  statusLabel: string;
+  statusTone: ReturnType<typeof applicationStepStatusTone>;
 }) {
   const showSpinner = state === "in_progress" && hasActiveJob;
+  const tone =
+    statusTone === "progress" && state === "done" ? stateTone("in_progress") : stateTone(state);
   return (
     <span
       className={cn(
         "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
-        current ? "bg-primary text-on-primary" : stateTone(state),
+        current ? "bg-primary text-on-primary" : tone,
       )}
-      aria-label={stateLabel(state)}
+      aria-label={statusLabel}
       data-testid={
         showSpinner
           ? "tracker-step-marker-spinner"
@@ -166,6 +155,12 @@ export function ApplicationTrackerList({
               state={step.state}
               current={step.isCurrent}
               hasActiveJob={step.hasActiveJob}
+              statusLabel={applicationStepStatusLabel(step)}
+              statusTone={applicationStepStatusTone({
+                key: step.key,
+                workDone: step.workDone,
+                state: step.state,
+              })}
             />
             <span className="min-w-0 flex-1">
               <span className="block font-medium">

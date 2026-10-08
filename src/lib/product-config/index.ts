@@ -69,7 +69,10 @@ export {
   applicationStepFromPathname,
   applicationStepHref,
   applicationStepList,
+  applicationStepStatusLabel,
+  applicationStepStatusTone,
 } from "./application-steps";
+export type { ApplicationStepStatusTone } from "./application-steps";
 export type { ApplicationStepDefinition, ApplicationStepKey } from "./application-steps";
 export {
   harperActionLabel,
