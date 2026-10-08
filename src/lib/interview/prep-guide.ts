@@ -5,7 +5,7 @@ import {
 } from "@/lib/application/contacts";
 import { isHiringTeamPersonaBuilt } from "@/lib/hiring-team/build";
 import { prisma } from "@/lib/prisma-client";
-import { applicationSummaryConfig, vocab } from "@/lib/product-config";
+import { vocab } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 
 /**
@@ -19,7 +19,12 @@ export async function queueInterviewPrepGuide(input: {
   campaignId: string;
   userId: string;
   contactId: string;
-}): Promise<{ jobId: string | null; unchanged: boolean }> {
+  personaId?: string | null;
+}): Promise<{
+  jobId: string | null;
+  unchanged: boolean;
+  needsPersonaChoice: boolean;
+}> {
   const contactId = input.contactId.trim();
   if (!contactId) throw new TenantError("Choose a person first.");
 
@@ -52,7 +57,8 @@ export async function queueInterviewPrepGuide(input: {
     );
   }
 
-  let personaId = membership.chosenPersonaId;
+  const requestedPersonaId = input.personaId?.trim() || null;
+  let personaId = requestedPersonaId ?? membership.chosenPersonaId;
   if (!personaId) {
     const roles = await prisma.persona.findMany({
       where: {
@@ -68,11 +74,11 @@ export async function queueInterviewPrepGuide(input: {
       roles,
     });
     if (!matched.personaId) {
-      throw new TenantError(
-        matched.decisionReason ?? `Choose ${vocab.persona.aSingular}.`,
-      );
+      return { jobId: null, unchanged: false, needsPersonaChoice: true };
     }
     personaId = matched.personaId;
+  }
+  if (personaId !== membership.chosenPersonaId) {
     await assignApplicationContactToPersona({
       organizationId: input.organizationId,
       campaignId: input.campaignId,
@@ -107,7 +113,7 @@ export async function queueInterviewPrepGuide(input: {
         sectionKey,
       })
     ) {
-      return { jobId: null, unchanged: true };
+      return { jobId: null, unchanged: true, needsPersonaChoice: false };
     }
   }
 
@@ -119,7 +125,25 @@ export async function queueInterviewPrepGuide(input: {
     initiatedByUserId: input.userId,
     payload: { userId: input.userId, sectionKey },
   });
-  return { jobId: job.id, unchanged: false };
+  return { jobId: job.id, unchanged: false, needsPersonaChoice: false };
+}
+
+/** True when this person still needs the existing Hiring Team role dropdown. */
+export function interviewPrepGuideNeedsPersonaChoice(input: {
+  chosenPersonaId: string | null;
+  title: string | null;
+  roles: Array<{
+    id: string;
+    name: string;
+    suggestionKey: string | null;
+    targetTitles: unknown;
+  }>;
+}): boolean {
+  if (input.chosenPersonaId) return false;
+  return !matchHiringTeamRoleFromTitle({
+    title: input.title,
+    roles: input.roles,
+  }).personaId;
 }
 
 /**
@@ -151,8 +175,6 @@ export async function prepareInterviewPrepGuideGeneration(input: {
     select: { profileJson: true },
   });
   if (!isHiringTeamPersonaBuilt(persona ?? {})) {
-    throw new Error(
-      `${applicationSummaryConfig.title} could not be generated. Retry.`,
-    );
+    throw new Error("Hiring team persona has no narrative after the full build.");
   }
 }

@@ -185,10 +185,10 @@ describe("Harper Batch B3 person view, search, Add Interview Contact, assign-onl
       stages.indexOf("export async function startPersonPrepForContact"),
       stages.indexOf("export function stageTypeLabel"),
     );
-    expect(startFn).toContain("personPrepOfferedAt");
-    expect(startFn).toContain("offerPersonPrep");
-    expect(startFn).toContain("enqueueInterviewerCheatSheetSection");
-    expect(startFn).toContain("alreadyStarted: true");
+    expect(startFn).toContain("queueInterviewPrepGuide");
+    expect(startFn).not.toContain("offerPersonPrep");
+    expect(startFn).not.toContain("enqueueInterviewerCheatSheetSection");
+    expect(startFn).not.toContain("personPrepOfferedAt");
   });
 
   it("Use this interviewer assigns only and enqueues no prep or builds", () => {

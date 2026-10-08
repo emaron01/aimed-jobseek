@@ -17,7 +17,7 @@ export function latestApplicationSummaryFailure(input: {
   if (latest?.status === "FAILED") {
     const targetId = latest.targetId?.trim() ?? "";
     return {
-      message: latest.error?.trim() || input.fallback,
+      message: input.fallback,
       sectionKey:
         targetId.startsWith("contact:") || targetId.startsWith("persona:")
           ? targetId
@@ -26,7 +26,7 @@ export function latestApplicationSummaryFailure(input: {
   }
   if (input.summaryStatus === "FAILED") {
     return {
-      message: input.generationError?.trim() || input.fallback,
+      message: input.fallback,
       sectionKey: null,
     };
   }

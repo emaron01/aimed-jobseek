@@ -70,6 +70,24 @@ export async function buildCheatSheetPersonaAction(
   }
 }
 
+function interviewPrepGuideResult(queued: {
+  jobId: string | null;
+  unchanged: boolean;
+  needsPersonaChoice: boolean;
+}): ApplicationSummaryActionResult {
+  if (queued.needsPersonaChoice) {
+    return { ok: false, message: `Choose ${vocab.persona.aSingular}.` };
+  }
+  if (queued.unchanged) {
+    return { ok: true, message: applicationSummaryConfig.actions.unchanged };
+  }
+  return {
+    ok: true,
+    message: workspaceProgressText("APPLICATION_SUMMARY"),
+    ...(queued.jobId ? { jobId: queued.jobId } : {}),
+  };
+}
+
 export async function createInterviewPrepGuideAction(
   _previous: ApplicationSummaryActionResult | null,
   formData: FormData,
@@ -86,20 +104,11 @@ export async function createInterviewPrepGuideAction(
       campaignId,
       userId: user.id,
       contactId,
+      personaId: String(formData.get("personaId") ?? "").trim() || null,
     });
     revalidatePath(`/campaigns/${campaignId}/summary`);
     revalidatePath(`/campaigns/${campaignId}/interviews`);
-    if (queued.unchanged) {
-      return {
-        ok: true,
-        message: applicationSummaryConfig.actions.unchanged,
-      };
-    }
-    return {
-      ok: true,
-      message: workspaceProgressText("APPLICATION_SUMMARY"),
-      ...(queued.jobId ? { jobId: queued.jobId } : {}),
-    };
+    return interviewPrepGuideResult(queued);
   } catch (error) {
     if (error instanceof TenantError) {
       return { ok: false, message: error.message };
@@ -127,6 +136,19 @@ export async function generateApplicationSummaryAction(
     const organizationId = await requireOrganizationId();
     const user = await requireCurrentUser();
     const sectionKey = String(formData.get("sectionKey") ?? "").trim() || undefined;
+    if (sectionKey?.startsWith("contact:")) {
+      const contactId = sectionKey.slice("contact:".length).trim();
+      const queued = await queueInterviewPrepGuide({
+        organizationId,
+        campaignId,
+        userId: user.id,
+        contactId,
+        personaId: String(formData.get("personaId") ?? "").trim() || null,
+      });
+      revalidatePath(`/campaigns/${campaignId}/summary`);
+      revalidatePath(`/campaigns/${campaignId}/interviews`);
+      return interviewPrepGuideResult(queued);
+    }
     const { applicationSummaryNothingToRebuild } = await import(
       "@/lib/application-summary/service"
     );

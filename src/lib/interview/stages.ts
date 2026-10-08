@@ -5,7 +5,6 @@ import type {
   InterviewStageType,
 } from "@prisma/client";
 import { addApplicationContact } from "@/lib/application/contacts";
-import { enqueueInterviewerCheatSheetSection } from "@/lib/application-summary/enqueue";
 import { saveLinkedInPaste } from "@/lib/contact-profile/service";
 import { prisma } from "@/lib/prisma-client";
 import {
@@ -515,8 +514,8 @@ export async function addInterviewContact(input: {
 }
 
 /**
- * Harper start-prep for an existing contact (offerPersonPrep + cheat-sheet section).
- * Used when prep has not been started yet (`personPrepOfferedAt` unset).
+ * Harper "Start interviewer prep" uses the same guide queue as
+ * Create / Update Interview Prep Guide.
  */
 export async function startPersonPrepForContact(input: {
   organizationId: string;
@@ -525,57 +524,20 @@ export async function startPersonPrepForContact(input: {
   contactId: string;
   personaId?: string | null;
 }) {
-  await requireOwnedCampaign(input);
-  const membership = await prisma.campaignContact.findFirst({
-    where: {
-      organizationId: input.organizationId,
-      campaignId: input.campaignId,
-      contactId: input.contactId,
-    },
-    select: { id: true, chosenPersonaId: true, personPrepOfferedAt: true },
-  });
-  if (!membership) {
-    throw new TenantError(
-      `${vocab.contact.Singular} was not found on this ${vocab.campaign.singular}.`,
-    );
-  }
-  if (membership.personPrepOfferedAt) {
-    return {
-      contactId: input.contactId,
-      alreadyStarted: true as const,
-      sectionUnchanged: false,
-      jobId: null,
-    };
-  }
-  const personaId = input.personaId?.trim() || membership.chosenPersonaId;
-  const { offerPersonPrep } = await import("@/lib/interview/person-prep");
-  await offerPersonPrep({
+  const { queueInterviewPrepGuide } = await import("@/lib/interview/prep-guide");
+  const queued = await queueInterviewPrepGuide({
     organizationId: input.organizationId,
     campaignId: input.campaignId,
+    userId: input.userId,
     contactId: input.contactId,
-    personaId,
+    personaId: input.personaId,
   });
-  const { personSectionInputsUnchanged } = await import(
-    "@/lib/application-summary/service"
-  );
-  const sectionUnchanged = await personSectionInputsUnchanged({
-    organizationId: input.organizationId,
-    campaignId: input.campaignId,
-    sectionKey: `contact:${input.contactId}`,
-  });
-  const jobId = sectionUnchanged
-    ? null
-    : await enqueueInterviewerCheatSheetSection({
-        organizationId: input.organizationId,
-        campaignId: input.campaignId,
-        userId: input.userId,
-        contactId: input.contactId,
-      });
   return {
     contactId: input.contactId,
     alreadyStarted: false as const,
-    sectionUnchanged,
-    jobId,
+    sectionUnchanged: queued.unchanged,
+    needsPersonaChoice: queued.needsPersonaChoice,
+    jobId: queued.jobId,
   };
 }
 

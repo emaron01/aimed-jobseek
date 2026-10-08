@@ -4,6 +4,13 @@ import { act, createElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const queueGuide = vi.hoisted(() =>
+  vi.fn(async (_input: { contactId?: string; campaignId?: string }) => ({
+    jobId: "summary-job" as string | null,
+    unchanged: false,
+    needsPersonaChoice: false,
+  })),
+);
 const enqueue = vi.hoisted(() =>
   vi.fn(async (input: {
     campaignId?: string;
@@ -49,6 +56,10 @@ vi.mock("@/lib/tenant/getCurrentOrganization", () => ({
 
 vi.mock("@/lib/application-jobs/service", () => ({
   enqueueApplicationJob: enqueue,
+}));
+
+vi.mock("@/lib/interview/prep-guide", () => ({
+  queueInterviewPrepGuide: queueGuide,
 }));
 
 vi.mock("@/lib/application-summary/service", async (importOriginal) => {
@@ -422,13 +433,20 @@ describe("person sections run only when the seeker chooses that person", () => {
       stages.indexOf("export async function startPersonPrepForContact"),
       stages.indexOf("export function stageTypeLabel"),
     );
-    expect(startPrep).toContain("enqueueInterviewerCheatSheetSection");
-    expect(startPrep).toContain("personSectionInputsUnchanged");
+    expect(startPrep).toContain("queueInterviewPrepGuide");
+    expect(startPrep).not.toContain("enqueueInterviewerCheatSheetSection");
+    expect(startPrep).not.toContain("offerPersonPrep");
   });
 
   it("shows No Changes To Likely Questions and makes no paid call when inputs are unchanged", async () => {
     rebuild.mockResolvedValue(true);
     enqueue.mockClear();
+    queueGuide.mockClear();
+    queueGuide.mockResolvedValue({
+      jobId: null,
+      unchanged: true,
+      needsPersonaChoice: false,
+    });
     runPaid.mockClear();
     const formData = new FormData();
     formData.set("campaignId", "camp");
@@ -436,8 +454,11 @@ describe("person sections run only when the seeker chooses that person", () => {
     const result = await generateApplicationSummaryAction(null, formData);
     expect(result).toEqual({
       ok: true,
-      message: "No Changes To Likely Questions",
+      message: "No Changes To Cheat Sheet",
     });
+    expect(queueGuide).toHaveBeenCalledWith(
+      expect.objectContaining({ contactId: "c-1", campaignId: "camp" }),
+    );
     expect(enqueue).not.toHaveBeenCalled();
     expect(runPaid).not.toHaveBeenCalled();
     expect(generateStructured).not.toHaveBeenCalled();
@@ -452,19 +473,25 @@ describe("person sections run only when the seeker chooses that person", () => {
   it("enqueues only that person's section when inputs changed", async () => {
     rebuild.mockResolvedValue(false);
     enqueue.mockClear();
+    queueGuide.mockClear();
+    queueGuide.mockResolvedValue({
+      jobId: "summary-job",
+      unchanged: false,
+      needsPersonaChoice: false,
+    });
     const formData = new FormData();
     formData.set("campaignId", "camp");
     formData.set("sectionKey", "contact:c-1");
     const result = await generateApplicationSummaryAction(null, formData);
     expect(result.ok).toBe(true);
-    expect(result.message).toBe("Refreshing likely questions…");
+    expect(result.message).toBe("Writing the Interview cheat sheet…");
     expect(result.jobId).toBe("summary-job");
-    expect(enqueue).toHaveBeenCalledTimes(1);
-    expect(enqueue.mock.calls[0]?.[0]).toMatchObject({
+    expect(queueGuide).toHaveBeenCalledTimes(1);
+    expect(queueGuide.mock.calls[0]?.[0]).toMatchObject({
       campaignId: "camp",
-      type: "APPLICATION_SUMMARY",
-      targetId: "contact:c-1",
+      contactId: "c-1",
     });
+    expect(enqueue).not.toHaveBeenCalled();
   });
 
   it("makes one writing-model call through the paid-call gate, and a retry uses a different fingerprint", async () => {
@@ -603,6 +630,11 @@ describe("Refresh likely questions button", () => {
 
   it("clicking it with unchanged inputs shows the exact message and enqueues nothing", async () => {
     rebuild.mockResolvedValue(true);
+    queueGuide.mockResolvedValue({
+      jobId: null,
+      unchanged: true,
+      needsPersonaChoice: false,
+    });
     const host = mount(
       createElement(RefreshLikelyQuestionsButton, {
         campaignId: "camp",
@@ -613,7 +645,8 @@ describe("Refresh likely questions button", () => {
     await act(async () => {
       form?.requestSubmit();
     });
-    expect(host.textContent).toContain("No Changes To Likely Questions");
+    expect(host.textContent).toContain("No Changes To Cheat Sheet");
+    expect(queueGuide).toHaveBeenCalled();
     expect(enqueue).not.toHaveBeenCalled();
     expect(runPaid).not.toHaveBeenCalled();
     expect(generateStructured).not.toHaveBeenCalled();
@@ -621,6 +654,12 @@ describe("Refresh likely questions button", () => {
 
   it("clicking it with changed inputs enqueues only that person's section job", async () => {
     rebuild.mockResolvedValue(false);
+    queueGuide.mockClear();
+    queueGuide.mockResolvedValue({
+      jobId: "summary-job",
+      unchanged: false,
+      needsPersonaChoice: false,
+    });
     const host = mount(
       createElement(RefreshLikelyQuestionsButton, {
         campaignId: "camp",
@@ -631,12 +670,12 @@ describe("Refresh likely questions button", () => {
     await act(async () => {
       form?.requestSubmit();
     });
-    expect(enqueue).toHaveBeenCalledTimes(1);
-    expect(enqueue.mock.calls[0]?.[0]).toMatchObject({
-      type: "APPLICATION_SUMMARY",
-      targetId: "contact:c-1",
+    expect(queueGuide).toHaveBeenCalledTimes(1);
+    expect(queueGuide.mock.calls[0]?.[0]).toMatchObject({
+      contactId: "c-1",
       campaignId: "camp",
     });
+    expect(enqueue).not.toHaveBeenCalled();
     expect(runPaid).not.toHaveBeenCalled();
     expect(generateStructured).not.toHaveBeenCalled();
   });

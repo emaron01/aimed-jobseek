@@ -120,8 +120,9 @@ describe("Interview cheat sheet coaching guide", () => {
       stages.indexOf("export async function addInterviewContact"),
       stages.indexOf("export async function startPersonPrepForContact"),
     );
-    expect(startPrep).toContain("enqueueInterviewerCheatSheetSection");
-    expect(startPrep).toContain("personSectionInputsUnchanged");
+    expect(startPrep).toContain("queueInterviewPrepGuide");
+    expect(startPrep).not.toContain("enqueueInterviewerCheatSheetSection");
+    expect(startPrep).not.toContain("offerPersonPrep");
     expect(updateStage).not.toContain("enqueueInterviewerCheatSheetSection");
     expect(addContact).not.toContain("enqueueInterviewerCheatSheetSection");
     expect(stages).not.toContain("if (people.some((person) => person.sectionKey === sectionKey))");

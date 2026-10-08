@@ -956,24 +956,29 @@ export async function ApplicationWorkspace({
     {showFocus(focus, ["interviews"]) ? (
     <div id="interviews">
     <WorkspaceProgress jobs={live.jobs} type="APPLICATION_SUMMARY" hideFailure />
-    <CheatSheetGenerationError
-      message={
-        latestApplicationSummaryFailure({
-          jobs: live.jobs,
-          fallback: `${applicationSummaryConfig.title} could not be generated. Retry.`,
-        })?.message ?? null
-      }
-    />
-    <InterviewStagesSection
-      campaignId={requirement.campaignId}
-      organizationId={organizationId}
-      canEdit={canEdit}
-      roles={requirement.campaign.hiringTeamRoles}
-      contacts={requirement.campaign.contacts.map((row) => ({
-        contactId: row.contact.id,
-        personaId: row.chosenPersonaId,
-      }))}
-    />
+    {(() => {
+      const guideFailure = latestApplicationSummaryFailure({
+        jobs: live.jobs,
+        fallback: `${applicationSummaryConfig.title} could not be generated. Retry.`,
+      });
+      const pageFailure = guideFailure?.sectionKey ? null : guideFailure;
+      return (
+        <>
+          <CheatSheetGenerationError message={pageFailure?.message ?? null} />
+          <InterviewStagesSection
+            campaignId={requirement.campaignId}
+            organizationId={organizationId}
+            canEdit={canEdit}
+            roles={requirement.campaign.hiringTeamRoles}
+            contacts={requirement.campaign.contacts.map((row) => ({
+              contactId: row.contact.id,
+              personaId: row.chosenPersonaId,
+            }))}
+            guideFailure={guideFailure}
+          />
+        </>
+      );
+    })()}
     </div>
     ) : null}
     {showFocus(focus, ["summary"]) ? (

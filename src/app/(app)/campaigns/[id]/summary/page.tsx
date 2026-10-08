@@ -145,7 +145,8 @@ export default async function ApplicationSummaryPage({
     generationError: view.summary?.generationError ?? null,
     fallback: `${applicationSummaryConfig.title} could not be generated. Retry.`,
   });
-  const actionLabel = summaryFailure
+  const pageFailure = summaryFailure?.sectionKey ? null : summaryFailure;
+  const actionLabel = pageFailure
     ? applicationSummaryConfig.actions.retry
     : summaryStatus === "READY"
       ? applicationSummaryConfig.actions.regenerate
@@ -235,7 +236,7 @@ export default async function ApplicationSummaryPage({
             <CheatSheetPeopleFilter />
           </div>
         ) : null}
-        <CheatSheetGenerationError message={summaryFailure?.message ?? null} />
+        <CheatSheetGenerationError message={pageFailure?.message ?? null} />
         {canGenerate ? (
           <div className="mt-3">
             <ApplicationActionForm
@@ -245,9 +246,6 @@ export default async function ApplicationSummaryPage({
               suppressJobFailure
             >
               <input type="hidden" name="campaignId" value={id} />
-              {summaryFailure?.sectionKey ? (
-                <input type="hidden" name="sectionKey" value={summaryFailure.sectionKey} />
-              ) : null}
             </ApplicationActionForm>
           </div>
         ) : null}
@@ -342,7 +340,7 @@ export default async function ApplicationSummaryPage({
           <CheatSheetSection id={person.sectionKey} title={person.heading}
             headerAside={
               <>
-                {canGenerate && section ? (
+                {canGenerate && section && !person.contactId ? (
                   <RefreshLikelyQuestionsButton
                     campaignId={id}
                     sectionKey={person.sectionKey}
@@ -365,7 +363,26 @@ export default async function ApplicationSummaryPage({
                 sectionKey={person.sectionKey}
                 hasGuide={Boolean(section) && !personSectionNeedsGeneration(section)}
                 canEdit={canGenerate}
+                failed={summaryFailure?.sectionKey === person.sectionKey}
+                failureMessage={summaryFailure?.message ?? null}
+                roles={view.roles.map((role) => ({ id: role.id, name: role.name }))}
               />
+            ) : summaryFailure?.sectionKey === person.sectionKey ? (
+              <div className="space-y-2">
+                <CheatSheetGenerationError message={summaryFailure.message} />
+                {canGenerate ? (
+                  <ApplicationActionForm
+                    action={generateApplicationSummaryAction}
+                    submitLabel={applicationSummaryConfig.actions.retry}
+                    testId={`retry-cheat-sheet-${person.sectionKey}`}
+                    suppressJobFailure
+                    formClassName="print:hidden"
+                  >
+                    <input type="hidden" name="campaignId" value={id} />
+                    <input type="hidden" name="sectionKey" value={person.sectionKey} />
+                  </ApplicationActionForm>
+                ) : null}
+              </div>
             ) : null}
             <CheatSheetPersonBody
               campaignId={id}

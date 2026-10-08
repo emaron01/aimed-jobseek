@@ -4,6 +4,40 @@ import { outreachConfig, vocab } from "@/lib/product-config";
 
 const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
 
+/** The Hiring Team role dropdown used when a person needs a persona. */
+export function HiringTeamRoleField({
+  roles,
+  defaultValue = "",
+  className = fieldClass,
+}: {
+  roles: Array<{ id: string; name: string }>;
+  defaultValue?: string;
+  className?: string;
+}) {
+  return (
+    <label className="text-sm md:col-span-2">
+      <span className="font-medium text-ink">{outreachConfig.labels.assignRole}</span>
+      <select
+        name="personaId"
+        required
+        defaultValue={defaultValue}
+        className={className}
+      >
+        <option value="" disabled>
+          {roles.length === 0
+            ? `No ${vocab.persona.plural} yet`
+            : `Choose ${vocab.persona.aSingular}`}
+        </option>
+        {roles.map((role) => (
+          <option key={role.id} value={role.id}>
+            {role.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export type ContactEditFormValues = {
   contactId: string;
   campaignId: string | null;
@@ -77,26 +111,10 @@ export function ContactEditForm({ values }: { values: ContactEditFormValues }) {
         </label>
         {values.campaignId ? (
           <>
-            <label className="text-sm md:col-span-2">
-              <span className="font-medium text-ink">{outreachConfig.labels.assignRole}</span>
-              <select
-                name="personaId"
-                required
-                defaultValue={values.personaId ?? ""}
-                className={fieldClass}
-              >
-                <option value="" disabled>
-                  {values.roles.length === 0
-                    ? `No ${vocab.persona.plural} yet`
-                    : `Choose ${vocab.persona.aSingular}`}
-                </option>
-                {values.roles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <HiringTeamRoleField
+              roles={values.roles}
+              defaultValue={values.personaId ?? ""}
+            />
             <label className="text-sm md:col-span-2">
               <span className="font-medium text-ink">
                 {outreachConfig.labels.pasteInterviewerProfile}

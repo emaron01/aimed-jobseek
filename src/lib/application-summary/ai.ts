@@ -38,6 +38,7 @@ async function unavailable() {
   return {
     ok: false as const,
     message: `${applicationSummaryConfig.title} is not available. Retry.`,
+    cause: `${applicationSummaryConfig.title} is not available.`,
   };
 }
 
@@ -47,7 +48,7 @@ export async function generateApplicationSummaryShell(input: {
   usage?: AiCallUsageContext;
 }): Promise<
   | { ok: true; data: ReturnType<typeof applicationSummaryShellSchema.parse> }
-  | { ok: false; message: string }
+  | { ok: false; message: string; cause: string }
 > {
   if (!isConsultationAiConfigured()) return unavailable();
   const organizationId = input.usage?.organizationId;
@@ -97,6 +98,7 @@ export async function generateApplicationSummaryShell(input: {
     return {
       ok: false,
       message: `${applicationSummaryConfig.title} could not be generated. Retry.`,
+      cause: error instanceof Error ? error.message : "unknown",
     };
   }
 }
@@ -114,7 +116,7 @@ export async function generateCheatSheetPersonSectionGuidance(input: {
       ok: true;
       data: ReturnType<typeof cheatSheetPersonSectionGenerateRecoverSchema.parse>;
     }
-  | { ok: false; message: string }
+  | { ok: false; message: string; cause: string }
 > {
   if (!isConsultationReplyAiConfigured()) return unavailable();
   const messages = buildApplicationSummaryGuidanceMessages({
@@ -175,6 +177,7 @@ export async function generateCheatSheetPersonSectionGuidance(input: {
     return {
       ok: false,
       message: `${applicationSummaryConfig.title} could not be generated. Retry.`,
+      cause: error instanceof Error ? error.message : "unknown",
     };
   }
 }

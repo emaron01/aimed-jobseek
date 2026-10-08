@@ -13,7 +13,7 @@ import {
   startPersonPrepForContact,
   updateInterviewStage,
 } from "@/lib/interview/stages";
-import { applicationSummaryConfig, interviewConfig } from "@/lib/product-config";
+import { applicationSummaryConfig, interviewConfig, vocab, workspaceProgressText } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 
@@ -252,15 +252,18 @@ export async function startPersonPrepAction(
       personaId: String(formData.get("personaId") ?? "").trim() || null,
     });
     revalidate(id);
-    if (!started.alreadyStarted && started.sectionUnchanged) {
+    if (started.needsPersonaChoice) {
+      return { ok: false, message: `Choose ${vocab.persona.aSingular}.` };
+    }
+    if (started.sectionUnchanged) {
       return {
         ok: true,
-        message: applicationSummaryConfig.actions.unchangedLikelyQuestions,
+        message: applicationSummaryConfig.actions.unchanged,
       };
     }
     return {
       ok: true,
-      message: "Interviewer prep started.",
+      message: workspaceProgressText("APPLICATION_SUMMARY"),
       ...(started.jobId ? { jobId: started.jobId } : {}),
     };
   } catch (error) {

@@ -6,6 +6,7 @@ import {
 } from "@/app/actions/interview";
 import { AdditionalInterviewPrepQa } from "@/components/AdditionalInterviewPrepQa";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
+import { HiringTeamRoleField } from "@/components/ContactEditForm";
 import {
   CheatSheetPersonBody,
   RefreshLikelyQuestionsButton,
@@ -115,6 +116,7 @@ export function HarperPersonInlineProfile({
   jobsActive,
   additionalPrepQuestions = [],
   generalQuestions = [],
+  roles = [],
 }: {
   campaignId: string;
   canEdit: boolean;
@@ -132,6 +134,7 @@ export function HarperPersonInlineProfile({
   additionalPrepQuestions?: ConsultationQaItem[];
   /** Harper's General questions, so a referenced likely question shows that card. */
   generalQuestions?: ConsultationQaItem[];
+  roles?: Array<{ id: string; name: string }>;
 }) {
   const [pendingTarget, setPendingTarget] = useState<string | null>(null);
   const showReply =
@@ -194,7 +197,11 @@ export function HarperPersonInlineProfile({
         >
           <input type="hidden" name="campaignId" value={campaignId} />
           <input type="hidden" name="contactId" value={contactId} />
-          <input type="hidden" name="personaId" value={personaId} />
+          {personaId ? (
+            <input type="hidden" name="personaId" value={personaId} />
+          ) : (
+            <HiringTeamRoleField roles={roles} />
+          )}
         </ApplicationActionForm>
       ) : null}
       <CheatSheetPersonBody

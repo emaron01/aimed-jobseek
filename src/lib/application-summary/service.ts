@@ -864,33 +864,12 @@ export async function generateApplicationSummary(input: {
       throw new TenantError("That Interview cheat sheet section is not on this application.");
     }
     if (person.contactId && !person.personaBuilt) {
-      try {
-        await prepareInterviewPrepGuideGeneration({
-          organizationId: input.organizationId,
-          campaignId: input.campaignId,
-          personaId: person.roleId,
-          personaBuilt: false,
-        });
-      } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : `${applicationSummaryConfig.title} could not be generated. Retry.`;
-        if (!existing) {
-          await prisma.applicationSummary.upsert({
-            where: { campaignId: input.campaignId },
-            create: {
-              organizationId: input.organizationId,
-              campaignId: input.campaignId,
-              status: "FAILED",
-              generationError: message,
-              promptVersion: APPLICATION_SUMMARY_PROMPT_VERSION,
-            },
-            update: { status: "FAILED", generationError: message },
-          });
-        }
-        throw error;
-      }
+      await prepareInterviewPrepGuideGeneration({
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        personaId: person.roleId,
+        personaBuilt: false,
+      });
       return generateApplicationSummary(input);
     }
     await prisma.applicationSummary.upsert({
@@ -898,7 +877,7 @@ export async function generateApplicationSummary(input: {
       create: {
         organizationId: input.organizationId,
         campaignId: input.campaignId,
-        status: existing ? "READY" : "GENERATING",
+        status: "READY",
         promptVersion: APPLICATION_SUMMARY_PROMPT_VERSION,
         guidanceJson: existing ? jsonGuidance(existing) : undefined,
       },
@@ -950,6 +929,7 @@ export async function generateApplicationSummary(input: {
     const harperAskedCareerWalkThrough =
       harperAlreadyAskedCareerWalkThrough(consultantTurns);
     let qualityFeedback: string[] = [];
+    let failureCause = "Person section did not meet the guide requirements.";
     type GeneratedSection = Extract<
       Awaited<ReturnType<typeof generateCheatSheetPersonSectionGuidance>>,
       { ok: true }
@@ -1012,6 +992,7 @@ export async function generateApplicationSummary(input: {
         interviewer,
       });
       if (!generated.ok) {
+        failureCause = generated.cause;
         if (attempt === 1) break;
         continue;
       }
@@ -1066,9 +1047,7 @@ export async function generateApplicationSummary(input: {
       await saveSection(best.data, best.likelyQuestions);
       return;
     }
-    const message = `${applicationSummaryConfig.title} could not be generated. Retry.`;
-    if (!existing) await markSummaryFailed(input.campaignId, message);
-    throw new Error(message);
+    throw new Error(failureCause);
   }
 
   const shellSources = sourcesForShell(data.sources);
@@ -1123,7 +1102,7 @@ export async function generateApplicationSummary(input: {
     if (!generated.ok) {
       if (attempt === 1) {
         await markSummaryFailed(input.campaignId, generated.message);
-        throw new Error(generated.message);
+        throw new Error(generated.cause);
       }
       continue;
     }
@@ -1150,7 +1129,7 @@ export async function generateApplicationSummary(input: {
   }
   const message = `${applicationSummaryConfig.title} could not be generated. Retry.`;
   await markSummaryFailed(input.campaignId, message);
-  throw new Error(message);
+  throw new Error("Interview cheat sheet overview did not return a usable result.");
 }
 
 export async function getApplicationSummaryView(input: {
