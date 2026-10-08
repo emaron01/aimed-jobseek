@@ -66,6 +66,7 @@ export function ResultActions({
   onSaved,
   editFormId,
   draftValues,
+  keyPointValues,
   trailing,
 }: {
   campaignId: string;
@@ -76,13 +77,19 @@ export function ResultActions({
   onSaved?: () => void;
   editFormId?: string;
   draftValues?: Record<string, string>;
+  keyPointValues?: Record<string, string>;
   trailing?: ReactNode;
 }) {
   const [internalEditing, setInternalEditing] = useState(false);
   const [localValues, setLocalValues] = useState<Record<string, string>>({});
+  const [localKeyPoints, setLocalKeyPoints] = useState<Record<string, string>>({});
   const editing = editingProp ?? internalEditing;
   const startEdit = onStartEdit ?? (() => setInternalEditing(true));
   const values = draftValues ?? localValues;
+  const keyPoints = keyPointValues ?? localKeyPoints;
+  function keyPointField(statement: QaStatement): string {
+    return keyPoints[statement.id] ?? (statement.keyPoints ?? []).join("\n");
+  }
   const formId = editFormId ?? `harper-draft-edit-${testId}`;
   if (statements.length === 0) return null;
   const draft = statements.filter((statement) => statement.status !== "APPROVED");
@@ -120,6 +127,16 @@ export function ResultActions({
                 value={values[statement.id] ?? statement.content}
               />
             ))}
+            {statements.map((statement) =>
+              statement.kind === "INTERVIEW_ANSWER" ? (
+                <input
+                  key={`points-${statement.id}`}
+                  type="hidden"
+                  name={`keyPoints:${statement.id}`}
+                  value={keyPointField(statement)}
+                />
+              ) : null,
+            )}
           </ApplicationActionForm>
         ) : (
           <AppButton
@@ -162,6 +179,26 @@ export function ResultActions({
               }
             />
           ))}
+          {statements
+            .filter((statement) => statement.kind === "INTERVIEW_ANSWER")
+            .map((statement) => (
+              <label key={`points-editor-${statement.id}`} className="block text-sm">
+                <span className="font-medium text-ink">{polishCopy.keyPoints}</span>
+                <textarea
+                  rows={3}
+                  value={keyPointField(statement)}
+                  aria-label={polishCopy.keyPoints}
+                  data-testid={`consultation-key-points-editor-${statement.id}`}
+                  className={fieldClass}
+                  onChange={(event) =>
+                    setLocalKeyPoints((current) => ({
+                      ...current,
+                      [statement.id]: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+            ))}
         </div>
       ) : null}
       <div className={cardButtonRowClass} data-testid={testId}>
@@ -227,6 +264,16 @@ export function ResultActions({
                 value={values[statement.id] ?? statement.content}
               />
             ))}
+            {statements.map((statement) =>
+              statement.kind === "INTERVIEW_ANSWER" ? (
+                <input
+                  key={`points-${statement.id}`}
+                  type="hidden"
+                  name={`keyPoints:${statement.id}`}
+                  value={keyPointField(statement)}
+                />
+              ) : null,
+            )}
           </ApplicationActionForm>
         ) : (
           <AppButton
@@ -263,11 +310,15 @@ export function ResultBody({
   editing = false,
   value,
   onValueChange,
+  keyPointsValue,
+  onKeyPointsChange,
 }: {
   statement: QaStatement;
   editing?: boolean;
   value?: string;
   onValueChange?: (statementId: string, value: string) => void;
+  keyPointsValue?: string;
+  onKeyPointsChange?: (statementId: string, value: string) => void;
 }) {
   const draft = statement.status === "DRAFT";
   const showEditor = editing && (draft || statement.status === "APPROVED");
@@ -309,7 +360,19 @@ export function ResultBody({
           {stripInternalIdsFromDisplayText(statement.content)}
         </p>
       )}
-      {statement.keyPoints && statement.keyPoints.length > 0 ? (
+      {showEditor && statement.kind === "INTERVIEW_ANSWER" ? (
+        <label className="block text-sm">
+          <span className="font-medium text-ink">{polishCopy.keyPoints}</span>
+          <textarea
+            rows={3}
+            value={keyPointsValue ?? (statement.keyPoints ?? []).join("\n")}
+            aria-label={polishCopy.keyPoints}
+            data-testid={`consultation-key-points-editor-${statement.id}`}
+            className={fieldClass}
+            onChange={(event) => onKeyPointsChange?.(statement.id, event.target.value)}
+          />
+        </label>
+      ) : statement.keyPoints && statement.keyPoints.length > 0 ? (
         <ul className="list-disc space-y-1 pl-5 text-sm text-ink" data-testid="consultation-key-points">
           {statement.keyPoints.map((point) => (
             <li key={point}>{stripInternalIdsFromDisplayText(point)}</li>
@@ -635,6 +698,7 @@ function QuestionCard({
   );
   const [editingDraft, setEditingDraft] = useState(false);
   const [draftText, setDraftText] = useState<Record<string, string>>({});
+  const [keyPointText, setKeyPointText] = useState<Record<string, string>>({});
   const editFormId = `harper-draft-edit-${item.questionTurnId}`;
   const pendingDraftStatements = [
     item.pendingDraftTalkingPoint,
@@ -653,6 +717,9 @@ function QuestionCard({
       editing,
       value: draftValue(statement),
       onValueChange: onDraftValue,
+      keyPointsValue: keyPointText[statement.id],
+      onKeyPointsChange: (statementId: string, next: string) =>
+        setKeyPointText((current) => ({ ...current, [statementId]: next })),
     };
   }
   function draftActions(statements: QaStatement[]) {
@@ -665,6 +732,7 @@ function QuestionCard({
       onSaved: () => setEditingDraft(false),
       editFormId,
       draftValues: draftText,
+      keyPointValues: keyPointText,
     };
   }
   const expanded = approvedControlled ? approvedExpanded : localExpanded;

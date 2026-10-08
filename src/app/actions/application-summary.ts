@@ -16,6 +16,7 @@ import { queueInterviewPrepGuide } from "@/lib/interview/prep-guide";
 import {
   applicationSummaryConfig,
   consultationConversationCopy,
+  polishCopy,
   vocab,
   workspaceProgressText,
 } from "@/lib/product-config";
@@ -347,7 +348,7 @@ export async function regenerateCheatSheetSampleAction(
       requireOrganizationId(),
       requireCurrentUser(),
     ]);
-    await regenerateCheatSheetSampleAnswer({
+    const result = await regenerateCheatSheetSampleAnswer({
       organizationId,
       campaignId,
       userId: user.id,
@@ -357,7 +358,12 @@ export async function regenerateCheatSheetSampleAction(
     revalidatePath(`/campaigns/${campaignId}`);
     revalidatePath(`/campaigns/${campaignId}/summary`);
     revalidatePath(`/campaigns/${campaignId}/consultation`);
-    return { ok: true, message: "Polished statement regenerated." };
+    return {
+      ok: true,
+      message: result.polished
+        ? polishCopy.statementRegenerated
+        : polishCopy.statementUnchanged,
+    };
   } catch (error) {
     if (error instanceof TenantError) {
       return { ok: false, message: error.message };

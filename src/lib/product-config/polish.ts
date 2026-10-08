@@ -8,6 +8,9 @@ import { vocab } from "./vocabulary";
 export const polishCopy = Object.freeze({
   generate: "Generate",
   regenerate: "Regenerate",
+  statementRegenerated: "Polished statement regenerated.",
+  statementUnchanged: "No changes to this answer.",
+  keyPoints: "Key points",
   researchAndGenerate: "Research and generate",
   loading: "Loading this page…",
   errorTitle: "This did not load",

@@ -142,6 +142,49 @@ export function keyPointsFromGrounding(value: unknown): string[] {
   return normalizeKeyPoints((value as { keyPoints?: unknown }).keyPoints);
 }
 
+/** True after the seeker saved their own draft text or key points. */
+export function groundingSeekerEdited(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return (value as { seekerEdited?: unknown }).seekerEdited === true;
+}
+
+export function keyPointsText(points: readonly string[] | null | undefined): string {
+  return (points ?? []).join("\n");
+}
+
+/**
+ * The text Regenerate sends to polish.
+ * A seeker-owned draft uses the saved answer. A Harper draft uses the stored
+ * reply context, or the turn body when that context is absent.
+ */
+export function draftRegenerationAnswer(input: {
+  seekerEdited: boolean;
+  content: string;
+  turnBody: string;
+  answerContext: string | null;
+}): string {
+  if (input.seekerEdited) return input.content.trim();
+  return input.answerContext?.trim() || input.turnBody.trim();
+}
+
+/** Keep the stored grounding and mark the draft as the seeker's. */
+export function withSeekerEditedGrounding(
+  existing: unknown,
+  keyPoints?: readonly string[] | null,
+): Record<string, unknown> {
+  const base =
+    existing && typeof existing === "object" && !Array.isArray(existing)
+      ? { ...(existing as Record<string, unknown>) }
+      : {};
+  const points =
+    keyPoints == null ? keyPointsFromGrounding(existing) : normalizeKeyPoints(keyPoints);
+  return {
+    ...base,
+    seekerEdited: true,
+    keyPoints: points,
+  };
+}
+
 export function questionLooksMultipart(text: string): boolean {
   const trimmed = text.trim();
   if (!trimmed) return false;

@@ -298,6 +298,8 @@ describe("Harper drafts stay put and can be edited", () => {
       status: "DRAFT",
       kind: "INTERVIEW_ANSWER",
       turnId: "turn-1",
+      content: "Harper's draft.",
+      groundingJson: { keyPoints: ["Login VSI grew pipeline."] },
     });
     update.mockImplementation((args: unknown) => Promise.resolve(args));
     transaction.mockImplementation(async (ops: Promise<unknown>[]) => Promise.all(ops));
@@ -310,7 +312,13 @@ describe("Harper drafts stay put and can be edited", () => {
 
     expect(update).toHaveBeenCalledWith({
       where: { id: "st-1" },
-      data: { content: "Edited draft text." },
+      data: {
+        content: "Edited draft text.",
+        groundingJson: {
+          keyPoints: ["Login VSI grew pipeline."],
+          seekerEdited: true,
+        },
+      },
     });
     expect(updateMany).not.toHaveBeenCalled();
     const saved = update.mock.calls[0]?.[0] as { data: Record<string, unknown> };
@@ -321,7 +329,7 @@ describe("Harper drafts stay put and can be edited", () => {
       service.indexOf("export async function saveEditedConsultationStatement"),
       service.indexOf("export async function recordConsultationAnswerEdit"),
     );
-    expect(save).toContain("data: { content }");
+    expect(save).toContain("withSeekerEditedGrounding");
     expect(save).not.toContain("enqueueApplicationJob");
     expect(save).not.toContain("runPaidStructuredCall");
     const approve = service.slice(
@@ -347,6 +355,8 @@ describe("Harper drafts stay put and can be edited", () => {
       status: "APPROVED",
       kind: "INTERVIEW_ANSWER",
       turnId: "turn-approved",
+      content: "Original approved answer.",
+      groundingJson: { keyPoints: ["Coached the joint call."] },
     });
     update.mockImplementation((args: unknown) => Promise.resolve(args));
     updateMany.mockImplementation((args: unknown) => Promise.resolve(args));
@@ -360,7 +370,13 @@ describe("Harper drafts stay put and can be edited", () => {
 
     expect(update).toHaveBeenCalledWith({
       where: { id: "st-approved" },
-      data: { content: "Coached the team through joint customer calls." },
+      data: {
+        content: "Coached the team through joint customer calls.",
+        groundingJson: {
+          keyPoints: ["Coached the joint call."],
+          seekerEdited: true,
+        },
+      },
     });
     const saved = update.mock.calls[0]?.[0] as { data: Record<string, unknown> };
     expect(saved.data.status).toBeUndefined();

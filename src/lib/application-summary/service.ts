@@ -1461,7 +1461,7 @@ export async function regenerateCheatSheetSampleAnswer(input: {
   userId: string;
   itemId: string;
   content: string;
-}): Promise<void> {
+}): Promise<{ polished: boolean }> {
   await saveCheatSheetSampleDraft(input);
   const prepared = await ensureCheatSheetConsultantTurn(input);
   const statement = await prisma.consultationStatement.findFirst({
@@ -1473,7 +1473,7 @@ export async function regenerateCheatSheetSampleAnswer(input: {
     select: { id: true },
   });
   if (!statement) throw new TenantError("That polished statement was not found.");
-  await regenerateConsultationStatement({
+  return regenerateConsultationStatement({
     organizationId: input.organizationId,
     statementId: statement.id,
   });

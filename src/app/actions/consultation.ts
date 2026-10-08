@@ -29,6 +29,7 @@ import {
   applicationAssetConfig,
   consultationConversationCopy,
   isObsoleteWorkspaceFailure,
+  polishCopy,
   vocab,
 } from "@/lib/product-config";
 import {
@@ -399,9 +400,14 @@ export async function regenerateConsultationStatementAction(
     if (!statementId) {
       return { ok: false, message: "That polished statement was not found." };
     }
-    await regenerateConsultationStatement({ organizationId, statementId });
+    const result = await regenerateConsultationStatement({ organizationId, statementId });
     if (campaignId) revalidatePath(`/campaigns/${campaignId}`);
-    return { ok: true, message: "Polished statement regenerated." };
+    return {
+      ok: true,
+      message: result.polished
+        ? polishCopy.statementRegenerated
+        : polishCopy.statementUnchanged,
+    };
   } catch (error) {
     return fail(error, "The polished statement could not be regenerated.");
   }
@@ -458,10 +464,14 @@ export async function saveEditedConsultationStatementAction(
       const content = String(
         keyed ?? (statementIds.length === 1 ? formData.get("content") ?? "" : ""),
       );
+      const pointsField = formData.get(`keyPoints:${statementId}`);
       await saveEditedConsultationStatement({
         organizationId,
         statementId,
         content,
+        ...(pointsField == null
+          ? {}
+          : { keyPoints: String(pointsField).split("\n") }),
       });
     }
     if (campaignId) revalidateHarperAndCheatSheet(campaignId);
@@ -618,9 +628,14 @@ export async function regenerateConsultationQaResultAction(
     if (statementIds.length === 0) {
       return { ok: false, message: "That polished statement was not found." };
     }
-    await regenerateConsultationQaResult({ organizationId, statementIds });
+    const result = await regenerateConsultationQaResult({ organizationId, statementIds });
     if (campaignId) revalidateHarperAndCheatSheet(campaignId);
-    return { ok: true, message: "Polished statement regenerated." };
+    return {
+      ok: true,
+      message: result.polished
+        ? polishCopy.statementRegenerated
+        : polishCopy.statementUnchanged,
+    };
   } catch (error) {
     return fail(error, "The result could not be regenerated.");
   }

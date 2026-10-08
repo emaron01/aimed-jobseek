@@ -51,6 +51,12 @@ import {
   type RoleExpertiseJobInputs,
 } from "@/lib/consultation/role-expertise";
 import {
+  draftRegenerationAnswer,
+  groundingSeekerEdited,
+  keyPointsFromGrounding,
+  withSeekerEditedGrounding,
+} from "@/lib/consultation/answer-binding";
+import {
   ASK_HARPER_TARGET_PREFIX,
   CONSULTATION_PROMPT_VERSION,
   WHY_THIS_COMPANY_TARGET_KEY,
@@ -4575,16 +4581,24 @@ function completeStoryFromAnalysis(value: unknown): {
 export async function regenerateConsultationStatement(input: {
   organizationId: string;
   statementId: string;
-}): Promise<void> {
+}): Promise<{ polished: boolean }> {
   const statement = await prisma.consultationStatement.findFirst({
     where: { id: input.statementId, organizationId: input.organizationId },
     include: { turn: true, session: true },
   });
   if (!statement) throw new TenantError("That polished statement was not found.");
   const analyzed = completeStoryFromAnalysis(statement.turn.analysisJson);
-  const answer =
-    analyzed?.answerContext.trim() ||
-    statement.turn.body.trim();
+  const seekerOwned = groundingSeekerEdited(statement.groundingJson);
+  const questionText =
+    statement.turn.speaker === "CONSULTANT" && !statement.turn.followUp
+      ? statement.turn.body.trim()
+      : "";
+  const answer = draftRegenerationAnswer({
+    seekerEdited: seekerOwned,
+    content: statement.content,
+    turnBody: statement.turn.body,
+    answerContext: analyzed?.answerContext ?? null,
+  });
   if (!answer) {
     throw new TenantError(consultationConversationCopy.generationFailed);
   }
@@ -4592,49 +4606,99 @@ export async function regenerateConsultationStatement(input: {
     input.organizationId,
     statement.session.campaignId,
   );
-  const confirmedGap = analyzed?.gapDecision === "no_evidence";
-  const libraryQuestion = await libraryQuestionForPolish({
-    organizationId: input.organizationId,
-    campaignId: statement.session.campaignId,
-    sessionId: statement.sessionId,
-    question:
-      statement.turn.speaker === "CONSULTANT" && !statement.turn.followUp
-        ? statement.turn.body
-        : "",
-    targetKey: statement.turn.targetKey,
-  });
-  const polished = await polishAnswerWithQuality({
-    answer,
-    story: analyzed?.story ?? {
+  let confirmedGap = analyzed?.gapDecision === "no_evidence";
+  let answerStory: {
+    situation: string | null;
+    task: string | null;
+    action: string | null;
+    result: string | null;
+  } = analyzed?.story ?? {
+    situation: null,
+    task: null,
+    action: null,
+    result: null,
+  };
+  let strengtheningNeeds = analyzed?.missingStarElements ?? [];
+  let declinedFollowUp = analyzed?.followUpDeclined ?? false;
+  const libraryQuestion = seekerOwned
+    ? null
+    : await libraryQuestionForPolish({
+        organizationId: input.organizationId,
+        campaignId: statement.session.campaignId,
+        sessionId: statement.sessionId,
+        question: questionText,
+        targetKey: statement.turn.targetKey,
+      });
+  if (seekerOwned) {
+    const extracted = await extractAnswerWithQuality({
+      answer,
+      seekerReplies: [answer],
+      question: questionText,
+      target: null,
+      targets: [],
+      profileItems: [],
+      followUpAlreadyUsed: true,
+      questionKey: statement.turn.targetKey ?? statement.turnId,
+      usage: consultationUsage(
+        input.organizationId,
+        statement.session.campaignId,
+        "CONSULTATION_REPLY",
+        "extract",
+      ),
+    });
+    if (!extracted.ok) throw new TenantError(extracted.message);
+    const extractedStory =
+      isConsultationExtractAnswer(extracted.data) &&
+      extracted.data.gapDecision === "evidence"
+        ? extracted.data.story
+        : null;
+    answerStory = extractedStory ?? {
       situation: null,
       task: null,
       action: null,
       result: null,
-    },
+    };
+    confirmedGap = false;
+    declinedFollowUp = false;
+    strengtheningNeeds = [];
+  }
+  const polished = await polishAnswerWithQuality({
+    answer,
+    story: answerStory,
     sources: polishingSources({
       answer,
       turnId: statement.turnId,
     }),
-    seekerAnswers: answer
-      .split("\n")
-      .map((entry) => entry.trim())
-      .filter(Boolean),
-    declinedFollowUp: analyzed?.followUpDeclined ?? false,
+    seekerAnswers: seekerOwned
+      ? [answer]
+      : answer.split("\n").map((entry) => entry.trim()).filter(Boolean),
+    declinedFollowUp,
     confirmedGap,
     firstName: profileFirstName(profile),
     careerStage: deriveCareerStage(profile),
-    strengtheningNeeds: analyzed?.missingStarElements ?? [],
-    profileItems: profileEvidenceForApplication(profile, {
-      campaignId: statement.session.campaignId,
-      whyThisCompany: campaign.whyThisCompany,
-    }),
+    strengtheningNeeds,
+    profileItems: seekerOwned
+      ? []
+      : profileEvidenceForApplication(profile, {
+          campaignId: statement.session.campaignId,
+          whyThisCompany: campaign.whyThisCompany,
+        }),
     libraryQuestion,
+    ...(seekerOwned
+      ? {
+          target: {
+            key: statement.turn.targetKey ?? statement.turnId,
+            kind: "COMPETENCY" as const,
+            text: questionText || statement.turn.body,
+          },
+        }
+      : {}),
     questionKey: statement.turn.targetKey ?? statement.turnId,
     usage: consultationUsage(
       input.organizationId,
       statement.session.campaignId,
       "CONSULTATION_REPLY",
-      "statement_regeneration",
+      seekerOwned ? "polish" : "statement_regeneration",
     ),
   });
   if (!polished.ok) throw new TenantError(polished.message);
@@ -4662,13 +4726,20 @@ export async function regenerateConsultationStatement(input: {
           statement.kind === "INTERVIEW_ANSWER"
             ? polished.data.strengtheningNote?.trim() || null
             : null,
-        groundingJson:
-          statement.kind === "INTERVIEW_ANSWER"
-            ? interviewAnswerGroundingJson(
+        groundingJson: (statement.kind === "INTERVIEW_ANSWER"
+          ? seekerOwned
+            ? withSeekerEditedGrounding(
+                interviewAnswerGroundingJson(
+                  polished.data.answerPartsGrounding,
+                  polished.data.keyPoints,
+                ),
+                polished.data.keyPoints,
+              )
+            : interviewAnswerGroundingJson(
                 polished.data.answerPartsGrounding,
                 polished.data.keyPoints,
               )
-            : [],
+          : []) as Prisma.InputJsonValue,
         promptVersion: CONSULTATION_PROMPT_VERSION,
         generation: { increment: 1 },
         approvedAt: null,
@@ -4689,6 +4760,24 @@ export async function regenerateConsultationStatement(input: {
         ]
       : []),
   ]);
+  const nextPoints =
+    statement.kind === "INTERVIEW_ANSWER"
+      ? keyPointsFromGrounding(
+          withSeekerEditedGrounding(
+            interviewAnswerGroundingJson(
+              polished.data.answerPartsGrounding,
+              polished.data.keyPoints,
+            ),
+            polished.data.keyPoints,
+          ),
+        )
+      : [];
+  const previousPoints = keyPointsFromGrounding(statement.groundingJson);
+  return {
+    polished:
+      value.trim() !== statement.content.trim() ||
+      nextPoints.join("\n") !== previousPoints.join("\n"),
+  };
 }
 
 /**
@@ -4748,16 +4837,19 @@ export async function approveConsultationQaResult(input: {
 export async function regenerateConsultationQaResult(input: {
   organizationId: string;
   statementIds: string[];
-}): Promise<void> {
+}): Promise<{ polished: boolean }> {
   if (input.statementIds.length === 0) {
     throw new TenantError("That polished statement was not found.");
   }
+  let polished = false;
   for (const statementId of input.statementIds) {
-    await regenerateConsultationStatement({
+    const result = await regenerateConsultationStatement({
       organizationId: input.organizationId,
       statementId,
     });
+    if (result.polished) polished = true;
   }
+  return { polished };
 }
 
 export async function approveConsultationStatement(input: {
@@ -4892,6 +4984,7 @@ export async function saveEditedConsultationStatement(input: {
   organizationId: string;
   statementId: string;
   content: string;
+  keyPoints?: readonly string[] | null;
 }): Promise<void> {
   const content = input.content.trim();
   if (!content) throw new TenantError("A polished statement cannot be empty.");
@@ -4899,6 +4992,13 @@ export async function saveEditedConsultationStatement(input: {
     where: { id: input.statementId, organizationId: input.organizationId },
   });
   if (!statement) throw new TenantError("That polished statement was not found.");
+  const previousPoints = keyPointsFromGrounding(statement.groundingJson);
+  const nextPoints =
+    input.keyPoints == null ? previousPoints : input.keyPoints.map((point) => point.trim()).filter(Boolean);
+  const contentChanged = content !== statement.content.trim();
+  const pointsChanged = nextPoints.join("\n") !== previousPoints.join("\n");
+  const seekerOwned =
+    groundingSeekerEdited(statement.groundingJson) || contentChanged || pointsChanged;
   const profileField =
     statement.status === "APPROVED" && statement.kind === "INTERVIEW_ANSWER"
       ? { interviewAnswer: content }
@@ -4908,7 +5008,17 @@ export async function saveEditedConsultationStatement(input: {
   await prisma.$transaction([
     prisma.consultationStatement.update({
       where: { id: statement.id },
-      data: { content },
+      data: {
+        content,
+        ...(seekerOwned
+          ? {
+              groundingJson: withSeekerEditedGrounding(
+                statement.groundingJson,
+                input.keyPoints == null ? null : nextPoints,
+              ) as Prisma.InputJsonValue,
+            }
+          : {}),
+      },
     }),
     ...(profileField
       ? [
