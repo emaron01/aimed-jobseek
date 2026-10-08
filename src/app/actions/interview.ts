@@ -322,7 +322,7 @@ export async function addCheatSheetInterviewNoteAction(
       text: String(formData.get("note") ?? ""),
     });
     revalidate(id, stageId || undefined);
-    return { ok: true, message: "Saved to the cheat sheet." };
+    return { ok: true, message: "Saved to Interview Preparation Guides." };
   } catch (error) {
     return errorResult(error);
   }

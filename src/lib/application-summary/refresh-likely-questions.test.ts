@@ -454,7 +454,7 @@ describe("person sections run only when the seeker chooses that person", () => {
     const result = await generateApplicationSummaryAction(null, formData);
     expect(result).toEqual({
       ok: true,
-      message: "No Changes To Cheat Sheet",
+      message: "No Changes To Interview Preparation Guides",
     });
     expect(queueGuide).toHaveBeenCalledWith(
       expect.objectContaining({ contactId: "c-1", campaignId: "camp" }),
@@ -466,7 +466,7 @@ describe("person sections run only when the seeker chooses that person", () => {
     const pageData = new FormData();
     pageData.set("campaignId", "camp");
     const pageResult = await generateApplicationSummaryAction(null, pageData);
-    expect(pageResult.message).toBe("No Changes To Cheat Sheet");
+    expect(pageResult.message).toBe("No Changes To Interview Preparation Guides");
     expect(enqueue).not.toHaveBeenCalled();
   });
 
@@ -484,7 +484,7 @@ describe("person sections run only when the seeker chooses that person", () => {
     formData.set("sectionKey", "contact:c-1");
     const result = await generateApplicationSummaryAction(null, formData);
     expect(result.ok).toBe(true);
-    expect(result.message).toBe("Writing the Interview cheat sheet…");
+    expect(result.message).toBe("Writing the Interview Preparation Guides…");
     expect(result.jobId).toBe("summary-job");
     expect(queueGuide).toHaveBeenCalledTimes(1);
     expect(queueGuide.mock.calls[0]?.[0]).toMatchObject({
@@ -645,7 +645,7 @@ describe("Refresh likely questions button", () => {
     await act(async () => {
       form?.requestSubmit();
     });
-    expect(host.textContent).toContain("No Changes To Cheat Sheet");
+    expect(host.textContent).toContain("No Changes To Interview Preparation Guides");
     expect(queueGuide).toHaveBeenCalled();
     expect(enqueue).not.toHaveBeenCalled();
     expect(runPaid).not.toHaveBeenCalled();

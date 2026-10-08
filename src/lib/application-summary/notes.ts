@@ -39,7 +39,7 @@ export function appendCheatSheetNote(input: {
 }): CheatSheetNote[] {
   const text = input.text.trim();
   if (!text) {
-    throw new TenantError("Write the information to add to this cheat sheet section.");
+    throw new TenantError("Write the information to add to this Interview Preparation Guides section.");
   }
   return [
     ...parseCheatSheetNotes(input.existing),
@@ -60,7 +60,7 @@ export function peopleRequestedForGeneration(input: {
   if (!requested) return [];
   const match = input.people.find((person) => person.sectionKey === requested);
   if (!match) {
-    throw new TenantError("That Interview cheat sheet section is not on this application.");
+    throw new TenantError("That Interview Preparation Guides section is not on this application.");
   }
   return [match];
 }

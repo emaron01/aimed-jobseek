@@ -314,7 +314,7 @@ export function CheatSheetPersonBody({
             href={`/campaigns/${campaignId}/summary#general-questions`}
             className="font-medium text-ink underline"
           >
-            {section.contactId ? "General Questions" : applicationSummaryConfig.generalQuestionsLink}
+            {applicationSummaryConfig.generalQuestionsLink}
           </a>
           {"."}
         </p>

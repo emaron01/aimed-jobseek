@@ -96,8 +96,8 @@ describe("Harper Batch B4 Cheat Sheet read-only", () => {
     );
     expect(body).toContain("notesFromInterviewsWithHeading");
     expect(body).toContain("NotesFromInterviewsSection");
-    expect(page).toContain("compileNotesFromInterviewsWithPerson");
-    expect(page).toContain("interviewNotes=");
+    expect(page).toContain("CheatSheetInterviewNotes");
+    expect(page).not.toContain("compileNotesFromInterviewsWithPerson");
 
     const empty = compileNotesFromInterviewsWithPerson({
       contactId: "c1",

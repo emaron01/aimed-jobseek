@@ -313,7 +313,7 @@ describe("interview notes polish", () => {
     );
     follows(host.querySelector("[data-testid=saved-notes-priya-stage-priya]"), noteBox);
     expect(host.querySelector("[data-testid=add-cheat-sheet-note-priya-stage-priya] button[type=submit]")?.textContent).toBe(
-      "Save and Add Note to Cheat Sheet",
+      "Save and Add Note to Interview Preparation Guides",
     );
 
     const followUp = host.querySelector("[data-testid=add-follow-up-priya]");
@@ -367,8 +367,9 @@ describe("interview notes polish", () => {
       "You may have {count} outbound due. Review Interview stages and Send Outreach to take action.",
     );
     const summary = readFileSync("src/app/(app)/campaigns/[id]/summary/page.tsx", "utf8");
-    expect(summary).toContain("applicationSummaryConfig.sections.interviewStages");
-    expect(summary).toContain("No interview stages yet.");
+    expect(summary).not.toContain("applicationSummaryConfig.sections.interviewStages");
+    expect(summary).not.toContain("No interview stages yet.");
+    expect(summary).not.toContain('id="stages"');
     expect(readFileSync("src/components/InterviewStagesSection.tsx", "utf8")).toContain("No stages yet.");
     expect(enqueue).not.toHaveBeenCalled();
     expect(paidCall).not.toHaveBeenCalled();

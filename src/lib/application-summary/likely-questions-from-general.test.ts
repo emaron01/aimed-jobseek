@@ -52,7 +52,7 @@ const QUESTION = "Tell me about your background and why you are interested in th
 const APPROVED = "I led the national sales motion and grew the book.";
 const NEW_QUESTION = "Tell me how you coach a sales manager through a missed quarter.";
 const GENERAL_NOTE =
-  "These are Harper's top picks. They represent the types of questions this interviewer may ask. Make sure you study General Questions.";
+  "These are Harper's top picks. They represent the types of questions this interviewer may ask. Make sure you study General Study Questions.";
 const LIKELY_INSTRUCTION =
   "You are given Harper's General questions for this application. Choose the questions this interviewer is most likely to ask, relevant to their role and responsibilities, referencing Harper's General questions by id when they fit. Then add the questions this interviewer would likely ask from their own function's perspective that Harper's list does not cover. Return between 4 and 12 questions in total, ranked from most to least likely, chosen as the most likely rather than a random sample. Do not include questions outside their area.";
 
@@ -579,7 +579,7 @@ describe("likely questions from Harper's General questions", () => {
       expect(note?.textContent).toBe(GENERAL_NOTE);
       const link = note?.querySelector("a");
       expect(link?.getAttribute("href")).toBe("/campaigns/camp/summary#general-questions");
-      expect(link?.textContent).toBe("General Questions");
+      expect(link?.textContent).toBe("General Study Questions");
       expect(likely?.querySelector(".mt-2")?.lastElementChild).toBe(note);
     }
     const css = readFileSync("src/app/globals.css", "utf8");

@@ -74,7 +74,7 @@ describe("account lifecycle B4 — account settings delete placement", () => {
     );
     expect(copy).toContain(DELETE_MY_ACCOUNT_CONFIRM_BODY);
     expect(DELETE_MY_ACCOUNT_CONFIRM_BODY).toBe(
-      "This permanently deletes your account and everything in it: your profile, applications, Harper coaching, cheat sheets, resumes, and messages. This can't be undone.",
+      "This permanently deletes your account and everything in it: your profile, applications, Harper coaching, Interview Preparation Guides, resumes, and messages. This can't be undone.",
     );
     expect(DELETE_MY_ACCOUNT_CONFIRM_PHRASE).toBe("DELETE");
     expect(DELETE_MY_ACCOUNT_BUTTON_LABEL).toBe(

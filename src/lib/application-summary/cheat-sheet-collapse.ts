@@ -6,12 +6,15 @@ export const CHEAT_SHEET_HEADING_CLASS =
 
 const SUBSECTION_SUFFIXES = [
   "-likely-questions",
+  "-guide-notes",
   "-notes",
   "-cares-about",
   "-positioning",
   "-key-statements",
   "-questions-to-ask",
   "-additional-prep",
+  "-overview",
+  "-company",
 ] as const;
 
 export function initialCheatSheetOpenIds(): Set<string> {

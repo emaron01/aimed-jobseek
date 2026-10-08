@@ -96,7 +96,7 @@ import {
 } from "@/lib/product-config";
 
 const ROLE_NOTE =
-  "These are Harper's top picks for this role. They represent the types of questions someone in this role may ask. Make sure you study General Questions.";
+  "These are Harper's top picks for this role. They represent the types of questions someone in this role may ask. Make sure you study General Study Questions.";
 const EMPTY_PEOPLE =
   "When you know who you will interview with, add them here for Interview Prep.";
 const RECOMMENDED_LINE =
@@ -308,7 +308,7 @@ describe("persona cheat sheet activation", () => {
     expect(note?.querySelector("a")?.getAttribute("href")).toBe(
       "/campaigns/camp-1/summary#general-questions",
     );
-    expect(note?.querySelector("a")?.textContent).toBe("General Questions");
+    expect(note?.querySelector("a")?.textContent).toBe("General Study Questions");
     expect(
       applicationSummaryConfig.roleLikelyQuestionsLead +
         applicationSummaryConfig.generalQuestionsLink +
@@ -388,8 +388,8 @@ describe("persona cheat sheet activation", () => {
     );
     expect(document.querySelector("[data-testid='hiring-team-recommended-direct-2']")).not.toBeNull();
     expect(document.querySelector("[data-testid='hiring-team-recommended-indirect-1']")).toBeNull();
-    expect(document.body.textContent).toContain("Add to Cheat Sheet");
-    expect(document.body.textContent).not.toContain("Remove from Cheat Sheet");
+    expect(document.body.textContent).toContain("Add to Interview Preparation Guides");
+    expect(document.body.textContent).not.toContain("Remove from Interview Preparation Guides");
     expect(document.querySelector("[role='dialog']")).toBeNull();
     expect(document.body.textContent?.toLowerCase()).not.toContain("confirm");
     const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");

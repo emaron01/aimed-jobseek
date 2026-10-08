@@ -272,7 +272,7 @@ export const applicationWorkspaceCopy = Object.freeze({
   jobLearnedTop: "Enter any new requirements you have learned here",
   jobLearnedTitle: "What I've learned",
   jobLearnedHelp:
-    "Add what you learn at any time, for example after a call with an interviewer. These notes are included when the job requirements regenerate, and they are used by {consultant} and the Interview cheat sheet.",
+    "Add what you learn at any time, for example after a call with an interviewer. These notes are included when the job requirements regenerate, and they are used by {consultant} and Interview Preparation Guides.",
   jobLearnedSave: "Save notes",
   jobLearnedSaved: "Notes saved.",
   jobLearnedFailed: "The notes could not be saved.",

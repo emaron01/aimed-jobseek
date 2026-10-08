@@ -99,7 +99,7 @@ describe("Account settings delete panel", () => {
       open.click();
     });
     expect(view.host.textContent).toContain(
-      "This permanently deletes your account and everything in it: your profile, applications, Harper coaching, cheat sheets, resumes, and messages. This can't be undone.",
+      "This permanently deletes your account and everything in it: your profile, applications, Harper coaching, Interview Preparation Guides, resumes, and messages. This can't be undone.",
     );
     const submit = () =>
       view.host.querySelector(

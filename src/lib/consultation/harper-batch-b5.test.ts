@@ -176,7 +176,7 @@ describe("Harper Batch B5 Additional Interview Prep Q&A", () => {
     expect(personView).toContain("additionalPrepQuestions");
     expect(body).toContain("AdditionalInterviewPrepQa");
     expect(page).not.toContain("additionalPrepQuestions");
-    expect(page).toContain('title="General Questions"');
+    expect(page).toContain("sections.generalStudyQuestions");
     expect(section).not.toContain("additionalInterviewPrepQuestionsForProfile");
     expect(section).not.toContain("involvement: person.involvement");
   });

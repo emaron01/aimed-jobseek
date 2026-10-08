@@ -184,7 +184,7 @@ const STEP_PAGES = [
   ["hiring-team", "Personas and Interviewers", `${DASHBOARD}/hiring-team`],
   ["outreach", "Send Outreach", `${DASHBOARD}/outreach`],
   ["interviews", "Interview Notes", `${DASHBOARD}/interviews`],
-  ["summary", "Interview cheat sheet", `${DASHBOARD}/summary`],
+  ["summary", "Interview Preparation Guides", `${DASHBOARD}/summary`],
 ] as const;
 
 function markup(node: ReactElement): string {

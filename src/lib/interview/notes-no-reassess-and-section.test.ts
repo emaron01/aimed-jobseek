@@ -357,10 +357,8 @@ describe("notes never reassess Harper, and the cheat sheet lists them once", () 
     expect(prep?.interviewLabel).toContain("Recruiter");
 
     const page = readFileSync("src/app/(app)/campaigns/[id]/summary/page.tsx", "utf8");
+    expect(page.indexOf("{view.people.map")).toBeLessThan(page.indexOf('id="general-questions"'));
     expect(page.indexOf('id="general-questions"')).toBeLessThan(page.indexOf('id="interview-notes"'));
-    expect(page.indexOf('id="interview-notes"')).toBeLessThan(
-      page.indexOf("{view.people.map"),
-    );
     const printCss = readFileSync("src/app/globals.css", "utf8");
     expect(printCss).toContain(".application-summary .cheat-sheet-collapsible-body.hidden");
 
@@ -566,7 +564,7 @@ describe("notes never reassess Harper, and the cheat sheet lists them once", () 
     expect(interview?.textContent).not.toContain("Post Interview Notes");
     expect(interview?.textContent).not.toContain("Newly gained information");
     expect(interview?.textContent).toContain("They care about forecast hygiene.");
-    expect(interview?.textContent).toContain("Save and Add Note to Cheat Sheet");
+    expect(interview?.textContent).toContain("Save and Add Note to Interview Preparation Guides");
     const form = host.querySelector(
       `[data-testid=update-stage-${stageId}-${contactId}]`,
     ) as HTMLFormElement;

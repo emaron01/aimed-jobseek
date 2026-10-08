@@ -861,7 +861,7 @@ export async function generateApplicationSummary(input: {
     });
     const person = data.people.find((item) => item.sectionKey === requested[0]!.sectionKey);
     if (!person) {
-      throw new TenantError("That Interview cheat sheet section is not on this application.");
+      throw new TenantError("That Interview Preparation Guides section is not on this application.");
     }
     if (person.contactId && !person.personaBuilt) {
       await prepareInterviewPrepGuideGeneration({
@@ -1129,7 +1129,7 @@ export async function generateApplicationSummary(input: {
   }
   const message = `${applicationSummaryConfig.title} could not be generated. Retry.`;
   await markSummaryFailed(input.campaignId, message);
-  throw new Error("Interview cheat sheet overview did not return a usable result.");
+  throw new Error("Interview Preparation Guides overview did not return a usable result.");
 }
 
 export async function getApplicationSummaryView(input: {

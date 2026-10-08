@@ -85,7 +85,7 @@ export function CheatSheetFilterProvider({
       selectOption: (sectionKey) => {
         const option = options.find((item) => item.sectionKey === sectionKey);
         if (!option) {
-          throw new Error("That Interview cheat sheet section is not on this page.");
+          throw new Error("That Interview Preparation Guides section is not on this page.");
         }
         setSelectedKey(sectionKey);
         setQuery(optionLabel(option));

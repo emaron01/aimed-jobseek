@@ -66,7 +66,7 @@ function qaItem(
 describe("Harper three-section page copy and chrome", () => {
   it("uses the exact intro, section titles, and descriptions", () => {
     expect(consultationConversationCopy.pageIntro).toBe(
-      "Harper helps you prepare the answers you'll use throughout this application. What you approve here is what she uses to build your resume, cover letter, outreach, and interview cheat sheets. Answer what you can, skip what you can't, review her suggestions, and approve what best represents your background in a professional way. When it's time to interview, your cheat sheet brings it all together.",
+      "Harper helps you prepare the answers you'll use throughout this application. What you approve here is what she uses to build your resume, cover letter, outreach, and Interview Preparation Guides. Answer what you can, skip what you can't, review her suggestions, and approve what best represents your background in a professional way. When it's time to interview, your Interview Preparation Guides bring it all together.",
     );
     expect(consultationConversationCopy.whereYouStand).toBe("Where you stand");
     expect(consultationConversationCopy.whereYouStandDescription).toBe(

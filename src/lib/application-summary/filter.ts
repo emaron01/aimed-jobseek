@@ -38,7 +38,7 @@ export function visibleCheatSheetSectionKeys(input: {
 }): string[] {
   if (!input.selectedKey) return input.sectionKeys;
   if (!input.sectionKeys.includes(input.selectedKey)) {
-    throw new Error("That Interview cheat sheet section is not on this page.");
+    throw new Error("That Interview Preparation Guides section is not on this page.");
   }
   return [input.selectedKey];
 }

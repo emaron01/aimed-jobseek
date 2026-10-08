@@ -6,7 +6,7 @@
 export const DELETE_MY_ACCOUNT_MENU_LABEL = "Delete my account";
 
 export const DELETE_MY_ACCOUNT_CONFIRM_BODY =
-  "This permanently deletes your account and everything in it: your profile, applications, Harper coaching, cheat sheets, resumes, and messages. This can't be undone.";
+  "This permanently deletes your account and everything in it: your profile, applications, Harper coaching, Interview Preparation Guides, resumes, and messages. This can't be undone.";
 
 /** Seekers must type this exactly before the delete button enables. */
 export const DELETE_MY_ACCOUNT_CONFIRM_PHRASE = "DELETE";

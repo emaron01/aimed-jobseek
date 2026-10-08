@@ -58,7 +58,7 @@ vi.mock("@/app/actions/hiring-team", async (importOriginal) => {
         campaignId: String(formData.get("campaignId") ?? ""),
         personaId: String(formData.get("personaId") ?? ""),
       });
-      return { ok: true, message: "Remove from Cheat Sheet" };
+      return { ok: true, message: "Remove from Interview Preparation Guides" };
     },
   };
 });
@@ -200,13 +200,13 @@ describe("cheat sheet batch 3", () => {
     const labels = [...persona.querySelectorAll("button")].map((node) => node.textContent ?? "");
     const printAt = labels.indexOf("Print this section");
     const refreshAt = labels.indexOf("Refresh likely questions");
-    const removeAt = labels.indexOf("Remove from Cheat Sheet");
+    const removeAt = labels.indexOf("Remove from Interview Preparation Guides");
     expect(printAt).toBeGreaterThanOrEqual(0);
     expect(printAt).toBeLessThan(refreshAt);
     expect(refreshAt).toBeLessThan(removeAt);
 
     const person = mount(header("c-1"));
-    expect(person.textContent).not.toContain("Remove from Cheat Sheet");
+    expect(person.textContent).not.toContain("Remove from Interview Preparation Guides");
     expect(person.textContent).toContain("Print this section");
     expect(person.textContent).toContain("Refresh likely questions");
 
@@ -274,7 +274,7 @@ describe("cheat sheet batch 3", () => {
       expect(printed).not.toContain("▼");
       expect(printed).not.toContain("Print this section");
       expect(printed).not.toContain("Refresh likely questions");
-      expect(printed).not.toContain("Remove from Cheat Sheet");
+      expect(printed).not.toContain("Remove from Interview Preparation Guides");
       expect(printed.replace("Approved answers only.", "")).not.toContain("Approved");
     }
     const personaPrint = printClone(host, "persona:p-1");
@@ -347,8 +347,8 @@ describe("cheat sheet batch 3", () => {
     expect(harper).toContain("CheatSheetPersonBody");
     expect(applicationSummaryConfig.actions.generateSection).toBe("Generate");
     expect(applicationSummaryConfig.actions.refreshLikelyQuestions).toBe("Refresh likely questions");
-    expect(hiringTeamConfig.actions.addToCheatSheet).toBe("Add to Cheat Sheet");
-    expect(hiringTeamConfig.actions.removeFromCheatSheet).toBe("Remove from Cheat Sheet");
+    expect(hiringTeamConfig.actions.addToCheatSheet).toBe("Add to Interview Preparation Guides");
+    expect(hiringTeamConfig.actions.removeFromCheatSheet).toBe("Remove from Interview Preparation Guides");
     expect(hiringTeamConfig.actions.buildAllDirect).toBe("Generate all Direct roles");
     expect(vocab.persona.singular).toBe("Hiring Team role");
     expect(applicationSummaryConfig.actions.buildPersonaNow).toBe("Yes");

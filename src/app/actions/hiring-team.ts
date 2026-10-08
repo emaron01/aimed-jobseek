@@ -232,7 +232,7 @@ export async function addPersonaToCheatSheetAction(
     }
     return { ok: true, message: hiringTeamConfig.actions.addToCheatSheet };
   } catch (error) {
-    return fail(error, `The ${vocab.persona.singular} could not be added to the cheat sheet.`);
+    return fail(error, `The ${vocab.persona.singular} could not be added to Interview Preparation Guides.`);
   }
 }
 
@@ -254,7 +254,7 @@ export async function removePersonaFromCheatSheetAction(
     revalidatePath(`/campaigns/${campaignId}/summary`);
     return { ok: true, message: hiringTeamConfig.actions.removeFromCheatSheet };
   } catch (error) {
-    return fail(error, `The ${vocab.persona.singular} could not be removed from the cheat sheet.`);
+    return fail(error, `The ${vocab.persona.singular} could not be removed from Interview Preparation Guides.`);
   }
 }
 

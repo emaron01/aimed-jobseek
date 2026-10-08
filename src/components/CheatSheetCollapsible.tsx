@@ -147,11 +147,16 @@ export function CheatSheetSection({
   title,
   headerAside = null,
   children,
+  primary = false,
+  testId,
 }: {
   id: string;
   title: string;
   headerAside?: ReactNode;
   children?: ReactNode;
+  /** Harper white card: thicker, darker outer border. */
+  primary?: boolean;
+  testId?: string;
 }) {
   const collapse = useCheatSheetCollapse();
   const open = collapse ? collapse.isOpen(id) : false;
@@ -161,7 +166,12 @@ export function CheatSheetSection({
       data-print-id={id}
       data-cheat-sheet-section={id}
       data-cheat-sheet-open={open ? "true" : "false"}
-      className="application-summary-section break-inside-avoid rounded-lg border border-edge bg-surface p-6"
+      data-testid={testId}
+      className={
+        primary
+          ? "application-summary-section break-inside-avoid rounded-md border-2 border-edge-strong bg-surface p-4"
+          : "application-summary-section break-inside-avoid rounded-lg border border-edge bg-surface p-6"
+      }
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">

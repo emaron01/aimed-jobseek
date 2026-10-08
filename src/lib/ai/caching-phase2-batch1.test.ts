@@ -215,7 +215,7 @@ describe("Caching Phase 2 batch 1 wiring", () => {
       "No Changes To Your Background",
     );
     expect(applicationSummaryConfig.actions.unchanged).toBe(
-      "No Changes To Cheat Sheet",
+      "No Changes To Interview Preparation Guides",
     );
     expect(applicationWorkspaceCopy.jobPostingSaved).not.toBe(
       applicationWorkspaceCopy.jobPostingUnchanged,

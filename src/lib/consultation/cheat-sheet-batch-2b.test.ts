@@ -434,6 +434,6 @@ describe("Cheat Sheet batch 2b", () => {
     const page = readFileSync("src/app/(app)/campaigns/[id]/summary/page.tsx", "utf8");
     expect(page).not.toContain("additionalInterviewPrepQuestionsForProfile");
     expect(page).toContain('id="general-questions"');
-    expect(page).toContain('title="General Questions"');
+    expect(page).toContain("sections.generalStudyQuestions");
   });
 });

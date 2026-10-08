@@ -125,7 +125,7 @@ export const applicationStepCopy = Object.freeze({
   newOutreachContact: "New: contact added",
   newOutreachMessage: "New: message for",
   newInterviewStage: "New: interview stage",
-  newCheatSheet: "New: interview cheat sheet",
+  newCheatSheet: "New: Interview Preparation Guides",
   expandTracker: "Show steps",
   collapseTracker: "Hide steps",
   appliedAction: outreachConfig.labels.appliedStatus,

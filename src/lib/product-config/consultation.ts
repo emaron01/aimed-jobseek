@@ -71,7 +71,7 @@ export const consultationConversationCopy = Object.freeze({
   bestPracticeDescription:
     "Questions a hiring manager for this role commonly asks, with Harper's suggested answers drawn from your profile. Edit them to make them yours, then approve.",
   pageIntro:
-    "Harper helps you prepare the answers you'll use throughout this application. What you approve here is what she uses to build your resume, cover letter, outreach, and interview cheat sheets. Answer what you can, skip what you can't, review her suggestions, and approve what best represents your background in a professional way. When it's time to interview, your cheat sheet brings it all together.",
+    "Harper helps you prepare the answers you'll use throughout this application. What you approve here is what she uses to build your resume, cover letter, outreach, and Interview Preparation Guides. Answer what you can, skip what you can't, review her suggestions, and approve what best represents your background in a professional way. When it's time to interview, your Interview Preparation Guides bring it all together.",
   generalQuestions: "General questions",
   expandEvidence: "Expand evidence",
   collapseEvidence: "Collapse evidence",

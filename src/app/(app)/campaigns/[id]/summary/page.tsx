@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { generateApplicationPageMetadata } from "@/lib/application/page-metadata";
 import { generateApplicationSummaryAction } from "@/app/actions/application-summary";
@@ -9,7 +10,11 @@ import { CheatSheetCompanyResearch } from "@/components/ApplicationCompanyBriefi
 import {
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
-import { CheatSheetPrintBanner, CheatSheetSection } from "@/components/CheatSheetCollapsible";
+import {
+  CheatSheetPrintBanner,
+  CheatSheetSection,
+  CheatSheetSubsection,
+} from "@/components/CheatSheetCollapsible";
 import { CheatSheetInterviewNotes } from "@/components/CheatSheetInterviewNotes";
 import { CheatSheetEmptyState } from "@/components/CheatSheetEmptyState";
 import {
@@ -37,10 +42,8 @@ import { loadCheatSheetCoachQaByContact } from "@/lib/application-summary/coach-
 import { statedListItems } from "@/lib/application-summary/display";
 import { latestApplicationSummaryFailure } from "@/lib/application-summary/failure-message";
 import { personSectionNeedsGeneration } from "@/lib/application-summary/people";
-import {
-  compileApplicationInterviewNotes,
-  compileNotesFromInterviewsWithPerson,
-} from "@/lib/application-summary/interview-notes";
+import type { ApplicationSummaryGuidance } from "@/lib/application-summary/contract";
+import { compileApplicationInterviewNotes } from "@/lib/application-summary/interview-notes";
 import { getApplicationSummaryView } from "@/lib/application-summary/service";
 import { loadOrderedAnsweredHarperQuestions } from "@/lib/consultation/harper-display-qa";
 import { personViewListQuestions } from "@/lib/consultation/harper-layout";
@@ -49,7 +52,6 @@ import { getMembershipForCurrentUser } from "@/lib/auth/authz";
 import { canOpenCampaignDetail } from "@/lib/campaign/visibility";
 import type { JobScorecard } from "@/lib/job-requirement/types";
 import { applicationSummaryConfig, interviewConfig } from "@/lib/product-config";
-import { stageTypeLabel } from "@/lib/interview/stages";
 import { parseStringArray } from "@/lib/research";
 import { TenantError } from "@/lib/tenant/errors";
 import { getCurrentOrganization } from "@/lib/tenant/getCurrentOrganization";
@@ -90,6 +92,134 @@ function TextList({ items }: { items: readonly string[] }) {
         <li key={`${index}:${item}`}>{item}</li>
       ))}
     </ul>
+  );
+}
+
+type SummaryView = Awaited<ReturnType<typeof getApplicationSummaryView>>;
+
+function AtAGlanceBody({
+  overview,
+}: {
+  overview: ApplicationSummaryGuidance["overview"] | null | undefined;
+}) {
+  if (!overview) {
+    return (
+      <p className="text-sm text-muted">
+        {`Generate the ${applicationSummaryConfig.title} to create the company background, job requirements, and where you shine.`}
+      </p>
+    );
+  }
+  return (
+    <>
+      <div>
+        <h3 className="font-medium text-ink">
+          {applicationSummaryConfig.sections.companyBackground}
+        </h3>
+        <p className="mt-1 text-sm text-ink">{overview.companyBackground.text}</p>
+      </div>
+      <div>
+        <h3 className="font-medium text-ink">
+          {applicationSummaryConfig.sections.jobRequirements}
+        </h3>
+        <TextList items={overview.jobRequirements.map((item) => item.text)} />
+      </div>
+      <div>
+        <h3 className="font-medium text-ink">
+          {applicationSummaryConfig.sections.whereSeekerShines}
+        </h3>
+        <TextList items={overview.whereSeekerShines.map((item) => item.text)} />
+      </div>
+    </>
+  );
+}
+
+function CompanyProfileBody({
+  research,
+  companyName,
+  postingText,
+}: {
+  research: SummaryView["research"];
+  companyName: string | null;
+  postingText: string | null;
+}) {
+  return (
+    <>
+      <CheatSheetCompanyResearch
+        companySummary={research?.companySummary ?? null}
+        whatTheySell={research?.whatTheySell ?? null}
+        jobFocus={research?.jobFocus ?? null}
+        jobFocusDetail={research?.jobFocusDetail ?? null}
+        sources={research?.researchSources ?? []}
+        companyName={companyName}
+        anchorHost={research?.anchorHost ?? null}
+        sisterHosts={research?.sisterHosts ?? null}
+        postingText={postingText}
+      />
+      <div>
+        <h3 className="font-medium text-ink">Customers</h3>
+        <TextList items={lines(research?.customerTypes)} />
+      </div>
+      {statedListItems(lines(research?.hiringSignals)).length > 0 ? (
+        <TextList items={lines(research?.hiringSignals)} />
+      ) : null}
+    </>
+  );
+}
+
+function PositionBody({
+  requirement,
+  requirementScorecard,
+}: {
+  requirement: SummaryView["requirement"];
+  requirementScorecard: JobScorecard;
+}) {
+  return (
+    <>
+      <dl className="grid gap-4 sm:grid-cols-2">
+        {[
+          ["Title", requirement.title],
+          ["Reporting line", requirement.reportingLine],
+          ["Location", requirement.location],
+          ["Work arrangement", requirement.workArrangement],
+          ["Compensation in posting", requirement.compensationRange],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">{label}</dt>
+            <dd className="mt-1 text-sm text-ink">{value || "Not stated."}</dd>
+          </div>
+        ))}
+      </dl>
+      <div>
+        <h3 className="font-medium text-ink">Mission</h3>
+        <p className="mt-1 text-sm text-ink">
+          {requirementScorecard.mission?.text ?? "Not stated."}
+        </p>
+      </div>
+      <div>
+        <h3 className="font-medium text-ink">Key outcomes</h3>
+        <TextList items={requirementScorecard.outcomes.map((item) => item.text)} />
+      </div>
+    </>
+  );
+}
+
+function PrepGuidePrimaryCard({
+  testId,
+  title,
+  children,
+}: {
+  testId: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      className="space-y-4 rounded-md border-2 border-edge-strong bg-surface p-4"
+      data-testid={testId}
+    >
+      <h2 className="text-sm font-semibold text-ink">{title}</h2>
+      {children}
+    </section>
   );
 }
 
@@ -251,73 +381,15 @@ export default async function ApplicationSummaryPage({
         ) : null}
       </div>
 
-      <CheatSheetSharedSection>
-      <CheatSheetSection id="overview" title={applicationSummaryConfig.sections.overview}>
-        {!guidance?.overview ? (
-          <p className="text-sm text-muted">
-            {`Generate the ${applicationSummaryConfig.title} to create the company background, job requirements, and where you shine.`}
-          </p>
-        ) : (
-          <>
-            <div>
-              <h3 className="font-medium text-ink">
-                {applicationSummaryConfig.sections.companyBackground}
-              </h3>
-              <p className="mt-1 text-sm text-ink">
-                {guidance.overview.companyBackground.text}
-              </p>
-            </div>
-            <div>
-              <h3 className="font-medium text-ink">
-                {applicationSummaryConfig.sections.jobRequirements}
-              </h3>
-              <TextList items={guidance.overview.jobRequirements.map((item) => item.text)} />
-            </div>
-            <div>
-              <h3 className="font-medium text-ink">
-                {applicationSummaryConfig.sections.whereSeekerShines}
-              </h3>
-              <TextList items={guidance.overview.whereSeekerShines.map((item) => item.text)} />
-            </div>
-          </>
-        )}
-      </CheatSheetSection>
-      </CheatSheetSharedSection>
-
       <HarperDraftProvider>
-      {view.people.length === 0 ? <CheatSheetEmptyState campaignId={id} /> : null}
-      <CheatSheetSection id="general-questions" title="General Questions">
-        <CheatSheetQuestionCards
-          campaignId={id}
-          canEdit={canGenerate}
-          questions={generalQuestions}
-          jobsActive={live.jobs.some(
-            (job) =>
-              job.type === "CONSULTATION" &&
-              (job.status === "PENDING" || job.status === "IN_PROGRESS"),
-          )}
-          testId="cheat-sheet-general-questions"
-        />
-      </CheatSheetSection>
-      <CheatSheetSection
-        id="interview-notes"
-        title={applicationSummaryConfig.sections.interviewNotes}
+      <PrepGuidePrimaryCard
+        testId="prep-guide-personas"
+        title={applicationSummaryConfig.sections.interviewPersonas}
       >
-        <CheatSheetInterviewNotes notes={applicationInterviewNotes} />
-      </CheatSheetSection>
+      {view.people.length === 0 ? <CheatSheetEmptyState campaignId={id} /> : null}
       {view.people.map((person) => {
         const section =
           guidance?.people.find((item) => item.sectionKey === person.sectionKey) ?? null;
-        const notes = person.contactId
-          ? view.notesByContactId.get(person.contactId) ?? []
-          : [];
-        const interviewNotes = person.contactId
-          ? compileNotesFromInterviewsWithPerson({
-              contactId: person.contactId,
-              gainedNotes: notes,
-              stages: stagesForNotes,
-            })
-          : [];
         const coachQaItems = person.contactId
           ? coachQaByContact.get(person.contactId) ?? []
           : [];
@@ -384,91 +456,102 @@ export default async function ApplicationSummaryPage({
                 ) : null}
               </div>
             ) : null}
+            <CheatSheetSubsection
+              id={`${person.sectionKey}-overview`}
+              title={applicationSummaryConfig.sections.overview}
+            >
+              <AtAGlanceBody overview={guidance?.overview} />
+            </CheatSheetSubsection>
+            <CheatSheetSubsection
+              id={`${person.sectionKey}-guide-notes`}
+              title={applicationSummaryConfig.sections.interviewNotes}
+            >
+              <CheatSheetInterviewNotes notes={applicationInterviewNotes} />
+            </CheatSheetSubsection>
             <CheatSheetPersonBody
               campaignId={id}
               canEdit={canGenerate}
               sectionKey={person.sectionKey}
               section={section}
-              notes={notes}
+              notes={[]}
               personaBuilt={person.personaBuilt}
               personaId={person.roleId}
               coachQaItems={coachQaItems}
               jobsActive={consultationBusy}
-              interviewNotes={person.contactId ? interviewNotes : null}
-              interviewNotesPersonName={person.contactId ? person.heading : null}
               generalQuestions={generalQuestions}
               personQuestions={personQuestions}
               prepGuideOwnsContact
             />
+            <CheatSheetSubsection
+              id={`${person.sectionKey}-company`}
+              title={applicationSummaryConfig.sections.company}
+            >
+              <CompanyProfileBody
+                research={view.research}
+                companyName={view.requirement.companyName}
+                postingText={view.requirement.rawText}
+              />
+            </CheatSheetSubsection>
           </CheatSheetSection>
           </CheatSheetPersonSection>
         );
       })}
+      </PrepGuidePrimaryCard>
+      <CheatSheetSharedSection>
+      <CheatSheetSection
+        id="general-questions"
+        title={applicationSummaryConfig.sections.generalStudyQuestions}
+        primary
+        testId="prep-guide-general-questions"
+      >
+        <CheatSheetQuestionCards
+          campaignId={id}
+          canEdit={canGenerate}
+          questions={generalQuestions}
+          jobsActive={live.jobs.some(
+            (job) =>
+              job.type === "CONSULTATION" &&
+              (job.status === "PENDING" || job.status === "IN_PROGRESS"),
+          )}
+          testId="cheat-sheet-general-questions"
+        />
+      </CheatSheetSection>
+      </CheatSheetSharedSection>
       </HarperDraftProvider>
 
       <CheatSheetSharedSection>
-      <CheatSheetSection id="company" title={applicationSummaryConfig.sections.company}>
-        <CheatSheetCompanyResearch
-          companySummary={view.research?.companySummary ?? null}
-          whatTheySell={view.research?.whatTheySell ?? null}
-          jobFocus={view.research?.jobFocus ?? null}
-          jobFocusDetail={view.research?.jobFocusDetail ?? null}
-          sources={view.research?.researchSources ?? []}
+      <CheatSheetSection
+        id="interview-notes"
+        title={applicationSummaryConfig.sections.consolidatedInterviewNotes}
+        primary
+        testId="prep-guide-consolidated-notes"
+      >
+        <CheatSheetInterviewNotes notes={applicationInterviewNotes} />
+      </CheatSheetSection>
+
+      <CheatSheetSection
+        id="position"
+        title={applicationSummaryConfig.sections.position}
+        primary
+        testId="prep-guide-position"
+      >
+        <PositionBody
+          requirement={view.requirement}
+          requirementScorecard={requirementScorecard}
+        />
+      </CheatSheetSection>
+
+      <CheatSheetSection
+        id="company"
+        title={applicationSummaryConfig.sections.company}
+        primary
+        testId="prep-guide-company"
+      >
+        <CompanyProfileBody
+          research={view.research}
           companyName={view.requirement.companyName}
-          anchorHost={view.research?.anchorHost ?? null}
-          sisterHosts={view.research?.sisterHosts ?? null}
           postingText={view.requirement.rawText}
         />
-        <div>
-          <h3 className="font-medium text-ink">Customers</h3>
-          <TextList items={lines(view.research?.customerTypes)} />
-        </div>
-        {statedListItems(lines(view.research?.hiringSignals)).length > 0 ? (
-          <TextList items={lines(view.research?.hiringSignals)} />
-        ) : null}
-      </CheatSheetSection>
-
-      <CheatSheetSection id="position" title={applicationSummaryConfig.sections.position}>
-        <dl className="grid gap-4 sm:grid-cols-2">
-          {[
-            ["Title", view.requirement.title],
-            ["Reporting line", view.requirement.reportingLine],
-            ["Location", view.requirement.location],
-            ["Work arrangement", view.requirement.workArrangement],
-            ["Compensation in posting", view.requirement.compensationRange],
-          ].map(([label, value]) => (
-            <div key={label}>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">{label}</dt>
-              <dd className="mt-1 text-sm text-ink">{value || "Not stated."}</dd>
-            </div>
-          ))}
-        </dl>
-        <div>
-          <h3 className="font-medium text-ink">Mission</h3>
-          <p className="mt-1 text-sm text-ink">
-            {requirementScorecard.mission?.text ?? "Not stated."}
-          </p>
-        </div>
-        <div>
-          <h3 className="font-medium text-ink">Key outcomes</h3>
-          <TextList items={requirementScorecard.outcomes.map((item) => item.text)} />
-        </div>
-      </CheatSheetSection>
-
-      <CheatSheetSection id="stages" title={applicationSummaryConfig.sections.interviewStages}>
-        {view.stages.length === 0 ? (
-          <p className="text-sm text-subtle">No interview stages yet.</p>
-        ) : (
-          <>
-            <ul className="space-y-3 text-sm text-ink">
-              {view.stages.map((stage) => (
-                <li key={stage.id}>
-                  <span className="font-medium">{stageTypeLabel(stage.type)}</span>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
       </CheatSheetSection>
       </CheatSheetSharedSection>
     </main>

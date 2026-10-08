@@ -2,13 +2,13 @@ import { consultationConfig } from "./consultation";
 import { vocab } from "./vocabulary";
 
 export const applicationSummaryConfig = Object.freeze({
-  title: "Interview cheat sheet",
+  title: "Interview Preparation Guides",
   description: "Answers organized by the people you will meet",
   actions: {
-    generate: "Generate cheat sheet",
-    regenerate: "Regenerate cheat sheet",
-    retry: "Retry cheat sheet",
-    unchanged: "No Changes To Cheat Sheet",
+    generate: "Generate Interview Preparation Guides",
+    regenerate: "Regenerate Interview Preparation Guides",
+    retry: "Retry Interview Preparation Guides",
+    unchanged: "No Changes To Interview Preparation Guides",
     unchangedLikelyQuestions: "No Changes To Likely Questions",
     refreshLikelyQuestions: "Refresh likely questions",
     refreshingLikelyQuestions: "Refreshing likely questions…",
@@ -27,6 +27,9 @@ export const applicationSummaryConfig = Object.freeze({
   },
   sections: {
     overview: "At a glance",
+    interviewPersonas: "Interview Personas",
+    generalStudyQuestions: "General Study Questions",
+    consolidatedInterviewNotes: "Consolidated Interview Notes",
     companyBackground: "Company background",
     jobRequirements: "The job requirements",
     whereSeekerShines: "Where you shine",
@@ -35,7 +38,7 @@ export const applicationSummaryConfig = Object.freeze({
     gapsToPrepare: "Gaps to address",
     sampleAnswer: "Sample answer",
     harperQuestion: `${consultationConfig.displayName} still needs this`,
-    company: "Company",
+    company: "Full Company Profile",
     position: "Position",
     people: "People you will meet",
     caresAbout: "What they care about",
@@ -79,7 +82,7 @@ export const applicationSummaryConfig = Object.freeze({
   emptyPeopleTail: " for Interview Prep.",
   roleLikelyQuestionsLead:
     "These are Harper's top picks for this role. They represent the types of questions someone in this role may ask. Make sure you study ",
-  generalQuestionsLink: "General Questions",
+  generalQuestionsLink: "General Study Questions",
   cultureEvidenceLabel: "Based on limited public evidence",
   missingWhyThisCompany:
     "State why you want this company in the Personal Profile. This is not answered by a work story.",
