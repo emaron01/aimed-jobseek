@@ -361,7 +361,7 @@ describe("likely questions from Harper's General questions", () => {
     expect(sent.people).toHaveLength(1);
     expect(JSON.parse(messages[1]!.content).careerStage).toBe("late_career");
     expect(messages[0]!.content).toContain(LIKELY_INSTRUCTION);
-    expect(messages[0]!.content).toContain("Prompt version: 16");
+    expect(messages[0]!.content).toContain("Prompt version: 17");
   });
 
   it("accepts 4 to 12 likely questions, rejects fewer or more, and drops an unknown reference", () => {
@@ -593,7 +593,7 @@ describe("likely questions from Harper's General questions", () => {
 
   it("keeps the approved instruction text, bumps the prompt version, and does not regenerate on a page view", () => {
     expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain(LIKELY_INSTRUCTION);
-    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("16");
+    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("17");
     const person = {
       sectionKey: "contact:1",
       roleId: "role-1",

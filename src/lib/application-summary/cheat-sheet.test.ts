@@ -8,6 +8,7 @@ import {
   cheatSheetSectionKind,
 } from "@/lib/application-summary/people";
 import { validateApplicationSummaryGuidance } from "@/lib/application-summary/service";
+import { APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content/application-summary";
 import { applicationSummaryConfig } from "@/lib/product-config";
 
 const spoken = "I rebuilt the forecast cadence.";
@@ -16,7 +17,10 @@ const item = { text: spoken, supports: [] };
 describe("Interview Cheat Sheet", () => {
   it("renames the surface through the vocabulary module", () => {
     expect(applicationSummaryConfig.title).toBe("Interview cheat sheet");
-    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("16");
+    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("17");
+    expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain(
+      'Write each "what they care about" item about this interviewer, using their first name (or their role when no name is known), and call the seeker "you", for example: "Ashley cares about whether your experience can transfer into Sift\'s fraud and digital-trust market without overstating direct fraud-platform experience."',
+    );
     expect(JSON.stringify(applicationSummaryConfig)).not.toContain("Application Summary");
   });
 

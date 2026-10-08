@@ -73,7 +73,7 @@ function profile(input: {
 describe("Harper Batch D5 — career stage", () => {
   it("bumps prompt versions for career-stage instructions", () => {
     expect(CONSULTATION_PROMPT_VERSION).toBe("39");
-    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("16");
+    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("17");
   });
 
   it("adds the exact coach, polish, and Cheat Sheet careerStage lines", () => {
