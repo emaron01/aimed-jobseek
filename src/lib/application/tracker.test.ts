@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { consultationFacts } from "@/lib/application/tracker";
+import {
+  consultationFacts,
+  interviewersMissingPrepGuides,
+} from "@/lib/application/tracker";
 import {
   emptyApplicationStepFacts,
   resolveApplicationStepState,
@@ -51,6 +54,8 @@ describe("consultationFacts Harper green", () => {
       started: true,
       unanswered: false,
       complete: true,
+      unansweredCount: 0,
+      firstUnansweredTurnId: null,
     });
     expect(
       resolveApplicationStepState(
@@ -97,6 +102,8 @@ describe("consultationFacts Harper green", () => {
       started: true,
       unanswered: true,
       complete: false,
+      unansweredCount: 1,
+      firstUnansweredTurnId: "q2",
     });
     expect(
       resolveApplicationStepState(
@@ -158,6 +165,8 @@ describe("consultationFacts Harper green", () => {
       started: true,
       unanswered: false,
       complete: true,
+      unansweredCount: 0,
+      firstUnansweredTurnId: null,
     });
     expect(
       resolveApplicationStepState(
@@ -171,5 +180,34 @@ describe("consultationFacts Harper green", () => {
         [],
       ),
     ).toBe("done");
+  });
+});
+
+describe("interviewersMissingPrepGuides", () => {
+  it("counts interviewers on the newest interview first and names the first one without a guide", () => {
+    const readyPerson = {
+      contactId: "ready",
+      positioningStatements: ["a"],
+      keyStatements: ["b"],
+      caresAbout: ["c"],
+      likelyQuestions: ["d"],
+      questionsToAsk: ["e"],
+    };
+    const result = interviewersMissingPrepGuides({
+      stages: [
+        {
+          id: "older",
+          scheduledAt: "2026-01-01T00:00:00.000Z",
+          interviewerContactIds: ["missing_old"],
+        },
+        {
+          id: "newer",
+          scheduledAt: "2026-06-01T00:00:00.000Z",
+          interviewerContactIds: ["ready", "missing_new"],
+        },
+      ],
+      guidanceJson: { people: [readyPerson] },
+    });
+    expect(result).toEqual({ count: 2, firstContactId: "missing_new" });
   });
 });

@@ -14,6 +14,7 @@ import {
 import { isHiringTeamPersonaBuilt, hiringTeamInvolvement } from "@/lib/hiring-team/build";
 import { JOB_REQUIREMENT_PROCESSING_VERSION } from "@/lib/job-requirement/types";
 import { askedQuestionsFromTurns } from "@/lib/consultation/questions";
+import { personSectionNeedsGeneration } from "@/lib/application-summary/people";
 import { prisma } from "@/lib/prisma-client";
 import {
   applicationStepFromPathname,
@@ -66,8 +67,14 @@ export async function loadApplicationStepFacts(input: {
           contact: { select: { firstName: true, lastName: true } },
         },
       },
-      interviewStages: { select: { id: true } },
-      applicationSummary: { select: { status: true } },
+        interviewStages: {
+          select: {
+            id: true,
+            scheduledAt: true,
+            interviewers: { select: { contactId: true } },
+          },
+        },
+        applicationSummary: { select: { status: true, guidanceJson: true } },
       consultationSession: {
         select: {
           id: true,
@@ -145,6 +152,14 @@ export async function loadApplicationStepFacts(input: {
     .join(" ")
     .trim();
   const consultation = consultationFacts(campaign.consultationSession);
+  const missingGuides = interviewersMissingPrepGuides({
+    stages: campaign.interviewStages.map((stage) => ({
+      id: stage.id,
+      scheduledAt: stage.scheduledAt,
+      interviewerContactIds: stage.interviewers.map((row) => row.contactId),
+    })),
+    guidanceJson: campaign.applicationSummary?.guidanceJson ?? null,
+  });
   return {
     researchDone: research.phase === "done",
     researchFailed: research.phase === "failed",
@@ -186,6 +201,10 @@ export async function loadApplicationStepFacts(input: {
     consultationStarted: consultation.started,
     consultationComplete: consultation.complete,
     consultationUnanswered: consultation.unanswered,
+    consultationUnansweredCount: consultation.unansweredCount,
+    consultationFirstUnansweredTurnId: consultation.firstUnansweredTurnId,
+    interviewersWithoutGuideCount: missingGuides.count,
+    firstInterviewerWithoutGuideId: missingGuides.firstContactId,
   };
 }
 
@@ -325,20 +344,89 @@ export function consultationFacts(
       analysisJson: unknown;
     }>;
   } | null,
-): { started: boolean; complete: boolean; unanswered: boolean } {
+): {
+  started: boolean;
+  complete: boolean;
+  unanswered: boolean;
+  unansweredCount: number;
+  firstUnansweredTurnId: string | null;
+} {
   if (!session) {
-    return { started: false, complete: false, unanswered: false };
+    return {
+      started: false,
+      complete: false,
+      unanswered: false,
+      unansweredCount: 0,
+      firstUnansweredTurnId: null,
+    };
   }
   const asked = askedQuestionsFromTurns(session.turns).filter(
     (question) =>
       Boolean(question.targetKey) || question.text.includes("?"),
   );
-  const unanswered = asked.some(
+  const open = asked.filter(
     (question) => !question.answered && !question.ignored,
   );
   return {
     started: true,
-    unanswered,
-    complete: !unanswered,
+    unanswered: open.length > 0,
+    complete: open.length === 0,
+    unansweredCount: open.length,
+    firstUnansweredTurnId: open[0]?.turnId ?? null,
   };
+}
+
+/** Newest interview first, then the first interviewer on that interview who has no ready guide. */
+export function interviewersMissingPrepGuides(input: {
+  stages: readonly {
+    id: string;
+    scheduledAt: Date | string | null;
+    interviewerContactIds: readonly string[];
+  }[];
+  guidanceJson: unknown;
+}): { count: number; firstContactId: string | null } {
+  const ready = readyGuideContactIds(input.guidanceJson);
+  const stages = [...input.stages].sort((left, right) => {
+    const byTime = timeValue(right.scheduledAt) - timeValue(left.scheduledAt);
+    return byTime === 0 ? right.id.localeCompare(left.id) : byTime;
+  });
+  const seen = new Set<string>();
+  const missing: string[] = [];
+  for (const stage of stages) {
+    for (const contactId of stage.interviewerContactIds) {
+      const id = contactId.trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      if (!ready.has(id)) missing.push(id);
+    }
+  }
+  return { count: missing.length, firstContactId: missing[0] ?? null };
+}
+
+function timeValue(value: Date | string | null): number {
+  if (!value) return 0;
+  const time = value instanceof Date ? value.getTime() : Date.parse(value);
+  return Number.isFinite(time) ? time : 0;
+}
+
+function readyGuideContactIds(guidanceJson: unknown): Set<string> {
+  const people =
+    guidanceJson && typeof guidanceJson === "object" && "people" in guidanceJson
+      ? (guidanceJson as { people?: unknown }).people
+      : null;
+  const ready = new Set<string>();
+  if (!Array.isArray(people)) return ready;
+  for (const person of people) {
+    if (!person || typeof person !== "object") continue;
+    const contactId = (person as { contactId?: unknown }).contactId;
+    if (typeof contactId !== "string" || !contactId.trim()) continue;
+    if (
+      !personSectionNeedsGeneration(
+        person as Parameters<typeof personSectionNeedsGeneration>[0],
+      )
+    ) {
+      ready.add(contactId);
+    }
+  }
+  return ready;
 }

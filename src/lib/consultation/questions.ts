@@ -149,6 +149,7 @@ export function askedQuestionsFromTurns(
       ignored,
       targetKey: turn.targetKey,
       followUp: turn.followUp,
+      turnId: turn.id,
     });
   }
   return asked;

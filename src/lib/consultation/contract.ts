@@ -179,6 +179,8 @@ export type AskedConsultationQuestion = {
   ignored: boolean;
   targetKey: string | null;
   followUp: boolean;
+  /** Consultant turn id, when this row was read from stored turns. */
+  turnId?: string;
 };
 
 export type SeekerStatedFactPayload = {

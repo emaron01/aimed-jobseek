@@ -316,7 +316,13 @@ describe("application dashboard navigation", () => {
     for (const [key, titleText, href] of STEP_PAGES) {
       expect(html).toContain(`data-testid="overview-step-${key}"`);
       expect(html).toContain(titleText);
-      expect(html).toContain(`href="${href}"`);
+      const actionHref =
+        key === "assets"
+          ? `${href}#resume-document`
+          : key === "summary"
+            ? `${DASHBOARD}/interviews`
+            : href;
+      expect(html).toContain(`href="${actionHref}"`);
     }
     expect(html).not.toContain("Back to dashboard");
     expect(enqueueApplicationJob).not.toHaveBeenCalled();

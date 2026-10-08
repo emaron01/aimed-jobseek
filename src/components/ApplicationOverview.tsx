@@ -1,5 +1,7 @@
+import { AppActionLink } from "@/components/AppButton";
 import { ApplicationStepCards } from "@/components/ApplicationStepCards";
 import { AppCard, SectionHeader, StatusPill } from "@/components/design";
+import { applicationProgressCurrent } from "@/lib/application/step-progress";
 import { applicationStepCopy, consultationConversationCopy } from "@/lib/product-config";
 import { features } from "@/lib/product-config/features";
 import type { ApplicationOverviewView } from "@/lib/application/overview";
@@ -22,6 +24,7 @@ export function ApplicationOverview({
       >
         {applicationStepCopy.dashboardTitle}
       </h1>
+      <YourNextStep steps={view.steps} />
       <AppCard>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -59,6 +62,28 @@ export function ApplicationOverview({
         <SectionHeader title={applicationStepCopy.trackerLabel} />
         <ApplicationStepCards steps={view.steps} />
       </AppCard>
+    </div>
+  );
+}
+
+function YourNextStep({
+  steps,
+}: {
+  steps: ApplicationOverviewView["steps"];
+}) {
+  const step = applicationProgressCurrent(steps);
+  if (!step) return null;
+  return (
+    <div
+      className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-edge bg-surface px-3 py-2"
+      data-testid="your-next-step"
+    >
+      <p className="text-sm text-ink">
+        {applicationStepCopy.yourNextStep}: {step.title}: {step.actionLabel}
+      </p>
+      <AppActionLink href={step.actionHref} data-testid="your-next-step-action">
+        {step.actionLabel}
+      </AppActionLink>
     </div>
   );
 }

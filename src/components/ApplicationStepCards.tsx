@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { AppPendingIndicator } from "@/components/AppButton";
+import { AppActionLink, AppPendingIndicator } from "@/components/AppButton";
 import { StatusPill } from "@/components/design";
 import { useWorkspaceJobs } from "@/components/workspace-jobs-context";
 import {
@@ -14,6 +13,15 @@ import {
   applicationStepStatusTone,
 } from "@/lib/product-config";
 
+type TurnKind = "working" | "your_turn" | "done" | "not_started";
+
+function turnKind(step: ApplicationStepView, spinning: boolean): TurnKind {
+  if (spinning) return "working";
+  if (step.workDone) return "done";
+  if (step.state === "not_started") return "not_started";
+  return "your_turn";
+}
+
 export function ApplicationStepCards({
   steps,
 }: {
@@ -23,20 +31,31 @@ export function ApplicationStepCards({
   return (
     <ol className="grid gap-2 sm:grid-cols-2">
       {steps.map((step) => {
-        const spinning = dashboardStepShowsSpinner(step, jobs);
+        const kind = turnKind(step, dashboardStepShowsSpinner(step, jobs));
+        const status = applicationStepStatusLabel(step);
+        const showStatus =
+          (kind === "your_turn" || kind === "done") &&
+          status !== applicationStepCopy.yourTurn &&
+          status !== applicationStepCopy.done;
         return (
           <li key={step.key}>
-            <Link
-              href={step.href}
-              className="flex flex-col gap-1 rounded-md border border-edge px-3 py-2 text-sm text-ink hover:bg-canvas"
+            <div
+              className="flex h-full flex-col gap-2 rounded-md border border-edge px-3 py-2 text-sm text-ink"
               data-testid={`overview-step-${step.key}`}
             >
               <span className="font-medium">
                 {step.number}. {step.title}
               </span>
-              {spinning ? (
-                <AppPendingIndicator label={applicationStepCopy.inProgress} />
-              ) : (
+              {kind === "working" ? (
+                <AppPendingIndicator label={applicationStepCopy.harperIsWorking} />
+              ) : null}
+              {kind === "your_turn" ? (
+                <StatusPill tone="progress">{applicationStepCopy.yourTurn}</StatusPill>
+              ) : null}
+              {kind === "your_turn" && step.turnCountLabel ? (
+                <p data-testid={`overview-step-count-${step.key}`}>{step.turnCountLabel}</p>
+              ) : null}
+              {kind === "done" ? (
                 <StatusPill
                   tone={applicationStepStatusTone({
                     key: step.key,
@@ -44,10 +63,21 @@ export function ApplicationStepCards({
                     state: step.state,
                   })}
                 >
-                  {applicationStepStatusLabel(step)}
+                  {applicationStepCopy.done}
                 </StatusPill>
-              )}
-            </Link>
+              ) : null}
+              {kind === "not_started" ? (
+                <StatusPill tone="attention">{applicationStepCopy.notStarted}</StatusPill>
+              ) : null}
+              {showStatus ? <p>{status}</p> : null}
+              <AppActionLink
+                href={step.actionHref}
+                className="mt-auto self-start"
+                data-testid={`overview-step-action-${step.key}`}
+              >
+                {step.actionLabel}
+              </AppActionLink>
+            </div>
           </li>
         );
       })}

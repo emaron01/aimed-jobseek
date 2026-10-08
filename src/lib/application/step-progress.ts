@@ -1,5 +1,6 @@
 import type { ApplicationJobType } from "@prisma/client";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
+import { workspaceHarperStandingQuestionHref } from "@/lib/application/workspace-links";
 import {
   APPLICATION_STEP_KEYS,
   applicationStepCopy,
@@ -45,6 +46,10 @@ export type ApplicationStepFactInput = {
   consultationStarted: boolean;
   consultationComplete: boolean;
   consultationUnanswered: boolean;
+  consultationUnansweredCount: number;
+  consultationFirstUnansweredTurnId: string | null;
+  interviewersWithoutGuideCount: number;
+  firstInterviewerWithoutGuideId: string | null;
 };
 
 export type ApplicationStepView = {
@@ -60,6 +65,11 @@ export type ApplicationStepView = {
   hasActiveJob: boolean;
   /** The step's own work is finished. Unread "new" does not clear this. */
   workDone: boolean;
+  /** Task button. A done step opens its page. */
+  actionLabel: string;
+  actionHref: string;
+  /** Shown with "Your turn" when this step already has a count. */
+  turnCountLabel: string | null;
   isCurrent: boolean;
   isPage: boolean;
 };
@@ -107,6 +117,10 @@ export function emptyApplicationStepFacts(): ApplicationStepFactInput {
     consultationStarted: false,
     consultationComplete: false,
     consultationUnanswered: false,
+    consultationUnansweredCount: 0,
+    consultationFirstUnansweredTurnId: null,
+    interviewersWithoutGuideCount: 0,
+    firstInterviewerWithoutGuideId: null,
   };
 }
 
@@ -398,6 +412,14 @@ export function buildApplicationStepViews(input: {
       input.jobs,
       hasNew && stepIsDone(step.key, input.facts),
     );
+    const workDone = stepIsDone(step.key, input.facts);
+    const task = stepTask({
+      campaignId: input.campaignId,
+      key: step.key,
+      title: step.title,
+      workDone,
+      facts: input.facts,
+    });
     return {
       key: step.key,
       number: step.number,
@@ -409,7 +431,10 @@ export function buildApplicationStepViews(input: {
       statusNote: null,
       hasNew,
       hasActiveJob,
-      workDone: stepIsDone(step.key, input.facts),
+      workDone,
+      actionLabel: task.actionLabel,
+      actionHref: task.actionHref,
+      turnCountLabel: task.turnCountLabel,
       isCurrent:
         input.currentStep === step.key ||
         (input.currentStep === "overview" && step.key === "applied"),
@@ -500,27 +525,159 @@ const PROGRESS_PILL_ORDER: readonly ApplicationStepKey[] = [
   "summary",
 ];
 
-/** First running step in the seeker workflow, otherwise the first step in that order that is not done. */
-export function applicationProgressLine(
-  steps: readonly {
-    key: ApplicationStepKey;
-    title: string;
-    hasActiveJob: boolean;
-    workDone: boolean;
-  }[],
-): ApplicationProgressLabels | null {
+type ProgressStep = {
+  key: ApplicationStepKey;
+  title: string;
+  hasActiveJob: boolean;
+  workDone: boolean;
+};
+
+function orderedProgressSteps<T extends ProgressStep>(steps: readonly T[]): T[] {
   const rank = new Map(PROGRESS_PILL_ORDER.map((key, index) => [key, index]));
-  const ordered = [...steps].sort(
+  return [...steps].sort(
     (left, right) => (rank.get(left.key) ?? 0) - (rank.get(right.key) ?? 0),
   );
-  const running = ordered.find((step) => step.hasActiveJob && !step.workDone);
-  const current = running ?? ordered.find((step) => !step.workDone);
+}
+
+function selectProgressSteps<T extends ProgressStep>(
+  steps: readonly T[],
+): { current: T | null; next: T | null } {
+  const ordered = orderedProgressSteps(steps);
+  const current =
+    ordered.find((step) => step.hasActiveJob && !step.workDone) ??
+    ordered.find((step) => !step.workDone) ??
+    null;
+  if (!current) return { current: null, next: null };
+  const next =
+    ordered.slice(ordered.indexOf(current) + 1).find((step) => !step.workDone) ?? null;
+  return { current, next };
+}
+
+/** The step named by the top-bar "Currently Completing" pill. Null when every step is done. */
+export function applicationProgressCurrent<T extends ProgressStep>(
+  steps: readonly T[],
+): T | null {
+  return selectProgressSteps(steps).current;
+}
+
+/** First running step in the seeker workflow, otherwise the first step in that order that is not done. */
+export function applicationProgressLine(
+  steps: readonly ProgressStep[],
+): ApplicationProgressLabels | null {
+  const { current, next } = selectProgressSteps(steps);
   if (!current) return null;
-  const next = ordered.slice(ordered.indexOf(current) + 1).find((step) => !step.workDone);
   return {
     current: `${applicationStepCopy.currentlyCompleting}: ${current.title}`,
     next: next ? `${applicationStepCopy.nextUp}: ${next.title}` : null,
   };
+}
+
+function countedLabel(count: number, one: string, many: string): string | null {
+  if (count <= 0) return null;
+  if (count === 1) return one;
+  return many.replace("{count}", String(count));
+}
+
+function stepTask(input: {
+  campaignId: string;
+  key: ApplicationStepKey;
+  title: string;
+  workDone: boolean;
+  facts: ApplicationStepFactInput;
+}): { actionLabel: string; actionHref: string; turnCountLabel: string | null } {
+  const page = applicationStepHref(input.campaignId, input.key);
+  const turnCountLabel = stepTurnCountLabel(input.key, input.facts);
+  if (input.workDone) {
+    return {
+      actionLabel: applicationStepCopy.openStep.replace("{step}", input.title),
+      actionHref: page,
+      turnCountLabel,
+    };
+  }
+  switch (input.key) {
+    case "applied":
+      return { actionLabel: applicationStepCopy.markApplied, actionHref: page, turnCountLabel };
+    case "job":
+      return { actionLabel: applicationStepCopy.reviewJob, actionHref: page, turnCountLabel };
+    case "company":
+      return {
+        actionLabel: applicationStepCopy.reviewCompany,
+        actionHref: page,
+        turnCountLabel,
+      };
+    case "consultation": {
+      const turnId = input.facts.consultationFirstUnansweredTurnId?.trim() ?? "";
+      return {
+        actionLabel: applicationStepCopy.answerHarper,
+        actionHref: turnId
+          ? workspaceHarperStandingQuestionHref(input.campaignId, turnId)
+          : page,
+        turnCountLabel,
+      };
+    }
+    case "assets":
+      return {
+        actionLabel: applicationStepCopy.reviewBullets,
+        actionHref: `${page}#resume-document`,
+        turnCountLabel,
+      };
+    case "hiring-team":
+      return {
+        actionLabel: applicationStepCopy.reviewPersonas,
+        actionHref: page,
+        turnCountLabel,
+      };
+    case "outreach":
+      return { actionLabel: applicationStepCopy.sendMessage, actionHref: page, turnCountLabel };
+    case "interviews":
+      return {
+        actionLabel: applicationStepCopy.addInterviewNotes,
+        actionHref: page,
+        turnCountLabel,
+      };
+    case "summary": {
+      const contactId = input.facts.firstInterviewerWithoutGuideId?.trim() ?? "";
+      return {
+        actionLabel: applicationStepCopy.createPrepGuides,
+        actionHref: contactId
+          ? `${applicationStepHref(input.campaignId, "interviews")}#person-section-${encodeURIComponent(contactId)}`
+          : applicationStepHref(input.campaignId, "interviews"),
+        turnCountLabel,
+      };
+    }
+    default: {
+      const exhaustive: never = input.key;
+      throw new Error(`Unknown application step: ${String(exhaustive)}`);
+    }
+  }
+}
+
+function stepTurnCountLabel(
+  key: ApplicationStepKey,
+  facts: ApplicationStepFactInput,
+): string | null {
+  if (key === "consultation") {
+    return countedLabel(
+      facts.consultationUnansweredCount,
+      applicationStepCopy.oneQuestionNeedsYourAnswer,
+      applicationStepCopy.questionsNeedYourAnswer,
+    );
+  }
+  if (key === "summary") {
+    return countedLabel(
+      facts.interviewersWithoutGuideCount,
+      applicationStepCopy.oneInterviewerHasNoPrepGuide,
+      applicationStepCopy.interviewersHaveNoPrepGuide,
+    );
+  }
+  if (key === "hiring-team") {
+    return countedLabel(
+      Math.max(0, facts.hiringTeamRoleCount - facts.hiringTeamBuiltCount),
+      applicationStepCopy.onePersonaIsNotBuilt,
+      applicationStepCopy.personasAreNotBuilt,
+    );
+  }
+  return null;
 }
 
 /** Create-page labels only. They are not application steps and do not change what the page does. */

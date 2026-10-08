@@ -1,6 +1,12 @@
 "use client";
 
-import { useActionState, useRef, useState, type ReactNode } from "react";
+import {
+  useActionState,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { addApplicationContactAction } from "@/app/actions/application-outreach";
 import {
   addCheatSheetInterviewNoteAction,
@@ -229,6 +235,25 @@ export function CheatSheetNoteForm({
   );
 }
 
+function subscribeLocationHash(onStoreChange: () => void): () => void {
+  window.addEventListener("hashchange", onStoreChange);
+  return () => window.removeEventListener("hashchange", onStoreChange);
+}
+
+function readLocationHash(): string {
+  return window.location.hash;
+}
+
+function locationHashMatches(hash: string, testId: string): boolean {
+  const raw = hash.replace(/^#/, "");
+  if (!raw) return false;
+  try {
+    return decodeURIComponent(raw) === testId;
+  } catch {
+    return raw === testId;
+  }
+}
+
 export function InterviewerCollapsible({
   title,
   startOpen,
@@ -249,14 +274,21 @@ export function InterviewerCollapsible({
   onOpenChange?: (open: boolean) => void;
 }) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(startOpen);
-  const open = controlledOpen ?? uncontrolledOpen;
+  const [hashDismissed, setHashDismissed] = useState(false);
+  const hash = useSyncExternalStore(subscribeLocationHash, readLocationHash, () => "");
+  const openedByHash =
+    controlledOpen === undefined && !hashDismissed && locationHashMatches(hash, testId);
+  const open = controlledOpen ?? (uncontrolledOpen || openedByHash);
   function toggle() {
     const next = !open;
-    if (controlledOpen === undefined) setUncontrolledOpen(next);
+    if (controlledOpen === undefined) {
+      setUncontrolledOpen(next);
+      setHashDismissed(!next);
+    }
     onOpenChange?.(next);
   }
   return (
-    <div data-testid={testId} data-open={open ? "true" : "false"}>
+    <div id={testId} data-testid={testId} data-open={open ? "true" : "false"}>
       <AppButton
         type="button"
         variant="secondary"

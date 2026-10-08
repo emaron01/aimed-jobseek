@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { ApplicationOverview } from "@/components/ApplicationOverview";
 import { ApplicationStepCards } from "@/components/ApplicationStepCards";
 import { ApplicationStepMarker } from "@/components/ApplicationSidebarTracker";
 import { TopBar } from "@/components/TopBar";
@@ -53,6 +55,9 @@ function step(
     hasNew: false,
     hasActiveJob: false,
     workDone: false,
+    actionLabel: "Open Harper",
+    actionHref: "/campaigns/camp_1/consultation",
+    turnCountLabel: null,
     isCurrent: false,
     isPage: true,
     ...patch,
@@ -72,6 +77,7 @@ describe("dashboard step cards", () => {
       createElement(ApplicationStepCards, { steps: [running] }),
     );
     expect(spinning).toContain('data-testid="action-pending-spinner"');
+    expect(spinning).toContain(applicationStepCopy.harperIsWorking);
 
     const finished = step({
       key: "consultation",
@@ -297,5 +303,147 @@ describe("dashboard step wording", () => {
     expect(marker).toContain("bg-warning-tint");
     expect(marker).toContain(applicationStepCopy.interviewsDone);
     expect(marker).not.toContain("bg-success");
+  });
+});
+
+describe("dashboard guidance", () => {
+  function overviewView(steps: ApplicationStepView[]) {
+    return {
+      campaignId: "camp_1",
+      campaignName: "Acme",
+      jobTitle: "Analyst",
+      companyName: "Northwind",
+      statusLabel: "Not applied",
+      statusTone: "attention" as const,
+      appliedAt: null,
+      nextStepText: "Add the company website.",
+      nextStepFailed: false,
+      fitLabel: null,
+      location: null,
+      workArrangement: null,
+      compensation: null,
+      steps,
+    };
+  }
+
+  it("shows a your-turn count and the task button from the existing step state", () => {
+    const steps = buildApplicationStepViews({
+      campaignId: "camp_1",
+      currentStep: "overview",
+      facts: {
+        ...emptyApplicationStepFacts(),
+        consultationStarted: true,
+        consultationComplete: false,
+        consultationUnanswered: true,
+        consultationUnansweredCount: 3,
+        consultationFirstUnansweredTurnId: "turn_9",
+        hiringTeamRoleCount: 2,
+        hiringTeamBuiltCount: 0,
+        interviewersWithoutGuideCount: 2,
+        firstInterviewerWithoutGuideId: "contact_2",
+      },
+      jobs: [],
+      seen: {},
+    });
+    const html = renderToStaticMarkup(
+      createElement(ApplicationStepCards, { steps }),
+    );
+    const consultation = steps.find((item) => item.key === "consultation");
+    expect(consultation?.state).toBe("in_progress");
+    const text = html.replaceAll("&#x27;", "'").replaceAll("&#39;", "'");
+    expect(text).toContain(applicationStepCopy.yourTurn);
+    expect(text).toContain("3 questions need your answer");
+    expect(text).toContain(applicationStepCopy.answerHarper);
+    expect(html).toContain(
+      'href="/campaigns/camp_1/consultation#harper-q%3Aturn_9"',
+    );
+    expect(html).toContain("2 personas are not built");
+    const guides = steps.find((item) => item.key === "summary");
+    expect(guides?.state).toBe("not_started");
+    expect(guides?.turnCountLabel).toBe("2 interviewers have no prep guide");
+    expect(guides?.actionLabel).toBe(applicationStepCopy.createPrepGuides);
+    expect(guides?.actionHref).toBe(
+      "/campaigns/camp_1/interviews#person-section-contact_2",
+    );
+    expect(html).toContain(applicationStepCopy.createPrepGuides);
+    expect(html).toContain('href="/campaigns/camp_1/interviews#person-section-contact_2"');
+    const guideCard = html.match(
+      /data-testid="overview-step-summary"[\s\S]*?<\/a>/,
+    )?.[0] ?? "";
+    expect(guideCard).not.toContain("2 interviewers have no prep guide");
+  });
+
+  it("uses the same step as Currently Completing and hides when every step is done", () => {
+    const steps = [
+      step({
+        key: "job",
+        title: "Job requirements",
+        number: 2,
+        workDone: true,
+        actionLabel: "Open Job requirements",
+        actionHref: "/campaigns/camp_1/job",
+      }),
+      step({
+        key: "company",
+        title: "Company Research",
+        number: 3,
+        hasActiveJob: true,
+        state: "in_progress",
+        actionLabel: applicationStepCopy.reviewCompany,
+        actionHref: "/campaigns/camp_1/company",
+      }),
+    ];
+    const progress = applicationProgressLine(steps);
+    const html = renderToStaticMarkup(
+      createElement(ApplicationOverview, { view: overviewView(steps) }),
+    );
+    expect(progress?.current).toBe(
+      `${applicationStepCopy.currentlyCompleting}: Company Research`,
+    );
+    expect(html).toContain(
+      `${applicationStepCopy.yourNextStep}: Company Research: ${applicationStepCopy.reviewCompany}`,
+    );
+    expect(html).toContain('data-testid="your-next-step-action"');
+    expect(html).toContain('href="/campaigns/camp_1/company"');
+
+    const finished = steps.map((item) => ({
+      ...item,
+      workDone: true,
+      hasActiveJob: false,
+    }));
+    expect(applicationProgressLine(finished)).toBeNull();
+    const doneHtml = renderToStaticMarkup(
+      createElement(ApplicationOverview, { view: overviewView(finished) }),
+    );
+    expect(doneHtml).not.toContain('data-testid="your-next-step"');
+  });
+
+  it("does not enqueue work or make a paid call while drawing the dashboard", () => {
+    const html = renderToStaticMarkup(
+      createElement(ApplicationOverview, {
+        view: overviewView(
+          buildApplicationStepViews({
+            campaignId: "camp_1",
+            currentStep: "overview",
+            facts: emptyApplicationStepFacts(),
+            jobs: [],
+            seen: {},
+          }),
+        ),
+      }),
+    );
+    expect(html).toContain(applicationStepCopy.dashboardTitle);
+    for (const path of [
+      "src/components/ApplicationOverview.tsx",
+      "src/components/ApplicationStepCards.tsx",
+      "src/lib/application/overview.ts",
+      "src/lib/application/tracker.ts",
+      "src/app/(app)/campaigns/[id]/page.tsx",
+    ]) {
+      const source = readFileSync(path, "utf8");
+      expect(source).not.toContain("enqueueApplicationJob");
+      expect(source).not.toContain("runPaidStructuredCall");
+      expect(source).not.toContain("generateStructured");
+    }
   });
 });
