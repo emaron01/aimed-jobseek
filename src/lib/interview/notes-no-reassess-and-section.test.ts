@@ -357,7 +357,7 @@ describe("notes never reassess Harper, and the cheat sheet lists them once", () 
     expect(prep?.interviewLabel).toContain("Recruiter");
 
     const page = readFileSync("src/app/(app)/campaigns/[id]/summary/page.tsx", "utf8");
-    expect(page.indexOf("{view.people.map")).toBeLessThan(page.indexOf('id="general-questions"'));
+    expect(page.indexOf("{group.people.map")).toBeLessThan(page.indexOf('id="general-questions"'));
     expect(page.indexOf('id="general-questions"')).toBeLessThan(page.indexOf('id="interview-notes"'));
     const printCss = readFileSync("src/app/globals.css", "utf8");
     expect(printCss).toContain(".application-summary .cheat-sheet-collapsible-body.hidden");

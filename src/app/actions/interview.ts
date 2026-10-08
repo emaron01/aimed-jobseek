@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { startConsultation } from "@/lib/consultation/service";
+import { buildNewInterviewPrep } from "@/lib/interview/new-interview";
 import { requireCurrentUser } from "@/lib/auth/authz";
 import { addCheatSheetInterviewNote } from "@/lib/application-summary/service";
 import {
@@ -13,7 +14,7 @@ import {
   startPersonPrepForContact,
   updateInterviewStage,
 } from "@/lib/interview/stages";
-import { applicationSummaryConfig, interviewConfig, vocab, workspaceProgressText } from "@/lib/product-config";
+import { applicationSummaryConfig, interviewConfig, prepGuideReadyMessage, vocab, workspaceProgressText } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 import { requireOrganizationId } from "@/lib/tenant/getCurrentOrganization";
 
@@ -23,6 +24,9 @@ export type InterviewActionResult = {
   message: string;
   questions?: Array<{ id: string; text: string }>;
   violations?: string[];
+  contactId?: string;
+  sectionKey?: string;
+  displayName?: string;
 };
 
 function campaignId(formData: FormData): string {
@@ -62,6 +66,40 @@ function errorResult(error: unknown): InterviewActionResult {
         ? error.message
         : "The interview action could not be completed. Retry.",
   };
+}
+
+export async function buildNewInterviewAction(
+  _previous: InterviewActionResult | null,
+  formData: FormData,
+): Promise<InterviewActionResult> {
+  try {
+    const [user, organizationId] = await Promise.all([
+      requireCurrentUser(),
+      requireOrganizationId(),
+    ]);
+    const id = campaignId(formData);
+    const result = await buildNewInterviewPrep({
+      organizationId,
+      campaignId: id,
+      userId: user.id,
+      title: String(formData.get("title") ?? ""),
+      name: String(formData.get("name") ?? ""),
+      scheduledAt: String(formData.get("scheduledAt") ?? ""),
+      format: String(formData.get("format") ?? ""),
+      personaId: String(formData.get("personaId") ?? ""),
+    });
+    revalidate(id, result.stageId ?? undefined);
+    return {
+      ok: true,
+      message: prepGuideReadyMessage(result.displayName),
+      contactId: result.contactId,
+      sectionKey: result.sectionKey,
+      displayName: result.displayName,
+      jobId: result.jobId ?? undefined,
+    };
+  } catch (error) {
+    return errorResult(error);
+  }
 }
 
 export async function createInterviewStageAction(

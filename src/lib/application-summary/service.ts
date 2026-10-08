@@ -61,6 +61,7 @@ import {
   buildCheatSheetPeople,
   cheatSheetPersonSectionInputHash,
   cheatSheetSectionKind,
+  guideHeadingUpgrade,
   interviewerContactIdsFrom,
   personSectionNeedsGeneration,
   type CheatSheetGeneralQuestionInput,
@@ -197,6 +198,69 @@ export async function personSectionInputsUnchanged(input: {
     interviewer,
   });
   return existingPerson.inputHash === inputHash;
+}
+
+/**
+ * A name added to a title-only contact keeps the same guide. The heading and
+ * its input hash are rewritten only when nothing else in the hash changed,
+ * so the next guide check does not pay.
+ */
+export async function keepGuideWhenOnlyTheNameChanged(input: {
+  organizationId: string;
+  campaignId: string;
+  contactId: string;
+}): Promise<boolean> {
+  const sectionKey = `contact:${input.contactId}`;
+  const data = await loadSummaryData(input.organizationId, input.campaignId);
+  const existing = parsedGuidance(data.campaign.applicationSummary?.guidanceJson);
+  const person = data.people.find((item) => item.sectionKey === sectionKey);
+  const stored = existing?.people.find((item) => item.sectionKey === sectionKey);
+  if (!person || !existing || !stored) return false;
+  const personSources = sourcesForPersonSection({
+    sources: data.sources,
+    contactId: person.contactId,
+    roleId: person.roleId,
+    noteIds: (person.contactId
+      ? data.notesByContactId.get(person.contactId) ?? []
+      : []
+    ).map((note) => note.id),
+    includeApplicationLearnings: person.sectionKind === "HIRING_MANAGER",
+  });
+  const careerStage = careerStageFromProfileJson(data.campaign.product.profileJson);
+  const generalQuestions = await generalQuestionsForPersonSection(
+    input.organizationId,
+    input.campaignId,
+  );
+  const interviewer = interviewerContextForPerson(person, data.roles);
+  const hashFor = (heading: string) =>
+    cheatSheetPersonSectionInputHash({
+      person: personPayload({ ...person, heading }),
+      sources: personSources,
+      careerStage,
+      generalQuestions,
+      interviewer,
+    });
+  const upgrade = guideHeadingUpgrade({
+    storedHeading: stored.heading,
+    storedInputHash: stored.inputHash,
+    nextHeading: person.heading,
+    hashFor,
+  });
+  if (!upgrade) return false;
+  const summaryId = data.campaign.applicationSummary?.id;
+  if (!summaryId) return false;
+  await prisma.applicationSummary.update({
+    where: { id: summaryId },
+    data: {
+      guidanceJson: jsonGuidance({
+        ...existing,
+        people: existing.people.map((item) =>
+          item.sectionKey === sectionKey ? { ...item, ...upgrade } : item,
+        ),
+      }),
+    },
+  });
+  return true;
 }
 
 /**
@@ -466,8 +530,16 @@ async function loadSummaryData(organizationId: string, campaignId: string) {
       })),
   }).map((person) => {
     const role = campaign.hiringTeamRoles.find((item) => item.id === person.roleId);
+    const contact = campaign.contacts.find((row) => row.contactId === person.contactId);
+    const contactName = contact
+      ? [contact.contact.firstName, contact.contact.lastName]
+          .filter(Boolean)
+          .join(" ")
+          .trim() || null
+      : null;
     return {
       ...person,
+      contactName,
       sectionKind: cheatSheetSectionKind(person),
       personaBuilt: isHiringTeamPersonaBuilt(role ?? {}),
     };

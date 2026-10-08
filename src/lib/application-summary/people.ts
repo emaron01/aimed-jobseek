@@ -118,6 +118,33 @@ export function personSectionNeedsGeneration(section: {
   );
 }
 
+/** A person guide whose contact has a title and no name. Display only. */
+export function isTitleOnlyPrepGuide(person: {
+  contactId: string | null;
+  contactName: string | null;
+}): boolean {
+  return Boolean(person.contactId) && !person.contactName?.trim();
+}
+
+/**
+ * When a stored guide hash matches the previous heading, keep that guide and
+ * retitle it. Any other hash difference is left for a later rebuild.
+ */
+export function guideHeadingUpgrade(input: {
+  storedHeading: string;
+  storedInputHash: string | null | undefined;
+  nextHeading: string;
+  hashFor: (heading: string) => string;
+}): { heading: string; inputHash: string } | null {
+  if (!input.storedInputHash) return null;
+  if (input.storedHeading === input.nextHeading) return null;
+  if (input.storedInputHash !== input.hashFor(input.storedHeading)) return null;
+  return {
+    heading: input.nextHeading,
+    inputHash: input.hashFor(input.nextHeading),
+  };
+}
+
 export function personaCheatSheetSectionKey(personaId: string): string {
   return `persona:${personaId}`;
 }

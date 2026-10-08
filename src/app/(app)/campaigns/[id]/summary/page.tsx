@@ -41,7 +41,7 @@ import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-st
 import { loadCheatSheetCoachQaByContact } from "@/lib/application-summary/coach-qa";
 import { statedListItems } from "@/lib/application-summary/display";
 import { latestApplicationSummaryFailure } from "@/lib/application-summary/failure-message";
-import { personSectionNeedsGeneration } from "@/lib/application-summary/people";
+import { isTitleOnlyPrepGuide, personSectionNeedsGeneration } from "@/lib/application-summary/people";
 import type { ApplicationSummaryGuidance } from "@/lib/application-summary/contract";
 import { compileApplicationInterviewNotes } from "@/lib/application-summary/interview-notes";
 import { getApplicationSummaryView } from "@/lib/application-summary/service";
@@ -318,6 +318,8 @@ export default async function ApplicationSummaryPage({
       campaignId: id,
     }),
   ]);
+  const titleOnlyGuides = view.people.filter((person) => isTitleOnlyPrepGuide(person));
+  const namedGuides = view.people.filter((person) => !isTitleOnlyPrepGuide(person));
   const applicationInterviewNotes = compileApplicationInterviewNotes({
     people: [...view.notesByContactId.entries()].map(([contactId, notes]) => ({
       contactId,
@@ -338,6 +340,9 @@ export default async function ApplicationSummaryPage({
         @media print {
           body[data-print-section] [data-print-section-chrome] { display: none !important; }
           body[data-print-section] [data-testid="prep-guide-personas"]:not(:has([data-print-active="true"])) {
+            display: none !important;
+          }
+          body[data-print-section] [data-testid="prep-guide-by-title"]:not(:has([data-print-active="true"])) {
             display: none !important;
           }
           body[data-print-section] .application-summary-section { display: none !important; }
@@ -401,12 +406,30 @@ export default async function ApplicationSummaryPage({
       </div>
 
       <HarperDraftProvider>
+      {[
+        {
+          testId: "prep-guide-personas",
+          title: applicationSummaryConfig.sections.interviewPersonas,
+          people: namedGuides,
+          showEmpty: true,
+        },
+        {
+          testId: "prep-guide-by-title",
+          title: applicationSummaryConfig.sections.prepByTitle,
+          people: titleOnlyGuides,
+          showEmpty: false,
+        },
+      ].map((group) => (
       <PrepGuidePrimaryCard
-        testId="prep-guide-personas"
-        title={applicationSummaryConfig.sections.interviewPersonas}
+        key={group.testId}
+        testId={group.testId}
+        title={group.title}
       >
-      {view.people.length === 0 ? <CheatSheetEmptyState campaignId={id} /> : null}
-      {view.people.map((person) => {
+      {group.showEmpty && group.people.length === 0 ? <CheatSheetEmptyState campaignId={id} /> : null}
+      {!group.showEmpty && group.people.length === 0 ? (
+        <p className="text-sm text-subtle">Not stated.</p>
+      ) : null}
+      {group.people.map((person) => {
         const section =
           guidance?.people.find((item) => item.sectionKey === person.sectionKey) ?? null;
         const coachQaItems = person.contactId
@@ -506,6 +529,7 @@ export default async function ApplicationSummaryPage({
         );
       })}
       </PrepGuidePrimaryCard>
+      ))}
       <CheatSheetSharedSection>
       <CheatSheetSection
         id="general-questions"

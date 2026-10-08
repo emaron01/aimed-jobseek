@@ -22,6 +22,7 @@ describe("Interview Preparation Guides layout", () => {
     );
     expect(applicationSummaryConfig.sections.company).toBe("Full Company Profile");
     expect(applicationSummaryConfig.sections.interviewPersonas).toBe("Interview Personas");
+    expect(applicationSummaryConfig.sections.prepByTitle).toBe("Prep by Title");
     expect(applicationSummaryConfig.sections.generalStudyQuestions).toBe(
       "General Study Questions",
     );
@@ -43,11 +44,12 @@ describe("Interview Preparation Guides layout", () => {
     );
   });
 
-  it("puts the guide sections and five primary cards in order and drops Interview stages", () => {
+  it("puts the guide sections and primary cards in order and drops Interview stages", () => {
     const page = readFileSync("src/app/(app)/campaigns/[id]/summary/page.tsx", "utf8");
     const body = readFileSync("src/components/CheatSheetPersonBody.tsx", "utf8");
     const cards = [
-      'testId="prep-guide-personas"',
+      '"prep-guide-personas"',
+      '"prep-guide-by-title"',
       'testId="prep-guide-general-questions"',
       'testId="prep-guide-consolidated-notes"',
       'testId="prep-guide-position"',
@@ -60,7 +62,7 @@ describe("Interview Preparation Guides layout", () => {
       last = at;
     }
 
-    const mapStart = page.indexOf("{view.people.map");
+    const mapStart = page.indexOf("{group.people.map");
     const mapEnd = page.indexOf("</PrepGuidePrimaryCard>", mapStart);
     const map = page.slice(mapStart, mapEnd);
     const overview = map.indexOf("-overview");
@@ -140,7 +142,7 @@ describe("Interview Preparation Guides layout", () => {
     expect(css).toContain(".application-summary .cheat-sheet-collapsible-body.hidden");
     expect(css).toContain("display: block !important");
 
-    const mapStart = page.indexOf("{view.people.map");
+    const mapStart = page.indexOf("{group.people.map");
     const map = page.slice(mapStart, page.indexOf("</PrepGuidePrimaryCard>", mapStart));
     const sectionStart = map.indexOf("<CheatSheetSection");
     const overview = map.indexOf('sections.overview');

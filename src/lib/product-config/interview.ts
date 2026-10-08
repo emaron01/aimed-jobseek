@@ -49,6 +49,19 @@ export const interviewConfig = Object.freeze({
     openGuide: "Open stage",
     startByChoosing: "Start by choosing who you're meeting.",
     addSomeoneYoureMeeting: "Add someone you're meeting",
+    newInterview: "I have a new interview!",
+    newInterviewCongratulations: "Congratulations on making it to the next stage!",
+    buildMyPrepGuide: "Build my prep guide",
+    cancelNewInterview: "Cancel",
+    theirTitle: "Their title",
+    theirName: "Their name",
+    interviewWhen: "Date and time",
+    interviewFormat: "Format",
+    matchedRole: "Matching role",
+    chooseRole: "Choose a role",
+    createRoleFromTitle: "Create a new role from this title",
+    preparingGuide: "Harper is preparing your guide…",
+    viewGuide: "View guide",
     addNewContact: "Add a new contact",
     addAnotherInterview: "Add another interview",
     addFollowUpInterview: "Add Follow-up Interview",
@@ -122,6 +135,13 @@ export const interviewConfig = Object.freeze({
     "reinforce",
   ],
 } as const);
+
+/** The type Interview Notes pre-selects, and the type a new interview uses. */
+export const DEFAULT_INTERVIEW_STAGE_TYPE = "RECRUITER_SCREEN" as const;
+
+export function prepGuideReadyMessage(who: string): string {
+  return `Your prep guide for ${who.trim()} is ready`;
+}
 
 export type InterviewStageTypeValue = keyof typeof interviewConfig.types;
 export type InterviewFormatValue = keyof typeof interviewConfig.formats;

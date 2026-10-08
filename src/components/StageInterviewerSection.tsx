@@ -18,7 +18,7 @@ import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { AppButton } from "@/components/AppButton";
 import { CHEAT_SHEET_HEADING_CLASS } from "@/lib/application-summary/cheat-sheet-collapse";
 import { formatSavedInterviewNoteAt } from "@/lib/interview/saved-note-label";
-import { interviewConfig } from "@/lib/product-config";
+import { DEFAULT_INTERVIEW_STAGE_TYPE, interviewConfig } from "@/lib/product-config";
 
 type RoleOption = { id: string; name: string; suggestionKey?: string | null };
 type PersonOption = {
@@ -47,7 +47,7 @@ function ScheduleFields({ fieldClass }: { fieldClass: string }) {
     <div className="grid gap-3 md:grid-cols-2">
       <label className="text-sm">
         Type
-        <select name="type" required className={fieldClass} defaultValue="RECRUITER_SCREEN">
+        <select name="type" required className={fieldClass} defaultValue={DEFAULT_INTERVIEW_STAGE_TYPE}>
           {Object.entries(interviewConfig.types).map(([value, label]) => (
             <option key={value} value={value}>
               {label}

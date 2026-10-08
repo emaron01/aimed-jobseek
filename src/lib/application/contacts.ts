@@ -4,55 +4,20 @@ import { prisma } from "@/lib/prisma";
 import { normalizeContactEmail } from "@/lib/contact/identity";
 import type { NamedJobContact } from "@/lib/job-requirement/types";
 import { vocab } from "@/lib/product-config";
-import { parseStringArray } from "@/lib/research";
-import { evaluatePersonaTitleGate } from "@/lib/scoring/title-fit";
 import { TenantError } from "@/lib/tenant/errors";
+import {
+  matchHiringTeamRoleFromTitle,
+  type ApplicationHiringTeamRole,
+} from "@/lib/application/role-title-match";
 
-export type ApplicationHiringTeamRole = {
-  id: string;
-  name: string;
-  suggestionKey: string | null;
-  targetTitles: unknown;
-};
+export type { ApplicationHiringTeamRole };
+export { matchHiringTeamRoleFromTitle };
 
-export function matchHiringTeamRoleFromTitle(input: {
-  title: string | null;
-  roles: ApplicationHiringTeamRole[];
-}): ReturnType<typeof resolveContactPersonaDecision> {
-  const snapshots = input.roles.map((role) => ({
-    id: role.id,
-    name: role.name,
-    targetTitles: parseStringArray(role.targetTitles),
-    criteria: [],
-  }));
-  const gates = snapshots.map((persona) =>
-    evaluatePersonaTitleGate({
-      persona,
-      contactTitle: input.title,
-      applyPositiveFit: true,
-    }),
-  );
-  const candidates = gates.filter((gate) => gate.status === "CANDIDATE");
-  const recruiter = input.roles.find((role) => role.suggestionKey === "recruiter");
-  if (candidates.length === 1) {
-    return resolveContactPersonaDecision({
-      matchedPersonaId: candidates[0]!.personaId,
-    });
-  }
-  if (candidates.length > 1) {
-    const recruiterCandidate = candidates.find(
-      (gate) => gate.personaId === recruiter?.id,
-    );
-    return resolveContactPersonaDecision({
-      aiSkipReason: "MULTI_PERSONA_MATCH",
-      suggestedPersonaId:
-        recruiterCandidate?.personaId ?? candidates[0]!.personaId,
-    });
-  }
-  return resolveContactPersonaDecision({
-    aiSkipReason: input.title?.trim() ? "NO_TITLE_FIT" : "NO_TITLE_FIT",
-    suggestedPersonaId: recruiter?.id ?? input.roles[0]?.id ?? null,
-  });
+export async function listApplicationHiringTeamRoles(
+  organizationId: string,
+  campaignId: string,
+): Promise<ApplicationHiringTeamRole[]> {
+  return hiringTeamRoles(organizationId, campaignId);
 }
 
 async function hiringTeamRoles(
@@ -93,10 +58,12 @@ export async function addApplicationContact(input: {
   const firstName = input.firstName.trim();
   const lastName = input.lastName.trim();
   const title = input.title.trim();
-  if (!firstName) throw new TenantError("First name is required.");
-  if (!lastName) throw new TenantError("Last name is required.");
   if (!title && input.source !== "POSTING") {
     throw new TenantError("Title is required.");
+  }
+  if (!title) {
+    if (!firstName) throw new TenantError("First name is required.");
+    if (!lastName) throw new TenantError("Last name is required.");
   }
 
   const campaign = await prisma.campaign.findFirst({
@@ -306,8 +273,6 @@ export async function updateApplicationContact(input: {
   const firstName = input.firstName.trim();
   const lastName = input.lastName.trim();
   const title = input.title.trim();
-  if (!firstName) throw new TenantError("First name is required.");
-  if (!lastName) throw new TenantError("Last name is required.");
   if (!title) throw new TenantError("Title is required.");
 
   const contact = await prisma.contact.findFirst({
@@ -368,9 +333,11 @@ export async function updateApplicationContact(input: {
   }
   const linkedinUrl = input.linkedinUrl?.trim() || null;
   const titleChanged = title !== (contact.title ?? "");
-  const fieldsChanged =
+  const nameChanged =
     firstName !== (contact.firstName ?? "") ||
-    lastName !== (contact.lastName ?? "") ||
+    lastName !== (contact.lastName ?? "");
+  const fieldsChanged =
+    nameChanged ||
     titleChanged ||
     email !== (contact.email ?? null) ||
     linkedinUrl !== (contact.linkedinUrl ?? null);
@@ -414,7 +381,9 @@ export async function updateApplicationContact(input: {
   const existingPaste = membership?.linkedInProfileText?.trim() || "";
   let pasteQueued = false;
   const displayName =
-    [firstName, lastName].filter(Boolean).join(" ") || vocab.contact.Singular;
+    [firstName, lastName].filter(Boolean).join(" ").trim() ||
+    title ||
+    vocab.contact.Singular;
   if (campaignId && pastedText && pastedText !== existingPaste) {
     const { saveLinkedInPaste } = await import("@/lib/contact-profile/service");
     const paste = await saveLinkedInPaste({
@@ -432,6 +401,25 @@ export async function updateApplicationContact(input: {
     !personaChanged &&
     !pasteQueued &&
     (!pastedText || pastedText === existingPaste);
+
+  if (
+    campaignId &&
+    nameChanged &&
+    !titleChanged &&
+    email === (contact.email ?? null) &&
+    linkedinUrl === (contact.linkedinUrl ?? null) &&
+    !personaChanged &&
+    !pasteQueued
+  ) {
+    const { keepGuideWhenOnlyTheNameChanged } = await import(
+      "@/lib/application-summary/service"
+    );
+    await keepGuideWhenOnlyTheNameChanged({
+      organizationId: input.organizationId,
+      campaignId,
+      contactId: contact.id,
+    });
+  }
 
   return {
     contactId: contact.id,

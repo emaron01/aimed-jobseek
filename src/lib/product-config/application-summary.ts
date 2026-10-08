@@ -28,6 +28,7 @@ export const applicationSummaryConfig = Object.freeze({
   sections: {
     overview: "At a glance",
     interviewPersonas: "Interview Personas",
+    prepByTitle: "Prep by Title",
     generalStudyQuestions: "General Study Questions",
     consolidatedInterviewNotes: "Consolidated Interview Notes",
     companyBackground: "Company background",

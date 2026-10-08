@@ -1,5 +1,9 @@
 import { ApplicationStepCards, DashboardStepAction } from "@/components/ApplicationStepCards";
 import { AppCard, SectionHeader, StatusPill } from "@/components/design";
+import {
+  NewInterviewForm,
+  type NewInterviewRoleOption,
+} from "@/components/NewInterviewForm";
 import { applicationProgressCurrent } from "@/lib/application/step-progress";
 import { applicationStepCopy, consultationConversationCopy } from "@/lib/product-config";
 import { features } from "@/lib/product-config/features";
@@ -12,8 +16,12 @@ function appliedDateLabel(value: string): string {
 
 export function ApplicationOverview({
   view,
+  campaignId,
+  roles,
 }: {
   view: ApplicationOverviewView;
+  campaignId?: string;
+  roles?: NewInterviewRoleOption[];
 }) {
   return (
     <div className="space-y-4" data-testid="application-overview">
@@ -57,6 +65,9 @@ export function ApplicationOverview({
           />
         </dl>
       </AppCard>
+      {campaignId ? (
+        <NewInterviewForm campaignId={campaignId} roles={roles ?? []} />
+      ) : null}
       <AppCard data-testid="application-overview-steps">
         <SectionHeader title={applicationStepCopy.trackerLabel} />
         <ApplicationStepCards steps={view.steps} />

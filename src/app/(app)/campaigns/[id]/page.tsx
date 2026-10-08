@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ApplicationOverview } from "@/components/ApplicationOverview";
+import { listApplicationHiringTeamRoles } from "@/lib/application/contacts";
 import { ApplicationWorkspace } from "@/components/ApplicationWorkspace";
 import { generateApplicationPageMetadata } from "@/lib/application/page-metadata";
 import { getApplicationOverview } from "@/lib/application/overview";
@@ -490,7 +491,11 @@ export default async function CampaignDetailPage({
 
   return (
     <div className="space-y-6">
-      <ApplicationOverview view={overview} />
+      <ApplicationOverview
+        view={overview}
+        campaignId={campaign.id}
+        roles={await listApplicationHiringTeamRoles(organization.id, campaign.id)}
+      />
       <ApplicationWorkspace
         campaignId={campaign.id}
         organizationId={organization.id}
