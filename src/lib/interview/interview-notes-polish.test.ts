@@ -11,6 +11,7 @@ import {
 } from "@/lib/application/step-progress";
 import { parseCheatSheetNotes } from "@/lib/application-summary/notes";
 import { applicationStepFromPathname } from "@/lib/product-config/application-steps";
+import { workspaceCheatSheetPersonHref } from "@/lib/application/workspace-links";
 import { listInterviewStages } from "@/lib/interview/stages";
 import { formatSavedInterviewNoteAt } from "@/lib/interview/saved-note-label";
 import {
@@ -140,6 +141,59 @@ describe("interview notes polish", () => {
     host.remove();
   });
 
+  it("shows View Interview Prep Guide only when that person's guide exists", async () => {
+    enqueue.mockClear();
+    paidCall.mockClear();
+    act(() => root.unmount());
+    root = createRoot(host);
+    const alex: Person = {
+      contactId: "alex",
+      name: "Alex Chen",
+      title: "Director",
+      personaId: "role-2",
+      personaName: "Hiring Manager",
+    };
+    await paint(
+      root,
+      createElement(InterviewStagesList, {
+        campaignId: "camp",
+        canEdit: true,
+        roles: [{ id: "role-1", name: "Recruiter", suggestionKey: "recruiter" }],
+        people: [priya, alex],
+        notesByContactId: new Map(),
+        guideReadyByContactId: new Map([[priya.contactId, true]]),
+        stages: [
+          stage({ id: "priya-stage" }),
+          stage({
+            id: "alex-stage",
+            interviewers: [
+              {
+                id: "link-alex",
+                contactId: alex.contactId,
+                contact: { firstName: "Alex", lastName: "Chen", title: "Director" },
+              },
+            ],
+          }),
+        ],
+      }),
+    );
+
+    const view = host.querySelector("[data-testid=view-interview-prep-guide-priya]");
+    expect(view?.textContent).toBe(applicationSummaryConfig.actions.viewInterviewPrepGuide);
+    expect(view?.getAttribute("href")).toBe(
+      workspaceCheatSheetPersonHref("camp", priya.contactId),
+    );
+    expect(view?.className).toContain("bg-primary");
+    expect(host.querySelector("[data-testid=view-interview-prep-guide-alex]")).toBeNull();
+    expect(host.querySelector("[data-testid=interview-prep-guide-priya]")?.textContent).toContain(
+      "Update Interview Prep Guide",
+    );
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(paidCall).not.toHaveBeenCalled();
+    act(() => root.unmount());
+    root = createRoot(host);
+  });
+
   it("renders the collapsed add flow, saved notes, follow-up, outcome spacing, and Interview Notes", async () => {
     enqueue.mockClear();
     paidCall.mockClear();
@@ -190,6 +244,7 @@ describe("interview notes polish", () => {
     );
 
     expect(host.querySelector("h2")?.textContent).toBe("Interview Notes");
+    expect(host.querySelector("[data-testid=view-interview-prep-guide-priya]")).toBeNull();
     expect(host.textContent).toContain(interviewConfig.labels.sectionHelp);
     const addSection = host.querySelector("[data-testid=add-someone-youre-meeting]");
     expect(addSection?.getAttribute("data-open")).toBe("false");

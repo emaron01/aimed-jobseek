@@ -1,4 +1,5 @@
 import { updateInterviewStageAction } from "@/app/actions/interview";
+import { AppActionLink } from "@/components/AppButton";
 import { InterviewPrepGuideForm } from "@/components/InterviewPrepGuideButton";
 import { applicationSummaryGuidanceSchema } from "@/lib/application-summary/contract";
 import { personSectionNeedsGeneration } from "@/lib/application-summary/people";
@@ -22,7 +23,8 @@ import { interviewPrepGuideNeedsPersonaChoice } from "@/lib/interview/prep-guide
 import { CheatSheetGenerationError } from "@/components/CheatSheetGenerationError";
 import { parseCheatSheetNotes } from "@/lib/application-summary/notes";
 import { listInterviewStages, stageTypeLabel } from "@/lib/interview/stages";
-import { interviewConfig } from "@/lib/product-config";
+import { workspaceCheatSheetPersonHref } from "@/lib/application/workspace-links";
+import { applicationSummaryConfig, interviewConfig } from "@/lib/product-config";
 import { prisma } from "@/lib/prisma-client";
 import type {
   InterviewFormat,
@@ -364,6 +366,7 @@ export function InterviewStagesList({
 
       {grouped.people.map((group) => {
         const startOpen = group.interviews.length === 1 && group.interviews[0]?.outcome == null;
+        const hasGuide = guideReadyByContactId.get(group.person.contactId) ?? false;
         return (
           <InterviewerCollapsible
             key={group.person.contactId}
@@ -374,21 +377,33 @@ export function InterviewStagesList({
               <InterviewStageInterviewerLink campaignId={campaignId} person={group.person} />
             }
           >
-            {canEdit ? (
-              <InterviewPrepGuideForm
-                campaignId={campaignId}
-                contactId={group.person.contactId}
-                hasGuide={guideReadyByContactId.get(group.person.contactId) ?? false}
-                failed={guideFailure?.sectionKey === `contact:${group.person.contactId}`}
-                failureMessage={guideFailure?.message ?? null}
-                needsPersonaChoice={
-                  needsPersonaChoiceByContactId.get(group.person.contactId) ?? false
-                }
-                roles={roles}
-              />
-            ) : guideFailure?.sectionKey === `contact:${group.person.contactId}` ? (
-              <CheatSheetGenerationError message={guideFailure.message} />
-            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              {canEdit ? (
+                <InterviewPrepGuideForm
+                  campaignId={campaignId}
+                  contactId={group.person.contactId}
+                  hasGuide={hasGuide}
+                  failed={guideFailure?.sectionKey === `contact:${group.person.contactId}`}
+                  failureMessage={guideFailure?.message ?? null}
+                  needsPersonaChoice={
+                    needsPersonaChoiceByContactId.get(group.person.contactId) ?? false
+                  }
+                  roles={roles}
+                />
+              ) : guideFailure?.sectionKey === `contact:${group.person.contactId}` ? (
+                <CheatSheetGenerationError message={guideFailure.message} />
+              ) : null}
+              {hasGuide ? (
+                <AppActionLink
+                  href={workspaceCheatSheetPersonHref(campaignId, group.person.contactId)}
+                  variant="primary"
+                  className="print:hidden"
+                  data-testid={`view-interview-prep-guide-${group.person.contactId}`}
+                >
+                  {applicationSummaryConfig.actions.viewInterviewPrepGuide}
+                </AppActionLink>
+              ) : null}
+            </div>
             {group.interviews.map((stage) => (
               <PersonInterview
                 key={stage.id}

@@ -21,6 +21,7 @@ export const applicationSummaryConfig = Object.freeze({
     generateSection: "Generate",
     createInterviewPrepGuide: "Create Interview Prep Guide",
     updateInterviewPrepGuide: "Update Interview Prep Guide",
+    viewInterviewPrepGuide: "View Interview Prep Guide",
     buildPersonaNow: "Yes",
     buildPersonaNo: "No",
   },
