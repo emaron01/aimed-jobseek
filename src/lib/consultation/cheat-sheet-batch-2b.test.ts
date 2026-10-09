@@ -106,7 +106,7 @@ describe("Cheat Sheet batch 2b", () => {
     expect(html).toContain(consultationStatementLabels.DRAFT);
     expect(html).toContain(consultationConversationCopy.approve);
     expect(html).toContain(consultationConversationCopy.editAnswer);
-    expect(html).toContain(consultationConversationCopy.threadReply);
+    expect(html).not.toContain(consultationConversationCopy.threadReply);
     expect(html).toContain("I moved the commit to Monday.");
     expect(html.match(/Tell me how you run a weekly forecast\./g)?.length).toBe(1);
   });
@@ -346,7 +346,6 @@ describe("Cheat Sheet batch 2b", () => {
       createElement(CheatSheetCoachItems, {
         campaignId: "camp_1",
         canEdit: true,
-        generalQuestions: [generalShared, intentOnlyGeneral],
         qaItems: [answered],
         items: [
           {
@@ -384,15 +383,15 @@ describe("Cheat Sheet batch 2b", () => {
         ],
       }),
     );
-    expect(html).toContain('data-testid="cheat-sheet-shared-general-question"');
-    expect(html).toContain(`name="targetKey" value="${consultationReplyTargetKey(generalShared.questionTurnId)}"`);
-    expect(screenMarkup(html).match(new RegExp(sharedText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))?.length).toBe(2);
+    expect(html).not.toContain('data-testid="cheat-sheet-shared-general-question"');
+    expect(html).not.toContain('data-testid="cheat-sheet-referenced-general-question"');
+    expect(html).not.toContain(`name="targetKey" value="${consultationReplyTargetKey(generalShared.questionTurnId)}"`);
+    expect(html).toContain("A sample that must not replace the general card.");
     expect(html).toContain(intentOnlyPerson);
     expect(html).not.toContain(intentOnlyGeneral.question);
     expect(html).toContain('data-testid="cheat-sheet-coach-harper-qa"');
     expect(html).toContain(consultationConversationCopy.showYourReplies);
     expect(html).toContain(personOnly);
-    expect(html).not.toContain("A sample that must not replace the general card.");
     expect(
       alreadyAnsweredGeneralDuplicateCount({
         personItems: [

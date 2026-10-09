@@ -4,14 +4,8 @@ import {
   type CheatSheetSectionKind,
 } from "@/lib/application-summary/contract";
 import type { CareerStage } from "@/lib/consultation/career-stage";
-import type { InterviewTypeTag } from "@/lib/consultation/contract";
-
-export type CheatSheetGeneralQuestionInput = {
-  id: string;
-  text: string;
-  interviewTypeTag: InterviewTypeTag | null;
-  targetKey: string | null;
-};
+import type { ApprovedInterviewAnswer } from "@/lib/application-summary/approved-answers";
+import { DEFAULT_LIKELY_QUESTIONS_PER_PERSON } from "@/lib/application-summary/likely-question-limit";
 
 export type CheatSheetInterviewerContext = {
   hiringTeamRole: string;
@@ -44,7 +38,8 @@ export function cheatSheetPersonSectionInputHash(input: {
   };
   sources: Array<{ id: string; text: string }>;
   careerStage: CareerStage;
-  generalQuestions?: CheatSheetGeneralQuestionInput[];
+  approvedAnswers?: ApprovedInterviewAnswer[];
+  likelyQuestionMax?: number;
   interviewer?: CheatSheetInterviewerContext | null;
 }): string {
   return createHash("sha256")
@@ -57,7 +52,9 @@ export function cheatSheetPersonSectionInputHash(input: {
           id: source.id,
           text: source.text,
         })),
-        generalQuestions: input.generalQuestions ?? [],
+        approvedAnswers: input.approvedAnswers ?? [],
+        likelyQuestionMax:
+          input.likelyQuestionMax ?? DEFAULT_LIKELY_QUESTIONS_PER_PERSON,
         interviewer: input.interviewer ?? null,
       }),
     )

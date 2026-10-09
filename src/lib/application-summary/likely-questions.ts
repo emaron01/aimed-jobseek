@@ -2,18 +2,12 @@ import type {
   CheatSheetCoachItem,
   CheatSheetPersonSection,
 } from "@/lib/application-summary/contract";
+import type { ApprovedInterviewAnswer } from "@/lib/application-summary/approved-answers";
 import {
   CHEAT_SHEET_TARGET_PREFIX,
   CHRONOLOGY_TARGET_KEY,
-  type AnswerFramework,
   type InterviewTypeTag,
 } from "@/lib/consultation/contract";
-import {
-  composeInterviewAnswerFromParts,
-  containsFrameworkOrPartLabel,
-  resultStatesOutcome,
-  type AnswerPartsGrounding,
-} from "@/lib/consultation/polish-parts";
 import {
   looksLikeCareerWalkThrough,
   resolveInterviewTypeTag,
@@ -62,164 +56,20 @@ export function harperAlreadyAskedCareerWalkThrough(
   return careerWalkThroughAlreadyAsked(turns);
 }
 
-function partsGroundingFromItem(
-  item: CheatSheetCoachItem,
-): AnswerPartsGrounding | null {
-  if (item.answerFramework !== "CAR" && item.answerFramework !== "STAR") {
-    return null;
-  }
-  if (item.answerFramework === "CAR") {
-    const challenge = fieldText(item.challenge);
-    const action = fieldText(item.action);
-    const result = fieldText(item.result);
-    if (!challenge || !action || !result) return null;
-    return { answerFramework: "CAR", challenge, action, result };
-  }
-  const situation = fieldText(item.situation);
-  const task = fieldText(item.task);
-  const action = fieldText(item.action);
-  const result = fieldText(item.result);
-  if (!situation || !task || !action || !result) return null;
-  return { answerFramework: "STAR", situation, task, action, result };
-}
-
-export function composeSampleAnswerFromParts(item: CheatSheetCoachItem): string {
-  const grounding = partsGroundingFromItem(item);
-  if (!grounding) return fieldText(item.sampleAnswer);
-  if (grounding.answerFramework === "CAR") {
-    return composeInterviewAnswerFromParts([
-      grounding.challenge ?? "",
-      grounding.action,
-      grounding.result,
-    ]);
-  }
-  return composeInterviewAnswerFromParts([
-    grounding.situation ?? "",
-    grounding.task ?? "",
-    grounding.action,
-    grounding.result,
-  ]);
-}
-
-function scanLabels(...fields: Array<string | null | undefined>): string | null {
-  for (const field of fields) {
-    if (field && containsFrameworkOrPartLabel(field)) {
-      return "Do not name CAR, STAR, or label parts (Challenge:, Situation:, Task:, Action:, Result:) in any field.";
-    }
-  }
-  return null;
-}
-
-export const LIKELY_QUESTION_MIN = 4;
-export const LIKELY_QUESTION_MAX = 12;
-
-/** A General question the person-section writer may reference by id or targetKey. */
-export type SuppliedGeneralQuestion = {
-  id: string;
-  text: string;
-  interviewTypeTag?: InterviewTypeTag | null;
-  targetKey?: string | null;
-};
-
 /**
- * 4–12 is a save. Fewer than 4 retries once, then the shorter list is kept.
- * More than 12 is never accepted.
- */
-export function personLikelyQuestionCountDecision(
-  count: number,
-  attemptIndex: number,
-): "save" | "retry" | "accept-short" {
-  if (count > LIKELY_QUESTION_MAX) return "retry";
-  if (count >= LIKELY_QUESTION_MIN) return "save";
-  return attemptIndex < 1 ? "retry" : "accept-short";
-}
-
-/**
- * Quality issues for one likely-questions item (reuses D2 tag overrides + D3 checks).
- * A reference to a General question does not need its own sample answer.
+ * A person likely question needs its own wording and a tag.
+ * The answer is copied from an approved statement, or left blank.
  */
 export function validateLikelyQuestionItem(item: CheatSheetCoachItem): string[] {
   const issues: string[] = [];
-  if (fieldText(item.generalQuestionId)) {
-    if (!item.interviewTypeTag) {
-      issues.push(
-        "Every likelyQuestions item requires interviewTypeTag (screening, chronological_walk_through, focused_competency, or reference_check_prep).",
-      );
-    }
-    if (!fieldText(item.prompt)) {
-      issues.push("A referenced General question is missing its text.");
-    }
-    return issues;
-  }
   if (!item.interviewTypeTag) {
     issues.push(
       "Every likelyQuestions item requires interviewTypeTag (screening, chronological_walk_through, focused_competency, or reference_check_prep).",
     );
   }
-  const harperQuestion = fieldText(item.harperQuestion);
-  const sampleAnswer = fieldText(item.sampleAnswer);
-  const hasParts =
-    item.answerFramework === "CAR" || item.answerFramework === "STAR";
-
-  if (harperQuestion) {
-    if (sampleAnswer || hasParts) {
-      issues.push(
-        "When harperQuestion is set, sampleAnswer and answer parts must be null.",
-      );
-    }
-    const labelIssue = scanLabels(item.prompt, item.harperQuestion);
-    if (labelIssue) issues.push(labelIssue);
-    return issues;
+  if (!fieldText(item.prompt)) {
+    issues.push("A likely question is missing its text.");
   }
-
-  if (!hasParts) {
-    issues.push(
-      'Return answerFramework "CAR" or "STAR" with each required part as its own field for sampleAnswer items.',
-    );
-    return issues;
-  }
-
-  if (item.answerFramework === "CAR") {
-    if (!fieldText(item.challenge)) {
-      issues.push("The challenge part was missing or empty.");
-    }
-    if (!fieldText(item.action)) {
-      issues.push("The action part was missing or empty.");
-    }
-    if (!fieldText(item.result)) {
-      issues.push("The result part was missing or empty.");
-    }
-  } else {
-    if (!fieldText(item.situation)) {
-      issues.push("The situation part was missing or empty.");
-    }
-    if (!fieldText(item.task)) {
-      issues.push("The task part was missing or empty.");
-    }
-    if (!fieldText(item.action)) {
-      issues.push("The action part was missing or empty.");
-    }
-    if (!fieldText(item.result)) {
-      issues.push("The result part was missing or empty.");
-    }
-  }
-
-  if (fieldText(item.result) && !resultStatesOutcome(item.result ?? "")) {
-    issues.push(
-      "The result must state what changed or what happened because of the person's action. A number is welcome when the facts include one but is never required.",
-    );
-  }
-
-  const labelIssue = scanLabels(
-    item.prompt,
-    item.challenge,
-    item.situation,
-    item.task,
-    item.action,
-    item.result,
-    item.sampleAnswer,
-  );
-  if (labelIssue) issues.push(labelIssue);
   return issues;
 }
 
@@ -235,143 +85,87 @@ export function validatePersonSectionLikelyQuestions(
   return issues;
 }
 
-function normalizeOneLikelyQuestion(item: CheatSheetCoachItem): CheatSheetCoachItem {
-  const modelTag = (item.interviewTypeTag ??
-    "focused_competency") as InterviewTypeTag;
-  const interviewTypeTag = resolveInterviewTypeTag({
-    targetKey: looksLikeCareerWalkThrough(item.prompt)
-      ? CHRONOLOGY_TARGET_KEY
-      : "",
-    text: item.prompt,
-    modelTag,
-  });
-  const harperQuestion = fieldText(item.harperQuestion) || null;
-  if (harperQuestion) {
-    return {
-      ...item,
-      interviewTypeTag,
-      harperQuestion,
-      sampleAnswer: null,
-      answerFramework: null,
-      challenge: null,
-      situation: null,
-      task: null,
-      action: null,
-      result: null,
-    };
-  }
-  const composed = composeSampleAnswerFromParts(item);
-  return {
-    ...item,
-    interviewTypeTag,
-    harperQuestion: null,
-    sampleAnswer: composed || fieldText(item.sampleAnswer) || null,
-    answerFramework: (item.answerFramework ?? null) as AnswerFramework | null,
-    challenge: fieldText(item.challenge) || null,
-    situation: fieldText(item.situation) || null,
-    task: fieldText(item.task) || null,
-    action: fieldText(item.action) || null,
-    result: fieldText(item.result) || null,
-  };
-}
+export type PersonLikelyQuestionDraft = {
+  prompt: string;
+  approvedAnswerId?: string | null;
+  interviewTypeTag?: InterviewTypeTag | null;
+  id?: string;
+};
 
-function suppliedGeneralQuestions(
-  questions: readonly SuppliedGeneralQuestion[],
-): Map<string, SuppliedGeneralQuestion> {
-  const byId = new Map<string, SuppliedGeneralQuestion>();
-  for (const question of questions) {
-    const id = question.id.trim();
-    if (id) byId.set(id, question);
-    const targetKey = question.targetKey?.trim() ?? "";
-    if (targetKey) byId.set(targetKey, question);
-  }
-  return byId;
-}
-
-function hasOwnQuestionContent(item: CheatSheetCoachItem): boolean {
-  if (!fieldText(item.prompt)) return false;
-  if (fieldText(item.harperQuestion)) return true;
-  if (item.answerFramework === "CAR" || item.answerFramework === "STAR") return true;
-  return fieldText(item.sampleAnswer).length > 0;
-}
-
-function isCareerWalkThroughItem(item: CheatSheetCoachItem): boolean {
+function isCareerWalkThroughItem(item: {
+  prompt: string;
+  interviewTypeTag?: InterviewTypeTag | null;
+}): boolean {
   return (
     item.interviewTypeTag === "chronological_walk_through" ||
     looksLikeCareerWalkThrough(item.prompt)
   );
 }
 
+function clearedAnswer(sampleAnswer: string | null): Pick<
+  CheatSheetCoachItem,
+  | "sampleAnswer"
+  | "harperQuestion"
+  | "answerFramework"
+  | "challenge"
+  | "situation"
+  | "task"
+  | "action"
+  | "result"
+  | "generalQuestionId"
+  | "supports"
+> {
+  return {
+    sampleAnswer,
+    harperQuestion: null,
+    answerFramework: null,
+    challenge: null,
+    situation: null,
+    task: null,
+    action: null,
+    result: null,
+    generalQuestionId: null,
+    supports: [],
+  };
+}
+
 /**
- * Resolve General-question references, compose new questions, and drop a
- * chronological walk-through (new or referenced) when Harper already asked it.
- * Writer order is kept. The walk-through filter can leave fewer than 4 items;
- * the caller then retries once and saves the shorter list.
+ * Keep the model's question text. Copy an approved answer only when its id
+ * matches. An unknown or null id leaves the answer blank. Drop a career
+ * walk-through when Harper has already asked one. Writer order is kept.
  */
 export function resolvePersonLikelyQuestions(input: {
-  likelyQuestions: CheatSheetCoachItem[];
+  likelyQuestions: readonly PersonLikelyQuestionDraft[];
   harperAskedCareerWalkThrough: boolean;
-  generalQuestions?: readonly SuppliedGeneralQuestion[];
-}): { items: CheatSheetCoachItem[]; unusedReferenceIds: string[] } {
-  const supplied = suppliedGeneralQuestions(input.generalQuestions ?? []);
-  const unusedReferenceIds: string[] = [];
+  approvedAnswers: readonly ApprovedInterviewAnswer[];
+}): CheatSheetCoachItem[] {
+  const answers = new Map(
+    input.approvedAnswers
+      .filter((answer) => answer.id.trim() && answer.content.trim())
+      .map((answer) => [answer.id.trim(), answer.content]),
+  );
   const items: CheatSheetCoachItem[] = [];
   for (const raw of input.likelyQuestions) {
-    const referenceId = fieldText(raw.generalQuestionId);
-    if (referenceId) {
-      const match = supplied.get(referenceId);
-      if (!match || !fieldText(match.text)) {
-        unusedReferenceIds.push(referenceId);
-        if (hasOwnQuestionContent(raw)) {
-          items.push(
-            normalizeOneLikelyQuestion({ ...raw, generalQuestionId: null }),
-          );
-        }
-        continue;
-      }
-      items.push(
-        normalizeOneLikelyQuestion({
-          ...raw,
-          generalQuestionId: match.id,
-          prompt: match.text,
-          interviewTypeTag: (match.interviewTypeTag ??
-            raw.interviewTypeTag ??
-            "focused_competency") as InterviewTypeTag,
-          sampleAnswer: null,
-          harperQuestion: null,
-          answerFramework: null,
-          challenge: null,
-          situation: null,
-          task: null,
-          action: null,
-          result: null,
-        }),
-      );
-      continue;
-    }
-    items.push(normalizeOneLikelyQuestion({ ...raw, generalQuestionId: null }));
+    const prompt = fieldText(raw.prompt);
+    if (!prompt) continue;
+    const modelTag = (raw.interviewTypeTag ??
+      "focused_competency") as InterviewTypeTag;
+    const interviewTypeTag = resolveInterviewTypeTag({
+      targetKey: looksLikeCareerWalkThrough(prompt) ? CHRONOLOGY_TARGET_KEY : "",
+      text: prompt,
+      modelTag,
+    });
+    const approvedId = fieldText(raw.approvedAnswerId);
+    const copied = approvedId ? answers.get(approvedId) : undefined;
+    items.push({
+      id: raw.id,
+      prompt,
+      interviewTypeTag,
+      ...clearedAnswer(copied ?? null),
+    });
   }
-  const filtered = input.harperAskedCareerWalkThrough
-    ? items.filter((item) => !isCareerWalkThroughItem(item))
-    : items;
-  return { items: filtered, unusedReferenceIds };
-}
-
-/**
- * Compose sample answers, apply D2 tag overrides, and drop a duplicate career
- * walk-through when Harper already asked chronology. Keeps writer order.
- */
-export function normalizePersonSectionLikelyQuestions(input: {
-  likelyQuestions: CheatSheetCoachItem[];
-  harperAskedCareerWalkThrough: boolean;
-  generalQuestions?: readonly SuppliedGeneralQuestion[];
-}): CheatSheetCoachItem[] {
-  return resolvePersonLikelyQuestions(input).items;
-}
-
-function referencedGeneralId(item: CheatSheetCoachItem): string | null {
-  const id = item.generalQuestionId?.trim();
-  return id ? id : null;
+  if (!input.harperAskedCareerWalkThrough) return items;
+  return items.filter((item) => !isCareerWalkThroughItem(item));
 }
 
 /**
@@ -425,64 +219,32 @@ export function seekerKeptLikelyQuestionIds(input: {
 }
 
 /**
- * The writer's new list replaces the stored one.
- * A question the seeker edited, answered, or approved stays, including when
- * the writer omitted it or wrote a new version of it.
- * The writer's 4–12 range applies to `incoming` before this merge.
+ * Questions the seeker has answered or kept stay exactly as stored.
+ * New questions fill the remaining slots up to max, skipping near-duplicates
+ * of questions already on the list. A stored Harper reference with no guide
+ * answer from the seeker is not kept.
+ * Seeker-kept questions stay even when they already exceed max.
  */
 export function mergePersonLikelyQuestions(input: {
   existing: CheatSheetCoachItem[];
   incoming: CheatSheetCoachItem[];
   seekerKeptIds?: ReadonlySet<string>;
+  max: number;
 }): CheatSheetCoachItem[] {
   const seekerKeptIds = input.seekerKeptIds ?? new Set<string>();
-  const protectedItems = input.existing.filter((item) => {
+  const limit = Number.isInteger(input.max) && input.max > 0 ? input.max : 0;
+  const kept = input.existing.filter((item) => {
     const id = item.id?.trim();
     return Boolean(id && seekerKeptIds.has(id));
   });
-  const usedProtected = new Set<string>();
-  const result: CheatSheetCoachItem[] = [];
-
-  const matchesProtected = (item: CheatSheetCoachItem): CheatSheetCoachItem | null => {
-    const generalId = referencedGeneralId(item);
-    if (generalId) {
-      const byGeneral = protectedItems.find((existing) => {
-        const id = existing.id?.trim() ?? "";
-        return !usedProtected.has(id) && referencedGeneralId(existing) === generalId;
-      });
-      if (byGeneral) return byGeneral;
-    }
-    const prompt = item.prompt.trim();
-    return (
-      protectedItems.find((existing) => {
-        const id = existing.id?.trim() ?? "";
-        return !usedProtected.has(id) && questionTextNearDuplicate(existing.prompt, prompt);
-      }) ?? null
-    );
-  };
-
-  const alreadyListed = (item: CheatSheetCoachItem): boolean => {
-    const generalId = referencedGeneralId(item);
-    if (generalId && result.some((existing) => referencedGeneralId(existing) === generalId)) {
-      return true;
-    }
-    const prompt = item.prompt.trim();
-    return result.some((existing) => questionTextNearDuplicate(existing.prompt, prompt));
-  };
-
+  const result: CheatSheetCoachItem[] = [...kept];
   for (const item of input.incoming) {
-    const kept = matchesProtected(item);
-    if (kept) {
-      usedProtected.add(kept.id?.trim() ?? "");
-      if (!alreadyListed(kept)) result.push(kept);
+    if (result.length >= limit) break;
+    const prompt = item.prompt.trim();
+    if (!prompt) continue;
+    if (result.some((existing) => questionTextNearDuplicate(existing.prompt, prompt))) {
       continue;
     }
-    if (alreadyListed(item)) continue;
-    result.push(item);
-  }
-  for (const item of protectedItems) {
-    const id = item.id?.trim() ?? "";
-    if (usedProtected.has(id) || alreadyListed(item)) continue;
     result.push(item);
   }
   return result;

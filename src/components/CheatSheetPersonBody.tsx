@@ -15,10 +15,7 @@ import type { CheatSheetNote } from "@/lib/application-summary/notes";
 import type { CheatSheetPersonSection } from "@/lib/application-summary/contract";
 import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
 import { ADDITIONAL_INTERVIEW_PREP_QA_HEADING } from "@/lib/consultation/additional-prep-qa";
-import {
-  displayedPersonQuestions,
-  sharedGeneralTurnIdsForLikelyQuestions,
-} from "@/lib/consultation/general-question-match";
+import { displayedPersonQuestions } from "@/lib/consultation/general-question-match";
 import {
   applicationSummaryConfig,
   consultationConversationCopy,
@@ -113,7 +110,6 @@ export function CheatSheetPersonBody({
   interviewNotes = null,
   interviewNotesPersonName = null,
   additionalPrepQuestions = [],
-  generalQuestions = [],
   personQuestions = [],
   prepGuideOwnsContact = false,
 }: {
@@ -141,8 +137,6 @@ export function CheatSheetPersonBody({
   interviewNotesPersonName?: string | null;
   /** Direct-role Harper questions that are not this person's primary cards. */
   additionalPrepQuestions?: ConsultationQaItem[];
-  /** Cheat Sheet only: General questions that can stand in for a matching person item. */
-  generalQuestions?: ConsultationQaItem[];
   /** This person's person-prep questions, excluding coach items already listed. */
   personQuestions?: ConsultationQaItem[];
   /**
@@ -237,19 +231,12 @@ export function CheatSheetPersonBody({
     );
   }
 
-  const sharedGeneralTurnIds = sharedGeneralTurnIdsForLikelyQuestions(
-    section.likelyQuestions,
-    coachQaItems,
-    generalQuestions,
-  );
   const personQuestionCards = (
     <CheatSheetQuestionCards
       campaignId={campaignId}
       canEdit={canEdit && showCoachAnswerForms}
       questions={displayedPersonQuestions({
         personQuestions,
-        generalQuestions,
-        hiddenTurnIds: sharedGeneralTurnIds,
       })}
       jobsActive={jobsActive}
       showReply={showReply}
@@ -302,7 +289,6 @@ export function CheatSheetPersonBody({
           canEdit={canEdit && showCoachAnswerForms}
           items={section.likelyQuestions}
           qaItems={coachQaItems}
-          generalQuestions={generalQuestions}
           jobsActive={jobsActive}
           showReply={showReply}
         />

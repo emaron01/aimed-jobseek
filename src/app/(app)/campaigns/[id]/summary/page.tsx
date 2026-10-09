@@ -520,7 +520,6 @@ export default async function ApplicationSummaryPage({
               personaId={person.roleId}
               coachQaItems={coachQaItems}
               jobsActive={consultationBusy}
-              generalQuestions={generalQuestions}
               personQuestions={personQuestions}
               prepGuideOwnsContact
             />

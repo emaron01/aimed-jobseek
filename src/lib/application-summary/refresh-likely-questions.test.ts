@@ -104,9 +104,9 @@ import {
   type CheatSheetCoachItem,
   type CheatSheetPersonSection,
 } from "@/lib/application-summary/contract";
+import { DEFAULT_LIKELY_QUESTIONS_PER_PERSON } from "@/lib/application-summary/likely-question-limit";
 import {
   mergePersonLikelyQuestions,
-  personLikelyQuestionCountDecision,
   seekerKeptLikelyQuestionIds,
 } from "@/lib/application-summary/likely-questions";
 import { contactIdFromCheatSheetTarget } from "@/lib/consultation/harper-layout";
@@ -216,6 +216,7 @@ describe("stable likely-question identity", () => {
       existing: [answered, second],
       incoming: writerOrder,
       seekerKeptIds: new Set(["contact:c1:likely:1"]),
+      max: DEFAULT_LIKELY_QUESTIONS_PER_PERSON,
     });
     const stored = assignLikely(merged);
     const forecast = stored.find((row) => row.prompt === FORECAST);
@@ -237,11 +238,10 @@ describe("stable likely-question identity", () => {
     expect(answers.has(`cheatSheet:${added?.id}`)).toBe(false);
   });
 
-  it("gives a new question an id from its text or General question id, not its position", () => {
+  it("gives a new question an id from its text, not its position", () => {
     const coaching = item({ prompt: COACHING });
     const general = item({
       prompt: GENERAL_TEXT,
-      generalQuestionId: "turn-general",
     });
     const first = assignLikely([coaching]);
     const reordered = assignLikely([general, coaching]);
@@ -306,20 +306,20 @@ describe("person-section update replaces unedited questions", () => {
       existing: [edited, answered, approved, unedited],
       incoming,
       seekerKeptIds: new Set([edited.id!, answered.id!, approved.id!]),
+      max: DEFAULT_LIKELY_QUESTIONS_PER_PERSON,
     });
-    expect(merged.map((row) => row.prompt)).toEqual([
-      FORECAST,
-      COACHING,
-      "Tell me how you would open a first meeting with this hiring manager.",
-      edited.prompt,
-      answered.prompt,
+    expect(merged.slice(0, 3).map((row) => row.id)).toEqual([
+      edited.id,
+      answered.id,
+      approved.id,
     ]);
+    expect(merged[0]).toEqual(edited);
+    expect(merged[1]).toEqual(answered);
+    expect(merged[2]?.prompt).toBe(FORECAST);
+    expect(merged[2]?.sampleAnswer).toBe("Approved Monday commit.");
+    expect(merged.filter((row) => row.prompt === FORECAST)).toHaveLength(1);
     expect(merged.map((row) => row.prompt)).not.toContain(GENERAL_TEXT);
-    expect(merged[0]?.id).toBe(approved.id);
-    expect(merged[0]?.sampleAnswer).toBe("Approved Monday commit.");
-    expect(merged[3]?.id).toBe(edited.id);
-    expect(merged[4]?.id).toBe(answered.id);
-    expect(merged[2]?.generalQuestionId).toBe("turn-new");
+    expect(merged.map((row) => row.prompt)).toContain(COACHING);
   });
 
   it("treats a saved sample, a reply, and an approval as kept, and a skip as not kept", () => {
@@ -367,12 +367,7 @@ describe("person-section update replaces unedited questions", () => {
     expect([...kept].sort()).toEqual(["answered", "approved", "edited"]);
   });
 
-  it("applies 4-12 to the writer's new list and drops unedited questions instead of accumulating", () => {
-    expect(personLikelyQuestionCountDecision(4, 0)).toBe("save");
-    expect(personLikelyQuestionCountDecision(12, 0)).toBe("save");
-    expect(personLikelyQuestionCountDecision(13, 0)).toBe("retry");
-    expect(personLikelyQuestionCountDecision(3, 0)).toBe("retry");
-    expect(personLikelyQuestionCountDecision(3, 1)).toBe("accept-short");
+  it("keeps the first questions up to the setting and does not accumulate unedited ones", () => {
     const existingPrompts = [
       "How did you rebuild the weekly forecast cadence?",
       "How do you coach a manager through a missed commit?",
@@ -406,32 +401,34 @@ describe("person-section update replaces unedited questions", () => {
       }),
     );
     const incoming = incomingPrompts.map((prompt) => item({ prompt }));
-    const merged = mergePersonLikelyQuestions({ existing, incoming });
-    expect(merged).toHaveLength(12);
-    expect(merged.map((row) => row.prompt)).toEqual(incomingPrompts);
+    const merged = mergePersonLikelyQuestions({
+      existing,
+      incoming,
+      max: DEFAULT_LIKELY_QUESTIONS_PER_PERSON,
+    });
+    expect(merged).toHaveLength(DEFAULT_LIKELY_QUESTIONS_PER_PERSON);
+    expect(merged.map((row) => row.prompt)).toEqual(
+      incomingPrompts.slice(0, DEFAULT_LIKELY_QUESTIONS_PER_PERSON),
+    );
     const kept = mergePersonLikelyQuestions({
       existing,
       incoming,
       seekerKeptIds: new Set([existing[0]!.id!, existing[1]!.id!]),
+      max: DEFAULT_LIKELY_QUESTIONS_PER_PERSON,
     });
-    expect(kept).toHaveLength(14);
-    expect(kept.slice(0, 12).map((row) => row.prompt)).toEqual(incomingPrompts);
-    expect(kept.slice(12).map((row) => row.id)).toEqual([
+    expect(kept).toHaveLength(DEFAULT_LIKELY_QUESTIONS_PER_PERSON);
+    expect(kept.slice(0, 2).map((row) => row.id)).toEqual([
       existing[0]!.id,
       existing[1]!.id,
     ]);
+    expect(kept[0]?.prompt).toBe(existing[0]!.prompt);
+    expect(kept[1]?.prompt).toBe(existing[1]!.prompt);
     const parsed = storedSection(kept);
-    expect(parsed.likelyQuestions).toHaveLength(14);
+    expect(parsed.likelyQuestions).toHaveLength(DEFAULT_LIKELY_QUESTIONS_PER_PERSON);
     const twelve = incoming.slice(0, 12).map((row) => ({
-      ...row,
+      prompt: row.prompt,
+      approvedAnswerId: null,
       interviewTypeTag: "focused_competency" as const,
-      answerFramework: null,
-      challenge: null,
-      situation: null,
-      task: null,
-      action: null,
-      result: null,
-      generalQuestionId: null,
     }));
     expect(
       cheatSheetPersonSectionGenerateSchema.safeParse({
@@ -466,7 +463,7 @@ describe("person-section update replaces unedited questions", () => {
         ],
         questionsToAsk: [{ text: "What does success look like?", followUps: [], supports: [] }],
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 });
 
@@ -602,7 +599,7 @@ describe("person sections run only when the seeker chooses that person", () => {
     });
     const second = await generateCheatSheetPersonSectionGuidance({
       ...input,
-      qualityFeedback: ["Return between 4 and 12 likely questions in total."],
+      qualityFeedback: ["Rewrite only the caresAbout field."],
     });
     expect(second.ok).toBe(true);
     expect(generateStructured).toHaveBeenCalledTimes(2);

@@ -6,6 +6,7 @@ import {
   type PlatformSettingsActionResult,
 } from "@/app/actions/platform-settings";
 import type { HarperDraftSettings } from "@/lib/consultation/harper-draft-settings";
+import { DEFAULT_LIKELY_QUESTIONS_PER_PERSON } from "@/lib/application-summary/likely-question-limit";
 import { applicationAssetConfig } from "@/lib/product-config";
 
 const initial: PlatformSettingsActionResult | null = null;
@@ -40,9 +41,11 @@ const BULLET_FIELDS: Array<{ key: keyof HarperDraftSettings; label: string }> = 
 export function HarperDraftSettingsForm({
   settings,
   hasConsoleRow,
+  likelyQuestionsPerPerson = DEFAULT_LIKELY_QUESTIONS_PER_PERSON,
 }: {
   settings: HarperDraftSettings;
   hasConsoleRow: boolean;
+  likelyQuestionsPerPerson?: number;
 }) {
   const [state, formAction, pending] = useActionState(
     updateHarperDraftSettingsAction,
@@ -57,7 +60,32 @@ export function HarperDraftSettingsForm({
           : "No console row yet. Harper is using the defaults below. Saving does not start a run."}
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
-        {FIELDS.map((field) => (
+        {FIELDS.slice(0, 2).map((field) => (
+          <label key={field.key} className="block text-sm text-ink">
+            <span className="mb-1 block font-medium">{field.label}</span>
+            <input
+              name={field.key}
+              type="number"
+              min={0}
+              required
+              defaultValue={settings[field.key]}
+              className="w-full rounded-md border border-edge bg-canvas px-3 py-2 text-sm text-ink"
+            />
+          </label>
+        ))}
+        <label className="block text-sm text-ink">
+          <span className="mb-1 block font-medium">Likely questions per person</span>
+          <input
+            name="likelyQuestionsPerPerson"
+            type="number"
+            min={1}
+            max={50}
+            required
+            defaultValue={likelyQuestionsPerPerson}
+            className="w-full rounded-md border border-edge bg-canvas px-3 py-2 text-sm text-ink"
+          />
+        </label>
+        {FIELDS.slice(2).map((field) => (
           <label key={field.key} className="block text-sm text-ink">
             <span className="mb-1 block font-medium">{field.label}</span>
             <input

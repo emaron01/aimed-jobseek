@@ -9,15 +9,12 @@ import {
 import type { AiCallUsageContext } from "@/lib/ai/types";
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import { aiCallTracking } from "@/lib/usage/ai-call";
+import type { ApprovedInterviewAnswer } from "@/lib/application-summary/approved-answers";
 import {
   applicationSummaryShellSchema,
-  cheatSheetPersonSectionGenerateRecoverSchema,
   cheatSheetPersonSectionGenerateSchema,
 } from "@/lib/application-summary/contract";
-import type {
-  CheatSheetGeneralQuestionInput,
-  CheatSheetInterviewerContext,
-} from "@/lib/application-summary/people";
+import type { CheatSheetInterviewerContext } from "@/lib/application-summary/people";
 import { buildApplicationSummaryGuidanceMessages } from "@/lib/application-summary/prompt";
 import { fingerprintPaidCallInputs, runPaidStructuredCall } from "@/lib/ai/paid-call-gate";
 import { runGatedApplicationSummaryShell } from "@/lib/application-summary/shell-gate";
@@ -109,12 +106,13 @@ export async function generateCheatSheetPersonSectionGuidance(input: {
   careerStage: CareerStage;
   qualityFeedback?: string[];
   usage?: AiCallUsageContext;
-  generalQuestions?: CheatSheetGeneralQuestionInput[];
+  approvedAnswers?: ApprovedInterviewAnswer[];
+  likelyQuestionMax?: number;
   interviewer?: CheatSheetInterviewerContext | null;
 }): Promise<
   | {
       ok: true;
-      data: ReturnType<typeof cheatSheetPersonSectionGenerateRecoverSchema.parse>;
+      data: ReturnType<typeof cheatSheetPersonSectionGenerateSchema.parse>;
     }
   | { ok: false; message: string; cause: string }
 > {
@@ -125,7 +123,8 @@ export async function generateCheatSheetPersonSectionGuidance(input: {
     mode: "person",
     careerStage: input.careerStage,
     qualityFeedback: input.qualityFeedback,
-    generalQuestions: input.generalQuestions,
+    approvedAnswers: input.approvedAnswers,
+    likelyQuestionMax: input.likelyQuestionMax,
     interviewer: input.interviewer,
   });
   const callProvider = async () => {
@@ -134,18 +133,14 @@ export async function generateCheatSheetPersonSectionGuidance(input: {
       ...(input.usage ? aiCallTracking(input.usage) : {}),
       messages,
       parseOutput: (raw) => {
-        const strict = cheatSheetPersonSectionGenerateSchema.safeParse(raw);
-        if (strict.success) {
-          return { data: strict.data, coercedFields: [] };
+        const parsed = cheatSheetPersonSectionGenerateSchema.safeParse(raw);
+        if (!parsed.success) {
+          throw new Error(
+            parsed.error.issues.map((issue) => issue.message).join("; ") ||
+              "Cheat sheet person section did not match the schema.",
+          );
         }
-        const recovered = cheatSheetPersonSectionGenerateRecoverSchema.safeParse(raw);
-        if (recovered.success && recovered.data.likelyQuestions.length < 4) {
-          return { data: recovered.data, coercedFields: [] };
-        }
-        throw new Error(
-          strict.error.issues.map((issue) => issue.message).join("; ") ||
-            "Cheat sheet person section did not match the schema.",
-        );
+        return { data: parsed.data, coercedFields: [] };
       },
     });
     return response.data;
@@ -161,7 +156,7 @@ export async function generateCheatSheetPersonSectionGuidance(input: {
         subjectKey: `${campaignId}:${sectionKey}`,
         inputFingerprint: fingerprintPaidCallInputs(messages),
         isResultUsable: (stored) => stored.likelyQuestions.length > 0,
-        parseStored: (json) => cheatSheetPersonSectionGenerateRecoverSchema.parse(json),
+        parseStored: (json) => cheatSheetPersonSectionGenerateSchema.parse(json),
         callProvider,
       });
       return { ok: true, data: gated.data };

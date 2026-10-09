@@ -1,11 +1,10 @@
 import type { AiMessage } from "@/lib/ai/types";
+import type { ApprovedInterviewAnswer } from "@/lib/application-summary/approved-answers";
 import { APPLICATION_SUMMARY_PROMPT_VERSION } from "@/lib/application-summary/contract";
-import type {
-  CheatSheetGeneralQuestionInput,
-  CheatSheetInterviewerContext,
-} from "@/lib/application-summary/people";
+import { DEFAULT_LIKELY_QUESTIONS_PER_PERSON } from "@/lib/application-summary/likely-question-limit";
+import type { CheatSheetInterviewerContext } from "@/lib/application-summary/people";
 import type { CareerStage } from "@/lib/consultation/career-stage";
-import { APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content";
+import { applicationSummaryGuidanceSystemInstructions } from "@/lib/prompt-content/application-summary";
 import { consultationConfig } from "@/lib/product-config";
 
 export function buildApplicationSummaryGuidanceMessages(input: {
@@ -22,15 +21,18 @@ export function buildApplicationSummaryGuidanceMessages(input: {
   mode: "shell" | "person";
   careerStage?: CareerStage;
   qualityFeedback?: string[];
-  generalQuestions?: CheatSheetGeneralQuestionInput[];
+  approvedAnswers?: ApprovedInterviewAnswer[];
+  likelyQuestionMax?: number;
   interviewer?: CheatSheetInterviewerContext | null;
 }): AiMessage[] {
+  const likelyQuestionMax =
+    input.likelyQuestionMax ?? DEFAULT_LIKELY_QUESTIONS_PER_PERSON;
   return [
     {
       role: "system",
       content: `Prompt version: ${APPLICATION_SUMMARY_PROMPT_VERSION}
 
-${APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS}`,
+${applicationSummaryGuidanceSystemInstructions(likelyQuestionMax)}`,
     },
     {
       role: "user",
@@ -49,7 +51,7 @@ ${APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS}`,
         people: input.people,
         ...(input.mode === "person"
           ? {
-              generalQuestions: input.generalQuestions ?? [],
+              approvedAnswers: input.approvedAnswers ?? [],
               interviewer: input.interviewer ?? null,
             }
           : {}),

@@ -1,4 +1,5 @@
 import { requirePlatformSuperAdmin } from "@/lib/auth/authz";
+import { getLikelyQuestionsPerPerson } from "@/lib/application-summary/likely-question-limit";
 import {
   getHarperDraftSettings,
   HARPER_DRAFT_SETTINGS_KEY,
@@ -8,9 +9,10 @@ import { HarperDraftSettingsForm } from "@/components/platform/HarperDraftSettin
 
 export default async function PlatformHarperPage() {
   await requirePlatformSuperAdmin();
-  const [settings, hasConsoleRow] = await Promise.all([
+  const [settings, hasConsoleRow, likelyQuestionsPerPerson] = await Promise.all([
     getHarperDraftSettings(),
     hasPlatformSetting(HARPER_DRAFT_SETTINGS_KEY),
+    getLikelyQuestionsPerPerson(),
   ]);
 
   return (
@@ -23,7 +25,11 @@ export default async function PlatformHarperPage() {
           Changing them does not call a model.
         </p>
       </div>
-      <HarperDraftSettingsForm settings={settings} hasConsoleRow={hasConsoleRow} />
+      <HarperDraftSettingsForm
+        settings={settings}
+        hasConsoleRow={hasConsoleRow}
+        likelyQuestionsPerPerson={likelyQuestionsPerPerson}
+      />
     </div>
   );
 }

@@ -115,7 +115,6 @@ export function HarperPersonInlineProfile({
   sessionStatus,
   jobsActive,
   additionalPrepQuestions = [],
-  generalQuestions = [],
   roles = [],
 }: {
   campaignId: string;
@@ -132,8 +131,6 @@ export function HarperPersonInlineProfile({
   sessionStatus: string;
   jobsActive: boolean;
   additionalPrepQuestions?: ConsultationQaItem[];
-  /** Harper's General questions, so a referenced likely question shows that card. */
-  generalQuestions?: ConsultationQaItem[];
   roles?: Array<{ id: string; name: string }>;
 }) {
   const [pendingTarget, setPendingTarget] = useState<string | null>(null);
@@ -216,7 +213,6 @@ export function HarperPersonInlineProfile({
         coachQaItems={coachQaItems}
         jobsActive={jobsActive}
         showReply={showReply}
-        generalQuestions={generalQuestions}
       />
       {listQuestions.length > 0 ? (
         <div className="space-y-3" data-testid="harper-person-qa">

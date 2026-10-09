@@ -21,15 +21,14 @@ import {
   assignCoachItemIds,
   findCoachItem,
 } from "@/lib/application-summary/coach";
+import { loadApprovedInterviewAnswers } from "@/lib/application-summary/approved-answers";
+import { getLikelyQuestionsPerPerson } from "@/lib/application-summary/likely-question-limit";
 import {
   harperAlreadyAskedCareerWalkThrough,
   mergePersonLikelyQuestions,
-  personLikelyQuestionCountDecision,
   resolvePersonLikelyQuestions,
   seekerKeptLikelyQuestionIds,
-  validatePersonSectionLikelyQuestions,
 } from "@/lib/application-summary/likely-questions";
-import { loadOrderedAnsweredHarperQuestions } from "@/lib/consultation/harper-display-qa";
 import { isApplicationLearningsSourceId } from "@/lib/consultation/learnings";
 import {
   approveConsultationStatement,
@@ -64,7 +63,6 @@ import {
   guideHeadingUpgrade,
   interviewerContactIdsFrom,
   personSectionNeedsGeneration,
-  type CheatSheetGeneralQuestionInput,
   type CheatSheetInterviewerContext,
 } from "@/lib/application-summary/people";
 import { listPersonPreps } from "@/lib/interview/person-prep";
@@ -185,17 +183,17 @@ export async function personSectionInputsUnchanged(input: {
     includeApplicationLearnings: person.sectionKind === "HIRING_MANAGER",
   });
   const careerStage = careerStageFromProfileJson(data.campaign.product.profileJson);
-  const generalQuestions = await generalQuestionsForPersonSection(
-    input.organizationId,
-    input.campaignId,
-  );
-  const interviewer = interviewerContextForPerson(person, data.roles);
+  const guideInputs = await personGuideModelInputs({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    person,
+    roles: data.roles,
+  });
   const inputHash = cheatSheetPersonSectionInputHash({
     person: personPayload(person),
     sources: personSources,
     careerStage,
-    generalQuestions,
-    interviewer,
+    ...guideInputs,
   });
   return existingPerson.inputHash === inputHash;
 }
@@ -227,18 +225,18 @@ export async function keepGuideWhenOnlyTheNameChanged(input: {
     includeApplicationLearnings: person.sectionKind === "HIRING_MANAGER",
   });
   const careerStage = careerStageFromProfileJson(data.campaign.product.profileJson);
-  const generalQuestions = await generalQuestionsForPersonSection(
-    input.organizationId,
-    input.campaignId,
-  );
-  const interviewer = interviewerContextForPerson(person, data.roles);
+  const guideInputs = await personGuideModelInputs({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    person,
+    roles: data.roles,
+  });
   const hashFor = (heading: string) =>
     cheatSheetPersonSectionInputHash({
       person: personPayload({ ...person, heading }),
       sources: personSources,
       careerStage,
-      generalQuestions,
-      interviewer,
+      ...guideInputs,
     });
   const upgrade = guideHeadingUpgrade({
     storedHeading: stored.heading,
@@ -846,20 +844,24 @@ function jsonGuidance(value: ApplicationSummaryGuidance): Prisma.InputJsonValue 
   return value as unknown as Prisma.InputJsonValue;
 }
 
-async function generalQuestionsForPersonSection(
-  organizationId: string,
-  campaignId: string,
-): Promise<CheatSheetGeneralQuestionInput[]> {
-  const loaded = await loadOrderedAnsweredHarperQuestions({
-    organizationId,
-    campaignId,
-  });
-  return loaded.generalQuestions.map((item) => ({
-    id: item.questionTurnId,
-    text: item.question,
-    interviewTypeTag: item.interviewTypeTag ?? null,
-    targetKey: item.targetKey,
-  }));
+async function personGuideModelInputs(input: {
+  organizationId: string;
+  campaignId: string;
+  person: { roleId: string; roleName: string; titles: string[] };
+  roles: Parameters<typeof interviewerContextForPerson>[1];
+}) {
+  const [approvedAnswers, likelyQuestionMax] = await Promise.all([
+    loadApprovedInterviewAnswers({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+    }),
+    getLikelyQuestionsPerPerson(),
+  ]);
+  return {
+    approvedAnswers,
+    likelyQuestionMax,
+    interviewer: interviewerContextForPerson(input.person, input.roles),
+  };
 }
 
 function interviewerContextForPerson(
@@ -1020,17 +1022,17 @@ export async function generateApplicationSummary(input: {
       includeApplicationLearnings: person.sectionKind === "HIRING_MANAGER",
     });
     const careerStage = careerStageFromProfileJson(data.campaign.product.profileJson);
-    const generalQuestions = await generalQuestionsForPersonSection(
-      input.organizationId,
-      input.campaignId,
-    );
-    const interviewer = interviewerContextForPerson(person, data.roles);
+    const guideInputs = await personGuideModelInputs({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      person,
+      roles: data.roles,
+    });
     const inputHash = cheatSheetPersonSectionInputHash({
       person: personPayload(person),
       sources: personSources,
       careerStage,
-      generalQuestions,
-      interviewer,
+      ...guideInputs,
     });
     const existingPerson = existing?.people.find(
       (item) => item.sectionKey === person.sectionKey,
@@ -1058,16 +1060,10 @@ export async function generateApplicationSummary(input: {
     });
     const harperAskedCareerWalkThrough =
       harperAlreadyAskedCareerWalkThrough(consultantTurns);
-    let qualityFeedback: string[] = [];
-    let failureCause = "Person section did not meet the guide requirements.";
     type GeneratedSection = Extract<
       Awaited<ReturnType<typeof generateCheatSheetPersonSectionGuidance>>,
       { ok: true }
     >["data"];
-    let best: {
-      data: GeneratedSection;
-      likelyQuestions: CheatSheetCoachItem[];
-    } | null = null;
     const saveSection = async (
       generatedData: GeneratedSection,
       likelyQuestions: CheatSheetCoachItem[],
@@ -1076,7 +1072,11 @@ export async function generateApplicationSummary(input: {
         existing: existingPerson?.likelyQuestions ?? [],
         incoming: likelyQuestions,
         seekerKeptIds,
+        max: guideInputs.likelyQuestionMax,
       });
+      if (mergedLikelyQuestions.length === 0) {
+        throw new Error("Person section did not meet the guide requirements.");
+      }
       const section = {
         ...assignCoachItemIds({
           overview: existing?.overview,
@@ -1112,73 +1112,23 @@ export async function generateApplicationSummary(input: {
         },
       });
     };
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      const generated = await generateCheatSheetPersonSectionGuidance({
-        sources: personSources,
-        person: personPayload(person),
-        careerStage,
-        qualityFeedback,
-        usage,
-        generalQuestions,
-        interviewer,
-      });
-      if (!generated.ok) {
-        failureCause = generated.cause;
-        if (attempt === 1) break;
-        continue;
-      }
-      const resolved = resolvePersonLikelyQuestions({
-        likelyQuestions: generated.data.likelyQuestions,
-        harperAskedCareerWalkThrough,
-        generalQuestions,
-      });
-      const likelyQuestions = resolved.items;
-      const decision = personLikelyQuestionCountDecision(likelyQuestions.length, attempt);
-      const partIssues =
-        likelyQuestions.length >= 4
-          ? validatePersonSectionLikelyQuestions({ likelyQuestions })
-          : [];
-      if (
-        likelyQuestions.length > 0 &&
-        likelyQuestions.length <= 12 &&
-        partIssues.length === 0
-      ) {
-        if (!best || likelyQuestions.length > best.likelyQuestions.length) {
-          best = { data: generated.data, likelyQuestions };
-        }
-      }
-      if (decision === "save" && partIssues.length === 0) {
-        await saveSection(generated.data, likelyQuestions);
-        return;
-      }
-      if (decision === "accept-short" && best) {
-        await saveSection(best.data, best.likelyQuestions);
-        return;
-      }
-      qualityFeedback = [
-        ...(likelyQuestions.length < 4
-          ? [
-              "Return between 4 and 12 likely questions in total, ranked from most to least likely.",
-            ]
-          : []),
-        ...(resolved.unusedReferenceIds.length > 0
-          ? [
-              "A reference to a General question id that was not supplied was not used. Reference only the supplied ids.",
-            ]
-          : []),
-        ...(likelyQuestions.length === 0
-          ? [
-              "Keep at least one likelyQuestions item that is not a duplicate career walk-through.",
-            ]
-          : []),
-        ...partIssues,
-      ];
-    }
-    if (best && best.likelyQuestions.length > 0 && best.likelyQuestions.length < 4) {
-      await saveSection(best.data, best.likelyQuestions);
-      return;
-    }
-    throw new Error(failureCause);
+    const generated = await generateCheatSheetPersonSectionGuidance({
+      sources: personSources,
+      person: personPayload(person),
+      careerStage,
+      usage,
+      approvedAnswers: guideInputs.approvedAnswers,
+      likelyQuestionMax: guideInputs.likelyQuestionMax,
+      interviewer: guideInputs.interviewer,
+    });
+    if (!generated.ok) throw new Error(generated.cause);
+    const likelyQuestions = resolvePersonLikelyQuestions({
+      likelyQuestions: generated.data.likelyQuestions,
+      harperAskedCareerWalkThrough,
+      approvedAnswers: guideInputs.approvedAnswers,
+    });
+    await saveSection(generated.data, likelyQuestions);
+    return;
   }
 
   const shellSources = sourcesForShell(data.sources);

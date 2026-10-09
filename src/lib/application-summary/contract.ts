@@ -4,7 +4,7 @@ import {
   interviewTypeTagSchema,
 } from "@/lib/consultation/contract";
 
-export const APPLICATION_SUMMARY_PROMPT_VERSION = "18";
+export const APPLICATION_SUMMARY_PROMPT_VERSION = "19";
 
 export const CHEAT_SHEET_SECTION_KINDS = [
   "RECRUITER",
@@ -25,21 +25,11 @@ const guidanceItemSchema = z.object({
   supports: z.array(supportSchema).optional().default([]),
 });
 
-/** Model output for likely questions (OpenAI-strict flat parts + WHO tag). */
+/** Model output for one person-guide likely question. The answer is chosen later by id. */
 export const cheatSheetCoachItemGenerateSchema = z.object({
   prompt: z.string().trim().min(1),
+  approvedAnswerId: z.string().nullable(),
   interviewTypeTag: interviewTypeTagSchema,
-  sampleAnswer: z.string().nullable(),
-  harperQuestion: z.string().nullable(),
-  answerFramework: z.enum(ANSWER_FRAMEWORKS).nullable(),
-  challenge: z.string().nullable(),
-  situation: z.string().nullable(),
-  task: z.string().nullable(),
-  action: z.string().nullable(),
-  result: z.string().nullable(),
-  /** Turn id or targetKey of a supplied General question. Null when this is a new question. */
-  generalQuestionId: z.string().nullable().optional(),
-  supports: z.array(supportSchema).optional().default([]),
 });
 
 /**
@@ -171,22 +161,16 @@ export const cheatSheetPersonSectionGenerateSchema = z.object({
   caresAbout: z.array(caresAboutItemSchema).min(1).max(6),
   positioningStatements: z.array(guidanceItemSchema).min(1).max(6),
   keyStatements: z.array(guidanceItemSchema).min(1).max(6),
-  likelyQuestions: z.array(cheatSheetCoachItemGenerateSchema).min(4).max(12),
+  likelyQuestions: z.array(cheatSheetCoachItemGenerateSchema).min(0),
   questionsToAsk: z.array(questionToAskSchema).min(1).max(6),
 });
-
-/** Same section shape when the model returns fewer than 4 questions, so the one retry can keep them. */
-export const cheatSheetPersonSectionGenerateRecoverSchema =
-  cheatSheetPersonSectionGenerateSchema.extend({
-    likelyQuestions: z.array(cheatSheetCoachItemGenerateSchema).min(0).max(12),
-  });
 
 export const cheatSheetPersonSectionSchema = z.preprocess(
   coercePersonSection,
   cheatSheetPersonSectionGenerateSchema
     .omit({ likelyQuestions: true })
     .extend({
-      // The writer is capped at 12 per call. An update replaces that list, and seeker-kept questions can make the stored list longer than 12.
+      // The writer is capped by guide.likelyQuestionsPerPerson. Seeker-kept questions can make the stored list longer than that cap.
       likelyQuestions: z.array(cheatSheetCoachItemSchema).min(1),
       bestMaterial: z.array(guidanceItemSchema).optional().default([]),
       storyIds: z.array(z.string()).optional().default([]),

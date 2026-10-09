@@ -150,7 +150,6 @@ function hashFor(heading: string): string {
     },
     sources: [],
     careerStage: "college_graduate",
-    generalQuestions: [],
     interviewer: null,
   });
 }

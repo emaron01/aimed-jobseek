@@ -23,6 +23,10 @@ import {
   PLATFORM_SETTING_BILLING_TRIAL,
 } from "@/lib/billing/trial-period";
 import {
+  LIKELY_QUESTIONS_PER_PERSON_KEY,
+  parseLikelyQuestionsPerPerson,
+} from "@/lib/application-summary/likely-question-limit";
+import {
   DEFAULT_HARPER_DRAFT_SETTINGS,
   HARPER_DRAFT_SETTINGS_KEY,
   parseHarperDraftSettings,
@@ -425,6 +429,10 @@ export async function updateHarperDraftSettingsAction(
         key: HARPER_DRAFT_SETTINGS_KEY,
         actorUserId: user.id,
       });
+      await deletePlatformSetting({
+        key: LIKELY_QUESTIONS_PER_PERSON_KEY,
+        actorUserId: user.id,
+      });
       revalidatePath("/platform/harper");
       return {
         ok: true,
@@ -435,9 +443,17 @@ export async function updateHarperDraftSettingsAction(
       Object.keys(DEFAULT_HARPER_DRAFT_SETTINGS).map((key) => [key, formData.get(key)]),
     );
     const settings = parseHarperDraftSettings(raw);
+    const likelyQuestionsPerPerson = parseLikelyQuestionsPerPerson({
+      max: formData.get("likelyQuestionsPerPerson"),
+    });
     await upsertPlatformSetting({
       key: HARPER_DRAFT_SETTINGS_KEY,
       value: settings,
+      actorUserId: user.id,
+    });
+    await upsertPlatformSetting({
+      key: LIKELY_QUESTIONS_PER_PERSON_KEY,
+      value: { max: likelyQuestionsPerPerson },
       actorUserId: user.id,
     });
     revalidatePath("/platform/harper");

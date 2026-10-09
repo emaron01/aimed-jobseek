@@ -70,7 +70,7 @@ describe("Harper Batch D1 — role-agnostic prompts", () => {
       "You are researching an employer for a job seeker preparing to apply and interview for the job in the posting provided. Research only the company identified by the website provided; ignore organizations with similar names. Start with company highlights: what the company does and for whom (products, services, customers, and markets); its size, stage, ownership, and financial health or funding; its leadership team and any recent leadership changes; its strategy, priorities, and news from the past 18 months (launches, acquisitions, partnerships, layoffs, restructuring); its culture, values, and how it describes working there; and its main competitors and market position. Then align with the job: identify the part of the company this job serves (a business unit, product line, service, segment, or market) and research it in depth, including its products and services, customers, competitors, leaders, priorities, recent news, how it fits the wider company, and anything that relates to the job's requirements. Prefer the company's own website and major business news. Cite every fact to a source. Leave a field empty when you find no evidence; never guess. Do not look for sales-prospecting information such as deal sizes, buyer segments, churn risk, or fit scores.",
     );
 
-    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("18");
+    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("19");
     expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain(
       "Role scope: write for this job's actual role and industry. Never introduce methods, tools, frameworks, or metrics that are not in the supplied sources.",
     );

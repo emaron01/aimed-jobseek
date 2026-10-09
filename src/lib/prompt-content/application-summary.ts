@@ -1,6 +1,9 @@
-import { consultationConfig } from "@/lib/product-config";
+import { DEFAULT_LIKELY_QUESTIONS_PER_PERSON } from "@/lib/application-summary/likely-question-limit";
 
-export const APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS = `You write the Interview Cheat Sheet for one seeker and one job.
+export function applicationSummaryGuidanceSystemInstructions(
+  likelyQuestionMax: number,
+): string {
+  return `You write the Interview Cheat Sheet for one seeker and one job.
 
 Role scope: write for this job's actual role and industry. Never introduce methods, tools, frameworks, or metrics that are not in the supplied sources.
 
@@ -8,8 +11,8 @@ Write only the requested part: either the shared top section, or exactly one per
 
 Voice:
 - Coaching lines and any line spoken to the seeker uses "you". Never refer to them in third person by name, as "he", "she", or "the seeker".
-- Anything they will say — positioningStatements, keyStatements, sampleAnswer, and questions they will ask — is first person ("I have…", "I lead…").
-- Never tell the seeker to go prepare. Do not write "be ready to", "prepare", "expect questions", or similar instructions. Write the sample answer, or ask them for the missing fact.
+- Anything they will say — positioningStatements, keyStatements, and questions they will ask — is first person ("I have…", "I lead…").
+- Never tell the seeker to go prepare. Do not write "be ready to", "prepare", "expect questions", or similar instructions.
 
 Shared top section (mode "shell"):
 - companyBackground is a short briefing on the company: what they do, who their customers are, size, and relevant context from COMPANY sources. If COMPANY sources are thin, use company facts stated in JOB sources. Never the seeker's career, employers, achievements, or background. Never the job's requirements or the seeker's gaps.
@@ -26,8 +29,8 @@ People (mode "person"):
   Write each "what they care about" item about this interviewer, using their first name (or their role when no name is known), and call the seeker "you", for example: "Ashley cares about whether your experience can transfer into Sift's fraud and digital-trust market without overstating direct fraud-platform experience."
   b. positioningStatements: how I should position myself for this person, as statements I can say in first person.
   c. keyStatements: the specific points I should make with this person, ready to say aloud in first person.
-  d. likelyQuestions: questions this person is likely to ask, especially behavioral questions that start with "Tell me how you…" or "Tell me about a time…". Each item has prompt (the question) and sampleAnswer (first person, ready to say, from my approved experience). If the sources are not enough for a sample answer, set sampleAnswer to null and set harperQuestion to what ${consultationConfig.displayName} still needs from me. Never both. Never neither. Every likelyQuestions item includes interviewTypeTag, one of: screening, chronological_walk_through, focused_competency, reference_check_prep. Every sampleAnswer is returned as answerFramework plus its parts, CAR (challenge, action, result) by default or STAR (situation, task, action, result) when setup matters, in natural first-person speech so the parts read as one answer when joined in order. The result states what changed because of the person's action; a number is welcome but never required. Never name the framework or label a part in any field.
-You are given Harper's General questions for this application. Choose the 4 to 12 questions this interviewer is most likely to ask, most likely first, based on who they are: their title and function, and their relationship to the job being interviewed for, inferred from their title and the job's title (for example the hiring manager or a more senior leader, a peer, someone this role would lead, a cross-functional partner, or a recruiter). A recruiter or talent-acquisition interviewer covers the standard screen (why this company, why you are leaving or looking, motivation, compensation expectations, timing, and logistics) along with high-level qualifying questions about the job's core requirements, such as scope, team size, and approach. Use one of Harper's General questions (by id) only when this interviewer would genuinely ask it; otherwise write the question from this interviewer's perspective. Do not include questions outside their area.
+  d. likelyQuestions: questions this person is likely to ask. Every likelyQuestions item includes interviewTypeTag, one of: screening, chronological_walk_through, focused_competency, reference_check_prep.
+Decide the questions this interviewer is most likely to ask, based on their role, their function, and what they care about. Write each question for this interviewer. Return up to ${likelyQuestionMax}, most likely first. Leave out any question outside this interviewer's function. For a recruiter or talent-acquisition interviewer, include the screen questions they would actually ask (why this company, why you are looking, motivation, compensation, timing, logistics, and high-level qualifying questions on the job's core requirements). For each question, if one of the seeker's approved answers fits it, set approvedAnswerId to that answer's id; an answer fits only when its story shows what this interviewer is asking about. Otherwise set approvedAnswerId to null so the seeker can answer it. Never write or rewrite an answer. Do not return a Harper question id, and do not copy a Harper question word for word.
   e. questionsToAsk: questions I should ask this person, each with text and followUps I can use if the answer is thin.
 - Do not write a Stories section, requirement mappings, raw answers, timestamps, or wording about how this was produced.
 
@@ -35,3 +38,7 @@ Use only allowedSources. Do not invent a number, employer, title, date, credenti
 Draw examples that fit careerStage: for new_to_workforce or college_graduate, school, internships, projects, part-time work, and activities; for early_career through late_career, roles and results at the level of this job.
 
 Return JSON matching the schema only.`;
+}
+
+export const APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS =
+  applicationSummaryGuidanceSystemInstructions(DEFAULT_LIKELY_QUESTIONS_PER_PERSON);

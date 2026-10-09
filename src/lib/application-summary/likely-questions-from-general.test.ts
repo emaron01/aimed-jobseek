@@ -13,19 +13,16 @@ import { HarperDraftProvider } from "@/components/HarperDraftStore";
 import { HarperPersonInlineProfile } from "@/components/HarperPersonView";
 import {
   APPLICATION_SUMMARY_PROMPT_VERSION,
-  cheatSheetPersonSectionGenerateRecoverSchema,
   cheatSheetPersonSectionGenerateSchema,
   cheatSheetPersonSectionSchema,
   type CheatSheetPersonSection,
 } from "@/lib/application-summary/contract";
-import {
-  personLikelyQuestionCountDecision,
-  resolvePersonLikelyQuestions,
-  type SuppliedGeneralQuestion,
-} from "@/lib/application-summary/likely-questions";
+import { resolvePersonLikelyQuestions } from "@/lib/application-summary/likely-questions";
+import { DEFAULT_LIKELY_QUESTIONS_PER_PERSON } from "@/lib/application-summary/likely-question-limit";
+import { mergePersonLikelyQuestions } from "@/lib/application-summary/likely-questions";
 import { cheatSheetPersonSectionInputHash } from "@/lib/application-summary/people";
 import { buildApplicationSummaryGuidanceMessages } from "@/lib/application-summary/prompt";
-import { consultationReplyTargetKey, type ConsultationQaItem, type QaStatement } from "@/lib/consultation/qa-view";
+import { type ConsultationQaItem, type QaStatement } from "@/lib/consultation/qa-view";
 import { APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS } from "@/lib/prompt-content";
 import {
   ENTERPRISE_SALES_DIRECTOR_POSTING,
@@ -58,7 +55,7 @@ const NEW_QUESTION = "Tell me how you coach a sales manager through a missed qua
 const GENERAL_NOTE =
   "These are Harper's top picks. They represent the types of questions this interviewer may ask. Make sure you study General Study Questions.";
 const LIKELY_INSTRUCTION =
-  "You are given Harper's General questions for this application. Choose the 4 to 12 questions this interviewer is most likely to ask, most likely first, based on who they are: their title and function, and their relationship to the job being interviewed for, inferred from their title and the job's title (for example the hiring manager or a more senior leader, a peer, someone this role would lead, a cross-functional partner, or a recruiter). A recruiter or talent-acquisition interviewer covers the standard screen (why this company, why you are leaving or looking, motivation, compensation expectations, timing, and logistics) along with high-level qualifying questions about the job's core requirements, such as scope, team size, and approach. Use one of Harper's General questions (by id) only when this interviewer would genuinely ask it; otherwise write the question from this interviewer's perspective. Do not include questions outside their area.";
+  "Decide the questions this interviewer is most likely to ask, based on their role, their function, and what they care about. Write each question for this interviewer. Return up to 8, most likely first. Leave out any question outside this interviewer's function. For a recruiter or talent-acquisition interviewer, include the screen questions they would actually ask (why this company, why you are looking, motivation, compensation, timing, logistics, and high-level qualifying questions on the job's core requirements). For each question, if one of the seeker's approved answers fits it, set approvedAnswerId to that answer's id; an answer fits only when its story shows what this interviewer is asking about. Otherwise set approvedAnswerId to null so the seeker can answer it. Never write or rewrite an answer. Do not return a Harper question id, and do not copy a Harper question word for word.";
 
 function statement(
   partial: Partial<QaStatement> & Pick<QaStatement, "id" | "kind" | "status" | "content">,
@@ -171,35 +168,19 @@ function shellFields() {
   };
 }
 
-function modelQuestion(prompt: string, generalQuestionId: string | null) {
+function modelQuestion(prompt: string, approvedAnswerId: string | null) {
   return {
     prompt,
+    approvedAnswerId,
     interviewTypeTag: "focused_competency" as const,
-    sampleAnswer: null as string | null,
-    harperQuestion: generalQuestionId ? null : "Which quarter was that?",
-    answerFramework: null,
-    challenge: null,
-    situation: null,
-    task: null,
-    action: null,
-    result: null,
-    generalQuestionId,
-    supports: [] as Array<{ sourceId: string; quote: string }>,
   };
 }
 
-const supplied: SuppliedGeneralQuestion[] = [
+const supplied = [
   {
-    id: "turn-general",
-    text: QUESTION,
-    interviewTypeTag: "screening",
-    targetKey: "why-this-company",
-  },
-  {
-    id: "turn-walk",
-    text: "Walk me through your career for the last ten years.",
-    interviewTypeTag: "chronological_walk_through",
-    targetKey: "chronology",
+    id: "stmt-approved",
+    question: QUESTION,
+    content: APPROVED,
   },
 ];
 
@@ -270,12 +251,11 @@ describe("likely questions from Harper's General questions", () => {
           notes: [],
           personaBuilt: true,
           personaId: "role-1",
-          generalQuestions: [item],
         }),
       ),
     );
 
-    for (const host of [harper, person, general, section]) {
+    for (const host of [harper, person, general]) {
       const printNodes = host.querySelectorAll(".consultation-question-print");
       expect(printNodes.length).toBeGreaterThan(0);
       for (const node of printNodes) {
@@ -285,6 +265,10 @@ describe("likely questions from Harper's General questions", () => {
       expect(count(visible, QUESTION)).toBe(1);
       expect(visible).not.toContain("consultation-print-question");
     }
+    const sectionVisible = screenText(section);
+    expect(count(sectionVisible, QUESTION)).toBe(1);
+    expect(sectionVisible).toContain(APPROVED);
+    expect(section.querySelector("[data-testid='cheat-sheet-referenced-general-question']")).toBeNull();
 
     const printed = printText(general);
     expect(printed.startsWith("Approved answers only.")).toBe(true);
@@ -319,12 +303,11 @@ describe("likely questions from Harper's General questions", () => {
       responsibilities: "Forecast, hiring, and the weekly commit.",
       caresAbout: ["Repeatable execution"],
     };
-    const generalQuestions = [
+    const approvedAnswers = [
       {
-        id: "turn-general",
-        text: QUESTION,
-        interviewTypeTag: "screening" as const,
-        targetKey: "why-this-company",
+        id: "stmt-approved",
+        question: QUESTION,
+        content: APPROVED,
       },
     ];
     const result = await generateCheatSheetPersonSectionGuidance({
@@ -339,7 +322,8 @@ describe("likely questions from Harper's General questions", () => {
         sectionKind: "HIRING_MANAGER",
       },
       careerStage: "late_career",
-      generalQuestions,
+      approvedAnswers,
+      likelyQuestionMax: 8,
       interviewer,
     });
     expect(result.ok).toBe(true);
@@ -353,23 +337,23 @@ describe("likely questions from Harper's General questions", () => {
       mode: "shell",
     });
     const shellUser = JSON.parse(shell[2]!.content) as Record<string, unknown>;
-    expect(shellUser.generalQuestions).toBeUndefined();
+    expect(shellUser.approvedAnswers).toBeUndefined();
     expect(shellUser.interviewer).toBeUndefined();
     const sent = JSON.parse(messages[2]!.content) as {
-      generalQuestions: typeof generalQuestions;
+      approvedAnswers: typeof approvedAnswers;
       interviewer: typeof interviewer;
       people: unknown[];
     };
-    expect(sent.generalQuestions).toEqual(generalQuestions);
+    expect(sent.approvedAnswers).toEqual(approvedAnswers);
     expect(sent.interviewer).toEqual(interviewer);
     expect(sent.people).toHaveLength(1);
     expect(JSON.parse(messages[1]!.content).careerStage).toBe("late_career");
     expect(messages[0]!.content).toContain(LIKELY_INSTRUCTION);
-    expect(messages[0]!.content).toContain("Prompt version: 18");
+    expect(messages[0]!.content).toContain("Prompt version: 19");
   });
 
-  it("accepts 4 to 12 likely questions, rejects fewer or more, and drops an unknown reference", () => {
-    const four = [1, 2, 3, 4].map((index) => modelQuestion(`Question ${index}`, index === 1 ? "turn-general" : null));
+  it("accepts any count, copies an approved answer by id, and blanks an unknown id", () => {
+    const four = [1, 2, 3, 4].map((index) => modelQuestion(`Question ${index}`, index === 1 ? "stmt-approved" : null));
     expect(
       cheatSheetPersonSectionGenerateSchema.safeParse({ ...shellFields(), likelyQuestions: four }).success,
     ).toBe(true);
@@ -386,19 +370,13 @@ describe("likely questions from Harper's General questions", () => {
         ...shellFields(),
         likelyQuestions: [1, 2, 3].map((index) => modelQuestion(`Question ${index}`, null)),
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       cheatSheetPersonSectionGenerateSchema.safeParse({
         ...shellFields(),
         likelyQuestions: Array.from({ length: 13 }, (_, index) =>
           modelQuestion(`Question ${index + 1}`, null),
         ),
-      }).success,
-    ).toBe(false);
-    expect(
-      cheatSheetPersonSectionGenerateRecoverSchema.safeParse({
-        ...shellFields(),
-        likelyQuestions: [modelQuestion("Only one", null)],
       }).success,
     ).toBe(true);
 
@@ -417,75 +395,65 @@ describe("likely questions from Harper's General questions", () => {
       expect(stored.data.likelyQuestions[0]?.generalQuestionId).toBeUndefined();
     }
 
-    const unknown = resolvePersonLikelyQuestions({
+    const copied = resolvePersonLikelyQuestions({
       likelyQuestions: [
-        {
-          prompt: "Unused",
-          generalQuestionId: "not-supplied",
-          interviewTypeTag: "focused_competency",
-          sampleAnswer: null,
-          harperQuestion: null,
-          supports: [],
-        },
-        {
-          prompt: NEW_QUESTION,
-          generalQuestionId: "also-missing",
-          interviewTypeTag: "focused_competency",
-          sampleAnswer: null,
-          harperQuestion: "Which team was that?",
-          answerFramework: null,
-          challenge: null,
-          situation: null,
-          task: null,
-          action: null,
-          result: null,
-          supports: [],
-        },
+        modelQuestion("How did marketing and you work the launch?", "stmt-approved"),
+        modelQuestion(NEW_QUESTION, "missing-id"),
+        modelQuestion("What timing works for a start date?", null),
       ],
       harperAskedCareerWalkThrough: false,
-      generalQuestions: supplied,
+      approvedAnswers: supplied,
     });
-    expect(unknown.unusedReferenceIds).toEqual(["not-supplied", "also-missing"]);
-    expect(unknown.items).toHaveLength(1);
-    expect(unknown.items[0]?.generalQuestionId).toBeNull();
-    expect(unknown.items[0]?.prompt).toBe(NEW_QUESTION);
+    expect(copied[0]?.prompt).toBe("How did marketing and you work the launch?");
+    expect(copied[0]?.sampleAnswer).toBe(APPROVED);
+    expect(copied[1]?.sampleAnswer).toBeNull();
+    expect(copied[2]?.sampleAnswer).toBeNull();
 
-    expect(personLikelyQuestionCountDecision(3, 0)).toBe("retry");
-    expect(personLikelyQuestionCountDecision(3, 1)).toBe("accept-short");
-    expect(personLikelyQuestionCountDecision(4, 0)).toBe("save");
-    expect(personLikelyQuestionCountDecision(13, 1)).toBe("retry");
+    const overMax = [
+      "Why are you leaving your current company?",
+      "What compensation range are you targeting?",
+      "When could you start?",
+      "How large a team have you led?",
+      "Which markets have you launched in?",
+      "How do you measure a campaign?",
+      "Who did you partner with in product marketing?",
+      "What would you ask our customers first?",
+      "How do you handle a missed launch date?",
+      "What budget have you owned?",
+    ].map((prompt) => modelQuestion(prompt, null));
+    const trimmed = mergePersonLikelyQuestions({
+      existing: [],
+      incoming: resolvePersonLikelyQuestions({
+        likelyQuestions: overMax,
+        harperAskedCareerWalkThrough: false,
+        approvedAnswers: [],
+      }),
+      max: DEFAULT_LIKELY_QUESTIONS_PER_PERSON,
+    });
+    expect(trimmed).toHaveLength(DEFAULT_LIKELY_QUESTIONS_PER_PERSON);
+    expect(trimmed[0]?.prompt).toBe(overMax[0]?.prompt);
 
     const filtered = resolvePersonLikelyQuestions({
       likelyQuestions: [
-        { ...modelQuestion(QUESTION, "why-this-company"), interviewTypeTag: "screening" },
+        { ...modelQuestion(QUESTION, null), interviewTypeTag: "screening" },
         modelQuestion(NEW_QUESTION, null),
-        modelQuestion("Walk me through your career for the last ten years.", "turn-walk"),
+        {
+          ...modelQuestion("Walk me through your career for the last ten years.", null),
+          interviewTypeTag: "chronological_walk_through" as const,
+        },
         modelQuestion("Tell me how you hired a sales lead.", null),
       ],
       harperAskedCareerWalkThrough: true,
-      generalQuestions: supplied,
+      approvedAnswers: [],
     });
-    expect(filtered.items.map((item) => item.prompt)).toEqual([
+    expect(filtered.map((item) => item.prompt)).toEqual([
       QUESTION,
       NEW_QUESTION,
       "Tell me how you hired a sales lead.",
     ]);
-    expect(filtered.items[0]?.generalQuestionId).toBe("turn-general");
-    expect(personLikelyQuestionCountDecision(filtered.items.length, 0)).toBe("retry");
-    expect(personLikelyQuestionCountDecision(filtered.items.length, 1)).toBe("accept-short");
   });
 
-  it("renders a referenced General card in writer order, a new question as the person's own item, and an older section without references as before", () => {
-    const general = qaItem({
-      questionTurnId: "turn-general",
-      targetKey: "why-this-company",
-      question: QUESTION,
-    });
-    const otherGeneral = qaItem({
-      questionTurnId: "turn-other",
-      targetKey: "other",
-      question: "Tell me how you built a partner channel from nothing.",
-    });
+  it("renders each likely question's own text, a copied answer, and a blank reply", () => {
     const host = mount(
       createElement(CheatSheetPersonBody, {
         campaignId: "camp",
@@ -519,24 +487,21 @@ describe("likely questions from Harper's General questions", () => {
         notes: [],
         personaBuilt: true,
         personaId: "role-1",
-        generalQuestions: [general, otherGeneral],
+        personQuestions: [],
       }),
     );
     const items = [...host.querySelectorAll("[data-testid='cheat-sheet-coach-items'] > li")];
     expect(items).toHaveLength(3);
-    expect(items[0]?.querySelector("[data-testid='cheat-sheet-referenced-general-question']")).toBeTruthy();
-    expect(items[0]?.textContent).toContain(QUESTION);
-    expect(items[0]?.textContent).not.toContain("stored prompt that must not replace the general text");
-    const target = items[0]?.querySelector("input[name='targetKey']") as HTMLInputElement | null;
-    expect(target?.value).toBe(consultationReplyTargetKey("turn-general"));
-    expect(items[1]?.querySelector("[data-testid='cheat-sheet-referenced-general-question']")).toBeNull();
-    expect(items[1]?.querySelector("[data-testid='cheat-sheet-shared-general-question']")).toBeNull();
+    expect(items[0]?.querySelector("[data-testid='cheat-sheet-referenced-general-question']")).toBeNull();
+    expect(items[0]?.querySelector("[data-testid='cheat-sheet-shared-general-question']")).toBeNull();
+    expect(items[0]?.textContent).toContain("stored prompt that must not replace the general text");
+    expect(items[0]?.textContent).not.toContain(QUESTION);
+    expect(items[0]?.querySelector("[data-testid='cheat-sheet-coach-reply-contact:c-1:likely:1']")).toBeTruthy();
     expect(items[1]?.textContent).toContain(NEW_QUESTION);
     expect(items[1]?.querySelector("[data-testid='cheat-sheet-sample-draft']")).toBeTruthy();
-    expect(items[2]?.querySelector("[data-testid='cheat-sheet-shared-general-question']")).toBeTruthy();
-    expect(items[2]?.querySelector("input[name='targetKey']")?.getAttribute("value")).toBe(
-      consultationReplyTargetKey("turn-other"),
-    );
+    expect(items[2]?.querySelector("[data-testid='cheat-sheet-shared-general-question']")).toBeNull();
+    expect(items[2]?.textContent).toContain("Tell me how you built a partner channel from nothing.");
+    expect(items[2]?.querySelector("[data-testid='cheat-sheet-coach-reply-contact:c-1:likely:3']")).toBeTruthy();
     expect(screenText(host).match(/Tell me how you built a partner channel from nothing\./g)).toHaveLength(1);
   });
 
@@ -597,7 +562,7 @@ describe("likely questions from Harper's General questions", () => {
 
   it("keeps the approved instruction text, bumps the prompt version, and does not regenerate on a page view", () => {
     expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain(LIKELY_INSTRUCTION);
-    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("18");
+    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("19");
     const person = {
       sectionKey: "contact:1",
       roleId: "role-1",
@@ -617,14 +582,14 @@ describe("likely questions from Harper's General questions", () => {
       person,
       sources,
       careerStage: "mid_career",
-      generalQuestions: [
+      approvedAnswers: [
         {
-          id: "turn-general",
-          text: QUESTION,
-          interviewTypeTag: "screening",
-          targetKey: "why-this-company",
+          id: "stmt-approved",
+          question: QUESTION,
+          content: APPROVED,
         },
       ],
+      likelyQuestionMax: 8,
       interviewer: {
         hiringTeamRole: "Hiring Manager",
         title: "Director",
@@ -641,22 +606,21 @@ describe("likely questions from Harper's General questions", () => {
     expect(view).not.toContain("enqueueApplicationJob");
     expect(view).not.toContain("generateCheatSheetPersonSectionGuidance");
     expect(view).not.toContain("generateStructured");
-    expect(service).toContain("personLikelyQuestionCountDecision");
-    expect(service).toContain("for (let attempt = 0; attempt < 2; attempt += 1)");
+    const personBlock = service.slice(
+      service.indexOf("approvedAnswers: guideInputs.approvedAnswers"),
+      service.indexOf("const shellSources = sourcesForShell"),
+    );
+    expect(personBlock).not.toContain("personLikelyQuestionCountDecision");
+    expect(personBlock).not.toContain("for (let attempt = 0; attempt < 2; attempt += 1)");
   });
 
   it("sends the exact person instruction for a recruiter and for sales, nursing, and new-graduate guides", () => {
     const screen =
-      "A recruiter or talent-acquisition interviewer covers the standard screen (why this company, why you are leaving or looking, motivation, compensation expectations, timing, and logistics) along with high-level qualifying questions about the job's core requirements, such as scope, team size, and approach.";
+      "For a recruiter or talent-acquisition interviewer, include the screen questions they would actually ask (why this company, why you are looking, motivation, compensation, timing, logistics, and high-level qualifying questions on the job's core requirements).";
     expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain(LIKELY_INSTRUCTION);
     expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).not.toContain(
-      "relevant to their role and responsibilities",
+      "Use one of Harper's General questions",
     );
-    expect(
-      APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS.split(
-        "You are given Harper's General questions",
-      ),
-    ).toHaveLength(2);
 
     const cases = [
       {
@@ -720,9 +684,7 @@ describe("likely questions from Harper's General questions", () => {
       const system = messages[0]?.content ?? "";
       expect(system).toContain(LIKELY_INSTRUCTION);
       expect(system).toContain(screen);
-      expect(system).toContain(
-        "Every sampleAnswer is returned as answerFramework plus its parts",
-      );
+      expect(system).not.toContain("answerFramework");
       const sources = JSON.parse(messages[1]?.content ?? "{}") as {
         allowedSources?: Array<{ text?: string }>;
         careerStage?: string;

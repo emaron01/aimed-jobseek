@@ -2,7 +2,6 @@ import { sameRequirementMeaning } from "@/lib/consultation/assess";
 import type { InterviewTypeTag } from "@/lib/consultation/contract";
 import { questionIntentClass } from "@/lib/consultation/question-detection";
 import { questionNearDuplicate } from "@/lib/consultation/questions";
-import { coachItemIdFromCheatSheetTarget } from "@/lib/consultation/harper-layout";
 import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
 
 function normalizedQuestion(text: string): string {
@@ -41,49 +40,6 @@ export function interviewerQuestionMatchesGeneral(input: {
   return questionTextNearDuplicate(input.interviewerText, input.generalText);
 }
 
-export function sharedGeneralForCoachItem(
-  item: { prompt: string; interviewTypeTag?: InterviewTypeTag | null },
-  own: ConsultationQaItem | null | undefined,
-  generalQuestions: readonly ConsultationQaItem[],
-): ConsultationQaItem | null {
-  if (personItemHasOwnAnswer(own)) return null;
-  return matchingGeneralQuestion(
-    { text: item.prompt, tag: item.interviewTypeTag },
-    generalQuestions,
-  );
-}
-
-export function sharedGeneralTurnIdsForLikelyQuestions(
-  items: ReadonlyArray<{
-    id?: string | null;
-    prompt: string;
-    interviewTypeTag?: InterviewTypeTag | null;
-    generalQuestionId?: string | null;
-  }>,
-  qaItems: readonly ConsultationQaItem[],
-  generalQuestions: readonly ConsultationQaItem[],
-): Set<string> {
-  const ids = new Set<string>();
-  for (const item of items) {
-    const referenceId = item.generalQuestionId?.trim() ?? "";
-    if (referenceId) {
-      const referenced = generalQuestions.find(
-        (question) =>
-          question.questionTurnId === referenceId || question.targetKey === referenceId,
-      );
-      if (referenced) ids.add(referenced.questionTurnId);
-      continue;
-    }
-    const coachId = item.id?.trim() ?? "";
-    const own = qaItems.find(
-      (qa) => coachItemIdFromCheatSheetTarget(qa.targetKey) === coachId,
-    );
-    const match = sharedGeneralForCoachItem(item, own, generalQuestions);
-    if (match) ids.add(match.questionTurnId);
-  }
-  return ids;
-}
-
 export function matchingGeneralQuestion(
   interviewer: { text: string; tag?: InterviewTypeTag | null },
   generalQuestions: readonly ConsultationQaItem[],
@@ -103,29 +59,19 @@ export function matchingGeneralQuestion(
 }
 
 /**
- * Person-prep cards for one interviewer. A match with no own answer is replaced
- * by the General question's card. Already-answered person items stay as they are.
+ * Person-prep cards for one interviewer. Each card is the question that is
+ * actually on that person. Likely questions render their own text, so these
+ * cards are not swapped for a General question and are not hidden by one.
  */
 export function displayedPersonQuestions(input: {
   personQuestions: readonly ConsultationQaItem[];
-  generalQuestions: readonly ConsultationQaItem[];
-  hiddenTurnIds?: Iterable<string>;
 }): ConsultationQaItem[] {
-  const hidden = new Set(input.hiddenTurnIds ?? []);
   const seen = new Set<string>();
   const shown: ConsultationQaItem[] = [];
   for (const item of input.personQuestions) {
-    const replacement = personItemHasOwnAnswer(item)
-      ? item
-      : matchingGeneralQuestion(
-          { text: item.question, tag: item.interviewTypeTag },
-          input.generalQuestions,
-        ) ?? item;
-    if (hidden.has(replacement.questionTurnId) || seen.has(replacement.questionTurnId)) {
-      continue;
-    }
-    seen.add(replacement.questionTurnId);
-    shown.push(replacement);
+    if (seen.has(item.questionTurnId)) continue;
+    seen.add(item.questionTurnId);
+    shown.push(item);
   }
   return shown;
 }

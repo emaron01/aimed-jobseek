@@ -14,7 +14,6 @@ import {
 import { AppButton } from "@/components/AppButton";
 import { QuestionList, ResultBody } from "@/components/ConsultationThread";
 import type { CheatSheetCoachItem } from "@/lib/application-summary/contract";
-import { sharedGeneralForCoachItem } from "@/lib/consultation/general-question-match";
 import {
   coachItemIdFromCheatSheetTarget,
   harperCoachItemAnchorId,
@@ -117,7 +116,6 @@ export function CheatSheetCoachItems({
   canEdit,
   items,
   qaItems = [],
-  generalQuestions = [],
   jobsActive = false,
   showReply = true,
 }: {
@@ -126,8 +124,6 @@ export function CheatSheetCoachItems({
   items: CheatSheetCoachItem[];
   /** When set, answered/open Harper turns for these coach items render once here (Batch A card). */
   qaItems?: ConsultationQaItem[];
-  /** General questions that can replace a matching person item that has no answer yet. */
-  generalQuestions?: ConsultationQaItem[];
   /** When true, hide coach answer forms (Harper analyzing). */
   jobsActive?: boolean;
   showReply?: boolean;
@@ -151,19 +147,6 @@ export function CheatSheetCoachItems({
         const coachId = item.id?.trim() ?? "";
         const qaItem = coachId ? qaByCoachId.get(coachId) : undefined;
         const anchorId = coachId ? harperCoachItemAnchorId(coachId) : undefined;
-        const referenceId = item.generalQuestionId?.trim() ?? "";
-        const referenced = referenceId
-          ? generalQuestions.find(
-              (question) =>
-                question.questionTurnId === referenceId ||
-                question.targetKey === referenceId,
-            )
-          : undefined;
-        const shared = referenced
-          ? referenced
-          : referenceId
-            ? null
-            : sharedGeneralForCoachItem(item, qaItem, generalQuestions);
         const sampleStatement: QaStatement | null = answer
           ? {
               id: `sample:${coachId || item.prompt}`,
@@ -182,30 +165,7 @@ export function CheatSheetCoachItems({
             className="rounded-md border-2 border-edge-strong bg-surface p-4"
             data-testid={`cheat-sheet-coach-${item.id ?? "item"}`}
           >
-            {shared ? (
-              <div
-                className="mt-3"
-                data-testid={
-                  referenced
-                    ? "cheat-sheet-referenced-general-question"
-                    : "cheat-sheet-shared-general-question"
-                }
-              >
-                <QuestionList
-                  campaignId={campaignId}
-                  canEdit={canEdit}
-                  questions={[shared]}
-                  showReply={showReply}
-                  pendingTarget={pendingTarget}
-                  jobsActive={jobsActive}
-                  outerCard={false}
-                  onSubmitStart={(replyKey, answerText) => {
-                    setPendingTarget(replyKey);
-                    void answerText;
-                  }}
-                />
-              </div>
-            ) : qaItem ? (
+            {qaItem ? (
               <div data-testid="cheat-sheet-coach-harper-qa">
                 <p className="consultation-question-screen text-sm font-medium text-ink">
                   {item.prompt}
