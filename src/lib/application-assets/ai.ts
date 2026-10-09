@@ -78,7 +78,15 @@ function assetUsage(
   };
 }
 
-function failure(operation: string, error: unknown, message: string) {
+export const OUTREACH_GENERATION_FAILURE_MESSAGE =
+  "The message couldn't be generated. Please try again.";
+
+function failure(
+  operation: string,
+  error: unknown,
+  message: string,
+  options?: { includeIssueDetail?: boolean },
+) {
   const issues = error instanceof AiValidationError ? error.issues : undefined;
   console.error(
     JSON.stringify({
@@ -88,12 +96,23 @@ function failure(operation: string, error: unknown, message: string) {
       issues,
     }),
   );
-  const detail = issues?.length
-    ? ` ${issues
-        .map((issue) => `${issue.path}: ${issue.code}`)
-        .join("; ")}`
-    : "";
+  const detail =
+    options?.includeIssueDetail === false || !issues?.length
+      ? ""
+      : ` ${issues
+          .map((issue) => `${issue.path}: ${issue.code}`)
+          .join("; ")}`;
   return { ok: false as const, message: `${message}${detail}` };
+}
+
+/** Seeker-facing outreach generation failure. Schema issues stay in the server log. */
+export function outreachGenerationFailure(error: unknown) {
+  return failure(
+    "outreachAsset",
+    error,
+    OUTREACH_GENERATION_FAILURE_MESSAGE,
+    { includeIssueDetail: false },
+  );
 }
 
 export const RESUME_WRITER_TEMPERATURE = 0;
@@ -256,12 +275,7 @@ export async function generateOutreachWithModel(
   const tracking = aiCallTracking(
     assetUsage(input.context, "EMAIL_GENERATION", "EMAIL_GENERATION"),
   );
-  const failed = (error: unknown) =>
-    failure(
-      "outreachAsset",
-      error,
-      "The outreach message could not be generated. Retry.",
-    );
+  const failed = (error: unknown) => outreachGenerationFailure(error);
   const callProvider = async (): Promise<ApplicationAssetContent> => {
     if (input.type === "EMAIL") {
       const response = await getConsultationReplyAiProvider().generateStructured({

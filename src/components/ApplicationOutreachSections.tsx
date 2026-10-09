@@ -104,10 +104,17 @@ const GENERATOR_KINDS: OutreachGeneratorKind[] = [
   "INTERVIEW_THANK_YOU",
 ];
 
-function Status({ result }: { result: ApplicationOutreachActionResult | null }) {
+function Status({
+  result,
+  suppressJobFailure = false,
+}: {
+  result: ApplicationOutreachActionResult | null;
+  /** The section banner already shows a finished job error. */
+  suppressJobFailure?: boolean;
+}) {
   if (!result) return null;
   return (
-    <InlineActionStatus result={result}>
+    <InlineActionStatus result={result} suppressJobFailure={suppressJobFailure}>
       {result.violations?.length ? (
         <ul className="mt-1 list-disc pl-5">
           {result.violations.map((violation) => (
@@ -1071,7 +1078,7 @@ export function ApplicationOutreachSection({
                   <SubmitButton>{outreachConfig.labels.generate}</SubmitButton>
                 </form>
             ) : null}
-            <Status result={generateState} />
+            <Status result={generateState} suppressJobFailure />
           </div>
         ) : null}
       </div>

@@ -68,7 +68,11 @@ export const resumeAssetContentSchema = z.object({
   credentials: z.array(assetClaimSchema),
 });
 
-/** Seeker edit of a generated outreach message. Absent until they save one. */
+/**
+ * Seeker edit of a generated outreach message.
+ * Absent or null until they save one. Strict structured output requires the
+ * key and sends null when there is no edit.
+ */
 export const outreachSeekerEditSchema = z.object({
   subject: z.string().nullable(),
   body: z.string(),
@@ -95,14 +99,14 @@ export const emailAssetContentSchema = z.object({
   paragraphs: z.array(outreachClaimSchema).min(1),
   signoff: z.string().trim().min(1),
   signerName: z.string().trim().min(1),
-  seekerEdit: outreachSeekerEditSchema.optional(),
+  seekerEdit: outreachSeekerEditSchema.nullable().optional(),
 });
 
 export const linkedinNoteAssetContentSchema = z.object({
   type: z.literal("LINKEDIN_CONNECTION_NOTE"),
   greeting: z.string().trim().min(1),
   body: outreachClaimSchema,
-  seekerEdit: outreachSeekerEditSchema.optional(),
+  seekerEdit: outreachSeekerEditSchema.nullable().optional(),
 });
 
 export const linkedinInmailAssetContentSchema = z.object({
@@ -110,7 +114,7 @@ export const linkedinInmailAssetContentSchema = z.object({
   subject: z.string().trim().min(1),
   greeting: z.string().trim().min(1),
   paragraphs: z.array(outreachClaimSchema).min(1),
-  seekerEdit: outreachSeekerEditSchema.optional(),
+  seekerEdit: outreachSeekerEditSchema.nullable().optional(),
 });
 
 export const applicationAssetContentSchema = z.discriminatedUnion("type", [
