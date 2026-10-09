@@ -21,16 +21,9 @@ import {
   saveRoleAsTemplateAction,
   updateApplicationRoleAction,
 } from "@/app/actions/hiring-team";
-import {
-  parseIndividualProfile,
-  parseLinkedInExtracted,
-} from "@/lib/contact-profile/service";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { InterviewStagesSection } from "@/components/InterviewStagesSection";
-import { ApplicationAssetsSection } from "@/components/ApplicationAssetsSection";
 import { OpenDetailsOnMount } from "@/components/OpenDetailsOnMount";
-import { ApplicationOutreachSection } from "@/components/ApplicationOutreachSections";
-import { isOutreachAssetType } from "@/lib/product-config";
 import { HiringTeamDisclosureGroup } from "@/components/HiringTeamDisclosureGroup";
 import { AddPersonaSection } from "@/components/AddPersonaSection";
 import { HiringTeamAssumptionNotice } from "@/components/HiringTeamAssumptionNotice";
@@ -42,12 +35,10 @@ import {
   HiringTeamRecommendedMark,
 } from "@/components/HiringTeamCheatSheetControls";
 import { prisma } from "@/lib/prisma";
-import { coverLetterThinEvidenceCopy } from "@/lib/application-assets/service";
-import { applicationSummaryConfig, applicationWorkspaceCopy, consultationConversationCopy, hiringTeamConfig, hiringTeamDetailsTitle, outreachConfig, vocab } from "@/lib/product-config";
+import { applicationSummaryConfig, consultationConversationCopy, hiringTeamConfig, hiringTeamDetailsTitle, outreachConfig, vocab } from "@/lib/product-config";
 import { AppActionLink } from "@/components/ui";
 import { parseStringArray } from "@/lib/research";
 import { contactDisplayName } from "@/lib/utils";
-import { missingResumeContactLabels } from "@/lib/application-assets/header";
 import {
   ApplicationWorkspaceEmpty,
   type ApplicationWorkspaceFocus,
@@ -57,6 +48,8 @@ import {
   ApplicationCompanyDetails,
 } from "@/components/ApplicationCompanyBody";
 import { ApplicationJobBody, ApplicationJobDetails } from "@/components/ApplicationJobBody";
+import { ApplicationAssetsBody } from "@/components/ApplicationAssetsBody";
+import { ApplicationOutreachBody } from "@/components/ApplicationOutreachBody";
 import { loadApplicationWorkspaceModel } from "@/components/application-workspace-model";
 
 export type { ApplicationWorkspaceFocus };
@@ -101,28 +94,48 @@ export async function ApplicationWorkspace({
       />
     );
   }
+  if (focus === "assets") {
+    return (
+      <ApplicationAssetsBody
+        campaignId={campaignId}
+        organizationId={organizationId}
+        canEdit={canEdit}
+      />
+    );
+  }
+  if (focus === "hiring-team") {
+    return (
+      <ApplicationHiringTeamBody
+        campaignId={campaignId}
+        organizationId={organizationId}
+        canEdit={canEdit}
+        asPage
+      />
+    );
+  }
+  if (focus === "outreach") {
+    return (
+      <ApplicationOutreachBody
+        campaignId={campaignId}
+        organizationId={organizationId}
+        canEdit={canEdit}
+      />
+    );
+  }
   const loaded = await loadApplicationWorkspaceModel(
     organizationId,
     campaignId,
     canEdit,
-    showFocus(focus, ["assets"]),
-    focus === "all" || focus === "outreach",
+    focus === "all",
+    focus === "all",
   );
   if (!loaded.requirement) {
     return <ApplicationWorkspaceEmpty focus={focus} />;
   }
   const requirement = loaded.requirement;
-  const profile = loaded.profile;
-  const statementPicker = loaded.statementPicker;
-  const coverLetterEvidenceThin = loaded.coverLetterEvidenceThin;
-  const emailSignature = loaded.emailSignature;
   const nextStep = loaded.nextStep;
   const live = loaded.live;
   const profileHref = loaded.profileHref;
-  const profileEditHref = loaded.profileEditHref;
-  const invalidPlanTypes = loaded.invalidPlanTypes;
-  const presentationPlans = loaded.presentationPlans;
-  const assetsOpen = loaded.assetsOpen;
   const asPage = focus !== "all";
 
   return (
@@ -177,111 +190,18 @@ export async function ApplicationWorkspace({
     />
     ) : null}
     {showFocus(focus, ["assets"]) ? (
-    <div id="assets">
-    <WorkspaceProgress
-      jobs={live.jobs}
-      type="RESUME"
-      profileHref={profileHref}
-    />
-    <WorkspaceProgress
-      jobs={live.jobs}
-      type="COVER_LETTER"
-      profileHref={profileHref}
-    />
-    <ApplicationAssetsSection
-      campaignId={requirement.campaignId}
+    <ApplicationAssetsBody
+      campaignId={campaignId}
+      organizationId={organizationId}
       canEdit={canEdit}
-      defaultOpen={assetsOpen}
-      plans={presentationPlans}
-      invalidPlanTypes={invalidPlanTypes}
-      coverLetterThinNotice={
-        coverLetterEvidenceThin ? coverLetterThinEvidenceCopy() : null
-      }
-      missingResumeContacts={
-        profile.ok ? missingResumeContactLabels(profile.profile) : []
-      }
-      profileHref={profileHref}
-      profileEditHref={profileEditHref}
-      statementGroups={statementPicker.groups}
-      statementRoleOptions={statementPicker.roleOptions}
-      needsPrepare={statementPicker.needsPrepare}
-      assets={requirement.campaign.applicationAssets
-        .filter(
-          (
-            asset,
-          ): asset is typeof asset & { type: "RESUME" | "COVER_LETTER" } =>
-            asset.type === "RESUME" || asset.type === "COVER_LETTER",
-        )
-        .map((asset) => ({
-          id: asset.id,
-          type: asset.type,
-          version: asset.version,
-          status: asset.status,
-          content: asset.contentJson,
-          guidance: asset.guidance,
-          promptVersion: asset.promptVersion,
-          staleReason: asset.staleReason,
-          createdAt: asset.createdAt.toISOString(),
-        }))}
     />
-    </div>
     ) : null}
     {showFocus(focus, ["outreach"]) ? (
-    <div id="outreach" data-testid="application-contacts-wrap">
-    <p className="sr-only">{applicationWorkspaceCopy.contactsTitle}</p>
-    <WorkspaceProgress jobs={live.jobs} type="OUTREACH" />
-    <ApplicationOutreachSection
-      campaignId={requirement.campaignId}
+    <ApplicationOutreachBody
+      campaignId={campaignId}
+      organizationId={organizationId}
       canEdit={canEdit}
-      approvedResumeId={
-        requirement.campaign.applicationAssets.find(
-          (asset) => asset.type === "RESUME" && asset.status === "APPROVED",
-        )?.id ?? null
-      }
-      roles={requirement.campaign.hiringTeamRoles.map((role) => ({
-        id: role.id,
-        name: role.name,
-        suggestionKey: role.suggestionKey,
-        personaBuilt: isHiringTeamPersonaBuilt(role),
-      }))}
-      contacts={requirement.campaign.contacts.map(toContactRow)}
-      interviewStages={requirement.campaign.interviewStages.map((stage) => {
-        const interviewerContactId = stage.interviewers[0]?.contactId ?? null;
-        const personaId =
-          requirement.campaign.contacts.find(
-            (row) => row.contact.id === interviewerContactId,
-          )?.chosenPersonaId ?? null;
-        return {
-          id: stage.id,
-          type: stage.type,
-          format: stage.format,
-          scheduledAt: stage.scheduledAt.toISOString(),
-          notesAfter: stage.notesAfter,
-          thankYouClarifyJson: stage.thankYouClarifyJson,
-          interviewerContactId,
-          personaId,
-        };
-      })}
-      assets={requirement.campaign.applicationAssets
-        .filter((asset): asset is typeof asset & {
-          type: "EMAIL" | "LINKEDIN_CONNECTION_NOTE" | "LINKEDIN_INMAIL";
-        } => isOutreachAssetType(asset.type))
-        .map((asset) => ({
-          id: asset.id,
-          type: asset.type,
-          version: asset.version,
-          status: asset.status,
-          personaId: asset.personaId,
-          contactId: asset.contactId,
-          purpose: asset.purpose,
-          sentAt: asset.sentAt?.toISOString() ?? null,
-          createdAt: asset.createdAt.toISOString(),
-          emailLength: asset.emailLength,
-          content: asset.contentJson,
-        }))}
-      emailSignature={emailSignature}
     />
-    </div>
     ) : null}
     {showFocus(focus, ["interviews"]) ? (
     <div id="interviews">
@@ -401,45 +321,6 @@ function readNarrative(value: unknown): {
   };
 }
 
-function toContactRow(row: {
-  chosenPersonaId: string | null;
-  roleConfirmed: boolean;
-  linkedInProfileText: string | null;
-  linkedInExtractedJson: unknown;
-  individualProfileJson: unknown;
-  individualProfileStatus: string | null;
-  individualProfileError: string | null;
-  contact: {
-    id: string;
-    firstName: string | null;
-    lastName: string | null;
-    title: string | null;
-    email: string | null;
-    linkedinUrl: string | null;
-  };
-  chosenPersona: { name: string } | null;
-}) {
-  const extracted = parseLinkedInExtracted(row.linkedInExtractedJson);
-  const individual = parseIndividualProfile(row.individualProfileJson);
-  return {
-    contactId: row.contact.id,
-    firstName: row.contact.firstName,
-    lastName: row.contact.lastName,
-    title: row.contact.title,
-    email: row.contact.email,
-    linkedinUrl: row.contact.linkedinUrl,
-    personaId: row.chosenPersonaId,
-    personaName: row.chosenPersona?.name ?? null,
-    roleConfirmed: row.roleConfirmed,
-    linkedInProfileText: row.linkedInProfileText,
-    extractedTitle: extracted?.currentTitle?.text ?? null,
-    individualStatus: row.individualProfileStatus,
-    individualError: row.individualProfileError,
-    commonGround: individual?.commonGround ?? [],
-    caresAbout: individual?.caresAbout ?? [],
-  };
-}
-
 function hiringTeamStatusChip(building: boolean): {
   kind: "none" | "building";
   text?: string;
@@ -469,7 +350,7 @@ function KindMark({ kind }: { kind: string }) {
   );
 }
 
-async function HiringTeamSection({
+export async function HiringTeamSection({
   campaignId,
   organizationId,
   canEdit,
@@ -832,6 +713,40 @@ async function HiringTeamSection({
       </div>
     </details>
     </>
+  );
+}
+
+export async function ApplicationHiringTeamBody({
+  campaignId,
+  organizationId,
+  canEdit,
+  asPage,
+}: {
+  campaignId: string;
+  organizationId: string;
+  canEdit: boolean;
+  asPage: boolean;
+}) {
+  const loaded = await loadApplicationWorkspaceModel(
+    organizationId,
+    campaignId,
+    canEdit,
+    false,
+    false,
+  );
+  if (!loaded.requirement) {
+    return <ApplicationWorkspaceEmpty focus="hiring-team" />;
+  }
+  return (
+    <div className={`space-y-4 ${WORKSPACE_CARD_WRAP_CLASS}`}>
+      <HiringTeamSection
+        campaignId={loaded.requirement.campaignId}
+        organizationId={organizationId}
+        canEdit={canEdit}
+        jobs={loaded.live.jobs}
+        asPage={asPage}
+      />
+    </div>
   );
 }
 

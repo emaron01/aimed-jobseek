@@ -52,8 +52,9 @@ describe("employer correction form fields", () => {
     const job = readFileSync("src/components/ApplicationJobBody.tsx", "utf8");
     const form = readFileSync("src/components/ApplicationActionForm.tsx", "utf8");
     const action = readFileSync("src/app/actions/application.ts", "utf8");
-    expect(workspace).toContain('data-testid="application-contacts-wrap"');
-    expect(workspace).toContain("applicationWorkspaceCopy.contactsTitle");
+    const outreach = readFileSync("src/components/ApplicationOutreachBody.tsx", "utf8");
+    expect(outreach).toContain('data-testid="application-contacts-wrap"');
+    expect(outreach).toContain("applicationWorkspaceCopy.contactsTitle");
     expect(workspace).toContain("hiringTeamConfig.workspaceTitle");
     expect(job).toContain("applicationWorkspaceCopy.jobRequirementTitle");
     expect(company).toContain('testId="correct-employer-form"');

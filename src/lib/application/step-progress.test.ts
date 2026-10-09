@@ -50,7 +50,7 @@ describe("application step routes", () => {
       "/campaigns/camp_1/interviews",
     );
     expect(applicationStepHref("camp_1", "summary")).toBe("/campaigns/camp_1/summary");
-    expect(applicationStepHref("camp_1", "applied")).toBe("/campaigns/camp_1#applied");
+    expect(applicationStepHref("camp_1", "applied")).toBe("/campaigns/camp_1?open=applied");
     expect(applicationStepFromPathname("/campaigns/camp_1")).toBe("overview");
     expect(applicationStepFromPathname("/campaigns/camp_1/job")).toBe("job");
     expect(applicationStepFromPathname("/campaigns/camp_1/interviews/stage_1")).toBe(

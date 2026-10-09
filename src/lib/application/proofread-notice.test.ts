@@ -65,10 +65,9 @@ describe("resume and cover letter proofread notice", () => {
     expect(assetsPage).not.toContain("generateCoverLetterWithModel");
     expect(assetsPage).not.toContain("generateStructured");
 
-    const assetsRender = workspace.slice(
-      workspace.indexOf('showFocus(focus, ["assets"])'),
-      workspace.indexOf('showFocus(focus, ["outreach"])'),
-    );
+    const assetsRender = src("src/components/ApplicationAssetsBody.tsx");
+    expect(workspace).toContain('showFocus(focus, ["assets"])');
+    expect(workspace).toContain("ApplicationAssetsBody");
     expect(assetsRender).toContain("ApplicationAssetsSection");
     expect(assetsRender).not.toContain("enqueueApplicationJob");
     expect(assetsRender).not.toContain("generateResumeWithModel");

@@ -1,8 +1,11 @@
 import "server-only";
 
 import type { ReactNode } from "react";
+import { ApplicationAssetsBody } from "@/components/ApplicationAssetsBody";
 import { ApplicationCompanyBody } from "@/components/ApplicationCompanyBody";
+import { ApplicationHiringTeamBody } from "@/components/ApplicationWorkspace";
 import { ApplicationJobBody } from "@/components/ApplicationJobBody";
+import { ApplicationOutreachBody } from "@/components/ApplicationOutreachBody";
 import { ApplicationStatusBody } from "@/components/ApplicationStatusBody";
 import {
   parseDashboardOpenSteps,
@@ -42,6 +45,34 @@ export async function loadDashboardInPlacePanels(input: {
   if (keys.includes("company")) {
     panels.company = (
       <ApplicationCompanyBody
+        campaignId={input.campaignId}
+        organizationId={input.organizationId}
+        canEdit={input.canEdit}
+      />
+    );
+  }
+  if (keys.includes("assets")) {
+    panels.assets = (
+      <ApplicationAssetsBody
+        campaignId={input.campaignId}
+        organizationId={input.organizationId}
+        canEdit={input.canEdit}
+      />
+    );
+  }
+  if (keys.includes("hiring-team")) {
+    panels["hiring-team"] = (
+      <ApplicationHiringTeamBody
+        campaignId={input.campaignId}
+        organizationId={input.organizationId}
+        canEdit={input.canEdit}
+        asPage={false}
+      />
+    );
+  }
+  if (keys.includes("outreach")) {
+    panels.outreach = (
+      <ApplicationOutreachBody
         campaignId={input.campaignId}
         organizationId={input.organizationId}
         canEdit={input.canEdit}

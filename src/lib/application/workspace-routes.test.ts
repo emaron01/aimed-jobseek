@@ -10,7 +10,7 @@ describe("application workspace routes", () => {
   it("has a page file for every page step and keeps Applied on the overview", () => {
     for (const step of applicationStepList) {
       if (!step.hrefSegment) {
-        expect(applicationStepHref("camp_1", step.key)).toBe("/campaigns/camp_1#applied");
+        expect(applicationStepHref("camp_1", step.key)).toBe("/campaigns/camp_1?open=applied");
         continue;
       }
       const file = `src/app/(app)/campaigns/[id]/${step.hrefSegment}/page.tsx`;

@@ -427,6 +427,10 @@ function AssetVersionEditor({
   const [content, setContent] = useState(asset.content);
   const [heading, setHeading] = useState(earlierExperienceHeading ?? "");
   const [result, action] = useActionState(saveEditedApplicationAssetAction, initial);
+  const router = useRouter();
+  useEffect(() => {
+    if (result?.ok) router.refresh();
+  }, [result, router]);
 
   if (!editing) {
     return (
@@ -523,6 +527,10 @@ function AssetHistory({
     approveApplicationAssetAction,
     initial,
   );
+  const router = useRouter();
+  useEffect(() => {
+    if (approveResult?.ok) router.refresh();
+  }, [approveResult, router]);
   const ordered = sortAssetsNewestFirst(rows);
   return (
     <div className="space-y-3" data-testid="asset-version-history">

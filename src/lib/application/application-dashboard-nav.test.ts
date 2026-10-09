@@ -312,7 +312,7 @@ describe("application dashboard navigation", () => {
     expect(html).toContain("$120,000");
     expect(html).toContain("Application steps");
     expect(html).toContain("1. Application Status");
-    expect(html).toContain(`href="${DASHBOARD}#applied"`);
+    expect(html).toContain(`href="${DASHBOARD}?open=applied"`);
     for (const [key, titleText, href] of STEP_PAGES) {
       expect(html).toContain(`data-testid="overview-step-${key}"`);
       expect(html).toContain(titleText);

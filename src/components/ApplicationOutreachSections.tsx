@@ -547,6 +547,10 @@ export function ApplicationOutreachSection({
     markOutreachSentAction,
     initial,
   );
+  const router = useRouter();
+  useEffect(() => {
+    if (addState?.ok || roleState?.ok || generateState?.ok || sentState?.ok) router.refresh();
+  }, [addState, roleState, generateState, sentState, router]);
   const [selectedId, setSelectedId] = useState(contacts[0]?.contactId ?? "");
   const [explicitAssetId, setExplicitAssetId] = useState<string | null>(null);
   const [generatorKind, setGeneratorKind] =
@@ -1167,6 +1171,10 @@ export function OutreachMessageCard({
     saveOutreachMessageEditAction,
     initial,
   );
+  const router = useRouter();
+  useEffect(() => {
+    if (editState?.ok) router.refresh();
+  }, [editState, router]);
   const contact =
     contacts.find((row) => row.contactId === asset.contactId) ?? null;
   const [copied, setCopied] = useState<string | null>(null);
