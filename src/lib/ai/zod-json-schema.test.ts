@@ -8,9 +8,18 @@ import {
   buildOpenAiJsonSchemaFormat,
   collectStrictObjectViolations,
   collectUnsupportedKeywordViolations,
+  installStrictOptionalNullParsing,
   sanitizeOpenAiStrictJsonSchema,
   zodToOpenAiStrictJsonSchema,
 } from "@/lib/ai/zod-json-schema";
+import { applicationSummaryGuidanceGenerateSchema } from "@/lib/application-summary/contract";
+import { claimValidationSchema } from "@/lib/email-generation/claim-validation-contract";
+import {
+  icpInterpretationResultSchema,
+  interpretationResultSchema,
+} from "@/lib/interpretation/schema";
+import { personaAiResponseSchema } from "@/lib/persona-research/contract";
+import { emptyCandidateProfile } from "@/lib/product-research/candidate-profile";
 import {
   parseProductAiResponse,
   productAiResponseSchema,
@@ -306,5 +315,252 @@ describe("openai-responses strict request body", () => {
     expectStrictObjectNodes(body.text.format.schema);
     expect(body.text.format.type).not.toBe("json_object");
     vi.unstubAllGlobals();
+  });
+});
+
+function strictProperty(
+  schema: z.ZodType,
+  path: string[],
+): Record<string, unknown> {
+  let node: unknown = zodToOpenAiStrictJsonSchema(schema);
+  for (const part of path) {
+    const record = node as Record<string, unknown>;
+    node =
+      part === "[]"
+        ? record.items
+        : (record.properties as Record<string, unknown>)[part];
+  }
+  return node as Record<string, unknown>;
+}
+
+function expectSameStrictField(live: z.ZodType, path: string[], field: z.ZodType) {
+  expect(strictProperty(live, path)).toEqual(
+    strictProperty(z.object({ field: field.nullable().optional() }), ["field"]),
+  );
+}
+
+const companyResearchModelResult = {
+  companySummary: null,
+  whatTheySell: null,
+  customerTypes: [],
+  primaryMarkets: [],
+  businessModel: null,
+  companySizeContext: null,
+  relevantTechnologies: [],
+  hiringSignals: [],
+  riskSignals: [],
+  jobFocus: null,
+  jobFocusDetail: null,
+  confidence: "LOW" as const,
+  identityCertainty: null,
+  sources: [
+    {
+      url: "https://example.com",
+      title: null,
+      publisher: null,
+      sourceType: "COMPANY_WEBSITE" as const,
+      retrievedAt: "2026-10-09",
+      supports: [],
+    },
+  ],
+};
+
+const interpretedCriterion = {
+  name: "Industry",
+  description: null,
+  criterionType: "industry",
+  dataType: "TEXT" as const,
+  operator: "EXISTS" as const,
+  importance: "MEDIUM" as const,
+  isRequired: false,
+  isDisqualifier: false,
+  evidenceClass: null,
+  tier: null,
+  sortOrder: 0,
+};
+
+describe("strict optional null parsing", () => {
+  it("treats null on an optional field as omitted and still rejects a wrong type", () => {
+    const schema = z.object({
+      name: z.string(),
+      note: z.string().optional(),
+      comment: z.string().nullable(),
+      kept: z.string().nullable().optional(),
+      tags: z.array(z.string()).optional().default([]),
+      draft: z.object({
+        kind: z.enum(["FACT", "INFERENCE"]).optional(),
+      }),
+      signals: z.array(
+        z.union([
+          z.string(),
+          z.object({
+            text: z.string().optional(),
+            flag: z.boolean().optional(),
+          }),
+        ]),
+      ),
+    });
+    const before = JSON.stringify(zodToOpenAiStrictJsonSchema(schema));
+    installStrictOptionalNullParsing(schema);
+    expect(JSON.stringify(zodToOpenAiStrictJsonSchema(schema))).toBe(before);
+    expect(
+      JSON.stringify(
+        zodToOpenAiStrictJsonSchema(
+          schema.extend({ note: z.string().nullable().optional() }),
+        ),
+      ),
+    ).toBe(before);
+
+    const input = {
+      name: "Ada",
+      note: null,
+      comment: null,
+      kept: null,
+      draft: { kind: null },
+      signals: ["ok", { text: null, flag: null }],
+    };
+    const parsed = schema.parse(input);
+    expect(input.note).toBeNull();
+    expect(parsed.note).toBeUndefined();
+    expect(parsed).not.toHaveProperty("note");
+    expect(parsed.comment).toBeNull();
+    expect(parsed.kept).toBeNull();
+    expect(parsed.draft.kind).toBeUndefined();
+    expect(parsed.signals).toEqual(["ok", {}]);
+    expect(schema.safeParse({ name: "Ada", note: 1 }).success).toBe(false);
+    expect(schema.safeParse({ name: "Ada", tags: null }).success).toBe(false);
+    expect(schema.safeParse({ name: "Ada", signals: [1] }).success).toBe(false);
+  });
+
+  it("parses null optional fields for each affected model schema without changing its strict schema", () => {
+    const profile = emptyCandidateProfile();
+    const product = productAiResponseSchema.parse({
+      candidateProfile: {
+        ...profile,
+        bulletRoleChoices: null,
+        dismissedBulletTexts: null,
+      },
+    });
+    expect(product.candidateProfile.bulletRoleChoices).toBeUndefined();
+    expect(product.candidateProfile.dismissedBulletTexts).toBeUndefined();
+    expect(
+      productAiResponseSchema.safeParse({
+        candidateProfile: { ...profile, bulletRoleChoices: "none" },
+      }).success,
+    ).toBe(false);
+    expectSameStrictField(
+      productAiResponseSchema,
+      ["candidateProfile", "bulletRoleChoices"],
+      z.record(z.string(), z.string()),
+    );
+
+    const persona = personaAiResponseSchema.parse({
+      personaDraft: {
+        name: "Recruiter",
+        talkingPoints: null,
+        negativeRoleSignals: [{ text: null, isDisqualifying: null }],
+      },
+    });
+    expect(persona.personaDraft.talkingPoints).toBeUndefined();
+    expect(persona.personaDraft.negativeRoleSignals).toEqual([{}]);
+    expectSameStrictField(
+      personaAiResponseSchema,
+      ["personaDraft", "talkingPoints"],
+      z.array(z.string()),
+    );
+
+    const personaCriteria = interpretationResultSchema.parse({
+      criteria: [interpretedCriterion],
+    });
+    expect(personaCriteria.criteria[0]?.evidenceClass).toBeUndefined();
+    expect(personaCriteria.criteria[0]?.tier).toBeUndefined();
+    expect(personaCriteria.criteria[0]?.description).toBeNull();
+    expectSameStrictField(
+      interpretationResultSchema,
+      ["criteria", "[]", "evidenceClass"],
+      z.enum(["LIST_DATA", "COMPANY_RESEARCH", "TARGETED_SEARCH", "SEMANTIC"]),
+    );
+    expect(
+      interpretationResultSchema.safeParse({
+        criteria: [{ ...interpretedCriterion, evidenceClass: "NOT_A_CLASS" }],
+      }).success,
+    ).toBe(false);
+
+    const icp = icpInterpretationResultSchema.parse({
+      understoodSummary: "They sell software.",
+      criteria: [interpretedCriterion],
+    });
+    expect(icp.criteria[0]?.tier).toBeUndefined();
+    expect(icp.criteria[0]?.evidenceClass).toBeUndefined();
+    expectSameStrictField(
+      icpInterpretationResultSchema,
+      ["criteria", "[]", "tier"],
+      z.enum(["PRIMARY", "SECONDARY"]),
+    );
+
+    const research = companyResearchAiResultSchema.parse(
+      companyResearchModelResult,
+    );
+    expect(research.identityCertainty).toBeUndefined();
+    expect(research).not.toHaveProperty("identityCertainty");
+    expect(research.companySummary).toBeNull();
+    expect(research.sources[0]?.title).toBeNull();
+    expect(
+      companyResearchAiResultSchema.safeParse({
+        ...companyResearchModelResult,
+        identityCertainty: "MAYBE",
+      }).success,
+    ).toBe(false);
+    expectSameStrictField(
+      companyResearchAiResultSchema,
+      ["identityCertainty"],
+      z.enum(["HIGH", "MEDIUM", "LOW", "AMBIGUOUS"]),
+    );
+
+    const claim = claimValidationSchema.parse({
+      compliant: false,
+      violations: [
+        {
+          type: "UNSUPPORTED_FACT",
+          description: "No source",
+          matchedGuard: null,
+          bodyExcerpt: null,
+          origin: null,
+        },
+      ],
+    });
+    expect(claim.violations[0]?.origin).toBeUndefined();
+    expect(claim.violations[0]?.matchedGuard).toBeNull();
+    expect(
+      claimValidationSchema.safeParse({
+        compliant: false,
+        violations: [
+          {
+            type: "UNSUPPORTED_FACT",
+            description: "No source",
+            matchedGuard: null,
+            bodyExcerpt: null,
+            origin: "HUMAN",
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expectSameStrictField(
+      claimValidationSchema,
+      ["violations", "[]", "origin"],
+      z.literal("MODEL_ORIGINATED"),
+    );
+
+    const guidance = applicationSummaryGuidanceGenerateSchema.parse({
+      overview: null,
+      people: [],
+    });
+    expect(guidance.overview).toBeUndefined();
+    expect(guidance).not.toHaveProperty("overview");
+    expectSameStrictField(
+      applicationSummaryGuidanceGenerateSchema,
+      ["overview"],
+      applicationSummaryGuidanceGenerateSchema.shape.overview.unwrap(),
+    );
   });
 });

@@ -122,6 +122,268 @@ export function buildOpenAiJsonSchemaFormat(
   };
 }
 
+type StrictZod = z.ZodType & {
+  _zod: {
+    def: {
+      type: string;
+      innerType?: StrictZod;
+      shape?: Record<string, StrictZod>;
+      options?: readonly StrictZod[];
+      element?: StrictZod;
+      in?: StrictZod;
+      out?: StrictZod;
+      left?: StrictZod;
+      right?: StrictZod;
+      valueType?: StrictZod;
+      discriminator?: string;
+    };
+    innerType?: StrictZod;
+    values?: Set<unknown>;
+    propValues?: Record<string, Set<unknown>>;
+    run: (
+      payload: { value: unknown; issues: unknown[] },
+      ctx: unknown,
+    ) => unknown;
+  };
+};
+
+const strictOptionalNullInstalled = new WeakSet<z.ZodType>();
+
+function strictZod(schema: z.ZodType): StrictZod {
+  return schema as StrictZod;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function schemaAcceptsNull(schema: StrictZod, stack: Set<StrictZod>): boolean {
+  const def = schema._zod.def;
+  switch (def.type) {
+    case "nullable":
+    case "null":
+    case "any":
+    case "unknown":
+      return true;
+    case "literal":
+      return schema._zod.values?.has(null) ?? false;
+    case "optional":
+    case "default":
+    case "prefault":
+    case "readonly":
+    case "nonoptional":
+    case "catch":
+      return def.innerType ? schemaAcceptsNull(def.innerType, stack) : false;
+    case "lazy": {
+      if (stack.has(schema)) return false;
+      stack.add(schema);
+      try {
+        return schema._zod.innerType
+          ? schemaAcceptsNull(schema._zod.innerType, stack)
+          : false;
+      } finally {
+        stack.delete(schema);
+      }
+    }
+    case "union":
+      return (def.options ?? []).some((option) => schemaAcceptsNull(option, stack));
+    case "pipe":
+      return def.in ? schemaAcceptsNull(def.in, stack) : false;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Strict object schemas require every key and allow null for Zod `.optional()`
+ * fields that are not defaults. Null on those fields means the model omitted a
+ * value. Explicit `.nullable()` values stay null. A wrong type is left in place
+ * so Zod still rejects it.
+ */
+export function coerceStrictOptionalNulls(
+  schema: z.ZodType,
+  value: unknown,
+): unknown {
+  return coerceStrictOptionalNull(strictZod(schema), value, new Set(), false);
+}
+
+function coerceStrictOptionalNull(
+  schema: StrictZod,
+  value: unknown,
+  stack: Set<StrictZod>,
+  asProperty: boolean,
+): unknown {
+  const def = schema._zod.def;
+  switch (def.type) {
+    case "optional": {
+      if (value === undefined) return undefined;
+      if (
+        value === null &&
+        asProperty &&
+        def.innerType &&
+        !schemaAcceptsNull(def.innerType, stack)
+      ) {
+        return undefined;
+      }
+      return def.innerType
+        ? coerceStrictOptionalNull(def.innerType, value, stack, false)
+        : value;
+    }
+    case "nullable":
+      if (value === null) return value;
+      return def.innerType
+        ? coerceStrictOptionalNull(def.innerType, value, stack, false)
+        : value;
+    case "default":
+    case "prefault":
+      if (value === null) return value;
+      return def.innerType
+        ? coerceStrictOptionalNull(def.innerType, value, stack, false)
+        : value;
+    case "readonly":
+    case "nonoptional":
+    case "catch":
+      return def.innerType
+        ? coerceStrictOptionalNull(def.innerType, value, stack, asProperty)
+        : value;
+    case "lazy": {
+      if (stack.has(schema) || !schema._zod.innerType) return value;
+      stack.add(schema);
+      try {
+        return coerceStrictOptionalNull(
+          schema._zod.innerType,
+          value,
+          stack,
+          asProperty,
+        );
+      } finally {
+        stack.delete(schema);
+      }
+    }
+    case "pipe": {
+      const inner = def.out ?? def.in;
+      return inner
+        ? coerceStrictOptionalNull(inner, value, stack, asProperty)
+        : value;
+    }
+    case "object":
+      return coerceStrictOptionalObject(def.shape ?? {}, value, stack);
+    case "array":
+      return coerceStrictOptionalArray(def.element, value, stack);
+    case "record":
+      return coerceStrictOptionalRecord(def.valueType, value, stack);
+    case "union":
+      return coerceStrictOptionalUnion(schema, value, stack);
+    case "intersection": {
+      const left = def.left
+        ? coerceStrictOptionalNull(def.left, value, stack, asProperty)
+        : value;
+      return def.right
+        ? coerceStrictOptionalNull(def.right, left, stack, asProperty)
+        : left;
+    }
+    default:
+      return value;
+  }
+}
+
+function coerceStrictOptionalObject(
+  shape: Record<string, StrictZod>,
+  value: unknown,
+  stack: Set<StrictZod>,
+): unknown {
+  if (!isPlainObject(value)) return value;
+  let next: Record<string, unknown> | null = null;
+  for (const key of Object.keys(shape)) {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+    const current = value[key];
+    const coerced = coerceStrictOptionalNull(shape[key]!, current, stack, true);
+    if (coerced === current) continue;
+    next ??= { ...value };
+    if (coerced === undefined) delete next[key];
+    else next[key] = coerced;
+  }
+  return next ?? value;
+}
+
+function coerceStrictOptionalArray(
+  element: StrictZod | undefined,
+  value: unknown,
+  stack: Set<StrictZod>,
+): unknown {
+  if (!Array.isArray(value) || !element) return value;
+  let next: unknown[] | null = null;
+  for (let index = 0; index < value.length; index += 1) {
+    const current = value[index];
+    const coerced = coerceStrictOptionalNull(element, current, stack, false);
+    if (coerced === current) continue;
+    next ??= value.slice();
+    next[index] = coerced;
+  }
+  return next ?? value;
+}
+
+function coerceStrictOptionalRecord(
+  valueType: StrictZod | undefined,
+  value: unknown,
+  stack: Set<StrictZod>,
+): unknown {
+  if (!isPlainObject(value) || !valueType) return value;
+  let next: Record<string, unknown> | null = null;
+  for (const key of Object.keys(value)) {
+    const current = value[key];
+    const coerced = coerceStrictOptionalNull(valueType, current, stack, false);
+    if (coerced === current) continue;
+    next ??= { ...value };
+    next[key] = coerced;
+  }
+  return next ?? value;
+}
+
+function coerceStrictOptionalUnion(
+  schema: StrictZod,
+  value: unknown,
+  stack: Set<StrictZod>,
+): unknown {
+  const def = schema._zod.def;
+  if (!isPlainObject(value)) return value;
+  const discriminator = def.discriminator;
+  if (discriminator) {
+    const discriminant = value[discriminator];
+    const match = (def.options ?? []).find((option) =>
+      option._zod.propValues?.[discriminator]?.has(discriminant),
+    );
+    return match
+      ? coerceStrictOptionalNull(match, value, stack, false)
+      : value;
+  }
+  const objectOptions = (def.options ?? []).filter(
+    (option) => option._zod.def.type === "object",
+  );
+  if (objectOptions.length === 1) {
+    return coerceStrictOptionalNull(objectOptions[0]!, value, stack, false);
+  }
+  return value;
+}
+
+/**
+ * Make one structured-output schema treat null on `.optional()` object fields
+ * as omitted. Does not change the JSON schema sent to the model.
+ */
+export function installStrictOptionalNullParsing(schema: z.ZodType): void {
+  if (strictOptionalNullInstalled.has(schema)) return;
+  strictOptionalNullInstalled.add(schema);
+  type Payload = { value: unknown; issues: unknown[] };
+  type Run = (payload: Payload, ctx: unknown) => Payload;
+  const slot = schema._zod as { run: Run };
+  const original = slot.run.bind(slot);
+  slot.run = (payload, ctx) => {
+    const value = coerceStrictOptionalNulls(schema, payload.value);
+    const next = value === payload.value ? payload : { ...payload, value };
+    return original(next, ctx);
+  };
+}
+
 export function sanitizeOpenAiStrictJsonSchema(
   node: Record<string, unknown>,
 ): Record<string, unknown> {

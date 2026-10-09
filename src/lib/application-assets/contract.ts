@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { installStrictOptionalNullParsing } from "@/lib/ai/zod-json-schema";
 import {
   appendEmailSignature,
   normalizeEmailBody,
@@ -70,8 +71,8 @@ export const resumeAssetContentSchema = z.object({
 
 /**
  * Seeker edit of a generated outreach message.
- * Absent or null until they save one. Strict structured output requires the
- * key and sends null when there is no edit.
+ * Absent until they save one. Strict structured output requires the key and
+ * sends null when there is no edit; parsing treats that null as not provided.
  */
 export const outreachSeekerEditSchema = z.object({
   subject: z.string().nullable(),
@@ -99,14 +100,14 @@ export const emailAssetContentSchema = z.object({
   paragraphs: z.array(outreachClaimSchema).min(1),
   signoff: z.string().trim().min(1),
   signerName: z.string().trim().min(1),
-  seekerEdit: outreachSeekerEditSchema.nullable().optional(),
+  seekerEdit: outreachSeekerEditSchema.optional(),
 });
 
 export const linkedinNoteAssetContentSchema = z.object({
   type: z.literal("LINKEDIN_CONNECTION_NOTE"),
   greeting: z.string().trim().min(1),
   body: outreachClaimSchema,
-  seekerEdit: outreachSeekerEditSchema.nullable().optional(),
+  seekerEdit: outreachSeekerEditSchema.optional(),
 });
 
 export const linkedinInmailAssetContentSchema = z.object({
@@ -114,7 +115,7 @@ export const linkedinInmailAssetContentSchema = z.object({
   subject: z.string().trim().min(1),
   greeting: z.string().trim().min(1),
   paragraphs: z.array(outreachClaimSchema).min(1),
-  seekerEdit: outreachSeekerEditSchema.nullable().optional(),
+  seekerEdit: outreachSeekerEditSchema.optional(),
 });
 
 export const applicationAssetContentSchema = z.discriminatedUnion("type", [
@@ -124,6 +125,11 @@ export const applicationAssetContentSchema = z.discriminatedUnion("type", [
   linkedinNoteAssetContentSchema,
   linkedinInmailAssetContentSchema,
 ]);
+
+installStrictOptionalNullParsing(emailAssetContentSchema);
+installStrictOptionalNullParsing(linkedinNoteAssetContentSchema);
+installStrictOptionalNullParsing(linkedinInmailAssetContentSchema);
+installStrictOptionalNullParsing(applicationAssetContentSchema);
 
 export const assetClaimValidationSchema = z.object({
   violations: z.array(

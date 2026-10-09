@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { installStrictOptionalNullParsing } from "@/lib/ai/zod-json-schema";
 import { offerValidationSchema } from "@/lib/campaign/offer-validation-contract";
 import { contactResearchAiResultSchema } from "@/lib/contact-research/contract";
 import { claimValidationSchema } from "@/lib/email-generation/claim-validation-contract";
@@ -293,6 +294,10 @@ export const STRUCTURED_OUTPUT_SCHEMAS = {
 } as const satisfies Record<string, StructuredOutputSchemaEntry>;
 
 export type StructuredOutputSchemaKey = keyof typeof STRUCTURED_OUTPUT_SCHEMAS;
+
+for (const entry of Object.values(STRUCTURED_OUTPUT_SCHEMAS)) {
+  installStrictOptionalNullParsing(entry.schema);
+}
 
 export function structuredOutputRequest<K extends StructuredOutputSchemaKey>(
   key: K,

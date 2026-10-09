@@ -32,7 +32,8 @@ const emailFromModel = {
 describe("outreach generate seekerEdit", () => {
   it("accepts the null edit strict output requires and keeps the generated message", () => {
     const email = emailAssetContentSchema.parse(emailFromModel);
-    expect(email.seekerEdit).toBeNull();
+    expect(email.seekerEdit).toBeUndefined();
+    expect(email).not.toHaveProperty("seekerEdit");
     expect(composeOutreachText(email)).toMatchObject({
       subject: "Introduction",
       body: expect.stringContaining("First paragraph."),
@@ -87,10 +88,16 @@ describe("outreach generate seekerEdit", () => {
       linkedinNoteAssetContentSchema,
       linkedinInmailAssetContentSchema,
     ]) {
-      const before = zodToOpenAiStrictJsonSchema(
+      const asOptional = zodToOpenAiStrictJsonSchema(
         schema.extend({ seekerEdit: outreachSeekerEditSchema.optional() }),
       );
-      expect(zodToOpenAiStrictJsonSchema(schema)).toEqual(before);
+      const asNullish = zodToOpenAiStrictJsonSchema(
+        schema.extend({
+          seekerEdit: outreachSeekerEditSchema.nullable().optional(),
+        }),
+      );
+      expect(zodToOpenAiStrictJsonSchema(schema)).toEqual(asOptional);
+      expect(asOptional).toEqual(asNullish);
     }
   });
 
