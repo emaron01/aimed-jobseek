@@ -32,6 +32,7 @@ import {
   CheatSheetSharedSection,
 } from "@/components/CheatSheetPeopleFilter";
 import { AskHarperBox } from "@/components/AskHarperBox";
+import { CheatSheetPageLinkProvider } from "@/components/PrintApplicationSummaryButton";
 import { PageHeader, TenantMissing } from "@/components/ui";
 import {
   applicationHasHarperQuestion,
@@ -225,15 +226,19 @@ function PrepGuidePrimaryCard({
   );
 }
 
-export default async function ApplicationSummaryPage({
-  params,
-  searchParams,
-}: PageProps) {
+export async function InterviewPrepGuides({
+  campaignId,
+  person = null,
+  showPageHeader = true,
+}: {
+  campaignId: string;
+  person?: string | null;
+  showPageHeader?: boolean;
+}) {
   const organization = await getCurrentOrganization();
   const user = await requireCurrentUser();
-  if (!organization) return <TenantMissing />;
-  const { id } = await params;
-  const query = await searchParams;
+  if (!organization) return showPageHeader ? <TenantMissing /> : null;
+  const id = campaignId;
   let view: Awaited<ReturnType<typeof getApplicationSummaryView>>;
   try {
     view = await getApplicationSummaryView({
@@ -241,7 +246,10 @@ export default async function ApplicationSummaryPage({
       campaignId: id,
     });
   } catch (error) {
-    if (error instanceof TenantError) notFound();
+    if (error instanceof TenantError) {
+      if (showPageHeader) notFound();
+      return null;
+    }
     throw error;
   }
   const membership = await getMembershipForCurrentUser(organization.id);
@@ -252,7 +260,8 @@ export default async function ApplicationSummaryPage({
       campaign: view.campaign,
     })
   ) {
-    notFound();
+    if (showPageHeader) notFound();
+    return null;
   }
 
   const live = await getApplicationWorkspaceLive({
@@ -330,9 +339,10 @@ export default async function ApplicationSummaryPage({
   });
 
   return (
+    <CheatSheetPageLinkProvider href={showPageHeader ? null : `/campaigns/${id}/summary`}>
     <CheatSheetFilterProvider
       options={filterOptions}
-      initialPersonKey={query.person ?? null}
+      initialPersonKey={person}
     >
     <main className="application-summary mx-auto max-w-5xl space-y-6">
       <CheatSheetPrintBanner />
@@ -367,6 +377,7 @@ export default async function ApplicationSummaryPage({
         drafts={askHarperDrafts}
         hasQuestion={hasHarperQuestion}
       />
+      {showPageHeader ? (
       <PageHeader
         title={applicationSummaryConfig.title}
         description={`${view.campaign.name} · ${applicationSummaryConfig.description}`}
@@ -376,6 +387,7 @@ export default async function ApplicationSummaryPage({
           </div>
         }
       />
+      ) : null}
       </div>
 
       <div className="print:hidden">
@@ -588,5 +600,21 @@ export default async function ApplicationSummaryPage({
       </CheatSheetSharedSection>
     </main>
     </CheatSheetFilterProvider>
+    </CheatSheetPageLinkProvider>
+  );
+}
+
+export default async function ApplicationSummaryPage({
+  params,
+  searchParams,
+}: PageProps) {
+  const { id } = await params;
+  const query = await searchParams;
+  return (
+    <InterviewPrepGuides
+      campaignId={id}
+      person={query.person ?? null}
+      showPageHeader
+    />
   );
 }

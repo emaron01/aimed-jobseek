@@ -1,13 +1,43 @@
 "use client";
 
-import { AppButton } from "@/components/AppButton";
+import { createContext, useContext, type ReactNode } from "react";
+import { AppActionLink, AppButton } from "@/components/AppButton";
 import { applicationSummaryConfig } from "@/lib/product-config";
+
+const CheatSheetPageLinkContext = createContext<string | null>(null);
+
+/** On the dashboard panel, print controls link to the guides page. The page itself prints. */
+export function CheatSheetPageLinkProvider({
+  href,
+  children,
+}: {
+  href: string | null;
+  children: ReactNode;
+}) {
+  return (
+    <CheatSheetPageLinkContext.Provider value={href}>
+      {children}
+    </CheatSheetPageLinkContext.Provider>
+  );
+}
 
 export function PrintApplicationSummaryButton({
   sectionId,
 }: {
   sectionId?: string;
 }) {
+  const pageHref = useContext(CheatSheetPageLinkContext);
+  const label = sectionId
+    ? applicationSummaryConfig.actions.printSection
+    : applicationSummaryConfig.actions.print;
+  if (pageHref) {
+    const href = sectionId ? `${pageHref}#${sectionId}` : pageHref;
+    return (
+      <AppActionLink href={href} variant="secondary" className="print:hidden">
+        {label}
+      </AppActionLink>
+    );
+  }
   return (
     <AppButton
       type="button"
@@ -34,9 +64,7 @@ export function PrintApplicationSummaryButton({
         window.print();
       }}
     >
-      {sectionId
-        ? applicationSummaryConfig.actions.printSection
-        : applicationSummaryConfig.actions.print}
+      {label}
     </AppButton>
   );
 }

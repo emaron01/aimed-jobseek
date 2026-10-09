@@ -339,6 +339,62 @@ describe("dashboard steps open in place", () => {
     );
   });
 
+  it("opens Interview Preparation Guides under its row and closes it in the query string", () => {
+    const guideSteps = [
+      ...steps,
+      step({ key: "summary", title: "Interview Preparation Guides", number: 9 }),
+    ];
+    const html = renderToStaticMarkup(
+      createElement(ApplicationStepCards, {
+        steps: guideSteps,
+        campaignId: "camp_1",
+        openSteps: ["summary"],
+        panels: {
+          summary: createElement("section", { "data-testid": "prep-guide-personas" }, "Guides"),
+        },
+      }),
+    );
+    const index = guideSteps.findIndex((item) => item.key === "summary");
+    expect(html).toContain('data-testid="prep-guide-personas"');
+    expect(html).toContain('data-testid="overview-step-full-page-summary"');
+    expect(html).toContain('href="/campaigns/camp_1/summary"');
+    expect(html.split('data-testid="overview-step-close-summary"').length - 1).toBe(2);
+    expect(html).toContain("data-expand-outer-section");
+    expect(html).toContain('href="/campaigns/camp_1/consultation"');
+    expect(panelStyle(html, "summary")).toContain(
+      `--step-order:${dashboardStepPanelOrder(index, 1)}`,
+    );
+    const closed = closeDashboardOpenStep(["summary"], "summary");
+    expect(closed).toEqual([]);
+    expect(dashboardOpenSearch("?open=summary", closed)).toBe("");
+    const page = readFileSync("src/app/(app)/campaigns/[id]/summary/page.tsx", "utf8");
+    const panels = readFileSync("src/components/DashboardInPlaceStepPanels.tsx", "utf8");
+    expect(page).toContain("export async function InterviewPrepGuides");
+    expect(page).toContain("<InterviewPrepGuides");
+    expect(page).toContain("person={query.person ?? null}");
+    expect(panels).toContain("<InterviewPrepGuides");
+    expect(panels).toContain("showPageHeader={false}");
+    for (const id of [
+      '"prep-guide-personas"',
+      '"prep-guide-by-title"',
+      'testId="prep-guide-general-questions"',
+      'testId="prep-guide-consolidated-notes"',
+      'testId="prep-guide-position"',
+      'testId="prep-guide-company"',
+    ]) {
+      expect(page).toContain(id);
+    }
+    expect(page).not.toContain("enqueueApplicationJob");
+    expect(page).not.toContain("runPaidStructuredCall");
+    expect(page).not.toContain("generateStructured");
+    const print = readFileSync("src/components/PrintApplicationSummaryButton.tsx", "utf8");
+    expect(print).toContain("window.print()");
+    expect(print).toContain("`${pageHref}#${sectionId}`");
+    expect(readFileSync("src/components/ApplicationActionForm.tsx", "utf8")).toContain(
+      "router.refresh()",
+    );
+  });
+
   it("expands an open panel's outer section and leaves inner profiles collapsed", () => {
     const root = document.createElement("div");
     root.innerHTML = [
