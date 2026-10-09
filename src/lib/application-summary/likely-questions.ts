@@ -131,8 +131,10 @@ function clearedAnswer(sampleAnswer: string | null): Pick<
 
 /**
  * Keep the model's question text. Copy an approved answer only when its id
- * matches. An unknown or null id leaves the answer blank. Drop a career
- * walk-through when Harper has already asked one. Writer order is kept.
+ * matches, and only on the first (most likely) question that names that id.
+ * A later question with the same id gets a blank answer. An unknown or null
+ * id leaves the answer blank. Drop a career walk-through when Harper has
+ * already asked one. Writer order is kept.
  */
 export function resolvePersonLikelyQuestions(input: {
   likelyQuestions: readonly PersonLikelyQuestionDraft[];
@@ -144,6 +146,7 @@ export function resolvePersonLikelyQuestions(input: {
       .filter((answer) => answer.id.trim() && answer.content.trim())
       .map((answer) => [answer.id.trim(), answer.content]),
   );
+  const usedApprovedIds = new Set<string>();
   const items: CheatSheetCoachItem[] = [];
   for (const raw of input.likelyQuestions) {
     const prompt = fieldText(raw.prompt);
@@ -156,7 +159,9 @@ export function resolvePersonLikelyQuestions(input: {
       modelTag,
     });
     const approvedId = fieldText(raw.approvedAnswerId);
-    const copied = approvedId ? answers.get(approvedId) : undefined;
+    const repeat = Boolean(approvedId && usedApprovedIds.has(approvedId));
+    if (approvedId) usedApprovedIds.add(approvedId);
+    const copied = approvedId && !repeat ? answers.get(approvedId) : undefined;
     items.push({
       id: raw.id,
       prompt,

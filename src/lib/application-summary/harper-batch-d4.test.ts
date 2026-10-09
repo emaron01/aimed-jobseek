@@ -78,7 +78,7 @@ describe("Harper Batch D4 — Cheat Sheet WHO tags + CAR/STAR parts", () => {
   });
 
   it("bumps application-summary prompt version and adds the PO likely-questions line", () => {
-    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("19");
+    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("20");
     expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain(
       "Every likelyQuestions item includes interviewTypeTag, one of: screening, chronological_walk_through, focused_competency, reference_check_prep.",
     );

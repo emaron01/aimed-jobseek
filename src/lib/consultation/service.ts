@@ -12,7 +12,10 @@ import {
   polishAnswerWithModel,
 } from "@/lib/consultation/ai";
 import type { ConsultationPlanDecision } from "@/lib/consultation/plan-split";
-import { buildConsultationCoachMessages } from "@/lib/consultation/prompt";
+import {
+  buildConsultationCoachMessages,
+  GUIDE_ANSWER_TAILOR_INSTRUCTION,
+} from "@/lib/consultation/prompt";
 import {
   evidenceTargets,
   gapsAreCovered,
@@ -58,6 +61,7 @@ import {
 } from "@/lib/consultation/answer-binding";
 import {
   ASK_HARPER_TARGET_PREFIX,
+  CHEAT_SHEET_TARGET_PREFIX,
   CONSULTATION_PROMPT_VERSION,
   WHY_THIS_COMPANY_TARGET_KEY,
   isConsultationExtractAnswer,
@@ -4578,6 +4582,156 @@ function completeStoryFromAnalysis(value: unknown): {
   };
 }
 
+/**
+ * One polish call that rewrites the guide answer onto the guide question turn.
+ * The approved statement this text was copied from is a different row and is
+ * not loaded or updated.
+ */
+async function tailorGuideAnswerStatement(input: {
+  organizationId: string;
+  targetKey: string;
+  statement: {
+    id: string;
+    content: string;
+    turnId: string;
+    sessionId: string;
+    groundingJson: unknown;
+    session: { campaignId: string };
+    turn: {
+      id: string;
+      body: string;
+      speaker: string;
+      followUp: boolean;
+    };
+  };
+}): Promise<{ polished: boolean }> {
+  const answer = input.statement.content.trim();
+  if (!answer) {
+    throw new TenantError(consultationConversationCopy.generationFailed);
+  }
+  const questionTurn =
+    input.statement.turn.speaker === "CONSULTANT" && !input.statement.turn.followUp
+      ? { id: input.statement.turn.id, body: input.statement.turn.body }
+      : await prisma.consultationTurn.findFirst({
+          where: {
+            sessionId: input.statement.sessionId,
+            speaker: "CONSULTANT",
+            followUp: false,
+            targetKey: input.targetKey,
+          },
+          select: { id: true, body: true },
+        });
+  const question = questionTurn?.body.trim() ?? "";
+  if (!questionTurn || !question) {
+    throw new TenantError(consultationConversationCopy.generationFailed);
+  }
+  const polished = await polishAnswerWithModel({
+    answer,
+    seekerReplies: [answer],
+    story: { situation: null, task: null, action: null, result: null },
+    declinedFollowUp: false,
+    confirmedGap: false,
+    strengtheningNeeds: [],
+    profileItems: [],
+    approvedAnswers: [],
+    backgroundEvidence: [],
+    voiceSamples: [],
+    careerStage: deriveCareerStage({ experience: [], education: [] }),
+    target: { key: input.targetKey, kind: "COMPETENCY", text: question },
+    questionKey: input.targetKey,
+    spokenAnswerWords: 150,
+    systemInstructions: GUIDE_ANSWER_TAILOR_INSTRUCTION,
+    usage: consultationUsage(
+      input.organizationId,
+      input.statement.session.campaignId,
+      "CONSULTATION_REPLY",
+      "polish",
+    ),
+  });
+  if (!polished.ok) throw new TenantError(polished.message);
+  const normalized = normalizePolishAnswer({
+    data: polished.data,
+    whyThisCompany: false,
+    confirmedGap: false,
+  });
+  const value = normalized.interviewAnswer.trim() || polished.data.interviewAnswer?.trim() || "";
+  if (!value) {
+    throw new TenantError(consultationConversationCopy.generationFailed);
+  }
+  const baseGrounding = interviewAnswerGroundingJson(
+    normalized.answerPartsGrounding,
+    normalized.keyPoints,
+  );
+  const groundingJson = (
+    groundingSeekerEdited(input.statement.groundingJson)
+      ? withSeekerEditedGrounding(baseGrounding, normalized.keyPoints)
+      : baseGrounding
+  ) as Prisma.InputJsonValue;
+  const note = polished.data.strengtheningNote?.trim() || null;
+  const draft = {
+    status: "DRAFT" as const,
+    content: value,
+    strengtheningNote: note,
+    groundingJson,
+    promptVersion: CONSULTATION_PROMPT_VERSION,
+    generation: { increment: 1 },
+    approvedAt: null,
+  };
+  const turnIds = new Set<string>([questionTurn.id]);
+  if (input.statement.turnId !== questionTurn.id) turnIds.add(input.statement.turnId);
+  const stories = await prisma.profileStory.findMany({
+    where: {
+      organizationId: input.organizationId,
+      consultationTurnId: { in: [...turnIds] },
+    },
+    select: { id: true },
+  });
+  await prisma.$transaction([
+    ...(input.statement.turnId === questionTurn.id
+      ? [
+          prisma.consultationStatement.update({
+            where: { id: input.statement.id },
+            data: draft,
+          }),
+        ]
+      : [
+          prisma.consultationStatement.upsert({
+            where: {
+              turnId_kind: { turnId: questionTurn.id, kind: "INTERVIEW_ANSWER" },
+            },
+            create: {
+              organizationId: input.organizationId,
+              sessionId: input.statement.sessionId,
+              turnId: questionTurn.id,
+              kind: "INTERVIEW_ANSWER",
+              status: "DRAFT",
+              content: value,
+              strengtheningNote: note,
+              groundingJson,
+              promptVersion: CONSULTATION_PROMPT_VERSION,
+            },
+            update: draft,
+          }),
+          prisma.consultationStatement.update({
+            where: { id: input.statement.id },
+            data: draft,
+          }),
+        ]),
+    ...stories.map((story) =>
+      prisma.profileStory.update({
+        where: { id: story.id },
+        data: { interviewAnswer: null, interviewAnswerApprovedAt: null },
+      }),
+    ),
+  ]);
+  const nextPoints = keyPointsFromGrounding(groundingJson);
+  const previousPoints = keyPointsFromGrounding(input.statement.groundingJson);
+  return {
+    polished:
+      value !== answer || nextPoints.join("\n") !== previousPoints.join("\n"),
+  };
+}
+
 export async function regenerateConsultationStatement(input: {
   organizationId: string;
   statementId: string;
@@ -4587,6 +4741,17 @@ export async function regenerateConsultationStatement(input: {
     include: { turn: true, session: true },
   });
   if (!statement) throw new TenantError("That polished statement was not found.");
+  const guideTarget = statement.turn.targetKey?.trim() ?? "";
+  if (
+    statement.kind === "INTERVIEW_ANSWER" &&
+    guideTarget.startsWith(CHEAT_SHEET_TARGET_PREFIX)
+  ) {
+    return tailorGuideAnswerStatement({
+      organizationId: input.organizationId,
+      targetKey: guideTarget,
+      statement,
+    });
+  }
   const analyzed = completeStoryFromAnalysis(statement.turn.analysisJson);
   const seekerOwned = groundingSeekerEdited(statement.groundingJson);
   const questionText =
