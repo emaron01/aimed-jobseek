@@ -46,14 +46,6 @@ async function paint(root: Root, node: ReactNode) {
   });
 }
 
-async function click(host: HTMLElement, selector: string) {
-  const node = host.querySelector(selector);
-  if (!(node instanceof HTMLElement)) throw new Error(`Missing ${selector}`);
-  await act(async () => {
-    node.click();
-  });
-}
-
 const person = {
   contactId: "contact-1",
   name: "Priya Shah",
@@ -168,28 +160,14 @@ describe("interview stages batch 1", () => {
 
     expect(interviewConfig.labels.openGuide).toBe("Open stage");
     expect(host.textContent).not.toContain("Open stage");
-    expect(host.querySelector("[data-testid=stage-create-start]")?.textContent).toBe(
-      "Add someone you're meeting",
-    );
-    await click(host, "[data-testid=add-someone-youre-meeting-toggle]");
-    await click(host, "[data-testid=add-new-contact-toggle]");
-    const contactForm = host.querySelector("[data-testid=add-application-contact]");
-    expect(contactForm).not.toBeNull();
-    for (const name of ["firstName", "lastName", "title", "email", "linkedinUrl", "linkedInProfileText", "personaId"]) {
-      expect(contactForm?.querySelector(`[name=${name}]`)).not.toBeNull();
-    }
-    const stageForm = host.querySelector("[data-testid=add-interview-stage]");
-    const contactSelect = host.querySelector("[data-testid=add-someone-youre-meeting] select[name=contactId]");
-    expect(contactSelect?.hasAttribute("required")).toBe(true);
-    expect((stageForm?.querySelector("select[name=type]") as HTMLSelectElement).value).toBe(
-      "RECRUITER_SCREEN",
-    );
-    expect(stageForm?.textContent).toContain("Date and time");
-    const format = stageForm?.querySelector("select[name=format]") as HTMLSelectElement;
-    expect(format.required).toBe(true);
-    expect(format.value).toBe("VIDEO");
-    expect(stageForm?.querySelector("[name=notesBefore]")).toBeNull();
-    expect(stageForm?.querySelector("[name=expectedDecisionAt]")).toBeNull();
+    const dashboardLine = host.querySelector("[data-testid=new-interview-on-dashboard]");
+    expect(dashboardLine?.textContent).toContain("Have a new interview?");
+    expect(dashboardLine?.textContent).toContain("I have a new interview!");
+    expect(
+      host.querySelector("[data-testid=new-interview-dashboard-link]")?.getAttribute("href"),
+    ).toBe("/campaigns/camp");
+    expect(host.querySelector("[data-testid=add-someone-youre-meeting]")).toBeNull();
+    expect(host.querySelector("[data-testid^=add-follow-up-]")).toBeNull();
     expect(host.textContent).not.toContain("Choose interviewer");
     expect(host.textContent).not.toContain("Use this interviewer");
     expect(host.textContent).not.toContain("Add new interviewer");

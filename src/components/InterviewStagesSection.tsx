@@ -11,8 +11,6 @@ import {
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { InterviewStageInterviewerLink } from "@/components/InterviewStagePanel";
 import {
-  AddFollowUpInterview,
-  AddSomeoneYoureMeeting,
   CheatSheetNoteForm,
   InterviewerCollapsible,
   RemoveInterviewControl,
@@ -356,12 +354,16 @@ export function InterviewStagesList({
       </div>
 
       {canEdit ? (
-        <AddSomeoneYoureMeeting
-          campaignId={campaignId}
-          roles={roles}
-          people={people}
-          fieldClass={fieldClass}
-        />
+        <p className="text-sm text-ink" data-testid="new-interview-on-dashboard">
+          {interviewConfig.labels.newInterviewDashboardPrompt}{" "}
+          <AppActionLink
+            href={`/campaigns/${campaignId}`}
+            data-testid="new-interview-dashboard-link"
+          >
+            {interviewConfig.labels.newInterviewDashboardLink}
+          </AppActionLink>{" "}
+          {interviewConfig.labels.newInterviewDashboardTail}
+        </p>
       ) : null}
 
       {grouped.people.map((group) => {
@@ -415,13 +417,6 @@ export function InterviewStagesList({
                 fieldClass={fieldClass}
               />
             ))}
-            {canEdit ? (
-              <AddFollowUpInterview
-                campaignId={campaignId}
-                contactId={group.person.contactId}
-                fieldClass={fieldClass}
-              />
-            ) : null}
           </InterviewerCollapsible>
         );
       })}

@@ -314,6 +314,9 @@ describe("dashboard steps open in place", () => {
       "InterviewStagesSection",
     );
     expect(readFileSync("src/components/InterviewStagesSection.tsx", "utf8")).toContain(
+      "newInterviewDashboardLink",
+    );
+    expect(readFileSync("src/components/InterviewStagesSection.tsx", "utf8")).not.toContain(
       "AddSomeoneYoureMeeting",
     );
   });

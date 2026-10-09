@@ -87,6 +87,8 @@ export async function buildNewInterviewAction(
       scheduledAt: String(formData.get("scheduledAt") ?? ""),
       format: String(formData.get("format") ?? ""),
       personaId: String(formData.get("personaId") ?? ""),
+      contactId: String(formData.get("contactId") ?? ""),
+      stageType: String(formData.get("type") ?? ""),
     });
     revalidate(id, result.stageId ?? undefined);
     return {

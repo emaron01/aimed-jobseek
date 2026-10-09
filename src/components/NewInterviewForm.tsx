@@ -10,6 +10,7 @@ import {
 } from "@/lib/application/role-title-match";
 import {
   interviewConfig,
+  interviewStageTypeForRole,
   prepGuideReadyMessage,
 } from "@/lib/product-config";
 
@@ -23,18 +24,33 @@ export type NewInterviewRoleOption = {
   targetTitles: unknown;
 };
 
+export type NewInterviewContactOption = {
+  contactId: string;
+  name: string;
+  title: string | null;
+  personaName: string | null;
+};
+
 export function NewInterviewForm({
   campaignId,
   roles,
+  contacts = [],
 }: {
   campaignId: string;
   roles: NewInterviewRoleOption[];
+  contacts?: NewInterviewContactOption[];
 }) {
   const [open, setOpen] = useState(false);
+  const [who, setWho] = useState<"existing" | "new">(
+    contacts.length > 0 ? "existing" : "new",
+  );
+  const [contactId, setContactId] = useState(contacts[0]?.contactId ?? "");
   const [title, setTitle] = useState("");
   const [name, setName] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
   const [format, setFormat] = useState("");
+  const [stageType, setStageType] = useState("OTHER");
+  const [typeTouched, setTypeTouched] = useState(false);
   const [personaChoice, setPersonaChoice] = useState("");
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +66,21 @@ export function NewInterviewForm({
   const matches = matchingHiringTeamRoles({ title, roles });
   const single = matches.length === 1 ? matches[0]! : null;
   const choices = single ? [] : matches.length > 1 ? matches : roles;
+  const selectedContact =
+    contacts.find((contact) => contact.contactId === contactId) ?? null;
+  const newRoleName =
+    who === "new"
+      ? single
+        ? single.name
+        : personaChoice === CREATE_ROLE_FROM_TITLE
+          ? title
+          : (roles.find((role) => role.id === personaChoice)?.name ?? "")
+      : "";
+  const suggestedType = interviewStageTypeForRole({
+    roleName: who === "existing" ? (selectedContact?.personaName ?? "") : newRoleName,
+    title: who === "existing" ? (selectedContact?.title ?? "") : title,
+  });
+  const displayedType = typeTouched ? stageType : suggestedType;
 
   useEffect(() => {
     if (!ready?.jobId) return;
@@ -67,7 +98,11 @@ export function NewInterviewForm({
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (lock.current && !guideFailed) return;
-    if (!single && !personaChoice) {
+    if (who === "existing" && !contactId) {
+      setError(interviewConfig.labels.noInterviewer);
+      return;
+    }
+    if (who === "new" && !single && !personaChoice) {
       setError(interviewConfig.labels.chooseRole);
       return;
     }
@@ -81,11 +116,16 @@ export function NewInterviewForm({
     setWorking(true);
     const formData = new FormData();
     formData.set("campaignId", campaignId);
-    formData.set("title", title);
-    formData.set("name", name);
     formData.set("scheduledAt", scheduledAt);
     formData.set("format", format);
-    formData.set("personaId", single ? single.id : personaChoice);
+    formData.set("type", displayedType);
+    if (who === "existing") {
+      formData.set("contactId", contactId);
+    } else {
+      formData.set("title", title);
+      formData.set("name", name);
+      formData.set("personaId", single ? single.id : personaChoice);
+    }
     const result = await buildNewInterviewAction(null, formData);
     if (!result.ok || !result.contactId || !result.sectionKey || !result.displayName) {
       setWorking(false);
@@ -153,7 +193,61 @@ export function NewInterviewForm({
               <p className="text-sm font-medium text-ink">
                 {interviewConfig.labels.newInterviewCongratulations}
               </p>
+              <fieldset className="space-y-2" data-testid="new-interview-who">
+                <legend className="text-sm font-medium text-ink">Who</legend>
+                <label className="flex items-center gap-2 text-sm text-ink">
+                  <input
+                    type="radio"
+                    name="who"
+                    checked={who === "existing"}
+                    onChange={() => {
+                      setWho("existing");
+                      setTypeTouched(false);
+                    }}
+                    data-testid="new-interview-who-existing"
+                  />
+                  {interviewConfig.labels.someoneAlreadyOnApplication}
+                </label>
+                <label className="flex items-center gap-2 text-sm text-ink">
+                  <input
+                    type="radio"
+                    name="who"
+                    checked={who === "new"}
+                    onChange={() => {
+                      setWho("new");
+                      setTypeTouched(false);
+                    }}
+                    data-testid="new-interview-who-new"
+                  />
+                  {interviewConfig.labels.aNewPerson}
+                </label>
+              </fieldset>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {who === "existing" ? (
+                  <label className="block text-sm text-ink sm:col-span-2">
+                    {interviewConfig.labels.someoneAlreadyOnApplication}
+                    <select
+                      required
+                      value={contactId}
+                      onChange={(event) => {
+                        setContactId(event.target.value);
+                        setTypeTouched(false);
+                      }}
+                      className={fieldClass}
+                      data-testid="new-interview-person"
+                    >
+                      <option value="">{interviewConfig.labels.noInterviewer}</option>
+                      {contacts.map((contact) => (
+                        <option key={contact.contactId} value={contact.contactId}>
+                          {contact.name}
+                          {contact.title ? ` · ${contact.title}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+                {who === "new" ? (
+                <>
                 <label className="block text-sm text-ink sm:col-span-2">
                   {interviewConfig.labels.theirTitle}
                   <input
@@ -199,6 +293,26 @@ export function NewInterviewForm({
                     data-testid="new-interview-name"
                   />
                 </label>
+                </>
+                ) : null}
+                <label className="block text-sm text-ink">
+                  {interviewConfig.labels.interviewType}
+                  <select
+                    value={displayedType}
+                    onChange={(event) => {
+                      setTypeTouched(true);
+                      setStageType(event.target.value);
+                    }}
+                    className={fieldClass}
+                    data-testid="new-interview-type"
+                  >
+                    {Object.entries(interviewConfig.types).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <label className="block text-sm text-ink">
                   {interviewConfig.labels.interviewWhen}
                   <input
@@ -225,6 +339,12 @@ export function NewInterviewForm({
                     ))}
                   </select>
                 </label>
+                <p
+                  className="text-sm text-muted sm:col-span-2"
+                  data-testid="new-interview-schedule-hint"
+                >
+                  {interviewConfig.labels.scheduleLaterHint}
+                </p>
               </div>
               {error || guideFailed ? (
                 <p className="text-sm text-danger" data-testid="new-interview-error">

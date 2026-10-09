@@ -119,10 +119,11 @@ describe("Harper context finish", () => {
       "src/components/ApplicationOutreachSections.tsx",
       "utf8",
     );
-    expect(readFileSync("src/components/StageInterviewerSection.tsx", "utf8")).toContain(
+    expect(readFileSync("src/components/StageInterviewerSection.tsx", "utf8")).not.toContain(
       "StageAddContactForm",
     );
-    expect(stage).toContain("AddSomeoneYoureMeeting");
+    expect(stage).toContain("newInterviewDashboardLink");
+    expect(stage).not.toContain("AddSomeoneYoureMeeting");
     expect(addPerson).toContain("pasteInterviewerProfile");
     expect(contacts).toContain("pasteInterviewerProfile");
     expect(stage).not.toContain("Paste LinkedIn profile");

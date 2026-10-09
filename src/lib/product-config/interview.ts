@@ -49,6 +49,14 @@ export const interviewConfig = Object.freeze({
     openGuide: "Open stage",
     startByChoosing: "Start by choosing who you're meeting.",
     addSomeoneYoureMeeting: "Add someone you're meeting",
+    someoneAlreadyOnApplication: "Someone already on this application",
+    aNewPerson: "A new person",
+    interviewType: "Type",
+    scheduleLaterHint:
+      "Add a date and format to schedule this interview. You can schedule it later by picking this person.",
+    newInterviewDashboardPrompt: "Have a new interview? Use",
+    newInterviewDashboardLink: "I have a new interview!",
+    newInterviewDashboardTail: "on the Application Dashboard,",
     newInterview:
       "Did You Land A New Interview? Click Here For Harper To Prepare Your Study Guide!",
     newInterviewCongratulations: "Congratulations on making it to the next stage!",
@@ -153,6 +161,22 @@ export function isInterviewStageType(
   value: string,
 ): value is InterviewStageTypeValue {
   return value in interviewConfig.types;
+}
+
+const RECRUITER_OR_TALENT_ACQUISITION = /\b(?:recruiter|talent[- ]acquisition)\b/i;
+
+/**
+ * Recruiter and talent-acquisition titles or roles use the recruiter screen.
+ * Every other role uses the general interviewer type, OTHER.
+ */
+export function interviewStageTypeForRole(input: {
+  roleName: string;
+  title: string;
+}): "RECRUITER_SCREEN" | "OTHER" {
+  const haystack = `${input.roleName}\n${input.title}`;
+  return RECRUITER_OR_TALENT_ACQUISITION.test(haystack)
+    ? "RECRUITER_SCREEN"
+    : "OTHER";
 }
 
 export function isInterviewFormat(value: string): value is InterviewFormatValue {

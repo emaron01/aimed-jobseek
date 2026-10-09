@@ -96,6 +96,7 @@ export {
 export {
   DEFAULT_INTERVIEW_STAGE_TYPE,
   interviewConfig,
+  interviewStageTypeForRole,
   isApplicationInterviewingOrLater,
   isApplicationProgress,
   isInterviewFormat,
