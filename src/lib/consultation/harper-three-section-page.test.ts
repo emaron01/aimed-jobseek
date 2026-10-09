@@ -99,13 +99,15 @@ describe("Harper three-section page copy and chrome", () => {
     expect(standing).toContain("whereYouStandDescription");
     expect(standing).toContain("needsMoreInfoDescription");
     expect(standing).toContain("bestPracticeDescription");
-    // All three start open.
+    // All three start collapsed. A question hash opens one section later.
     expect(standing).toContain("HARPER_SECTION_IDS.standing");
     expect(standing).toContain("HARPER_SECTION_IDS.needsInfo");
     expect(standing).toContain("HARPER_SECTION_IDS.bestPractice");
-    expect(standing).toMatch(
+    expect(standing).toContain("() => new Set()");
+    expect(standing).not.toMatch(
       /new Set\(\[\s*HARPER_SECTION_IDS\.standing,\s*HARPER_SECTION_IDS\.needsInfo,\s*HARPER_SECTION_IDS\.bestPractice/,
     );
+    expect(standing).toContain("<details");
     // Description renders in the heading (visible while collapsed).
     expect(standing).toContain("data-testid={`${testId}-description`}");
     expect(standing).toContain("aria-expanded={open}");

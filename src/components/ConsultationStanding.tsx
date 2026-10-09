@@ -6,10 +6,9 @@ import {
   replyConsultationAction,
 } from "@/app/actions/consultation";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
-import { AppButton } from "@/components/AppButton";
 import { QuestionList } from "@/components/ConsultationThread";
 import { useHarperDraft } from "@/components/HarperDraftStore";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   bestPracticeInterviewTitle,
   consultationConversationCopy,
@@ -164,10 +163,21 @@ function ReopenIgnoredLink({
   );
 }
 
+function harperLocationHash(): string {
+  const raw = window.location.hash.replace(/^#/, "");
+  if (!raw) return "";
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
 function HarperPageSection({
   sectionId,
   title,
   description,
+  note,
   open,
   onToggle,
   children,
@@ -176,26 +186,29 @@ function HarperPageSection({
   sectionId: HarperPageSectionId;
   title: string;
   description: string;
+  note?: ReactNode;
   open: boolean;
   onToggle: () => void;
   children: ReactNode;
   testId: string;
 }) {
   return (
-    <section
+    <details
       id={`harper-section-${sectionId}`}
       className="rounded-md border border-edge bg-canvas"
+      open={open}
       data-testid={testId}
       data-harper-section={sectionId}
       data-harper-section-open={open ? "true" : "false"}
     >
-      <AppButton
-        type="button"
-        variant="secondary"
-        className="!h-auto w-full !flex-col !items-start !justify-start !rounded-none !border-0 !border-b !border-primary/20 !bg-primary/10 !px-4 !py-3 !shadow-none hover:!bg-primary/15 active:!bg-primary/15"
+      <summary
+        className="cursor-pointer list-none [&::-webkit-details-marker]:hidden !flex !h-auto w-full !flex-col !items-start !justify-start !rounded-none !border-0 !border-b !border-primary/20 !bg-primary/10 !px-4 !py-3"
         aria-expanded={open}
         data-testid={`${testId}-heading`}
-        onClick={onToggle}
+        onClick={(event) => {
+          event.preventDefault();
+          onToggle();
+        }}
       >
         <h3 className="flex items-center gap-2 text-sm font-semibold text-primary">
           <span
@@ -214,13 +227,12 @@ function HarperPageSection({
         >
           {description}
         </p>
-      </AppButton>
-      {open ? (
-        <div className="space-y-4 border-t border-edge px-4 py-4" data-testid={`${testId}-body`}>
-          {children}
-        </div>
-      ) : null}
-    </section>
+        {note}
+      </summary>
+      <div className="space-y-4 border-t border-edge px-4 py-4" data-testid={`${testId}-body`}>
+        {children}
+      </div>
+    </details>
   );
 }
 
@@ -378,13 +390,9 @@ export function ConsultationStanding({
     [entries],
   );
   const [openSections, setOpenSections] = useState<Set<HarperPageSectionId>>(
-    () =>
-      new Set([
-        HARPER_SECTION_IDS.standing,
-        HARPER_SECTION_IDS.needsInfo,
-        HARPER_SECTION_IDS.bestPractice,
-      ]),
+    () => new Set(),
   );
+  const pendingQuestionScroll = useRef<string | null>(null);
   const [expandedApproved, setExpandedApproved] = useState<Set<string>>(
     () => new Set(),
   );
@@ -457,7 +465,7 @@ export function ConsultationStanding({
   useEffect(() => {
     function openFromHash() {
       if (isApplicationDashboardPath(window.location.pathname)) return;
-      const hash = window.location.hash.replace(/^#/, "");
+      const hash = harperLocationHash();
       if (!hash) return;
       if (hash === HARPER_STANDING_ANCHOR || hash === HARPER_GENERAL_ANCHOR) {
         ensureSectionOpen(HARPER_SECTION_IDS.standing);
@@ -466,17 +474,25 @@ export function ConsultationStanding({
       if (!hash.startsWith("harper-q:")) return;
       const turnId = hash.slice("harper-q:".length);
       const section = sections.sectionByQuestionTurnId.get(turnId);
-      if (section) ensureSectionOpen(section);
-      requestAnimationFrame(() => {
-        document.getElementById(harperQuestionAnchorId(turnId))?.scrollIntoView({
-          block: "nearest",
-        });
-      });
+      if (!section) return;
+      pendingQuestionScroll.current = turnId;
+      ensureSectionOpen(section);
     }
     openFromHash();
     window.addEventListener("hashchange", openFromHash);
     return () => window.removeEventListener("hashchange", openFromHash);
   }, [sections.sectionByQuestionTurnId]);
+
+  useEffect(() => {
+    const turnId = pendingQuestionScroll.current;
+    if (!turnId) return;
+    const section = sections.sectionByQuestionTurnId.get(turnId);
+    if (!section || !openSections.has(section)) return;
+    pendingQuestionScroll.current = null;
+    document.getElementById(harperQuestionAnchorId(turnId))?.scrollIntoView({
+      block: "nearest",
+    });
+  }, [openSections, sections.sectionByQuestionTurnId]);
 
   const bestPracticeTitle = bestPracticeInterviewTitle(jobTitle);
 
@@ -505,6 +521,13 @@ export function ConsultationStanding({
         sectionId={HARPER_SECTION_IDS.standing}
         title={consultationConversationCopy.whereYouStand}
         description={consultationConversationCopy.whereYouStandDescription}
+        note={
+          <p className="mt-1 text-sm text-ink" data-testid="consultation-standing-counts">
+            {evidenceStrengthLabels.STRONG} {counts.STRONG},{" "}
+            {evidenceStrengthLabels.PARTIAL} {counts.PARTIAL},{" "}
+            {evidenceStrengthLabels.NONE} {counts.NONE}
+          </p>
+        }
         open={openSections.has(HARPER_SECTION_IDS.standing)}
         onToggle={() => toggleSection(HARPER_SECTION_IDS.standing)}
         testId="harper-section-standing"
@@ -518,11 +541,6 @@ export function ConsultationStanding({
               {stripInternalIdsFromDisplayText(overall)}
             </p>
           ) : null}
-          <p className="text-sm text-ink" data-testid="consultation-standing-counts">
-            {evidenceStrengthLabels.STRONG} {counts.STRONG},{" "}
-            {evidenceStrengthLabels.PARTIAL} {counts.PARTIAL},{" "}
-            {evidenceStrengthLabels.NONE} {counts.NONE}
-          </p>
           {careerRecap ? (
             <p className="text-sm text-ink" data-testid="consultation-career-recap">
               {stripInternalIdsFromDisplayText(careerRecap)}
