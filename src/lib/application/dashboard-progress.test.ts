@@ -449,6 +449,12 @@ describe("dashboard guidance", () => {
     for (const path of [
       "src/components/ApplicationOverview.tsx",
       "src/components/ApplicationStepCards.tsx",
+      "src/components/DashboardInPlaceStepPanels.tsx",
+      "src/components/ApplicationStatusBody.tsx",
+      "src/components/ApplicationJobBody.tsx",
+      "src/components/ApplicationCompanyBody.tsx",
+      "src/components/application-workspace-model.ts",
+      "src/lib/application/dashboard-open-steps.ts",
       "src/lib/application/overview.ts",
       "src/lib/application/tracker.ts",
       "src/app/(app)/campaigns/[id]/page.tsx",

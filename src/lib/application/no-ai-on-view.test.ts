@@ -10,15 +10,19 @@ function src(path: string): string {
 describe("no AI on page view / skip unchanged / research cost", () => {
   it("application page render paths enqueue no AI", () => {
     const workspace = src("src/components/ApplicationWorkspace.tsx");
+    const model = src("src/components/application-workspace-model.ts");
     const overview = src("src/lib/application/overview.ts");
     const nextStep = src("src/lib/application/next-step.ts");
 
-    expect(workspace).toContain("readApplicationNextStep");
-    expect(workspace).not.toContain("ensureApplicationNextStep");
-    expect(workspace).not.toContain("ensureNamedEmployerResearch");
-    expect(workspace).not.toContain("ensureHiringTeamAfterResearch");
-    expect(workspace).not.toContain("enqueueApplicationJob");
-    expect(workspace).not.toContain("queueApplicationResearch");
+    expect(workspace).toContain("loadApplicationWorkspaceModel");
+    expect(model).toContain("readApplicationNextStep");
+    for (const source of [workspace, model]) {
+      expect(source).not.toContain("ensureApplicationNextStep");
+      expect(source).not.toContain("ensureNamedEmployerResearch");
+      expect(source).not.toContain("ensureHiringTeamAfterResearch");
+      expect(source).not.toContain("enqueueApplicationJob");
+      expect(source).not.toContain("queueApplicationResearch");
+    }
 
     expect(overview).toContain("readApplicationNextStep");
     expect(overview).not.toContain("ensureApplicationNextStep");

@@ -547,17 +547,20 @@ describe("tailored employer research reader", () => {
     expect(briefing).toContain("In depth");
 
     const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
+    const model = readFileSync("src/components/application-workspace-model.ts", "utf8");
+    const company = readFileSync("src/components/ApplicationCompanyBody.tsx", "utf8");
+    const job = readFileSync("src/components/ApplicationJobBody.tsx", "utf8");
     const summary = readFileSync("src/app/(app)/campaigns/[id]/summary/page.tsx", "utf8");
     const briefingSource = readFileSync(
       "src/components/ApplicationCompanyBriefing.tsx",
       "utf8",
     );
-    for (const source of [workspace, summary, briefingSource]) {
+    for (const source of [workspace, model, company, job, summary, briefingSource]) {
       expect(source).not.toContain("researchCompany(");
       expect(source).not.toContain("runPaidStructuredCall");
       expect(source).not.toContain("enqueueApplicationResearch");
     }
-    expect(workspace).toContain("loadApplicationEmployerResearch");
+    expect(model).toContain("loadApplicationEmployerResearch");
     expect(summary).toContain("CheatSheetCompanyResearch");
     const whyThisCompanyInstruction =
       'When whyThisCompany is true: the answer is motivation for wanting this company, not a work story. Write one first-person interview answer to "Why do you want to work here?" using that motivation. When companyResearch is supplied, connect the person\'s motivation to the part of the company this job serves, using the company highlights as context. Company facts may come only from companyResearch; never invent them. Facts about the person come only from their answer and Personal Profile. resumeBullet is always null. Do not invent a work story or a resume bullet.';

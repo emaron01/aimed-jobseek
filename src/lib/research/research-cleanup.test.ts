@@ -143,6 +143,9 @@ describe("research cleanup", () => {
     expect(providerCall).toBeGreaterThan(skip);
     for (const file of [
       "src/components/ApplicationWorkspace.tsx",
+      "src/components/ApplicationCompanyBody.tsx",
+      "src/components/ApplicationJobBody.tsx",
+      "src/components/application-workspace-model.ts",
       "src/components/ApplicationCompanyBriefing.tsx",
       "src/app/(app)/campaigns/[id]/summary/page.tsx",
     ]) {

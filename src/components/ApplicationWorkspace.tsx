@@ -1,42 +1,19 @@
-import {
-  confirmApplicationEmployerIdentityAction,
-  nameApplicationEmployerAction,
-  rejectApplicationEmployerIdentityAction,
-  rescoreApplicationFitAction,
-  retryApplicationNextStepAction,
-  saveApplicationEmployerWebsiteAction,
-} from "@/app/actions/application";
-import {
-  anchorHostFromResearchTimings,
-  employerSitePrefillFromPostingUrl,
-  employerWebsiteAnchor,
-} from "@/lib/application/company-website";
-import { loadApplicationEmployerResearch } from "@/lib/application/employer-research-reader";
-import { ApplicationResearchStatus } from "@/components/ApplicationResearchStatus";
-import { ApplicationFitOverride } from "@/components/ApplicationFitOverride";
+import { retryApplicationNextStepAction } from "@/app/actions/application";
 import {
   ApplicationWorkspaceLive,
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
 import { CheatSheetGenerationError } from "@/components/CheatSheetGenerationError";
 import { latestApplicationSummaryFailure } from "@/lib/application-summary/failure-message";
-import { loadResumeStatementGroups } from "@/lib/application-assets/resume-statement-picker-data";
-import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-status";
-import { supersedeObsoleteWorkspaceFailures } from "@/lib/application-jobs/obsolete-failures";
 import {
   WORKSPACE_CARD_WRAP_CLASS,
   WORKSPACE_MESSAGE_WRAP_CLASS,
   workspaceCampaignSummaryHref,
   workspaceContactEditHref,
-  workspaceProfileEditHref,
-  workspaceProfileHref,
 } from "@/lib/application/workspace-links";
 import { listApplicationContacts } from "@/lib/application/contacts";
 import { isHiringTeamPersonaBuilt } from "@/lib/hiring-team/build";
-import { requireCurrentUser } from "@/lib/auth/session";
-import { getActiveEmailSignatureBody } from "@/lib/signature/signature";
 import { AppPendingIndicator } from "@/components/AppButton";
-import { getApplicationResearchStatus } from "@/lib/application/research-status";
 import {
   addTemplateRoleAction,
   moveApplicationRoleInvolvementAction,
@@ -51,22 +28,8 @@ import {
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { InterviewStagesSection } from "@/components/InterviewStagesSection";
 import { ApplicationAssetsSection } from "@/components/ApplicationAssetsSection";
-import { ApplicationCompanyBriefing } from "@/components/ApplicationCompanyBriefing";
-import {
-  ApplicationJobRequirementActions,
-  ApplicationJobRequirementTopActions,
-} from "@/components/ApplicationJobRequirementActions";
-import { EmptyState } from "@/components/design";
 import { OpenDetailsOnMount } from "@/components/OpenDetailsOnMount";
-import {
-  applicationStepByKey,
-  applicationStepCopy,
-  type ApplicationStepKey,
-} from "@/lib/product-config";
-import {
-  ApplicationAppliedSection,
-  ApplicationOutreachSection,
-} from "@/components/ApplicationOutreachSections";
+import { ApplicationOutreachSection } from "@/components/ApplicationOutreachSections";
 import { isOutreachAssetType } from "@/lib/product-config";
 import { HiringTeamDisclosureGroup } from "@/components/HiringTeamDisclosureGroup";
 import { AddPersonaSection } from "@/components/AddPersonaSection";
@@ -78,185 +41,29 @@ import {
   HiringTeamRecommendedLine,
   HiringTeamRecommendedMark,
 } from "@/components/HiringTeamCheatSheetControls";
-import {
-  displayedFitBucket,
-  fitCriterionReason,
-  fitSignalLabels,
-  formatFitBucketLabel,
-} from "@/lib/application/fit";
-import type { ApplicationFitOutcome } from "@/lib/application/fit";
-import { readApplicationFitStale } from "@/lib/application/service";
 import { prisma } from "@/lib/prisma";
-import {
-  coverLetterEvidenceIsThin,
-  coverLetterThinEvidenceCopy,
-} from "@/lib/application-assets/service";
-import { presentationPlanSchema } from "@/lib/application-assets/plan-contract";
-import { readApplicationNextStep } from "@/lib/application/next-step";
-import { applicationResearchCopy, applicationSummaryConfig, applicationWorkspaceCopy, consultationConversationCopy, employerIdentityCopy, hiringTeamConfig, hiringTeamDetailsTitle, outreachConfig, polishCopy, vocab } from "@/lib/product-config";
-import { features } from "@/lib/product-config/features";
-import {
-  parseIdentityVerification,
-} from "@/lib/job-requirement/identity-verification";
-import {
-  ensureIdentityVerification,
-} from "@/lib/application/service";
+import { coverLetterThinEvidenceCopy } from "@/lib/application-assets/service";
+import { applicationSummaryConfig, applicationWorkspaceCopy, consultationConversationCopy, hiringTeamConfig, hiringTeamDetailsTitle, outreachConfig, vocab } from "@/lib/product-config";
 import { AppActionLink } from "@/components/ui";
 import { parseStringArray } from "@/lib/research";
-import type { ResearchSource } from "@/lib/research/types";
-import { hasUsableCompanyResearchFields } from "@/lib/research/freshness";
-import { researchStatusLabel } from "@/lib/tenant/companies";
-import { contactDisplayName, formatDate, formatNumber } from "@/lib/utils";
-import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-profile";
-import { persistExtractedExperienceDates } from "@/lib/product-research/restore-role-dates";
-import { persistExtractedContactDetails } from "@/lib/product-research/restore-contact-details";
+import { contactDisplayName } from "@/lib/utils";
 import { missingResumeContactLabels } from "@/lib/application-assets/header";
+import {
+  ApplicationWorkspaceEmpty,
+  type ApplicationWorkspaceFocus,
+} from "@/components/ApplicationWorkspaceEmpty";
+import {
+  ApplicationCompanyBody,
+  ApplicationCompanyDetails,
+} from "@/components/ApplicationCompanyBody";
+import { ApplicationJobBody, ApplicationJobDetails } from "@/components/ApplicationJobBody";
+import { loadApplicationWorkspaceModel } from "@/components/application-workspace-model";
+
+export type { ApplicationWorkspaceFocus };
 
 function textList(value: unknown): string[] {
   return parseStringArray(value);
 }
-
-function readOutcomes(value: unknown): ApplicationFitOutcome[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((entry): entry is ApplicationFitOutcome => {
-    if (!entry || typeof entry !== "object") return false;
-    return typeof (entry as { name?: unknown }).name === "string";
-  });
-}
-
-function IdentityVerificationPanel({
-  campaignId,
-  canEdit,
-  requirement,
-}: {
-  campaignId: string;
-  canEdit: boolean;
-  requirement: {
-    campaignId: string;
-    identityConfirmation: "PENDING" | "CONFIRMED" | "REJECTED";
-    identityVerificationJson: unknown;
-  };
-}) {
-  const verification = parseIdentityVerification(requirement.identityVerificationJson);
-  const showCandidate =
-    verification &&
-    requirement.identityConfirmation !== "CONFIRMED" &&
-    (verification.verdict === "AMBIGUOUS" || requirement.identityConfirmation === "REJECTED");
-
-  return (
-    <div className="space-y-3 border-t border-edge pt-4" data-testid="employer-identity">
-      <h2 className="text-base font-semibold text-ink">{employerIdentityCopy.title}</h2>
-      {requirement.identityConfirmation === "CONFIRMED" ? (
-        <p className="text-sm text-ink">{employerIdentityCopy.confirmed}</p>
-      ) : null}
-      {requirement.identityConfirmation === "REJECTED" ? (
-        <p className="text-sm text-warning">{employerIdentityCopy.rejected}</p>
-      ) : null}
-      {showCandidate ? (
-        <div
-          className="space-y-3 rounded-md border border-warning bg-warning-tint p-3"
-          data-testid="employer-identity-candidate"
-        >
-          <p className="text-sm text-warning">{employerIdentityCopy.unmatched}</p>
-          <div className="space-y-1 text-sm text-ink">
-            <p className="font-medium">
-              {verification.candidate.name || employerIdentityCopy.unknownCompany}
-            </p>
-            {verification.candidate.summary ? <p>{verification.candidate.summary}</p> : null}
-            {verification.candidate.whatTheyDo ? (
-              <p>
-                {employerIdentityCopy.candidateLabels.whatTheyDo}: {verification.candidate.whatTheyDo}
-              </p>
-            ) : null}
-            {verification.candidate.location ? (
-              <p>
-                {employerIdentityCopy.candidateLabels.location}: {verification.candidate.location}
-              </p>
-            ) : null}
-            {verification.candidate.sizeOrStage ? (
-              <p>
-                {employerIdentityCopy.candidateLabels.sizeOrStage}: {verification.candidate.sizeOrStage}
-              </p>
-            ) : null}
-            {verification.candidate.website ? (
-              <p>
-                {employerIdentityCopy.candidateLabels.website}: {verification.candidate.website}
-              </p>
-            ) : null}
-          </div>
-          <ul className="space-y-2" data-testid="employer-identity-checks">
-            {verification.checks.map((check) => (
-              <li key={check.key} className="text-sm text-ink">
-                <span className="font-medium">
-                  {employerIdentityCopy.checkLabels[check.key]}
-                </span>
-                <span className="ml-2 rounded bg-surface px-1.5 py-0.5 text-xs font-medium text-ink">
-                  {employerIdentityCopy.status[check.status]}
-                </span>
-                <span className="mt-1 block text-ink">{check.reason}</span>
-                {check.postingEvidence ? (
-                  <span className="mt-1 block text-muted">
-                    {employerIdentityCopy.postingEvidence}: {check.postingEvidence}
-                  </span>
-                ) : null}
-                {check.researchEvidence ? (
-                  <span className="block text-muted">
-                    {employerIdentityCopy.researchEvidence}: {check.researchEvidence}
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-          {canEdit && requirement.identityConfirmation !== "REJECTED" ? (
-            <div className="flex flex-wrap gap-3">
-              <ApplicationActionForm
-                action={confirmApplicationEmployerIdentityAction}
-                submitLabel={employerIdentityCopy.confirm}
-                testId="confirm-employer-identity"
-              >
-                <input type="hidden" name="campaignId" value={campaignId} />
-              </ApplicationActionForm>
-              <ApplicationActionForm
-                action={rejectApplicationEmployerIdentityAction}
-                submitLabel={employerIdentityCopy.reject}
-                testId="reject-employer-identity"
-              >
-                <input type="hidden" name="campaignId" value={campaignId} />
-              </ApplicationActionForm>
-            </div>
-          ) : null}
-          {canEdit ? (
-            <ApplicationActionForm
-              action={nameApplicationEmployerAction}
-              submitLabel={employerIdentityCopy.rerun}
-              testId="correct-employer-form"
-            >
-              <input type="hidden" name="campaignId" value={requirement.campaignId} />
-              <label className="block text-sm">
-                <span className="font-medium text-ink">{employerIdentityCopy.supplyName}</span>
-                <input
-                  name="employerName"
-                  className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="block text-sm">
-                <span className="font-medium text-ink">{employerIdentityCopy.supplyWebsite}</span>
-                <input
-                  name="website"
-                  required
-                  className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
-                />
-              </label>
-            </ApplicationActionForm>
-          ) : null}
-        </div>
-      ) : null}
-
-    </div>
-  );
-}
-
-export type ApplicationWorkspaceFocus = ApplicationStepKey | "overview" | "all";
 
 function showFocus(
   focus: ApplicationWorkspaceFocus,
@@ -276,240 +83,50 @@ export async function ApplicationWorkspace({
   canEdit: boolean;
   focus?: ApplicationWorkspaceFocus;
 }) {
-  await ensureIdentityVerification({ organizationId, campaignId });
-  const requirement = await prisma.jobRequirement.findFirst({
-    where: { campaignId, organizationId },
-    include: {
-      company: { include: { research: { orderBy: { updatedAt: "desc" }, take: 1 } } },
-      campaign: {
-        select: {
-          companyResearchNotes: true,
-          icp: {
-            select: { updatedAt: true, interpretationPromptVersion: true, name: true },
-          },
-          applicationFit: true,
-          product: { select: { id: true, profileJson: true } },
-          appliedAt: true,
-          applicationProgress: true,
-          contacts: {
-            include: {
-              contact: true,
-              chosenPersona: {
-                select: { id: true, name: true, suggestionKey: true },
-              },
-            },
-            orderBy: { createdAt: "asc" },
-          },
-          hiringTeamRoles: {
-            where: { archivedAt: null },
-            orderBy: { createdAt: "asc" },
-            select: {
-              id: true,
-              name: true,
-              suggestionKey: true,
-              setupStatus: true,
-              profileJson: true,
-            },
-          },
-          applicationAssets: {
-            orderBy: [{ type: "asc" }, { version: "desc" }],
-          },
-          interviewStages: {
-            orderBy: { sortOrder: "asc" },
-            select: {
-              id: true,
-              type: true,
-              format: true,
-              scheduledAt: true,
-              notesAfter: true,
-              thankYouClarifyJson: true,
-              interviewers: {
-                take: 1,
-                select: { contactId: true },
-              },
-            },
-          },
-          presentationPlans: true,
-        },
-      },
-    },
-  });
-  if (!requirement) {
-    const step =
-      focus === "all" || focus === "overview"
-        ? null
-        : applicationStepByKey(focus);
+  if (focus === "job") {
     return (
-      <EmptyState
-        title={step?.title ?? applicationStepCopy.dashboardTitle}
-        description={step?.emptyGuidance ?? applicationStepCopy.factMissing}
-        actions={
-          <AppActionLink href="/campaigns" variant="secondary">
-            {polishCopy.backToApplications}
-          </AppActionLink>
-        }
+      <ApplicationJobBody
+        campaignId={campaignId}
+        organizationId={organizationId}
+        canEdit={canEdit}
       />
     );
   }
-
-  const researchAnchor = employerWebsiteAnchor({
-    suppliedEmployerWebsite: requirement.suppliedEmployerWebsite,
-    companyWebsite: requirement.company?.website,
-    companyDomain: requirement.company?.normalizedDomain,
-  });
-  const researchStatus = await getApplicationResearchStatus({
-    organizationId,
-    campaignId,
-  });
-  const sharedResearch = requirement.company?.research[0] ?? null;
-  const employerResearch = await loadApplicationEmployerResearch({
-    organizationId,
-    campaignId,
-  });
-  const research = employerResearch ?? sharedResearch;
-  const researchAnchored = (() => {
-    if (employerResearch?.source === "tailored") return true;
-    const stamped = anchorHostFromResearchTimings(
-      sharedResearch?.researchStageTimings,
+  if (focus === "company") {
+    return (
+      <ApplicationCompanyBody
+        campaignId={campaignId}
+        organizationId={organizationId}
+        canEdit={canEdit}
+      />
     );
-    return Boolean(
-      stamped && researchAnchor && stamped === researchAnchor.domain,
-    );
-  })();
-  const fit = requirement.campaign.applicationFit;
-  const icp = requirement.campaign.icp;
-  const stale = fit
-    ? readApplicationFitStale({
-        stale: fit.stale,
-        staleReason: fit.staleReason,
-        computedAt: fit.computedAt,
-        icpUpdatedAt: fit.icpUpdatedAt,
-        companyResearchUpdatedAt: fit.companyResearchUpdatedAt,
-        interpretationPromptVersion: fit.interpretationPromptVersion,
-        currentIcpUpdatedAt: icp?.updatedAt ?? null,
-        currentResearchUpdatedAt: research?.updatedAt ?? null,
-        currentPromptVersion: icp?.interpretationPromptVersion ?? null,
-      })
-    : null;
-  const outcomes = fit ? readOutcomes(fit.outcomesJson) : [];
-  let profile = parseCandidateProfileSafe(
-    requirement.campaign.product.profileJson,
-  );
-  if (profile.ok && canEdit) {
-    profile = {
-      ok: true,
-      profile: await persistExtractedContactDetails({
-        organizationId,
-        productId: requirement.campaign.product.id,
-        profile: await persistExtractedExperienceDates({
-          organizationId,
-          productId: requirement.campaign.product.id,
-          profile: profile.profile,
-        }),
-      }),
-    };
   }
-  const statementPicker = showFocus(focus, ["assets"])
-    ? await loadResumeStatementGroups({ organizationId, campaignId })
-    : { groups: [], needsPrepare: false, roleOptions: [] };
-  const [approvedStatementCount, approvedStoryCount] = await Promise.all([
-    prisma.consultationStatement.count({
-      where: {
-        organizationId,
-        session: { campaignId },
-        status: "APPROVED",
-      },
-    }),
-    prisma.profileStory.count({
-      where: {
-        organizationId,
-        productId: requirement.campaign.product.id,
-      },
-    }),
-  ]);
-  const coverLetterEvidenceThin = coverLetterEvidenceIsThin({
-    approvedStatementCount,
-    approvedStoryCount,
-    achievementTexts: profile.ok
-      ? profile.profile.experience.flatMap((role) =>
-          role.achievements.map((item) => item.text),
-        )
-      : [],
-  });
-  const emailSignature =
-    focus === "all" || focus === "outreach"
-      ? await getActiveEmailSignatureBody({
-          organizationId,
-          userId: (await requireCurrentUser()).id,
-        })
-      : null;
-  await supersedeObsoleteWorkspaceFailures({ organizationId, campaignId });
-  const [nextStep, live] = await Promise.all([
-    readApplicationNextStep({
-      organizationId,
-      campaignId,
-    }),
-    getApplicationWorkspaceLive({ organizationId, campaignId }),
-  ]);
-  const profileHref = workspaceProfileHref(requirement.campaign.product.id);
-  const profileEditHref = workspaceProfileEditHref(
-    requirement.campaign.product.id,
+  const loaded = await loadApplicationWorkspaceModel(
+    organizationId,
+    campaignId,
+    canEdit,
+    showFocus(focus, ["assets"]),
+    focus === "all" || focus === "outreach",
   );
-  const invalidPlanTypes = requirement.campaign.presentationPlans.flatMap(
-    (row) =>
-      presentationPlanSchema.safeParse(row.planJson).success
-        ? []
-        : [row.type as "RESUME" | "COVER_LETTER"],
-  );
-  const presentationPlans = requirement.campaign.presentationPlans.flatMap(
-    (row) => {
-      const parsed = presentationPlanSchema.safeParse(row.planJson);
-      if (!parsed.success) return [];
-      return [
-        {
-          type: row.type as "RESUME" | "COVER_LETTER",
-          status: row.status as "DRAFT" | "ACCEPTED",
-          plan: parsed.data,
-        },
-      ];
-    },
-  );
-  const assetsOpen =
-    nextStep.stateKey === "resume_plan_ready" ||
-    nextStep.stateKey === "cover_plan_ready" ||
-    nextStep.stateKey === "resume_ready" ||
-    nextStep.stateKey === "cover_ready";
-  const shownBucket = fit
-    ? displayedFitBucket({
-        bucket: fit.bucket,
-        overrideBucket: fit.overrideBucket,
-      })
-    : null;
-
+  if (!loaded.requirement) {
+    return <ApplicationWorkspaceEmpty focus={focus} />;
+  }
+  const requirement = loaded.requirement;
+  const profile = loaded.profile;
+  const statementPicker = loaded.statementPicker;
+  const coverLetterEvidenceThin = loaded.coverLetterEvidenceThin;
+  const emailSignature = loaded.emailSignature;
+  const nextStep = loaded.nextStep;
+  const live = loaded.live;
+  const profileHref = loaded.profileHref;
+  const profileEditHref = loaded.profileEditHref;
+  const invalidPlanTypes = loaded.invalidPlanTypes;
+  const presentationPlans = loaded.presentationPlans;
+  const assetsOpen = loaded.assetsOpen;
   const asPage = focus !== "all";
 
   return (
     <div className={`space-y-4 ${WORKSPACE_CARD_WRAP_CLASS}`}>
-    {showFocus(focus, ["overview", "applied"]) ? (
-    <details
-      className="rounded-lg border border-edge bg-surface p-5"
-      data-testid="application-applied-wrap"
-      id="applied"
-    >
-      {asPage ? <OpenDetailsOnMount /> : null}
-      <summary className="cursor-pointer text-base font-semibold text-ink">
-        {applicationWorkspaceCopy.appliedTitle}
-      </summary>
-      <div className="mt-4">
-    <ApplicationAppliedSection
-      campaignId={requirement.campaignId}
-      canEdit={canEdit}
-      appliedAt={requirement.campaign.appliedAt?.toISOString() ?? null}
-      applicationProgress={requirement.campaign.applicationProgress}
-    />
-      </div>
-    </details>
-    ) : null}
     {showFocus(focus, ["overview"]) ? (
     <section
       className={`space-y-3 rounded-lg border border-edge bg-surface p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
@@ -545,286 +162,10 @@ export async function ApplicationWorkspace({
     </section>
     ) : null}
     {showFocus(focus, ["company"]) ? (
-    <details
-      className="space-y-4 rounded-lg border border-edge bg-surface p-5"
-      data-testid="application-company"
-      id="company"
-    >
-      {asPage ? <OpenDetailsOnMount /> : null}
-      <summary className="cursor-pointer text-base font-semibold text-ink">
-        {applicationWorkspaceCopy.companyTitle}
-      </summary>
-      <div className="mt-4 space-y-4">
-        <ApplicationResearchStatus
-          campaignId={campaignId}
-          canEdit={canEdit}
-          initialStatus={researchStatus}
-          hideRetry
-        />
-        {!researchAnchor ? (
-          <div
-            className="space-y-3 rounded-md border border-warning bg-warning-tint p-3"
-            data-testid="company-website-required"
-          >
-            <p className="text-sm text-ink">
-              {applicationWorkspaceCopy.companyWebsitePrompt}
-            </p>
-            {canEdit ? (
-              <ApplicationActionForm
-                action={saveApplicationEmployerWebsiteAction}
-                submitLabel={applicationWorkspaceCopy.companyWebsiteSave}
-                testId="save-company-website"
-              >
-                <input type="hidden" name="campaignId" value={campaignId} />
-                <label className="block text-sm">
-                  <span className="font-medium text-ink">
-                    {applicationWorkspaceCopy.companyWebsiteLabel}
-                  </span>
-                  <span className="mt-0.5 block text-xs font-normal text-muted">
-                    {applicationWorkspaceCopy.companyWebsiteHint}
-                  </span>
-                  <input
-                    name="companyWebsite"
-                    required
-                    data-testid="company-website"
-                    defaultValue={
-                      employerSitePrefillFromPostingUrl(requirement.postingUrl) ?? ""
-                    }
-                    placeholder="https://www.cscglobal.com"
-                    className="mt-1 w-full rounded-md border border-edge-strong bg-surface px-3 py-2 text-sm"
-                  />
-                </label>
-              </ApplicationActionForm>
-            ) : null}
-          </div>
-        ) : null}
-        {researchAnchored ? null : (
-        <IdentityVerificationPanel
-          campaignId={campaignId}
-          canEdit={canEdit}
-          requirement={requirement}
-        />
-        )}
-        <ApplicationCompanyBriefing
-          campaignId={campaignId}
-          canEdit={canEdit}
-          companyName={
-            requirement.company?.name ??
-            requirement.companyName ??
-            applicationWorkspaceCopy.companyTitle
-          }
-          meta={{
-            domain:
-              requirement.company?.normalizedDomain ??
-              requirement.company?.website ??
-              null,
-            industry: requirement.company?.industry ?? null,
-            location: requirement.company?.location ?? null,
-            employeeCount:
-              requirement.company?.employeeCount != null
-                ? formatNumber(requirement.company.employeeCount)
-                : null,
-            revenue:
-              requirement.company?.revenue != null
-                ? String(requirement.company.revenue)
-                : null,
-            lastResearched: research?.researchedAt
-              ? formatDate(research.researchedAt)
-              : null,
-          }}
-          defaults={{
-            companySummary: research?.companySummary ?? null,
-            whatTheySell: research?.whatTheySell ?? null,
-            customerTypes: research?.customerTypes ?? [],
-            primaryMarkets: research?.primaryMarkets ?? [],
-            businessModel: research?.businessModel ?? null,
-            companySizeContext: research?.companySizeContext ?? null,
-            relevantTechnologies: research?.relevantTechnologies ?? [],
-            hiringSignals: research?.hiringSignals ?? [],
-            riskSignals: research?.riskSignals ?? [],
-            jobFocus: employerResearch?.jobFocus ?? null,
-            jobFocusDetail: employerResearch?.jobFocusDetail ?? null,
-          }}
-          sources={
-            Array.isArray(research?.researchSources)
-              ? (research.researchSources as ResearchSource[])
-              : []
-          }
-          anchorHost={employerResearch?.anchorHost ?? researchAnchor?.domain ?? null}
-          sisterHosts={employerResearch?.sisterHosts ?? null}
-          postingText={requirement.rawText}
-          researchMethod={research?.researchMethod ?? null}
-          researchStatus={
-            research &&
-            (research.status === "COMPLETED" || research.status === "PARTIAL")
-              ? hasUsableCompanyResearchFields(research)
-                ? "Researched"
-                : "No usable details found"
-              : researchStatusLabel(research?.status)
-          }
-          notes={requirement.campaign.companyResearchNotes ?? ""}
-          researchLive={
-            researchStatus.phase === "queued" ||
-            researchStatus.phase === "researching"
-          }
-        />
-      </div>
-    </details>
+    <ApplicationCompanyDetails model={loaded} canEdit={canEdit} asPage={asPage} />
     ) : null}
     {showFocus(focus, ["job"]) ? (
-    <>
-    <details className="space-y-4 rounded-lg border border-edge bg-surface p-5" data-testid="application-workspace">
-      {asPage ? <OpenDetailsOnMount /> : null}
-      <summary className="cursor-pointer text-base font-semibold text-ink">
-        {applicationWorkspaceCopy.jobRequirementTitle}
-      </summary>
-      <div className="mt-4 space-y-4">
-    <section className="space-y-4">
-      {canEdit ? <ApplicationJobRequirementTopActions /> : null}
-      <p className="text-sm text-muted">
-        {applicationWorkspaceCopy.jobPostingHelp}
-      </p>
-      <dl className="grid gap-3 md:grid-cols-2" data-testid="job-requirement-view">
-        <Field label={applicationWorkspaceCopy.fieldTitle} value={requirement.title} />
-        <Field label={applicationWorkspaceCopy.fieldEmployer} value={requirement.companyName} />
-        <Field label={applicationWorkspaceCopy.fieldLocation} value={requirement.location} />
-        <Field label={applicationWorkspaceCopy.fieldWorkArrangement} value={requirement.workArrangement} />
-        <Field label={applicationWorkspaceCopy.fieldEmploymentType} value={requirement.employmentType} />
-        <Field label={applicationWorkspaceCopy.fieldSeniority} value={requirement.seniority} />
-        <Field label={applicationWorkspaceCopy.fieldCompensation} value={requirement.compensationRange} />
-        <Field label={applicationWorkspaceCopy.fieldReportsTo} value={requirement.reportingLine} />
-      </dl>
-      <BulletList title={applicationWorkspaceCopy.responsibilitiesTitle} items={textList(requirement.responsibilities)} />
-      <BulletList title={applicationWorkspaceCopy.requiredTitle} items={textList(requirement.requiredItems)} />
-      <BulletList title={applicationWorkspaceCopy.preferredTitle} items={textList(requirement.preferredItems)} />
-      {canEdit ? (
-        <ApplicationJobRequirementActions
-          campaignId={requirement.campaignId}
-          rawText={requirement.rawText}
-          learnedNotes={requirement.seekerLearnedNotes ?? ""}
-        />
-      ) : null}
-
-      {requirement.employerSkipReason ? (
-        <p className="rounded-md border border-warning bg-warning-tint px-3 py-2 text-sm text-warning" data-testid="employer-skip-reason">
-          {requirement.employerSkipReason}
-        </p>
-      ) : null}
-
-      {canEdit && requirement.employerDisposition !== "IDENTIFIED" && !parseIdentityVerification(requirement.identityVerificationJson) ? (
-        <ApplicationActionForm
-          action={nameApplicationEmployerAction}
-          submitLabel={applicationResearchCopy.saveEmployer}
-          testId="confirm-employer-form"
-        >
-          <input type="hidden" name="campaignId" value={requirement.campaignId} />
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Employer name</span>
-            <input
-              name="employerName"
-              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-ink">{employerIdentityCopy.supplyWebsite}</span>
-            <input
-              name="website"
-              required
-              className="mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm"
-            />
-          </label>
-        </ApplicationActionForm>
-      ) : null}
-
-    </section>
-      </div>
-    </details>
-    {features.employerIcpFit && icp ? (
-    <details
-      className="space-y-4 rounded-lg border border-edge bg-surface p-5"
-      data-testid="employer-fit"
-      id="employer-fit"
-    >
-      {asPage ? <OpenDetailsOnMount /> : null}
-      <summary className="cursor-pointer text-base font-semibold text-ink">
-        {applicationWorkspaceCopy.employerFitTitle}
-      </summary>
-      <div className="mt-4 space-y-3">
-        <p className="text-sm text-muted">
-          {applicationWorkspaceCopy.fitHelp.replace("{name}", icp.name)}
-        </p>
-        {shownBucket ? (
-          <p className="text-sm font-medium text-ink" data-testid="employer-fit-bucket">
-            {applicationWorkspaceCopy.fitScoredLabel}: {formatFitBucketLabel(shownBucket)}
-          </p>
-        ) : (
-          <p className="text-sm text-muted">{applicationWorkspaceCopy.fitMissing}</p>
-        )}
-        {stale?.stale ? (
-          <p className="text-sm text-warning" data-testid="employer-fit-stale">
-            {stale.reason}
-          </p>
-        ) : null}
-        <ul className="space-y-2" data-testid="employer-fit-criteria">
-          {outcomes.map((outcome) => {
-            const labels = fitSignalLabels(outcome);
-            const result = fitCriterionReason(outcome);
-            return (
-              <li
-                key={outcome.criterionId ?? outcome.name}
-                className="text-sm text-ink"
-                data-testid="employer-fit-criterion"
-                data-fit-status={result.status}
-              >
-                <span className="font-medium">{outcome.name}</span>
-                <span className="ml-2 rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink">
-                  {result.label}
-                </span>
-                {labels.map((label) => (
-                  <span
-                    key={label}
-                    className="ml-2 rounded bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink"
-                    data-testid={
-                      outcome.dealBreakerHit
-                        ? "deal-breaker-signal"
-                        : outcome.mustHaveMiss
-                          ? "must-have-signal"
-                          : undefined
-                    }
-                  >
-                    {label}
-                  </span>
-                ))}
-                <span className="mt-1 block text-muted">{result.reason}</span>
-                {outcome.evidence ? (
-                  <span className="mt-1 block text-muted">{outcome.evidence}</span>
-                ) : null}
-                {outcome.source ? (
-                  <span className="block text-xs text-subtle">{outcome.source}</span>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-        {canEdit && fit && shownBucket ? (
-          <ApplicationFitOverride
-            campaignId={requirement.campaignId}
-            bucket={shownBucket}
-          />
-        ) : null}
-        {canEdit && stale?.stale && requirement.employerDisposition === "IDENTIFIED" ? (
-          <ApplicationActionForm
-            action={rescoreApplicationFitAction}
-            submitLabel="Rescore employer fit"
-            testId="rescore-employer-fit"
-          >
-            <input type="hidden" name="campaignId" value={requirement.campaignId} />
-          </ApplicationActionForm>
-        ) : null}
-      </div>
-    </details>
-    ) : null}
-    </>
+    <ApplicationJobDetails model={loaded} canEdit={canEdit} asPage={asPage} />
     ) : null}
     {showFocus(focus, ["hiring-team"]) ? (
     <HiringTeamSection
@@ -1512,30 +853,6 @@ function AnnotatedBlock({
             {item.text}
             <KindMark kind={item.kind} />
           </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function Field({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-subtle">{label}</dt>
-      <dd className="mt-1 text-sm text-ink">{value?.trim() ? value : "—"}</dd>
-    </div>
-  );
-}
-
-function BulletList({ title, items }: { title: string; items: string[] }) {
-  const visible = items.filter((item) => item.replace(/\s+/g, " ").trim());
-  if (visible.length === 0) return null;
-  return (
-    <div>
-      <h3 className="text-sm font-medium text-ink">{title}</h3>
-      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink">
-        {visible.map((item) => (
-          <li key={item}>{item}</li>
         ))}
       </ul>
     </div>

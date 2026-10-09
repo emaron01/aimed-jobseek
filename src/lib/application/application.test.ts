@@ -359,7 +359,7 @@ describe("employer fit bucket labels", () => {
     expect(formatFitBucketLabel("POOR_FIT")).toBe("Poor fit");
     expect(formatFitBucketLabel("EXCLUDED")).toBe("Excluded");
     const workspace = readFileSync(
-      "src/components/ApplicationWorkspace.tsx",
+      "src/components/ApplicationJobBody.tsx",
       "utf8",
     );
     expect(workspace).toContain("formatFitBucketLabel");

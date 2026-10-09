@@ -225,10 +225,17 @@ describe("tailored application research brief and search", () => {
   });
 
   it("does not run research from an application page view", () => {
-    const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
-    expect(workspace).not.toContain("researchCompany(");
-    expect(workspace).not.toContain("runPaidStructuredCall");
-    expect(workspace).not.toContain("enqueueApplicationResearch");
+    for (const file of [
+      "src/components/ApplicationWorkspace.tsx",
+      "src/components/ApplicationCompanyBody.tsx",
+      "src/components/ApplicationJobBody.tsx",
+      "src/components/application-workspace-model.ts",
+    ]) {
+      const source = readFileSync(file, "utf8");
+      expect(source).not.toContain("researchCompany(");
+      expect(source).not.toContain("runPaidStructuredCall");
+      expect(source).not.toContain("enqueueApplicationResearch");
+    }
   });
 });
 

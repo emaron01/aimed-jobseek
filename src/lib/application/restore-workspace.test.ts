@@ -30,6 +30,8 @@ function walk(dir: string, acc: string[] = []): string[] {
 describe("restored workspace editing and Harper", () => {
   it("lets the seeker edit job requirements and regenerate company research", () => {
     const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
+    const company = readFileSync("src/components/ApplicationCompanyBody.tsx", "utf8");
+    const jobBody = readFileSync("src/components/ApplicationJobBody.tsx", "utf8");
     const briefing = readFileSync(
       "src/components/ApplicationCompanyBriefing.tsx",
       "utf8",
@@ -39,10 +41,11 @@ describe("restored workspace editing and Harper", () => {
       "utf8",
     );
     const actions = readFileSync("src/app/actions/application.ts", "utf8");
-    expect(workspace).toContain("ApplicationCompanyBriefing");
+    expect(company).toContain("ApplicationCompanyBriefing");
     expect(workspace).not.toContain("ApplicationCompanyUpdateForm");
-    expect(workspace).toContain("ApplicationJobRequirementActions");
+    expect(jobBody).toContain("ApplicationJobRequirementActions");
     expect(workspace).not.toContain("ApplicationJobRequirementForm");
+    expect(jobBody).not.toContain("ApplicationJobRequirementForm");
     expect(briefing).toContain("regenerate-company-research");
     expect(briefing).toContain("company-research-notes");
     expect(job).toContain("edit-job-posting");
@@ -123,8 +126,9 @@ describe("restored workspace editing and Harper", () => {
       applicationWorkspaceCopy.appliedTitle,
     );
     const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
-    expect(workspace.indexOf("application-applied-wrap")).toBeLessThan(
-      workspace.indexOf("application-next-step"),
-    );
+    const status = readFileSync("src/components/ApplicationStatusBody.tsx", "utf8");
+    expect(workspace).not.toContain("application-applied-wrap");
+    expect(workspace).toContain("application-next-step");
+    expect(status).toContain("ApplicationAppliedSection");
   });
 });

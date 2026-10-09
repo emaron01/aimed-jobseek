@@ -85,7 +85,7 @@ describe("employerIcpFit Phase A gate (flag off)", () => {
 
   it("application workspace has no Scorecard display and hides Employer fit when off", () => {
     const workspace = readFileSync(
-      "src/components/ApplicationWorkspace.tsx",
+      "src/components/ApplicationJobBody.tsx",
       "utf8",
     );
     expect(workspace).toContain("features.employerIcpFit && icp");

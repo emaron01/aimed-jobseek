@@ -48,15 +48,17 @@ describe("employer correction form fields", () => {
 
   it("wires the correction form and submits through the live form FormData", () => {
     const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
+    const company = readFileSync("src/components/ApplicationCompanyBody.tsx", "utf8");
+    const job = readFileSync("src/components/ApplicationJobBody.tsx", "utf8");
     const form = readFileSync("src/components/ApplicationActionForm.tsx", "utf8");
     const action = readFileSync("src/app/actions/application.ts", "utf8");
     expect(workspace).toContain('data-testid="application-contacts-wrap"');
     expect(workspace).toContain("applicationWorkspaceCopy.contactsTitle");
     expect(workspace).toContain("hiringTeamConfig.workspaceTitle");
-    expect(workspace).toContain("applicationWorkspaceCopy.jobRequirementTitle");
-    expect(workspace).toContain('testId="correct-employer-form"');
-    expect(workspace).toContain('name="employerName"');
-    expect(workspace).toContain('name="website"');
+    expect(job).toContain("applicationWorkspaceCopy.jobRequirementTitle");
+    expect(company).toContain('testId="correct-employer-form"');
+    expect(company).toContain('name="employerName"');
+    expect(company).toContain('name="website"');
     expect(form).toContain("new FormData(form as HTMLFormElement)");
     expect(form).toContain("event.preventDefault()");
     expect(form).toContain("pending={pending}");

@@ -133,6 +133,7 @@ export const applicationStepCopy = Object.freeze({
   yourTurn: "Your turn",
   yourNextStep: "Your next step",
   openStep: "Open {step}",
+  openFullPage: "Open full page",
   markApplied: "Mark as applied",
   reviewJob: "Review job requirements",
   reviewCompany: "Review company research",

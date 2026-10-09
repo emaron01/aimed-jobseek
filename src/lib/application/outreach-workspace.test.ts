@@ -286,15 +286,11 @@ describe("hiring team persona actions", () => {
 
 describe("company research status", () => {
   it("renders Employer research once on the company page", () => {
-    const workspace = readFileSync(
-      "src/components/ApplicationWorkspace.tsx",
+    const companyBlock = readFileSync(
+      "src/components/ApplicationCompanyBody.tsx",
       "utf8",
     );
-    const companyBlock = workspace.slice(
-      workspace.indexOf('data-testid="application-company"'),
-      workspace.indexOf('data-testid="application-workspace"'),
-    );
-    const matches = companyBlock.match(/ApplicationResearchStatus/g) ?? [];
+    const matches = companyBlock.match(/<ApplicationResearchStatus/g) ?? [];
     expect(matches).toHaveLength(1);
     expect(companyBlock).toContain("IdentityVerificationPanel");
   });

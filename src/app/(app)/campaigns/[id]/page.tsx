@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ApplicationOverview } from "@/components/ApplicationOverview";
+import { loadDashboardInPlacePanels } from "@/components/DashboardInPlaceStepPanels";
+import { parseDashboardOpenSteps } from "@/lib/application/dashboard-open-steps";
 import { listApplicationHiringTeamRoles } from "@/lib/application/contacts";
 import { ApplicationWorkspace } from "@/components/ApplicationWorkspace";
 import { generateApplicationPageMetadata } from "@/lib/application/page-metadata";
@@ -70,6 +72,7 @@ type PageProps = {
     contact?: string;
     scoringRun?: string;
     attached?: string;
+    open?: string;
   }>;
 };
 
@@ -495,6 +498,13 @@ export default async function CampaignDetailPage({
         view={overview}
         campaignId={campaign.id}
         roles={await listApplicationHiringTeamRoles(organization.id, campaign.id)}
+        openSteps={parseDashboardOpenSteps(query.open)}
+        panels={await loadDashboardInPlacePanels({
+          open: query.open,
+          campaignId: campaign.id,
+          organizationId: organization.id,
+          canEdit: canEditTemplate && !campaignArchived,
+        })}
       />
       <ApplicationWorkspace
         campaignId={campaign.id}

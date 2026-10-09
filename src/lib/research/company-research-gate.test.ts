@@ -137,12 +137,16 @@ describe("company research fingerprint gate (source)", () => {
     );
     expect(noAi).toContain("queueApplicationResearch");
     expect(noAi).toContain("enqueueApplicationResearch");
-    const workspace = readFileSync(
+    for (const file of [
       "src/components/ApplicationWorkspace.tsx",
-      "utf8",
-    );
-    expect(workspace).not.toContain("enqueueApplicationResearch");
-    expect(workspace).not.toContain("researchCompany(");
+      "src/components/ApplicationCompanyBody.tsx",
+      "src/components/ApplicationJobBody.tsx",
+      "src/components/application-workspace-model.ts",
+    ]) {
+      const source = readFileSync(file, "utf8");
+      expect(source).not.toContain("enqueueApplicationResearch");
+      expect(source).not.toContain("researchCompany(");
+    }
   });
 });
 

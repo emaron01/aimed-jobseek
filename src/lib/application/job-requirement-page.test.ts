@@ -22,7 +22,8 @@ vi.mock("@/lib/product-config/features", async (importOriginal) => {
 });
 
 describe("job requirements page", () => {
-  const workspace = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
+  const workspace = readFileSync("src/components/ApplicationJobBody.tsx", "utf8");
+  const shell = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
   const actions = readFileSync(
     "src/components/ApplicationJobRequirementActions.tsx",
     "utf8",
@@ -62,17 +63,20 @@ describe("job requirements page", () => {
   });
 
   it("does not render the Scorecard section or note on the Job Requirements page", () => {
-    expect(workspace).not.toContain("criterionFlags.inference");
-    expect(workspace).not.toContain("polishCopy.inferredLabel");
-    expect(workspace).not.toContain("scorecard-note");
-    expect(workspace).not.toContain("applicationWorkspaceCopy.scorecardNote");
-    expect(workspace).not.toContain("applicationWorkspaceCopy.scorecardTitle");
-    expect(workspace).not.toContain("applicationWorkspaceCopy.outcomesTitle");
-    expect(workspace).not.toContain("applicationWorkspaceCopy.competenciesTitle");
-    expect(workspace).not.toContain("applicationWorkspaceCopy.noMission");
-    expect(workspace).not.toContain("ScorecardList");
-    expect(workspace).not.toContain("readScorecard");
-    expect(workspace).not.toContain("scorecardJson");
+    expect(shell).toContain('showFocus(focus, ["job"])');
+    for (const source of [shell, workspace]) {
+      expect(source).not.toContain("criterionFlags.inference");
+      expect(source).not.toContain("polishCopy.inferredLabel");
+      expect(source).not.toContain("scorecard-note");
+      expect(source).not.toContain("applicationWorkspaceCopy.scorecardNote");
+      expect(source).not.toContain("applicationWorkspaceCopy.scorecardTitle");
+      expect(source).not.toContain("applicationWorkspaceCopy.outcomesTitle");
+      expect(source).not.toContain("applicationWorkspaceCopy.competenciesTitle");
+      expect(source).not.toContain("applicationWorkspaceCopy.noMission");
+      expect(source).not.toContain("ScorecardList");
+      expect(source).not.toContain("readScorecard");
+      expect(source).not.toContain("scorecardJson");
+    }
   });
 
   it("hides Employer fit behind employerIcpFit (no fit content without the flag)", () => {

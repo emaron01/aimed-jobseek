@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useActionState, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useRouter } from "next/navigation";
 import {
   addApplicationContactAction,
   generateOutreachAssetAction,
@@ -412,6 +413,10 @@ export function ApplicationAppliedSection({
     setApplicationProgressAction,
     initial,
   );
+  const router = useRouter();
+  useEffect(() => {
+    if (state?.ok || progressState?.ok) router.refresh();
+  }, [state, progressState, router]);
   return (
     <section
       className={`space-y-3 rounded-lg border border-edge bg-surface p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}

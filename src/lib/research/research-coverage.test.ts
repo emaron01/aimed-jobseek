@@ -353,6 +353,9 @@ describe("research coverage before stopping", () => {
   it("does not run research from an application page view", () => {
     for (const file of [
       "src/components/ApplicationWorkspace.tsx",
+      "src/components/ApplicationCompanyBody.tsx",
+      "src/components/ApplicationJobBody.tsx",
+      "src/components/application-workspace-model.ts",
       "src/components/ApplicationCompanyBriefing.tsx",
     ]) {
       const page = readFileSync(file, "utf8");

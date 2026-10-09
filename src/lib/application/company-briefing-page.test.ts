@@ -13,6 +13,7 @@ import type { RetrievedEvidenceBundle } from "@/lib/research/sources";
 function sourceFiles() {
   return {
     workspace: readFileSync("src/components/ApplicationWorkspace.tsx", "utf8"),
+    company: readFileSync("src/components/ApplicationCompanyBody.tsx", "utf8"),
     briefing: readFileSync(
       "src/components/ApplicationCompanyBriefing.tsx",
       "utf8",
@@ -31,8 +32,8 @@ function sourceFiles() {
 
 describe("application Company page briefing", () => {
   it("uses the briefing layout with sources and citations", () => {
-    const { workspace, briefing } = sourceFiles();
-    expect(workspace).toContain("ApplicationCompanyBriefing");
+    const { workspace, company, briefing } = sourceFiles();
+    expect(company).toContain("ApplicationCompanyBriefing");
     expect(workspace).toContain('showFocus(focus, ["company"])');
     expect(briefing).toContain('data-testid="application-company-briefing"');
     expect(briefing).toContain("company-source-lead");
@@ -41,7 +42,7 @@ describe("application Company page briefing", () => {
     expect(briefing).toContain("sourcesSupportingClaim");
     expect(briefing).toContain("applicationWorkspaceCopy.whatTheyDoTitle");
     expect(briefing).toContain("formatCompanyBriefingMeta");
-    expect(workspace).toContain("lastResearched");
+    expect(company).toContain("lastResearched");
     expect(applicationWorkspaceCopy.whatTheyDoTitle).toBe("What they do");
   });
 
@@ -58,7 +59,7 @@ describe("application Company page briefing", () => {
   });
 
   it("makes Regenerate the only company action and hides the edit form", () => {
-    const { workspace, briefing, status } = sourceFiles();
+    const { workspace, company, briefing, status } = sourceFiles();
     expect(workspace).not.toContain("ApplicationCompanyUpdateForm");
     expect(workspace).not.toContain("Products:");
     expect(briefing).toContain("polishCopy.regenerate");
@@ -66,7 +67,7 @@ describe("application Company page briefing", () => {
     expect(briefing).not.toContain("ApplicationCompanyUpdateForm");
     expect(briefing).not.toContain("company-update-form");
     expect(status).toContain("hideRetry");
-    expect(workspace).toContain("hideRetry");
+    expect(company).toContain("hideRetry");
     expect(polishCopy.regenerate).toBe("Regenerate");
   });
 

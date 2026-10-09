@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ApplicationStepCards, DashboardStepAction } from "@/components/ApplicationStepCards";
 import { AppCard, SectionHeader, StatusPill } from "@/components/design";
 import {
@@ -7,7 +8,9 @@ import {
 import { applicationProgressCurrent } from "@/lib/application/step-progress";
 import { applicationStepCopy, consultationConversationCopy } from "@/lib/product-config";
 import { features } from "@/lib/product-config/features";
+import type { DashboardInPlaceStepKey } from "@/lib/application/dashboard-open-steps";
 import type { ApplicationOverviewView } from "@/lib/application/overview";
+
 function appliedDateLabel(value: string): string {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!match) return value;
@@ -18,10 +21,14 @@ export function ApplicationOverview({
   view,
   campaignId,
   roles,
+  openSteps,
+  panels,
 }: {
   view: ApplicationOverviewView;
   campaignId?: string;
   roles?: NewInterviewRoleOption[];
+  openSteps?: readonly DashboardInPlaceStepKey[];
+  panels?: Partial<Record<DashboardInPlaceStepKey, ReactNode>>;
 }) {
   return (
     <div className="space-y-4" data-testid="application-overview">
@@ -70,7 +77,12 @@ export function ApplicationOverview({
       ) : null}
       <AppCard data-testid="application-overview-steps">
         <SectionHeader title={applicationStepCopy.trackerLabel} />
-        <ApplicationStepCards steps={view.steps} />
+        <ApplicationStepCards
+          steps={view.steps}
+          campaignId={campaignId}
+          openSteps={openSteps}
+          panels={panels}
+        />
       </AppCard>
     </div>
   );
