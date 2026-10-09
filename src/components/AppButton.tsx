@@ -41,8 +41,8 @@ const VARIANT_CLASS: Record<AppButtonVariant, string> = {
 const BUTTON_SIZE_CLASS = {
   md: "px-3.5 py-2 text-sm",
   sm: "px-2.5 py-1 text-xs",
-  /** Three times the small dashboard button: padding and type. */
-  cta: "px-7.5 py-3 text-4xl leading-[3rem]",
+  /** 24px call to action, one line. */
+  cta: "whitespace-nowrap px-5 py-2 text-2xl",
 } as const;
 
 export type AppButtonSize = keyof typeof BUTTON_SIZE_CLASS;

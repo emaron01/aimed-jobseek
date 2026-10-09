@@ -118,7 +118,7 @@ export function NewInterviewForm({
             type="button"
             variant="lightOrange"
             size="cta"
-            className="max-w-3xl whitespace-normal text-center"
+            className="shrink-0"
             data-testid="new-interview-open"
             onClick={() => setOpen(true)}
           >
