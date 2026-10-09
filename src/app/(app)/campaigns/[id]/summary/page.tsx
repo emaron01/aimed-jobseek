@@ -417,6 +417,15 @@ export async function InterviewPrepGuides({
         ) : null}
       </div>
 
+      <CheatSheetSection
+        id="at-a-glance"
+        title={applicationSummaryConfig.sections.overview}
+        primary
+        testId="prep-guide-at-a-glance"
+      >
+        <AtAGlanceBody overview={guidance?.overview} />
+      </CheatSheetSection>
+
       <HarperDraftProvider>
       {[
         {

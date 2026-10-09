@@ -47,9 +47,11 @@ describe("Interview Preparation Guides layout", () => {
   it("puts the guide sections and primary cards in order and drops Interview stages", () => {
     const page = readFileSync("src/app/(app)/campaigns/[id]/summary/page.tsx", "utf8");
     const body = readFileSync("src/components/CheatSheetPersonBody.tsx", "utf8");
+    const render = page.slice(page.indexOf("</style>"));
     const cards = [
-      '"prep-guide-personas"',
-      '"prep-guide-by-title"',
+      'testId="prep-guide-at-a-glance"',
+      'testId: "prep-guide-personas"',
+      'testId: "prep-guide-by-title"',
       'testId="prep-guide-general-questions"',
       'testId="prep-guide-consolidated-notes"',
       'testId="prep-guide-position"',
@@ -57,7 +59,7 @@ describe("Interview Preparation Guides layout", () => {
     ];
     let last = -1;
     for (const id of cards) {
-      const at = page.indexOf(id);
+      const at = render.indexOf(id);
       expect(at, id).toBeGreaterThan(last);
       last = at;
     }
