@@ -379,7 +379,13 @@ describe("dashboard steps open in place", () => {
     expect(page).toContain("person={query.person ?? null}");
     expect(panels).toContain("<InterviewPrepGuides");
     expect(panels).toContain("showPageHeader={false}");
+    const render = page.slice(page.indexOf("</style>"));
+    const glance = render.indexOf('testId="prep-guide-at-a-glance"');
+    const personas = render.indexOf('testId: "prep-guide-personas"');
+    expect(glance).toBeGreaterThan(-1);
+    expect(glance).toBeLessThan(personas);
     for (const id of [
+      'testId="prep-guide-at-a-glance"',
       '"prep-guide-personas"',
       '"prep-guide-by-title"',
       'testId="prep-guide-general-questions"',
