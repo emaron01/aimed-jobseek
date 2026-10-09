@@ -181,7 +181,7 @@ const STEP_PAGES = [
   ["company", "Company Research", `${DASHBOARD}/company`],
   ["consultation", "Harper Questionnaire", `${DASHBOARD}/consultation`],
   ["assets", "Resume and cover letter", `${DASHBOARD}/assets`],
-  ["hiring-team", "Personas and Interviewers", `${DASHBOARD}/hiring-team`],
+  ["hiring-team", "Interviewer Profiles", `${DASHBOARD}/hiring-team`],
   ["outreach", "Send Outreach", `${DASHBOARD}/outreach`],
   ["interviews", "Interview Notes", `${DASHBOARD}/interviews`],
   ["summary", "Interview Preparation Guides", `${DASHBOARD}/summary`],

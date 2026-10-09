@@ -11,6 +11,7 @@ export const DASHBOARD_IN_PLACE_STEP_KEYS = [
   "assets",
   "hiring-team",
   "outreach",
+  "interviews",
 ] as const;
 
 export type DashboardInPlaceStepKey = (typeof DASHBOARD_IN_PLACE_STEP_KEYS)[number];

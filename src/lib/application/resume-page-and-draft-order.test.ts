@@ -90,12 +90,9 @@ describe("Resume page live update, draft order, and cover letter writing", () =>
     const workspace = src("src/components/ApplicationWorkspace.tsx");
     const assetsFocus = src("src/components/ApplicationAssetsBody.tsx");
     const outreachFocus = src("src/components/ApplicationOutreachBody.tsx");
-    expect(workspace).toContain('showFocus(focus, ["assets"])');
-    expect(workspace).toContain('showFocus(focus, ["outreach"])');
-    const hiringFocus = workspace.slice(
-      workspace.indexOf('showFocus(focus, ["hiring-team"])'),
-      workspace.indexOf('showFocus(focus, ["assets"])'),
-    );
+    expect(workspace).toContain('if (focus === "assets")');
+    expect(workspace).toContain('if (focus === "outreach")');
+    expect(workspace).toContain('if (focus === "hiring-team")');
     const consultation = src("src/components/ConsultationSection.tsx");
     const summary = src("src/app/(app)/campaigns/[id]/summary/page.tsx");
 
@@ -111,7 +108,6 @@ describe("Resume page live update, draft order, and cover letter writing", () =>
     expect(assetsFocus).toContain('type="RESUME"');
     expect(assetsFocus).toContain('type="COVER_LETTER"');
     expect(outreachFocus).not.toContain("WorkspaceJobRefresh");
-    expect(hiringFocus).not.toContain("WorkspaceJobRefresh");
     expect(consultation).not.toContain("WorkspaceJobRefresh");
     expect(summary).not.toContain("WorkspaceJobRefresh");
     expect(workspace).not.toContain("WorkspaceJobRefresh");

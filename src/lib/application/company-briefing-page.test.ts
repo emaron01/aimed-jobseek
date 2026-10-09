@@ -34,7 +34,7 @@ describe("application Company page briefing", () => {
   it("uses the briefing layout with sources and citations", () => {
     const { workspace, company, briefing } = sourceFiles();
     expect(company).toContain("ApplicationCompanyBriefing");
-    expect(workspace).toContain('showFocus(focus, ["company"])');
+    expect(workspace).toContain('if (focus === "company")');
     expect(briefing).toContain('data-testid="application-company-briefing"');
     expect(briefing).toContain("company-source-lead");
     expect(briefing).toContain("ResearchSourcesAppendix");

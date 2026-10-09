@@ -224,7 +224,7 @@ export const JOB_BOARD_HOSTS = Object.freeze([
 export const applicationWorkspaceCopy = Object.freeze({
   nextStepTitle: "Let's walk through this application",
   jobRequirementTitle: "Job requirements",
-  hiringTeamTitle: "Personas and Interviewers",
+  hiringTeamTitle: "Interviewer Profiles",
   appliedTitle: "Application Status",
   contactsTitle: "Add and review interview contacts",
   companyTitle: "Company",

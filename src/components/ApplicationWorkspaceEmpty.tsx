@@ -7,7 +7,7 @@ import {
   type ApplicationStepKey,
 } from "@/lib/product-config";
 
-export type ApplicationWorkspaceFocus = ApplicationStepKey | "overview" | "all";
+export type ApplicationWorkspaceFocus = ApplicationStepKey | "overview";
 
 export function ApplicationWorkspaceEmpty({
   focus,
@@ -15,7 +15,7 @@ export function ApplicationWorkspaceEmpty({
   focus: ApplicationWorkspaceFocus;
 }) {
   const step =
-    focus === "all" || focus === "overview" ? null : applicationStepByKey(focus);
+    focus === "overview" ? null : applicationStepByKey(focus);
   return (
     <EmptyState
       title={step?.title ?? applicationStepCopy.dashboardTitle}

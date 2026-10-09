@@ -230,7 +230,7 @@ describe("Interview prep guide", () => {
     ).rejects.toThrow(/no narrative/);
 
     const page = readFileSync("src/app/(app)/campaigns/[id]/summary/page.tsx", "utf8");
-    const notes = readFileSync("src/components/ApplicationWorkspace.tsx", "utf8");
+    const notes = readFileSync("src/components/ApplicationInterviewsBody.tsx", "utf8");
     expect(page.match(/could not be generated/g)).toHaveLength(1);
     expect(page).toContain("hideFailure");
     expect(page).toContain("suppressJobFailure");

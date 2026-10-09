@@ -237,7 +237,7 @@ describe("dashboard step wording", () => {
       applicationStepCopy.consultationInProgress,
     );
     expect(card(html, "assets")).toContain(applicationStepCopy.assetsDone);
-    expect(card(html, "hiring-team")).toContain("Personas and Interviewers");
+    expect(card(html, "hiring-team")).toContain("Interviewer Profiles");
     expect(card(html, "hiring-team")).toContain(applicationStepCopy.done);
     expect(card(html, "hiring-team")).not.toContain(applicationStepCopy.yourTurn);
     expect(card(html, "hiring-team")).not.toContain(applicationStepCopy.onePersonaIsNotBuilt);

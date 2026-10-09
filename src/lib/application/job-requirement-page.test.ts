@@ -63,7 +63,7 @@ describe("job requirements page", () => {
   });
 
   it("does not render the Scorecard section or note on the Job Requirements page", () => {
-    expect(shell).toContain('showFocus(focus, ["job"])');
+    expect(shell).toContain('if (focus === "job")');
     for (const source of [shell, workspace]) {
       expect(source).not.toContain("criterionFlags.inference");
       expect(source).not.toContain("polishCopy.inferredLabel");

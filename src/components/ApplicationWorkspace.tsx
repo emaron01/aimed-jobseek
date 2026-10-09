@@ -3,12 +3,9 @@ import {
   ApplicationWorkspaceLive,
   WorkspaceProgress,
 } from "@/components/ApplicationWorkspaceLive";
-import { CheatSheetGenerationError } from "@/components/CheatSheetGenerationError";
-import { latestApplicationSummaryFailure } from "@/lib/application-summary/failure-message";
 import {
   WORKSPACE_CARD_WRAP_CLASS,
   WORKSPACE_MESSAGE_WRAP_CLASS,
-  workspaceCampaignSummaryHref,
   workspaceContactEditHref,
 } from "@/lib/application/workspace-links";
 import { listApplicationContacts } from "@/lib/application/contacts";
@@ -22,7 +19,7 @@ import {
   updateApplicationRoleAction,
 } from "@/app/actions/hiring-team";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
-import { InterviewStagesSection } from "@/components/InterviewStagesSection";
+import { ApplicationInterviewsBody } from "@/components/ApplicationInterviewsBody";
 import { OpenDetailsOnMount } from "@/components/OpenDetailsOnMount";
 import { HiringTeamDisclosureGroup } from "@/components/HiringTeamDisclosureGroup";
 import { AddPersonaSection } from "@/components/AddPersonaSection";
@@ -35,7 +32,7 @@ import {
   HiringTeamRecommendedMark,
 } from "@/components/HiringTeamCheatSheetControls";
 import { prisma } from "@/lib/prisma";
-import { applicationSummaryConfig, consultationConversationCopy, hiringTeamConfig, hiringTeamDetailsTitle, outreachConfig, vocab } from "@/lib/product-config";
+import { consultationConversationCopy, hiringTeamConfig, hiringTeamDetailsTitle, outreachConfig, vocab } from "@/lib/product-config";
 import { AppActionLink } from "@/components/ui";
 import { parseStringArray } from "@/lib/research";
 import { contactDisplayName } from "@/lib/utils";
@@ -43,11 +40,8 @@ import {
   ApplicationWorkspaceEmpty,
   type ApplicationWorkspaceFocus,
 } from "@/components/ApplicationWorkspaceEmpty";
-import {
-  ApplicationCompanyBody,
-  ApplicationCompanyDetails,
-} from "@/components/ApplicationCompanyBody";
-import { ApplicationJobBody, ApplicationJobDetails } from "@/components/ApplicationJobBody";
+import { ApplicationCompanyBody } from "@/components/ApplicationCompanyBody";
+import { ApplicationJobBody } from "@/components/ApplicationJobBody";
 import { ApplicationAssetsBody } from "@/components/ApplicationAssetsBody";
 import { ApplicationOutreachBody } from "@/components/ApplicationOutreachBody";
 import { loadApplicationWorkspaceModel } from "@/components/application-workspace-model";
@@ -58,18 +52,11 @@ function textList(value: unknown): string[] {
   return parseStringArray(value);
 }
 
-function showFocus(
-  focus: ApplicationWorkspaceFocus,
-  keys: ApplicationWorkspaceFocus[],
-): boolean {
-  return focus === "all" || keys.includes(focus);
-}
-
 export async function ApplicationWorkspace({
   campaignId,
   organizationId,
   canEdit,
-  focus = "all",
+  focus = "overview",
 }: {
   campaignId: string;
   organizationId: string;
@@ -122,25 +109,32 @@ export async function ApplicationWorkspace({
       />
     );
   }
+  if (focus === "interviews") {
+    return (
+      <ApplicationInterviewsBody
+        campaignId={campaignId}
+        organizationId={organizationId}
+        canEdit={canEdit}
+      />
+    );
+  }
   const loaded = await loadApplicationWorkspaceModel(
     organizationId,
     campaignId,
     canEdit,
-    focus === "all",
-    focus === "all",
+    false,
+    false,
   );
   if (!loaded.requirement) {
     return <ApplicationWorkspaceEmpty focus={focus} />;
   }
-  const requirement = loaded.requirement;
   const nextStep = loaded.nextStep;
   const live = loaded.live;
   const profileHref = loaded.profileHref;
-  const asPage = focus !== "all";
+  if (focus !== "overview") return null;
 
   return (
     <div className={`space-y-4 ${WORKSPACE_CARD_WRAP_CLASS}`}>
-    {showFocus(focus, ["overview"]) ? (
     <section
       className={`space-y-3 rounded-lg border border-edge bg-surface p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
       data-testid="application-next-step"
@@ -173,83 +167,6 @@ export async function ApplicationWorkspace({
         <p className={`text-sm text-ink ${WORKSPACE_MESSAGE_WRAP_CLASS}`}>{nextStep.text}</p>
       )}
     </section>
-    ) : null}
-    {showFocus(focus, ["company"]) ? (
-    <ApplicationCompanyDetails model={loaded} canEdit={canEdit} asPage={asPage} />
-    ) : null}
-    {showFocus(focus, ["job"]) ? (
-    <ApplicationJobDetails model={loaded} canEdit={canEdit} asPage={asPage} />
-    ) : null}
-    {showFocus(focus, ["hiring-team"]) ? (
-    <HiringTeamSection
-      campaignId={requirement.campaignId}
-      organizationId={organizationId}
-      canEdit={canEdit}
-      jobs={live.jobs}
-      asPage={asPage}
-    />
-    ) : null}
-    {showFocus(focus, ["assets"]) ? (
-    <ApplicationAssetsBody
-      campaignId={campaignId}
-      organizationId={organizationId}
-      canEdit={canEdit}
-    />
-    ) : null}
-    {showFocus(focus, ["outreach"]) ? (
-    <ApplicationOutreachBody
-      campaignId={campaignId}
-      organizationId={organizationId}
-      canEdit={canEdit}
-    />
-    ) : null}
-    {showFocus(focus, ["interviews"]) ? (
-    <div id="interviews">
-    <WorkspaceProgress jobs={live.jobs} type="APPLICATION_SUMMARY" hideFailure />
-    {(() => {
-      const guideFailure = latestApplicationSummaryFailure({
-        jobs: live.jobs,
-        fallback: `${applicationSummaryConfig.title} could not be generated. Retry.`,
-      });
-      const pageFailure = guideFailure?.sectionKey ? null : guideFailure;
-      return (
-        <>
-          <CheatSheetGenerationError message={pageFailure?.message ?? null} />
-          <InterviewStagesSection
-            campaignId={requirement.campaignId}
-            organizationId={organizationId}
-            canEdit={canEdit}
-            roles={requirement.campaign.hiringTeamRoles}
-            contacts={requirement.campaign.contacts.map((row) => ({
-              contactId: row.contact.id,
-              personaId: row.chosenPersonaId,
-            }))}
-            guideFailure={guideFailure}
-          />
-        </>
-      );
-    })()}
-    </div>
-    ) : null}
-    {showFocus(focus, ["summary"]) ? (
-    <details
-      className="rounded-lg border border-edge bg-surface p-5"
-      data-testid="application-summary-wrap"
-      id="application-summary"
-    >
-      {asPage ? <OpenDetailsOnMount /> : null}
-      <summary className="cursor-pointer text-base font-semibold text-ink">
-        {applicationSummaryConfig.title}
-      </summary>
-      <div className="mt-4 space-y-3">
-        <WorkspaceProgress jobs={live.jobs} type="APPLICATION_SUMMARY" />
-        <p className="text-sm text-muted">{applicationSummaryConfig.description}</p>
-        <AppActionLink href={workspaceCampaignSummaryHref(campaignId)} variant="secondary">
-          {applicationSummaryConfig.title}
-        </AppActionLink>
-      </div>
-    </details>
-    ) : null}
     </div>
   );
 }

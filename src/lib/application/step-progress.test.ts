@@ -80,7 +80,7 @@ describe("application step routes", () => {
       "Application Status",
     );
     expect(applicationStepList.find((step) => step.key === "hiring-team")?.title).toBe(
-      "Personas and Interviewers",
+      "Interviewer Profiles",
     );
     expect(applicationStepList.find((step) => step.key === "outreach")?.title).toBe(
       "Send Outreach",

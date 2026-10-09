@@ -97,7 +97,7 @@ describe("vocabulary", () => {
     expect(applicationWorkspaceCopy.jobRequirementTitle).toBe(
       "Job requirements",
     );
-    expect(hiringTeamConfig.workspaceTitle).toBe("Personas and Interviewers");
+    expect(hiringTeamConfig.workspaceTitle).toBe("Interviewer Profiles");
     expect(outreachConfig.labels.appliedTitle).toBe("Application Status");
     expect(outreachConfig.labels.contactsTitle).toBe(
       "Add and review interview contacts",

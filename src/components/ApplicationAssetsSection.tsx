@@ -807,7 +807,7 @@ export function ApplicationAssetsSection({
   });
   return (
     <details
-      open={defaultOpen}
+      {...(defaultOpen ? { open: true } : {})}
       className={`space-y-4 rounded-lg border border-edge bg-surface p-5 ${WORKSPACE_CARD_WRAP_CLASS}`}
       data-testid="application-assets"
     >

@@ -1,8 +1,10 @@
+// @vitest-environment happy-dom
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ApplicationStepCards } from "@/components/ApplicationStepCards";
+import { expandOuterDetails } from "@/components/DashboardOpenSection";
 import {
   closeDashboardOpenStep,
   dashboardOpenSearch,
@@ -136,6 +138,8 @@ describe("dashboard steps open in place", () => {
       "src/components/ApplicationCompanyBody.tsx",
       "src/components/ApplicationAssetsBody.tsx",
       "src/components/ApplicationOutreachBody.tsx",
+      "src/components/ApplicationInterviewsBody.tsx",
+      "src/components/DashboardOpenSection.tsx",
       "src/components/application-workspace-model.ts",
       "src/lib/application/dashboard-open-steps.ts",
     ]) {
@@ -235,7 +239,7 @@ describe("dashboard steps open in place", () => {
     const expanded = [
       ...steps.slice(0, 3),
       step({ key: "assets", title: "Resume and cover letter", number: 4 }),
-      step({ key: "hiring-team", title: "Personas and Interviewers", number: 5 }),
+      step({ key: "hiring-team", title: "Interviewer Profiles", number: 5 }),
       step({ key: "outreach", title: "Send Outreach", number: 6 }),
       steps[3]!,
     ];
@@ -270,5 +274,80 @@ describe("dashboard steps open in place", () => {
     expect(panels).toContain("asPage={false}");
     expect(panels).toContain('keys.includes("outreach")');
     expect(panels).not.toContain("enqueueApplicationJob");
+  });
+
+  it("opens Interview Notes under its row and closes it in the query string", () => {
+    const notesSteps = [
+      ...steps,
+      step({ key: "interviews", title: "Interview Notes", number: 8 }),
+    ];
+    const html = renderToStaticMarkup(
+      createElement(ApplicationStepCards, {
+        steps: notesSteps,
+        campaignId: "camp_1",
+        openSteps: ["interviews"],
+        panels: {
+          interviews: createElement("p", { "data-testid": "shared-interviews" }, "Notes"),
+        },
+      }),
+    );
+    const index = notesSteps.findIndex((item) => item.key === "interviews");
+    expect(html).toContain('data-testid="shared-interviews"');
+    expect(html).toContain('data-testid="overview-step-full-page-interviews"');
+    expect(html).toContain('href="/campaigns/camp_1/interviews"');
+    expect(html.split('data-testid="overview-step-close-interviews"').length - 1).toBe(2);
+    expect(html).toContain("data-expand-outer-section");
+    expect(panelStyle(html, "interviews")).toContain(
+      `--step-order:${dashboardStepPanelOrder(index, 1)}`,
+    );
+    const closed = closeDashboardOpenStep(["interviews", "job"], "interviews");
+    expect(closed).toEqual(["job"]);
+    expect(dashboardOpenSearch("?open=job,interviews", closed)).toBe("?open=job");
+    expect(readFileSync("src/components/DashboardInPlaceStepPanels.tsx", "utf8")).toContain(
+      'keys.includes("interviews")',
+    );
+    expect(readFileSync("src/components/ApplicationInterviewsBody.tsx", "utf8")).toContain(
+      "InterviewStagesSection",
+    );
+    expect(readFileSync("src/components/InterviewStagesSection.tsx", "utf8")).toContain(
+      "AddSomeoneYoureMeeting",
+    );
+  });
+
+  it("names the hiring-team step Interviewer Profiles and leaves Interview Personas", () => {
+    expect(readFileSync("src/lib/product-config/vocabulary.ts", "utf8")).toContain(
+      'hiringTeamTitle: "Interviewer Profiles"',
+    );
+    expect(readFileSync("src/lib/product-config/application-summary.ts", "utf8")).toContain(
+      'interviewPersonas: "Interview Personas"',
+    );
+    const interviewsPage = readFileSync(
+      "src/app/(app)/campaigns/[id]/interviews/page.tsx",
+      "utf8",
+    );
+    const hiringPage = readFileSync(
+      "src/app/(app)/campaigns/[id]/hiring-team/page.tsx",
+      "utf8",
+    );
+    expect(interviewsPage).toContain('focus="interviews"');
+    expect(hiringPage).toContain('focus="hiring-team"');
+    expect(readFileSync("src/components/ApplicationWorkspace.tsx", "utf8")).toContain(
+      "<ApplicationInterviewsBody",
+    );
+    expect(readFileSync("src/components/ApplicationWorkspace.tsx", "utf8")).not.toContain(
+      'focus === "all"',
+    );
+  });
+
+  it("expands an open panel's outer section and leaves inner profiles collapsed", () => {
+    const root = document.createElement("div");
+    root.innerHTML = [
+      '<details id="outer"><summary>Interviewer Profiles</summary>',
+      '<details id="profile"><summary>Profile</summary><p>Hidden</p></details>',
+      "</details>",
+    ].join("");
+    expandOuterDetails(root);
+    expect((root.querySelector("#outer") as HTMLDetailsElement).open).toBe(true);
+    expect((root.querySelector("#profile") as HTMLDetailsElement).open).toBe(false);
   });
 });

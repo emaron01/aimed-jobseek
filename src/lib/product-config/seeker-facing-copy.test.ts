@@ -81,7 +81,7 @@ describe("seeker-facing copy", () => {
     );
     expect(applicationWorkspaceCopy.jobRequirementTitle).toBe("Job requirements");
     expect(applicationWorkspaceCopy.hiringTeamTitle).toBe(
-      "Personas and Interviewers",
+      "Interviewer Profiles",
     );
     expect(applicationSummaryConfig.title).toBe("Interview Preparation Guides");
     expect(applicationAssetConfig.labels.sectionTitle).toBe("Resume and cover letter");

@@ -4,6 +4,7 @@ import { Fragment, useEffect, type CSSProperties, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { markApplicationStepViewedAction } from "@/app/actions/application-jobs";
 import { AppActionLink, AppButton, AppPendingIndicator } from "@/components/AppButton";
+import { DashboardOpenSection } from "@/components/DashboardOpenSection";
 import { StatusPill } from "@/components/design";
 import { useWorkspaceJobs } from "@/components/workspace-jobs-context";
 import {
@@ -387,7 +388,7 @@ export function ApplicationStepCards({
                       ) : null}
                       <DashboardStepClose stepKey={step.key} campaignId={campaignId} />
                     </div>
-                    {panels?.[step.key] ?? null}
+                    <DashboardOpenSection>{panels?.[step.key] ?? null}</DashboardOpenSection>
                     <DashboardStepClose stepKey={step.key} campaignId={campaignId} />
                   </div>
                 </li>

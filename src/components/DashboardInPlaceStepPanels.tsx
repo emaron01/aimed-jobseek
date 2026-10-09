@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { ApplicationAssetsBody } from "@/components/ApplicationAssetsBody";
 import { ApplicationCompanyBody } from "@/components/ApplicationCompanyBody";
 import { ApplicationHiringTeamBody } from "@/components/ApplicationWorkspace";
+import { ApplicationInterviewsBody } from "@/components/ApplicationInterviewsBody";
 import { ApplicationJobBody } from "@/components/ApplicationJobBody";
 import { ApplicationOutreachBody } from "@/components/ApplicationOutreachBody";
 import { ApplicationStatusBody } from "@/components/ApplicationStatusBody";
@@ -73,6 +74,15 @@ export async function loadDashboardInPlacePanels(input: {
   if (keys.includes("outreach")) {
     panels.outreach = (
       <ApplicationOutreachBody
+        campaignId={input.campaignId}
+        organizationId={input.organizationId}
+        canEdit={input.canEdit}
+      />
+    );
+  }
+  if (keys.includes("interviews")) {
+    panels.interviews = (
+      <ApplicationInterviewsBody
         campaignId={input.campaignId}
         organizationId={input.organizationId}
         canEdit={input.canEdit}
