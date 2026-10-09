@@ -2,7 +2,7 @@
 
 Branch: `fix/guide-questions-per-interviewer`
 Base: `origin/main` at `463847b` ("Make the new-interview button a compact light-orange dashboard action.")
-Commit: filled in after this file is committed. Not merged. Not deployed.
+Commit: `5994ea07ad0d7e401ae8cbd32e4b1cdffce4e551` — "Write each interviewer's likely questions for that person." Not merged. Not deployed. Not pushed. The branch still tracks `origin/main`; do not run a bare `git push`.
 
 Worktree: `C:\Repos\aimed-jobseek-guide-questions-fix`
 
