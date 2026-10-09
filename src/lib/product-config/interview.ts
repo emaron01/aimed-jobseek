@@ -49,7 +49,8 @@ export const interviewConfig = Object.freeze({
     openGuide: "Open stage",
     startByChoosing: "Start by choosing who you're meeting.",
     addSomeoneYoureMeeting: "Add someone you're meeting",
-    newInterview: "I have a new interview!",
+    newInterview:
+      "Did You Land A New Interview? Click Here For Harper To Prepare Your Study Guide!",
     newInterviewCongratulations: "Congratulations on making it to the next stage!",
     buildMyPrepGuide: "Build my prep guide",
     cancelNewInterview: "Cancel",
