@@ -35,7 +35,16 @@ function extractSystem() {
 ${CONSULTATION_EXTRACT_SYSTEM_INSTRUCTIONS}`;
 }
 
-function polishSystem(words = 150) {
+/** Guide regenerate rewrites the seeker's own answer. Harper polish does not use this. */
+export const GUIDE_ANSWER_TAILOR_INSTRUCTION =
+  "Rewrite the seeker's answer so it directly answers this question. Use only the story, facts, numbers, and names already in the seeker's answer. Do not add a new story, fact, or claim, and do not change any fact. Keep the seeker's voice and keep it concise, about 150 words.";
+
+function polishSystem(words = 150, instructions?: string) {
+  if (instructions) {
+    return `Prompt version: ${CONSULTATION_PROMPT_VERSION}
+
+${instructions}`;
+  }
   return `Prompt version: ${CONSULTATION_PROMPT_VERSION}
 
 ${CONSULTATION_POLISH_SYSTEM_INSTRUCTIONS}
@@ -295,6 +304,8 @@ export function buildConsultationPolishMessages(input: {
     roleId?: string | null;
   }>;
   spokenAnswerWords?: number;
+  /** Replaces the shared polish instruction for this call only. Harper omits it. */
+  systemInstructions?: string;
 }): AiMessage[] {
   const seekerReplies =
     input.seekerReplies?.map((reply) => reply.trim()).filter(Boolean) ??
@@ -303,7 +314,10 @@ export function buildConsultationPolishMessages(input: {
       .map((reply) => reply.trim())
       .filter(Boolean);
   return [
-    { role: "system", content: polishSystem(input.spokenAnswerWords) },
+    {
+      role: "system",
+      content: polishSystem(input.spokenAnswerWords, input.systemInstructions),
+    },
     {
       role: "user",
       content: JSON.stringify({

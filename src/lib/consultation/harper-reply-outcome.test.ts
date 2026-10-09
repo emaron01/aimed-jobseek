@@ -75,7 +75,7 @@ describe("Harper reply outcome, fact preservation, and approved-plus-draft", () 
     expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain(FACT_SENTENCE);
     expect(CONSULTATION_PROMPT_VERSION).toBe("39");
     expect(ROLE_EXPERTISE_PROMPT_VERSION).toBe("3");
-    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("19");
+    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("20");
   });
 
   it("ITEM 3: approved + newer draft → talkingPoint is APPROVED, pendingDraftTalkingPoint is DRAFT", () => {

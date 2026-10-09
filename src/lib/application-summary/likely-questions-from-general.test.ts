@@ -55,7 +55,7 @@ const NEW_QUESTION = "Tell me how you coach a sales manager through a missed qua
 const GENERAL_NOTE =
   "These are Harper's top picks. They represent the types of questions this interviewer may ask. Make sure you study General Study Questions.";
 const LIKELY_INSTRUCTION =
-  "Decide the questions this interviewer is most likely to ask, based on their role, their function, and what they care about. Write each question for this interviewer. Return up to 8, most likely first. Leave out any question outside this interviewer's function. For a recruiter or talent-acquisition interviewer, include the screen questions they would actually ask (why this company, why you are looking, motivation, compensation, timing, logistics, and high-level qualifying questions on the job's core requirements). For each question, if one of the seeker's approved answers fits it, set approvedAnswerId to that answer's id; an answer fits only when its story shows what this interviewer is asking about. Otherwise set approvedAnswerId to null so the seeker can answer it. Never write or rewrite an answer. Do not return a Harper question id, and do not copy a Harper question word for word.";
+  "Decide the questions this interviewer is most likely to ask, based on their role, their function, and what they care about. Write each question for this interviewer. Return up to 8, most likely first. Leave out any question outside this interviewer's function. For a recruiter or talent-acquisition interviewer, include the screen questions they would actually ask (why this company, why you are looking, motivation, compensation, timing, logistics, and high-level qualifying questions on the job's core requirements). For each question, if one of the seeker's approved answers fits it, set approvedAnswerId to that answer's id. An answer fits only when its story directly answers the question as written and shows the seeker working with this interviewer's function; a story that mentions their function only in passing does not fit. When a question names several functions, narrow it to this interviewer's function. Use each approved answer at most once, on the question it answers best. Otherwise set approvedAnswerId to null so the seeker can answer it. Never write or rewrite an answer. Do not return a Harper question id, and do not copy a Harper question word for word.";
 
 function statement(
   partial: Partial<QaStatement> & Pick<QaStatement, "id" | "kind" | "status" | "content">,
@@ -562,7 +562,7 @@ describe("likely questions from Harper's General questions", () => {
 
   it("keeps the approved instruction text, bumps the prompt version, and does not regenerate on a page view", () => {
     expect(APPLICATION_SUMMARY_GUIDANCE_SYSTEM_INSTRUCTIONS).toContain(LIKELY_INSTRUCTION);
-    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("19");
+    expect(APPLICATION_SUMMARY_PROMPT_VERSION).toBe("20");
     const person = {
       sectionKey: "contact:1",
       roleId: "role-1",
