@@ -41,6 +41,8 @@ const VARIANT_CLASS: Record<AppButtonVariant, string> = {
 const BUTTON_SIZE_CLASS = {
   md: "px-3.5 py-2 text-sm",
   sm: "px-2.5 py-1 text-xs",
+  /** Three times the small dashboard button: padding and type. */
+  cta: "px-7.5 py-3 text-4xl leading-[3rem]",
 } as const;
 
 export type AppButtonSize = keyof typeof BUTTON_SIZE_CLASS;
@@ -50,7 +52,7 @@ const BASE_CLASS =
 
 function buttonSizeClass(size: AppButtonSize): string {
   if (size === "md") return BASE_CLASS;
-  return BASE_CLASS.replace("px-3.5 py-2 text-sm", BUTTON_SIZE_CLASS.sm);
+  return BASE_CLASS.replace("px-3.5 py-2 text-sm", BUTTON_SIZE_CLASS[size]);
 }
 
 export const PRIMARY_BUTTON_CLASS = `${BASE_CLASS} ${VARIANT_CLASS.primary}`;

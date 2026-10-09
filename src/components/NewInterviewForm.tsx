@@ -113,15 +113,18 @@ export function NewInterviewForm({
   return (
     <div data-testid="new-interview">
       {open ? null : (
-        <AppButton
-          type="button"
-          variant="lightOrange"
-          size="sm"
-          data-testid="new-interview-open"
-          onClick={() => setOpen(true)}
-        >
-          {interviewConfig.labels.newInterview}
-        </AppButton>
+        <div className="flex justify-center">
+          <AppButton
+            type="button"
+            variant="lightOrange"
+            size="cta"
+            className="max-w-3xl whitespace-normal text-center"
+            data-testid="new-interview-open"
+            onClick={() => setOpen(true)}
+          >
+            {interviewConfig.labels.newInterview}
+          </AppButton>
+        </div>
       )}
       {open ? (
         <div

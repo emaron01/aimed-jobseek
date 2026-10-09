@@ -423,7 +423,9 @@ describe("new interview form", () => {
   it("keeps typed title, name, date, and format across a refresh and offers the role dropdown when nothing matches", () => {
     const view = mount(createElement(RefreshHarness));
     root = view.root;
-    expect(view.host.textContent).toContain("I have a new interview!");
+    expect(view.host.textContent).toContain(
+      "Did You Land A New Interview? Click Here For Harper To Prepare Your Study Guide!",
+    );
     act(() => {
       (
         view.host.querySelector("[data-testid='new-interview-open']") as HTMLButtonElement
