@@ -88,14 +88,10 @@ describe("Resume page live update, draft order, and cover letter writing", () =>
     const chrome = src("src/components/ApplicationWorkspaceChrome.tsx");
     const live = src("src/components/ApplicationWorkspaceLive.tsx");
     const workspace = src("src/components/ApplicationWorkspace.tsx");
-    const assetsFocus = workspace.slice(
-      workspace.indexOf('showFocus(focus, ["assets"])'),
-      workspace.indexOf('showFocus(focus, ["outreach"])'),
-    );
-    const outreachFocus = workspace.slice(
-      workspace.indexOf('showFocus(focus, ["outreach"])'),
-      workspace.indexOf('showFocus(focus, ["interviews"])'),
-    );
+    const assetsFocus = src("src/components/ApplicationAssetsBody.tsx");
+    const outreachFocus = src("src/components/ApplicationOutreachBody.tsx");
+    expect(workspace).toContain('showFocus(focus, ["assets"])');
+    expect(workspace).toContain('showFocus(focus, ["outreach"])');
     const hiringFocus = workspace.slice(
       workspace.indexOf('showFocus(focus, ["hiring-team"])'),
       workspace.indexOf('showFocus(focus, ["assets"])'),

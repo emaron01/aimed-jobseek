@@ -1,12 +1,13 @@
 "use client";
 
-import { Fragment, useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useEffect, type CSSProperties, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { markApplicationStepViewedAction } from "@/app/actions/application-jobs";
 import { AppActionLink, AppButton, AppPendingIndicator } from "@/components/AppButton";
 import { StatusPill } from "@/components/design";
 import { useWorkspaceJobs } from "@/components/workspace-jobs-context";
 import {
+  closeDashboardOpenStep,
   dashboardOpenSearch,
   dashboardStepCardOrder,
   dashboardStepPanelOrder,
@@ -56,7 +57,41 @@ function panelOrderStyle(index: number): CSSProperties {
   } as CSSProperties;
 }
 
-export function DashboardStepAction({
+function useDashboardStepNavigation(campaignId: string) {
+  const router = useRouter();
+  const pathname = usePathname() || "";
+
+  function replaceSteps(next: readonly DashboardInPlaceStepKey[], stepKey: DashboardInPlaceStepKey) {
+    const hash =
+      stepKey === "applied" && window.location.hash === "#applied" ? "" : window.location.hash;
+    router.replace(
+      `${pathname}${dashboardOpenSearch(window.location.search, next)}${hash}`,
+      { scroll: false },
+    );
+  }
+
+  async function toggle(stepKey: DashboardInPlaceStepKey) {
+    const current = parseDashboardOpenSteps(
+      new URLSearchParams(window.location.search).get("open"),
+    );
+    const next = toggleDashboardOpenStep(current, stepKey);
+    if (next.includes(stepKey)) {
+      await markApplicationStepViewedAction(campaignId, stepKey);
+    }
+    replaceSteps(next, stepKey);
+  }
+
+  function close(stepKey: DashboardInPlaceStepKey) {
+    const current = parseDashboardOpenSteps(
+      new URLSearchParams(window.location.search).get("open"),
+    );
+    replaceSteps(closeDashboardOpenStep(current, stepKey), stepKey);
+  }
+
+  return { toggle, close };
+}
+
+function DashboardStepLink({
   step,
   testId,
 }: {
@@ -75,6 +110,62 @@ export function DashboardStepAction({
     >
       {step.actionLabel}
     </AppActionLink>
+  );
+}
+
+export function DashboardStepAction({
+  step,
+  testId,
+  campaignId,
+}: {
+  step: ApplicationStepView;
+  testId: string;
+  campaignId?: string;
+}) {
+  if (campaignId && isDashboardInPlaceStep(step.key)) {
+    return (
+      <DashboardInPlaceAction
+        step={step}
+        stepKey={step.key}
+        campaignId={campaignId}
+        testId={testId}
+      />
+    );
+  }
+  return <DashboardStepLink step={step} testId={testId} />;
+}
+
+function DashboardInPlaceAction({
+  step,
+  stepKey,
+  campaignId,
+  testId,
+  open,
+}: {
+  step: ApplicationStepView;
+  stepKey: DashboardInPlaceStepKey;
+  campaignId: string;
+  testId: string;
+  open?: boolean;
+}) {
+  const jobs = useWorkspaceJobs();
+  const { toggle } = useDashboardStepNavigation(campaignId);
+  const kind = turnKind(step, dashboardStepShowsSpinner(step, jobs));
+  return (
+    <AppButton
+      type="button"
+      variant={stepActionVariant(kind)}
+      size="sm"
+      className="shrink-0"
+      aria-expanded={open === undefined ? undefined : open}
+      data-testid={testId}
+      onClick={(event) => {
+        event.stopPropagation();
+        void toggle(stepKey);
+      }}
+    >
+      {step.actionLabel}
+    </AppButton>
   );
 }
 
@@ -150,51 +241,44 @@ function DashboardInPlaceStep({
   open: boolean;
 }) {
   const jobs = useWorkspaceJobs();
-  const router = useRouter();
-  const pathname = usePathname() || "";
+  const { toggle } = useDashboardStepNavigation(campaignId);
   const kind = turnKind(step, dashboardStepShowsSpinner(step, jobs));
-
-  async function toggle() {
-    const current = parseDashboardOpenSteps(
-      new URLSearchParams(window.location.search).get("open"),
-    );
-    const next = toggleDashboardOpenStep(current, stepKey);
-    const opening = next.includes(stepKey);
-    if (opening) {
-      await markApplicationStepViewedAction(campaignId, stepKey);
-    }
-    const hash =
-      !opening && stepKey === "applied" && window.location.hash === "#applied"
-        ? ""
-        : window.location.hash;
-    router.replace(
-      `${pathname}${dashboardOpenSearch(window.location.search, next)}${hash}`,
-      { scroll: false },
-    );
-  }
-
   return (
     <StepCardFace
       step={step}
       kind={kind}
-      onActivate={() => void toggle()}
+      onActivate={() => void toggle(stepKey)}
       action={
-        <AppButton
-          type="button"
-          variant={stepActionVariant(kind)}
-          size="sm"
-          className="shrink-0"
-          aria-expanded={open}
-          data-testid={`overview-step-action-${step.key}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            void toggle();
-          }}
-        >
-          {step.actionLabel}
-        </AppButton>
+        <DashboardInPlaceAction
+          step={step}
+          stepKey={stepKey}
+          campaignId={campaignId}
+          testId={`overview-step-action-${step.key}`}
+          open={open}
+        />
       }
     />
+  );
+}
+
+function DashboardStepClose({
+  stepKey,
+  campaignId,
+}: {
+  stepKey: DashboardInPlaceStepKey;
+  campaignId: string;
+}) {
+  const { close } = useDashboardStepNavigation(campaignId);
+  return (
+    <AppButton
+      type="button"
+      variant="secondary"
+      size="sm"
+      data-testid={`overview-step-close-${stepKey}`}
+      onClick={() => close(stepKey)}
+    >
+      {applicationStepCopy.closeStep}
+    </AppButton>
   );
 }
 
@@ -207,26 +291,32 @@ function OpenAppliedFromHash({
 }) {
   const router = useRouter();
   const pathname = usePathname() || "";
-  const ran = useRef(false);
+  const openStepsKey = openSteps.join(",");
   useEffect(() => {
-    if (ran.current) return;
-    if (window.location.hash !== "#applied") return;
-    if (openSteps.includes("applied")) return;
-    ran.current = true;
-    void (async () => {
-      await markApplicationStepViewedAction(campaignId, "applied");
+    function openFromHash() {
+      if (window.location.hash !== "#applied") return;
       const current = parseDashboardOpenSteps(
         new URLSearchParams(window.location.search).get("open"),
       );
-      const next = current.includes("applied")
-        ? current
-        : toggleDashboardOpenStep(current, "applied");
-      router.replace(
-        `${pathname}${dashboardOpenSearch(window.location.search, next)}#applied`,
-        { scroll: false },
-      );
-    })();
-  }, [campaignId, openSteps, pathname, router]);
+      if (current.includes("applied")) return;
+      void (async () => {
+        await markApplicationStepViewedAction(campaignId, "applied");
+        const latest = parseDashboardOpenSteps(
+          new URLSearchParams(window.location.search).get("open"),
+        );
+        const next = latest.includes("applied")
+          ? latest
+          : toggleDashboardOpenStep(latest, "applied");
+        router.replace(
+          `${pathname}${dashboardOpenSearch(window.location.search, next)}`,
+          { scroll: false },
+        );
+      })();
+    }
+    openFromHash();
+    window.addEventListener("hashchange", openFromHash);
+    return () => window.removeEventListener("hashchange", openFromHash);
+  }, [campaignId, openStepsKey, pathname, router]);
   return null;
 }
 
@@ -284,15 +374,21 @@ export function ApplicationStepCards({
                   data-testid={`overview-step-panel-${step.key}`}
                 >
                   <div className="space-y-3">
-                    <AppActionLink
-                      href={applicationStepHref(campaignId, step.key)}
-                      variant="secondary"
-                      size="sm"
-                      data-testid={`overview-step-full-page-${step.key}`}
-                    >
-                      {applicationStepCopy.openFullPage}
-                    </AppActionLink>
+                    <div className="flex flex-wrap gap-2">
+                      {step.isPage ? (
+                        <AppActionLink
+                          href={applicationStepHref(campaignId, step.key)}
+                          variant="secondary"
+                          size="sm"
+                          data-testid={`overview-step-full-page-${step.key}`}
+                        >
+                          {applicationStepCopy.openFullPage}
+                        </AppActionLink>
+                      ) : null}
+                      <DashboardStepClose stepKey={step.key} campaignId={campaignId} />
+                    </div>
                     {panels?.[step.key] ?? null}
+                    <DashboardStepClose stepKey={step.key} campaignId={campaignId} />
                   </div>
                 </li>
               ) : null}

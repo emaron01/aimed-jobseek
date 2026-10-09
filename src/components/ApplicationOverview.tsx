@@ -38,7 +38,7 @@ export function ApplicationOverview({
       >
         {applicationStepCopy.dashboardTitle}
       </h1>
-      <YourNextStep steps={view.steps} />
+      <YourNextStep steps={view.steps} campaignId={campaignId} />
       <AppCard>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -90,8 +90,10 @@ export function ApplicationOverview({
 
 function YourNextStep({
   steps,
+  campaignId,
 }: {
   steps: ApplicationOverviewView["steps"];
+  campaignId?: string;
 }) {
   const step = applicationProgressCurrent(steps);
   if (!step) return null;
@@ -103,7 +105,11 @@ function YourNextStep({
       <p className="min-w-0 flex-1 text-sm text-ink">
         {applicationStepCopy.yourNextStep}: {step.title}: {step.actionLabel}
       </p>
-      <DashboardStepAction step={step} testId="your-next-step-action" />
+      <DashboardStepAction
+        step={step}
+        testId="your-next-step-action"
+        campaignId={campaignId}
+      />
     </div>
   );
 }

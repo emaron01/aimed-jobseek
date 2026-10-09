@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ApplicationStepCards } from "@/components/ApplicationStepCards";
 import {
+  closeDashboardOpenStep,
   dashboardOpenSearch,
   dashboardStepCardOrder,
   dashboardStepPanelOrder,
@@ -40,7 +41,13 @@ function step(
 }
 
 const steps = [
-  step({ key: "applied", title: "Application Status", number: 1, actionHref: "/campaigns/camp_1#applied" }),
+  step({
+    key: "applied",
+    title: "Application Status",
+    number: 1,
+    actionHref: "/campaigns/camp_1?open=applied",
+    isPage: false,
+  }),
   step({ key: "job", title: "Job requirements", number: 2 }),
   step({ key: "company", title: "Company Research", number: 3 }),
   step({ key: "consultation", title: "Harper Questionnaire", number: 4 }),
@@ -105,6 +112,8 @@ describe("dashboard steps open in place", () => {
     );
     expect(html).toContain('data-testid="shared-applied"');
     expect(html).toContain('data-testid="shared-job"');
+    expect(html).not.toContain("overview-step-full-page-applied");
+    expect(html).toContain('data-testid="overview-step-full-page-job"');
     const closed = renderToStaticMarkup(
       createElement(ApplicationStepCards, {
         steps,
@@ -125,6 +134,8 @@ describe("dashboard steps open in place", () => {
       "src/components/ApplicationStatusBody.tsx",
       "src/components/ApplicationJobBody.tsx",
       "src/components/ApplicationCompanyBody.tsx",
+      "src/components/ApplicationAssetsBody.tsx",
+      "src/components/ApplicationOutreachBody.tsx",
       "src/components/application-workspace-model.ts",
       "src/lib/application/dashboard-open-steps.ts",
     ]) {
@@ -152,6 +163,9 @@ describe("dashboard steps open in place", () => {
     expect(companyPage).toContain('focus="company"');
     expect(workspace).toContain("<ApplicationJobBody");
     expect(workspace).toContain("<ApplicationCompanyBody");
+    expect(workspace).toContain("<ApplicationAssetsBody");
+    expect(workspace).toContain("<ApplicationOutreachBody");
+    expect(workspace).toContain("<ApplicationHiringTeamBody");
     expect(workspace).not.toContain("application-applied-wrap");
     expect(
       readFileSync("src/components/ApplicationJobBody.tsx", "utf8"),
@@ -162,5 +176,99 @@ describe("dashboard steps open in place", () => {
     expect(
       readFileSync("src/components/ApplicationStatusBody.tsx", "utf8"),
     ).toContain("ApplicationAppliedSection");
+    for (const [path, focus] of [
+      ["src/app/(app)/campaigns/[id]/assets/page.tsx", "assets"],
+      ["src/app/(app)/campaigns/[id]/hiring-team/page.tsx", "hiring-team"],
+      ["src/app/(app)/campaigns/[id]/outreach/page.tsx", "outreach"],
+    ] as const) {
+      expect(readFileSync(path, "utf8")).toContain(`focus="${focus}"`);
+    }
+    expect(readFileSync("src/components/ApplicationAssetsBody.tsx", "utf8")).toContain(
+      "ApplicationAssetsSection",
+    );
+    expect(readFileSync("src/components/ApplicationOutreachBody.tsx", "utf8")).toContain(
+      'data-testid="application-contacts-wrap"',
+    );
+    expect(workspace).toContain('data-testid="hiring-team"');
+  });
+
+  it("closes an open step in the query string without scrolling", () => {
+    const html = renderToStaticMarkup(
+      createElement(ApplicationStepCards, {
+        steps,
+        campaignId: "camp_1",
+        openSteps: ["job"],
+        panels: { job: createElement("p", null, "Job body") },
+      }),
+    );
+    expect(html.split('data-testid="overview-step-close-job"').length - 1).toBe(2);
+    const closed = closeDashboardOpenStep(["applied", "job"], "job");
+    expect(closed).toEqual(["applied"]);
+    expect(dashboardOpenSearch("?open=applied,job", closed)).toBe("?open=applied");
+    expect(closeDashboardOpenStep(closed, "job")).toEqual(["applied"]);
+    const cards = readFileSync("src/components/ApplicationStepCards.tsx", "utf8");
+    expect(cards).toContain("closeDashboardOpenStep");
+    expect(cards).toContain("{ scroll: false }");
+  });
+
+  it("opens Application Status in place with no full page link", () => {
+    const html = renderToStaticMarkup(
+      createElement(ApplicationStepCards, {
+        steps,
+        campaignId: "camp_1",
+        openSteps: ["applied"],
+        panels: {
+          applied: createElement("p", { "data-testid": "shared-applied" }, "Status"),
+        },
+      }),
+    );
+    expect(html).toContain('data-testid="shared-applied"');
+    expect(html).toContain('data-testid="overview-step-action-applied"');
+    expect(html).not.toContain("overview-step-full-page-applied");
+    expect(html).not.toContain('href="/campaigns/camp_1?open=applied"');
+    const panel = panelStyle(html, "applied");
+    expect(panel).toContain(`--step-order:${dashboardStepPanelOrder(0, 1)}`);
+    expect(panel).toContain(`--step-order-sm:${dashboardStepPanelOrder(0, 2)}`);
+  });
+
+  it("renders personas, resume, and outreach under their rows", () => {
+    const expanded = [
+      ...steps.slice(0, 3),
+      step({ key: "assets", title: "Resume and cover letter", number: 4 }),
+      step({ key: "hiring-team", title: "Personas and Interviewers", number: 5 }),
+      step({ key: "outreach", title: "Send Outreach", number: 6 }),
+      steps[3]!,
+    ];
+    const html = renderToStaticMarkup(
+      createElement(ApplicationStepCards, {
+        steps: expanded,
+        campaignId: "camp_1",
+        openSteps: ["assets", "hiring-team", "outreach"],
+        panels: {
+          assets: createElement("p", { "data-testid": "shared-assets" }, "Resume"),
+          "hiring-team": createElement("p", { "data-testid": "shared-hiring-team" }, "Personas"),
+          outreach: createElement("p", { "data-testid": "shared-outreach" }, "Outreach"),
+        },
+      }),
+    );
+    expect(html).toContain('data-testid="shared-assets"');
+    expect(html).toContain('data-testid="shared-hiring-team"');
+    expect(html).toContain('data-testid="shared-outreach"');
+    expect(panelStyle(html, "assets")).toContain(
+      `--step-order:${dashboardStepPanelOrder(3, 1)}`,
+    );
+    expect(panelStyle(html, "hiring-team")).toContain(
+      `--step-order-sm:${dashboardStepPanelOrder(4, 2)}`,
+    );
+    expect(panelStyle(html, "outreach")).toContain(
+      `--step-order:${dashboardStepPanelOrder(5, 1)}`,
+    );
+    expect(html).toContain('href="/campaigns/camp_1/consultation"');
+    const panels = readFileSync("src/components/DashboardInPlaceStepPanels.tsx", "utf8");
+    expect(panels).toContain('keys.includes("assets")');
+    expect(panels).toContain('keys.includes("hiring-team")');
+    expect(panels).toContain("asPage={false}");
+    expect(panels).toContain('keys.includes("outreach")');
+    expect(panels).not.toContain("enqueueApplicationJob");
   });
 });

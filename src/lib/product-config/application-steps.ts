@@ -134,6 +134,7 @@ export const applicationStepCopy = Object.freeze({
   yourNextStep: "Your next step",
   openStep: "Open {step}",
   openFullPage: "Open full page",
+  closeStep: "Close",
   markApplied: "Mark as applied",
   reviewJob: "Review job requirements",
   reviewCompany: "Review company research",
@@ -183,7 +184,7 @@ export function applicationStepHref(
   const id = campaignId.trim();
   if (!id) throw new Error("Application step link is missing an application.");
   const step = applicationStepByKey(key);
-  if (!step.hrefSegment) return `/campaigns/${id}#applied`;
+  if (!step.hrefSegment) return `/campaigns/${id}?open=applied`;
   return `/campaigns/${id}/${step.hrefSegment}`;
 }
 

@@ -350,6 +350,9 @@ export function ResumeStatementPicker({
     prepareResumeBulletCandidatesAction,
     initial,
   );
+  useEffect(() => {
+    if (state?.ok) router.refresh();
+  }, [state, router]);
   const prepareWasPending = useRef(false);
   useEffect(() => {
     if (preparing) {

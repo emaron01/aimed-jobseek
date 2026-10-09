@@ -4,7 +4,14 @@ import type { ApplicationStepKey } from "@/lib/product-config/application-steps"
  * Steps that expand under their card on the Application Dashboard.
  * Later batches add a key here and a panel in DashboardInPlaceStepPanels.
  */
-export const DASHBOARD_IN_PLACE_STEP_KEYS = ["applied", "job", "company"] as const;
+export const DASHBOARD_IN_PLACE_STEP_KEYS = [
+  "applied",
+  "job",
+  "company",
+  "assets",
+  "hiring-team",
+  "outreach",
+] as const;
 
 export type DashboardInPlaceStepKey = (typeof DASHBOARD_IN_PLACE_STEP_KEYS)[number];
 
@@ -25,6 +32,13 @@ export function parseDashboardOpenSteps(
       .filter(Boolean),
   );
   return DASHBOARD_IN_PLACE_STEP_KEYS.filter((key) => wanted.has(key));
+}
+
+export function closeDashboardOpenStep(
+  current: readonly DashboardInPlaceStepKey[],
+  key: DashboardInPlaceStepKey,
+): DashboardInPlaceStepKey[] {
+  return DASHBOARD_IN_PLACE_STEP_KEYS.filter((item) => current.includes(item) && item !== key);
 }
 
 export function toggleDashboardOpenStep(
