@@ -115,8 +115,8 @@ export function NewInterviewForm({
       {open ? null : (
         <AppButton
           type="button"
-          variant="success"
-          className="w-full px-4 py-4 text-lg"
+          variant="lightOrange"
+          size="sm"
           data-testid="new-interview-open"
           onClick={() => setOpen(true)}
         >

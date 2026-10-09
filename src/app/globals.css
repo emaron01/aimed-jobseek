@@ -19,6 +19,9 @@
   --color-warning-tint: #fef3c7;
   --color-bright-orange: #ff6a00;
   --color-on-bright-orange: #000000;
+  --color-light-orange: #fde7d3;
+  --color-on-light-orange: #9a3412;
+  --color-light-orange-hover: #f5d9c4;
   --color-active: #0f766e;
   --color-active-tint: #ccfbf1;
   --color-canvas: #f8fafc;
@@ -55,6 +58,9 @@
   --color-warning-tint: var(--color-warning-tint);
   --color-bright-orange: var(--color-bright-orange);
   --color-on-bright-orange: var(--color-on-bright-orange);
+  --color-light-orange: var(--color-light-orange);
+  --color-on-light-orange: var(--color-on-light-orange);
+  --color-light-orange-hover: var(--color-light-orange-hover);
   --color-active: var(--color-active);
   --color-active-tint: var(--color-active-tint);
   --color-canvas: var(--color-canvas);

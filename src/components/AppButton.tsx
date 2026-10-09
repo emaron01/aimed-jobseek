@@ -15,6 +15,7 @@ export type AppButtonVariant =
   | "danger"
   | "warning"
   | "orange"
+  | "lightOrange"
   | "success"
   | "chip";
 
@@ -29,6 +30,8 @@ const VARIANT_CLASS: Record<AppButtonVariant, string> = {
     "border border-warning bg-warning text-on-ink hover:bg-warning active:bg-warning focus-visible:outline-focus disabled:bg-edge-strong disabled:text-on-ink",
   orange:
     "border border-bright-orange bg-bright-orange text-on-bright-orange hover:bg-bright-orange active:bg-bright-orange focus-visible:outline-focus disabled:bg-edge-strong disabled:text-on-ink",
+  lightOrange:
+    "bg-light-orange text-on-light-orange hover:bg-light-orange-hover focus-visible:bg-light-orange-hover active:bg-light-orange-hover focus-visible:outline-focus disabled:bg-edge-strong disabled:text-on-ink",
   success:
     "cursor-pointer bg-success text-on-ink hover:bg-success-tint hover:text-success focus-visible:bg-success-tint focus-visible:text-success active:bg-success-tint active:text-success focus-visible:outline-focus disabled:bg-edge-strong disabled:text-on-ink",
   chip:
@@ -80,6 +83,7 @@ export function AppPendingIndicator({
 function AppButtonInner({
   children,
   variant = "primary",
+  size = "md",
   pending = false,
   pendingLabel,
   disabledReason,
@@ -92,6 +96,7 @@ function AppButtonInner({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: AppButtonVariant;
+  size?: AppButtonSize;
   pending?: boolean;
   pendingLabel?: string;
   disabledReason?: string;
@@ -110,7 +115,7 @@ function AppButtonInner({
       title={why}
       aria-busy={isPending || undefined}
       aria-disabled={isDisabled || undefined}
-      className={`${BASE_CLASS} ${VARIANT_CLASS[variant]} ${className}`.trim()}
+      className={`${buttonSizeClass(size)} ${VARIANT_CLASS[variant]} ${className}`.trim()}
     >
       {isPending ? (
         <AppPendingIndicator
@@ -127,6 +132,7 @@ function AppButtonInner({
 function SubmitAppButton(
   props: ButtonHTMLAttributes<HTMLButtonElement> & {
     variant?: AppButtonVariant;
+    size?: AppButtonSize;
     pending?: boolean;
     pendingLabel?: string;
     disabledReason?: string;
@@ -139,6 +145,7 @@ function SubmitAppButton(
 export function AppButton(
   props: ButtonHTMLAttributes<HTMLButtonElement> & {
     variant?: AppButtonVariant;
+    size?: AppButtonSize;
     pending?: boolean;
     pendingLabel?: string;
     disabledReason?: string;
