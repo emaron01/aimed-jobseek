@@ -3,6 +3,7 @@ import { ApplicationStepCards, DashboardStepAction } from "@/components/Applicat
 import { AppCard, SectionHeader, StatusPill } from "@/components/design";
 import {
   NewInterviewForm,
+  type NewInterviewContactOption,
   type NewInterviewRoleOption,
 } from "@/components/NewInterviewForm";
 import { applicationProgressCurrent } from "@/lib/application/step-progress";
@@ -21,12 +22,14 @@ export function ApplicationOverview({
   view,
   campaignId,
   roles,
+  contacts,
   openSteps,
   panels,
 }: {
   view: ApplicationOverviewView;
   campaignId?: string;
   roles?: NewInterviewRoleOption[];
+  contacts?: NewInterviewContactOption[];
   openSteps?: readonly DashboardInPlaceStepKey[];
   panels?: Partial<Record<DashboardInPlaceStepKey, ReactNode>>;
 }) {
@@ -73,7 +76,11 @@ export function ApplicationOverview({
         </dl>
       </AppCard>
       {campaignId ? (
-        <NewInterviewForm campaignId={campaignId} roles={roles ?? []} />
+        <NewInterviewForm
+          campaignId={campaignId}
+          roles={roles ?? []}
+          contacts={contacts ?? []}
+        />
       ) : null}
       <AppCard data-testid="application-overview-steps">
         <SectionHeader title={applicationStepCopy.trackerLabel} />

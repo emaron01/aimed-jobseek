@@ -25,7 +25,11 @@ import {
   interviewScheduleIsComplete,
   interviewStageTypeForRole,
 } from "@/lib/interview/new-interview";
-import { DEFAULT_INTERVIEW_STAGE_TYPE, prepGuideReadyMessage } from "@/lib/product-config";
+import {
+  DEFAULT_INTERVIEW_STAGE_TYPE,
+  interviewConfig,
+  prepGuideReadyMessage,
+} from "@/lib/product-config";
 
 const salesTitle = ENTERPRISE_SALES_DIRECTOR_POSTING.split("\n")[0]!;
 const nursingTitle = NURSE_MANAGER_POSTING.split("\n")[0]!;
@@ -61,6 +65,10 @@ const mocks = {
     void args;
     return { count: 1 };
   }),
+  findFirst: vi.fn(async (args?: unknown) => {
+    void args;
+    return null as unknown;
+  }),
   addContact: vi.fn(async (args?: unknown) => {
     void args;
     return {} as unknown;
@@ -91,6 +99,7 @@ vi.mock("@/lib/prisma-client", () => ({
       findMany: (args: unknown) => mocks.findMany(args),
     },
     campaignContact: {
+      findFirst: (args: unknown) => mocks.findFirst(args),
       updateMany: (args: unknown) => mocks.updateMany(args),
     },
   },
@@ -167,6 +176,8 @@ const base = {
 describe("new interview build", () => {
   beforeEach(() => {
     mocks.findMany.mockReset();
+    mocks.findFirst.mockReset();
+    mocks.findFirst.mockResolvedValue(null);
     mocks.updateMany.mockClear();
     mocks.addContact.mockReset();
     mocks.addRole.mockReset();
@@ -286,6 +297,90 @@ describe("new interview build", () => {
     expect(mocks.createStage).not.toHaveBeenCalled();
     expect(interviewScheduleIsComplete({ scheduledAt: "2026-10-08T15:00", format: "VIDEO" })).toBe(
       true,
+    );
+  });
+
+  it("picks an existing person without creating a contact", async () => {
+    mocks.findFirst.mockResolvedValue({
+      id: "membership-ada",
+      chosenPersonaId: "sales",
+      contact: { firstName: "Ada", lastName: "Lovelace", title: "Sales Recruiter" },
+      chosenPersona: { name: "Enterprise Sales Director" },
+    });
+    const scheduled = await buildNewInterviewPrep({
+      ...base,
+      title: "",
+      name: "",
+      contactId: "ada",
+      stageType: "HIRING_MANAGER",
+    });
+    expect(mocks.addContact).not.toHaveBeenCalled();
+    expect(mocks.createStage).toHaveBeenCalledTimes(1);
+    expect(mocks.createStage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "HIRING_MANAGER",
+        format: "VIDEO",
+        interviewerContactIds: ["ada"],
+      }),
+    );
+    expect(mocks.queueGuide).toHaveBeenCalledWith(
+      expect.objectContaining({ contactId: "ada", personaId: "sales" }),
+    );
+    expect(scheduled.contactId).toBe("ada");
+    expect(scheduled.stageId).toBe("stage-1");
+    expect(mocks.paid).not.toHaveBeenCalled();
+
+    mocks.createStage.mockClear();
+    mocks.addContact.mockClear();
+    const unscheduled = await buildNewInterviewPrep({
+      ...base,
+      title: "",
+      name: "",
+      contactId: "ada",
+      scheduledAt: "",
+      format: "",
+      stageType: "EXECUTIVE",
+    });
+    expect(mocks.addContact).not.toHaveBeenCalled();
+    expect(mocks.createStage).not.toHaveBeenCalled();
+    expect(mocks.queueGuide).toHaveBeenCalledWith(
+      expect.objectContaining({ contactId: "ada" }),
+    );
+    expect(unscheduled.stageId).toBeNull();
+  });
+
+  it("does not regenerate an unchanged guide", async () => {
+    mocks.findFirst.mockResolvedValue({
+      id: "membership-ada",
+      chosenPersonaId: "sales",
+      contact: { firstName: "Ada", lastName: "Lovelace", title: "Director" },
+      chosenPersona: { name: "Enterprise Sales Director" },
+    });
+    mocks.queueGuide.mockResolvedValue({
+      jobId: null,
+      unchanged: true,
+      needsPersonaChoice: false,
+    });
+    const result = await buildNewInterviewPrep({
+      ...base,
+      title: "",
+      name: "",
+      contactId: "ada",
+      scheduledAt: "",
+      format: "",
+    });
+    expect(result.jobId).toBeNull();
+    expect(mocks.addContact).not.toHaveBeenCalled();
+    expect(mocks.paid).not.toHaveBeenCalled();
+    const gate = readFileSync("src/lib/interview/prep-guide.ts", "utf8");
+    expect(gate).toContain("personSectionInputsUnchanged");
+    expect(gate).toContain("unchanged: true");
+    const notes = readFileSync("src/components/InterviewStagesSection.tsx", "utf8");
+    expect(notes).not.toContain("AddSomeoneYoureMeeting");
+    expect(notes).not.toContain("AddFollowUpInterview");
+    expect(notes).toContain("newInterviewDashboardLink");
+    expect(readFileSync("src/components/StageInterviewerSection.tsx", "utf8")).toContain(
+      'name="note"',
     );
   });
 
@@ -548,5 +643,59 @@ describe("new interview form", () => {
       });
     });
     expect(view.host.textContent).toContain("Your prep guide for Ada Lovelace is ready");
+  });
+
+  it("submits a picked person and the chosen type without a title", async () => {
+    action.mockResolvedValue({
+      ok: true,
+      message: prepGuideReadyMessage("Ada Lovelace"),
+      contactId: "ada",
+      sectionKey: "contact:ada",
+      displayName: "Ada Lovelace",
+      jobId: null,
+    });
+    const view = mount(
+      createElement(NewInterviewForm, {
+        campaignId: "camp",
+        roles,
+        contacts: [
+          {
+            contactId: "ada",
+            name: "Ada Lovelace",
+            title: "Sales Recruiter",
+            personaName: "Enterprise Sales Director",
+          },
+        ],
+      }),
+    );
+    root = view.root;
+    act(() => {
+      (
+        view.host.querySelector("[data-testid='new-interview-open']") as HTMLButtonElement
+      ).click();
+    });
+    expect(view.host.querySelector("[data-testid='new-interview-title']")).toBeNull();
+    expect(
+      (view.host.querySelector("[data-testid='new-interview-person']") as HTMLSelectElement).value,
+    ).toBe("ada");
+    expect(view.host.querySelector("[data-testid='new-interview-schedule-hint']")?.textContent).toBe(
+      interviewConfig.labels.scheduleLaterHint,
+    );
+    const type = view.host.querySelector("[data-testid='new-interview-type']") as HTMLSelectElement;
+    expect([...type.options].map((option) => option.textContent)).toEqual(
+      Object.values(interviewConfig.types),
+    );
+    expect(type.value).toBe("RECRUITER_SCREEN");
+    act(() => {
+      type.value = "PANEL_COMPETENCY";
+      type.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await act(async () => {
+      (view.host.querySelector("[data-testid='new-interview-build']") as HTMLButtonElement).click();
+    });
+    const formData = action.mock.calls[0]?.[1] as FormData;
+    expect(formData.get("contactId")).toBe("ada");
+    expect(formData.get("type")).toBe("PANEL_COMPETENCY");
+    expect(formData.get("title")).toBeNull();
   });
 });

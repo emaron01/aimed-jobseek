@@ -159,11 +159,12 @@ describe("Harper Batch B3 person view, search, Add Interview Contact, assign-onl
     expect(addFn).toContain("saveLinkedInPaste");
     expect(addFn).not.toContain("replaceStageInterviewer");
 
-    // Create starts from an existing contact; the per-stage assign control is gone.
-    const addSomeone = src("src/components/StageInterviewerSection.tsx");
-    expect(addSomeone).toContain("people.map");
-    expect(addSomeone).toContain('name="contactId"');
-    expect(stageList).toContain("AddSomeoneYoureMeeting");
+    // Notes no longer schedule a person. Harper still adds a contact on its own.
+    const notes = src("src/components/StageInterviewerSection.tsx");
+    expect(notes).not.toContain("AddSomeoneYoureMeeting");
+    expect(notes).toContain('name="note"');
+    expect(stageList).toContain("newInterviewDashboardLink");
+    expect(stageList).not.toContain("AddFollowUpInterview");
     expect(panel).not.toContain("assignExistingInterviewerAction");
   });
 

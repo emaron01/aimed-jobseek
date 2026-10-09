@@ -3,7 +3,10 @@ import type { Metadata } from "next";
 import { ApplicationOverview } from "@/components/ApplicationOverview";
 import { loadDashboardInPlacePanels } from "@/components/DashboardInPlaceStepPanels";
 import { parseDashboardOpenSteps } from "@/lib/application/dashboard-open-steps";
-import { listApplicationHiringTeamRoles } from "@/lib/application/contacts";
+import {
+  listApplicationContacts,
+  listApplicationHiringTeamRoles,
+} from "@/lib/application/contacts";
 import { ApplicationWorkspace } from "@/components/ApplicationWorkspace";
 import { generateApplicationPageMetadata } from "@/lib/application/page-metadata";
 import { getApplicationOverview } from "@/lib/application/overview";
@@ -498,6 +501,23 @@ export default async function CampaignDetailPage({
         view={overview}
         campaignId={campaign.id}
         roles={await listApplicationHiringTeamRoles(organization.id, campaign.id)}
+        contacts={(
+          await listApplicationContacts({
+            organizationId: organization.id,
+            campaignId: campaign.id,
+          })
+        ).map((row) => {
+          const name = [row.contact.firstName, row.contact.lastName]
+            .filter(Boolean)
+            .join(" ")
+            .trim();
+          return {
+            contactId: row.contactId,
+            name: name || row.contact.title?.trim() || row.contactId,
+            title: row.contact.title,
+            personaName: row.chosenPersona?.name ?? null,
+          };
+        })}
         openSteps={parseDashboardOpenSteps(query.open)}
         panels={await loadDashboardInPlacePanels({
           open: query.open,

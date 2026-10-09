@@ -7,10 +7,15 @@ import { addApplicationHiringTeamRole } from "@/lib/hiring-team/build";
 import { queueInterviewPrepGuide } from "@/lib/interview/prep-guide";
 import { createInterviewStage } from "@/lib/interview/stages";
 import { prisma } from "@/lib/prisma-client";
-import { interviewConfig, isInterviewFormat } from "@/lib/product-config";
+import {
+  interviewConfig,
+  interviewStageTypeForRole,
+  isInterviewFormat,
+  isInterviewStageType,
+} from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 
-export { CREATE_ROLE_FROM_TITLE };
+export { CREATE_ROLE_FROM_TITLE, interviewStageTypeForRole };
 
 const inflight = new Map<string, Promise<NewInterviewResult>>();
 
@@ -49,20 +54,22 @@ export function interviewScheduleIsComplete(input: {
   return Boolean(input.scheduledAt.trim() && input.format.trim());
 }
 
-const RECRUITER_OR_TALENT_ACQUISITION = /\b(?:recruiter|talent[- ]acquisition)\b/i;
-
-/**
- * Recruiter and talent-acquisition roles use the recruiter screen.
- * Every other role uses the general interviewer type, OTHER.
- */
-export function interviewStageTypeForRole(input: {
+export function chosenInterviewStageType(input: {
+  requested: string | null | undefined;
   roleName: string;
   title: string;
-}): "RECRUITER_SCREEN" | "OTHER" {
-  const haystack = `${input.roleName}\n${input.title}`;
-  return RECRUITER_OR_TALENT_ACQUISITION.test(haystack)
-    ? "RECRUITER_SCREEN"
-    : "OTHER";
+}): ReturnType<typeof interviewStageTypeForRole> | "HIRING_MANAGER" | "PANEL_COMPETENCY" | "EXECUTIVE" {
+  const requested = input.requested?.trim() ?? "";
+  if (!requested) {
+    return interviewStageTypeForRole({
+      roleName: input.roleName,
+      title: input.title,
+    });
+  }
+  if (!isInterviewStageType(requested)) {
+    throw new TenantError("Interview stage type is invalid.");
+  }
+  return requested;
 }
 
 export async function buildNewInterviewPrep(input: {
@@ -74,19 +81,24 @@ export async function buildNewInterviewPrep(input: {
   scheduledAt?: string | null;
   format?: string | null;
   personaId?: string | null;
+  contactId?: string | null;
+  stageType?: string | null;
 }): Promise<NewInterviewResult> {
   const title = input.title.trim();
   const name = input.name.trim();
-  if (!title) throw new TenantError("Title is required.");
+  const contactId = input.contactId?.trim() ?? "";
+  if (!contactId && !title) throw new TenantError("Title is required.");
   const key = [
     input.organizationId,
     input.campaignId,
     input.userId,
+    contactId,
     title.toLowerCase(),
     name.toLowerCase(),
     input.scheduledAt?.trim() ?? "",
     input.format?.trim() ?? "",
     input.personaId?.trim() ?? "",
+    input.stageType?.trim() ?? "",
   ].join("|");
   const pending = inflight.get(key);
   if (pending) return pending;
@@ -106,10 +118,21 @@ async function buildNewInterviewPrepOnce(input: {
   scheduledAt?: string | null;
   format?: string | null;
   personaId?: string | null;
+  contactId?: string | null;
+  stageType?: string | null;
 }): Promise<NewInterviewResult> {
-  const { firstName, lastName } = splitInterviewName(input.name);
   const scheduledAt = input.scheduledAt?.trim() ?? "";
   const format = input.format?.trim() ?? "";
+  const existingContactId = input.contactId?.trim() || null;
+  if (existingContactId) {
+    return buildInterviewForExistingPerson({
+      ...input,
+      contactId: existingContactId,
+      scheduledAt,
+      format,
+    });
+  }
+  const { firstName, lastName } = splitInterviewName(input.name);
   const roles = await prisma.persona.findMany({
     where: {
       organizationId: input.organizationId,
@@ -166,7 +189,11 @@ async function buildNewInterviewPrepOnce(input: {
       organizationId: input.organizationId,
       campaignId: input.campaignId,
       userId: input.userId,
-      type: interviewStageTypeForRole({ roleName, title: input.title }),
+      type: chosenInterviewStageType({
+        requested: input.stageType,
+        roleName,
+        title: input.title,
+      }),
       scheduledAt: when,
       format,
       interviewerContactIds: [added.contactId],
@@ -187,5 +214,80 @@ async function buildNewInterviewPrepOnce(input: {
     stageId,
     jobId: queued.jobId,
     displayName: interviewDisplayName({ name: input.name, title: input.title }),
+  };
+}
+
+async function buildInterviewForExistingPerson(input: {
+  organizationId: string;
+  campaignId: string;
+  userId: string;
+  contactId: string;
+  scheduledAt: string;
+  format: string;
+  stageType?: string | null;
+}): Promise<NewInterviewResult> {
+  const membership = await prisma.campaignContact.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      contactId: input.contactId,
+    },
+    select: {
+      id: true,
+      chosenPersonaId: true,
+      contact: { select: { firstName: true, lastName: true, title: true } },
+      chosenPersona: { select: { name: true } },
+    },
+  });
+  if (!membership) {
+    throw new TenantError("That person was not found on this application.");
+  }
+  await prisma.campaignContact.updateMany({
+    where: { id: membership.id, personPrepOfferedAt: null },
+    data: { personPrepOfferedAt: new Date(), personPrepStatus: "OFFERED" },
+  });
+
+  const title = membership.contact.title?.trim() ?? "";
+  const roleName = membership.chosenPersona?.name ?? "";
+  let stageId: string | null = null;
+  if (interviewScheduleIsComplete({ scheduledAt: input.scheduledAt, format: input.format })) {
+    if (!isInterviewFormat(input.format)) {
+      throw new TenantError("Interview format is invalid.");
+    }
+    const stage = await createInterviewStage({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      userId: input.userId,
+      type: chosenInterviewStageType({
+        requested: input.stageType,
+        roleName,
+        title,
+      }),
+      scheduledAt: new Date(input.scheduledAt),
+      format: input.format,
+      interviewerContactIds: [input.contactId],
+    });
+    stageId = stage.id;
+  }
+
+  const queued = await queueInterviewPrepGuide({
+    organizationId: input.organizationId,
+    campaignId: input.campaignId,
+    userId: input.userId,
+    contactId: input.contactId,
+    personaId: membership.chosenPersonaId,
+  });
+  if (queued.needsPersonaChoice) {
+    throw new TenantError(interviewConfig.labels.chooseRole);
+  }
+  const name = [membership.contact.firstName, membership.contact.lastName]
+    .filter(Boolean)
+    .join(" ");
+  return {
+    contactId: input.contactId,
+    sectionKey: `contact:${input.contactId}`,
+    stageId,
+    jobId: queued.jobId,
+    displayName: interviewDisplayName({ name, title }),
   };
 }

@@ -181,8 +181,8 @@ describe("interview page organized by person", () => {
   });
 
   it("lists each person once, newest first, with their interviews and stored notes", async () => {
-    expect(interviewConfig.labels.addSomeoneYoureMeeting).toBe("Add someone you're meeting");
-    expect(interviewConfig.labels.addAnotherInterview).toBe("Add another interview");
+    expect(interviewConfig.labels.newInterviewDashboardLink).toBe("I have a new interview!");
+    expect(interviewConfig.labels.scheduleLaterHint).toContain("Add a date and format");
     expect(interviewConfig.labels.notLinkedToAnyone).toBe("Not linked to anyone");
     expect(interviewConfig.labels.removeInterviewConfirmPlain).toBe(
       "Remove this interview? This can't be undone.",
@@ -268,18 +268,11 @@ describe("interview page organized by person", () => {
       }),
     );
 
-    expect(host.querySelector("[data-testid=stage-create-start]")?.textContent).toBe(
-      "Add someone you're meeting",
+    expect(host.querySelector("[data-testid=new-interview-on-dashboard]")?.textContent).toContain(
+      "I have a new interview!",
     );
-    await click(host, "[data-testid=add-someone-youre-meeting-toggle]");
-    const createForm = host.querySelector("[data-testid=add-interview-stage]");
-    const contactSelect = host.querySelector("[data-testid=add-someone-youre-meeting] select[name=contactId]");
-    expect(contactSelect?.hasAttribute("required")).toBe(true);
-    expect(createForm?.textContent).toContain("Type");
-    expect(createForm?.textContent).toContain("Date and time");
-    const format = createForm?.querySelector("select[name=format]") as HTMLSelectElement;
-    expect(format.required).toBe(true);
-    expect(format.value).toBe("VIDEO");
+    expect(host.querySelector("[data-testid=add-someone-youre-meeting]")).toBeNull();
+    expect(host.querySelector("[data-testid^=add-follow-up-]")).toBeNull();
     expect(host.querySelector("[data-testid^=interview-stage-]") ).toBeNull();
 
     const sections = [...host.querySelectorAll("[data-testid^=person-section-][data-open]")];
@@ -351,14 +344,7 @@ describe("interview page organized by person", () => {
       "Jordan gained this.",
     );
 
-    await click(host, "[data-testid=add-follow-up-sam-toggle]");
-    const another = host.querySelector("[data-testid=add-another-interview-sam]") as HTMLFormElement;
-    expect(another?.textContent).toContain("Add follow-up interview");
-    expect((another.querySelector("[name=contactId]") as HTMLInputElement).value).toBe("sam");
-    expect(another.querySelector("[name=contactId]")?.getAttribute("type")).toBe("hidden");
-    expect((another.querySelector("select[name=format]") as HTMLSelectElement).required).toBe(true);
-    expect(another.textContent).toContain("Type");
-    expect(another.textContent).toContain("Date and time");
+    expect(host.querySelector("[name=note]")).not.toBeNull();
 
     const unlinkedNode = host.querySelector("[data-testid=unlinked-interview-unlinked]");
     expect(host.querySelector("[data-testid=interviews-not-linked]")?.textContent).toContain(
@@ -726,8 +712,8 @@ describe.skipIf(!hasTestDatabase())("remove interview against postgres", { timeo
         notesByContactId,
       }),
     );
-    expect(host.querySelector("[data-testid=stage-create-start]")?.textContent).toBe(
-      "Add someone you're meeting",
+    expect(host.querySelector("[data-testid=new-interview-dashboard-link]")?.getAttribute("href")).toBe(
+      `/campaigns/${campaignId}`,
     );
     const personSections = [...host.querySelectorAll("[data-testid^=person-section-][data-open]")];
     expect(personSections.map((node) => node.getAttribute("data-testid"))).toEqual([
@@ -736,17 +722,14 @@ describe.skipIf(!hasTestDatabase())("remove interview against postgres", { timeo
       `person-section-${priyaId}`,
     ]);
 
-    await click(host, `[data-testid=add-follow-up-${samId}-toggle]`);
-    const samForm = host.querySelector(
-      `[data-testid=add-another-interview-${samId}]`,
-    ) as HTMLFormElement;
-    const when = samForm.querySelector("[name=scheduledAt]") as HTMLInputElement;
-    const type = samForm.querySelector("select[name=type]") as HTMLSelectElement;
-    when.value = "2026-12-02T18:30";
-    type.value = "EXECUTIVE";
-    await act(async () => {
-      samForm.requestSubmit();
-      await new Promise((resolve) => setTimeout(resolve, 50));
+    await createInterviewStage({
+      organizationId,
+      campaignId,
+      userId,
+      type: "EXECUTIVE",
+      scheduledAt: new Date("2026-12-02T18:30"),
+      format: "VIDEO",
+      interviewerContactIds: [samId],
     });
     const samStages = await prisma.interviewStage.findMany({
       where: { campaignId, interviewers: { some: { contactId: samId } } },

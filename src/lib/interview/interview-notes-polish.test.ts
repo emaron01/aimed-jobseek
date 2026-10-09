@@ -12,7 +12,8 @@ import {
 import { parseCheatSheetNotes } from "@/lib/application-summary/notes";
 import { applicationStepFromPathname } from "@/lib/product-config/application-steps";
 import { workspaceCheatSheetPersonHref } from "@/lib/application/workspace-links";
-import { listInterviewStages } from "@/lib/interview/stages";
+import { addApplicationContact } from "@/lib/application/contacts";
+import { createInterviewStage, listInterviewStages } from "@/lib/interview/stages";
 import { formatSavedInterviewNoteAt } from "@/lib/interview/saved-note-label";
 import {
   applicationStepCopy,
@@ -246,39 +247,13 @@ describe("interview notes polish", () => {
     expect(host.querySelector("h2")?.textContent).toBe("Interview Notes");
     expect(host.querySelector("[data-testid=view-interview-prep-guide-priya]")).toBeNull();
     expect(host.textContent).toContain(interviewConfig.labels.sectionHelp);
-    const addSection = host.querySelector("[data-testid=add-someone-youre-meeting]");
-    expect(addSection?.getAttribute("data-open")).toBe("false");
-    expect(host.querySelector("[data-testid=stage-create-start]")?.textContent).toBe(
-      "Add someone you're meeting",
+    expect(host.querySelector("[data-testid=new-interview-on-dashboard]")?.textContent).toContain(
+      "I have a new interview!",
     );
+    expect(host.querySelector("[data-testid=add-someone-youre-meeting]")).toBeNull();
     expect(host.querySelector("[data-testid=add-interview-stage]")).toBeNull();
     expect(enqueue).not.toHaveBeenCalled();
     expect(paidCall).not.toHaveBeenCalled();
-
-    await click(host, "[data-testid=add-someone-youre-meeting-toggle]");
-    expect(addSection?.getAttribute("data-open")).toBe("true");
-    const interviewer = host.querySelector("[data-testid=add-someone-youre-meeting] select[name=contactId]");
-    const addContact = host.querySelector("[data-testid=add-new-contact]");
-    const type = host.querySelector("[data-testid=add-interview-stage] select[name=type]");
-    const format = host.querySelector("[data-testid=add-interview-stage] select[name=format]");
-    const when = host.querySelector("[data-testid=add-interview-stage] input[name=scheduledAt]");
-    const addButton = host.querySelector("[data-testid=add-interview-stage] button[type=submit]");
-    follows(interviewer, addContact);
-    follows(addContact, type);
-    follows(type, format);
-    follows(format, when);
-    follows(when, addButton);
-    expect(interviewer?.parentElement?.textContent).toContain("Interviewer");
-    expect((interviewer as HTMLSelectElement).options[0]?.textContent).toBe("Choose who you are meeting.");
-    expect(addContact?.getAttribute("data-open")).toBe("false");
-    expect(addContact?.textContent).toContain("Add a new contact");
-    expect(host.querySelector("[data-testid=add-application-contact]")).toBeNull();
-    expect(addButton?.textContent).toBe("Add interview");
-    await click(host, "[data-testid=add-new-contact-toggle]");
-    expect(addContact?.getAttribute("data-open")).toBe("true");
-    for (const name of ["firstName", "lastName", "title", "email", "linkedinUrl", "linkedInProfileText", "personaId"]) {
-      expect(host.querySelector(`[data-testid=add-application-contact] [name=${name}]`)).not.toBeNull();
-    }
 
     await click(host, "[data-testid=person-section-priya-toggle]");
     const interview = host.querySelector("[data-testid=person-interview-priya-priya-stage]");
@@ -316,18 +291,8 @@ describe("interview notes polish", () => {
       "Save and Add Note to Interview Preparation Guides",
     );
 
-    const followUp = host.querySelector("[data-testid=add-follow-up-priya]");
-    expect(followUp?.getAttribute("data-open")).toBe("false");
-    expect(followUp?.textContent).toContain("Add Follow-up Interview");
-    expect(host.querySelector("[data-testid=add-another-interview-priya]")).toBeNull();
-    await click(host, "[data-testid=add-follow-up-priya-toggle]");
-    expect(followUp?.getAttribute("data-open")).toBe("true");
-    expect(host.querySelector("[data-testid=add-another-interview-priya] button[type=submit]")?.textContent).toBe(
-      "Add follow-up interview",
-    );
-    expect(host.querySelector("[data-testid=add-another-interview-priya] input[name=contactId]")?.getAttribute("value")).toBe(
-      "priya",
-    );
+    expect(host.querySelector("[data-testid=add-follow-up-priya]")).toBeNull();
+    expect(host.querySelector("[data-testid=add-cheat-sheet-note-priya-stage-priya] textarea[name=note]")).not.toBeNull();
 
     pathnameRef.value = "/campaigns/camp/interviews";
     const facts = { ...emptyApplicationStepFacts(), interviewStageCount: 1 };
@@ -489,43 +454,31 @@ describe.skipIf(!hasTestDatabase())("interview notes polish against postgres", {
     await renderPage();
     expect(enqueue).not.toHaveBeenCalled();
     expect(paidCall).not.toHaveBeenCalled();
-    expect(host.querySelector("[data-testid=add-someone-youre-meeting]")?.getAttribute("data-open")).toBe("false");
+    expect(host.querySelector("[data-testid=add-someone-youre-meeting]")).toBeNull();
+    expect(host.querySelector("[data-testid=new-interview-on-dashboard]")).not.toBeNull();
 
-    await click(host, "[data-testid=add-someone-youre-meeting-toggle]");
-    await click(host, "[data-testid=add-new-contact-toggle]");
-    const contactForm = host.querySelector("[data-testid=add-application-contact]") as HTMLFormElement;
-    (contactForm.querySelector("[name=firstName]") as HTMLInputElement).value = "Avery";
-    (contactForm.querySelector("[name=lastName]") as HTMLInputElement).value = "Nguyen";
-    (contactForm.querySelector("[name=title]") as HTMLInputElement).value = "Recruiter";
-    (contactForm.querySelector("[name=personaId]") as HTMLSelectElement).value = roleId;
-    await act(async () => {
-      contactForm.requestSubmit();
-      await new Promise((resolve) => setTimeout(resolve, 50));
+    const addedContact = await addApplicationContact({
+      organizationId,
+      campaignId,
+      userId,
+      firstName: "Avery",
+      lastName: "Nguyen",
+      title: "Recruiter",
+      personaId: roleId,
+      confirmRole: true,
     });
-    const added = await prisma.contact.findFirstOrThrow({
-      where: { organizationId, firstName: "Avery", lastName: "Nguyen" },
-    });
-    await renderPage();
-    expect(host.querySelector("[data-testid=add-someone-youre-meeting]")?.getAttribute("data-open")).toBe("true");
-    const chooser = host.querySelector(
-      "[data-testid=add-someone-youre-meeting] select[name=contactId]",
-    ) as HTMLSelectElement;
-    expect([...chooser.options].some((option) => option.textContent?.includes("Avery Nguyen"))).toBe(true);
-    chooser.value = added.id;
-    const createForm = host.querySelector("[data-testid=add-interview-stage]") as HTMLFormElement;
-    (createForm.querySelector("[name=scheduledAt]") as HTMLInputElement).value = "2026-10-03T15:00";
-    (createForm.querySelector("select[name=type]") as HTMLSelectElement).value = "HIRING_MANAGER";
-    await act(async () => {
-      createForm.requestSubmit();
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    });
-    expect(host.querySelector("[data-testid=add-someone-youre-meeting]")?.getAttribute("data-open")).toBe("false");
-    const created = await prisma.interviewStage.findFirstOrThrow({
-      where: { campaignId, interviewers: { some: { contactId: added.id } } },
+    const added = { id: addedContact.contactId };
+    const created = await createInterviewStage({
+      organizationId,
+      campaignId,
+      userId,
+      type: "HIRING_MANAGER",
+      scheduledAt: new Date("2026-10-03T15:00"),
+      format: "VIDEO",
+      interviewerContactIds: [added.id],
     });
     expect(created.type).toBe("HIRING_MANAGER");
     await renderPage();
-    expect(host.querySelector("[data-testid=add-someone-youre-meeting]")?.getAttribute("data-open")).toBe("false");
     await openPerson(added.id);
     expect(host.querySelector(`[data-testid=person-interview-${added.id}-${created.id}]`)).not.toBeNull();
 
@@ -580,19 +533,16 @@ describe.skipIf(!hasTestDatabase())("interview notes polish against postgres", {
       (host.querySelector(`[data-testid=add-cheat-sheet-note-${created.id}-${added.id}] textarea[name=note]`) as HTMLTextAreaElement).value,
     ).toBe("");
 
-    await click(host, `[data-testid=add-follow-up-${added.id}-toggle]`);
-    const followForm = host.querySelector(
-      `[data-testid=add-another-interview-${added.id}]`,
-    ) as HTMLFormElement;
-    (followForm.querySelector("[name=scheduledAt]") as HTMLInputElement).value = "2026-10-10T16:00";
-    (followForm.querySelector("select[name=type]") as HTMLSelectElement).value = "EXECUTIVE";
-    await act(async () => {
-      followForm.requestSubmit();
-      await new Promise((resolve) => setTimeout(resolve, 50));
+    await createInterviewStage({
+      organizationId,
+      campaignId,
+      userId,
+      type: "EXECUTIVE",
+      scheduledAt: new Date("2026-10-10T16:00"),
+      format: "VIDEO",
+      interviewerContactIds: [added.id],
     });
-    expect(host.querySelector(`[data-testid=add-follow-up-${added.id}]`)?.getAttribute("data-open")).toBe(
-      "false",
-    );
+    expect(host.querySelector(`[data-testid=add-follow-up-${added.id}]`)).toBeNull();
     const interviews = await prisma.interviewStage.findMany({
       where: { campaignId, interviewers: { some: { contactId: added.id } } },
       orderBy: { scheduledAt: "asc" },

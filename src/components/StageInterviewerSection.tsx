@@ -1,169 +1,20 @@
 "use client";
 
 import {
-  useActionState,
   useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { addApplicationContactAction } from "@/app/actions/application-outreach";
 import {
   addCheatSheetInterviewNoteAction,
-  createInterviewStageAction,
   removeInterviewAction,
 } from "@/app/actions/interview";
-import { AddContactForm } from "@/components/ApplicationOutreachSections";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { AppButton } from "@/components/AppButton";
 import { CHEAT_SHEET_HEADING_CLASS } from "@/lib/application-summary/cheat-sheet-collapse";
 import { formatSavedInterviewNoteAt } from "@/lib/interview/saved-note-label";
-import { DEFAULT_INTERVIEW_STAGE_TYPE, interviewConfig } from "@/lib/product-config";
-
-type RoleOption = { id: string; name: string; suggestionKey?: string | null };
-type PersonOption = {
-  contactId: string;
-  name: string;
-  title: string | null;
-};
-
-export function StageAddContactForm({
-  campaignId,
-  roles,
-}: {
-  campaignId: string;
-  roles: Array<{ id: string; name: string; campaignId?: string | null }>;
-}) {
-  const [, action] = useActionState(addApplicationContactAction, null);
-  return (
-    <AddContactForm campaignId={campaignId} roles={roles} action={action} />
-  );
-}
-
-const ADD_SOMEONE_FORM_ID = "add-someone-interview";
-
-function ScheduleFields({ fieldClass }: { fieldClass: string }) {
-  return (
-    <div className="grid gap-3 md:grid-cols-2">
-      <label className="text-sm">
-        Type
-        <select name="type" required className={fieldClass} defaultValue={DEFAULT_INTERVIEW_STAGE_TYPE}>
-          {Object.entries(interviewConfig.types).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="text-sm">
-        Format
-        <select name="format" required className={fieldClass} defaultValue="VIDEO">
-          {Object.entries(interviewConfig.formats).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="text-sm">
-        Date and time
-        <input name="scheduledAt" type="datetime-local" required className={fieldClass} />
-      </label>
-    </div>
-  );
-}
-
-export function AddSomeoneYoureMeeting({
-  campaignId,
-  roles,
-  people,
-  fieldClass,
-}: {
-  campaignId: string;
-  roles: RoleOption[];
-  people: PersonOption[];
-  fieldClass: string;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <InterviewerCollapsible
-      title={interviewConfig.labels.addSomeoneYoureMeeting}
-      startOpen={false}
-      open={open}
-      onOpenChange={setOpen}
-      testId="add-someone-youre-meeting"
-      titleTestId="stage-create-start"
-    >
-      <label className="block text-sm">
-        {interviewConfig.labels.interviewer}
-        <select
-          name="contactId"
-          form={ADD_SOMEONE_FORM_ID}
-          required
-          className={fieldClass}
-          defaultValue=""
-        >
-          <option value="">{interviewConfig.labels.noInterviewer}</option>
-          {people.map((person) => (
-            <option key={person.contactId} value={person.contactId}>
-              {person.name}
-              {person.title ? ` · ${person.title}` : ""}
-            </option>
-          ))}
-        </select>
-      </label>
-      <InterviewerCollapsible
-        title={interviewConfig.labels.addNewContact}
-        startOpen={false}
-        testId="add-new-contact"
-      >
-        <StageAddContactForm campaignId={campaignId} roles={roles} />
-      </InterviewerCollapsible>
-      <ApplicationActionForm
-        action={createInterviewStageAction}
-        submitLabel={interviewConfig.labels.addStage}
-        testId="add-interview-stage"
-        formId={ADD_SOMEONE_FORM_ID}
-        onSuccess={() => setOpen(false)}
-      >
-        <input type="hidden" name="campaignId" value={campaignId} />
-        <ScheduleFields fieldClass={fieldClass} />
-      </ApplicationActionForm>
-    </InterviewerCollapsible>
-  );
-}
-
-export function AddFollowUpInterview({
-  campaignId,
-  contactId,
-  fieldClass,
-}: {
-  campaignId: string;
-  contactId: string;
-  fieldClass: string;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <InterviewerCollapsible
-      title={interviewConfig.labels.addFollowUpInterview}
-      startOpen={false}
-      open={open}
-      onOpenChange={setOpen}
-      testId={`add-follow-up-${contactId}`}
-    >
-      <ApplicationActionForm
-        action={createInterviewStageAction}
-        submitLabel={interviewConfig.labels.addFollowUpInterviewSubmit}
-        testId={`add-another-interview-${contactId}`}
-        onSuccess={() => setOpen(false)}
-      >
-        <input type="hidden" name="campaignId" value={campaignId} />
-        <input type="hidden" name="contactId" value={contactId} />
-        <ScheduleFields fieldClass={fieldClass} />
-      </ApplicationActionForm>
-    </InterviewerCollapsible>
-  );
-}
+import { interviewConfig } from "@/lib/product-config";
 
 export function SavedInterviewNotes({
   stageId,
