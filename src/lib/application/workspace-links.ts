@@ -204,11 +204,17 @@ export function listWorkspaceHrefs(input: {
   ];
 }
 
+/** `/campaigns/[id]` only. Step pages such as `/consultation` are not the dashboard. */
+export function isApplicationDashboardPath(pathname: string): boolean {
+  return /^\/campaigns\/[^/]+\/?$/.test(pathname);
+}
+
 export function openWorkspaceSection(sectionId: string): void {
   if (typeof document === "undefined") {
     throw new Error("Workspace sections can only be opened in the browser.");
   }
   if (sectionId === workspaceSectionId("CONSULTATION")) {
+    if (isApplicationDashboardPath(window.location.pathname)) return;
     const match = window.location.pathname.match(/^\/campaigns\/([^/]+)/);
     if (match?.[1]) {
       window.location.assign(applicationStepHref(match[1], "consultation"));

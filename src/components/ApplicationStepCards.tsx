@@ -10,6 +10,7 @@ import { useWorkspaceJobs } from "@/components/workspace-jobs-context";
 import {
   closeDashboardOpenStep,
   dashboardOpenSearch,
+  dashboardStepHash,
   dashboardStepCardOrder,
   dashboardStepPanelOrder,
   isDashboardInPlaceStep,
@@ -63,8 +64,7 @@ function useDashboardStepNavigation(campaignId: string) {
   const pathname = usePathname() || "";
 
   function replaceSteps(next: readonly DashboardInPlaceStepKey[], stepKey: DashboardInPlaceStepKey) {
-    const hash =
-      stepKey === "applied" && window.location.hash === "#applied" ? "" : window.location.hash;
+    const hash = dashboardStepHash(stepKey, window.location.hash);
     router.replace(
       `${pathname}${dashboardOpenSearch(window.location.search, next)}${hash}`,
       { scroll: false },
@@ -378,7 +378,11 @@ export function ApplicationStepCards({
                     <div className="flex flex-wrap gap-2">
                       {step.isPage ? (
                         <AppActionLink
-                          href={applicationStepHref(campaignId, step.key)}
+                          href={
+                            step.key === "consultation"
+                              ? step.actionHref
+                              : applicationStepHref(campaignId, step.key)
+                          }
                           variant="secondary"
                           size="sm"
                           data-testid={`overview-step-full-page-${step.key}`}

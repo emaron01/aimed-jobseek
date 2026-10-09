@@ -3,11 +3,13 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { ApplicationOverview } from "@/components/ApplicationOverview";
 import { ApplicationStepCards } from "@/components/ApplicationStepCards";
 import { expandOuterDetails } from "@/components/DashboardOpenSection";
 import {
   closeDashboardOpenStep,
   dashboardOpenSearch,
+  dashboardStepHash,
   dashboardStepCardOrder,
   dashboardStepPanelOrder,
   parseDashboardOpenSteps,
@@ -88,7 +90,8 @@ describe("dashboard steps open in place", () => {
     );
     expect(jobCard?.[0]).toBeTruthy();
     expect(dashboardStepCardOrder(1)).toBe(2);
-    expect(html).toContain('href="/campaigns/camp_1/consultation"');
+    expect(html).toContain('data-testid="overview-step-action-consultation"');
+    expect(html).not.toContain('href="/campaigns/camp_1/consultation"');
     expect(html).not.toContain("overview-step-panel-consultation");
   });
 
@@ -267,7 +270,8 @@ describe("dashboard steps open in place", () => {
     expect(panelStyle(html, "outreach")).toContain(
       `--step-order:${dashboardStepPanelOrder(5, 1)}`,
     );
-    expect(html).toContain('href="/campaigns/camp_1/consultation"');
+    expect(html).toContain('data-testid="overview-step-action-consultation"');
+    expect(html).not.toContain("overview-step-panel-consultation");
     const panels = readFileSync("src/components/DashboardInPlaceStepPanels.tsx", "utf8");
     expect(panels).toContain('keys.includes("assets")');
     expect(panels).toContain('keys.includes("hiring-team")');
@@ -360,7 +364,8 @@ describe("dashboard steps open in place", () => {
     expect(html).toContain('href="/campaigns/camp_1/summary"');
     expect(html.split('data-testid="overview-step-close-summary"').length - 1).toBe(2);
     expect(html).toContain("data-expand-outer-section");
-    expect(html).toContain('href="/campaigns/camp_1/consultation"');
+    expect(html).toContain('data-testid="overview-step-action-consultation"');
+    expect(html).not.toContain("overview-step-panel-consultation");
     expect(panelStyle(html, "summary")).toContain(
       `--step-order:${dashboardStepPanelOrder(index, 1)}`,
     );
@@ -392,6 +397,104 @@ describe("dashboard steps open in place", () => {
     expect(print).toContain("`${pageHref}#${sectionId}`");
     expect(readFileSync("src/components/ApplicationActionForm.tsx", "utf8")).toContain(
       "router.refresh()",
+    );
+  });
+
+  it("opens Harper Questionnaire under its row and closes it in the query string", () => {
+    const harperSteps = [
+      step({
+        key: "consultation",
+        title: "Harper Questionnaire",
+        number: 4,
+        actionLabel: "Answer Harper's questions",
+        actionHref: "/campaigns/camp_1/consultation#harper-q%3Aturn_9",
+        state: "in_progress",
+        turnCountLabel: "3 questions need your answer",
+        isCurrent: true,
+      }),
+    ];
+    const html = renderToStaticMarkup(
+      createElement(ApplicationStepCards, {
+        steps: harperSteps,
+        campaignId: "camp_1",
+        openSteps: ["consultation"],
+        panels: {
+          consultation: createElement("section", { "data-testid": "consultation" }, "Harper"),
+        },
+      }),
+    );
+    const index = harperSteps.findIndex((item) => item.key === "consultation");
+    expect(html).toContain('data-testid="consultation"');
+    expect(html).toContain('data-testid="overview-step-action-consultation"');
+    expect(html.replaceAll("&#x27;", "'").replaceAll("&#39;", "'")).toContain(
+      "Answer Harper's questions",
+    );
+    expect(html).toContain("3 questions need your answer");
+    expect(html).toContain('data-testid="overview-step-full-page-consultation"');
+    expect(html).toContain('href="/campaigns/camp_1/consultation#harper-q%3Aturn_9"');
+    expect(html.split('data-testid="overview-step-close-consultation"').length - 1).toBe(2);
+    expect(html).toContain("data-expand-outer-section");
+    expect(panelStyle(html, "consultation")).toContain(
+      `--step-order:${dashboardStepPanelOrder(index, 1)}`,
+    );
+    const overview = renderToStaticMarkup(
+      createElement(ApplicationOverview, {
+        view: {
+          campaignId: "camp_1",
+          campaignName: "Acme",
+          jobTitle: "Analyst",
+          companyName: "Northwind",
+          statusLabel: "Not applied",
+          statusTone: "attention",
+          appliedAt: null,
+          nextStepText: "",
+          nextStepFailed: false,
+          fitLabel: null,
+          location: null,
+          workArrangement: null,
+          compensation: null,
+          steps: harperSteps,
+        },
+        campaignId: "camp_1",
+      }),
+    );
+    const nextAction =
+      overview.match(/<[^>]*data-testid="your-next-step-action"[^>]*>/)?.[0] ?? "";
+    expect(overview).toContain('data-testid="your-next-step"');
+    expect(nextAction.startsWith("<button")).toBe(true);
+    expect(nextAction).not.toContain("href=");
+    const closed = closeDashboardOpenStep(["consultation"], "consultation");
+    expect(closed).toEqual([]);
+    expect(dashboardOpenSearch("?open=consultation", closed)).toBe("");
+    expect(dashboardStepHash("consultation", "#harper-q%3Aturn_9")).toBe("");
+    expect(dashboardStepHash("consultation", "#consultation")).toBe("");
+    expect(dashboardStepHash("job", "#applied")).toBe("#applied");
+    const page = readFileSync("src/app/(app)/campaigns/[id]/consultation/page.tsx", "utf8");
+    const panels = readFileSync("src/components/DashboardInPlaceStepPanels.tsx", "utf8");
+    const section = readFileSync("src/components/ConsultationSection.tsx", "utf8");
+    expect(page).toContain("<ConsultationSection");
+    expect(panels).toContain("<ConsultationSection");
+    expect(panels).toContain('keys.includes("consultation")');
+    expect(panels).toContain("jobs={live.jobs}");
+    expect(section).not.toContain("enqueueApplicationJob");
+    expect(section).not.toContain("runPaidStructuredCall");
+    expect(section).not.toContain("generateStructured");
+    expect(section).not.toContain("startConsultation(");
+    expect(panels).not.toContain("enqueueApplicationJob");
+    expect(readFileSync("src/lib/application/workspace-links.ts", "utf8")).toContain(
+      "isApplicationDashboardPath",
+    );
+    expect(readFileSync("src/components/ConsultationStanding.tsx", "utf8")).toContain(
+      "isApplicationDashboardPath(window.location.pathname)",
+    );
+    expect(readFileSync("src/components/ApplicationActionForm.tsx", "utf8")).toContain(
+      "router.refresh()",
+    );
+    expect(readFileSync("src/app/actions/consultation.ts", "utf8")).toContain(
+      "revalidatePath(`/campaigns/${campaignId}`)",
+    );
+    expect(readFileSync("src/components/ApplicationStepCards.tsx", "utf8")).toContain(
+      "{ scroll: false }",
     );
   });
 

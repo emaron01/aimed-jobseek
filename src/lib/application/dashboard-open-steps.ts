@@ -8,6 +8,7 @@ export const DASHBOARD_IN_PLACE_STEP_KEYS = [
   "applied",
   "job",
   "company",
+  "consultation",
   "assets",
   "hiring-team",
   "outreach",
@@ -51,6 +52,34 @@ export function toggleDashboardOpenStep(
   if (next.has(key)) next.delete(key);
   else next.add(key);
   return DASHBOARD_IN_PLACE_STEP_KEYS.filter((item) => next.has(item));
+}
+
+/**
+ * Hash to keep after opening or closing a dashboard step.
+ * Harper question hashes belong on the Harper page, not the dashboard URL.
+ */
+export function dashboardStepHash(
+  stepKey: DashboardInPlaceStepKey,
+  hash: string,
+): string {
+  if (stepKey === "applied" && hash === "#applied") return "";
+  if (stepKey !== "consultation" || hash.length <= 1) return hash;
+  let decoded = hash.slice(1);
+  try {
+    decoded = decodeURIComponent(decoded);
+  } catch {
+    decoded = hash.slice(1);
+  }
+  if (
+    decoded === "consultation" ||
+    decoded === "harper-standing" ||
+    decoded === "harper-general" ||
+    decoded.startsWith("harper-q:") ||
+    decoded.startsWith("harper-coach:")
+  ) {
+    return "";
+  }
+  return hash;
 }
 
 /** Query value. Empty means the param should be removed. */

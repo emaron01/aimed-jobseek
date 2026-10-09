@@ -3,6 +3,7 @@ import "server-only";
 import type { ReactNode } from "react";
 import { ApplicationAssetsBody } from "@/components/ApplicationAssetsBody";
 import { ApplicationCompanyBody } from "@/components/ApplicationCompanyBody";
+import { ConsultationSection } from "@/components/ConsultationSection";
 import { ApplicationHiringTeamBody } from "@/components/ApplicationWorkspace";
 import { ApplicationInterviewsBody } from "@/components/ApplicationInterviewsBody";
 import { InterviewPrepGuides } from "@/app/(app)/campaigns/[id]/summary/page";
@@ -13,6 +14,7 @@ import {
   parseDashboardOpenSteps,
   type DashboardInPlaceStepKey,
 } from "@/lib/application/dashboard-open-steps";
+import { getApplicationWorkspaceLive } from "@/lib/application-jobs/workspace-status";
 
 /**
  * Panels for steps that are open. Closed steps are not rendered.
@@ -51,6 +53,24 @@ export async function loadDashboardInPlacePanels(input: {
         organizationId={input.organizationId}
         canEdit={input.canEdit}
       />
+    );
+  }
+  if (keys.includes("consultation")) {
+    const live = await getApplicationWorkspaceLive({
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+    });
+    // Outer details so DashboardOpenSection leaves nested answer edits collapsed.
+    panels.consultation = (
+      <details open className="[&>summary]:sr-only">
+        <summary>Harper Questionnaire</summary>
+        <ConsultationSection
+          campaignId={input.campaignId}
+          organizationId={input.organizationId}
+          canEdit={input.canEdit}
+          jobs={live.jobs}
+        />
+      </details>
     );
   }
   if (keys.includes("assets")) {

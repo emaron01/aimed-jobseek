@@ -14,6 +14,7 @@ import {
   matchCheatSheetFilterOptions,
   type CheatSheetFilterOption,
 } from "@/lib/application-summary/filter";
+import { isApplicationDashboardPath } from "@/lib/application/workspace-links";
 import { harperContactAnchorId } from "@/lib/consultation/harper-layout";
 import { applicationSummaryConfig } from "@/lib/product-config";
 
@@ -140,6 +141,7 @@ export function HarperFilterProvider({
 
   useEffect(() => {
     const scrollToHashTarget = () => {
+      if (isApplicationDashboardPath(window.location.pathname)) return;
       const raw = window.location.hash.replace(/^#/, "").trim();
       if (!raw) return;
       let decoded = raw;
@@ -182,6 +184,7 @@ export function HarperFilterProvider({
   useEffect(() => {
     if (!initialKey || !selectedKey) return;
     if (typeof window === "undefined") return;
+    if (isApplicationDashboardPath(window.location.pathname)) return;
     const raw = window.location.hash.replace(/^#/, "").trim();
     if (!raw) return;
     let decoded = raw;

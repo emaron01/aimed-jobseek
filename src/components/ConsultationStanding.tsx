@@ -15,6 +15,7 @@ import {
   consultationConversationCopy,
   evidenceStrengthLabels,
 } from "@/lib/product-config";
+import { isApplicationDashboardPath } from "@/lib/application/workspace-links";
 import { stripInternalIdsFromDisplayText } from "@/lib/consultation/evidence-display";
 import {
   HARPER_GENERAL_ANCHOR,
@@ -455,6 +456,7 @@ export function ConsultationStanding({
 
   useEffect(() => {
     function openFromHash() {
+      if (isApplicationDashboardPath(window.location.pathname)) return;
       const hash = window.location.hash.replace(/^#/, "");
       if (!hash) return;
       if (hash === HARPER_STANDING_ANCHOR || hash === HARPER_GENERAL_ANCHOR) {
