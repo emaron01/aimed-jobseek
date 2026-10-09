@@ -71,6 +71,10 @@ export function NewInterviewForm({
       setError(interviewConfig.labels.chooseRole);
       return;
     }
+    const submitButton = event.currentTarget.querySelector(
+      "[data-testid='new-interview-build']",
+    );
+    if (submitButton instanceof HTMLButtonElement) submitButton.disabled = true;
     lock.current = true;
     setError(null);
     setReady(null);
@@ -124,9 +128,6 @@ export function NewInterviewForm({
           className="rounded-md border border-edge bg-surface p-4"
           data-testid="new-interview-panel"
         >
-          {showSpinner ? (
-            <AppPendingIndicator label={interviewConfig.labels.preparingGuide} />
-          ) : null}
           {showReady && ready ? (
             <div className="space-y-3" data-testid="new-interview-ready">
               <p className="text-sm text-ink">
@@ -140,9 +141,12 @@ export function NewInterviewForm({
                 {interviewConfig.labels.viewGuide}
               </AppActionLink>
             </div>
-          ) : null}
-          {showSpinner || showReady ? null : (
+          ) : (
             <form className="space-y-3" onSubmit={onSubmit} data-testid="new-interview-form">
+              {showSpinner ? (
+                <AppPendingIndicator label={interviewConfig.labels.preparingGuide} />
+              ) : (
+              <>
               <p className="text-sm font-medium text-ink">
                 {interviewConfig.labels.newInterviewCongratulations}
               </p>
@@ -224,6 +228,8 @@ export function NewInterviewForm({
                   {error ?? job?.error ?? "The prep guide could not be prepared. Retry."}
                 </p>
               ) : null}
+              </>
+              )}
               <div className="flex flex-wrap gap-2">
                 <AppButton
                   type="submit"

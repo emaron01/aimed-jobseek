@@ -7,11 +7,7 @@ import { addApplicationHiringTeamRole } from "@/lib/hiring-team/build";
 import { queueInterviewPrepGuide } from "@/lib/interview/prep-guide";
 import { createInterviewStage } from "@/lib/interview/stages";
 import { prisma } from "@/lib/prisma-client";
-import {
-  DEFAULT_INTERVIEW_STAGE_TYPE,
-  interviewConfig,
-  isInterviewFormat,
-} from "@/lib/product-config";
+import { interviewConfig, isInterviewFormat } from "@/lib/product-config";
 import { TenantError } from "@/lib/tenant/errors";
 
 export { CREATE_ROLE_FROM_TITLE };
@@ -51,6 +47,22 @@ export function interviewScheduleIsComplete(input: {
   format: string;
 }): boolean {
   return Boolean(input.scheduledAt.trim() && input.format.trim());
+}
+
+const RECRUITER_OR_TALENT_ACQUISITION = /\b(?:recruiter|talent[- ]acquisition)\b/i;
+
+/**
+ * Recruiter and talent-acquisition roles use the recruiter screen.
+ * Every other role uses the general interviewer type, OTHER.
+ */
+export function interviewStageTypeForRole(input: {
+  roleName: string;
+  title: string;
+}): "RECRUITER_SCREEN" | "OTHER" {
+  const haystack = `${input.roleName}\n${input.title}`;
+  return RECRUITER_OR_TALENT_ACQUISITION.test(haystack)
+    ? "RECRUITER_SCREEN"
+    : "OTHER";
 }
 
 export async function buildNewInterviewPrep(input: {
@@ -147,11 +159,14 @@ async function buildNewInterviewPrepOnce(input: {
       throw new TenantError("Interview format is invalid.");
     }
     const when = new Date(scheduledAt);
+    const roleName =
+      roles.find((role) => role.id === personaId)?.name ??
+      (requested === CREATE_ROLE_FROM_TITLE ? input.title : "");
     const stage = await createInterviewStage({
       organizationId: input.organizationId,
       campaignId: input.campaignId,
       userId: input.userId,
-      type: DEFAULT_INTERVIEW_STAGE_TYPE,
+      type: interviewStageTypeForRole({ roleName, title: input.title }),
       scheduledAt: when,
       format,
       interviewerContactIds: [added.contactId],

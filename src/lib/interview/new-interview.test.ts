@@ -23,6 +23,7 @@ import {
 import {
   interviewDisplayName,
   interviewScheduleIsComplete,
+  interviewStageTypeForRole,
 } from "@/lib/interview/new-interview";
 import { DEFAULT_INTERVIEW_STAGE_TYPE, prepGuideReadyMessage } from "@/lib/product-config";
 
@@ -236,15 +237,50 @@ describe("new interview build", () => {
     );
     expect(mocks.createStage).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: DEFAULT_INTERVIEW_STAGE_TYPE,
+        type: "OTHER",
         format: "VIDEO",
         interviewerContactIds: ["contact-1"],
       }),
     );
+    expect(interviewStageTypeForRole({ roleName: "Nurse Manager", title: nursingTitle })).toBe(
+      "OTHER",
+    );
+    expect(
+      interviewStageTypeForRole({ roleName: "New Graduate", title: newGraduateTitle }),
+    ).toBe("OTHER");
+    expect(
+      interviewStageTypeForRole({
+        roleName: "Talent Acquisition Partner",
+        title: "Coordinator",
+      }),
+    ).toBe("RECRUITER_SCREEN");
+    expect(
+      interviewStageTypeForRole({ roleName: "Hiring Manager", title: "Senior Recruiter" }),
+    ).toBe("RECRUITER_SCREEN");
     expect(DEFAULT_INTERVIEW_STAGE_TYPE).toBe("RECRUITER_SCREEN");
 
     mocks.createStage.mockClear();
+    mocks.findMany.mockResolvedValue([
+      {
+        id: "ta",
+        name: "Talent Acquisition Partner",
+        suggestionKey: "recruiter",
+        targetTitles: ["Coordinator"],
+      },
+    ]);
+    await buildNewInterviewPrep({
+      ...base,
+      title: "Coordinator",
+      name: "Grace Hopper",
+      personaId: "ta",
+    });
+    expect(mocks.createStage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "RECRUITER_SCREEN" }),
+    );
+
+    mocks.createStage.mockClear();
     mocks.addContact.mockClear();
+    mocks.findMany.mockResolvedValue(roles);
     await buildNewInterviewPrep({ ...base, name: "Grace Hopper", format: "" });
     expect(mocks.createStage).not.toHaveBeenCalled();
     await buildNewInterviewPrep({ ...base, name: "Grace Hopper 2", scheduledAt: "" });
@@ -470,5 +506,46 @@ describe("new interview form", () => {
     expect(view.host.textContent).toContain("Your prep guide for Ada Lovelace is ready");
     const link = view.host.querySelector("[data-testid='new-interview-view-guide']") as HTMLAnchorElement;
     expect(link.getAttribute("href")).toBe("/campaigns/camp/summary#contact:contact-1");
+  });
+
+  it("disables Build my prep guide while the request is pending", async () => {
+    let finish: (value: unknown) => void = () => undefined;
+    action.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const view = mount(createElement(NewInterviewForm, { campaignId: "camp", roles }));
+    root = view.root;
+    act(() => {
+      (
+        view.host.querySelector("[data-testid='new-interview-open']") as HTMLButtonElement
+      ).click();
+    });
+    act(() => {
+      typeInto(
+        view.host.querySelector("[data-testid='new-interview-title']") as HTMLInputElement,
+        nursingTitle,
+      );
+    });
+    const build = () =>
+      view.host.querySelector("[data-testid='new-interview-build']") as HTMLButtonElement;
+    await act(async () => {
+      build().click();
+    });
+    expect(build().disabled).toBe(true);
+    expect(view.host.textContent).toContain("Harper is preparing your guide");
+    await act(async () => {
+      finish({
+        ok: true,
+        message: prepGuideReadyMessage("Ada Lovelace"),
+        contactId: "contact-1",
+        sectionKey: "contact:contact-1",
+        displayName: "Ada Lovelace",
+        jobId: null,
+      });
+    });
+    expect(view.host.textContent).toContain("Your prep guide for Ada Lovelace is ready");
   });
 });

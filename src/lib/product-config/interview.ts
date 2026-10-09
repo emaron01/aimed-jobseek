@@ -136,7 +136,7 @@ export const interviewConfig = Object.freeze({
   ],
 } as const);
 
-/** The type Interview Notes pre-selects, and the type a new interview uses. */
+/** The type Interview Notes pre-selects. A dashboard interview chooses from the role. */
 export const DEFAULT_INTERVIEW_STAGE_TYPE = "RECRUITER_SCREEN" as const;
 
 export function prepGuideReadyMessage(who: string): string {
