@@ -28,13 +28,13 @@ export function parseDashboardOpenSteps(
   raw: string | null | undefined,
 ): DashboardInPlaceStepKey[] {
   if (!raw) return [];
-  const wanted = new Set(
-    raw
-      .split(",")
-      .map((part) => part.trim())
-      .filter(Boolean),
-  );
-  return DASHBOARD_IN_PLACE_STEP_KEYS.filter((key) => wanted.has(key));
+  for (const part of raw.split(",")) {
+    const key = part.trim();
+    if ((DASHBOARD_IN_PLACE_STEP_KEYS as readonly string[]).includes(key)) {
+      return [key as DashboardInPlaceStepKey];
+    }
+  }
+  return [];
 }
 
 export function closeDashboardOpenStep(
@@ -44,14 +44,13 @@ export function closeDashboardOpenStep(
   return DASHBOARD_IN_PLACE_STEP_KEYS.filter((item) => current.includes(item) && item !== key);
 }
 
+/** Opening a step closes every other step. Clicking the open step closes it. */
 export function toggleDashboardOpenStep(
   current: readonly DashboardInPlaceStepKey[],
   key: DashboardInPlaceStepKey,
 ): DashboardInPlaceStepKey[] {
-  const next = new Set(current);
-  if (next.has(key)) next.delete(key);
-  else next.add(key);
-  return DASHBOARD_IN_PLACE_STEP_KEYS.filter((item) => next.has(item));
+  if (current.includes(key)) return [];
+  return [key];
 }
 
 /**

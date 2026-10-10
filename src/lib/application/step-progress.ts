@@ -48,6 +48,8 @@ export type ApplicationStepFactInput = {
   consultationUnanswered: boolean;
   consultationUnansweredCount: number;
   consultationFirstUnansweredTurnId: string | null;
+  /** Unanswered or skipped interviewer-guide questions. Approved and ignored are out. */
+  guideQuestionsToAnswerCount: number;
   interviewersWithoutGuideCount: number;
   firstInterviewerWithoutGuideId: string | null;
 };
@@ -119,6 +121,7 @@ export function emptyApplicationStepFacts(): ApplicationStepFactInput {
     consultationUnanswered: false,
     consultationUnansweredCount: 0,
     consultationFirstUnansweredTurnId: null,
+    guideQuestionsToAnswerCount: 0,
     interviewersWithoutGuideCount: 0,
     firstInterviewerWithoutGuideId: null,
   };
@@ -229,7 +232,7 @@ export function stepIsDone(
     case "interviews":
       return facts.interviewStageCount > 0;
     case "summary":
-      return facts.cheatSheetReady;
+      return facts.cheatSheetReady && facts.guideQuestionsToAnswerCount === 0;
     case "applied":
       return Boolean(facts.appliedAt);
     default: {
@@ -654,6 +657,13 @@ function stepTurnCountLabel(
     );
   }
   if (key === "summary") {
+    if (facts.guideQuestionsToAnswerCount > 0) {
+      return countedLabel(
+        facts.guideQuestionsToAnswerCount,
+        applicationStepCopy.oneQuestionToAnswer,
+        applicationStepCopy.questionsToAnswer,
+      );
+    }
     return countedLabel(
       facts.interviewersWithoutGuideCount,
       applicationStepCopy.oneInterviewerHasNoPrepGuide,

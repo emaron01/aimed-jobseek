@@ -73,6 +73,7 @@ import {
 } from "@/lib/product-research/candidate-profile";
 import { seekerBackgroundText } from "@/lib/product-research/seeker-background";
 import { parseStringArray } from "@/lib/research";
+import { interviewerProfileQuestionsToAnswer } from "@/lib/application/tracker";
 
 function experienceCalculation(value: unknown): {
   requiredYears: number;
@@ -567,6 +568,21 @@ export async function ConsultationSection({
                   sessionStatus={threadStatus}
                   jobsActive={consultationBusy}
                   jobTitle={campaign?.jobRequirement?.title ?? null}
+                  remainingInterviewerQuestions={
+                    session
+                      ? interviewerProfileQuestionsToAnswer({
+                          turns: session.turns,
+                          statements: threadStatements,
+                        }).map((line) => ({
+                          contactId: line.contactId,
+                          name:
+                            interviewerOrder.get(line.contactId)?.heading ??
+                            interviewConfig.labels.interviewer,
+                          count: line.count,
+                          href: `/campaigns/${campaignId}/summary#${line.hash}`,
+                        }))
+                      : []
+                  }
                   overall={
                     briefing?.success
                       ? stripInternalIdsFromDisplayText(briefing.data.overall)

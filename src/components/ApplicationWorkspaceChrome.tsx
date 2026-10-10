@@ -8,6 +8,7 @@ import { WorkspaceJobRefresh } from "@/components/ApplicationWorkspaceLive";
 import { WorkspaceJobsProvider } from "@/components/workspace-jobs-context";
 import { markApplicationStepViewedAction } from "@/app/actions/application-jobs";
 import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
+import type { ApplicationTrackerView } from "@/lib/application/tracker";
 import { workspaceCampaignHref } from "@/lib/application/workspace-links";
 import { applicationStepFromPathname } from "@/lib/product-config";
 
@@ -16,12 +17,14 @@ export function ApplicationWorkspaceChrome({
   initialSignature,
   initialJobs,
   initialWorkRunning = false,
+  initialTracker = null,
   children,
 }: {
   campaignId: string;
   initialSignature: string;
   initialJobs: WorkspaceJobStatusView[];
   initialWorkRunning?: boolean;
+  initialTracker?: ApplicationTrackerView | null;
   children?: ReactNode;
 }) {
   const pathname = usePathname() || "";
@@ -52,7 +55,7 @@ export function ApplicationWorkspaceChrome({
           initialJobs={initialJobs}
           initialWorkRunning={initialWorkRunning}
         />
-        <ApplicationCompactTracker campaignId={campaignId} />
+        <ApplicationCompactTracker tracker={initialTracker} />
         <div className="min-w-0 flex-1 space-y-4">
           {onDashboard ? null : (
             <div className="print:hidden">

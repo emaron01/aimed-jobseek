@@ -25,7 +25,7 @@ import {
 } from "@/lib/application/workspace-links";
 import { applicationAssetConfig, consultationConfig, vocab } from "@/lib/product-config";
 
-const POLL_MS = 3_000;
+const POLL_MS = 4_000;
 
 function JobErrorDetail({
   error,

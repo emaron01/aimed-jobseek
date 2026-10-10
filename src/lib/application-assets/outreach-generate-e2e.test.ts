@@ -159,8 +159,10 @@ describe("outreach generate end to end", () => {
     expect(live).toContain("return latest.active");
     expect(live).toContain("initialWorkRunning");
     const tracker = source("src/components/ApplicationSidebarTracker.tsx");
+    expect(tracker).not.toContain("setInterval");
     expect(tracker).toContain("step.hasActiveJob");
-    expect(tracker).toContain("activeWorkspaceJobs(liveJobs)");
+    const research = source("src/components/ApplicationResearchStatus.tsx");
+    expect(research).not.toContain("setInterval");
     const workspace = functionBody(
       "src/app/actions/application-jobs.ts",
       "getApplicationWorkspaceLiveAction",

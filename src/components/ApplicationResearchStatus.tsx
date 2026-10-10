@@ -1,9 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
-  getApplicationResearchStatusAction,
   retryApplicationResearchAction,
 } from "@/app/actions/application";
 import type { ApplicationResearchStatusView } from "@/lib/application/research-status";
@@ -12,12 +9,6 @@ import {
   applicationResearchCopy,
   employerIdentityCopy,
 } from "@/lib/product-config";
-
-const POLL_MS = 4_000;
-
-function isLivePhase(phase: ApplicationResearchStatusView["phase"]): boolean {
-  return phase === "queued" || phase === "researching" || phase === "not_started";
-}
 
 export function ApplicationResearchStatus({
   campaignId,
@@ -30,28 +21,7 @@ export function ApplicationResearchStatus({
   initialStatus: ApplicationResearchStatusView;
   hideRetry?: boolean;
 }) {
-  const router = useRouter();
-  const [status, setStatus] = useState(initialStatus);
-  const [appliedStatus, setAppliedStatus] = useState(initialStatus);
-  if (initialStatus !== appliedStatus) {
-    setAppliedStatus(initialStatus);
-    setStatus(initialStatus);
-  }
-
-  useEffect(() => {
-    if (!isLivePhase(status.phase)) return;
-
-    const interval = window.setInterval(async () => {
-      const latest = await getApplicationResearchStatusAction(campaignId);
-      if (!latest) return;
-      if (latest.phase !== status.phase || latest.label !== status.label) {
-        router.refresh();
-      }
-      setStatus(latest);
-    }, POLL_MS);
-
-    return () => window.clearInterval(interval);
-  }, [campaignId, router, status.phase, status.label]);
+  const status = initialStatus;
 
   return (
     <div className="space-y-2" data-testid="application-research-status">

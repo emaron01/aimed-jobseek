@@ -16,6 +16,7 @@ export type AppButtonVariant =
   | "warning"
   | "orange"
   | "lightOrange"
+  | "lightRed"
   | "success"
   | "chip";
 
@@ -32,6 +33,8 @@ const VARIANT_CLASS: Record<AppButtonVariant, string> = {
     "border border-bright-orange bg-bright-orange text-on-bright-orange hover:bg-bright-orange active:bg-bright-orange focus-visible:outline-focus disabled:bg-edge-strong disabled:text-on-ink",
   lightOrange:
     "bg-light-orange text-on-light-orange hover:bg-light-orange-hover focus-visible:bg-light-orange-hover active:bg-light-orange-hover focus-visible:outline-focus disabled:bg-edge-strong disabled:text-on-ink",
+  lightRed:
+    "bg-danger-tint text-danger hover:bg-danger-tint focus-visible:bg-danger-tint active:bg-danger-tint focus-visible:outline-focus disabled:bg-edge-strong disabled:text-on-ink",
   success:
     "cursor-pointer bg-success text-on-ink hover:bg-success-tint hover:text-success focus-visible:bg-success-tint focus-visible:text-success active:bg-success-tint active:text-success focus-visible:outline-focus disabled:bg-edge-strong disabled:text-on-ink",
   chip:

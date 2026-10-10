@@ -19,6 +19,12 @@ import {
   questionHasApprovedResult,
 } from "@/lib/consultation/harper-three-sections";
 import {
+  coachItemIdFromCheatSheetTarget,
+  contactIdFromCheatSheetTarget,
+  harperCoachItemAnchorId,
+  harperQuestionAnchorId,
+} from "@/lib/consultation/harper-layout";
+import {
   buildConsultationQaView,
   isIgnoredSeekerTurn,
   replyToTurnIdFromAnalysis,
@@ -214,6 +220,7 @@ export async function loadApplicationStepFacts(input: {
     consultationUnanswered: consultation.unanswered,
     consultationUnansweredCount: consultation.unansweredCount,
     consultationFirstUnansweredTurnId: consultation.firstUnansweredTurnId,
+    guideQuestionsToAnswerCount: consultation.guideQuestionsToAnswerCount,
     interviewersWithoutGuideCount: missingGuides.count,
     firstInterviewerWithoutGuideId: missingGuides.firstContactId,
   };
@@ -362,6 +369,7 @@ export function consultationFacts(
   unanswered: boolean;
   unansweredCount: number;
   firstUnansweredTurnId: string | null;
+  guideQuestionsToAnswerCount: number;
 } {
   if (!session) {
     return {
@@ -370,16 +378,18 @@ export function consultationFacts(
       unanswered: false,
       unansweredCount: 0,
       firstUnansweredTurnId: null,
+      guideQuestionsToAnswerCount: 0,
     };
   }
   const asked = askedQuestionsFromTurns(session.turns).filter(
     (question) =>
-      Boolean(question.targetKey) || question.text.includes("?"),
+      !isInterviewerProfileQuestionTarget(question.targetKey) &&
+      (Boolean(question.targetKey) || question.text.includes("?")),
   );
   const open = asked.filter(
     (question) => !question.answered && !question.ignored,
   );
-  const needing = harperQuestionsNeedingAnswer({
+  const split = splitQuestionsNeedingAnswer({
     turns: session.turns,
     statements: session.statements ?? [],
   });
@@ -387,8 +397,9 @@ export function consultationFacts(
     started: true,
     unanswered: open.length > 0,
     complete: open.length === 0,
-    unansweredCount: needing.count,
-    firstUnansweredTurnId: needing.firstTurnId,
+    unansweredCount: split.harper.length,
+    firstUnansweredTurnId: split.harper[0]?.questionTurnId ?? null,
+    guideQuestionsToAnswerCount: split.guide.length,
   };
 }
 
@@ -397,20 +408,29 @@ export function consultationFacts(
  * or a draft that is not approved. Approved results and permanent ignores are out.
  * The step's done rule stays on `unanswered` / `complete` above.
  */
-export function harperQuestionsNeedingAnswer(input: {
-  turns: Array<{
-    id: string;
-    speaker: "CONSULTANT" | "SEEKER";
-    body: string;
-    targetKey: string | null;
-    followUp: boolean;
-    skipped: boolean;
-    sequence: number;
-    intent: string | null;
-    analysisJson: unknown;
-  }>;
+type QuestionTurn = {
+  id: string;
+  speaker: "CONSULTANT" | "SEEKER";
+  body: string;
+  targetKey: string | null;
+  followUp: boolean;
+  skipped: boolean;
+  sequence: number;
+  intent: string | null;
+  analysisJson: unknown;
+};
+
+/** Interviewer Preparation Guide questions live on a person's cheat-sheet target. */
+export function isInterviewerProfileQuestionTarget(
+  targetKey: string | null | undefined,
+): boolean {
+  return contactIdFromCheatSheetTarget(targetKey) != null;
+}
+
+function splitQuestionsNeedingAnswer(input: {
+  turns: QuestionTurn[];
   statements: QaStatement[];
-}): { count: number; firstTurnId: string | null } {
+}): { harper: ConsultationQaItem[]; guide: ConsultationQaItem[] } {
   const view = buildConsultationQaView({
     turns: input.turns,
     statements: input.statements,
@@ -419,9 +439,53 @@ export function harperQuestionsNeedingAnswer(input: {
     harperQuestionNeedsSeekerAnswer(item, input.turns),
   );
   return {
+    harper: needing.filter((item) => !isInterviewerProfileQuestionTarget(item.targetKey)),
+    guide: needing.filter((item) => isInterviewerProfileQuestionTarget(item.targetKey)),
+  };
+}
+
+export function harperQuestionsNeedingAnswer(input: {
+  turns: QuestionTurn[];
+  statements: QaStatement[];
+}): { count: number; firstTurnId: string | null } {
+  const needing = splitQuestionsNeedingAnswer(input).harper;
+  return {
     count: needing.length,
     firstTurnId: needing[0]?.questionTurnId ?? null,
   };
+}
+
+export type InterviewerProfileQuestionLine = {
+  contactId: string;
+  count: number;
+  /** Fragment on that person's Interview Preparation Guide, without the leading #. */
+  hash: string;
+};
+
+/** One line per person. Unanswered and skipped count; approved and ignored do not. */
+export function interviewerProfileQuestionsToAnswer(input: {
+  turns: QuestionTurn[];
+  statements: QaStatement[];
+}): InterviewerProfileQuestionLine[] {
+  const groups = new Map<string, InterviewerProfileQuestionLine>();
+  for (const item of splitQuestionsNeedingAnswer(input).guide) {
+    const contactId = contactIdFromCheatSheetTarget(item.targetKey);
+    if (!contactId) continue;
+    const existing = groups.get(contactId);
+    if (existing) {
+      existing.count += 1;
+      continue;
+    }
+    const coachId = coachItemIdFromCheatSheetTarget(item.targetKey);
+    groups.set(contactId, {
+      contactId,
+      count: 1,
+      hash: coachId
+        ? harperCoachItemAnchorId(coachId)
+        : harperQuestionAnchorId(item.questionTurnId),
+    });
+  }
+  return [...groups.values()];
 }
 
 function harperQuestionNeedsSeekerAnswer(

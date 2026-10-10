@@ -24,7 +24,6 @@ import {
 } from "@/lib/application/step-progress";
 import {
   applicationStepCopy,
-  applicationStepHref,
   applicationStepStatusLabel,
   applicationStepStatusTone,
 } from "@/lib/product-config";
@@ -264,21 +263,23 @@ function DashboardInPlaceStep({
 
 function DashboardStepClose({
   stepKey,
+  sectionName,
   campaignId,
 }: {
   stepKey: DashboardInPlaceStepKey;
+  sectionName: string;
   campaignId: string;
 }) {
   const { close } = useDashboardStepNavigation(campaignId);
   return (
     <AppButton
       type="button"
-      variant="secondary"
+      variant="lightRed"
       size="sm"
       data-testid={`overview-step-close-${stepKey}`}
       onClick={() => close(stepKey)}
     >
-      {applicationStepCopy.closeStep}
+      {applicationStepCopy.closeStep.replace("{step}", sectionName)}
     </AppButton>
   );
 }
@@ -375,25 +376,17 @@ export function ApplicationStepCards({
                   data-testid={`overview-step-panel-${step.key}`}
                 >
                   <div className="space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                      {step.isPage ? (
-                        <AppActionLink
-                          href={
-                            step.key === "consultation"
-                              ? step.actionHref
-                              : applicationStepHref(campaignId, step.key)
-                          }
-                          variant="secondary"
-                          size="sm"
-                          data-testid={`overview-step-full-page-${step.key}`}
-                        >
-                          {applicationStepCopy.openFullPage}
-                        </AppActionLink>
-                      ) : null}
-                      <DashboardStepClose stepKey={step.key} campaignId={campaignId} />
-                    </div>
+                    <DashboardStepClose
+                      stepKey={step.key}
+                      sectionName={step.title}
+                      campaignId={campaignId}
+                    />
                     <DashboardOpenSection>{panels?.[step.key] ?? null}</DashboardOpenSection>
-                    <DashboardStepClose stepKey={step.key} campaignId={campaignId} />
+                    <DashboardStepClose
+                      stepKey={step.key}
+                      sectionName={step.title}
+                      campaignId={campaignId}
+                    />
                   </div>
                 </li>
               ) : null}

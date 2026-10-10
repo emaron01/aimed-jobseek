@@ -15,7 +15,15 @@ import {
   parseDashboardOpenSteps,
   toggleDashboardOpenStep,
 } from "@/lib/application/dashboard-open-steps";
-import type { ApplicationStepView } from "@/lib/application/step-progress";
+import {
+  buildApplicationStepViews,
+  emptyApplicationStepFacts,
+  type ApplicationStepView,
+} from "@/lib/application/step-progress";
+import {
+  ResumeBulletPoints,
+  resumeBulletSectionStartsOpen,
+} from "@/components/ApplicationAssetsSection";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
@@ -81,8 +89,9 @@ describe("dashboard steps open in place", () => {
     expect(panel).toContain(`--step-order:${dashboardStepPanelOrder(1, 1)}`);
     expect(panel).toContain(`--step-order-sm:${dashboardStepPanelOrder(1, 2)}`);
     expect(html).toContain('data-testid="shared-job"');
-    expect(html).toContain('data-testid="overview-step-full-page-job"');
-    expect(html).toContain('href="/campaigns/camp_1/job"');
+    expect(html).toContain("Close Job requirements");
+    expect(html).not.toContain("Open full page");
+    expect(html).not.toContain("overview-step-full-page-job");
     expect(html).not.toContain("overview-step-panel-applied");
     expect(html).not.toContain("overview-step-panel-company");
     const jobCard = html.match(
@@ -95,13 +104,15 @@ describe("dashboard steps open in place", () => {
     expect(html).not.toContain("overview-step-panel-consultation");
   });
 
-  it("keeps the open steps in the query string across a refresh", () => {
+  it("opens the clicked step and closes the one that was open", () => {
     const opened = toggleDashboardOpenStep(["applied"], "job");
+    expect(opened).toEqual(["job"]);
     const search = dashboardOpenSearch("?stage=list", opened);
     const again = parseDashboardOpenSteps(
       new URLSearchParams(search.slice(1)).get("open"),
     );
-    expect(again).toEqual(["applied", "job"]);
+    expect(again).toEqual(["job"]);
+    expect(parseDashboardOpenSteps("company,job")).toEqual(["company"]);
     expect(search.startsWith("?")).toBe(true);
     expect(search).toContain("stage=list");
     const html = renderToStaticMarkup(
@@ -115,10 +126,10 @@ describe("dashboard steps open in place", () => {
         },
       }),
     );
-    expect(html).toContain('data-testid="shared-applied"');
+    expect(html).not.toContain('data-testid="shared-applied"');
     expect(html).toContain('data-testid="shared-job"');
-    expect(html).not.toContain("overview-step-full-page-applied");
-    expect(html).toContain('data-testid="overview-step-full-page-job"');
+    expect(html).toContain("Close Job requirements");
+    expect(html).not.toContain("Open full page");
     const closed = renderToStaticMarkup(
       createElement(ApplicationStepCards, {
         steps,
@@ -297,8 +308,9 @@ describe("dashboard steps open in place", () => {
     );
     const index = notesSteps.findIndex((item) => item.key === "interviews");
     expect(html).toContain('data-testid="shared-interviews"');
-    expect(html).toContain('data-testid="overview-step-full-page-interviews"');
-    expect(html).toContain('href="/campaigns/camp_1/interviews"');
+    expect(html).toContain("Close Interview Notes");
+    expect(html).not.toContain("Open full page");
+    expect(html).not.toContain("overview-step-full-page-interviews");
     expect(html.split('data-testid="overview-step-close-interviews"').length - 1).toBe(2);
     expect(html).toContain("data-expand-outer-section");
     expect(panelStyle(html, "interviews")).toContain(
@@ -363,8 +375,9 @@ describe("dashboard steps open in place", () => {
     );
     const index = guideSteps.findIndex((item) => item.key === "summary");
     expect(html).toContain('data-testid="prep-guide-personas"');
-    expect(html).toContain('data-testid="overview-step-full-page-summary"');
-    expect(html).toContain('href="/campaigns/camp_1/summary"');
+    expect(html).toContain("Close Interview Preparation Guides");
+    expect(html).not.toContain("Open full page");
+    expect(html).not.toContain("overview-step-full-page-summary");
     expect(html.split('data-testid="overview-step-close-summary"').length - 1).toBe(2);
     expect(html).toContain("data-expand-outer-section");
     expect(html).toContain('data-testid="overview-step-action-consultation"');
@@ -439,8 +452,9 @@ describe("dashboard steps open in place", () => {
       "Answer Harper's questions",
     );
     expect(html).toContain("3 questions need your answer");
-    expect(html).toContain('data-testid="overview-step-full-page-consultation"');
-    expect(html).toContain('href="/campaigns/camp_1/consultation#harper-q%3Aturn_9"');
+    expect(html).toContain("Close Harper Questionnaire");
+    expect(html).not.toContain("Open full page");
+    expect(html).not.toContain("overview-step-full-page-consultation");
     expect(html.split('data-testid="overview-step-close-consultation"').length - 1).toBe(2);
     expect(html).toContain("data-expand-outer-section");
     expect(panelStyle(html, "consultation")).toContain(
@@ -517,5 +531,65 @@ describe("dashboard steps open in place", () => {
     expandOuterDetails(root);
     expect((root.querySelector("#outer") as HTMLDetailsElement).open).toBe(true);
     expect((root.querySelector("#profile") as HTMLDetailsElement).open).toBe(false);
+  });
+
+  it("starts resume bullet points collapsed only after the resume is approved", () => {
+    expect(resumeBulletSectionStartsOpen("APPROVED")).toBe(false);
+    expect(resumeBulletSectionStartsOpen("DRAFT")).toBe(true);
+    const collapsed = renderToStaticMarkup(
+      createElement(ResumeBulletPoints, { startOpen: false }, "Owned the forecast"),
+    );
+    const open = renderToStaticMarkup(
+      createElement(ResumeBulletPoints, { startOpen: true }, "Owned the forecast"),
+    );
+    expect(collapsed).toContain("Bullet points");
+    expect(collapsed).toContain("Owned the forecast");
+    expect(collapsed).not.toMatch(/<details[^>]*\sopen/);
+    expect(open).toMatch(/<details[^>]*\sopen/);
+  });
+
+  it("shows step 9 as your turn while guide questions remain", () => {
+    const steps = buildApplicationStepViews({
+      campaignId: "camp_1",
+      currentStep: "overview",
+      facts: {
+        ...emptyApplicationStepFacts(),
+        cheatSheetReady: true,
+        guideQuestionsToAnswerCount: 5,
+      },
+      jobs: [],
+      seen: {},
+    });
+    const guides = steps.find((step) => step.key === "summary");
+    expect(guides?.workDone).toBe(false);
+    expect(guides?.turnCountLabel).toBe("5 questions to answer");
+    const html = renderToStaticMarkup(
+      createElement(ApplicationStepCards, {
+        steps: guides ? [guides] : [],
+        campaignId: "camp_1",
+      }),
+    );
+    expect(html).toContain("Your turn");
+    expect(html).toContain("5 questions to answer");
+  });
+
+  it("polls workspace status on one timer only while work is running", () => {
+    const live = readFileSync("src/components/ApplicationWorkspaceLive.tsx", "utf8");
+    const tracker = readFileSync("src/components/ApplicationSidebarTracker.tsx", "utf8");
+    const research = readFileSync("src/components/ApplicationResearchStatus.tsx", "utf8");
+    const refresh = live.slice(live.indexOf("export function WorkspaceJobRefresh"));
+    expect(live).toContain("const POLL_MS = 4_000");
+    expect(refresh).toContain("setInterval");
+    expect(refresh).toContain("getApplicationWorkspaceLiveAction");
+    expect(refresh).toContain("router.refresh()");
+    expect(refresh).toContain("stopPolling");
+    expect(refresh).toContain("return latest.active");
+    expect(refresh).not.toContain("enqueueApplicationJob");
+    expect(refresh).not.toContain("runPaidStructuredCall");
+    expect(tracker).not.toContain("setInterval");
+    expect(research).not.toContain("setInterval");
+    expect(live.indexOf("setInterval", live.indexOf("export function ApplicationWorkspaceLive"))).toBe(
+      -1,
+    );
   });
 });

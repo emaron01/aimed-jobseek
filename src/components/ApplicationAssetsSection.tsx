@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   approveApplicationAssetAction,
   generateApplicationAssetAction,
@@ -208,12 +208,15 @@ function AssetPreview({
   editable = false,
   onChange,
   onHeadingChange,
+  bulletsStartOpen = true,
 }: {
   content: ApplicationAssetContent;
   earlierExperienceHeading: string | null;
   editable?: boolean;
   onChange?: (claimId: string, text: string) => void;
   onHeadingChange?: (heading: string) => void;
+  /** Approved resumes start with bullet points collapsed. */
+  bulletsStartOpen?: boolean;
 }) {
   if (content.type === "COVER_LETTER") {
     const paragraphs = visibleItems(content.paragraphs, (claim) => claim.text);
@@ -295,17 +298,19 @@ function AssetPreview({
               {formatResumeRoleMeta(role)}
             </p>
             {visibleItems(role.bullets, (claim) => claim.text).length ? (
-              <ul className="list-disc pl-5">
-                {visibleItems(role.bullets, (claim) => claim.text).map((claim) => (
-                  <li key={claim.id}>
-                    <ClaimText
-                      claim={claim}
-                      editable={editable}
-                      onChange={onChange}
-                    />
-                  </li>
-                ))}
-              </ul>
+              <ResumeBulletPoints startOpen={bulletsStartOpen}>
+                <ul className="list-disc pl-5">
+                  {visibleItems(role.bullets, (claim) => claim.text).map((claim) => (
+                    <li key={claim.id}>
+                      <ClaimText
+                        claim={claim}
+                        editable={editable}
+                        onChange={onChange}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </ResumeBulletPoints>
             ) : (
               <p className="text-sm text-muted">
                 {applicationAssetConfig.labels.emptySection}
@@ -369,12 +374,39 @@ function AssetPreview({
   );
 }
 
+export function resumeBulletSectionStartsOpen(status: "DRAFT" | "APPROVED"): boolean {
+  return status !== "APPROVED";
+}
+
+export function ResumeBulletPoints({
+  startOpen,
+  children,
+}: {
+  startOpen: boolean;
+  children?: ReactNode;
+}) {
+  const [open, setOpen] = useState(startOpen);
+  return (
+    <details
+      open={open}
+      className="mt-1"
+      data-testid="resume-bullet-points"
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary className="cursor-pointer text-sm font-medium text-ink">
+        {applicationAssetConfig.labels.bulletPoints}
+      </summary>
+      <div className="mt-1">{children}</div>
+    </details>
+  );
+}
+
 function AssetSection({
   title,
   children,
 }: {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <section>
@@ -442,6 +474,11 @@ function AssetVersionEditor({
         <AssetPreview
           content={asset.content}
           earlierExperienceHeading={earlierExperienceHeading}
+          bulletsStartOpen={
+            asset.content.type === "RESUME"
+              ? resumeBulletSectionStartsOpen(asset.status)
+              : true
+          }
         />
         <SecondaryButton
           type="button"
@@ -480,6 +517,7 @@ function AssetVersionEditor({
         earlierExperienceHeading={
           asset.content.type === "RESUME" ? heading : earlierExperienceHeading
         }
+        bulletsStartOpen
         editable
         onChange={(claimId, text) =>
           setContent((current) => mapClaimText(current, claimId, text))
@@ -555,6 +593,11 @@ function AssetHistory({
               <AssetPreview
                 content={asset.content}
                 earlierExperienceHeading={earlierExperienceHeading}
+                bulletsStartOpen={
+                  asset.content.type === "RESUME"
+                    ? resumeBulletSectionStartsOpen(asset.status)
+                    : true
+                }
               />
             )}
             <div className="flex flex-wrap gap-2">

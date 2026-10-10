@@ -10,6 +10,7 @@ import { QuestionList } from "@/components/ConsultationThread";
 import { useHarperDraft } from "@/components/HarperDraftStore";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  applicationStepCopy,
   bestPracticeInterviewTitle,
   consultationConversationCopy,
   evidenceStrengthLabels,
@@ -35,6 +36,11 @@ import {
 } from "@/lib/consultation/harper-three-sections";
 import type { StandingListEntry } from "@/lib/consultation/standing-entries";
 import type { ConsultationQaItem } from "@/lib/consultation/qa-view";
+
+function questionToAnswerLabel(count: number): string {
+  if (count === 1) return applicationStepCopy.oneQuestionToAnswer;
+  return applicationStepCopy.questionsToAnswer.replace("{count}", String(count));
+}
 
 const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
 const textLinkClass =
@@ -356,6 +362,7 @@ export function ConsultationStanding({
   jobsActive,
   overall,
   entries,
+  remainingInterviewerQuestions = [],
   jobTitle = null,
   /** @deprecated Ignored — entries replace gaps / dual lists. */
   gaps: _gaps,
@@ -374,6 +381,12 @@ export function ConsultationStanding({
   jobsActive: boolean;
   overall: string | null;
   entries: StandingListEntry[];
+  remainingInterviewerQuestions?: Array<{
+    contactId: string;
+    name: string;
+    count: number;
+    href: string;
+  }>;
   jobTitle?: string | null;
   gaps?: unknown[];
   careerRecap?: string | null;
@@ -565,6 +578,25 @@ export function ConsultationStanding({
             }}
           />
         </div>
+        {remainingInterviewerQuestions.length > 0 ? (
+          <section
+            className="mt-4 space-y-2"
+            data-testid="remaining-interviewer-profile-questions"
+          >
+            <h3 className="text-sm font-semibold text-ink">
+              {applicationStepCopy.remainingInterviewerProfileQuestions}
+            </h3>
+            <ul className="space-y-1 text-sm">
+              {remainingInterviewerQuestions.map((line) => (
+                <li key={line.contactId}>
+                  <a href={line.href} className="font-medium text-ink underline">
+                    {line.name}: {questionToAnswerLabel(line.count)}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
       </HarperPageSection>
 
       <HarperPageSection

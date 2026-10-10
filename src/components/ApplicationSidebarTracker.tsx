@@ -1,14 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { getApplicationTrackerAction } from "@/app/actions/application-jobs";
-import {
-  getExternalWorkspaceJobs,
-  subscribeExternalWorkspaceJobs,
-} from "@/components/workspace-jobs-context";
-import { activeWorkspaceJobs } from "@/lib/application-jobs/workspace-status";
 import { AppIcon, ErrorState, Skeleton } from "@/components/design";
 import {
   sidebarNavItemBranchClass,
@@ -35,76 +30,38 @@ import {
 } from "@/lib/product-config";
 import { cn } from "@/lib/utils";
 
-const POLL_MS = 3_000;
-
-function useApplicationTrackerPoll(
+function useApplicationTrackerLoad(
   campaignId: string,
   pathname: string,
   onTracker: (tracker: ApplicationTrackerView | null) => void,
   onFailed: (failed: boolean) => void,
   onLoaded: (loaded: boolean) => void,
 ) {
-  const liveJobs = useSyncExternalStore(
-    subscribeExternalWorkspaceJobs,
-    getExternalWorkspaceJobs,
-    getExternalWorkspaceJobs,
-  );
-  const liveRunning = activeWorkspaceJobs(liveJobs).length > 0;
-
   useEffect(() => {
     let cancelled = false;
-    let interval: number | null = null;
-
-    const stop = () => {
-      if (interval == null) return;
-      window.clearInterval(interval);
-      interval = null;
-    };
-
-    const load = async () => {
-      const next = await getApplicationTrackerAction(campaignId, pathname);
-      if (cancelled) return null;
-      onTracker(next);
-      onLoaded(true);
-      onFailed(false);
-      return next;
-    };
-
-    const tick = () => {
-      void load()
-        .then((next) => {
-          if (cancelled) return;
-          const busy =
-            liveRunning || Boolean(next?.steps.some((step) => step.hasActiveJob));
-          if (!busy) {
-            stop();
-            return;
-          }
-          if (interval != null) return;
-          interval = window.setInterval(() => {
-            tick();
-          }, POLL_MS);
-        })
-        .catch((error) => {
-          if (!cancelled) {
-            onLoaded(true);
-            onFailed(true);
-          }
-          console.error(
-            JSON.stringify({
-              event: "application_tracker_poll_failed",
-              message: error instanceof Error ? error.message : "unknown",
-            }),
-          );
-        });
-    };
-
-    tick();
+    void getApplicationTrackerAction(campaignId, pathname)
+      .then((next) => {
+        if (cancelled) return;
+        onTracker(next);
+        onLoaded(true);
+        onFailed(false);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          onLoaded(true);
+          onFailed(true);
+        }
+        console.error(
+          JSON.stringify({
+            event: "application_tracker_load_failed",
+            message: error instanceof Error ? error.message : "unknown",
+          }),
+        );
+      });
     return () => {
       cancelled = true;
-      stop();
     };
-  }, [campaignId, pathname, liveRunning, onTracker, onFailed, onLoaded]);
+  }, [campaignId, pathname, onTracker, onFailed, onLoaded]);
 }
 
 function applicationPageBranch(
@@ -287,7 +244,7 @@ export function ApplicationSidebarTracker({
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  useApplicationTrackerPoll(campaignId, pathname, setTracker, setFailed, setLoaded);
+  useApplicationTrackerLoad(campaignId, pathname, setTracker, setFailed, setLoaded);
 
   const href = workspaceCampaignHref(campaignId);
   const branch = applicationPageBranch(campaignId, pathname);
@@ -347,19 +304,17 @@ export function ApplicationSidebarTracker({
 }
 
 export function ApplicationCompactTracker({
-  campaignId,
+  tracker,
 }: {
-  campaignId: string;
+  tracker: ApplicationTrackerView | null;
 }) {
   const pathname = usePathname() || "";
-  const [tracker, setTracker] = useState<ApplicationTrackerView | null>(null);
   const [open, setOpen] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-
-  useApplicationTrackerPoll(campaignId, pathname, setTracker, setFailed, setLoaded);
-
-  const current = tracker?.steps.find((step) => step.isCurrent) ?? tracker?.steps[0];
+  const stepKey = applicationStepFromPathname(pathname);
+  const current =
+    tracker?.steps.find((step) =>
+      stepKey === "overview" ? step.key === "applied" : step.key === stepKey,
+    ) ?? tracker?.steps[0];
   const doneCount = tracker?.steps.filter((step) => step.state === "done").length ?? 0;
   const total = tracker?.steps.length ?? 0;
 
@@ -375,15 +330,15 @@ export function ApplicationCompactTracker({
               ? `${current.number}. ${current.title}`
               : applicationStepCopy.trackerLabel}
           </p>
-          {!loaded ? (
-            <Skeleton className="mt-1" lines={1} />
-          ) : (
+          {tracker ? (
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-edge">
               <div
                 className="h-full bg-primary transition-[width] duration-200 motion-reduce:transition-none"
                 style={{ width: total ? `${(doneCount / total) * 100}%` : "0%" }}
               />
             </div>
+          ) : (
+            <Skeleton className="mt-1" lines={1} />
           )}
         </div>
         <AppButton
@@ -396,14 +351,6 @@ export function ApplicationCompactTracker({
           {open ? applicationStepCopy.collapseTracker : applicationStepCopy.expandTracker}
         </AppButton>
       </div>
-      {failed && !tracker ? (
-        <div className="mt-2">
-          <ErrorState
-            description={polishCopy.trackerLoadFailed}
-            onRetry={() => window.location.reload()}
-          />
-        </div>
-      ) : null}
       {open && tracker ? (
         <div className="mt-2">
           <Suspense fallback={null}>

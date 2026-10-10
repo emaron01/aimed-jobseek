@@ -146,6 +146,7 @@ function facts(interviewStageCount: number): ApplicationStepFactInput {
     consultationUnanswered: false,
     consultationUnansweredCount: 0,
     consultationFirstUnansweredTurnId: null,
+    guideQuestionsToAnswerCount: 0,
     interviewersWithoutGuideCount: 0,
     firstInterviewerWithoutGuideId: null,
   };

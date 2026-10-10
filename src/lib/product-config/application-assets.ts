@@ -51,6 +51,7 @@ export const applicationAssetConfig = Object.freeze({
       "This role has {count} picks. The recommended range is {min} to {max}. You can still save.",
     interviewAnswerPick: "Interview answer",
     resumeBulletPick: "Resume bullet",
+    bulletPoints: "Bullet points",
     coversRequirement: "Covers {requirement}",
     prepareResumeBullets: "Prepare resume bullets",
     refreshBullets: "Refresh bullets",

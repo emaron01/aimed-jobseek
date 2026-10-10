@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   consultationFacts,
   harperQuestionsNeedingAnswer,
+  interviewerProfileQuestionsToAnswer,
   interviewersMissingPrepGuides,
 } from "@/lib/application/tracker";
 import {
+  buildApplicationStepViews,
   emptyApplicationStepFacts,
   resolveApplicationStepState,
 } from "@/lib/application/step-progress";
@@ -57,6 +59,7 @@ describe("consultationFacts Harper green", () => {
       complete: true,
       unansweredCount: 0,
       firstUnansweredTurnId: null,
+      guideQuestionsToAnswerCount: 0,
     });
     expect(
       resolveApplicationStepState(
@@ -105,6 +108,7 @@ describe("consultationFacts Harper green", () => {
       complete: false,
       unansweredCount: 1,
       firstUnansweredTurnId: "q2",
+      guideQuestionsToAnswerCount: 0,
     });
     expect(
       resolveApplicationStepState(
@@ -168,6 +172,7 @@ describe("consultationFacts Harper green", () => {
       complete: true,
       unansweredCount: 0,
       firstUnansweredTurnId: null,
+      guideQuestionsToAnswerCount: 0,
     });
     expect(
       resolveApplicationStepState(
@@ -298,6 +303,109 @@ describe("harperQuestionsNeedingAnswer", () => {
     expect(facts.unansweredCount).toBe(0);
     expect(facts.unanswered).toBe(true);
     expect(facts.complete).toBe(false);
+  });
+});
+
+describe("interviewer profile questions", () => {
+  it("keeps guide questions off the Harper count and on the guide lines", () => {
+    const turns = [
+      turn({
+        id: "harper-open",
+        speaker: "CONSULTANT",
+        body: "What was the forecasting result?",
+        targetKey: "forecasting",
+        sequence: 1,
+      }),
+      turn({
+        id: "guide-open",
+        speaker: "CONSULTANT",
+        body: "How do you run a forecast?",
+        targetKey: "cheatSheet:contact:ashley:likely:1",
+        sequence: 2,
+      }),
+      turn({
+        id: "guide-skipped-q",
+        speaker: "CONSULTANT",
+        body: "Walk me through a deal you lost?",
+        targetKey: "cheatSheet:contact:sam:likely:1",
+        sequence: 3,
+      }),
+      {
+        ...turn({
+          id: "guide-skip",
+          speaker: "SEEKER",
+          body: "",
+          targetKey: "cheatSheet:contact:sam:likely:1",
+          sequence: 4,
+          analysisJson: { status: "READY", replyToTurnId: "guide-skipped-q" },
+        }),
+        skipped: true,
+      },
+      turn({
+        id: "guide-approved-q",
+        speaker: "CONSULTANT",
+        body: "Why this company?",
+        targetKey: "cheatSheet:contact:sam:likely:2",
+        sequence: 5,
+      }),
+      turn({
+        id: "guide-ignored-q",
+        speaker: "CONSULTANT",
+        body: "Tell me about a gap?",
+        targetKey: "cheatSheet:contact:sam:likely:3",
+        sequence: 6,
+      }),
+      {
+        ...turn({
+          id: "guide-ignore",
+          speaker: "SEEKER",
+          body: "",
+          targetKey: "cheatSheet:contact:sam:likely:3",
+          sequence: 7,
+          analysisJson: {
+            status: "READY",
+            replyToTurnId: "guide-ignored-q",
+            ignored: true,
+          },
+        }),
+        skipped: true,
+      },
+    ];
+    const statements = [
+      statement({ id: "approved-guide", turnId: "guide-approved-q", status: "APPROVED" }),
+    ];
+    expect(harperQuestionsNeedingAnswer({ turns, statements })).toEqual({
+      count: 1,
+      firstTurnId: "harper-open",
+    });
+    expect(interviewerProfileQuestionsToAnswer({ turns, statements })).toEqual([
+      {
+        contactId: "ashley",
+        count: 1,
+        hash: "harper-coach:contact:ashley:likely:1",
+      },
+      {
+        contactId: "sam",
+        count: 1,
+        hash: "harper-coach:contact:sam:likely:1",
+      },
+    ]);
+    const facts = {
+      ...emptyApplicationStepFacts(),
+      cheatSheetReady: true,
+      guideQuestionsToAnswerCount: 2,
+    };
+    const steps = buildApplicationStepViews({
+      campaignId: "camp_1",
+      currentStep: "overview",
+      facts,
+      jobs: [],
+      seen: {},
+    });
+    const guides = steps.find((step) => step.key === "summary");
+    expect(guides?.workDone).toBe(false);
+    expect(guides?.turnCountLabel).toBe("2 questions to answer");
+    expect(guides?.state).not.toBe("not_started");
   });
 });
 
