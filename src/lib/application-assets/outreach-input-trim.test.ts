@@ -1,4 +1,9 @@
 import { describe, expect, it } from "vitest";
+import {
+  OUTREACH_EMAIL_INSTRUCTIONS,
+  OUTREACH_LINKEDIN_INMAIL_INSTRUCTIONS,
+  OUTREACH_LINKEDIN_NOTE_INSTRUCTIONS,
+} from "@/lib/prompt-content/outreach";
 import { fingerprintPaidCallInputs } from "@/lib/ai/paid-call-gate";
 import {
   buildOutreachAssetMessages,
@@ -226,6 +231,32 @@ function previousLayoutChars(context: ReadyApplicationGenerationContext): number
   return payload.length;
 }
 
+const APPROVED_VOICE =
+  "Match the seeker's voice from the supplied voice sample and the seeker facts in citableSources.";
+
+describe("outreach instruction wording", () => {
+  it("uses the approved proof and voice lines and not the replaced wording", () => {
+    const instructions = [
+      OUTREACH_EMAIL_INSTRUCTIONS,
+      OUTREACH_LINKEDIN_NOTE_INSTRUCTIONS,
+      OUTREACH_LINKEDIN_INMAIL_INSTRUCTIONS,
+    ].join("\n");
+    expect(instructions).toContain(
+      "Use at most one strong proof point, from any seeker fact in citableSources. Do not invent metrics or titles.",
+    );
+    expect(instructions).toContain(
+      "One proof point only, from any seeker fact in citableSources. Cite it from citableSources. A short paraphrase is better than pasting a long quote when space is tight.",
+    );
+    expect(instructions).toContain(
+      "One proof point only, from any seeker fact in citableSources.",
+    );
+    expect(instructions.split(APPROVED_VOICE).length - 1).toBe(4);
+    expect(instructions).not.toContain("approved statement or profile FACT");
+    expect(instructions).not.toContain("voice samples and seeker-authored");
+    expect(instructions).not.toContain("voice samples and consultation answers");
+  });
+});
+
 describe("outreach input trim", () => {
   it("sends the Sift / Ashley email facts once and drops the removed dumps", () => {
     const input = emailInput();
@@ -292,8 +323,8 @@ describe("outreach input trim", () => {
     expect(chars).toBeLessThan(OUTREACH_INPUT_LIMITS.messageCharCap);
     expect(tokens).toBeLessThanOrEqual(5_000);
     expect(beforeChars).toBeGreaterThan(chars);
-    expect(chars).toBe(6_673);
-    expect(tokens).toBe(1_669);
+    expect(chars).toBe(6_708);
+    expect(tokens).toBe(1_677);
   });
 
   it("ranks seeker material from every source and keeps ties in source order", () => {
