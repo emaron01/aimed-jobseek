@@ -71,6 +71,58 @@ function contactFirstName(contact: {
   return first || null;
 }
 
+async function priorOutreachThread(input: {
+  followUpToAssetId: string;
+  campaignId: string;
+  organizationId: string;
+}): Promise<
+  | {
+      ok: true;
+      messages: Array<{ subject: string | null; body: string }>;
+      followUpToAssetId: string;
+    }
+  | { ok: false; message: string }
+> {
+  const prior = await prisma.applicationAsset.findFirst({
+    where: {
+      id: input.followUpToAssetId,
+      campaignId: input.campaignId,
+      organizationId: input.organizationId,
+      sentAt: { not: null },
+    },
+  });
+  if (!prior) {
+    return {
+      ok: false,
+      message: "The earlier message was not found or has not been marked sent.",
+    };
+  }
+  const parsed = applicationAssetContentSchema.safeParse(prior.contentJson);
+  if (!parsed.success) {
+    return { ok: false, message: "The earlier message could not be read." };
+  }
+  const messages = [composeOutreachText(parsed.data)];
+  let ancestorId = prior.followUpToAssetId;
+  while (ancestorId) {
+    const ancestor = await prisma.applicationAsset.findFirst({
+      where: {
+        id: ancestorId,
+        campaignId: input.campaignId,
+        organizationId: input.organizationId,
+      },
+    });
+    if (!ancestor) break;
+    const ancestorParsed = applicationAssetContentSchema.safeParse(
+      ancestor.contentJson,
+    );
+    if (ancestorParsed.success) {
+      messages.push(composeOutreachText(ancestorParsed.data));
+    }
+    ancestorId = ancestor.followUpToAssetId;
+  }
+  return { ok: true, messages, followUpToAssetId: prior.id };
+}
+
 function outreachSentences(text: string): string[] {
   return text
     .split(/(?<=[.!?])\s+|\n+/)
@@ -1001,53 +1053,20 @@ export async function generateOutreachAsset(input: {
     };
   }
   let priorMessage: { subject: string | null; body: string } | null = null;
-  const priorMessages: Array<{ subject: string | null; body: string }> = [];
+  let priorMessages: Array<{ subject: string | null; body: string }> = [];
   let followUpToAssetId: string | null = null;
   if (input.purpose === "FOLLOW_UP") {
-    const prior = await prisma.applicationAsset.findFirst({
-      where: {
-        id: input.followUpToAssetId!,
-        campaignId: input.campaignId,
-        organizationId: input.organizationId,
-        sentAt: { not: null },
-      },
+    const thread = await priorOutreachThread({
+      followUpToAssetId: input.followUpToAssetId!,
+      campaignId: input.campaignId,
+      organizationId: input.organizationId,
     });
-    if (!prior) {
-      return {
-        ok: false,
-        message: "The earlier message was not found or has not been marked sent.",
-        violations: [],
-      };
+    if (!thread.ok) {
+      return { ok: false, message: thread.message, violations: [] };
     }
-    const parsed = applicationAssetContentSchema.safeParse(prior.contentJson);
-    if (!parsed.success) {
-      return {
-        ok: false,
-        message: "The earlier message could not be read.",
-        violations: parsed.error.issues.map((issue) => issue.message),
-      };
-    }
-    priorMessage = composeOutreachText(parsed.data);
-    priorMessages.push(priorMessage);
-    let ancestorId = prior.followUpToAssetId;
-    while (ancestorId) {
-      const ancestor = await prisma.applicationAsset.findFirst({
-        where: {
-          id: ancestorId,
-          campaignId: input.campaignId,
-          organizationId: input.organizationId,
-        },
-      });
-      if (!ancestor) break;
-      const ancestorParsed = applicationAssetContentSchema.safeParse(
-        ancestor.contentJson,
-      );
-      if (ancestorParsed.success) {
-        priorMessages.push(composeOutreachText(ancestorParsed.data));
-      }
-      ancestorId = ancestor.followUpToAssetId;
-    }
-    followUpToAssetId = prior.id;
+    priorMessages = thread.messages;
+    priorMessage = thread.messages[0] ?? null;
+    followUpToAssetId = thread.followUpToAssetId;
   }
   const channel = input.type === "EMAIL" ? "email" : "linkedin";
   const greeting = outreachGreeting({
@@ -1074,6 +1093,7 @@ export async function generateOutreachAsset(input: {
     purpose: input.purpose,
     emailLength,
     priorMessage,
+    priorMessages,
     interviewStageNotes,
     mentionApplied,
     regenerationInstruction: input.regenerationInstruction ?? null,
@@ -1302,20 +1322,17 @@ export async function outreachGenerateWouldSkip(input: {
   }
 
   let priorMessage: { subject: string | null; body: string } | null = null;
+  let priorMessages: Array<{ subject: string | null; body: string }> = [];
   if (input.purpose === "FOLLOW_UP") {
     if (!input.followUpToAssetId?.trim()) return false;
-    const prior = await prisma.applicationAsset.findFirst({
-      where: {
-        id: input.followUpToAssetId,
-        campaignId: input.campaignId,
-        organizationId: input.organizationId,
-        sentAt: { not: null },
-      },
+    const thread = await priorOutreachThread({
+      followUpToAssetId: input.followUpToAssetId,
+      campaignId: input.campaignId,
+      organizationId: input.organizationId,
     });
-    if (!prior) return false;
-    const parsed = applicationAssetContentSchema.safeParse(prior.contentJson);
-    if (!parsed.success) return false;
-    priorMessage = composeOutreachText(parsed.data);
+    if (!thread.ok) return false;
+    priorMessages = thread.messages;
+    priorMessage = thread.messages[0] ?? null;
   }
 
   const channel = input.type === "EMAIL" ? "email" : "linkedin";
@@ -1365,6 +1382,7 @@ export async function outreachGenerateWouldSkip(input: {
     purpose: input.purpose,
     emailLength,
     priorMessage,
+    priorMessages,
     interviewStageNotes,
     mentionApplied,
     regenerationInstruction: input.regenerationInstruction ?? null,

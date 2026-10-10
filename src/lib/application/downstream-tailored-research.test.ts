@@ -337,7 +337,10 @@ describe("tailored employer research reader", () => {
       purpose: "PROACTIVE",
       candidates: [],
     });
-    expect(outreach[1]?.content).toContain(JOB_FOCUS);
+    expect(outreach[1]?.content).toContain("Senior Director of Sales");
+    expect(outreach[1]?.content).toContain("CSC");
+    expect(outreach[1]?.content).not.toContain(JOB_FOCUS);
+    expect(outreach[1]?.content).not.toContain("scorecard");
 
     const evidence = companyResearchEvidenceText({
       companySummary: researchInput.companySummary,
@@ -436,10 +439,19 @@ describe("tailored employer research reader", () => {
       context: assetContext(researchInput),
       purpose: "PROACTIVE",
       candidates: [],
-    })).not.toBe(outreachFactSelectionFingerprint({
+    })).toBe(outreachFactSelectionFingerprint({
       context: assetContext(changedResearch),
       purpose: "PROACTIVE",
       candidates: [],
+    }));
+    expect(outreachFactSelectionFingerprint({
+      context: assetContext(researchInput),
+      purpose: "PROACTIVE",
+      candidates: [{ candidateId: "research:job-focus", text: JOB_FOCUS }],
+    })).not.toBe(outreachFactSelectionFingerprint({
+      context: assetContext(changedResearch),
+      purpose: "PROACTIVE",
+      candidates: [{ candidateId: "research:job-focus", text: "a different business unit" }],
     }));
 
     const excerpts = (focus: string) =>

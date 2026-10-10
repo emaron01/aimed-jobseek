@@ -24,6 +24,8 @@ export type OutreachGenerationInput = {
   purpose: "PROACTIVE" | "FOLLOW_UP" | "THANK_YOU" | "CHECK_IN";
   emailLength: EmailLength | null;
   priorMessage: { subject: string | null; body: string } | null;
+  /** Earlier messages in this thread. Follow-up, thank-you, and check-in send these. */
+  priorMessages?: Array<{ subject: string | null; body: string }>;
   interviewStageNotes: string | null;
   mentionApplied: boolean;
   regenerationInstruction: string | null;

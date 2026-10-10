@@ -43,27 +43,254 @@ function seekerSources(context: ApplicationGenerationContext) {
   );
 }
 
-function outreachCitableSources(
-  context: ApplicationGenerationContext,
-  mentionApplied: boolean,
-) {
-  return context.sources
-    .filter((source) =>
-      [
-        "PROFILE_FACT",
-        "APPROVED_STATEMENT",
-        "APPROVED_STORY",
-        "APPLICATION",
-        "JOB_REQUIREMENT",
-        "PERSONA",
-      ].includes(source.category),
-    )
-    .filter((source) => mentionApplied || source.id !== "application:status")
-    .map((source) => ({
+/** Caps from the outreach input-size report. Selection is by relevance, not source. */
+export const OUTREACH_INPUT_LIMITS = {
+  facts: 8,
+  factChars: 400,
+  statements: 8,
+  statementChars: 500,
+  stories: 4,
+  storyChars: 400,
+  personaChars: 2_000,
+  jobChars: 2_000,
+  companyFactChars: 500,
+  voiceChars: 1_200,
+  messageCharCap: 20_000,
+} as const;
+
+const STORY_FIELDS = [
+  "situation",
+  "task",
+  "action",
+  "result",
+  "verbatimAnswer",
+  "interviewAnswer",
+  "resumeBullet",
+] as const;
+
+const RELEVANCE_STOP_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "are",
+  "as",
+  "at",
+  "be",
+  "by",
+  "for",
+  "from",
+  "in",
+  "is",
+  "it",
+  "of",
+  "on",
+  "or",
+  "that",
+  "the",
+  "their",
+  "this",
+  "to",
+  "with",
+]);
+
+type SeekerKind = "fact" | "statement" | "story";
+
+export type OutreachCitableSource = {
+  id: string;
+  category: string;
+  text: string;
+};
+
+function capText(text: string, max: number): string {
+  const trimmed = text.trim().replace(/\s+/g, " ");
+  if (trimmed.length <= max) return trimmed;
+  const slice = trimmed.slice(0, max);
+  const space = slice.lastIndexOf(" ");
+  return (space > max * 0.6 ? slice.slice(0, space) : slice).trim();
+}
+
+function plainTexts(value: unknown): string[] {
+  if (typeof value === "string") return value.trim() ? [value.trim()] : [];
+  if (Array.isArray(value)) return value.flatMap(plainTexts);
+  if (value && typeof value === "object" && "text" in value) {
+    return plainTexts((value as { text?: unknown }).text);
+  }
+  return [];
+}
+
+function relevanceTerms(text: string): string[] {
+  const words = text.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+  return [
+    ...new Set(
+      words.filter((word) => word.length > 2 && !RELEVANCE_STOP_WORDS.has(word)),
+    ),
+  ];
+}
+
+function relevanceScore(text: string, terms: readonly string[]): number {
+  const haystack = text.toLowerCase();
+  let score = 0;
+  for (const term of terms) {
+    if (haystack.includes(term)) score += 1;
+  }
+  return score;
+}
+
+function normalizedFact(text: string): string {
+  return text.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function personaExcerpt(
+  context: ReadyApplicationGenerationContext,
+): string | null {
+  const persona = context.persona;
+  if (!persona) return null;
+  const parts = [persona.name, persona.likelyTitles.filter(Boolean).join(", ")];
+  const source = context.sources.find((item) => item.id === `persona:${persona.id}`);
+  if (source) {
+    const jsonAt = source.text.indexOf("{");
+    const prefix = (jsonAt >= 0 ? source.text.slice(0, jsonAt) : source.text).trim();
+    const withoutName = prefix
+      .replace(persona.name, "")
+      .replace(/^[.\s]+/, "")
+      .replace(/[.\s]+$/, "");
+    if (withoutName) parts.push(withoutName);
+  }
+  const profile = persona.profileJson;
+  const narrative =
+    profile && typeof profile === "object" && !Array.isArray(profile)
+      ? (profile as { narrative?: unknown }).narrative
+      : null;
+  if (narrative && typeof narrative === "object" && !Array.isArray(narrative)) {
+    const fields = narrative as Record<string, unknown>;
+    for (const key of ["overview", "pressures", "impact"]) {
+      parts.push(...plainTexts(fields[key]));
+    }
+  }
+  const text = capText(parts.filter(Boolean).join("\n"), OUTREACH_INPUT_LIMITS.personaChars);
+  return text || null;
+}
+
+function jobExcerpt(context: ReadyApplicationGenerationContext): string | null {
+  const requirement = context.requirement;
+  if (!requirement) return null;
+  const parts = [
+    requirement.title,
+    requirement.companyName,
+    requirement.location,
+    ...requirement.requiredItems,
+    ...requirement.responsibilities,
+  ].filter((part): part is string => Boolean(part?.trim()));
+  const text = capText(parts.join("\n"), OUTREACH_INPUT_LIMITS.jobChars);
+  return text || null;
+}
+
+function seekerKind(source: { id: string; category: string }): SeekerKind | null {
+  if (source.category === "PROFILE_FACT") return "fact";
+  if (source.id.startsWith("seeker-bullet:") || source.id.startsWith("bullet-edit:")) {
+    return "fact";
+  }
+  if (source.category === "APPROVED_STATEMENT" || source.category === "SEEKER_REPLY") {
+    return "statement";
+  }
+  return null;
+}
+
+/**
+ * Highest-scoring seeker material, capped per kind. Equal scores keep source order.
+ * The same text is kept once, in the higher-scoring copy.
+ */
+export function selectOutreachSeekerMaterial(input: {
+  context: ReadyApplicationGenerationContext;
+  personaText: string | null;
+  jobText: string | null;
+}): {
+  facts: OutreachCitableSource[];
+  statements: OutreachCitableSource[];
+  stories: OutreachCitableSource[];
+} {
+  const terms = relevanceTerms(
+    [input.personaText, input.jobText].filter(Boolean).join("\n"),
+  );
+  const ranked: Array<{
+    id: string;
+    category: string;
+    text: string;
+    kind: SeekerKind;
+    score: number;
+    index: number;
+    maxChars: number;
+  }> = [];
+  let index = 0;
+  for (const source of input.context.sources) {
+    const kind = seekerKind(source);
+    if (!kind || !source.text.trim()) continue;
+    ranked.push({
       id: source.id,
       category: source.category,
       text: source.text,
-    }));
+      kind,
+      score: relevanceScore(source.text, terms),
+      index,
+      maxChars:
+        kind === "fact"
+          ? OUTREACH_INPUT_LIMITS.factChars
+          : OUTREACH_INPUT_LIMITS.statementChars,
+    });
+    index += 1;
+  }
+  for (const story of input.context.stories ?? []) {
+    const fields = STORY_FIELDS.map((field, fieldIndex) => {
+      const text = story[field]?.trim() ?? "";
+      return {
+        fieldIndex,
+        text,
+        score: text ? relevanceScore(text, terms) : -1,
+      };
+    }).filter((field) => field.text);
+    if (fields.length === 0) continue;
+    fields.sort((a, b) => b.score - a.score || a.fieldIndex - b.fieldIndex);
+    const best = fields[0]!;
+    ranked.push({
+      id: `story:${story.id}`,
+      category: "SEEKER_STORY",
+      text: best.text,
+      kind: "story",
+      score: best.score,
+      index,
+      maxChars: OUTREACH_INPUT_LIMITS.storyChars,
+    });
+    index += 1;
+  }
+  ranked.sort((a, b) => b.score - a.score || a.index - b.index);
+  const limits: Record<SeekerKind, number> = {
+    fact: OUTREACH_INPUT_LIMITS.facts,
+    statement: OUTREACH_INPUT_LIMITS.statements,
+    story: OUTREACH_INPUT_LIMITS.stories,
+  };
+  const counts: Record<SeekerKind, number> = { fact: 0, statement: 0, story: 0 };
+  const seen = new Set<string>();
+  const chosen: Record<SeekerKind, OutreachCitableSource[]> = {
+    fact: [],
+    statement: [],
+    story: [],
+  };
+  for (const item of ranked) {
+    const key = normalizedFact(item.text);
+    if (!key || seen.has(key) || counts[item.kind] >= limits[item.kind]) continue;
+    seen.add(key);
+    counts[item.kind] += 1;
+    chosen[item.kind].push({
+      id: item.id,
+      category: item.category,
+      text: capText(item.text, item.maxChars),
+    });
+  }
+  return {
+    facts: chosen.fact,
+    statements: chosen.statement,
+    stories: chosen.story,
+  };
 }
 
 function jobRequirementPrefix(context: ReadyApplicationGenerationContext) {
@@ -357,14 +584,9 @@ export function buildOutreachFactSelectionMessages(input: {
     {
       role: "user",
       content: JSON.stringify({
-        jobRequirement: jobRequirementPrefix(input.context),
-        companyResearch: companyResearchPrefix(input.context),
-      }),
-    },
-    {
-      role: "user",
-      content: JSON.stringify({
         purpose: input.purpose,
+        jobTitle: input.context.requirement?.title ?? null,
+        companyName: input.context.requirement?.companyName ?? null,
         candidates: input.candidates,
       }),
     },
@@ -417,6 +639,65 @@ export function buildOutreachAssetMessages(
             paragraphs: ["claim"],
             claim: outreachClaimShape(),
           };
+  const personaText = personaExcerpt(input.context);
+  const jobText = jobExcerpt(input.context);
+  const seeker = selectOutreachSeekerMaterial({
+    context: input.context,
+    personaText,
+    jobText,
+  });
+  const seen = new Set(
+    [...seeker.facts, ...seeker.statements, ...seeker.stories].map((source) =>
+      normalizedFact(source.text),
+    ),
+  );
+  const companyFacts = input.selectedFacts.slice(0, 3).flatMap((fact) => {
+    const text = capText(fact.text, OUTREACH_INPUT_LIMITS.companyFactChars);
+    const key = normalizedFact(text);
+    if (!text || seen.has(key)) return [];
+    seen.add(key);
+    return [{ id: fact.candidateId, category: "COMPANY_RESEARCH", text }];
+  });
+  const status = input.mentionApplied
+    ? input.context.sources.find((source) => source.id === "application:status")
+    : undefined;
+  const voice = (input.context.voiceSamples ?? [])[0];
+  const voiceSample = voice
+    ? {
+        id: voice.id,
+        text: capText(voice.sampleText, OUTREACH_INPUT_LIMITS.voiceChars),
+      }
+    : null;
+  const usesThread =
+    input.purpose === "FOLLOW_UP" ||
+    input.purpose === "THANK_YOU" ||
+    input.purpose === "CHECK_IN";
+  const priorMessages = usesThread
+    ? input.priorMessages?.length
+      ? input.priorMessages
+      : input.priorMessage
+        ? [input.priorMessage]
+        : []
+    : [];
+  const citableSources = [
+    ...(personaText
+      ? [
+          {
+            id: `persona:${input.context.persona!.id}`,
+            category: "PERSONA",
+            text: personaText,
+          },
+        ]
+      : []),
+    ...(jobText ? [{ id: "job:posting", category: "JOB_REQUIREMENT", text: jobText }] : []),
+    ...(status
+      ? [{ id: status.id, category: status.category, text: capText(status.text, 500) }]
+      : []),
+    ...companyFacts,
+    ...seeker.facts,
+    ...seeker.statements,
+    ...seeker.stories,
+  ];
   return [
     {
       role: "system",
@@ -425,41 +706,24 @@ export function buildOutreachAssetMessages(
     {
       role: "user",
       content: JSON.stringify({
-        personalProfile: personalProfilePrefix(input.context),
-        jobRequirement: jobRequirementPrefix(input.context),
-        selectedFacts: input.selectedFacts,
-        recipientRole: input.context.persona
-          ? {
-              id: input.context.persona.id,
-              name: input.context.persona.name,
-              likelyTitles: input.context.persona.likelyTitles,
-            }
-          : null,
-        approvedStatements: input.context.approvedStatements,
-        approvedStories: input.context.stories,
-        voiceSamples: input.context.voiceSamples,
-        seekerAnswers: input.context.seekerAnswers,
-        citableSources: outreachCitableSources(
-          input.context,
-          input.mentionApplied,
-        ),
+        citableSources,
+        ...(voiceSample ? { voiceSample } : {}),
       }),
     },
     {
       role: "user",
       content: JSON.stringify({
-        applicationGuidance: input.context.campaign.applicationGuidance,
-        appliedAt: input.mentionApplied ? input.context.campaign.appliedAt : null,
-        mentionApplied: input.mentionApplied,
-        applicationProgress: input.context.campaign.applicationProgress,
         greeting: input.greeting,
         signerName: input.signerName,
         confirmedHiringManagerRole: input.confirmedHiringManagerRole,
         includeRedirect: input.includeRedirect,
         redirectAsk: input.includeRedirect ? outreachConfig.redirectAsk : null,
         purpose: input.purpose,
-        priorMessage: input.priorMessage,
-        interviewStageNotes: input.interviewStageNotes,
+        mentionApplied: input.mentionApplied,
+        ...(priorMessages.length ? { priorMessages } : {}),
+        ...(usesThread && input.interviewStageNotes
+          ? { interviewStageNotes: input.interviewStageNotes }
+          : {}),
         emailLength: input.emailLength,
         wordTarget,
         characterLimits: {
@@ -471,9 +735,10 @@ export function buildOutreachAssetMessages(
           inMailSubject: outreachConfig.linkedinLimits.inMailSubjectChars,
           inMailBody: outreachConfig.linkedinLimits.inMailBodyChars,
         },
-        seekerVoiceInstruction: applicationAssetConfig.seekerVoiceInstruction,
         regenerationInstruction: input.regenerationInstruction,
-        qualityFeedback: input.qualityFeedback,
+        ...(input.qualityFeedback.length
+          ? { qualityFeedback: input.qualityFeedback }
+          : {}),
         responseShape,
       }),
     },
