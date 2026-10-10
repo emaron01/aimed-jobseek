@@ -104,7 +104,7 @@ function siftAshleyContext(): ReadyApplicationGenerationContext {
     stories: [
       {
         id: "story-forecast",
-        situation: "STORY_SITUATION_MARKER forecast deviation was 20% before the reset.",
+        situation: "Forecast deviation was 20% before the reset.",
         task: "TASK_MARKER unrelated gardening",
         action: "ACTION_MARKER watering plants",
         result: "reducing forecast deviation to between 5%-10% quarterly",
@@ -298,6 +298,9 @@ describe("outreach input trim", () => {
     expect(text).not.toContain("RAW_POSTING_MARKER");
     expect(text).not.toContain("SCORECARD_MARKER");
     expect(text).not.toContain("TRANSCRIPT_MARKER");
+    expect(text).not.toContain("STORY_SITUATION_MARKER");
+    expect(text).not.toContain("TASK_MARKER");
+    expect(text).not.toContain("ACTION_MARKER");
     const proof = sources.citableSources.find((source) => source.id === "story:story-forecast");
     expect(proof?.text).toContain("20%");
     expect(proof?.text).toContain("5%-10%");
@@ -328,8 +331,8 @@ describe("outreach input trim", () => {
     expect(chars).toBeLessThan(OUTREACH_INPUT_LIMITS.messageCharCap);
     expect(tokens).toBeLessThanOrEqual(5_000);
     expect(beforeChars).toBeGreaterThan(chars);
-    expect(chars).toBe(6_666);
-    expect(tokens).toBe(1_667);
+    expect(chars).toBe(6_781);
+    expect(tokens).toBe(1_696);
   });
 
   it("ranks seeker material from every source and keeps ties in source order", () => {
@@ -385,15 +388,81 @@ describe("outreach input trim", () => {
           emailInput({ type, mentionApplied: false }),
         )[1]!.content,
       ) as { citableSources: Array<{ id: string; text: string }> };
-      expect(sources.citableSources).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            id: "application:status",
-            text: "Applied through the employer portal on 2026-09-20.",
-          }),
-        ]),
+      expect(sources.citableSources.some((source) => source.id === "application:status")).toBe(
+        false,
       );
     }
+  });
+
+  it("says the seeker applied only when mentionApplied is true", () => {
+    const sentence =
+      "When mentionApplied is true and the recipient is a recruiter or hiring manager, say that the seeker applied, and cite application:status.";
+    expect(OUTREACH_EMAIL_INSTRUCTIONS).toContain(sentence);
+    expect(OUTREACH_LINKEDIN_NOTE_INSTRUCTIONS).toContain(sentence);
+    expect(OUTREACH_LINKEDIN_INMAIL_INSTRUCTIONS).toContain(sentence);
+
+    const applied = JSON.parse(buildOutreachAssetMessages(emailInput())[1]!.content) as {
+      citableSources: Array<{ id: string }>;
+    };
+    expect(applied.citableSources.some((source) => source.id === "application:status")).toBe(true);
+
+    const notAppliedContext = siftAshleyContext();
+    notAppliedContext.campaign.appliedAt = null;
+    notAppliedContext.campaign.applicationProgress = null;
+    notAppliedContext.sources = notAppliedContext.sources.filter(
+      (source) => source.id !== "application:status",
+    );
+    const notApplied = JSON.parse(
+      buildOutreachAssetMessages(
+        emailInput({ context: notAppliedContext, mentionApplied: false }),
+      )[1]!.content,
+    ) as { citableSources: Array<{ id: string }> };
+    expect(notApplied.citableSources.some((source) => source.id === "application:status")).toBe(
+      false,
+    );
+  });
+
+  it("keeps both figures when a story states a dollar change or a ratio", () => {
+    const context = siftAshleyContext();
+    context.stories = [
+      {
+        id: "story-cost",
+        situation: "Forecast variance cost $2.4MM a year.",
+        task: "",
+        action: "",
+        result: "We cut that cost to $500K.",
+        verbatimAnswer: null,
+        interviewAnswer: null,
+        resumeBullet: null,
+        interviewAnswerApprovedAt: null,
+        resumeBulletApprovedAt: null,
+      },
+      {
+        id: "story-ratio",
+        situation: "The team was winning 3 of 4 enterprise deals.",
+        task: "",
+        action: "",
+        result: "The team then won 4 of 4 enterprise deals.",
+        verbatimAnswer: null,
+        interviewAnswer: null,
+        resumeBullet: null,
+        interviewAnswerApprovedAt: null,
+        resumeBulletApprovedAt: null,
+      },
+    ];
+    const selected = selectOutreachSeekerMaterial({
+      context,
+      personaText: "Ashley Cobb Sales Recruiter pipeline quality",
+      jobText: "Director of Sales Sift",
+    });
+    const cost = selected.stories.find((story) => story.id === "story:story-cost");
+    const ratio = selected.stories.find((story) => story.id === "story:story-ratio");
+    expect(cost?.text).toContain("$2.4MM");
+    expect(cost?.text).toContain("$500K");
+    expect(cost?.text.length ?? 0).toBeLessThanOrEqual(OUTREACH_INPUT_LIMITS.storyChars);
+    expect(ratio?.text).toContain("3 of 4");
+    expect(ratio?.text).toContain("4 of 4");
+    expect(ratio?.text.length ?? 0).toBeLessThanOrEqual(OUTREACH_INPUT_LIMITS.storyChars);
   });
 
   it("fact selection sends the job title, company, and candidates only", () => {

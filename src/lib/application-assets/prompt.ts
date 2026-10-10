@@ -109,23 +109,35 @@ function capText(text: string, max: number): string {
   return (space > max * 0.6 ? slice.slice(0, space) : slice).trim();
 }
 
-function percentFigures(text: string): string[] {
-  const matches = text.match(/\d+(?:\.\d+)?\s*(?:%|percent\b)/gi) ?? [];
-  return [
-    ...new Set(
-      matches.map((figure) =>
-        figure.replace(/\s+/g, "").replace(/percent$/i, "%").toLowerCase(),
-      ),
-    ),
-  ];
+const FIGURE_PATTERNS = [
+  /\$\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:mm|bn|k|m|b)\b)?/gi,
+  /\b\d[\d,]*(?:\.\d+)?\s*(?:mm|bn|k)\b/gi,
+  /\b\d+(?:\.\d+)?\s+of\s+\d+(?:\.\d+)?\b/gi,
+  /\d+(?:\.\d+)?\s*(?:%|percent\b)/gi,
+  /\b\d[\d,]*(?:\.\d+)?\b/g,
+];
+
+/** Percentages, money (including K/MM), ratios, counts, and plain numbers. */
+function figuresIn(text: string): string[] {
+  const spans: Array<{ start: number; end: number; key: string }> = [];
+  for (const pattern of FIGURE_PATTERNS) {
+    for (const match of text.matchAll(pattern)) {
+      const start = match.index ?? 0;
+      const end = start + match[0].length;
+      if (spans.some((span) => start < span.end && end > span.start)) continue;
+      const key = match[0].replace(/[$,]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+      if (key) spans.push({ start, end, key });
+    }
+  }
+  return [...new Set(spans.map((span) => span.key))];
 }
 
-/** A before-and-after fact keeps every percentage, inside the same character cap. */
+/** A before-and-after fact keeps every figure, inside the same character cap. */
 function capTextKeepingFigures(text: string, max: number): string {
-  const needed = percentFigures(text);
+  const needed = figuresIn(text);
   const capped = capText(text, max);
   if (needed.length < 2) return capped;
-  if (needed.every((figure) => percentFigures(capped).includes(figure))) return capped;
+  if (needed.every((figure) => figuresIn(capped).includes(figure))) return capped;
   const sentences = text
     .trim()
     .replace(/\s+/g, " ")
@@ -134,7 +146,7 @@ function capTextKeepingFigures(text: string, max: number): string {
   const kept: string[] = [];
   const seen = new Set<string>();
   for (const sentence of sentences) {
-    const figures = percentFigures(sentence);
+    const figures = figuresIn(sentence);
     if (!figures.some((figure) => !seen.has(figure))) continue;
     kept.push(sentence);
     for (const figure of figures) seen.add(figure);
@@ -142,7 +154,7 @@ function capTextKeepingFigures(text: string, max: number): string {
   }
   const excerpt = kept.join(" ");
   if (!excerpt) return capped;
-  if (excerpt.length <= max && needed.every((figure) => percentFigures(excerpt).includes(figure))) {
+  if (excerpt.length <= max && needed.every((figure) => figuresIn(excerpt).includes(figure))) {
     return excerpt;
   }
   return capText(excerpt, max);
@@ -292,8 +304,8 @@ export function selectOutreachSeekerMaterial(input: {
     const best = fields[0]!;
     const situation = story.situation?.trim() ?? "";
     const result = story.result?.trim() ?? "";
-    const starting = percentFigures(situation);
-    const ending = percentFigures(result);
+    const starting = figuresIn(situation);
+    const ending = figuresIn(result);
     const statesChange =
       starting.some((figure) => !ending.includes(figure)) &&
       ending.some((figure) => !starting.includes(figure));
@@ -705,14 +717,10 @@ export function buildOutreachAssetMessages(
     seen.add(key);
     return [{ id: fact.candidateId, category: "COMPANY_RESEARCH", text }];
   });
-  const applied = input.context.sources.find((source) => source.id === "application:status");
-  const status = applied?.text.trim()
-    ? {
-        id: applied.id,
-        category: applied.category,
-        text: capText(applied.text, 500),
-      }
-    : null;
+  const applied = input.mentionApplied
+    ? input.context.sources.find((source) => source.id === "application:status")
+    : undefined;
+  const status = applied?.text.trim() ? applied : undefined;
   const voice = (input.context.voiceSamples ?? [])[0];
   const voiceSample = voice
     ? {
