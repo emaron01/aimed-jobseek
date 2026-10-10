@@ -352,17 +352,44 @@ export async function addCheatSheetInterviewNoteAction(
     const id = campaignId(formData);
     const contactId = String(formData.get("contactId") ?? "").trim();
     const stageId = String(formData.get("stageId") ?? "").trim();
-    if (!contactId) throw new TenantError("Choose an interviewer first.");
-    await addCheatSheetInterviewNote({
-      organizationId,
-      campaignId: id,
-      userId: user.id,
-      contactId,
-      stageId: stageId || null,
-      text: String(formData.get("note") ?? ""),
-    });
+    const note = String(formData.get("note") ?? "");
+    const hasOutcome = formData.has("outcome");
+    if (note.trim()) {
+      if (!contactId) throw new TenantError("Choose an interviewer first.");
+      await addCheatSheetInterviewNote({
+        organizationId,
+        campaignId: id,
+        userId: user.id,
+        contactId,
+        stageId: stageId || null,
+        text: note,
+      });
+    } else if (!hasOutcome) {
+      if (!contactId) throw new TenantError("Choose an interviewer first.");
+      await addCheatSheetInterviewNote({
+        organizationId,
+        campaignId: id,
+        userId: user.id,
+        contactId,
+        stageId: stageId || null,
+        text: note,
+      });
+    }
+    if (hasOutcome) {
+      if (!stageId) throw new TenantError("Interview stage is required.");
+      await updateInterviewStage({
+        organizationId,
+        campaignId: id,
+        userId: user.id,
+        stageId,
+        outcome: String(formData.get("outcome") ?? "").trim() || null,
+      });
+    }
     revalidate(id, stageId || undefined);
-    return { ok: true, message: "Saved to Interview Preparation Guides." };
+    if (note.trim()) {
+      return { ok: true, message: "Saved to Interview Preparation Guides." };
+    }
+    return { ok: true, message: interviewConfig.labels.outcomeSaved };
   } catch (error) {
     return errorResult(error);
   }

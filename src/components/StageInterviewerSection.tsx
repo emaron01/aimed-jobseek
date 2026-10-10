@@ -27,7 +27,7 @@ export function SavedInterviewNotes({
 }) {
   if (notes.length === 0) return null;
   return (
-    <ul className="mb-3 mt-2 space-y-3" data-testid={`saved-notes-${stageId}-${contactId ?? "stage"}`}>
+    <ul className="space-y-3" data-testid={`saved-notes-${stageId}-${contactId ?? "stage"}`}>
       {notes.map((note) => (
         <li key={note.id} className="text-sm text-ink" data-testid={`stored-gained-note-${note.id}`}>
           <time
@@ -44,19 +44,48 @@ export function SavedInterviewNotes({
   );
 }
 
+function OutcomeSelect({
+  fieldClass,
+  outcome,
+  disabled = false,
+}: {
+  fieldClass: string;
+  outcome: string | null;
+  disabled?: boolean;
+}) {
+  return (
+    <label className="block text-sm">
+      {interviewConfig.labels.outcome}
+      <select
+        name="outcome"
+        className={fieldClass}
+        defaultValue={outcome ?? ""}
+        disabled={disabled}
+      >
+        <option value="">{interviewConfig.labels.noOutcome}</option>
+        {Object.entries(interviewConfig.outcomes).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function CheatSheetNoteForm({
   campaignId,
   stageId,
   contactId,
   fieldClass,
-  notes,
+  outcome,
   labelId,
 }: {
   campaignId: string;
   stageId: string;
-  contactId: string;
+  contactId: string | null;
   fieldClass: string;
-  notes: Array<{ id: string; text: string; createdAt: string }>;
+  outcome: string | null;
   labelId: string;
 }) {
   const formRef = useRef<HTMLDivElement>(null);
@@ -65,25 +94,43 @@ export function CheatSheetNoteForm({
     <ApplicationActionForm
       action={addCheatSheetInterviewNoteAction}
       submitLabel={interviewConfig.labels.addGainedInformation}
-      testId={`add-cheat-sheet-note-${stageId}-${contactId}`}
-      onSuccess={() => formRef.current?.querySelector("form")?.reset()}
+      testId={
+        contactId
+          ? `add-cheat-sheet-note-${stageId}-${contactId}`
+          : `add-cheat-sheet-note-${stageId}-unlinked`
+      }
+      onSuccess={() => {
+        const note = formRef.current?.querySelector("textarea[name=note]");
+        if (note instanceof HTMLTextAreaElement) note.value = "";
+      }}
     >
       <input type="hidden" name="campaignId" value={campaignId} />
       <input type="hidden" name="stageId" value={stageId} />
-      <input type="hidden" name="contactId" value={contactId} />
-      <label className="block text-sm">
-        <SavedInterviewNotes stageId={stageId} contactId={contactId} notes={notes} />
-        <textarea
-          name="note"
-          rows={4}
-          required
-          aria-labelledby={labelId}
-          className={fieldClass}
-        />
-      </label>
+      {contactId ? <input type="hidden" name="contactId" value={contactId} /> : null}
+      <OutcomeSelect fieldClass={fieldClass} outcome={outcome} />
+      {contactId ? (
+        <label className="block text-sm">
+          <textarea
+            name="note"
+            rows={4}
+            aria-labelledby={labelId}
+            className={fieldClass}
+          />
+        </label>
+      ) : null}
     </ApplicationActionForm>
     </div>
   );
+}
+
+export function ReadOnlyOutcome({
+  fieldClass,
+  outcome,
+}: {
+  fieldClass: string;
+  outcome: string | null;
+}) {
+  return <OutcomeSelect fieldClass={fieldClass} outcome={outcome} disabled />;
 }
 
 function subscribeLocationHash(onStoreChange: () => void): () => void {

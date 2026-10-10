@@ -186,9 +186,7 @@ describe("interview notes polish", () => {
     );
     expect(view?.className).toContain("bg-primary");
     expect(host.querySelector("[data-testid=view-interview-prep-guide-alex]")).toBeNull();
-    expect(host.querySelector("[data-testid=interview-prep-guide-priya]")?.textContent).toContain(
-      "Update Interview Prep Guide",
-    );
+    expect(host.querySelector("[data-testid=interview-prep-guide-priya]")).toBeNull();
     expect(enqueue).not.toHaveBeenCalled();
     expect(paidCall).not.toHaveBeenCalled();
     act(() => root.unmount());
@@ -250,6 +248,9 @@ describe("interview notes polish", () => {
     expect(host.querySelector("[data-testid=new-interview-on-dashboard]")?.textContent).toContain(
       "I have a new interview!",
     );
+    expect(host.querySelector("[data-testid=new-interview-dashboard-link]")?.className).toContain(
+      "bg-light-orange",
+    );
     expect(host.querySelector("[data-testid=add-someone-youre-meeting]")).toBeNull();
     expect(host.querySelector("[data-testid=add-interview-stage]")).toBeNull();
     expect(enqueue).not.toHaveBeenCalled();
@@ -257,12 +258,11 @@ describe("interview notes polish", () => {
 
     await click(host, "[data-testid=person-section-priya-toggle]");
     const interview = host.querySelector("[data-testid=person-interview-priya-priya-stage]");
-    const outcomeForm = host.querySelector("[data-testid=update-stage-priya-stage-priya]") as HTMLFormElement;
-    const outcomeButton = outcomeForm.querySelector("button[type=submit]");
-    expect(outcomeButton?.textContent).toBe("Save outcome");
-    expect(outcomeForm.className).toContain("flex-col");
-    expect(outcomeForm.className).toContain("gap-3");
-    expect(outcomeForm.querySelector("label")?.contains(outcomeButton)).toBe(false);
+    expect(host.querySelector("[data-testid=update-stage-priya-stage-priya]")).toBeNull();
+    expect(interview?.textContent).not.toContain("Save outcome");
+    expect(interview?.textContent).not.toContain("Saved outcome");
+    const outcome = interview?.querySelector("select[name=outcome]") as HTMLSelectElement;
+    expect(outcome?.value).toBe("ADVANCED");
     expect(interview?.textContent).toContain("Notes before");
     expect(interview?.textContent).toContain("Told to expect a forecast.");
     expect(interview?.textContent).toContain("Notes after");
@@ -286,7 +286,10 @@ describe("interview notes polish", () => {
     const noteBox = host.querySelector(
       "[data-testid=add-cheat-sheet-note-priya-stage-priya] textarea[name=note]",
     );
-    follows(host.querySelector("[data-testid=saved-notes-priya-stage-priya]"), noteBox);
+    const savedBox = host.querySelector("[data-testid=saved-notes-box-priya-stage-priya]");
+    expect(savedBox?.className).toContain("bg-warning-tint");
+    follows(savedBox, outcome);
+    follows(outcome, noteBox);
     expect(host.querySelector("[data-testid=add-cheat-sheet-note-priya-stage-priya] button[type=submit]")?.textContent).toBe(
       "Save and Add Note to Interview Preparation Guides",
     );
@@ -483,7 +486,7 @@ describe.skipIf(!hasTestDatabase())("interview notes polish against postgres", {
     expect(host.querySelector(`[data-testid=person-interview-${added.id}-${created.id}]`)).not.toBeNull();
 
     const outcomeForm = host.querySelector(
-      `[data-testid=update-stage-${created.id}-${added.id}]`,
+      `[data-testid=add-cheat-sheet-note-${created.id}-${added.id}]`,
     ) as HTMLFormElement;
     (outcomeForm.querySelector("select[name=outcome]") as HTMLSelectElement).value = "ADVANCED";
     await act(async () => {

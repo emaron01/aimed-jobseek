@@ -31,8 +31,13 @@ import {
   HiringTeamRecommendedLine,
   HiringTeamRecommendedMark,
 } from "@/components/HiringTeamCheatSheetControls";
+import { InterviewPrepGuideForm } from "@/components/InterviewPrepGuideButton";
+import { applicationSummaryGuidanceSchema } from "@/lib/application-summary/contract";
+import { latestApplicationSummaryFailure } from "@/lib/application-summary/failure-message";
+import { personSectionNeedsGeneration } from "@/lib/application-summary/people";
+import { interviewPrepGuideNeedsPersonaChoice } from "@/lib/interview/prep-guide";
 import { prisma } from "@/lib/prisma";
-import { consultationConversationCopy, hiringTeamConfig, hiringTeamDetailsTitle, outreachConfig, vocab } from "@/lib/product-config";
+import { applicationSummaryConfig, consultationConversationCopy, hiringTeamConfig, hiringTeamDetailsTitle, outreachConfig, vocab } from "@/lib/product-config";
 import { AppActionLink } from "@/components/ui";
 import { parseStringArray } from "@/lib/research";
 import { contactDisplayName } from "@/lib/utils";
@@ -280,7 +285,7 @@ export async function HiringTeamSection({
   jobs?: import("@/lib/application-jobs/workspace-status").WorkspaceJobStatusView[];
   asPage?: boolean;
 }) {
-  const [roles, templates, people] = await Promise.all([
+  const [roles, templates, people, summary] = await Promise.all([
     prisma.persona.findMany({
       where: { organizationId, campaignId, archivedAt: null },
       orderBy: { createdAt: "asc" },
@@ -291,7 +296,41 @@ export async function HiringTeamSection({
       select: { id: true, name: true },
     }),
     listApplicationContacts({ organizationId, campaignId }),
+    prisma.applicationSummary.findFirst({
+      where: { organizationId, campaignId },
+      select: { guidanceJson: true },
+    }),
   ]);
+  const guidance = summary?.guidanceJson
+    ? applicationSummaryGuidanceSchema.safeParse(summary.guidanceJson)
+    : null;
+  const guideReadyByContactId = new Map<string, boolean>();
+  if (guidance?.success) {
+    for (const section of guidance.data.people) {
+      if (!section.contactId) continue;
+      guideReadyByContactId.set(section.contactId, !personSectionNeedsGeneration(section));
+    }
+  }
+  const personaChoices = roles.map((role) => ({
+    id: role.id,
+    name: role.name,
+    suggestionKey: role.suggestionKey,
+    targetTitles: role.targetTitles,
+  }));
+  const needsPersonaChoiceByContactId = new Map(
+    people.map((person) => [
+      person.contactId,
+      interviewPrepGuideNeedsPersonaChoice({
+        chosenPersonaId: person.chosenPersonaId,
+        title: person.contact.title,
+        roles: personaChoices,
+      }),
+    ]),
+  );
+  const guideFailure = latestApplicationSummaryFailure({
+    jobs,
+    fallback: `${applicationSummaryConfig.title} could not be generated. Retry.`,
+  });
   const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
   const organizedRoles = roles.map((role) => ({
     role,
@@ -439,21 +478,36 @@ export async function HiringTeamSection({
             mappedPeople.map((person) => (
             <div
               key={person.contactId}
-              className="flex flex-wrap items-center justify-between gap-2"
+              className="space-y-2"
               data-testid={`hiring-team-person-${person.contactId}`}
             >
-              <p className="text-sm text-ink">
-                {contactDisplayName(person.contact.firstName, person.contact.lastName)}
-                {person.contact.title ? ` · ${person.contact.title}` : ""}
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-ink">
+                  {contactDisplayName(person.contact.firstName, person.contact.lastName)}
+                  {person.contact.title ? ` · ${person.contact.title}` : ""}
+                </p>
+                {canEdit ? (
+                  <AppActionLink
+                    href={workspaceContactEditHref(person.contactId, campaignId)}
+                    variant="chip"
+                    data-testid={`edit-contact-${person.contactId}`}
+                  >
+                    {outreachConfig.labels.editContact}
+                  </AppActionLink>
+                ) : null}
+              </div>
               {canEdit ? (
-                <AppActionLink
-                  href={workspaceContactEditHref(person.contactId, campaignId)}
-                  variant="chip"
-                  data-testid={`edit-contact-${person.contactId}`}
-                >
-                  {outreachConfig.labels.editContact}
-                </AppActionLink>
+                <InterviewPrepGuideForm
+                  campaignId={campaignId}
+                  contactId={person.contactId}
+                  hasGuide={guideReadyByContactId.get(person.contactId) ?? false}
+                  failed={guideFailure?.sectionKey === `contact:${person.contactId}`}
+                  failureMessage={guideFailure?.message ?? null}
+                  needsPersonaChoice={
+                    needsPersonaChoiceByContactId.get(person.contactId) ?? false
+                  }
+                  roles={roles.map((role) => ({ id: role.id, name: role.name }))}
+                />
               ) : null}
             </div>
             ))

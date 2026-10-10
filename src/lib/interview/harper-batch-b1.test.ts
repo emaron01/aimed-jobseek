@@ -74,11 +74,11 @@ describe("Harper Batch B1 Stage timeline and Outreach thank-you", () => {
     expect(src("src/components/StageInterviewerSection.tsx")).toContain(
       "addCheatSheetInterviewNoteAction",
     );
-    expect(stages).toContain("updateInterviewStageAction");
+    expect(stages).not.toContain("updateInterviewStageAction");
     expect(stages).toContain("notesBefore");
     expect(stages).toContain("notesAfter");
     expect(stages).toContain("expectedDecisionAt");
-    expect(stages).toContain('name="outcome"');
+    expect(src("src/components/StageInterviewerSection.tsx")).toContain('name="outcome"');
     expect(stages).not.toContain('name="notesBefore"');
     expect(stages).not.toContain('name="notesAfter"');
     expect(stages).not.toContain('name="expectedDecisionAt"');
