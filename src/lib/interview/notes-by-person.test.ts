@@ -320,7 +320,8 @@ describe("interview page organized by person", () => {
     expect(priyaLatestNode?.textContent).toContain("Outcome");
     expect(priyaLatestNode?.textContent).toContain("Advanced");
     expect(priyaLatestNode?.querySelector("[name=outcome]")).not.toBeNull();
-    expect(priyaLatestNode?.textContent).toContain("Save outcome");
+    expect(priyaLatestNode?.textContent).not.toContain("Save outcome");
+    expect(priyaLatestNode?.textContent).not.toContain("Saved outcome");
     expect(priyaLatestNode?.textContent).toContain("Interview Notes");
     expect(priyaLatestNode?.textContent).not.toContain("Newly gained information");
     expect(priyaLatestNode?.textContent).toContain("Notes before");

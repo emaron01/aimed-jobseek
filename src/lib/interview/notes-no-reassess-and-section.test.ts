@@ -559,14 +559,15 @@ describe("notes never reassess Harper, and the cheat sheet lists them once", () 
     expect(enqueue).not.toHaveBeenCalled();
     expect(paidCall).not.toHaveBeenCalled();
     const interview = host.querySelector(`[data-testid=person-interview-${contactId}-${stageId}]`);
-    expect(interview?.textContent).toContain("Saved outcome");
+    expect(interview?.textContent).not.toContain("Saved outcome");
+    expect(interview?.textContent).not.toContain("Save outcome");
     expect(interview?.textContent).toContain(interviewConfig.labels.interviewNotes);
     expect(interview?.textContent).not.toContain("Post Interview Notes");
     expect(interview?.textContent).not.toContain("Newly gained information");
     expect(interview?.textContent).toContain("They care about forecast hygiene.");
     expect(interview?.textContent).toContain("Save and Add Note to Interview Preparation Guides");
     const form = host.querySelector(
-      `[data-testid=update-stage-${stageId}-${contactId}]`,
+      `[data-testid=add-cheat-sheet-note-${stageId}-${contactId}]`,
     ) as HTMLFormElement;
     (form.querySelector("select[name=outcome]") as HTMLSelectElement).value = "ADVANCED";
     await act(async () => {

@@ -1,6 +1,4 @@
-import { updateInterviewStageAction } from "@/app/actions/interview";
 import { AppActionLink } from "@/components/AppButton";
-import { InterviewPrepGuideForm } from "@/components/InterviewPrepGuideButton";
 import { applicationSummaryGuidanceSchema } from "@/lib/application-summary/contract";
 import { personSectionNeedsGeneration } from "@/lib/application-summary/people";
 import { AskHarperBox } from "@/components/AskHarperBox";
@@ -8,17 +6,15 @@ import {
   applicationHasHarperQuestion,
   loadAskHarperDrafts,
 } from "@/lib/consultation/ask-harper";
-import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { InterviewStageInterviewerLink } from "@/components/InterviewStagePanel";
 import {
   CheatSheetNoteForm,
   InterviewerCollapsible,
+  ReadOnlyOutcome,
   RemoveInterviewControl,
   SavedInterviewNotes,
 } from "@/components/StageInterviewerSection";
 import { listApplicationContacts } from "@/lib/application/contacts";
-import { interviewPrepGuideNeedsPersonaChoice } from "@/lib/interview/prep-guide";
-import { CheatSheetGenerationError } from "@/components/CheatSheetGenerationError";
 import { parseCheatSheetNotes } from "@/lib/application-summary/notes";
 import { listInterviewStages, stageTypeLabel } from "@/lib/interview/stages";
 import { workspaceCheatSheetPersonHref } from "@/lib/application/workspace-links";
@@ -139,6 +135,7 @@ function StageStoredNotes({
   notesAfter,
   cheatSheetNotes,
   expectedDecisionAt,
+  outcome,
   canEdit,
   campaignId,
 }: {
@@ -148,6 +145,7 @@ function StageStoredNotes({
   notesAfter: string | null;
   cheatSheetNotes: Array<{ id: string; text: string; createdAt: string }>;
   expectedDecisionAt: Date | null;
+  outcome: string | null;
   canEdit: boolean;
   campaignId: string;
 }) {
@@ -177,6 +175,30 @@ function StageStoredNotes({
       >
         {interviewConfig.labels.interviewNotes}
       </h4>
+      {savedNotes.length > 0 ? (
+        <div
+          className="rounded-md border border-warning bg-warning-tint p-3"
+          data-testid={`saved-notes-box-${stageId}-${contactId ?? "stage"}`}
+        >
+          <SavedInterviewNotes stageId={stageId} contactId={contactId} notes={savedNotes} />
+        </div>
+      ) : null}
+      {canEdit ? (
+        <CheatSheetNoteForm
+          campaignId={campaignId}
+          stageId={stageId}
+          contactId={contactId}
+          fieldClass={fieldClass}
+          outcome={outcome}
+          labelId={
+            contactId
+              ? `interview-notes-label-${stageId}-${contactId}`
+              : `interview-notes-label-${stageId}`
+          }
+        />
+      ) : (
+        <ReadOnlyOutcome fieldClass={fieldClass} outcome={outcome} />
+      )}
       {before ? (
         <p className="text-sm text-ink" data-testid={`stored-notes-before-${stageId}-${contactId ?? "stage"}`}>
           <span className="font-medium">{interviewConfig.labels.notesBefore}</span>
@@ -195,22 +217,6 @@ function StageStoredNotes({
           <span className="mt-1 block">{dateLabel(expectedDecisionAt)}</span>
         </p>
       ) : null}
-      {canEdit && contactId ? (
-        <CheatSheetNoteForm
-          campaignId={campaignId}
-          stageId={stageId}
-          contactId={contactId}
-          fieldClass={fieldClass}
-          notes={savedNotes}
-          labelId={
-            contactId
-              ? `interview-notes-label-${stageId}-${contactId}`
-              : `interview-notes-label-${stageId}`
-          }
-        />
-      ) : (
-        <SavedInterviewNotes stageId={stageId} contactId={contactId} notes={savedNotes} />
-      )}
     </div>
   );
 }
@@ -221,14 +227,12 @@ function PersonInterview({
   contactId,
   notesByContactId,
   canEdit,
-  fieldClass,
 }: {
   campaignId: string;
   stage: StageView;
   contactId: string | null;
   notesByContactId: Map<string, ReturnType<typeof parseCheatSheetNotes>>;
   canEdit: boolean;
-  fieldClass: string;
 }) {
   const gained = contactId
     ? (notesByContactId.get(contactId) ?? []).filter((note) => note.stageId === stage.id)
@@ -254,38 +258,6 @@ function PersonInterview({
           <dd>{interviewConfig.formats[stage.format]}</dd>
         </div>
       </dl>
-      <div className="space-y-3">
-        <p className="text-sm text-ink">
-          <span className="font-medium">{interviewConfig.labels.savedOutcome}</span>
-          <span className="mt-1 block">
-            {stage.outcome
-              ? interviewConfig.outcomes[stage.outcome]
-              : interviewConfig.labels.noOutcome}
-          </span>
-        </p>
-        {canEdit ? (
-          <ApplicationActionForm
-            action={updateInterviewStageAction}
-            submitLabel={interviewConfig.labels.saveStage}
-            testId={`update-stage-${stage.id}-${contactId ?? "unlinked"}`}
-            formClassName="flex flex-col gap-3"
-          >
-            <input type="hidden" name="campaignId" value={campaignId} />
-            <input type="hidden" name="stageId" value={stage.id} />
-            <label className="block text-sm">
-              {interviewConfig.labels.outcome}
-              <select name="outcome" className={fieldClass} defaultValue={stage.outcome ?? ""}>
-                <option value="">{interviewConfig.labels.noOutcome}</option>
-                {Object.entries(interviewConfig.outcomes).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </ApplicationActionForm>
-        ) : null}
-      </div>
       <StageStoredNotes
         campaignId={campaignId}
         stageId={stage.id}
@@ -294,7 +266,8 @@ function PersonInterview({
         notesAfter={stage.notesAfter}
         cheatSheetNotes={gained}
         expectedDecisionAt={stage.expectedDecisionAt}
-        canEdit={canEdit && Boolean(contactId)}
+        outcome={stage.outcome}
+        canEdit={canEdit}
       />
       {canEdit ? (
         <RemoveInterviewControl
@@ -311,19 +284,16 @@ function PersonInterview({
 export function InterviewStagesList({
   campaignId,
   canEdit,
-  roles,
   people,
   stages,
   notesByContactId,
   askHarperDrafts = [],
   hasHarperQuestion = false,
   guideReadyByContactId = new Map<string, boolean>(),
-  needsPersonaChoiceByContactId = new Map<string, boolean>(),
-  guideFailure = null,
 }: {
   campaignId: string;
   canEdit: boolean;
-  roles: RoleOption[];
+  roles?: RoleOption[];
   people: PersonOption[];
   stages: StageView[];
   notesByContactId: Map<string, ReturnType<typeof parseCheatSheetNotes>>;
@@ -333,7 +303,6 @@ export function InterviewStagesList({
   needsPersonaChoiceByContactId?: Map<string, boolean>;
   guideFailure?: { message: string; sectionKey: string | null } | null;
 }) {
-  const fieldClass = "mt-1 w-full rounded-md border border-edge-strong px-3 py-2 text-sm";
   const grouped = interviewsByPerson(stages, people);
   return (
     <section
@@ -358,6 +327,7 @@ export function InterviewStagesList({
           {interviewConfig.labels.newInterviewDashboardPrompt}{" "}
           <AppActionLink
             href={`/campaigns/${campaignId}`}
+            variant="lightOrange"
             data-testid="new-interview-dashboard-link"
           >
             {interviewConfig.labels.newInterviewDashboardLink}
@@ -379,23 +349,8 @@ export function InterviewStagesList({
               <InterviewStageInterviewerLink campaignId={campaignId} person={group.person} />
             }
           >
-            <div className="flex flex-wrap items-center gap-2">
-              {canEdit ? (
-                <InterviewPrepGuideForm
-                  campaignId={campaignId}
-                  contactId={group.person.contactId}
-                  hasGuide={hasGuide}
-                  failed={guideFailure?.sectionKey === `contact:${group.person.contactId}`}
-                  failureMessage={guideFailure?.message ?? null}
-                  needsPersonaChoice={
-                    needsPersonaChoiceByContactId.get(group.person.contactId) ?? false
-                  }
-                  roles={roles}
-                />
-              ) : guideFailure?.sectionKey === `contact:${group.person.contactId}` ? (
-                <CheatSheetGenerationError message={guideFailure.message} />
-              ) : null}
-              {hasGuide ? (
+            {hasGuide ? (
+              <div className="flex flex-wrap items-center gap-2">
                 <AppActionLink
                   href={workspaceCheatSheetPersonHref(campaignId, group.person.contactId)}
                   variant="primary"
@@ -404,8 +359,8 @@ export function InterviewStagesList({
                 >
                   {applicationSummaryConfig.actions.viewInterviewPrepGuide}
                 </AppActionLink>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
             {group.interviews.map((stage) => (
               <PersonInterview
                 key={stage.id}
@@ -414,7 +369,6 @@ export function InterviewStagesList({
                 contactId={group.person.contactId}
                 notesByContactId={notesByContactId}
                 canEdit={canEdit}
-                fieldClass={fieldClass}
               />
             ))}
           </InterviewerCollapsible>
@@ -434,7 +388,6 @@ export function InterviewStagesList({
               contactId={null}
               notesByContactId={notesByContactId}
               canEdit={canEdit}
-              fieldClass={fieldClass}
             />
           ))}
         </section>
@@ -451,8 +404,6 @@ export async function InterviewStagesSection({
   campaignId,
   organizationId,
   canEdit,
-  roles,
-  guideFailure = null,
 }: {
   campaignId: string;
   organizationId: string;
@@ -461,17 +412,12 @@ export async function InterviewStagesSection({
   contacts: Array<{ contactId: string; personaId: string | null }>;
   guideFailure?: { message: string; sectionKey: string | null } | null;
 }) {
-  const [stages, memberships, noteRows, personaRoles] = await Promise.all([
+  const [stages, memberships, noteRows] = await Promise.all([
     listInterviewStages({ organizationId, campaignId }),
     listApplicationContacts({ organizationId, campaignId }),
     prisma.campaignContact.findMany({
       where: { organizationId, campaignId },
       select: { contactId: true, cheatSheetNotesJson: true },
-    }),
-    prisma.persona.findMany({
-      where: { organizationId, campaignId, archivedAt: null },
-      select: { id: true, name: true, suggestionKey: true, targetTitles: true },
-      orderBy: { createdAt: "asc" },
     }),
   ]);
   const people = memberships.map((row) => ({
@@ -499,16 +445,6 @@ export async function InterviewStagesSection({
     ? applicationSummaryGuidanceSchema.safeParse(summary.guidanceJson)
     : null;
   const guideReadyByContactId = new Map<string, boolean>();
-  const needsPersonaChoiceByContactId = new Map(
-    memberships.map((row) => [
-      row.contactId,
-      interviewPrepGuideNeedsPersonaChoice({
-        chosenPersonaId: row.chosenPersonaId,
-        title: row.contact.title,
-        roles: personaRoles,
-      }),
-    ]),
-  );
   if (guidance?.success) {
     for (const section of guidance.data.people) {
       if (!section.contactId) continue;
@@ -522,15 +458,12 @@ export async function InterviewStagesSection({
     <InterviewStagesList
       campaignId={campaignId}
       canEdit={canEdit}
-      roles={roles}
       people={people}
       stages={stages}
       notesByContactId={notesByContactId}
       askHarperDrafts={askHarperDrafts}
       hasHarperQuestion={hasHarperQuestion}
       guideReadyByContactId={guideReadyByContactId}
-      needsPersonaChoiceByContactId={needsPersonaChoiceByContactId}
-      guideFailure={guideFailure}
     />
   );
 }

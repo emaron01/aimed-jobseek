@@ -102,8 +102,12 @@ describe("Interview prep guide", () => {
     expect(button).toContain("createInterviewPrepGuideAction");
     expect(button).toContain("InterviewPrepGuideForm");
     expect(button).toContain("CheatSheetInterviewPrepGuideButton");
-    expect(notes).toContain("InterviewPrepGuideForm");
+    expect(notes).not.toContain("InterviewPrepGuideForm");
+    expect(notes).toContain("viewInterviewPrepGuide");
     expect(summary).toContain("CheatSheetInterviewPrepGuideButton");
+    expect(readFileSync("src/components/ApplicationWorkspace.tsx", "utf8")).toContain(
+      "InterviewPrepGuideForm",
+    );
     expect(applicationSummaryConfig.actions.createInterviewPrepGuide).toBe(
       "Create Interview Prep Guide",
     );
