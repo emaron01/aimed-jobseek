@@ -109,6 +109,45 @@ function capText(text: string, max: number): string {
   return (space > max * 0.6 ? slice.slice(0, space) : slice).trim();
 }
 
+function percentFigures(text: string): string[] {
+  const matches = text.match(/\d+(?:\.\d+)?\s*(?:%|percent\b)/gi) ?? [];
+  return [
+    ...new Set(
+      matches.map((figure) =>
+        figure.replace(/\s+/g, "").replace(/percent$/i, "%").toLowerCase(),
+      ),
+    ),
+  ];
+}
+
+/** A before-and-after fact keeps every percentage, inside the same character cap. */
+function capTextKeepingFigures(text: string, max: number): string {
+  const needed = percentFigures(text);
+  const capped = capText(text, max);
+  if (needed.length < 2) return capped;
+  if (needed.every((figure) => percentFigures(capped).includes(figure))) return capped;
+  const sentences = text
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(/(?<=[.!?])\s+/)
+    .filter(Boolean);
+  const kept: string[] = [];
+  const seen = new Set<string>();
+  for (const sentence of sentences) {
+    const figures = percentFigures(sentence);
+    if (!figures.some((figure) => !seen.has(figure))) continue;
+    kept.push(sentence);
+    for (const figure of figures) seen.add(figure);
+    if (needed.every((figure) => seen.has(figure))) break;
+  }
+  const excerpt = kept.join(" ");
+  if (!excerpt) return capped;
+  if (excerpt.length <= max && needed.every((figure) => percentFigures(excerpt).includes(figure))) {
+    return excerpt;
+  }
+  return capText(excerpt, max);
+}
+
 function plainTexts(value: unknown): string[] {
   if (typeof value === "string") return value.trim() ? [value.trim()] : [];
   if (Array.isArray(value)) return value.flatMap(plainTexts);
@@ -251,12 +290,20 @@ export function selectOutreachSeekerMaterial(input: {
     if (fields.length === 0) continue;
     fields.sort((a, b) => b.score - a.score || a.fieldIndex - b.fieldIndex);
     const best = fields[0]!;
+    const situation = story.situation?.trim() ?? "";
+    const result = story.result?.trim() ?? "";
+    const starting = percentFigures(situation);
+    const ending = percentFigures(result);
+    const statesChange =
+      starting.some((figure) => !ending.includes(figure)) &&
+      ending.some((figure) => !starting.includes(figure));
+    const text = statesChange ? `${situation} ${result}` : best.text;
     ranked.push({
       id: `story:${story.id}`,
       category: "SEEKER_STORY",
-      text: best.text,
+      text,
       kind: "story",
-      score: best.score,
+      score: statesChange ? Math.max(best.score, relevanceScore(text, terms)) : best.score,
       index,
       maxChars: OUTREACH_INPUT_LIMITS.storyChars,
     });
@@ -283,7 +330,7 @@ export function selectOutreachSeekerMaterial(input: {
     chosen[item.kind].push({
       id: item.id,
       category: item.category,
-      text: capText(item.text, item.maxChars),
+      text: capTextKeepingFigures(item.text, item.maxChars),
     });
   }
   return {
@@ -658,9 +705,14 @@ export function buildOutreachAssetMessages(
     seen.add(key);
     return [{ id: fact.candidateId, category: "COMPANY_RESEARCH", text }];
   });
-  const status = input.mentionApplied
-    ? input.context.sources.find((source) => source.id === "application:status")
-    : undefined;
+  const applied = input.context.sources.find((source) => source.id === "application:status");
+  const status = applied?.text.trim()
+    ? {
+        id: applied.id,
+        category: applied.category,
+        text: capText(applied.text, 500),
+      }
+    : null;
   const voice = (input.context.voiceSamples ?? [])[0];
   const voiceSample = voice
     ? {

@@ -104,10 +104,10 @@ function siftAshleyContext(): ReadyApplicationGenerationContext {
     stories: [
       {
         id: "story-forecast",
-        situation: "STORY_SITUATION_MARKER a quiet quarter",
+        situation: "STORY_SITUATION_MARKER forecast deviation was 20% before the reset.",
         task: "TASK_MARKER unrelated gardening",
         action: "ACTION_MARKER watering plants",
-        result: "I rebuilt the enterprise forecast so sellers could see slipped deals.",
+        result: "reducing forecast deviation to between 5%-10% quarterly",
         verbatimAnswer: null,
         interviewAnswer: null,
         resumeBullet: null,
@@ -250,7 +250,8 @@ describe("outreach instruction wording", () => {
     expect(instructions).toContain(
       "One proof point only, from any seeker fact in citableSources.",
     );
-    expect(instructions.split(APPROVED_VOICE).length - 1).toBe(4);
+    expect(instructions.split(APPROVED_VOICE).length - 1).toBe(3);
+    expect(OUTREACH_EMAIL_INSTRUCTIONS.split(APPROVED_VOICE).length - 1).toBe(1);
     expect(instructions).not.toContain("approved statement or profile FACT");
     expect(instructions).not.toContain("voice samples and seeker-authored");
     expect(instructions).not.toContain("voice samples and consultation answers");
@@ -297,7 +298,11 @@ describe("outreach input trim", () => {
     expect(text).not.toContain("RAW_POSTING_MARKER");
     expect(text).not.toContain("SCORECARD_MARKER");
     expect(text).not.toContain("TRANSCRIPT_MARKER");
-    expect(text).not.toContain("STORY_SITUATION_MARKER");
+    const proof = sources.citableSources.find((source) => source.id === "story:story-forecast");
+    expect(proof?.text).toContain("20%");
+    expect(proof?.text).toContain("5%-10%");
+    expect(proof?.text.length ?? 0).toBeLessThanOrEqual(OUTREACH_INPUT_LIMITS.storyChars);
+    expect(sources.citableSources.some((source) => source.id === "application:status")).toBe(true);
     expect(text).not.toContain("JOB_FOCUS_MARKER");
     expect(text).not.toContain("GUIDANCE_MARKER");
     expect(text).not.toContain(OLD_VOICE);
@@ -323,8 +328,8 @@ describe("outreach input trim", () => {
     expect(chars).toBeLessThan(OUTREACH_INPUT_LIMITS.messageCharCap);
     expect(tokens).toBeLessThanOrEqual(5_000);
     expect(beforeChars).toBeGreaterThan(chars);
-    expect(chars).toBe(6_708);
-    expect(tokens).toBe(1_677);
+    expect(chars).toBe(6_666);
+    expect(tokens).toBe(1_667);
   });
 
   it("ranks seeker material from every source and keeps ties in source order", () => {
@@ -374,6 +379,21 @@ describe("outreach input trim", () => {
     ) as { priorMessages: unknown[]; interviewStageNotes: string };
     expect(thankYou.priorMessages).toEqual([priorMessages[0]]);
     expect(thankYou.interviewStageNotes).toBe(notes);
+    for (const type of ["EMAIL", "LINKEDIN_CONNECTION_NOTE", "LINKEDIN_INMAIL"] as const) {
+      const sources = JSON.parse(
+        buildOutreachAssetMessages(
+          emailInput({ type, mentionApplied: false }),
+        )[1]!.content,
+      ) as { citableSources: Array<{ id: string; text: string }> };
+      expect(sources.citableSources).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "application:status",
+            text: "Applied through the employer portal on 2026-09-20.",
+          }),
+        ]),
+      );
+    }
   });
 
   it("fact selection sends the job title, company, and candidates only", () => {
