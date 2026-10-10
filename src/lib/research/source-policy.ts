@@ -9,6 +9,17 @@ export const APPROVED_RESEARCH_NEWS_HOSTS = [
   "techcrunch.com",
   "businesswire.com",
   "prnewswire.com",
+  "globenewswire.com",
+  "ft.com",
+  "cnbc.com",
+  "apnews.com",
+  "fortune.com",
+  "axios.com",
+  "nytimes.com",
+  "venturebeat.com",
+  "geekwire.com",
+  "bizjournals.com",
+  "sec.gov",
 ] as const;
 
 /** Hard cap on web searches for one employer-research run. */
@@ -89,19 +100,27 @@ export function hostIsEmployerSite(
   });
 }
 
-function subjectNeedles(names: Array<string | null | undefined>): string[] {
-  return names
-    .map((name) => name?.trim().toLowerCase() ?? "")
-    .filter((name) => name.length >= 3);
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Title, publisher, citation labels, or retrieved page text names the company or its job focus. */
+/**
+ * The company name appears as a whole word.
+ * "sift" does not match "sifting". A job-focus phrase is not a company name.
+ */
 export function textNamesCompanyOrJobFocus(
   text: string,
   names: Array<string | null | undefined>,
 ): boolean {
-  const haystack = text.toLowerCase();
-  return subjectNeedles(names).some((needle) => haystack.includes(needle));
+  return names.some((name) => {
+    const needle = name?.trim() ?? "";
+    if (needle.length < 3) return false;
+    const pattern = new RegExp(
+      `(?<![A-Za-z0-9])${escapeRegExp(needle)}(?![A-Za-z0-9])`,
+      "i",
+    );
+    return pattern.test(text);
+  });
 }
 
 export function employerSearchBudget(policyMax: number): number {
@@ -211,7 +230,11 @@ const JOB_FOCUS_STOPWORDS = new Set([
 /**
  * A year alone is not news (copyright lines). Require a 2025–2026 event,
  * or an explicit "past 18 months". Today is within that window for 2025–2026.
+ * A denial such as "no ... in the last 18 months" is not recent news.
  */
+const RECENT_NEWS_DENIAL =
+  /\bno\b[\s\S]{0,200}\b(?:in the |within the )?(?:past|last)\s+18\s+months\b/i;
+
 const TOPIC_PATTERNS: Record<HighlightCoverageTopic, RegExp> = {
   leadership:
     /\b(ceo|cfo|cto|coo|chief executive|chief financial|founder|president|leadership|executive team)\b/i,
@@ -278,6 +301,13 @@ export function jobFocusDetailIsOnlyPosting(
   return overlap / words.length >= 0.85;
 }
 
+function withoutRecentNewsDenials(text: string): string {
+  return text
+    .split(/(?<=[.!])\s+/)
+    .filter((sentence) => !RECENT_NEWS_DENIAL.test(sentence))
+    .join(" ");
+}
+
 function citedSourceText(
   source: ResearchSource,
   excerpts: ResearchExcerptHint[],
@@ -298,7 +328,10 @@ function sourceSupportsTopic(
     const allowed =
       hostIsAnchorOrSubdomain(host, input.anchorHost) || hostIsApprovedNews(host);
     if (!allowed) return false;
-    return TOPIC_PATTERNS[topic].test(citedSourceText(source, input.excerpts ?? []));
+    const text = citedSourceText(source, input.excerpts ?? []);
+    const stated =
+      topic === "recentNews" ? withoutRecentNewsDenials(text) : text;
+    return TOPIC_PATTERNS[topic].test(stated);
   });
 }
 
@@ -362,7 +395,16 @@ export function coverageSearchFocus(input: {
   const parts = input.missingTopics.map((topic) => TOPIC_FOCUS_LABEL[topic]);
   const sentences: string[] = [];
   if (parts.length > 0) {
-    sentences.push(`Find cited evidence for: ${parts.join("; ")}.`);
+    const topics = parts.join("; ");
+    const asksForOutside = input.missingTopics.some(
+      (topic) =>
+        topic === "ownershipOrFinancialHealth" || topic === "recentNews",
+    );
+    sentences.push(
+      asksForOutside
+        ? `Find cited evidence for: ${topics}. For ownership, financial health, funding, and news from the past 18 months, use a major business publication or newswire that names this company, not a different organization with a similar name.`
+        : `Find cited evidence for: ${topics}.`,
+    );
   }
   if (input.needJobFocusPage) {
     const subject = input.jobFocus?.trim();

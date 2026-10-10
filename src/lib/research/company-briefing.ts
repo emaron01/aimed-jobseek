@@ -40,14 +40,24 @@ function normalize(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-function sourceLabel(source: ResearchSource): string {
-  if (source.title?.trim()) return source.title.trim();
-  if (source.publisher?.trim()) return source.publisher.trim();
+/** Page title, or the hostname when the stored title is empty. */
+export function researchSourceDisplayTitle(source: {
+  title?: string | null;
+  url: string;
+}): string {
+  const title = source.title?.trim();
+  if (title) return title;
   try {
-    return new URL(source.url).hostname.replace(/^www\./, "");
+    return new URL(source.url).hostname.replace(/^www\./i, "");
   } catch {
     return source.url;
   }
+}
+
+function sourceLabel(source: ResearchSource): string {
+  if (source.title?.trim()) return source.title.trim();
+  if (source.publisher?.trim()) return source.publisher.trim();
+  return researchSourceDisplayTitle(source);
 }
 
 export function sourceSupportsField(

@@ -49,7 +49,7 @@ export function buildCompanyResearchMessages(input: {
         businessModel: "string|null",
         companySizeContext: "string|null",
         relevantTechnologies: ["string"],
-        hiringSignals: ["string"],
+        hiringSignals: ["string — company hiring and growth only, not this job posting"],
         riskSignals: ["string"],
         jobFocus:
           "string|null — the part of the company this job serves (a business unit, product line, service, segment, or market)",

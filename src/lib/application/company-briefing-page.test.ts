@@ -114,7 +114,7 @@ describe("seeker-supplied research notes", () => {
 
 describe("company research prompt v9", () => {
   it("uses the approved brief as the system instructions", () => {
-    expect(RESEARCH_PROMPT_VERSION).toBe("9");
+    expect(RESEARCH_PROMPT_VERSION).toBe("10");
     expect(COMPANY_RESEARCH_SYSTEM_INSTRUCTIONS).toContain(
       "identify the part of the company this job serves",
     );

@@ -130,8 +130,9 @@ function sourceNamesSubject(
 
 /**
  * Keep the anchor host and its subdomains.
- * Keep an approved news host only when its title or text names the company
- * or the part of the company the job serves.
+ * Keep an approved news host only when the company name appears as a whole
+ * word in the title, publisher, excerpt, or support labels.
+ * The job focus alone does not admit a news page.
  * Drop every other host before save, including fundraisers and lookalikes.
  */
 export function sourceKeptForEmployerResearch(input: {
@@ -149,7 +150,6 @@ export function sourceKeptForEmployerResearch(input: {
   if (input.source.supports.length === 0) return false;
   return sourceNamesSubject(input.source, input.excerpts ?? [], [
     input.companyName,
-    input.jobFocus,
   ]);
 }
 

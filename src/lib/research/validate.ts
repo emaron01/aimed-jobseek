@@ -26,6 +26,10 @@ const JOB_REQUIREMENT =
 const REAL_EMPLOYER_RISK =
   /\b(layoffs?|laid off|restructur\w*|bankrupt\w*|insolven\w*|lawsuits?|litigation|sued|regulatory|regulators?|investigation|turnover|resign\w*|stepped down|financial trouble|funding trouble|debt|shutdown|shut down)\b/i;
 
+/** Hiring facts that stay even when the sentence also appears in the posting. */
+const HIRING_GROWTH_FACT =
+  /\b(layoffs?|laid off|hiring freeze|headcount|expansions?|expanding)\b/i;
+
 function mostlyPostingText(risk: string, posting: string): boolean {
   const riskNorm = risk.toLowerCase().replace(/\s+/g, " ").trim();
   const postingNorm = posting.toLowerCase().replace(/\s+/g, " ").trim();
@@ -37,19 +41,39 @@ function mostlyPostingText(risk: string, posting: string): boolean {
   return overlap / words.length >= 0.75;
 }
 
-function sentenceIsEmployerRisk(
+function sentenceSurvivesPostingOverlap(
   sentence: string,
   postingText: string | null | undefined,
+  keep: RegExp,
 ): boolean {
   const text = sentence.trim();
   if (!text) return false;
   if (POSTING_INCONSISTENCY.test(text)) return false;
-  if (JOB_REQUIREMENT.test(text) && !REAL_EMPLOYER_RISK.test(text)) return false;
+  if (JOB_REQUIREMENT.test(text) && !keep.test(text)) return false;
   const posting = postingText?.trim();
-  if (posting && mostlyPostingText(text, posting) && !REAL_EMPLOYER_RISK.test(text)) {
+  if (posting && mostlyPostingText(text, posting) && !keep.test(text)) {
     return false;
   }
   return true;
+}
+
+function signalsWithoutPostingOverlap(
+  items: string[],
+  postingText: string | null | undefined,
+  keep: RegExp,
+): string[] {
+  const kept: string[] = [];
+  for (const item of items) {
+    const sentences = item
+      .split(/(?<=[.!])\s+/)
+      .map((sentence) => sentence.trim())
+      .filter(Boolean);
+    const good = (sentences.length > 0 ? sentences : [item]).filter((sentence) =>
+      sentenceSurvivesPostingOverlap(sentence, postingText, keep),
+    );
+    if (good.length > 0) kept.push(good.join(" "));
+  }
+  return kept;
 }
 
 /**
@@ -61,18 +85,39 @@ export function employerRisksForJobSeeker(
   risks: string[],
   postingText?: string | null,
 ): string[] {
-  const kept: string[] = [];
-  for (const risk of risks) {
-    const sentences = risk
-      .split(/(?<=[.!])\s+/)
-      .map((sentence) => sentence.trim())
-      .filter(Boolean);
-    const good = (sentences.length > 0 ? sentences : [risk]).filter((sentence) =>
-      sentenceIsEmployerRisk(sentence, postingText),
-    );
-    if (good.length > 0) kept.push(good.join(" "));
+  return signalsWithoutPostingOverlap(risks, postingText, REAL_EMPLOYER_RISK);
+}
+
+/**
+ * Hiring and growth uses the same posting-overlap removal. A sentence that
+ * only restates the posting is dropped. A layoff, hiring freeze, expansion,
+ * or headcount sentence stays.
+ */
+export function hiringSignalsForJobSeeker(
+  signals: string[],
+  postingText?: string | null,
+): string[] {
+  return signalsWithoutPostingOverlap(signals, postingText, HIRING_GROWTH_FACT);
+}
+
+function titleIsUrl(title: string, url: string): boolean {
+  return title.trim().replace(/\/$/, "").toLowerCase() === url.trim().replace(/\/$/, "").toLowerCase();
+}
+
+function modelTitleForSource(
+  rawSources: CompanyResearchAiResult["sources"],
+  key: string,
+  evidenceUrl: string,
+): string | null {
+  for (const source of rawSources) {
+    if (normalizeUrl(source.url) !== key) continue;
+    const title = source.title?.trim();
+    if (!title || titleIsUrl(title, evidenceUrl) || titleIsUrl(title, source.url)) {
+      continue;
+    }
+    return title;
   }
-  return kept;
+  return null;
 }
 
 function hasSubstantiveFindings(result: CompanyResearchAiResult): boolean {
@@ -120,8 +165,14 @@ export function validateCompanyResearchResult(
   const sources: ResearchSource[] = evidence.sources.map((source) => {
     const key = normalizeUrl(source.url);
     const supports = [...(mergedSupports.get(key) ?? new Set())];
+    const evidenceTitle = source.title?.trim() || null;
+    const title =
+      evidenceTitle ??
+      modelTitleForSource(raw.sources, key, source.url) ??
+      null;
     return {
       ...source,
+      title,
       supports,
     };
   });
@@ -171,7 +222,10 @@ export function validateCompanyResearchResult(
     companySizeContext: raw.companySizeContext,
     relevantTechnologies: raw.relevantTechnologies,
     buyingSignals: [],
-    hiringSignals: raw.hiringSignals,
+    hiringSignals: hiringSignalsForJobSeeker(
+      raw.hiringSignals,
+      options?.postingText,
+    ),
     riskSignals: employerRisksForJobSeeker(raw.riskSignals, options?.postingText),
     jobFocus: raw.jobFocus,
     jobFocusDetail: raw.jobFocusDetail,

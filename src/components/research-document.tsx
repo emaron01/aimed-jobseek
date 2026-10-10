@@ -12,7 +12,10 @@ import {
   type ResearchTextPart,
 } from "@/lib/research/research-prose";
 import type { ResearchSource } from "@/lib/research/types";
-import { sourceLabelForCompany } from "@/lib/research/company-briefing";
+import {
+  researchSourceDisplayTitle,
+  sourceLabelForCompany,
+} from "@/lib/research/company-briefing";
 
 export function SourceMarkers({ numbers }: { numbers: number[] }) {
   const label = formatSourceMarkerLabel(numbers);
@@ -102,7 +105,7 @@ export function ResearchSourceChip({
               rel="noreferrer"
               className="font-medium text-ink underline"
             >
-              {source.title?.trim() || source.url}
+              {researchSourceDisplayTitle(source)}
             </a>
             <span className="mt-1 block text-subtle">
               {source.sourceType}
@@ -252,7 +255,7 @@ export function ResearchSourcesAppendix({
             <li key={source.url}>
               <p className="font-medium text-ink">
                 <span className="text-subtle">[{number}]</span>{" "}
-                {source.title?.trim() || source.url}
+                {researchSourceDisplayTitle(source)}
               </p>
               <p className="text-xs text-subtle">
                 {source.sourceType}

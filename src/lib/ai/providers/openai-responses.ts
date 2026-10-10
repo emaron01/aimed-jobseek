@@ -627,10 +627,18 @@ function addNormalizedSource(
   } catch {
     return;
   }
-  if (map.has(key)) return;
+  const title =
+    typeof row.title === "string" && row.title.trim() ? row.title.trim() : null;
+  const existing = map.get(key);
+  if (existing) {
+    if (!existing.title?.trim() && title) {
+      map.set(key, { ...existing, title });
+    }
+    return;
+  }
   map.set(key, {
     url,
-    title: typeof row.title === "string" ? row.title : null,
+    title,
     publisher: typeof row.publisher === "string" ? row.publisher : null,
   });
 }
