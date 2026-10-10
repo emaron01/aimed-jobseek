@@ -142,7 +142,10 @@ describe("outreach generate seekerEdit", () => {
     expect(workspace).toContain("<ApplicationOutreachBody");
     expect(body.match(/<WorkspaceProgress\b/g)).toHaveLength(1);
     expect(body).toContain('type="OUTREACH"');
-    expect(body).not.toContain("hideFailure");
+    expect(body).toContain("hideFailure={hideJobFailure}");
+    expect(body).toContain("campaignId={campaignId}");
+    expect(dashboard).toContain("hideJobFailure");
+    expect(workspace).not.toContain("hideJobFailure");
     expect(sections.match(/<Status result=\{generateState\}/g)).toHaveLength(1);
     expect(sections).toContain(
       "<Status result={generateState} suppressJobFailure",

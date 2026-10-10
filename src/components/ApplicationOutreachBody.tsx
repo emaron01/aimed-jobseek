@@ -58,10 +58,13 @@ export async function ApplicationOutreachBody({
   campaignId,
   organizationId,
   canEdit,
+  hideJobFailure = false,
 }: {
   campaignId: string;
   organizationId: string;
   canEdit: boolean;
+  /** The dashboard already shows this job's failure and Retry once. */
+  hideJobFailure?: boolean;
 }) {
   const loaded = await loadApplicationWorkspaceModel(
     organizationId,
@@ -82,7 +85,12 @@ export async function ApplicationOutreachBody({
     <div className={`space-y-4 ${WORKSPACE_CARD_WRAP_CLASS}`}>
       <div id="outreach" data-testid="application-contacts-wrap">
         <p className="sr-only">{applicationWorkspaceCopy.contactsTitle}</p>
-        <WorkspaceProgress jobs={loaded.live.jobs} type="OUTREACH" />
+        <WorkspaceProgress
+          jobs={loaded.live.jobs}
+          type="OUTREACH"
+          campaignId={campaignId}
+          hideFailure={hideJobFailure}
+        />
         <ApplicationOutreachSection
           campaignId={requirement.campaignId}
           canEdit={canEdit}

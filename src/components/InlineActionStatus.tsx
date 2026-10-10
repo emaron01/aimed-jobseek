@@ -69,6 +69,7 @@ export function InlineActionStatus({
       (!item.job || item.job.status === "PENDING" || item.job.status === "IN_PROGRESS"),
   );
   if (stillRunning) {
+    if (suppressJobFailure) return null;
     return (
       <p
         role="status"

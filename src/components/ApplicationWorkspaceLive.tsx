@@ -6,7 +6,10 @@ import { getApplicationWorkspaceLiveAction } from "@/app/actions/application-job
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { retryApplicationJobAction } from "@/app/actions/application-jobs";
 import { workspaceJobCopy } from "@/lib/product-config";
-import type { WorkspaceJobStatusView } from "@/lib/application-jobs/workspace-status";
+import {
+  activeWorkspaceJobs,
+  type WorkspaceJobStatusView,
+} from "@/lib/application-jobs/workspace-status";
 import { AppPendingIndicator } from "@/components/AppButton";
 import {
   useReplaceWorkspaceJobs,
@@ -109,14 +112,8 @@ export function WorkspaceJobRefresh({
     let interval: number | null = null;
     let cancelled = false;
 
-    function hasActive(latest: {
-      jobs: WorkspaceJobStatusView[];
-      active?: boolean;
-    }): boolean {
-      if (typeof latest.active === "boolean") return latest.active;
-      return latest.jobs.some(
-        (job) => job.status === "PENDING" || job.status === "IN_PROGRESS",
-      );
+    function hasActive(latest: { jobs: WorkspaceJobStatusView[] }): boolean {
+      return activeWorkspaceJobs(latest.jobs).length > 0;
     }
 
     function stopPolling() {
@@ -169,8 +166,8 @@ export function WorkspaceJobRefresh({
     const startingJobs = initialJobsRef.current;
     if (startingJobs && hasActive({ jobs: startingJobs })) {
       startPolling();
+      void poll();
     }
-    void poll();
 
     return () => {
       cancelled = true;
@@ -199,12 +196,14 @@ export function WorkspaceProgress({
   type,
   stayAndWatch,
   profileHref,
+  campaignId,
   hideFailure = false,
 }: {
   jobs: WorkspaceJobStatusView[];
   type: WorkspaceJobStatusView["type"];
   stayAndWatch?: boolean;
   profileHref?: string | null;
+  campaignId?: string;
   /** Spinner only. The page shows one plain failure message. */
   hideFailure?: boolean;
 }) {
@@ -240,6 +239,16 @@ export function WorkspaceProgress({
         data-testid={`workspace-failed-${type}`}
       >
         <JobErrorDetail error={failed.error} profileHref={profileHref} />
+        {campaignId && failed.canRetry ? (
+          <ApplicationActionForm
+            action={retryApplicationJobAction}
+            submitLabel={workspaceJobCopy.retry}
+            testId={`retry-job-${failed.id}`}
+          >
+            <input type="hidden" name="campaignId" value={campaignId} />
+            <input type="hidden" name="jobId" value={failed.id} />
+          </ApplicationActionForm>
+        ) : null}
       </div>
     );
   }

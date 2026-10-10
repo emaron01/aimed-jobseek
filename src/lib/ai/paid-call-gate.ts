@@ -172,6 +172,83 @@ async function withSubjectLock<T>(
   }
 }
 
+/** Plain JSON for a receipt. Drops undefined keys Prisma cannot store. */
+export function paidCallResultJson(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+/**
+ * Receipt read / provider / receipt write. The lock wrapper calls this.
+ * The stored JSON is plain data so a successful model result can be saved.
+ */
+export async function executePaidStructuredCall<T>(input: {
+  organizationId: string;
+  operation: PaidCallOperation;
+  subjectKey: string;
+  inputFingerprint: string;
+  isResultUsable: (stored: T) => boolean;
+  parseStored: (json: unknown) => T;
+  callProvider: () => Promise<T>;
+}): Promise<{ data: T; skipped: boolean }> {
+  const existing = await prisma.paidCallReceipt.findUnique({
+    where: {
+      organizationId_operation_subjectKey: {
+        organizationId: input.organizationId,
+        operation: input.operation,
+        subjectKey: input.subjectKey,
+      },
+    },
+  });
+  if (existing && existing.inputHash === input.inputFingerprint) {
+    try {
+      const stored = input.parseStored(existing.resultJson);
+      if (input.isResultUsable(stored)) {
+        return { data: stored, skipped: true };
+      }
+    } catch {
+      // Unusable stored payload — fall through to provider.
+    }
+  }
+
+  const data = await input.callProvider();
+  // Record only after a usable result (failed/empty results must not block retries).
+  if (input.isResultUsable(data)) {
+    const resultJson = paidCallResultJson(data);
+    try {
+      await prisma.paidCallReceipt.upsert({
+        where: {
+          organizationId_operation_subjectKey: {
+            organizationId: input.organizationId,
+            operation: input.operation,
+            subjectKey: input.subjectKey,
+          },
+        },
+        create: {
+          organizationId: input.organizationId,
+          operation: input.operation,
+          subjectKey: input.subjectKey,
+          inputHash: input.inputFingerprint,
+          resultJson,
+        },
+        update: {
+          inputHash: input.inputFingerprint,
+          resultJson,
+        },
+      });
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: "paid_call_receipt_failed",
+          operation: input.operation,
+          message: error instanceof Error ? error.message : "unknown",
+        }),
+      );
+      throw error;
+    }
+  }
+  return { data, skipped: false };
+}
+
 export async function runPaidStructuredCall<T>(input: {
   organizationId: string;
   operation: PaidCallOperation;
@@ -188,53 +265,7 @@ export async function runPaidStructuredCall<T>(input: {
     input.organizationId,
     input.operation,
     input.subjectKey,
-    async () => {
-      const existing = await prisma.paidCallReceipt.findUnique({
-        where: {
-          organizationId_operation_subjectKey: {
-            organizationId: input.organizationId,
-            operation: input.operation,
-            subjectKey: input.subjectKey,
-          },
-        },
-      });
-      if (existing && existing.inputHash === input.inputFingerprint) {
-        try {
-          const stored = input.parseStored(existing.resultJson);
-          if (input.isResultUsable(stored)) {
-            return { data: stored, skipped: true };
-          }
-        } catch {
-          // Unusable stored payload — fall through to provider.
-        }
-      }
-
-      const data = await input.callProvider();
-      // Record only after a usable result (failed/empty results must not block retries).
-      if (input.isResultUsable(data)) {
-        await prisma.paidCallReceipt.upsert({
-          where: {
-            organizationId_operation_subjectKey: {
-              organizationId: input.organizationId,
-              operation: input.operation,
-              subjectKey: input.subjectKey,
-            },
-          },
-          create: {
-            organizationId: input.organizationId,
-            operation: input.operation,
-            subjectKey: input.subjectKey,
-            inputHash: input.inputFingerprint,
-            resultJson: data as Prisma.InputJsonValue,
-          },
-          update: {
-            inputHash: input.inputFingerprint,
-            resultJson: data as Prisma.InputJsonValue,
-          },
-        });
-      }
-      return { data, skipped: false };
-    },
+    () => executePaidStructuredCall(input),
   );
 }
 

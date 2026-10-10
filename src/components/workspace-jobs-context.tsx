@@ -27,6 +27,26 @@ const WorkspaceJobsContext = createContext<WorkspaceJobsContextValue>({
   watchJobIds: () => undefined,
 });
 
+let externalJobs: WorkspaceJobStatusView[] = [];
+const externalListeners = new Set<() => void>();
+
+function publishExternalJobs(jobs: WorkspaceJobStatusView[]) {
+  externalJobs = jobs;
+  for (const listener of externalListeners) listener();
+}
+
+/** Sidebar trackers sit outside the provider and still need to know when to poll. */
+export function subscribeExternalWorkspaceJobs(listener: () => void): () => void {
+  externalListeners.add(listener);
+  return () => {
+    externalListeners.delete(listener);
+  };
+}
+
+export function getExternalWorkspaceJobs(): WorkspaceJobStatusView[] {
+  return externalJobs;
+}
+
 export function workspaceJobListSignature(jobs: WorkspaceJobStatusView[]): string {
   return jobs.map((job) => `${job.id}:${job.status}:${job.error ?? ""}`).join("|");
 }
@@ -119,6 +139,7 @@ export function WorkspaceJobsProvider({
   useEffect(() => {
     jobsRef.current = jobs;
     missingRef.current = new Set(missingJobIds);
+    publishExternalJobs(jobs);
   }, [jobs, missingJobIds]);
 
   const knownIds = jobs.map((job) => job.id).join("|");

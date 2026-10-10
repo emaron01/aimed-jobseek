@@ -17,6 +17,7 @@ import {
   type GenerationSource,
   type ReadyApplicationGenerationContext,
 } from "@/lib/generation/context";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import { prisma } from "@/lib/prisma-client";
 import {
   applicationAssetConfig,
@@ -37,7 +38,11 @@ import {
 } from "@/lib/email-generation/email-body";
 import { TenantError } from "@/lib/tenant/errors";
 import { generateInterviewThankYouClarifyingQuestions } from "@/lib/interview/ai";
-import { generateOutreachWithModel, validateAssetClaimsWithModel } from "./ai";
+import {
+  generateOutreachWithModel,
+  OUTREACH_GENERATION_FAILURE_MESSAGE,
+  validateAssetClaimsWithModel,
+} from "./ai";
 import {
   applicationAssetContentSchema,
   assetClaims,
@@ -1061,67 +1066,63 @@ export async function generateOutreachAsset(input: {
   }
   const emailLength =
     input.type === "EMAIL" ? input.emailLength ?? "MEDIUM" : null;
-  let feedback: string[] = [];
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const generated = await generateOutreachWithModel({
-      context,
-      type: input.type,
-      greeting,
-      signerName,
-      confirmedHiringManagerRole,
-      includeRedirect,
-      purpose: input.purpose,
-      emailLength,
-      priorMessage,
-      interviewStageNotes,
-      mentionApplied,
-      regenerationInstruction: input.regenerationInstruction ?? null,
-      qualityFeedback: [],
-      contactId,
+  const generated = await generateOutreachWithModel({
+    context,
+    type: input.type,
+    greeting,
+    signerName,
+    confirmedHiringManagerRole,
+    includeRedirect,
+    purpose: input.purpose,
+    emailLength,
+    priorMessage,
+    interviewStageNotes,
+    mentionApplied,
+    regenerationInstruction: input.regenerationInstruction ?? null,
+    qualityFeedback: [],
+    contactId,
+    personaId,
+    interviewStageId,
+  });
+  if (!generated.ok) {
+    console.error(
+      JSON.stringify({
+        event: "outreach_validation_failed",
+        purpose: input.purpose,
+        errors: [generated.message],
+      }),
+    );
+    return { ok: false, message: generated.message, violations: [generated.message] };
+  }
+  // Unchanged inputs keep the current version (no new draft, no new model call).
+  if (generated.skipped) {
+    const groupKey = outreachGroupKey({
+      type: input.type as
+        | "EMAIL"
+        | "LINKEDIN_CONNECTION_NOTE"
+        | "LINKEDIN_INMAIL",
       personaId,
+      contactId,
+      purpose: input.purpose,
       interviewStageId,
     });
-    if (!generated.ok) {
-      console.error(
-        JSON.stringify({
-          event: "outreach_validation_failed",
-          purpose: input.purpose,
-          attempt: attempt + 1,
-          errors: [generated.message],
-        }),
-      );
-      feedback = [generated.message];
-      if (attempt === 1) {
-        return { ok: false, message: generated.message, violations: feedback };
-      }
-      continue;
+    const latest = await prisma.applicationAsset.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        campaignId: input.campaignId,
+        groupKey,
+      },
+      orderBy: { version: "desc" },
+      select: { id: true, version: true },
+    });
+    if (latest) {
+      return { ok: true, assetId: latest.id, version: latest.version };
     }
-    // Worker second line: unchanged inputs keep the current version (no new draft).
-    if (generated.skipped) {
-      const groupKey = outreachGroupKey({
-        type: input.type as
-          | "EMAIL"
-          | "LINKEDIN_CONNECTION_NOTE"
-          | "LINKEDIN_INMAIL",
-        personaId,
-        contactId,
-        purpose: input.purpose,
-        interviewStageId,
-      });
-      const latest = await prisma.applicationAsset.findFirst({
-        where: {
-          organizationId: input.organizationId,
-          campaignId: input.campaignId,
-          groupKey,
-        },
-        orderBy: { version: "desc" },
-        select: { id: true, version: true },
-      });
-      if (latest) {
-        return { ok: true, assetId: latest.id, version: latest.version };
-      }
-    }
-    const content = replaceEmDashesDeep(generated.data);
+  }
+  const content = paidCallResultJson(
+    replaceEmDashesDeep(generated.data),
+  ) as ApplicationAssetContent;
+  try {
     const saved = await saveOutreachVersion({
       context,
       type: input.type,
@@ -1135,12 +1136,20 @@ export async function generateOutreachAsset(input: {
       guidance: input.regenerationInstruction?.trim() || null,
     });
     return { ok: true, assetId: saved.id, version: saved.version };
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "outreach_save_failed",
+        purpose: input.purpose,
+        message: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+    return {
+      ok: false,
+      message: OUTREACH_GENERATION_FAILURE_MESSAGE,
+      violations: [],
+    };
   }
-  return {
-    ok: false,
-    message: lastOutreachMessage(feedback),
-    violations: feedback,
-  };
 }
 
 /**
@@ -1383,13 +1392,6 @@ export function outreachUnchangedSkipMessage(
   if (purpose === "THANK_YOU") return outreachConfig.labels.unchangedThankYouNote;
   if (purpose === "CHECK_IN") return outreachConfig.labels.unchangedCheckIn;
   return outreachConfig.labels.unchangedOutreach;
-}
-
-function lastOutreachMessage(feedback: string[]): string {
-  return (
-    feedback[0] ??
-    "The model did not return a usable message."
-  );
 }
 
 export async function saveOutreachMessageEdit(input: {

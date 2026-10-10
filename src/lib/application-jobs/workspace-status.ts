@@ -31,8 +31,8 @@ export type WorkspaceLiveView = {
   signature: string;
   /**
    * True while a background job, employer research, posting parse, or Harper
-   * generation is still unfinished. The existing refresher keeps polling
-   * while this is true.
+   * generation is still unfinished. Status polling continues only while an
+   * application job is queued or running.
    */
   active: boolean;
 };

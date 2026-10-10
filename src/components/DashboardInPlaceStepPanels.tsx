@@ -98,6 +98,7 @@ export async function loadDashboardInPlacePanels(input: {
         campaignId={input.campaignId}
         organizationId={input.organizationId}
         canEdit={input.canEdit}
+        hideJobFailure
       />
     );
   }

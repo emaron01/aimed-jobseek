@@ -21,6 +21,7 @@ export const outreachConfig = Object.freeze({
     appliedStatus: "Applied",
     notAppliedStatus: "Not marked applied",
     generate: "Generate",
+    writingMessage: "Writing your message… this can take about a minute.",
     regenerate: "Regenerate",
     addContact: "Add Contact",
     addNextMessage: "Add the next message",

@@ -22,6 +22,7 @@ import {
   formatOutreachGeneratorKindLabel,
   formatOutreachHistoryLine,
   formatOutreachTypeLabel,
+  resolveOutreachGeneratorKind,
   type OutreachGeneratorKind,
 } from "@/lib/application-assets/display";
 import { outreachEmailHandoff } from "@/lib/application-assets/handoff";
@@ -31,6 +32,9 @@ import {
   polishCopy,
   vocab,
 } from "@/lib/product-config";
+import { AppPendingIndicator } from "@/components/AppButton";
+import { useWorkspaceJobs } from "@/components/workspace-jobs-context";
+import { outreachJobTargetId } from "@/lib/product-config/outreach";
 import { SubmitButton, AppButton, AppActionLink, PageHeader } from "@/components/ui";
 import { ApplicationActionForm } from "@/components/ApplicationActionForm";
 import { InlineActionStatus } from "@/components/InlineActionStatus";
@@ -103,6 +107,43 @@ const GENERATOR_KINDS: OutreachGeneratorKind[] = [
   "LINKEDIN_INMAIL",
   "INTERVIEW_THANK_YOU",
 ];
+
+export function outreachWritingForContact(input: {
+  jobs: Array<{ id: string; type: string; status: string; targetId: string | null }>;
+  contactId: string;
+  personaId?: string | null;
+  assetType?: string | null;
+  purpose?: string | null;
+  pendingJobId?: string | null;
+}): boolean {
+  const running = (status: string) => status === "PENDING" || status === "IN_PROGRESS";
+  const target =
+    input.assetType && input.purpose
+      ? outreachJobTargetId({
+          type: input.assetType as "EMAIL" | "LINKEDIN_CONNECTION_NOTE" | "LINKEDIN_INMAIL",
+          personaId: input.personaId ?? null,
+          contactId: input.contactId,
+          purpose: input.purpose as "PROACTIVE" | "FOLLOW_UP" | "THANK_YOU" | "CHECK_IN",
+        })
+      : null;
+  if (
+    input.jobs.some((job) => {
+      if (job.type !== "OUTREACH" || !running(job.status)) return false;
+      if (target && job.targetId === target) return true;
+      const parts = (job.targetId ?? "").split(":");
+      return (
+        parts.includes(input.contactId) &&
+        (!input.assetType || parts[0] === input.assetType)
+      );
+    })
+  ) {
+    return true;
+  }
+  const pendingId = input.pendingJobId?.trim();
+  if (!pendingId) return false;
+  const tracked = input.jobs.find((job) => job.id === pendingId);
+  return !tracked || running(tracked.status);
+}
 
 function Status({
   result,
@@ -555,18 +596,39 @@ export function ApplicationOutreachSection({
     initial,
   );
   const router = useRouter();
+  const refreshed = useRef(new Set<ApplicationOutreachActionResult>());
   useEffect(() => {
-    if (addState?.ok || roleState?.ok || generateState?.ok || sentState?.ok) router.refresh();
+    for (const state of [addState, roleState, generateState, sentState]) {
+      if (!state?.ok || refreshed.current.has(state)) continue;
+      refreshed.current.add(state);
+      router.refresh();
+    }
   }, [addState, roleState, generateState, sentState, router]);
   const [selectedId, setSelectedId] = useState(contacts[0]?.contactId ?? "");
   const [explicitAssetId, setExplicitAssetId] = useState<string | null>(null);
   const [generatorKind, setGeneratorKind] =
     useState<OutreachGeneratorKind>("EMAIL");
   const [showAddContact, setShowAddContact] = useState(false);
+  const jobs = useWorkspaceJobs();
   const selected =
     contacts.find((contact) => contact.contactId === selectedId) ??
     contacts[0] ??
     null;
+  const writingKind = resolveOutreachGeneratorKind(
+    generatorKind === "INTERVIEW_THANK_YOU" ? "INTERVIEW_THANK_YOU" : generatorKind,
+  );
+  const writingPurpose =
+    writingKind.purpose ?? (selected && messagesForContact(assets, selected.contactId).some((asset) => asset.sentAt) ? "FOLLOW_UP" : "PROACTIVE");
+  const writing = selected
+    ? outreachWritingForContact({
+        jobs,
+        contactId: selected.contactId,
+        personaId: selected.personaId,
+        assetType: writingKind.type,
+        purpose: writingPurpose,
+        pendingJobId: generateState?.jobId,
+      })
+    : false;
   const selectedMessages = selected
     ? messagesForContact(assets, selected.contactId)
     : [];
@@ -1076,6 +1138,15 @@ export function ApplicationOutreachSection({
                     </span>
                   </label>
                   <SubmitButton>{outreachConfig.labels.generate}</SubmitButton>
+                  {writing ? (
+                    <p
+                      className="text-sm text-ink md:col-span-2"
+                      data-testid="outreach-writing"
+                      role="status"
+                    >
+                      <AppPendingIndicator label={outreachConfig.labels.writingMessage} />
+                    </p>
+                  ) : null}
                 </form>
             ) : null}
             <Status result={generateState} suppressJobFailure />

@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { getApplicationTrackerAction } from "@/app/actions/application-jobs";
 import {
-  getApplicationTrackerAction,
-} from "@/app/actions/application-jobs";
+  getExternalWorkspaceJobs,
+  subscribeExternalWorkspaceJobs,
+} from "@/components/workspace-jobs-context";
+import { activeWorkspaceJobs } from "@/lib/application-jobs/workspace-status";
 import { AppIcon, ErrorState, Skeleton } from "@/components/design";
 import {
   sidebarNavItemBranchClass,
@@ -33,6 +36,76 @@ import {
 import { cn } from "@/lib/utils";
 
 const POLL_MS = 3_000;
+
+function useApplicationTrackerPoll(
+  campaignId: string,
+  pathname: string,
+  onTracker: (tracker: ApplicationTrackerView | null) => void,
+  onFailed: (failed: boolean) => void,
+  onLoaded: (loaded: boolean) => void,
+) {
+  const liveJobs = useSyncExternalStore(
+    subscribeExternalWorkspaceJobs,
+    getExternalWorkspaceJobs,
+    getExternalWorkspaceJobs,
+  );
+  const liveRunning = activeWorkspaceJobs(liveJobs).length > 0;
+
+  useEffect(() => {
+    let cancelled = false;
+    let interval: number | null = null;
+
+    const stop = () => {
+      if (interval == null) return;
+      window.clearInterval(interval);
+      interval = null;
+    };
+
+    const load = async () => {
+      const next = await getApplicationTrackerAction(campaignId, pathname);
+      if (cancelled) return null;
+      onTracker(next);
+      onLoaded(true);
+      onFailed(false);
+      return next;
+    };
+
+    const tick = () => {
+      void load()
+        .then((next) => {
+          if (cancelled) return;
+          const busy =
+            liveRunning || Boolean(next?.steps.some((step) => step.hasActiveJob));
+          if (!busy) {
+            stop();
+            return;
+          }
+          if (interval != null) return;
+          interval = window.setInterval(() => {
+            tick();
+          }, POLL_MS);
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            onLoaded(true);
+            onFailed(true);
+          }
+          console.error(
+            JSON.stringify({
+              event: "application_tracker_poll_failed",
+              message: error instanceof Error ? error.message : "unknown",
+            }),
+          );
+        });
+    };
+
+    tick();
+    return () => {
+      cancelled = true;
+      stop();
+    };
+  }, [campaignId, pathname, liveRunning, onTracker, onFailed, onLoaded]);
+}
 
 function applicationPageBranch(
   campaignId: string,
@@ -214,44 +287,7 @@ export function ApplicationSidebarTracker({
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      const next = await getApplicationTrackerAction(campaignId, pathname);
-      if (!cancelled) {
-        setTracker(next);
-        setLoaded(true);
-        setFailed(false);
-      }
-    };
-    void load().catch((error) => {
-      if (!cancelled) {
-        setLoaded(true);
-        setFailed(true);
-      }
-      console.error(
-        JSON.stringify({
-          event: "application_tracker_poll_failed",
-          message: error instanceof Error ? error.message : "unknown",
-        }),
-      );
-    });
-    const interval = window.setInterval(() => {
-      void load().catch((error) => {
-        if (!cancelled) setFailed(true);
-        console.error(
-          JSON.stringify({
-            event: "application_tracker_poll_failed",
-            message: error instanceof Error ? error.message : "unknown",
-          }),
-        );
-      });
-    }, POLL_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [campaignId, pathname]);
+  useApplicationTrackerPoll(campaignId, pathname, setTracker, setFailed, setLoaded);
 
   const href = workspaceCampaignHref(campaignId);
   const branch = applicationPageBranch(campaignId, pathname);
@@ -321,43 +357,7 @@ export function ApplicationCompactTracker({
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      const next = await getApplicationTrackerAction(campaignId, pathname);
-      if (!cancelled) {
-        setTracker(next);
-        setLoaded(true);
-        setFailed(false);
-      }
-    };
-    void load().catch((error) => {
-      if (!cancelled) {
-        setLoaded(true);
-        setFailed(true);
-      }
-      console.error(
-        JSON.stringify({
-          event: "application_tracker_poll_failed",
-          message: error instanceof Error ? error.message : "unknown",
-        }),
-      );
-    });
-    const interval = window.setInterval(() => {
-      void load().catch((error) => {
-        console.error(
-          JSON.stringify({
-            event: "application_tracker_poll_failed",
-            message: error instanceof Error ? error.message : "unknown",
-          }),
-        );
-      });
-    }, POLL_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [campaignId, pathname]);
+  useApplicationTrackerPoll(campaignId, pathname, setTracker, setFailed, setLoaded);
 
   const current = tracker?.steps.find((step) => step.isCurrent) ?? tracker?.steps[0];
   const doneCount = tracker?.steps.filter((step) => step.state === "done").length ?? 0;
