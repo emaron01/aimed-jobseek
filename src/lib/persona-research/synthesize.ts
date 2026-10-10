@@ -172,7 +172,7 @@ export async function researchAndSynthesizePersona(
       createdByUserId: input.userId,
       productEvidenceBundleId: productBundle.id,
       webSearchQueriesUsed: progressive.webSearchQueriesUsed,
-      sourceIdsJson: progressive.sourceIds as unknown as Prisma.InputJsonValue,
+      sourceIdsJson: paidCallResultJson(progressive.sourceIds),
       normalizedEvidenceJson: paidCallResultJson({
         productEvidence: relevantProduct,
         personaEvidence: progressive.excerpts,

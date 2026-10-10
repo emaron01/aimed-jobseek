@@ -173,7 +173,7 @@ export async function approvePersonaFromDraft(input: {
           : definition,
         targetTitles: protectedPaths.includes("targetTitles")
           ? (existing.targetTitles as Prisma.InputJsonValue)
-          : (input.draft.likelyTitles as unknown as Prisma.InputJsonValue),
+          : paidCallResultJson(input.draft.likelyTitles),
         department: protectedPaths.includes("department")
           ? existing.department
           : input.draft.department,
@@ -194,11 +194,11 @@ export async function approvePersonaFromDraft(input: {
           : input.draft.messagingNotes,
         whyThisPersonaMatters: input.suggestion.whyThisPersonaMatters,
         suggestionKey: input.suggestion.suggestionKey,
-        personaMessagingJson: {
+        personaMessagingJson: paidCallResultJson({
           positioning: input.draft.personaPositioning,
           proofPoints: input.draft.relevantProofPoints,
           objections: input.draft.likelyObjections,
-        } as unknown as Prisma.InputJsonValue,
+        }),
         approvalStatus: "APPROVED",
         approvedAt: new Date(),
         approvedByUserId: input.userId,
@@ -213,7 +213,7 @@ export async function approvePersonaFromDraft(input: {
         productId: input.productId,
         name: input.draft.name,
         definition,
-        targetTitles: input.draft.likelyTitles as unknown as Prisma.InputJsonValue,
+        targetTitles: paidCallResultJson(input.draft.likelyTitles),
         department: input.draft.department,
         seniority: input.draft.seniority,
         responsibilities,
@@ -222,11 +222,11 @@ export async function approvePersonaFromDraft(input: {
         messagingNotes: input.draft.messagingNotes,
         whyThisPersonaMatters: input.suggestion.whyThisPersonaMatters,
         suggestionKey: input.suggestion.suggestionKey,
-        personaMessagingJson: {
+        personaMessagingJson: paidCallResultJson({
           positioning: input.draft.personaPositioning,
           proofPoints: input.draft.relevantProofPoints,
           objections: input.draft.likelyObjections,
-        } as unknown as Prisma.InputJsonValue,
+        }),
         approvalStatus: "APPROVED",
         approvedAt: new Date(),
         approvedByUserId: input.userId,
@@ -263,7 +263,7 @@ export async function approvePersonaFromDraft(input: {
           criterionType: String(c.criterionType ?? "OTHER"),
           dataType: "TEXT" as const,
           operator,
-          targetValue: (c.targetValue ?? c.name) as Prisma.InputJsonValue,
+          targetValue: paidCallResultJson(c.targetValue ?? c.name ?? ""),
           importance: (typeof c.importance === "string"
             ? c.importance
             : "MEDIUM") as "MEDIUM",

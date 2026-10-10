@@ -95,6 +95,7 @@ describe("parsed model JSON writes", () => {
     "src/lib/hiring-team/synthesize-outcome.ts",
     "src/lib/persona-research/approve.ts",
     "src/lib/persona-research/synthesize.ts",
+    "src/lib/persona-research/progressive-search.ts",
     "src/lib/persona-research/resynthesize-approved.ts",
     "src/lib/product-research/approve.ts",
     "src/lib/product-research/synthesize.ts",

@@ -4,7 +4,7 @@
 
 import "server-only";
 
-import { Prisma } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import { prisma } from "@/lib/prisma";
 import { discoverSourcesViaWebSearch } from "@/lib/research/web-search-retriever";
 import { fetchProductPageUrl } from "@/lib/product-research/fetch-url";
@@ -221,12 +221,12 @@ export async function runProgressivePersonaWebSearch(input: {
           status: "ACQUIRED",
           extractedText: fetched.text,
           freshnessExpiresAt: daysFromNow(input.freshnessDays),
-          metadataJson: {
+          metadataJson: paidCallResultJson({
             searchQuery: focus.slice(0, 500),
             correlationId: input.correlationId,
             provider: discovery.provider,
             model: discovery.model,
-          } as Prisma.InputJsonValue,
+          }),
         },
       });
 

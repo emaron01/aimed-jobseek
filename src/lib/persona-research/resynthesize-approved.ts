@@ -4,7 +4,6 @@
 
 import "server-only";
 
-import { Prisma } from "@prisma/client";
 import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import { planCriterionReinterpretation } from "@/lib/criteria/merge";
 import type { InterpretedCriterionDraft } from "@/lib/criteria/types";
@@ -403,8 +402,7 @@ export async function applyApprovedPersonaResynthesis(input: {
         ...(protectTitles
           ? {}
           : {
-              targetTitles: (draft.likelyTitles ??
-                []) as unknown as Prisma.InputJsonValue,
+              targetTitles: paidCallResultJson(draft.likelyTitles ?? []),
             }),
       },
     });
