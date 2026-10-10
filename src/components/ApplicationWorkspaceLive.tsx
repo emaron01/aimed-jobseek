@@ -87,10 +87,13 @@ export function WorkspaceJobRefresh({
   campaignId,
   initialSignature,
   initialJobs,
+  initialWorkRunning = false,
 }: {
   campaignId: string;
   initialSignature?: string;
   initialJobs?: WorkspaceJobStatusView[];
+  /** Research or posting work already running when the page loaded. */
+  initialWorkRunning?: boolean;
 }) {
   const router = useRouter();
   const jobs = useWorkspaceJobs();
@@ -112,8 +115,8 @@ export function WorkspaceJobRefresh({
     let interval: number | null = null;
     let cancelled = false;
 
-    function hasActive(latest: { jobs: WorkspaceJobStatusView[] }): boolean {
-      return activeWorkspaceJobs(latest.jobs).length > 0;
+    function hasActive(latest: { active: boolean }): boolean {
+      return latest.active;
     }
 
     function stopPolling() {
@@ -164,7 +167,7 @@ export function WorkspaceJobRefresh({
     }
 
     const startingJobs = initialJobsRef.current;
-    if (startingJobs && hasActive({ jobs: startingJobs })) {
+    if (startingJobs && activeWorkspaceJobs(startingJobs).length > 0) {
       startPolling();
       void poll();
     }
@@ -187,6 +190,12 @@ export function WorkspaceJobRefresh({
     ensurePollingRef.current?.();
     pollRef.current?.();
   }, [activeKey]);
+
+  useEffect(() => {
+    if (!initialWorkRunning || pollingRef.current) return;
+    ensurePollingRef.current?.();
+    pollRef.current?.();
+  }, [initialWorkRunning]);
 
   return null;
 }

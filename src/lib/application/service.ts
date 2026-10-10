@@ -1,4 +1,5 @@
 import type { Prisma, QualificationBucket } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import {
   anchorHostFromResearchTimings,
   employerWebsiteAnchor,
@@ -63,7 +64,7 @@ function asBucket(value: string): QualificationBucket {
 }
 
 function jsonValue(value: unknown): Prisma.InputJsonValue {
-  return value as Prisma.InputJsonValue;
+  return paidCallResultJson(value);
 }
 
 async function companyMatches(

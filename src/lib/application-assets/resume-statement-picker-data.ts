@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import {
   bulletResultKey,
   oneLineBullet,
@@ -65,7 +66,7 @@ async function persistCarriedHiddenRoles(input: {
     ),
     prisma.product.updateMany({
       where: { id: input.productId, organizationId: input.organizationId },
-      data: { profileJson: carried.profileJson as Prisma.InputJsonValue },
+      data: { profileJson: paidCallResultJson(carried.profileJson) },
     }),
   ]);
   return new Map(carried.updates.map((update) => [update.id, update.resumeStatementPicksJson]));
@@ -266,7 +267,7 @@ export async function saveBulletEvidenceRole(input: {
   });
   await prisma.product.update({
     where: { id: campaign.product.id },
-    data: { profileJson: profileJson as Prisma.InputJsonValue },
+    data: { profileJson: paidCallResultJson(profileJson) },
   });
   if (!input.pick) return;
   const campaignPicks = await prisma.campaign.findFirst({
@@ -393,11 +394,13 @@ export async function addSeekerBullet(input: {
   await prisma.product.update({
     where: { id: campaign.product.id },
     data: {
-      profileJson: profileWithSeekerBullet(campaign.product.profileJson, {
-        id,
-        text,
-        roleId: storedRole,
-      }) as Prisma.InputJsonValue,
+      profileJson: paidCallResultJson(
+        profileWithSeekerBullet(campaign.product.profileJson, {
+          id,
+          text,
+          roleId: storedRole,
+        }),
+      ),
     },
   });
   const saved = resumeStatementPicksFromCampaign({
@@ -455,7 +458,7 @@ export async function removePickerBullet(input: {
   if (bullet.seekerOwned) profileJson = profileWithoutSeekerBullet(profileJson, bullet.id);
   await prisma.product.update({
     where: { id: campaign.product.id },
-    data: { profileJson: profileJson as Prisma.InputJsonValue },
+    data: { profileJson: paidCallResultJson(profileJson) },
   });
   const stored = campaign.resumeStatementPicksJson;
   const saved = resumeStatementPicksFromCampaign({
@@ -503,7 +506,7 @@ export async function saveBulletText(input: {
   );
   await prisma.product.update({
     where: { id: campaign.product.id },
-    data: { profileJson: profileJson as Prisma.InputJsonValue },
+    data: { profileJson: paidCallResultJson(profileJson) },
   });
   const campaignPicks = await prisma.campaign.findFirst({
     where: { id: input.campaignId, organizationId: input.organizationId },

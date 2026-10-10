@@ -5,6 +5,7 @@
 import type { Prisma } from "@prisma/client";
 import {
   findPaidCallReceipt,
+  paidCallResultJson,
   type PaidCallOperation,
 } from "@/lib/ai/paid-call-gate";
 import { prisma } from "@/lib/prisma-client";
@@ -65,7 +66,7 @@ export function withAwaitingSeekerInput(
   } else {
     delete current.awaitingSeekerInput;
   }
-  return current as Prisma.InputJsonValue;
+  return paidCallResultJson(current);
 }
 
 export async function recordHiringTeamIncompleteSynthesize(input: {

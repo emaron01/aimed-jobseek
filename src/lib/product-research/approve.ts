@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Prisma } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
 import type {
@@ -94,9 +95,8 @@ export async function approveProductFromDraft(input: {
         input.fields.averageOrderValue != null
           ? new Prisma.Decimal(input.fields.averageOrderValue)
           : null,
-      profileJson: parsedProfile.profile as unknown as Prisma.InputJsonValue,
-      messagingJson: (input.messaging ??
-        run.messagingDraftJson) as Prisma.InputJsonValue,
+      profileJson: paidCallResultJson(parsedProfile.profile),
+      messagingJson: paidCallResultJson(input.messaging ?? run.messagingDraftJson),
       manuallyEditedFields: protectedPaths as unknown as Prisma.InputJsonValue,
       approvalStatus: "APPROVED",
       setupStatus: "APPROVED",

@@ -15,11 +15,13 @@ export function ApplicationWorkspaceChrome({
   campaignId,
   initialSignature,
   initialJobs,
+  initialWorkRunning = false,
   children,
 }: {
   campaignId: string;
   initialSignature: string;
   initialJobs: WorkspaceJobStatusView[];
+  initialWorkRunning?: boolean;
   children?: ReactNode;
 }) {
   const pathname = usePathname() || "";
@@ -48,6 +50,7 @@ export function ApplicationWorkspaceChrome({
           campaignId={campaignId}
           initialSignature={initialSignature}
           initialJobs={initialJobs}
+          initialWorkRunning={initialWorkRunning}
         />
         <ApplicationCompactTracker campaignId={campaignId} />
         <div className="min-w-0 flex-1 space-y-4">

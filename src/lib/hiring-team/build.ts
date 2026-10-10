@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import type { HiringTeamJobEvidence, HiringTeamResearchEvidence } from "@/lib/hiring-team/evidence";
 import { hiringTeamEvidenceExcerpts } from "@/lib/hiring-team/evidence";
 import { identifyRolesWithModel, synthesizeHiringTeamRole } from "@/lib/hiring-team/ai";
-import { findPaidCallReceipt } from "@/lib/ai/paid-call-gate";
+import { findPaidCallReceipt, paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import {
   jobRequirementLines,
   type HiringTeamNarrative,
@@ -77,7 +77,7 @@ function profilePayload(input: {
   corrections?: Array<{ roleKey: string; reason: string }>;
   dropped?: Array<{ name: string; reason: string }>;
 }): Prisma.InputJsonValue {
-  return {
+  return paidCallResultJson({
     includeResearch: input.includeResearch,
     roleKey: input.role.roleKey,
     involvement: input.role.involvement,
@@ -92,7 +92,7 @@ function profilePayload(input: {
     ...(input.awaitingSeekerInput ? { awaitingSeekerInput: true } : {}),
     corrections: input.corrections ?? [],
     dropped: input.dropped ?? [],
-  } as unknown as Prisma.InputJsonValue;
+  });
 }
 
 /** Exported for CHANGE 2 pre-queue fingerprint checks (DB reads only). */
@@ -632,7 +632,7 @@ export async function addApplicationHiringTeamRole(input: {
       additionalContext: input.notes,
       setupStatus: "NOT_STARTED",
       approvalStatus: "NOT_STARTED",
-      profileJson: {
+      profileJson: paidCallResultJson({
         involvement: "DIRECT",
         identification: {
           roleKey: `custom_${Date.now()}`,
@@ -644,7 +644,7 @@ export async function addApplicationHiringTeamRole(input: {
           evidence: [],
         },
         narrative: null,
-      },
+      }),
       manuallyEditedFields: ["seeker"],
     },
     select: { id: true },
@@ -998,7 +998,7 @@ export async function addTemplateToApplication(input: {
       additionalContext: template.notes,
       setupStatus: "NOT_STARTED",
       approvalStatus: "NOT_STARTED",
-      profileJson: {
+      profileJson: paidCallResultJson({
         involvement: "DIRECT",
         identification: {
           roleKey: `template_${template.id}`,
@@ -1010,7 +1010,7 @@ export async function addTemplateToApplication(input: {
           evidence: [],
         },
         narrative: null,
-      },
+      }),
       manuallyEditedFields: ["seeker"],
     },
     select: { id: true },

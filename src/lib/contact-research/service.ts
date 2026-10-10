@@ -2,7 +2,6 @@ import "server-only";
 
 import type {
   ContactResearch,
-  Prisma,
   UsageEventStatus,
 } from "@prisma/client";
 import {
@@ -11,6 +10,7 @@ import {
   getContactResearchAiConfig,
   isContactResearchAiConfigured,
 } from "@/lib/ai";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import type { AiMessage } from "@/lib/ai/types";
 import { CONTACT_RESEARCH_DISABLED_USER_MESSAGE } from "@/lib/contact-research/policy";
@@ -335,13 +335,11 @@ export async function researchContactRole(input: {
         confidence: hasRoleEvidence ? result.confidence : "LOW",
         currentTitle: contact.title,
         roleSummary: result.roleSummary,
-        responsibilities: result.responsibilities as Prisma.InputJsonValue,
-        ownershipAreas: result.ownershipAreas as Prisma.InputJsonValue,
-        professionalSignals:
-          result.professionalSignals as Prisma.InputJsonValue,
-        negativeRoleSignals:
-          result.negativeRoleSignals as Prisma.InputJsonValue,
-        researchSources: sources as Prisma.InputJsonValue,
+        responsibilities: paidCallResultJson(result.responsibilities),
+        ownershipAreas: paidCallResultJson(result.ownershipAreas),
+        professionalSignals: paidCallResultJson(result.professionalSignals),
+        negativeRoleSignals: paidCallResultJson(result.negativeRoleSignals),
+        researchSources: paidCallResultJson(sources),
         researchedAt: now,
         expiresAt,
         aiProvider: providerSummary.provider,
@@ -359,13 +357,11 @@ export async function researchContactRole(input: {
         confidence: hasRoleEvidence ? result.confidence : "LOW",
         currentTitle: contact.title,
         roleSummary: result.roleSummary,
-        responsibilities: result.responsibilities as Prisma.InputJsonValue,
-        ownershipAreas: result.ownershipAreas as Prisma.InputJsonValue,
-        professionalSignals:
-          result.professionalSignals as Prisma.InputJsonValue,
-        negativeRoleSignals:
-          result.negativeRoleSignals as Prisma.InputJsonValue,
-        researchSources: sources as Prisma.InputJsonValue,
+        responsibilities: paidCallResultJson(result.responsibilities),
+        ownershipAreas: paidCallResultJson(result.ownershipAreas),
+        professionalSignals: paidCallResultJson(result.professionalSignals),
+        negativeRoleSignals: paidCallResultJson(result.negativeRoleSignals),
+        researchSources: paidCallResultJson(sources),
         researchedAt: now,
         expiresAt,
         aiProvider: providerSummary.provider,

@@ -3,6 +3,7 @@
  * Next.js entry: `@/lib/tenant/companies` re-exports behind server-only.
  */
 
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import type {
   ApplicationEmployerResearch,
   Company,
@@ -782,6 +783,7 @@ export async function saveCompanyResearch(input: {
   anchorHost?: string | null;
   sisterHosts?: string[] | null;
 }): Promise<CompanyResearch> {
+  const storedResult = paidCallResultJson(input.result) as CompanyResearchResult;
   const organizationId = await orgId();
   const company = await prisma.company.findFirst({
     where: { id: input.companyId, organizationId },
@@ -794,7 +796,7 @@ export async function saveCompanyResearch(input: {
       : await getResearchPolicy(organizationId);
 
   const now = new Date();
-  const sources = input.result.sources ?? [];
+  const sources = storedResult.sources ?? [];
   const lockKey = `company-research-intro:${organizationId}:${company.id}`;
 
   return prisma.$transaction(async (tx) => {
@@ -813,7 +815,7 @@ export async function saveCompanyResearch(input: {
 
     const automated = (input.researchMethod ?? "AUTOMATED") === "AUTOMATED";
     const seekerColumns = automated
-      ? jobSeekerResearchColumns(input.result)
+      ? jobSeekerResearchColumns(storedResult)
       : null;
 
     const saved = await tx.companyResearch.create({
@@ -822,28 +824,28 @@ export async function saveCompanyResearch(input: {
         companyId: company.id,
         status: input.status ?? "COMPLETED",
         researchMethod: input.researchMethod ?? "AUTOMATED",
-        companySummary: input.result.companySummary,
-        whatTheySell: input.result.whatTheySell,
-        customerTypes: input.result.customerTypes,
-        primaryMarkets: input.result.primaryMarkets,
-        businessModel: input.result.businessModel,
+        companySummary: storedResult.companySummary,
+        whatTheySell: storedResult.whatTheySell,
+        customerTypes: storedResult.customerTypes,
+        primaryMarkets: storedResult.primaryMarkets,
+        businessModel: storedResult.businessModel,
         estimatedAov: seekerColumns
           ? seekerColumns.estimatedAov
-          : input.result.estimatedAov,
+          : storedResult.estimatedAov,
         aovReasoning: seekerColumns
           ? seekerColumns.aovReasoning
-          : input.result.aovReasoning,
-        companySizeContext: input.result.companySizeContext,
-        relevantTechnologies: input.result.relevantTechnologies,
+          : storedResult.aovReasoning,
+        companySizeContext: storedResult.companySizeContext,
+        relevantTechnologies: storedResult.relevantTechnologies,
         buyingSignals: seekerColumns
           ? seekerColumns.buyingSignals
-          : input.result.buyingSignals,
+          : storedResult.buyingSignals,
         hiringSignals: seekerColumns
           ? seekerColumns.hiringSignals
-          : (input.result.hiringSignals ?? []),
-        riskSignals: input.result.riskSignals,
+          : (storedResult.hiringSignals ?? []),
+        riskSignals: storedResult.riskSignals,
         identityAmbiguous: input.identityAmbiguous ?? false,
-        researchConfidence: input.result.confidence,
+        researchConfidence: storedResult.confidence,
         sourceCount: sources.length,
         researchSources: sources,
         researchedAt: now,
@@ -858,11 +860,14 @@ export async function saveCompanyResearch(input: {
         researchDurationMs: input.usage?.researchDurationMs ?? null,
         searchStagesUsed: input.telemetry?.searchStagesUsed ?? null,
         researchStoppedReason: input.telemetry?.researchStoppedReason ?? null,
-        researchStageTimings: (appendAnchorHostTiming(
-          input.telemetry?.researchStageTimings ?? null,
-          input.anchorHost,
-          input.sisterHosts,
-        ) ?? undefined) as Prisma.InputJsonValue | undefined,
+        researchStageTimings: (() => {
+          const timings = appendAnchorHostTiming(
+            input.telemetry?.researchStageTimings ?? null,
+            input.anchorHost,
+            input.sisterHosts,
+          );
+          return timings == null ? undefined : paidCallResultJson(timings);
+        })(),
         researchedByUserId: input.researchedByUserId ?? null,
         firstResearchedByUserId,
       },
@@ -895,28 +900,29 @@ export async function saveApplicationEmployerResearch(input: {
   sisterHosts?: string[] | null;
   inputFingerprint: string;
 }): Promise<ApplicationEmployerResearch> {
+  const storedResult = paidCallResultJson(input.result) as CompanyResearchResult;
   const organizationId = await orgId();
   const now = new Date();
-  const sources = input.result.sources ?? [];
+  const sources = storedResult.sources ?? [];
   return prisma.applicationEmployerResearch.create({
     data: {
       organizationId,
       campaignId: input.campaignId,
       companyId: input.companyId,
       status: input.status ?? "COMPLETED",
-      companySummary: input.result.companySummary,
-      whatTheySell: input.result.whatTheySell,
-      customerTypes: input.result.customerTypes,
-      primaryMarkets: input.result.primaryMarkets,
-      businessModel: input.result.businessModel,
-      companySizeContext: input.result.companySizeContext,
-      relevantTechnologies: input.result.relevantTechnologies,
-      hiringSignals: input.result.hiringSignals ?? [],
-      riskSignals: input.result.riskSignals,
-      jobFocus: input.result.jobFocus?.trim() || null,
-      jobFocusDetail: input.result.jobFocusDetail?.trim() || null,
+      companySummary: storedResult.companySummary,
+      whatTheySell: storedResult.whatTheySell,
+      customerTypes: storedResult.customerTypes,
+      primaryMarkets: storedResult.primaryMarkets,
+      businessModel: storedResult.businessModel,
+      companySizeContext: storedResult.companySizeContext,
+      relevantTechnologies: storedResult.relevantTechnologies,
+      hiringSignals: storedResult.hiringSignals ?? [],
+      riskSignals: storedResult.riskSignals,
+      jobFocus: storedResult.jobFocus?.trim() || null,
+      jobFocusDetail: storedResult.jobFocusDetail?.trim() || null,
       identityAmbiguous: input.identityAmbiguous ?? false,
-      researchConfidence: input.result.confidence,
+      researchConfidence: storedResult.confidence,
       sourceCount: sources.length,
       researchSources: sources,
       promptVersion: input.provenance?.promptVersion ?? null,
@@ -932,11 +938,14 @@ export async function saveApplicationEmployerResearch(input: {
       researchDurationMs: input.usage?.researchDurationMs ?? null,
       searchStagesUsed: input.telemetry?.searchStagesUsed ?? null,
       researchStoppedReason: input.telemetry?.researchStoppedReason ?? null,
-      researchStageTimings: (appendAnchorHostTiming(
-        input.telemetry?.researchStageTimings ?? null,
-        input.anchorHost,
-        input.sisterHosts,
-      ) ?? undefined) as Prisma.InputJsonValue | undefined,
+      researchStageTimings: (() => {
+        const timings = appendAnchorHostTiming(
+          input.telemetry?.researchStageTimings ?? null,
+          input.anchorHost,
+          input.sisterHosts,
+        );
+        return timings == null ? undefined : paidCallResultJson(timings);
+      })(),
       researchedByUserId: input.researchedByUserId ?? null,
     },
   });

@@ -30,9 +30,10 @@ export type WorkspaceLiveView = {
   jobs: WorkspaceJobStatusView[];
   signature: string;
   /**
-   * True while a background job, employer research, posting parse, or Harper
-   * generation is still unfinished. Status polling continues only while an
-   * application job is queued or running.
+   * True while an application job is queued or running, employer research is
+   * queued or in progress, or the posting is still parsing. Harper's
+   * GENERATING flag is not a poll signal: a stuck flag must not refresh forever.
+   * Harper work that is actually running is an application job.
    */
   active: boolean;
 };
@@ -119,13 +120,28 @@ export async function getApplicationWorkspaceLive(input: {
     `posting:${posting}`,
     `harper:${session?.generationStatus ?? "none"}:${session?.updatedAt?.toISOString() ?? ""}`,
   ].join("||");
-  const active =
-    views.some((job) => job.status === "PENDING" || job.status === "IN_PROGRESS") ||
-    research.phase === "queued" ||
-    research.phase === "researching" ||
-    posting === "processing" ||
-    session?.generationStatus === "GENERATING";
+  const active = workspaceWorkRunning({
+    jobs: views,
+    researchPhase: research.phase,
+    posting,
+  });
   return { jobs: views, signature, active };
+}
+
+/** Real in-progress workspace work. Excludes a stuck Harper GENERATING flag. */
+export function workspaceWorkRunning(input: {
+  jobs: Array<{ status: string }>;
+  researchPhase: string;
+  posting: string;
+}): boolean {
+  return (
+    input.jobs.some(
+      (job) => job.status === "PENDING" || job.status === "IN_PROGRESS",
+    ) ||
+    input.researchPhase === "queued" ||
+    input.researchPhase === "researching" ||
+    input.posting === "processing"
+  );
 }
 
 /** Read specific jobs by id. Does not enqueue work or call a model. */

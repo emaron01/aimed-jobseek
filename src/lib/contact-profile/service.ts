@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import { matchHiringTeamRoleFromTitle } from "@/lib/application/contacts";
 import { enqueueApplicationJob } from "@/lib/application-jobs/service";
 import { commonGroundFromProfiles } from "@/lib/contact-profile/common-ground";
@@ -18,7 +19,7 @@ import { parseCandidateProfileSafe } from "@/lib/product-research/candidate-prof
 import { TenantError } from "@/lib/tenant/errors";
 
 function jsonValue(value: unknown): Prisma.InputJsonValue {
-  return value as Prisma.InputJsonValue;
+  return paidCallResultJson(value);
 }
 
 export function parseLinkedInExtracted(value: unknown): LinkedInExtracted | null {

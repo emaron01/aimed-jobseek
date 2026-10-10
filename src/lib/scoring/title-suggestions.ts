@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import {
   AiConfigError,
   AiProviderError,
@@ -62,7 +63,7 @@ function isRetryable(error: unknown): boolean {
 }
 
 function jsonValue(value: unknown): Prisma.InputJsonValue {
-  return value as Prisma.InputJsonValue;
+  return paidCallResultJson(value);
 }
 
 export function isUnmatchedTitleScore(score: {

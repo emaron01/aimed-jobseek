@@ -652,10 +652,8 @@ async function saveOutreachVersion(input: {
           emailLength: input.emailLength,
           groupKey,
           version,
-          contentJson: input.content as unknown as Prisma.InputJsonValue,
-          claimTraceJson: claimTrace(
-            input.content,
-          ) as unknown as Prisma.InputJsonValue,
+          contentJson: paidCallResultJson(input.content),
+          claimTraceJson: paidCallResultJson(claimTrace(input.content)),
           guidance: input.guidance,
           promptVersion: outreachPromptVersion(input.type),
           status: "DRAFT",
@@ -1451,7 +1449,7 @@ export async function saveOutreachMessageEdit(input: {
   await prisma.applicationAsset.update({
     where: { id: asset.id },
     data: {
-      contentJson: content as unknown as Prisma.InputJsonValue,
+      contentJson: paidCallResultJson(content),
     },
   });
   return { subject, body };

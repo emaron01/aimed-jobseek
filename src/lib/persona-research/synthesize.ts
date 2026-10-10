@@ -5,6 +5,7 @@
 import "server-only";
 
 import { Prisma } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import {
   getAiConfigPublicSummary,
   getPersonaAiConfig,
@@ -119,11 +120,11 @@ export async function researchAndSynthesizePersona(
       productEvidenceBundleId: productBundle.id,
       correlationId,
       status: "RESEARCHING",
-      selectedBuyerRoleJson:
-        input.buyerRole as unknown as Prisma.InputJsonValue,
+      selectedBuyerRoleJson: paidCallResultJson(input.buyerRole),
       suggestionKey: input.buyerRole.suggestionKey,
-      userContextJson: (input.userContext ??
-        null) as unknown as Prisma.InputJsonValue,
+      userContextJson: input.userContext
+        ? paidCallResultJson(input.userContext)
+        : Prisma.JsonNull,
       synthesisPromptVersion: PERSONA_SYNTHESIS_PROMPT_VERSION,
       createdByUserId: input.userId,
     },
@@ -172,11 +173,11 @@ export async function researchAndSynthesizePersona(
       productEvidenceBundleId: productBundle.id,
       webSearchQueriesUsed: progressive.webSearchQueriesUsed,
       sourceIdsJson: progressive.sourceIds as unknown as Prisma.InputJsonValue,
-      normalizedEvidenceJson: {
+      normalizedEvidenceJson: paidCallResultJson({
         productEvidence: relevantProduct,
         personaEvidence: progressive.excerpts,
         stoppedReason: progressive.stoppedReason,
-      } as unknown as Prisma.InputJsonValue,
+      }),
     },
   });
 
@@ -389,7 +390,7 @@ export async function synthesizePersonaFromEvidence(input: {
       where: { id: input.personaSetupRunId },
       data: {
         status: "NEEDS_REVIEW",
-        personaDraftJson: draft as unknown as Prisma.InputJsonValue,
+        personaDraftJson: paidCallResultJson(draft),
         aiProvider: providerSummary.provider,
         aiModel: providerSummary.model,
         completedAt: new Date(),

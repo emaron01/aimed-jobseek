@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import {
   generateApplicationSummaryShell,
   generateCheatSheetPersonSectionGuidance,
@@ -841,7 +842,7 @@ function parsedGuidance(value: unknown): ApplicationSummaryGuidance | null {
 }
 
 function jsonGuidance(value: ApplicationSummaryGuidance): Prisma.InputJsonValue {
-  return value as unknown as Prisma.InputJsonValue;
+  return paidCallResultJson(value);
 }
 
 async function personGuideModelInputs(input: {

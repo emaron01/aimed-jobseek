@@ -4,6 +4,7 @@
  */
 
 import type { Prisma } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import {
   computeApplicationEmployerFit,
 } from "@/lib/application/fit";
@@ -36,7 +37,7 @@ import { TenantError } from "@/lib/tenant/errors";
 import type { ResearchCompanyResult } from "@/lib/tenant/company-research-service";
 
 function jsonValue(value: unknown): Prisma.InputJsonValue {
-  return value as Prisma.InputJsonValue;
+  return paidCallResultJson(value);
 }
 
 function researchActuals(row: {

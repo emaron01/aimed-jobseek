@@ -13,6 +13,7 @@ import {
 import {
   fingerprintPaidCallInputs,
   findPaidCallReceipt,
+  paidCallResultJson,
   runPaidStructuredCall,
 } from "@/lib/ai/paid-call-gate";
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
@@ -2048,12 +2049,12 @@ export async function storeRoleExpertiseQuestions(input: {
         body: question.text,
         targetKey: question.targetKey,
         followUp: false,
-        questionContextJson: {
+        questionContextJson: paidCallResultJson({
           requirementInterpretation: null,
           hiringTeamRoleId: "",
           whoCaresNote: "",
           interviewTypeTag: question.interviewTypeTag,
-        } as Prisma.InputJsonValue,
+        }),
       },
     });
     if (!question.content.trim()) continue;
@@ -2066,7 +2067,7 @@ export async function storeRoleExpertiseQuestions(input: {
         status: "DRAFT",
         content: question.content,
         strengtheningNote: null,
-        groundingJson: question.grounding as Prisma.InputJsonValue,
+        groundingJson: paidCallResultJson(question.grounding),
         promptVersion: ROLE_EXPERTISE_PROMPT_VERSION,
       },
     });
@@ -2084,12 +2085,12 @@ export async function storeRoleExpertiseQuestions(input: {
         targetKey: question.targetKey,
         followUp: true,
         analysisJson: { replyToTurnId: turn.id } as Prisma.InputJsonValue,
-        questionContextJson: {
+        questionContextJson: paidCallResultJson({
           requirementInterpretation: null,
           hiringTeamRoleId: "",
           whoCaresNote: "",
           interviewTypeTag: question.interviewTypeTag,
-        } as Prisma.InputJsonValue,
+        }),
       },
     });
   }
@@ -2249,7 +2250,7 @@ export async function draftSupportedGapQuestions(input: {
         status: "DRAFT",
         content: question.content,
         strengtheningNote: null,
-        groundingJson: question.grounding as Prisma.InputJsonValue,
+        groundingJson: paidCallResultJson(question.grounding),
         promptVersion: ROLE_EXPERTISE_PROMPT_VERSION,
       },
     });

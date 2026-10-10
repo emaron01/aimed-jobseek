@@ -8,6 +8,7 @@ import {
   getAiConfigPublicSummary,
   isInterpretationAiConfigured,
 } from "@/lib/ai";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
 import {
   buildLegacyIcpCriteria,
@@ -280,25 +281,25 @@ export async function updateIcpCriterionManual(input: {
           ? undefined
           : input.data.targetValue === null
             ? PrismaRuntime.JsonNull
-            : (input.data.targetValue as Prisma.InputJsonValue),
+            : paidCallResultJson(input.data.targetValue),
       minValue:
         input.data.minValue === undefined
           ? undefined
           : input.data.minValue === null
             ? PrismaRuntime.JsonNull
-            : (input.data.minValue as Prisma.InputJsonValue),
+            : paidCallResultJson(input.data.minValue),
       maxValue:
         input.data.maxValue === undefined
           ? undefined
           : input.data.maxValue === null
             ? PrismaRuntime.JsonNull
-            : (input.data.maxValue as Prisma.InputJsonValue),
+            : paidCallResultJson(input.data.maxValue),
       allowedValues:
         input.data.allowedValues === undefined
           ? undefined
           : input.data.allowedValues === null
             ? PrismaRuntime.JsonNull
-            : (input.data.allowedValues as Prisma.InputJsonValue),
+            : paidCallResultJson(input.data.allowedValues),
       importance: input.data.importance,
       isRequired: input.data.isRequired,
       isDisqualifier: input.data.isDisqualifier,
@@ -393,10 +394,16 @@ function draftToCreateData(
     criterionType: d.criterionType,
     dataType: d.dataType,
     operator: d.operator,
-    targetValue: normalized.targetValue as Prisma.InputJsonValue,
-    minValue: d.minValue as Prisma.InputJsonValue,
-    maxValue: d.maxValue as Prisma.InputJsonValue,
-    allowedValues: normalized.allowedValues as Prisma.InputJsonValue,
+    targetValue:
+      normalized.targetValue == null
+        ? PrismaRuntime.JsonNull
+        : paidCallResultJson(normalized.targetValue),
+    minValue: d.minValue == null ? PrismaRuntime.JsonNull : paidCallResultJson(d.minValue),
+    maxValue: d.maxValue == null ? PrismaRuntime.JsonNull : paidCallResultJson(d.maxValue),
+    allowedValues:
+      normalized.allowedValues == null
+        ? PrismaRuntime.JsonNull
+        : paidCallResultJson(normalized.allowedValues),
     importance: d.importance,
     isRequired: d.isRequired,
     isDisqualifier: d.isDisqualifier,

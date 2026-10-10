@@ -5,6 +5,7 @@
 import "server-only";
 
 import { Prisma } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import {
   appendProductSourcesToBundle,
   type IngestSourceInput,
@@ -81,10 +82,10 @@ async function tagApprovedProductResynthesisRun(input: {
   await prisma.productSetupRun.update({
     where: { id: input.setupRunId },
     data: {
-      userContextJson: {
+      userContextJson: paidCallResultJson({
         [PRODUCT_RESYNTHESIS_USER_CONTEXT_FLAG]: true,
         priorApproval: input.prior,
-      } as unknown as Prisma.InputJsonValue,
+      }),
     },
   });
 }

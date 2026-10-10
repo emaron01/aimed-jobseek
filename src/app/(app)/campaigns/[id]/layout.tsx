@@ -22,6 +22,7 @@ export default async function ApplicationLayout({
       campaignId={access.campaignId}
       initialSignature={live.signature}
       initialJobs={live.jobs}
+      initialWorkRunning={live.active}
     >
       {children}
     </ApplicationWorkspaceChrome>

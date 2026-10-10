@@ -22,6 +22,7 @@ import { recordUsageEvent } from "@/lib/usage/events";
 import { TenantError } from "@/lib/tenant/getCurrentOrganization";
 import { parseStringArray } from "@/lib/research";
 import type { Prisma, ResearchStatus } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import {
   deterministicContactQualification,
   type DeterministicQualificationSkipReason,
@@ -48,7 +49,7 @@ export type PersonaAssessmentRecord = {
 };
 
 function jsonValue(value: unknown): Prisma.InputJsonValue {
-  return value as Prisma.InputJsonValue;
+  return paidCallResultJson(value);
 }
 
 function recommendedActionForBucket(

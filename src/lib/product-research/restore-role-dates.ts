@@ -1,3 +1,4 @@
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import type { CandidateProfile } from "@/lib/product-research/candidate-profile";
 import { fillMissingRoleDates } from "@/lib/product-research/role-dates";
 import { prisma } from "@/lib/prisma-client";
@@ -29,7 +30,7 @@ export async function persistExtractedExperienceDates(input: {
   if (restored.filled.length === 0) return input.profile;
   await prisma.product.update({
     where: { id: input.productId },
-    data: { profileJson: restored.profile },
+    data: { profileJson: paidCallResultJson(restored.profile) },
   });
   console.info(
     JSON.stringify({

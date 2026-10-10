@@ -5,6 +5,7 @@
 import "server-only";
 
 import { Prisma } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
 import type { PersonaAiDraft } from "@/lib/persona-research/contract";
@@ -103,12 +104,12 @@ export async function approvePersonaFromSetupRun(input: {
         (run.selectedBuyerRoleJson as { whyThisRoleMatters?: string } | null)
           ?.whyThisRoleMatters ?? null,
       suggestionKey: run.suggestionKey,
-      profileJson: draft as unknown as Prisma.InputJsonValue,
-      personaMessagingJson: {
+      profileJson: paidCallResultJson(draft),
+      personaMessagingJson: paidCallResultJson({
         positioning: draft.personaSpecificPositioning,
         proofPoints: draft.proofPointsToEmphasize,
         objections: draft.likelyObjections,
-      } as unknown as Prisma.InputJsonValue,
+      }),
       manuallyEditedFields: protectedPaths as unknown as Prisma.InputJsonValue,
       approvalStatus: "APPROVED",
       setupStatus: "APPROVED",

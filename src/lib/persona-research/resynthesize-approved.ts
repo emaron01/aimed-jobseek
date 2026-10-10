@@ -5,6 +5,7 @@
 import "server-only";
 
 import { Prisma } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import { planCriterionReinterpretation } from "@/lib/criteria/merge";
 import type { InterpretedCriterionDraft } from "@/lib/criteria/types";
 import { prisma } from "@/lib/prisma";
@@ -212,7 +213,7 @@ export async function startApprovedPersonaResynthesis(input: {
       personaEvidenceBundleId: approvedRun?.personaEvidenceBundleId ?? null,
       correlationId,
       status: "SYNTHESIZING",
-      selectedBuyerRoleJson: buyerRole as unknown as Prisma.InputJsonValue,
+      selectedBuyerRoleJson: paidCallResultJson(buyerRole),
       suggestionKey: persona.suggestionKey,
       userContextJson: {
         [PERSONA_RESYNTHESIS_USER_CONTEXT_FLAG]: true,
@@ -390,12 +391,12 @@ export async function applyApprovedPersonaResynthesis(input: {
           input.fields.messagingNotes?.trim() ||
           draft.messagingNotes.join("\n") ||
           null,
-        profileJson: draft as unknown as Prisma.InputJsonValue,
-        personaMessagingJson: {
+        profileJson: paidCallResultJson(draft),
+        personaMessagingJson: paidCallResultJson({
           positioning: draft.personaSpecificPositioning,
           proofPoints: draft.proofPointsToEmphasize,
           objections: draft.likelyObjections,
-        } as unknown as Prisma.InputJsonValue,
+        }),
         approvedPersonaSetupRunId: run.id,
         approvedEvidenceBundleId: run.productEvidenceBundleId,
         setupStatus: "APPROVED",

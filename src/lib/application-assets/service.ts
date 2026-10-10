@@ -1,4 +1,5 @@
 import { Prisma, type ApplicationAssetType } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import {
   mentionsInternalSystemState,
   validateRepetitionAndMetaLanguage,
@@ -978,11 +979,10 @@ async function saveVersion(input: {
           personaId: input.personaId,
           groupKey: input.type,
           version,
-          contentJson: input.content as unknown as Prisma.InputJsonValue,
-          claimTraceJson: claimTrace(
-            input.content,
-            input.context,
-          ) as unknown as Prisma.InputJsonValue,
+          contentJson: paidCallResultJson(input.content),
+          claimTraceJson: paidCallResultJson(
+            claimTrace(input.content, input.context),
+          ),
           guidance: input.guidance,
           promptVersion: promptVersion(input.type),
           status: "DRAFT",
@@ -1382,11 +1382,10 @@ export async function resolveApplicationAssetFlag(input: {
   await prisma.applicationAsset.update({
     where: { id: existing.id },
     data: {
-      contentJson: content as unknown as Prisma.InputJsonValue,
-      claimTraceJson: claimTrace(
-        content,
-        context as ReadyApplicationGenerationContext,
-      ) as unknown as Prisma.InputJsonValue,
+      contentJson: paidCallResultJson(content),
+      claimTraceJson: paidCallResultJson(
+        claimTrace(content, context as ReadyApplicationGenerationContext),
+      ),
     },
   });
   return { ok: true, assetId: existing.id, version: existing.version };

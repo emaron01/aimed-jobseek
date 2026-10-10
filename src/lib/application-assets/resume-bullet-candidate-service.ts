@@ -1,10 +1,9 @@
-import { Prisma } from "@prisma/client";
 import {
   getConsultationReplyAiProvider,
   isConsultationReplyAiConfigured,
 } from "@/lib/ai";
 import { structuredOutputRequest } from "@/lib/ai/structured-output-schemas";
-import { runPaidStructuredCall } from "@/lib/ai/paid-call-gate";
+import { paidCallResultJson, runPaidStructuredCall } from "@/lib/ai/paid-call-gate";
 import { RESUME_WRITER_TEMPERATURE } from "@/lib/application-assets/ai";
 import {
   resumeBulletCandidatesSchema,
@@ -389,7 +388,7 @@ async function keepPickedBullets(packet: BulletCandidatePacket, json: unknown): 
   if (!changed) return;
   await prisma.product.update({
     where: { id: packet.productId },
-    data: { profileJson: profileJson as Prisma.InputJsonValue },
+    data: { profileJson: paidCallResultJson(profileJson) },
   });
 }
 

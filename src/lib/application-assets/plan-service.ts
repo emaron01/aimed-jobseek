@@ -1,5 +1,5 @@
 import type { ApplicationPresentationPlanType } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import { writePresentationPlanWithModel } from "@/lib/application-assets/plan-ai";
 import {
   COVER_LETTER_PRESENTATION_PLAN_PROMPT_VERSION,
@@ -134,7 +134,7 @@ export async function writePresentationPlan(input: {
       campaignId: input.campaignId,
       type: input.type,
       status: "DRAFT",
-      planJson: written.data as unknown as Prisma.InputJsonValue,
+      planJson: paidCallResultJson(written.data),
       adjustmentNote: input.adjustmentNote ?? null,
       promptVersion:
         input.type === "RESUME"
@@ -143,7 +143,7 @@ export async function writePresentationPlan(input: {
     },
     update: {
       status: "DRAFT",
-      planJson: written.data as unknown as Prisma.InputJsonValue,
+      planJson: paidCallResultJson(written.data),
       adjustmentNote: input.adjustmentNote ?? null,
       promptVersion:
         input.type === "RESUME"
@@ -317,7 +317,7 @@ export async function updateEarlierExperienceHeading(input: {
   };
   await prisma.applicationPresentationPlan.update({
     where: { id: plan.id },
-    data: { planJson: next as unknown as Prisma.InputJsonValue },
+    data: { planJson: paidCallResultJson(next) },
   });
   return { ok: true, heading: trimmed };
 }

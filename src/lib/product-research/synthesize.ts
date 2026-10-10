@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Prisma } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import {
   getAiConfigPublicSummary,
   getProductAiConfig,
@@ -198,8 +199,7 @@ export async function synthesizeProductSetup(input: {
       where: { id: run.id },
       data: {
         status: "NEEDS_REVIEW",
-        productDraftJson:
-          result.candidateProfile as unknown as Prisma.InputJsonValue,
+        productDraftJson: paidCallResultJson(result.candidateProfile),
         messagingDraftJson: Prisma.DbNull,
         suggestedPersonasJson: [] as unknown as Prisma.InputJsonValue,
         personaDraftsJson: Prisma.DbNull,

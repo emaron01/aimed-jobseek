@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Prisma } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import { prisma } from "@/lib/prisma";
 import {
   applicationAssetConfig,
@@ -101,7 +101,7 @@ export async function saveSeekerStatedBackground(input: {
   };
   await prisma.product.update({
     where: { id: product.id },
-    data: { profileJson: next as Prisma.InputJsonValue },
+    data: { profileJson: paidCallResultJson(next) },
   });
   await prisma.applicationAsset.updateMany({
     where: {

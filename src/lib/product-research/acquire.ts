@@ -1,6 +1,6 @@
 import "server-only";
 
-import { Prisma } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import { prisma } from "@/lib/prisma";
 import { TenantError } from "@/lib/tenant/errors";
 import { recordUsageEvent } from "@/lib/usage/events";
@@ -437,10 +437,10 @@ export async function acquireProductEvidence(input: {
       correlationId,
       status: errors.length > 0 && capped.length > 0 ? "PARTIAL" : "ACQUIRING",
       createdByUserId: input.userId,
-      normalizedEvidenceJson: {
+      normalizedEvidenceJson: paidCallResultJson({
         excerpts: capped,
-      } as unknown as Prisma.InputJsonValue,
-      sourceIdsJson: cappedIds as unknown as Prisma.InputJsonValue,
+      }),
+      sourceIdsJson: paidCallResultJson(cappedIds),
       urlResearchPerformed,
       webSearchQueriesUsed: 0,
     },
@@ -727,10 +727,10 @@ export async function appendProductSourcesToBundle(input: {
       correlationId,
       status: errors.length > 0 && capped.length > 0 ? "PARTIAL" : "ACQUIRING",
       createdByUserId: input.userId,
-      normalizedEvidenceJson: {
+      normalizedEvidenceJson: paidCallResultJson({
         excerpts: capped,
-      } as unknown as Prisma.InputJsonValue,
-      sourceIdsJson: cappedIds as unknown as Prisma.InputJsonValue,
+      }),
+      sourceIdsJson: paidCallResultJson(cappedIds),
       urlResearchPerformed: parentBundle?.urlResearchPerformed ?? false,
       webSearchQueriesUsed: 0,
     },

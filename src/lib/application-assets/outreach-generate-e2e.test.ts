@@ -156,8 +156,8 @@ describe("outreach generate end to end", () => {
 
   it("polls only while a job is queued or running and those reads do not enqueue or pay", () => {
     const live = source("src/components/ApplicationWorkspaceLive.tsx");
-    expect(live).toContain("activeWorkspaceJobs(latest.jobs).length > 0");
-    expect(live).not.toContain("return latest.active");
+    expect(live).toContain("return latest.active");
+    expect(live).toContain("initialWorkRunning");
     const tracker = source("src/components/ApplicationSidebarTracker.tsx");
     expect(tracker).toContain("step.hasActiveJob");
     expect(tracker).toContain("activeWorkspaceJobs(liveJobs)");

@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { paidCallResultJson } from "@/lib/ai/paid-call-gate";
 import {
   employerResearchModelInput,
   loadApplicationEmployerResearch,
@@ -369,10 +370,10 @@ async function saveAssessments(
         strategy: assessment.strategy,
         explanation: assessment.explanation,
         strategyText: assessment.strategyText,
-        verificationJson: assessment.verification as Prisma.InputJsonValue,
-        experienceCalculationJson:
-          (assessment.experienceCalculation as Prisma.InputJsonValue | null) ??
-          undefined,
+        verificationJson: paidCallResultJson(assessment.verification),
+        experienceCalculationJson: assessment.experienceCalculation
+          ? paidCallResultJson(assessment.experienceCalculation)
+          : undefined,
       },
       update: {
         kind: assessment.kind,
@@ -382,10 +383,10 @@ async function saveAssessments(
         strategy: assessment.strategy,
         explanation: assessment.explanation,
         strategyText: assessment.strategyText,
-        verificationJson: assessment.verification as Prisma.InputJsonValue,
-        experienceCalculationJson:
-          (assessment.experienceCalculation as Prisma.InputJsonValue | null) ??
-          Prisma.JsonNull,
+        verificationJson: paidCallResultJson(assessment.verification),
+        experienceCalculationJson: assessment.experienceCalculation
+          ? paidCallResultJson(assessment.experienceCalculation)
+          : Prisma.JsonNull,
       },
     });
   }
@@ -484,8 +485,9 @@ async function addTurn(input: {
       skipped: input.skipped ?? false,
       seekerAuthored: input.seekerAuthored ?? false,
       analysisJson: input.analysisJson,
-      questionContextJson:
-        (input.questionContext as Prisma.InputJsonValue | undefined) ?? undefined,
+      questionContextJson: input.questionContext
+        ? paidCallResultJson(input.questionContext)
+        : undefined,
       intent: input.intent ?? null,
     },
   });
@@ -679,11 +681,11 @@ function interviewAnswerGroundingJson(
     .filter(Boolean)
     .slice(0, 5);
   if (!grounding && points.length === 0) return [];
-  if (!grounding) return { keyPoints: points } as Prisma.InputJsonValue;
-  return {
+  if (!grounding) return paidCallResultJson({ keyPoints: points });
+  return paidCallResultJson({
     ...grounding,
     ...(points.length > 0 ? { keyPoints: points } : {}),
-  } as Prisma.InputJsonValue;
+  });
 }
 
 async function libraryQuestionForPolish(input: {
@@ -1862,7 +1864,7 @@ async function planAndStoreRound(input: {
       where: { id: input.sessionId },
       data: {
         coachNote: writing.data.commentary.trim() || null,
-        briefingJson: briefing as Prisma.InputJsonValue,
+        briefingJson: paidCallResultJson(briefing),
         promptVersion: CONSULTATION_PROMPT_VERSION,
         generationStatus: "READY",
         generationError: null,
@@ -3197,11 +3199,10 @@ async function processAnswerGeneration(input: {
           turnId: input.turnId,
           kind: proposal.kind,
           text: proposal.text,
-          storyJson:
-            (proposal.story as Prisma.InputJsonValue | null) ?? undefined,
-          competencyLinks:
-            (proposal.story?.competencyLinks as Prisma.InputJsonValue | null) ??
-            undefined,
+          storyJson: proposal.story ? paidCallResultJson(proposal.story) : undefined,
+          competencyLinks: proposal.story?.competencyLinks
+            ? paidCallResultJson(proposal.story.competencyLinks)
+            : undefined,
           profileItemId: proposal.profileItemId,
         },
       }),
@@ -3865,11 +3866,11 @@ export async function processConsultationReply(input: {
   if (!session) {
     throw new TenantError(consultationConversationCopy.notAcceptingReplies);
   }
+  try {
   await ensureConsultationAcceptsSeekerInput(session);
   if (session.status === "PAUSED" || session.status === "DONE") {
     session = { ...session, status: "IN_PROGRESS" };
   }
-  try {
   let { turns, view } = await loadSessionQaView(session.id);
   if (input.turnId) {
     const targeted = turns.find((turn) => turn.id === input.turnId);
@@ -4102,6 +4103,11 @@ export async function processConsultationReply(input: {
     wroteResult: processed.wroteResult,
     followUpAdded,
   });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Consultation reply failed.";
+    await failGeneration(session.id, message);
+    throw error;
   } finally {
     try {
       await recoverBestPracticeFillIfEmpty({
@@ -4116,6 +4122,16 @@ export async function processConsultationReply(input: {
           message: error instanceof Error ? error.message : "unknown",
         }),
       );
+    }
+    const current = await prisma.consultationSession.findUnique({
+      where: { id: session.id },
+      select: { generationStatus: true },
+    });
+    if (current?.generationStatus === "GENERATING") {
+      await prisma.consultationSession.update({
+        where: { id: session.id },
+        data: { generationStatus: "READY", generationError: null },
+      });
     }
   }
 }
@@ -4296,12 +4312,12 @@ async function declineConsultationFollowUp(input: {
     prisma.consultationTurn.update({
       where: { id: priorAnswer.id },
       data: {
-        analysisJson: {
+        analysisJson: paidCallResultJson({
           ...analyzed.analysis,
           followUpDeclined: true,
           gapDecision: confirmedGap ? "no_evidence" : "evidence",
           strengtheningNote: polished.data.strengtheningNote,
-        } as Prisma.InputJsonValue,
+        }),
       },
     }),
     prisma.consultationSession.update({
@@ -4662,11 +4678,11 @@ async function tailorGuideAnswerStatement(input: {
     normalized.answerPartsGrounding,
     normalized.keyPoints,
   );
-  const groundingJson = (
+  const groundingJson = paidCallResultJson(
     groundingSeekerEdited(input.statement.groundingJson)
       ? withSeekerEditedGrounding(baseGrounding, normalized.keyPoints)
-      : baseGrounding
-  ) as Prisma.InputJsonValue;
+      : baseGrounding,
+  );
   const note = polished.data.strengtheningNote?.trim() || null;
   const draft = {
     status: "DRAFT" as const,
@@ -4891,20 +4907,22 @@ export async function regenerateConsultationStatement(input: {
           statement.kind === "INTERVIEW_ANSWER"
             ? polished.data.strengtheningNote?.trim() || null
             : null,
-        groundingJson: (statement.kind === "INTERVIEW_ANSWER"
-          ? seekerOwned
-            ? withSeekerEditedGrounding(
-                interviewAnswerGroundingJson(
+        groundingJson: paidCallResultJson(
+          statement.kind === "INTERVIEW_ANSWER"
+            ? seekerOwned
+              ? withSeekerEditedGrounding(
+                  interviewAnswerGroundingJson(
+                    polished.data.answerPartsGrounding,
+                    polished.data.keyPoints,
+                  ),
+                  polished.data.keyPoints,
+                )
+              : interviewAnswerGroundingJson(
                   polished.data.answerPartsGrounding,
                   polished.data.keyPoints,
-                ),
-                polished.data.keyPoints,
-              )
-            : interviewAnswerGroundingJson(
-                polished.data.answerPartsGrounding,
-                polished.data.keyPoints,
-              )
-          : []) as Prisma.InputJsonValue,
+                )
+            : [],
+        ),
         promptVersion: CONSULTATION_PROMPT_VERSION,
         generation: { increment: 1 },
         approvedAt: null,
@@ -5106,8 +5124,9 @@ export async function approveConsultationStatement(input: {
             task: analyzed?.story.task ?? "",
             action: analyzed?.story.action ?? "",
             result: analyzed?.story.result ?? content,
-            competencyLinks:
-              (proposal?.competencyLinks as Prisma.InputJsonValue | null) ?? [],
+            competencyLinks: proposal?.competencyLinks
+              ? paidCallResultJson(proposal.competencyLinks)
+              : [],
             consultationTurnId: statement.turnId,
             seekerAuthored: true,
             verbatimAnswer: analyzed?.answerContext ?? statement.turn.body,
@@ -5177,10 +5196,12 @@ export async function saveEditedConsultationStatement(input: {
         content,
         ...(seekerOwned
           ? {
-              groundingJson: withSeekerEditedGrounding(
-                statement.groundingJson,
-                input.keyPoints == null ? null : nextPoints,
-              ) as Prisma.InputJsonValue,
+              groundingJson: paidCallResultJson(
+                withSeekerEditedGrounding(
+                  statement.groundingJson,
+                  input.keyPoints == null ? null : nextPoints,
+                ),
+              ),
             }
           : {}),
       },
@@ -5338,7 +5359,7 @@ export async function confirmConsultationProposal(input: {
     });
     await prisma.product.update({
       where: { id: product.id },
-      data: { profileJson: next },
+      data: { profileJson: paidCallResultJson(next) },
     });
   } else {
     const situation = input.situation?.trim() || "";
